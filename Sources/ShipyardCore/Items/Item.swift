@@ -136,8 +136,9 @@ public struct RateLimit: Equatable, Sendable {
     public var remaining: Int
     public var used: Int?
     public var resetAt: Date
-    /// What the request that reported it cost, when GitHub said (GraphQL's
-    /// `rateLimit.cost`).
+    /// What the refresh that reported it cost on this limit, when known:
+    /// GraphQL's `rateLimit.cost`; for REST, the requests that counted (a
+    /// `304` doesn't). The rate budget averages it to stretch the interval.
     public var cost: Int?
 
     public init(limit: Int, remaining: Int, used: Int? = nil, resetAt: Date, cost: Int? = nil) {

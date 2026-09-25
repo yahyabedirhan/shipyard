@@ -26,9 +26,9 @@ public enum GitHubError: Error, Equatable, Sendable {
     case malformed
     /// GraphQL answered with errors and no data.
     case graphQL(String)
-    /// An hourly limit ran out; requests work again at `resetAt`. GraphQL
-    /// says so with a 200, REST with a 403 or 429.
-    case rateLimited(resetAt: Date)
+    /// `api`'s hourly limit ran out; requests work again at `resetAt`, from
+    /// the response. GraphQL says so with a 200, REST with a 403 or 429.
+    case rateLimited(resetAt: Date, api: RateAPI = .graphql)
     /// A secondary limit (too many requests too fast); wait `retryAfter` seconds.
     case secondaryLimit(retryAfter: TimeInterval)
 }
@@ -76,10 +76,10 @@ public struct GitHubClient: Sendable {
         do {
             parsed = try ProjectQuery.parse(data, repositories: repositories)
         } catch GitHubError.graphQL(let message) {
-            if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt) }
+            if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
             throw GitHubError.graphQL(message)
         }
-        if parsed.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt) }
+        if parsed.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
 
@@ -136,17 +136,32 @@ public struct GitHubClient: Sendable {
         case 200..<300: return (data, response)
         case 401: throw GitHubError.unauthorized
         case 403, 429:
-            if let retryAfter = response.value(forHTTPHeaderField: "retry-after").flatMap(TimeInterval.init) {
+            // GitHub's guidance: obey `retry-after`; else, with nothing
+            // remaining, wait for `x-ratelimit-reset`; else wait at least a
+            // minute. A 403 that says none of this is a permission error.
+            if let retryAfter = response.value(forHTTPHeaderField: "retry-after")
+                .flatMap({ TimeInterval($0.trimmingCharacters(in: .whitespaces)) }) {
                 throw GitHubError.secondaryLimit(retryAfter: retryAfter)
             }
             if let limit = RateLimit(headers: response), limit.remaining == 0 {
-                throw GitHubError.rateLimited(resetAt: limit.resetAt)
+                throw GitHubError.rateLimited(resetAt: limit.resetAt, api: Self.api(of: response, for: request))
             }
-            // GitHub's guidance: with neither header, wait at least a minute.
-            if response.statusCode == 429 { throw GitHubError.secondaryLimit(retryAfter: 60) }
+            let message = String(decoding: data, as: UTF8.self).lowercased()
+            if response.statusCode == 429 || message.contains("secondary rate limit") {
+                throw GitHubError.secondaryLimit(retryAfter: RateBudget.defaultRetryAfter)
+            }
             throw GitHubError.http(response.statusCode)
         default: throw GitHubError.http(response.statusCode)
         }
+    }
+
+    /// Which limit a response counts against: its `x-ratelimit-resource`
+    /// (`graphql`, or `core` and the other REST resources), else the URL.
+    static func api(of response: HTTPURLResponse, for request: URLRequest) -> RateAPI {
+        if let resource = response.value(forHTTPHeaderField: "x-ratelimit-resource")?.lowercased() {
+            return resource == "graphql" ? .graphql : .rest
+        }
+        return request.url?.path == graphQLURL.path ? .graphql : .rest
     }
 }
 

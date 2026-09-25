@@ -6,7 +6,8 @@ import Foundation
 /// It signs in (a stored or `gh` token, else the device flow), signs out on
 /// any 401, follows the configuration between `needsProjects` and `ready`,
 /// and in `ready` runs the refresh pipeline: fetch every project's items in
-/// one GraphQL request and publish the menu model.
+/// one GraphQL request, publish the menu model, and ask the rate budget when
+/// to run next.
 @MainActor
 public final class Shipyard {
     /// What signing out left behind.
@@ -38,6 +39,11 @@ public final class Shipyard {
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
     public var isRefreshing: Bool { gate.isRunning }
+    /// What the rate budget knows: limits, recent costs, a pause.
+    public private(set) var budget = RateBudget()
+    /// Whether ⌘R may refresh now: false only while the rate budget pauses
+    /// refreshing (the menu model says why).
+    public var canRefreshNow: Bool { budget.canRefresh(at: clock.now) }
 
     public let configStore: ConfigStore
     private let tokenStore: any TokenStore
@@ -211,6 +217,7 @@ public final class Shipyard {
         snapshot = nil
         fetchError = nil
         menu = .empty
+        budget = RateBudget()
         timer.disarm()
         apply(.signedOut)
     }
@@ -243,13 +250,20 @@ public final class Shipyard {
     /// Does nothing outside `ready`. One refresh runs at a time: a call while
     /// one runs returns at once and the running one goes again when it's done
     /// (several calls meanwhile make one more run). Afterwards the timer is
-    /// armed for the next one.
+    /// armed for the next one, as the rate budget says. While the budget
+    /// pauses refreshing (a limit ran out, or a secondary limit), nothing is
+    /// sent: the timer stays armed for the end of the pause.
     public func refresh() async {
-        guard phase.canRefresh, gate.begin() else { return }
+        guard phase.canRefresh else { return }
+        guard canRefreshNow else {
+            if !gate.isRunning { armTimer() }
+            return
+        }
+        guard gate.begin() else { return }
         while true {
             await performRefresh()
             guard gate.finish() else { break }
-            guard phase.canRefresh, gate.begin() else { break }
+            guard phase.canRefresh, canRefreshNow, gate.begin() else { break }
         }
         armTimer()
     }
@@ -264,7 +278,9 @@ public final class Shipyard {
             guard current == session else { return }
             self.snapshot = snapshot
             fetchError = nil
+            budget.record(snapshot.rateLimits, at: clock.now)
             menu = MenuModel.build(snapshot: snapshot, configuration: configuration, now: clock.now)
+            publishRateStatus()
         } catch GitHubError.unauthorized {
             // `request` has signed out already.
         } catch is CancellationError {
@@ -273,19 +289,40 @@ public final class Shipyard {
             // Keep the rows and when they were fetched; say why they're old.
             let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
             fetchError = failure
+            budget.record(failure, at: clock.now)
             menu.fetchError = failure
+            publishRateStatus()
         }
     }
 
-    /// Arms the timer for the configured interval while refreshes may run,
-    /// and stops it otherwise. (The rate budget will stretch the interval.)
+    /// When the next refresh runs, from the rate budget and the configuration.
+    private func nextDelay() -> RefreshDelay {
+        let configuration = configStore.lastValid
+        return budget.nextDelay(
+            configured: TimeInterval(configuration.refreshIntervalSeconds),
+            sharePercent: configuration.rateLimit.maxSharePercent,
+            at: clock.now
+        )
+    }
+
+    /// Puts the next delay and the rate-limit indicator in the menu model.
+    @discardableResult
+    private func publishRateStatus() -> RefreshDelay {
+        let delay = nextDelay()
+        menu.refreshDelay = delay
+        menu.rateIndicator = budget.indicator(show: configStore.lastValid.rateLimit.show, at: clock.now)
+        return delay
+    }
+
+    /// Arms the timer with the rate budget's delay while refreshes may run,
+    /// and stops it otherwise.
     private func armTimer() {
         guard phase.canRefresh else {
             timer.disarm()
             return
         }
-        let interval = TimeInterval(configStore.lastValid.refreshIntervalSeconds)
-        timer.arm(after: interval) { [weak self] in
+        let delay = publishRateStatus()
+        timer.arm(after: delay.seconds(from: clock.now)) { [weak self] in
             await self?.refresh()
         }
     }

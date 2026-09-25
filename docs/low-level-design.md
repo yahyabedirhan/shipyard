@@ -101,7 +101,7 @@ Relationships:
 Shipyard -> ConfigStore            reads current Configuration, is told when it changes
 Shipyard -> Auth                   asks for a token; drives device flow
 Shipyard -> GitHubClient           fetch(projects) -> Snapshot (with rate limits)
-Shipyard -> RateBudget             record(limits, cost); nextDelay(configured) -> Delay | pausedUntil
+Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
 Shipyard -> EventDetector          diff(known, snapshot) -> [Event]
 Shipyard -> NotificationRules      should(event, project config) -> Bool
@@ -143,8 +143,9 @@ configError: ConfigError?
 snapshot: Snapshot?                (last good)
 fetchError: GitHubError?           (last refresh's failure, if any)
 menu: MenuModel                    (what the panel draws; a failed refresh keeps its rows and sets fetchError)
+budget: RateBudget                 (limits, recent costs, pause; reset on sign-out)
 gate: RefreshGate                  (one refresh at a time, queues one more)
-timer: RefreshTimer                (port; armed after every refresh, disarmed outside ready)
+timer: RefreshTimer                (port; armed with the budget's delay after every refresh, disarmed outside ready)
 ```
 
 The phase is a small state machine, declared in `Lifecycle.swift` as `Phase.after(LifecycleEvent)` so its transitions are tested on their own:
@@ -162,7 +163,8 @@ Operations:
 | Operation | Does | Rejects / edge |
 |---|---|---|
 | `start()` | load config; resolve token → phase; in `ready`, the first refresh | — |
-| `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run) |
+| `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
+| `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing; the store keeps the error |
 | `open(row)` / `markSeen(item)` | opens the URL through the `URLOpening` port (or not), `attention.markSeen` | — |
 | `markAllSeen(project?)` | marks every open item seen | — |
@@ -265,7 +267,7 @@ State: token, `HTTPTransport` (`URLSessionTransport` in the app; tests stub resp
 |---|---|
 | `viewer() -> Viewer` (login, id) | 401 → `.unauthorized` |
 | `fetch(projects: [ProjectSettings], at:) -> Snapshot` | one GraphQL call for PRs and issues (all repositories as aliases), plus one REST call per repository for runs when runs are on; partial errors land per repository in the snapshot. The GraphQL query also asks for `rateLimit { limit remaining resetAt cost }`; REST reads the `x-ratelimit-*` headers and sends `If-None-Match` so unchanged runs come back as 304, which GitHub doesn't count against the limit |
-| rate-limit errors | `.rateLimited(resetAt)` from `x-ratelimit-reset` (403/429 with `x-ratelimit-remaining: 0`, or GraphQL's 200 with a `RATE_LIMITED` error); `.secondaryLimit(retryAfter)` from `retry-after`, else 60 s for a bare 429. Every response's `x-ratelimit-*` headers are read into a `RateLimit`; the snapshot carries GraphQL's (headers first, `cost` from the body). GraphQL's exhausted case is a 200 with an error, so the check reads headers, not only the status code. REST calls for runs go one after another, never in parallel (GitHub's guidance against secondary limits) |
+| rate-limit errors | `.rateLimited(resetAt, api)` from `x-ratelimit-reset` (403/429 with `x-ratelimit-remaining: 0`, or GraphQL's 200 with a `RATE_LIMITED` error or with `x-ratelimit-remaining: 0` and an error); `api` comes from `x-ratelimit-resource` (`graphql`, else REST), or the URL without it. `.secondaryLimit(retryAfter)` from `retry-after` (it wins over the reset time), else 60 s for a bare 429 or a 403 whose message says "secondary rate limit"; any other 403 is `.http(403)`. Every response's `x-ratelimit-*` headers are read into a `RateLimit`; the snapshot carries GraphQL's (headers first, `cost` from the body). GraphQL's exhausted case is a 200 with an error, so the check reads headers, not only the status code. REST calls for runs go one after another, never in parallel (GitHub's guidance against secondary limits) |
 | `recentRepositories() -> [RepoSummary]` | for the picker: the viewer's repositories by `pushedAt` plus those they contributed to recently |
 
 The query text lives next to its parser in `GitHub/ProjectQuery.swift` (build + parse, one owner). Each repository is asked for once (aliases `repo0`, `repo1`… with `$owner<i>`/`$name<i>` variables), even when several projects list it, and the query also asks for `viewer { login }` (to tell `me` and the viewer's review requests apart) and `rateLimit`. An alias that comes back `null` with a `NOT_FOUND` (missing, or no access) or `FORBIDDEN` error becomes that repository's error in the snapshot; the others still parse. Per repository alias it asks for: open PRs (first 50), PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally), the same for issues when shown, and per PR `isDraft`, `author { login, __typename }`, `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, `reviewRequests` (to find the viewer), and the head commit's `statusCheckRollup.state`.
@@ -290,7 +292,7 @@ Snapshot
   fetchedAt
   items: [ProjectName: [Item]]
   errors: [Repository: RepositoryError]      (notFound | forbidden | other, GitHub's message)
-  rateLimits: { graphql: RateLimit?, rest: RateLimit? }   (limit, remaining, used, resetAt, cost of this refresh)
+  rateLimits: { graphql: RateLimit?, rest: RateLimit? }   (limit, remaining, used, resetAt, cost of this refresh: GraphQL's `rateLimit.cost`; REST's counted (non-304) requests)
   viewerLogin
 ```
 
@@ -325,7 +327,7 @@ Wraps `UNUserNotificationCenter`: asks permission on the first notification (not
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot, config, now) -> MenuModel` (app state joins it with attention): sections per project in configuration order, items filtered (kind shown, closed window counted back from `now` with 0 hiding closed items, `hide-authors`, drafts), sorted (open by `updatedAt` desc, then closed by `closedAt` desc), each row with its number, title, author, URL, semantic state (open, draft, merged, closed; the app's `Palette` colours it), check dot (open and draft PRs only), `since` for its age (opened, or closed), and later its attention flag; an error row per repository that failed; `lastUpdated` and `fetchError` for the banner; plus, with attention, the menu bar label (`total`, `per-kind`, `none`). All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(snapshot, config, now) -> MenuModel` (app state joins it with attention): sections per project in configuration order, items filtered (kind shown, closed window counted back from `now` with 0 hiding closed items, `hide-authors`, drafts), sorted (open by `updatedAt` desc, then closed by `closedAt` desc), each row with its number, title, author, URL, semantic state (open, draft, merged, closed; the app's `Palette` colours it), check dot (open and draft PRs only), `since` for its age (opened, or closed), and later its attention flag; an error row per repository that failed; `lastUpdated` and `fetchError` for the banner; `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, with attention, the menu bar label (`total`, `per-kind`, `none`). All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
 ### UI — `ShipyardApp/UI/`
 
@@ -348,16 +350,17 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 Pure value, so the arithmetic is tested without a network. It's the answer to "can we afford the configured interval?".
 
-State: last `RateLimit` per API, a moving average of what one refresh costs per API, `pausedUntil`.
+State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the last 5 refreshes per API (averaged), and a `RatePause` (until, reason: `exhausted(api)` or `secondaryLimit`). Every question takes `now`, so it stays pure.
 
 | Operation | Returns |
 |---|---|
-| `record(snapshot.rateLimits)` / `record(error)` | updates quotas, cost average; a rate-limit error sets `pausedUntil` = reset time (or now + `retry-after`) |
-| `nextDelay(configured, share) -> Delay` | `paused(until)` if paused or any API is at 0; `backedOff(600 s)` if any API is below 20%; else `max(configured, 3600 × cost ÷ (limit × share))` per API, reported as `stretched` when it beat `configured` |
-| `canRefreshNow() -> Bool` | false only while paused (⌘R uses this) |
-| `indicator(show) -> Indicator?` | what the footer draws: `GraphQL 4,850 / 5,000 · REST 4,960 / 5,000 · resets 16:42`, amber below 25% (ghbar's threshold), red at 0; `nil` for `never`, or for `when-low` above 25% |
+| `record(snapshot.rateLimits, at:)` | updates each API's limit and adds its `cost` to the average; an API the refresh didn't use (no limit reported, e.g. REST while runs are off) adds 0 once it has been measured; a limit reported at 0 with a future reset pauses until then |
+| `record(error, at:)` | `.rateLimited(resetAt, api)` marks that API at 0 and pauses until `resetAt`; `.secondaryLimit(retryAfter)` pauses for `retryAfter` (60 s when it's 0 or less); the later pause wins; other errors change nothing |
+| `nextDelay(configured, sharePercent, at:) -> RefreshDelay` | `paused(until, reason)` while paused; `backedOff(max(600 s, stretched), api)` if any API whose window hasn't reset has under 20% left; else `max(configured, 3600 × cost ÷ (limit × share))` over the APIs, reported as `stretched(seconds, api, cost)` when it beat `configured`, else `configured` |
+| `canRefresh(at:) -> Bool` | false only while paused (⌘R uses this) |
+| `indicator(show, at:) -> RateIndicator?` | what the footer draws: per API remaining / limit, reset time and level (`normal`, `low` under 25% (ghbar's threshold), `exhausted` at 0; a window that has reset counts as normal), and the worst level for the colour; `nil` for `never`, for `when-low` while all are normal, or before any limit is known |
 
-After every refresh `Shipyard` asks `nextDelay` and arms the refresh timer with the answer (until the budget exists, the configured interval), so a busy hour slows shipyard down on its own instead of running the limit dry.
+After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it (`paused` arms for the time left until the pause ends), so a busy hour slows shipyard down on its own instead of running the limit dry. Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
@@ -436,14 +439,15 @@ Shipyard is a macOS app and only ships for macOS. The package has two targets so
 ```text
 refresh()
   guard phase == ready else return
+  guard budget.canRefresh(now) else { timer.arm(until pause ends); return }   // ⌘R, panel, wake: nothing sent while paused
   guard gate.begin() else return                      // queued; runs again after this one
   config = configStore.lastValid
   do
     snapshot = await request { github.fetch(projects: config.projects.map(config.settings), at: clock.now) }   // every call goes through request (401 → signedOut)
   catch unauthorized
     phase = signedOut; gate.finish(); return
-  catch rateLimited(resetAt) / secondaryLimit(retryAfter)
-    budget.record(error); fetchError = error; gate.finish(); timer.arm(budget.nextDelay(…)); return
+  catch rateLimited(resetAt, api) / secondaryLimit(retryAfter)
+    budget.record(error, now); fetchError = error; menu.fetchError = error; gate.finish(); timer.arm(budget.nextDelay(…)); return
   catch other
     fetchError = other; menu.fetchError = other; gate.finish(); return   // keep old snapshot, rows and lastUpdated
   newProjects = config.projectNames - appState.knownProjects
@@ -455,9 +459,11 @@ refresh()
   appState.known = snapshot.knownItems; appState.knownProjects ∪= newProjects
   appState.attention.prune(snapshot); appStateStore.save()
   self.snapshot = snapshot; fetchError = nil
+  budget.record(snapshot.rateLimits, now)
   menu = MenuModel.build(snapshot, config, now)       // Panel re-renders from it
-  budget.record(snapshot.rateLimits)
-  timer.arm(budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent))
+  delay = budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent, now)
+  menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, now)
+  timer.arm(delay.seconds(from: now))
   if gate.finish() then refresh()                     // a queued trigger arrived meanwhile
 ```
 

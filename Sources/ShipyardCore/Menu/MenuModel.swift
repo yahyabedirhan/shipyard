@@ -11,12 +11,31 @@ public struct MenuModel: Equatable, Sendable {
     /// Why the latest refresh failed, while the rows above are kept from an
     /// earlier one; `nil` after a refresh succeeds.
     public var fetchError: GitHubError?
+    /// When the next refresh runs and why: the configured interval,
+    /// stretched to stay within the rate-limit share, backed off because a
+    /// limit is low, or paused until a reset. The banner says so unless it's
+    /// `configured`; `nil` before the first refresh.
+    public var refreshDelay: RefreshDelay?
+    /// The footer's rate-limit indicator; `nil` when `[rate-limit] show`
+    /// hides it or no limit is known yet.
+    public var rateIndicator: RateIndicator?
 
-    public init(sections: [MenuSection] = [], lastUpdated: Date? = nil, fetchError: GitHubError? = nil) {
+    public init(
+        sections: [MenuSection] = [],
+        lastUpdated: Date? = nil,
+        fetchError: GitHubError? = nil,
+        refreshDelay: RefreshDelay? = nil,
+        rateIndicator: RateIndicator? = nil
+    ) {
         self.sections = sections
         self.lastUpdated = lastUpdated
         self.fetchError = fetchError
+        self.refreshDelay = refreshDelay
+        self.rateIndicator = rateIndicator
     }
+
+    /// Whether ⌘R and the Refresh button work: not while paused.
+    public var canRefreshNow: Bool { !(refreshDelay?.isPaused ?? false) }
 
     /// Before anything was fetched.
     public static let empty = MenuModel()

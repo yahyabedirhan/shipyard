@@ -80,18 +80,28 @@ struct Harness {
     }
 
     /// A recorded GraphQL answer from `Fixtures/`, with GitHub's rate-limit headers.
-    nonisolated static func fixture(_ name: String, remaining: Int = 4990) throws -> StubHTTP.Answer {
-        try .fixture(name, headers: rateLimitHeaders(remaining: remaining))
+    nonisolated static func fixture(
+        _ name: String,
+        status: Int = 200,
+        remaining: Int = 4990,
+        reset: Date = rateLimitReset
+    ) throws -> StubHTTP.Answer {
+        try .fixture(name, status: status, headers: rateLimitHeaders(remaining: remaining, reset: reset))
     }
 
-    /// The `x-ratelimit-*` headers of a GraphQL response.
-    nonisolated static func rateLimitHeaders(remaining: Int) -> [String: String] {
+    /// The `x-ratelimit-*` headers of a GraphQL response (or, with
+    /// `resource: "core"`, a REST one).
+    nonisolated static func rateLimitHeaders(
+        remaining: Int,
+        reset: Date = rateLimitReset,
+        resource: String = "graphql"
+    ) -> [String: String] {
         [
             "x-ratelimit-limit": "5000",
             "x-ratelimit-remaining": String(remaining),
             "x-ratelimit-used": String(5000 - remaining),
-            "x-ratelimit-reset": String(Int(rateLimitReset.timeIntervalSince1970)),
-            "x-ratelimit-resource": "graphql",
+            "x-ratelimit-reset": String(Int(reset.timeIntervalSince1970)),
+            "x-ratelimit-resource": resource,
         ]
     }
 
