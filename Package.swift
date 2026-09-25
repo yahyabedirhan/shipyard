@@ -12,7 +12,7 @@ var targets: [Target] = [
     ),
     .testTarget(
         name: "ShipyardCoreTests",
-        dependencies: ["ShipyardCore"],
+        dependencies: ["ShipyardCore", .product(name: "TOMLDecoder", package: "TOMLDecoder")],
         path: "Tests/ShipyardCoreTests"
     ),
 ]

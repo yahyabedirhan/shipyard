@@ -234,16 +234,16 @@ Operations:
 
 | Operation | Returns / rejects |
 |---|---|
-| `static decode(Data) throws -> Configuration` | rejects: invalid TOML (with line), unknown key type, unknown event, bad repo slug (`owner/name`), duplicate project names, negative windows, interval < 30 |
+| `static decode(Data) throws(ConfigError) -> Decoded` | the configuration plus warnings; rejects, each with a line and a message (every problem is listed, not only the first): invalid TOML, a value of the wrong type, an unknown choice (event, author filter, count style…) with the nearest valid one suggested, bad repo slug (`owner/name`), a project without a name or repositories, duplicate project names, negative windows, interval < 30, share outside 1–50, a `version` other than 1 |
 | `settings(for: Project) -> ProjectSettings` | defaults merged with the project's overrides (objects merge by field; `notifications` replaces) |
 | `appendText(projects:) -> String` | the `[[projects]]` blocks the picker appends; the app never rewrites the file |
 
-Unknown keys are ignored with a warning, so a newer file doesn't break an older app.
+Unknown keys are ignored with a warning, so a newer file doesn't break an older app. TOMLDecoder parses the file but doesn't say where a value came from, so `ConfigurationReader` walks the parsed `TOMLTable` key by key and `TOMLSourceMap` (a light second pass over the text) finds the line of each key path for the messages. The published schema is `schema/config.schema.json`; tests check the example above and a file setting every key against it.
 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
-State: `url`, `lastValid: Configuration`, `error: ConfigError?`, a file watcher.
-Operations: `load()`, `onChange(handler)`, `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header when missing; never rewrites, so comments survive). The core has no file watcher; the app's `ConfigWatcher` calls `reload()`.
+State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `onChange(handler)` (called after every reload that isn't `unchanged`: a valid change, a fix that clears the error, or a rejected edit), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `reload()`.
 The app's `ConfigWatcher` watches the **directory**, not the file, and calls `reload()`: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. Changes are debounced 200 ms.
 
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `Shipyard/Keychain.swift`)
@@ -375,8 +375,10 @@ shipyard/
 │   ├── RefreshScheduler.swift        # timer (armed from RateBudget.nextDelay), triggers + RefreshGate
 │   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, URLOpening
 │   ├── Config/
-│   │   ├── Configuration.swift       # file model, defaults, validation, per-project merge
-│   │   └── ConfigStore.swift         # path, load/reload, last-valid fallback, append projects
+│   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
+│   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
+│   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
+│   │   └── ConfigStore.swift         # path, reload, last-valid fallback, append projects
 │   ├── GitHub/
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer, rate-limit headers, ETags
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
