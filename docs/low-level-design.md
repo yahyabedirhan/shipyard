@@ -171,7 +171,7 @@ Operations:
 | `start()` | load config; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Try again calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
 | `refresh()` | the refresh pipeline (§4); the timer, ⌘R, wake and a configuration change call it (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
-| `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), and phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
+| `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError`, `refreshDelay` and `rateIndicator` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears), and it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
@@ -361,7 +361,7 @@ Wraps `SMAppService.mainApp`: `setEnabled(true)` registers the running `.app` (n
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot?, config, appState, now) -> MenuModel`: sections per project in configuration order (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`)), items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(snapshot?, config, appState, now) -> MenuModel`: sections per project in configuration order (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
 ### UI — `ShipyardApp/UI/`
 
@@ -508,7 +508,7 @@ Shipyard is a macOS app and only ships for macOS. The package has two targets so
 ```text
 refresh()
   guard phase == ready else return
-  guard budget.canRefresh(now) else { timer.arm(until pause ends); return }   // ⌘R, panel, wake: nothing sent while paused
+  guard budget.canRefresh(now) else { timer.arm(until pause ends); return }   // ⌘R, wake: nothing sent while paused
   guard gate.begin() else return                      // queued; runs again after this one
   config = configStore.lastValid
   do
@@ -516,10 +516,10 @@ refresh()
   catch unauthorized
     phase = signedOut; gate.finish(); return
   catch rateLimited(resetAt, api) / secondaryLimit(retryAfter)
-    if snapshot == nil: menu = MenuModel.build(snapshot: nil, …)   // no refresh succeeded yet: list the projects, not loaded yet
+    rebuildMenu(config)   // MenuModel.build(snapshot (or nil: not loaded yet), config, …), keeping fetchError, refreshDelay, rateIndicator
     budget.record(error, now); fetchError = error; menu.fetchError = error; gate.finish(); timer.arm(budget.nextDelay(…)); return
   catch other
-    if snapshot == nil: menu = MenuModel.build(snapshot: nil, …)
+    rebuildMenu(config)
     fetchError = other; menu.fetchError = other; gate.finish(); return   // keep old snapshot, rows and lastUpdated
   appStateStore.update { state in                     // saves only if it changed
     events = EventDetector.events(state.known, snapshot, projects)   // first sight of a project's source: none
@@ -558,7 +558,7 @@ onDirectoryEvent (debounced)
   data = read(url)                    // missing file → Configuration() with no projects
   try config = Configuration.decode(data)
     lastValid = config; error = nil
-    shipyard.configChanged(config)     // phase may move to/from needsProjects; triggers refresh
+    shipyard.follow(.changed(config))  // phase may move to/from needsProjects; rebuildMenu(config) from the last snapshot at once (paused or failing too); triggers refresh
   catch e
     error = ConfigError(e, line)       // lastValid untouched
 ```

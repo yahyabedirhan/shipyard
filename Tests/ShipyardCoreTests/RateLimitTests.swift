@@ -96,6 +96,40 @@ struct RateLimitTests {
         #expect(harness.timer.armed == 120)
     }
 
+    @Test("a configuration change while paused shows at once: a new project not loaded yet, a removed one gone, the pause kept")
+    func configurationChangeWhilePaused() async throws {
+        let exhausted = try Harness.fixture("graphql-rate-limited.json", remaining: 0)
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), exhausted)
+        let shipyard = harness.shipyard
+        await harness.timer.fire()
+        let paused = shipyard.menu.refreshDelay
+        #expect(paused == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
+        let rows = try #require(harness.section("e-commerce")).rows
+
+        try harness.writeConfig("""
+            [[projects]]
+            name = "e-commerce"
+            repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
+
+            [[projects]]
+            name = "blog"
+            repositories = ["yahyabedirhan/blog"]
+
+            """)
+        await shipyard.reloadConfiguration()
+
+        #expect(harness.graphQLRequests.count == 2)
+        #expect(shipyard.menu.sections.map(\.name) == ["e-commerce", "blog"])
+        #expect(harness.section("e-commerce")?.rows == rows)
+        #expect(harness.section("e-commerce")?.isLoaded == true)
+        let blog = try #require(harness.section("blog"))
+        #expect(!blog.isLoaded && blog.rows.isEmpty)
+        #expect(PanelText.emptySection(blog) == "Not loaded yet")
+        #expect(shipyard.menu.fetchError == .rateLimited(resetAt: Harness.rateLimitReset, api: .graphql))
+        #expect(shipyard.menu.refreshDelay == paused)
+        #expect(shipyard.menu.lastUpdated == Harness.now)
+    }
+
     @Test("a refresh costing more than the share stretches the interval, and the model says why")
     func stretched() async throws {
         // 3 points a refresh at 1% of 5,000 an hour: one every 216 s.

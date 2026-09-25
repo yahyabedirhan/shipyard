@@ -65,7 +65,8 @@ public struct MenuModel: Equatable, Sendable {
     /// The model for `snapshot` under `configuration` and what the user has
     /// seen and collapsed, as of `now` (which the closed window counts back from).
     /// Without a snapshot (no refresh has succeeded yet) every configured
-    /// project still gets a section, empty and not loaded yet.
+    /// project still gets a section, empty and not loaded yet; so does a
+    /// project the snapshot has no entry for (added since it was fetched).
     public static func build(snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
@@ -101,7 +102,9 @@ public struct MenuModel: Equatable, Sendable {
                         .first
                         .map(MenuErrorRow.init)
                 },
-                showsRepository: project.repositories.count > 1
+                showsRepository: project.repositories.count > 1,
+                // A project added since the snapshot was fetched has no data yet.
+                isLoaded: snapshot.items[project.name] != nil
             )
         }
         var model = MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)

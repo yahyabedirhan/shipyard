@@ -248,6 +248,36 @@ struct RefreshTests {
         #expect(filled.sections.map(PanelText.emptySection) == [nil, nil])
     }
 
+    @Test("a configuration change while refreshing fails shows at once, keeping the fetch error")
+    func configurationChangeWhileFailing() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), .failure())
+        await harness.timer.fire()
+        let error = try #require(harness.shipyard.menu.fetchError)
+        let rows = try #require(harness.section("e-commerce")).rows
+
+        try harness.writeConfig("""
+            [[projects]]
+            name = "e-commerce"
+            repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
+
+            [[projects]]
+            name = "blog"
+            repositories = ["yahyabedirhan/blog"]
+
+            """)
+        await harness.shipyard.reloadConfiguration()
+
+        let menu = harness.shipyard.menu
+        #expect(menu.sections.map(\.name) == ["e-commerce", "blog"])
+        #expect(harness.section("e-commerce")?.rows == rows)
+        let blog = try #require(harness.section("blog"))
+        #expect(!blog.isLoaded && blog.rows.isEmpty)
+        #expect(PanelText.emptySection(blog) == "Not loaded yet")
+        #expect(menu.fetchError == error)
+        #expect(menu.lastUpdated == Harness.now)
+        #expect(menu.refreshDelay == .configured(120))
+    }
+
     @Test("a GitHub server error keeps the last model too")
     func serverErrorKeepsModel() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests(), .status(502))

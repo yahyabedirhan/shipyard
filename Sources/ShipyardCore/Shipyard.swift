@@ -285,16 +285,17 @@ public final class Shipyard {
         return result
     }
 
-    /// Moves the phase with a reload's result and refreshes (or stops the
-    /// timer). Only a valid change moves anything.
+    /// Moves the phase with a reload's result, rebuilds the menu from the
+    /// last snapshot and refreshes (or stops the timer). Only a valid change
+    /// moves anything.
     private func follow(_ result: ConfigStore.ReloadResult) async {
         configError = configStore.error
         if case .changed(let configuration) = result {
             followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
-            // `[attention]` and `[menu-bar]` apply at once, even if the
-            // refresh below can't run (paused).
-            applyAttention(configuration)
+            // Projects, filters, `[attention]` and `[menu-bar]` apply at
+            // once, even if the refresh below can't run (paused) or fails.
+            rebuildMenu(configuration)
             if phase.canRefresh {
                 await refresh()
             } else {
@@ -368,7 +369,7 @@ public final class Shipyard {
     // MARK: - Refreshing
 
     /// Fetches every project's items and publishes the menu model. The timer,
-    /// opening the panel, ⌘R, waking and a configuration change all come here.
+    /// ⌘R, waking and a configuration change all come here.
     /// Does nothing outside `ready`. One refresh runs at a time: a call while
     /// one runs returns at once and the running one goes again when it's done
     /// (several calls meanwhile make one more run). Afterwards the timer is
@@ -419,11 +420,10 @@ public final class Shipyard {
         } catch {
             guard current == session else { return }
             // Keep the rows and when they were fetched; say why they're old.
-            // Before any refresh succeeded, still list every project.
+            // Rebuilt from the last snapshot (or none, listing every project
+            // as not loaded yet) under the configuration this refresh used.
             let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
-            if snapshot == nil {
-                menu = MenuModel.build(snapshot: nil, configuration: configuration, state: appStateStore.state, now: clock.now)
-            }
+            rebuildMenu(configuration)
             fetchError = failure
             budget.record(failure, at: clock.now)
             menu.fetchError = failure
@@ -562,9 +562,22 @@ public final class Shipyard {
         applyAttention(configStore.lastValid)
     }
 
+    /// Rebuilds the menu model from the last snapshot (or none) under
+    /// `configuration`, keeping the fetch error, the refresh delay and the
+    /// rate-limit indicator: a project added since shows as not loaded yet,
+    /// a removed one disappears. Follows the menu bar rule of `applyAttention`.
+    private func rebuildMenu(_ configuration: Configuration) {
+        var rebuilt = MenuModel.build(snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+        rebuilt.fetchError = menu.fetchError
+        rebuilt.refreshDelay = menu.refreshDelay
+        rebuilt.rateIndicator = menu.rateIndicator
+        if phase != .ready { rebuilt.menuBarLabel = .hidden }
+        menu = rebuilt
+    }
+
     /// Brings the menu model's attention up to date, with no count in the
     /// menu bar unless the phase is `ready`: without projects the menu has
-    /// nothing to count, even while it still holds the last snapshot's rows.
+    /// nothing to count.
     private func applyAttention(_ configuration: Configuration) {
         menu.applyAttention(appStateStore.state, configuration: configuration)
         if phase != .ready { menu.menuBarLabel = .hidden }
