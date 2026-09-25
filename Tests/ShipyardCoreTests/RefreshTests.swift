@@ -457,6 +457,25 @@ struct RefreshTests {
         #expect(harness.shipyard.configError == nil)
     }
 
+    @Test("an unknown setting is published as a warning after a reload until the key is fixed")
+    func unknownSettingWarning() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests())
+        #expect(harness.shipyard.configWarnings.isEmpty)
+
+        try harness.writeConfig("refresh-interval-second = 300\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configError == nil)
+        #expect(harness.shipyard.configWarnings == [
+            ConfigIssue(line: 1, message: "unknown setting `refresh-interval-second` (ignored; did you mean `refresh-interval-seconds`?)"),
+        ])
+
+        try harness.writeConfig("refresh-interval-seconds = 300\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configWarnings.isEmpty)
+    }
+
     @Test("a file broken at launch is published for the banner")
     func brokenAtLaunch() async throws {
         let harness = try await Harness.started(config: "version = \"one\"\n", graphQL: pullRequests())

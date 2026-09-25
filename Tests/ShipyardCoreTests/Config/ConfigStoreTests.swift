@@ -90,7 +90,7 @@ struct ConfigStoreTests {
         try write(valid + "refresh-interval-seconds = 300\n", to: url)
         // A top-level key after a table belongs to that table: an unknown key, so still unchanged.
         #expect(store.reload() == .unchanged)
-        #expect(store.warnings.map(\.message) == ["unknown key `projects[0].refresh-interval-seconds` is ignored"])
+        #expect(store.warnings.map(\.message) == ["unknown setting `projects[0].refresh-interval-seconds` (ignored)"])
 
         try write("refresh-interval-seconds = 300\n" + valid, to: url)
         guard case .changed(let config) = store.reload() else {

@@ -173,6 +173,15 @@ public enum PanelText {
         return (lines + ["Using the last valid configuration."]).joined(separator: "\n")
     }
 
+    /// The quiet banner for settings the file has but shipyard ignores, each
+    /// with its line; `nil` when there are none.
+    public static func configWarnings(_ warnings: [ConfigIssue]) -> String? {
+        guard !warnings.isEmpty else { return nil }
+        return warnings.map { issue in
+            issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
+        }.joined(separator: "\n")
+    }
+
     /// Why the latest refresh failed, for the banner above the kept rows.
     public static func fetchError(_ error: GitHubError) -> String {
         switch error {

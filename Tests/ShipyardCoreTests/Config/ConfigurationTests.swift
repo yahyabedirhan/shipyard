@@ -417,10 +417,10 @@ struct ConfigurationWarningTests {
         #expect(result.configuration.attention.unseen)
         #expect(result.configuration.projects.map(\.name) == ["a"])
         #expect(Set(result.warnings) == [
-            ConfigIssue(line: 1, message: "unknown key `refreshIntervalSeconds` is ignored (did you mean `refresh-interval-seconds`?)"),
-            ConfigIssue(line: 2, message: "unknown key `theme` is ignored"),
-            ConfigIssue(line: 5, message: "unknown key `attention.unseeen` is ignored (did you mean `unseen`?)"),
-            ConfigIssue(line: 10, message: "unknown key `projects[0].colour` is ignored"),
+            ConfigIssue(line: 1, message: "unknown setting `refreshIntervalSeconds` (ignored; did you mean `refresh-interval-seconds`?)"),
+            ConfigIssue(line: 2, message: "unknown setting `theme` (ignored)"),
+            ConfigIssue(line: 5, message: "unknown setting `attention.unseeen` (ignored; did you mean `unseen`?)"),
+            ConfigIssue(line: 10, message: "unknown setting `projects[0].colour` (ignored)"),
         ])
     }
 }

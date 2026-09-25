@@ -63,6 +63,9 @@ public final class Shipyard {
     /// `nil` while it reads cleanly. Shipyard keeps running on the last
     /// valid configuration meanwhile.
     public private(set) var configError: ConfigError?
+    /// Unknown settings the last clean read ignored, for the panel's quiet
+    /// banner; empty when there are none.
+    public private(set) var configWarnings: [ConfigIssue] = []
     /// What the rate budget knows: limits, recent costs, a pause.
     public private(set) var budget = RateBudget()
     /// Whether ⌘R may refresh now: false only while the rate budget pauses
@@ -129,6 +132,7 @@ public final class Shipyard {
         appStateStore.load(at: clock.now)
         configStore.reload()
         configError = configStore.error
+        configWarnings = configStore.warnings
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -290,6 +294,7 @@ public final class Shipyard {
     /// moves anything.
     private func follow(_ result: ConfigStore.ReloadResult) async {
         configError = configStore.error
+        configWarnings = configStore.warnings
         if case .changed(let configuration) = result {
             followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))

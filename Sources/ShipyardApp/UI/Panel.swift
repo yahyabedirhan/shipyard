@@ -99,12 +99,15 @@ struct Panel: View {
         var action: (title: String, run: () -> Void)?
     }
 
-    /// Configuration error, refresh delay (stretched or backed off: amber;
+    /// Configuration error, configuration warnings (gray), refresh delay (stretched or backed off: amber;
     /// paused: red), fetch error, notifications off: each slides in and out.
     private var bannerItems: [BannerItem] {
         var items: [BannerItem] = []
         if let error = shipyard.configError {
             items.append(BannerItem(id: "config", symbol: "exclamationmark.octagon.fill", text: PanelText.configError(error), tint: Palette.red))
+        }
+        if let text = PanelText.configWarnings(shipyard.configWarnings) {
+            items.append(BannerItem(id: "config-warnings", symbol: "info.circle.fill", text: text, tint: Palette.gray))
         }
         guard shipyard.phase == .ready else { return items }
         let menu = shipyard.menu

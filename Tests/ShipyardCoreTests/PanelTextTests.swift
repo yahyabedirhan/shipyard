@@ -54,6 +54,18 @@ struct PanelTextTests {
             """)
     }
 
+    @Test("configuration warnings name the file and line; none means no banner")
+    func configWarnings() {
+        #expect(PanelText.configWarnings([]) == nil)
+        #expect(PanelText.configWarnings([
+            ConfigIssue(line: 1, message: "unknown setting `future-key` (ignored)"),
+            ConfigIssue(line: nil, message: "unknown setting `theme` (ignored; did you mean `them`?)"),
+        ]) == """
+            config.toml line 1: unknown setting `future-key` (ignored)
+            config.toml: unknown setting `theme` (ignored; did you mean `them`?)
+            """)
+    }
+
     @Test("with notifications turned off, the banner says so and where to turn them on")
     func notificationsOff() {
         #expect(PanelText.notificationsOff == "Notifications are off for shipyard, so it can't tell you when something happens.")

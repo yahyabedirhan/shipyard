@@ -378,8 +378,8 @@ final class ConfigurationReader {
     private func warnUnknownKeys(in node: Node, known: [String]) {
         for key in node.table.keys where !known.contains(key) {
             let path = node.path + [.key(key)]
-            let hint = Suggestion.nearest(to: key, in: known).map { " (did you mean `\($0)`?)" } ?? ""
-            warnings.append(ConfigIssue(line: map.line(for: path), message: "unknown key `\(path.dotted)` is ignored\(hint)"))
+            let hint = Suggestion.nearest(to: key, in: known).map { "; did you mean `\($0)`?" } ?? ""
+            warnings.append(ConfigIssue(line: map.line(for: path), message: "unknown setting `\(path.dotted)` (ignored\(hint))"))
         }
     }
 
