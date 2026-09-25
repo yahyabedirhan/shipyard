@@ -108,11 +108,10 @@ final class AppServices {
         Task { await shipyard.refresh() }
     }
 
-    /// Opening the panel refreshes (the rate budget may hold it back), and
-    /// rereads the notification permission (the user may have changed it
-    /// in System Settings).
+    /// Opening the panel rereads the notification permission (the user may
+    /// have changed it in System Settings). It doesn't refresh: looking
+    /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
-        refresh()
         Task { await notifier.checkPermission() }
     }
 
