@@ -182,14 +182,17 @@ public struct RateLimits: Equatable, Sendable {
     }
 }
 
-/// Everything one refresh fetched: each project's items, the repositories
-/// that failed, and the rate limits GitHub reported.
+/// Everything one refresh fetched: each project's items, the sources that
+/// failed, and the rate limits GitHub reported.
 public struct Snapshot: Equatable, Sendable {
     public var fetchedAt: Date
     /// Items per project name. A repository in two projects appears in both.
     public var items: [String: [Item]]
-    /// Failures per repository (`owner/name` as configured).
-    public var errors: [String: RepositoryError]
+    /// Failures per source: a repository (`owner/name` as configured) and
+    /// the kind of item that couldn't be fetched from it. A repository GitHub
+    /// can't resolve fails every kind a project fetches from it; one whose
+    /// workflow runs can't be read fails only its runs.
+    public var errors: [ItemSource: RepositoryError]
     public var rateLimits: RateLimits
     /// The login the query ran as, when GitHub said.
     public var viewerLogin: String?
@@ -197,7 +200,7 @@ public struct Snapshot: Equatable, Sendable {
     public init(
         fetchedAt: Date,
         items: [String: [Item]] = [:],
-        errors: [String: RepositoryError] = [:],
+        errors: [ItemSource: RepositoryError] = [:],
         rateLimits: RateLimits = RateLimits(),
         viewerLogin: String? = nil
     ) {

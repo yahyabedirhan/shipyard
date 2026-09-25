@@ -25,7 +25,6 @@ public final class ConfigStore: @unchecked Sendable {
     private var _lastValid = Configuration()
     private var _error: ConfigError?
     private var _warnings: [ConfigIssue] = []
-    private var handlers: [@Sendable (ReloadResult) -> Void] = []
 
     public init(url: URL) {
         self.url = url
@@ -58,14 +57,6 @@ public final class ConfigStore: @unchecked Sendable {
     /// Unknown keys found by the latest successful reload.
     public var warnings: [ConfigIssue] { synchronized { _warnings } }
 
-    /// Calls `handler` after every reload that isn't `.unchanged`: with the
-    /// new configuration after a valid change (or a fix), and with the error
-    /// after a rejected edit. The orchestrator uses this to move phase,
-    /// refresh and show or clear the configuration banner.
-    public func onChange(_ handler: @escaping @Sendable (ReloadResult) -> Void) {
-        synchronized { handlers.append(handler) }
-    }
-
     /// Reads the file again. A missing or empty file is the defaults with no
     /// projects. A broken file keeps the last valid configuration and sets
     /// `error`; a valid one clears it.
@@ -78,29 +69,28 @@ public final class ConfigStore: @unchecked Sendable {
             outcome = .failure(error)
         }
 
-        let (result, toNotify): (ReloadResult, [@Sendable (ReloadResult) -> Void]) = synchronized {
+        return synchronized {
             switch outcome {
             case .failure(let error):
                 _error = error
-                return (.invalid(error), handlers)
+                return .invalid(error)
             case .success(let decoded):
                 let hadError = _error != nil
                 _error = nil
                 _warnings = decoded.warnings
-                guard decoded.configuration != _lastValid || hadError else { return (.unchanged, []) }
+                guard decoded.configuration != _lastValid || hadError else { return .unchanged }
                 _lastValid = decoded.configuration
-                return (.changed(decoded.configuration), handlers)
+                return .changed(decoded.configuration)
             }
         }
-        for handler in toNotify { handler(result) }
-        return result
     }
 
     /// Adds `projects` as `[[projects]]` blocks at the end of the file,
     /// creating it (and its directory) with a commented header and the
     /// `#:schema` line when it's missing. Existing text is never rewritten.
-    /// Rejects slugs that aren't `owner/name` and names already used, before
-    /// writing anything. Returns the reload that follows.
+    /// Rejects slugs that aren't `owner/name`, a repository listed twice in
+    /// one project and names already used, before writing anything. Returns
+    /// the reload that follows.
     @discardableResult
     public func append(projects: [NewProject]) throws -> ReloadResult {
         try validate(projects)
@@ -134,8 +124,13 @@ public final class ConfigStore: @unchecked Sendable {
             if project.repositories.isEmpty {
                 issues.append(ConfigIssue(line: nil, message: "project `\(project.name)` needs at least one repository"))
             }
-            for repository in project.repositories where !ConfigurationReader.isRepositorySlug(repository) {
-                issues.append(ConfigIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
+            var repositories = Set<String>()
+            for repository in project.repositories {
+                if !ConfigurationReader.isRepositorySlug(repository) {
+                    issues.append(ConfigIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
+                } else if !repositories.insert(repository.lowercased()).inserted {
+                    issues.append(ConfigIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.name)))
+                }
             }
         }
         if !issues.isEmpty { throw ConfigError(issues) }

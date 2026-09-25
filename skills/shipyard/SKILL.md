@@ -122,9 +122,10 @@ taplo check ~/.config/shipyard/config.toml
 
 Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would only warn about, so fix those too.
 
-The schema can't check two rules; check them by reading the file:
+The schema can't check three rules; check them by reading the file:
 
 - Every project `name` is used once.
+- A project lists each repository once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
 - Top-level keys sit above the first `[table]` header.
 
 ## Worked requests

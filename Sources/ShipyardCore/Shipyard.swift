@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
 /// The app builds one with its adapters and the panel draws from it.
@@ -10,8 +11,10 @@ import Foundation
 /// ones the notification rules select, publish the menu model (with which
 /// rows need attention), and ask the rate budget when to run next. What the
 /// user has seen and collapsed, the items it knew and the events it notified
-/// are app state, kept by `appStateStore`.
+/// are app state, kept by `appStateStore`. Observable, so the panel redraws
+/// when what it reads changes.
 @MainActor
+@Observable
 public final class Shipyard {
     /// What signing out left behind.
     public enum SignOutResult: Equatable, Sendable {
@@ -63,13 +66,13 @@ public final class Shipyard {
 
     /// The client for the current token; `nil` when signed out.
     private(set) var github: GitHubClient?
-    private var deviceFlowTask: Task<Void, Never>?
+    @ObservationIgnored private var deviceFlowTask: Task<Void, Never>?
     /// Bumped whenever a device flow begins or is cancelled, so a flow that
     /// was cancelled can't change anything when it finishes.
-    private var deviceFlowGeneration = 0
+    @ObservationIgnored private var deviceFlowGeneration = 0
     /// Bumped whenever a token is taken up or dropped, so an answer to a
     /// request made with an earlier token can't sign in or out.
-    private var session = 0
+    @ObservationIgnored private var session = 0
 
     public init(
         configStore: ConfigStore,

@@ -51,8 +51,6 @@ struct ConfigStoreTests {
     func lastValidFallback() throws {
         let url = temporaryConfigURL()
         let store = ConfigStore(url: url)
-        let seen = Locked<[ConfigStore.ReloadResult]>([])
-        store.onChange { result in seen.withValue { $0.append(result) } }
 
         try write(valid, to: url)
         let first = store.reload()
@@ -75,24 +73,19 @@ struct ConfigStoreTests {
         #expect(store.reload() == .changed(config))
         #expect(store.error == nil)
         #expect(store.lastValid == config)
-
-        #expect(seen.current == [.changed(config), .invalid(error), .changed(config)])
     }
 
-    @Test("only a reload that changes something notifies")
-    func notifiesOnChange() throws {
+    @Test("a reload that means the same as before is unchanged")
+    func unchangedReload() throws {
         let url = temporaryConfigURL()
         let store = ConfigStore(url: url)
-        let calls = Locked(0)
-        store.onChange { _ in calls.withValue { $0 += 1 } }
 
         try write(valid, to: url)
-        store.reload()
-        #expect(calls.current == 1)
+        let first = store.reload()
+        #expect(first == .changed(store.lastValid))
 
         try write("# a comment changes nothing\n" + valid, to: url)
         #expect(store.reload() == .unchanged)
-        #expect(calls.current == 1)
 
         try write(valid + "refresh-interval-seconds = 300\n", to: url)
         // A top-level key after a table belongs to that table: an unknown key, so still unchanged.
@@ -105,7 +98,6 @@ struct ConfigStoreTests {
             return
         }
         #expect(config.refreshIntervalSeconds == 300)
-        #expect(calls.current == 2)
         #expect(store.warnings.isEmpty)
     }
 
@@ -188,7 +180,7 @@ struct ConfigStoreAppendTests {
         #expect(store.lastValid.projects.map(\.name) == [name])
     }
 
-    @Test("appending rejects bad slugs and names already used, without writing")
+    @Test("appending rejects bad slugs, names already used and a repository listed twice, without writing")
     func rejects() throws {
         let url = temporaryConfigURL()
         try write(valid, to: url)
@@ -200,6 +192,9 @@ struct ConfigStoreAppendTests {
         }
         #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project name `a` is already used")])) {
             try store.append(projects: [NewProject(name: "a", repositories: ["o/b"])])
+        }
+        #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project `b` lists repository `O/B` twice (names aren't case-sensitive)")])) {
+            try store.append(projects: [NewProject(name: "b", repositories: ["o/b", "O/B"])])
         }
         #expect(try contents(of: url) == valid)
     }

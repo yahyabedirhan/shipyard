@@ -296,6 +296,39 @@ struct WorkflowRunsTests {
         #expect(harness.shipyard.fetchError == nil)
     }
 
+    @Test("a repository's runs error shows only in projects that show its runs")
+    func runsErrorOnlyWhereShown() async throws {
+        let config = runsConfig() + """
+            [[projects]]
+            name = "everything"
+            repositories = ["yahyabedirhan/shop"]
+
+            """
+        let harness = try await Harness.started(
+            config: config,
+            graphQL: shopGraphQL(),
+            runs: [shopRepository: [.status(500, headers: Harness.rateLimitHeaders(remaining: 4900, resource: "core"))]]
+        )
+        #expect(harness.section("shop")?.errors.map(\.message) == ["yahyabedirhan/shop: workflow runs: HTTP 500"])
+        #expect(harness.section("everything")?.rows.map(\.number) == [1])
+        #expect(harness.section("everything")?.errors.isEmpty == true)
+    }
+
+    @Test("forbidden runs don't hold back a new project's pull request events")
+    func forbiddenRunsDontHoldBackPullRequests() async throws {
+        let forbidden = StubHTTP.Answer.status(403, headers: Harness.rateLimitHeaders(remaining: 4900, resource: "core"))
+        let harness = try await Harness.started(
+            config: runsConfig(),
+            graphQL: shopGraphQL([PR(1)]),
+            runs: [shopRepository: [forbidden]]
+        )
+        #expect(harness.section("shop")?.errors.map(\.kind) == [.forbidden])
+        #expect(harness.notifier.posted.isEmpty)
+
+        await harness.refresh(runs: forbidden, graphQL: shopGraphQL([PR(1), PR(2)]))
+        #expect(harness.titles == ["shop · New PR #2"])
+    }
+
     @Test("a spent REST limit keeps the last rows and pauses until its reset")
     func restLimitSpent() async throws {
         let harness = try await Harness.started(

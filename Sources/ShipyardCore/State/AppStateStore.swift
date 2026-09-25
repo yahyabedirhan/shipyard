@@ -7,7 +7,8 @@ public struct AppState: Equatable, Sendable {
     /// not a new version: every field is optional when read, so an older
     /// file loads with the new field empty and a newer file's extra fields
     /// are ignored. Bump it only for a change an older reader would
-    /// misunderstand, with a migration in `init(from:)`.
+    /// misunderstand, with a migration in `init(from:)`; a file with a newer
+    /// version than this is set aside, as an unreadable one is.
     public static let currentVersion = 1
 
     /// Which version of each item the user has seen.
@@ -41,7 +42,8 @@ public struct AppState: Equatable, Sendable {
 //       "seen": { "<item url>": { "fingerprint": "…", "present": "2026-09-25T12:00:00Z" } },
 //       "collapsed": ["job-search"],
 //       "known": { "<item url>": { "repository": "o/r", "state": "open", "checks": "pending",
-//                                  "reviewRequested": false, "activity": 0, "fingerprint": "…" } },
+//                                  "reviewRequested": false, "activity": 0, "fingerprint": "…",
+//                                  "present": "2026-09-25T12:00:00Z" } },
 //       "knownProjects": { "job-search": [{ "repository": "o/r", "kind": "pullRequest" }] },
 //       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
 //     }
@@ -51,6 +53,9 @@ public struct AppState: Equatable, Sendable {
 // the whole file unreadable: without them the next refresh is silent (no
 // project is known), which is the safe way to fail. Inside them, an entry a
 // newer build wrote that this one can't read (a new state, say) is skipped.
+// A known item's `present` came later: one without it is kept while it's
+// listed and dropped the first time it isn't. A `version` above
+// `currentVersion` fails the decode, so the store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version
@@ -63,7 +68,16 @@ extension AppState: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        _ = try container.decodeIfPresent(Int.self, forKey: .version)
+        // A file a newer build wrote in a format this one would misread
+        // isn't read at all: the store sets it aside, as a first run.
+        let version = try container.decodeIfPresent(Int.self, forKey: .version) ?? Self.currentVersion
+        guard version <= Self.currentVersion else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .version,
+                in: container,
+                debugDescription: "state.json version \(version) is newer than this build reads (\(Self.currentVersion))"
+            )
+        }
         let seen = try container.decodeIfPresent([String: Attention.SeenRecord].self, forKey: .seen) ?? [:]
         attention = Attention(seen: seen)
         collapsed = try container.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
@@ -102,8 +116,8 @@ private struct Lossy<Value: Decodable>: Decodable {
 /// provides (`~/Library/Application Support/Shipyard/`). The file is
 /// app-owned and never hand-edited.
 ///
-/// `load` reads it once at start. A file that can't be read as app state is
-/// renamed aside (`state-corrupt-<time>.json`) and shipyard starts as on a
+/// `load` reads it once at start. A file that can't be read as app state,
+/// or that a newer build wrote with a higher `version`, is renamed aside (`state-corrupt-<time>.json`) and shipyard starts as on a
 /// first run. `update` changes the state and saves it when it changed.
 @MainActor
 public final class AppStateStore {

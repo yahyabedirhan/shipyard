@@ -101,14 +101,15 @@ struct TOMLSourceMap {
     /// The line of the closest recorded ancestor of `path` (the key itself,
     /// its table, or the table's header). With `value`, the first line in
     /// that entry's span where `value` appears as a quoted string, which
-    /// places an element of a multi-line array.
-    func line(for path: ConfigPath, value: String? = nil) -> Int? {
+    /// places an element of a multi-line array; with `occurrence`, the line
+    /// of that appearance counting from 0 (a value listed twice).
+    func line(for path: ConfigPath, value: String? = nil, occurrence: Int = 0) -> Int? {
         var prefix = path
         while !prefix.isEmpty {
             let match = entries.first { $0.path == prefix }
                 ?? entries.first { $0.path.starts(with: prefix) }
             if let entry = match {
-                if let value, let found = line(of: value, in: entry.line...max(entry.line, entry.endLine)) {
+                if let value, let found = line(of: value, occurrence: occurrence, in: entry.line...max(entry.line, entry.endLine)) {
                     return found
                 }
                 return entry.line
@@ -118,11 +119,13 @@ struct TOMLSourceMap {
         return nil
     }
 
-    private func line(of value: String, in range: ClosedRange<Int>) -> Int? {
+    private func line(of value: String, occurrence: Int, in range: ClosedRange<Int>) -> Int? {
         let needles = ["\"\(value)\"", "'\(value)'"]
+        var seen = 0
         for number in range where number <= lines.count {
             let text = lines[number - 1]
-            if needles.contains(where: { text.contains($0) }) { return number }
+            seen += needles.reduce(0) { $0 + text.components(separatedBy: $1).count - 1 }
+            if seen > occurrence { return number }
         }
         return nil
     }

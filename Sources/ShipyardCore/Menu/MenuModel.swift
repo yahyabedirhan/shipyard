@@ -72,7 +72,14 @@ public struct MenuModel: Equatable, Sendable {
             return MenuSection(
                 name: project.name,
                 rows: rows.map { MenuRow($0) },
-                errors: project.repositories.compactMap { snapshot.errors[$0].map(MenuErrorRow.init) }
+                // One row per repository, for a kind this project shows: a
+                // runs failure isn't an error where runs are off.
+                errors: project.repositories.compactMap { repository in
+                    settings.fetchedKinds.lazy
+                        .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
+                        .first
+                        .map(MenuErrorRow.init)
+                }
             )
         }
         var model = MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)

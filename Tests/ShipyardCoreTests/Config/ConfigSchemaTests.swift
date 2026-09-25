@@ -84,6 +84,14 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
         if let minItems = schema["minItems"] as? Int, elements.count < minItems {
             found.append("\(path): fewer than \(minItems) items")
         }
+        if schema["uniqueItems"] as? Bool == true {
+            // Strings are all the file's unique lists hold; compared exactly, as JSON Schema does.
+            let strings = elements.compactMap { element -> String? in
+                guard case .string(let string) = element else { return nil }
+                return string
+            }
+            if Set(strings).count != strings.count { found.append("\(path): items not unique") }
+        }
         if let items = schema["items"] as? [String: Any] {
             for (index, element) in elements.enumerated() {
                 check(element, against: items, root: root, at: "\(path)[\(index)]", into: &found)
@@ -220,7 +228,7 @@ struct ConfigSchemaTests {
             event = "pr.openned"
             [[projects]]
             name = "a"
-            repositories = ["not-a-slug"]
+            repositories = ["not-a-slug", "o/r", "o/r"]
             issues = { closed-window-days = -1 }
             """
         let found = Set(try violations(bad, schema: schema))
@@ -230,6 +238,7 @@ struct ConfigSchemaTests {
             ".rate-limit.max-share-percent: above 50",
             ".defaults.notifications[0].event: pr.openned not in enum",
             ".projects[0].repositories[0]: not-a-slug doesn't match ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$",
+            ".projects[0].repositories: items not unique",
             ".projects[0].issues.closed-window-days: below 0",
         ])
     }

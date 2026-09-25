@@ -131,14 +131,36 @@ public struct KnownItem: Codable, Equatable, Sendable {
     /// `Item.fingerprint`, so a notification's item can be marked seen
     /// before a refresh has listed it again.
     public var fingerprint: String
+    /// When a refresh last listed the item, bumped at most once a day (like
+    /// `Attention.SeenRecord.present`). An item missing from a snapshot is
+    /// kept until it's been gone for `Attention.retention`.
+    public var present: Date
 
-    public init(_ item: Item) {
+    public init(_ item: Item, present: Date) {
         repository = item.repository
         state = item.state
         checks = item.checks
         reviewRequested = item.reviewRequestedFromViewer
         activity = item.activity
         fingerprint = item.fingerprint
+        self.present = present
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case repository, state, checks, reviewRequested, activity, fingerprint, present
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        repository = try container.decode(String.self, forKey: .repository)
+        state = try container.decode(ItemState.self, forKey: .state)
+        checks = try container.decode(ChecksState.self, forKey: .checks)
+        reviewRequested = try container.decode(Bool.self, forKey: .reviewRequested)
+        activity = try container.decode(Int.self, forKey: .activity)
+        fingerprint = try container.decode(String.self, forKey: .fingerprint)
+        // A file from before `present` was kept: the item is kept while
+        // it's listed, and dropped the first time it isn't, as it was then.
+        present = try container.decodeIfPresent(Date.self, forKey: .present) ?? .distantPast
     }
 }
 
@@ -162,27 +184,41 @@ public struct KnownItems: Equatable, Sendable {
     }
 
     /// What's known after `snapshot`, fetched for `projects`: the snapshot's
-    /// items and the sources it fetched (a repository that failed keeps its
-    /// items and sources from before, so its return isn't a burst of
-    /// events). A project, repository or kind no longer fetched is
-    /// forgotten, so adding it again is a first sight.
+    /// items and the sources it fetched. A source that failed keeps its
+    /// sources from before, so its return isn't a burst of events. An item
+    /// missing from the snapshot (it fell out of the most recent 50, or its
+    /// repository failed) is kept for `Attention.retention`, and while its
+    /// repository fails, so when it comes back it's compared with its last
+    /// version rather than announced as new. A project, repository or kind
+    /// no longer fetched is forgotten, so adding it again is a first sight.
     public func updated(with snapshot: Snapshot, projects: [ProjectSettings]) -> KnownItems {
         var next = KnownItems()
         let failed = Set(snapshot.errors.keys)
+        var fetched = Set<String>()
         for project in projects {
             var sources = Set<ItemSource>()
             for source in project.fetchedSources {
-                if !failed.contains(source.repository) || knows(source, in: project.name) {
+                fetched.insert(source.repository.lowercased())
+                if !failed.contains(source) || knows(source, in: project.name) {
                     sources.insert(source)
                 }
             }
             if !sources.isEmpty { next.sources[project.name] = sources }
         }
-        for (id, item) in items where failed.contains(item.repository) {
-            next.items[id] = item
+        let now = snapshot.fetchedAt
+        let cutoff = now.addingTimeInterval(-Attention.retention)
+        let failedRepositories = Set(failed.map { $0.repository.lowercased() })
+        for (id, item) in items {
+            let repository = item.repository.lowercased()
+            guard fetched.contains(repository) else { continue }
+            if item.present >= cutoff || failedRepositories.contains(repository) {
+                next.items[id] = item
+            }
         }
         for item in snapshot.items.values.joined() {
-            next.items[item.id] = KnownItem(item)
+            let before = items[item.id]?.present
+            let present = before.map { now.timeIntervalSince($0) < Attention.presenceResolution ? $0 : now } ?? now
+            next.items[item.id] = KnownItem(item, present: present)
         }
         return next
     }
@@ -192,8 +228,12 @@ extension ProjectSettings {
     /// The sources a refresh fetches for this project: each repository, for
     /// each kind the project shows.
     var fetchedSources: [ItemSource] {
-        let kinds = [ItemKind.pullRequest, .issue, .workflowRun].filter { shows($0) }
-        return repositories.flatMap { repository in kinds.map { ItemSource(repository: repository, kind: $0) } }
+        repositories.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
+    }
+
+    /// The kinds this project shows, in the menu's order.
+    var fetchedKinds: [ItemKind] {
+        [ItemKind.pullRequest, .issue, .workflowRun].filter { shows($0) }
     }
 }
 

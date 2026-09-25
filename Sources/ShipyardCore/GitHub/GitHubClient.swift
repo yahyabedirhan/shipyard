@@ -104,21 +104,27 @@ public struct GitHubClient: Sendable {
         )
 
         var items: [String: [Item]] = [:]
-        var errors: [String: RepositoryError] = [:]
+        var errors: [ItemSource: RepositoryError] = [:]
         let slugs = Dictionary(repositories.map { ($0.slug.lowercased(), $0.slug) }, uniquingKeysWith: { first, _ in first })
         for project in projects {
             var projectItems: [Item] = []
             for repository in project.repositories {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
-                    errors[repository] = RepositoryError(repository: repository, kind: error.kind, message: error.message)
+                    // Nothing of the repository could be fetched: every kind
+                    // the project shows from it failed.
+                    for kind in project.fetchedKinds {
+                        errors[ItemSource(repository: repository, kind: kind)] =
+                            RepositoryError(repository: repository, kind: error.kind, message: error.message)
+                    }
                     continue
                 }
                 var found = (parsed.items[slug] ?? []).filter { project.shows($0.kind) }
                 // Runs that couldn't be read leave the pull requests and
-                // issues listed, with an error row for the runs.
+                // issues listed, with an error for the runs source only.
                 if project.workflowRuns.show, let error = runs.errors[slug] {
-                    errors[repository] = RepositoryError(repository: repository, kind: error.kind, message: error.message)
+                    errors[ItemSource(repository: repository, kind: .workflowRun)] =
+                        RepositoryError(repository: repository, kind: error.kind, message: error.message)
                 } else if project.workflowRuns.show {
                     found += WorkflowRuns.filter(
                         runs.items[slug] ?? [],

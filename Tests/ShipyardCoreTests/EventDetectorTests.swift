@@ -67,8 +67,8 @@ private func settings(
     )
 }
 
-private func snapshot(_ items: [String: [Item]], errors: [String: RepositoryError] = [:]) -> Snapshot {
-    Snapshot(fetchedAt: now, items: items, errors: errors)
+private func snapshot(_ items: [String: [Item]], errors: [ItemSource: RepositoryError] = [:], at fetchedAt: Date = now) -> Snapshot {
+    Snapshot(fetchedAt: fetchedAt, items: items, errors: errors)
 }
 
 /// What's known after one refresh listing `items` in "shop".
@@ -200,7 +200,8 @@ struct EventDetectorTests {
             projects: project
         )
         let error = RepositoryError(repository: "o/gone", kind: .notFound, message: "gone")
-        let failed = first.updated(with: snapshot(["shop": [pr(1)]], errors: ["o/gone": error]), projects: project)
+        let gone = [ItemSource(repository: "o/gone", kind: .pullRequest): error]
+        let failed = first.updated(with: snapshot(["shop": [pr(1)]], errors: gone), projects: project)
         #expect(failed.items.count == 2)
         #expect(failed.knows(ItemSource(repository: "o/gone", kind: .pullRequest), in: "shop"))
 
@@ -208,8 +209,64 @@ struct EventDetectorTests {
         #expect(EventDetector.events(known: failed, snapshot: back, projects: project).map(\.item.number) == [3])
 
         // A repository that failed on its first refresh isn't known yet.
-        let never = KnownItems().updated(with: snapshot(["shop": [pr(1)]], errors: ["o/gone": error]), projects: project)
+        let never = KnownItems().updated(with: snapshot(["shop": [pr(1)]], errors: gone), projects: project)
         #expect(!never.knows(ItemSource(repository: "o/gone", kind: .pullRequest), in: "shop"))
+    }
+
+    @Test("an item that leaves the list and comes back isn't new: it's compared with its last version")
+    func leavesAndReturns() {
+        let before = known(pr(1), pr(2))
+        // #2 drops out of the most recent 50 for a while.
+        let gone = before.updated(with: snapshot(["shop": [pr(1)]], at: now + 600), projects: [settings()])
+        #expect(gone.items[pr(2).id]?.state == .open)
+        let later = snapshot(["shop": [pr(1), pr(2), pr(3)]], at: now + 1_200)
+        #expect(EventDetector.events(known: gone, snapshot: later, projects: [settings()]).map(\.item.number) == [3])
+
+        // Merged while it was out of the list: it's merged when it's back.
+        let merged = snapshot(["shop": [pr(1), pr(2, state: .merged)]], at: now + 1_200)
+        #expect(EventDetector.events(known: gone, snapshot: merged, projects: [settings()]).map(\.kind) == [.prMerged])
+    }
+
+    @Test("an item missing from the list is kept for 30 days, then forgotten")
+    func missingItemsRetention() {
+        let before = known(pr(1), pr(2))
+        let day = 86_400.0
+        let month = before.updated(with: snapshot(["shop": [pr(1)]], at: now + 29 * day), projects: [settings()])
+        #expect(month.items[pr(2).id] != nil)
+        let past = month.updated(with: snapshot(["shop": [pr(1)]], at: now + 31 * day), projects: [settings()])
+        #expect(past.items[pr(2).id] == nil)
+        // #1 was listed all along, so it stays.
+        #expect(past.items[pr(1).id] != nil)
+    }
+
+    @Test("a listed item's presence is bumped at most once a day, so an unchanged refresh changes nothing")
+    func presenceResolution() {
+        let before = known(pr(1))
+        let soon = before.updated(with: snapshot(["shop": [pr(1)]], at: now + 3_600), projects: [settings()])
+        #expect(soon == before)
+        let nextDay = before.updated(with: snapshot(["shop": [pr(1)]], at: now + 86_400), projects: [settings()])
+        #expect(nextDay.items[pr(1).id]?.present == now + 86_400)
+    }
+
+    @Test("a source that failed holds back only itself: runs that can't be read don't hold back pull requests")
+    func failedSourceOnly() {
+        let withRuns = ProjectSettings(
+            name: "blog",
+            repositories: ["o/r"],
+            pullRequests: PullRequestSettings(),
+            issues: IssueSettings(),
+            workflowRuns: WorkflowRunSettings(show: true),
+            notifications: [NotificationRule(event: .prOpened)]
+        )
+        let runs = ItemSource(repository: "o/r", kind: .workflowRun)
+        let forbidden = [runs: RepositoryError(repository: "o/r", kind: .forbidden, message: "workflow runs: HTTP 403")]
+        // A project just added, whose runs are forbidden on its first refresh.
+        let first = KnownItems().updated(with: snapshot(["blog": [pr(1)]], errors: forbidden), projects: [withRuns])
+        #expect(first.knows(ItemSource(repository: "o/r", kind: .pullRequest), in: "blog"))
+        #expect(!first.knows(runs, in: "blog"))
+
+        let next = snapshot(["blog": [pr(1), pr(2)]], errors: forbidden)
+        #expect(EventDetector.events(known: first, snapshot: next, projects: [withRuns]).map(\.kind) == [.prOpened])
     }
 
     @Test("an event's id is the same in every project, and tells recurring occurrences apart")
@@ -284,6 +341,17 @@ struct NotificationRulesTests {
     @Test("hidden authors are never notified")
     func hiddenAuthors() {
         #expect(!NotificationRules.shouldNotify(event(author: "Dependabot[bot]", authorKind: .bot), settings: settings(), hiddenAuthors: ["dependabot[bot]"]))
+    }
+
+    @Test("a draft isn't notified where the project hides drafts")
+    func hiddenDrafts() {
+        let draft = Event(kind: .prOpened, project: "shop", item: pr(state: .draft))
+        #expect(NotificationRules.shouldNotify(draft, settings: settings()))
+        var hiding = settings()
+        hiding.pullRequests.drafts = false
+        #expect(!NotificationRules.shouldNotify(draft, settings: hiding))
+        // Once it isn't a draft, it's notified as any other.
+        #expect(NotificationRules.shouldNotify(event(), settings: hiding))
     }
 
     @Test("a notification carries the project, title text, the item's title and its URL")

@@ -61,7 +61,7 @@ struct AppStateStoreTests {
         let reloaded = AppStateStore(directory: directory)
         #expect(reloaded.load(at: now) == .loaded)
         #expect(reloaded.state == store.state)
-        #expect(reloaded.state.known.items[item.id] == KnownItem(item))
+        #expect(reloaded.state.known.items[item.id] == KnownItem(item, present: now))
         #expect(reloaded.state.known.knows(ItemSource(repository: "o/r", kind: .pullRequest), in: "shop"))
         #expect(reloaded.state.notified.contains(event))
         #expect(reloaded.state.attention.seen.isEmpty)
@@ -123,6 +123,39 @@ struct AppStateStoreTests {
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.collapsed == ["shop"])
         #expect(store.state.attention.seen.isEmpty)
+
+        // A known item from before `present` was kept still loads.
+        let older = """
+            {
+              "version": 1,
+              "known": { "https://github.com/o/r/pull/1": { "repository": "o/r", "state": "open", "checks": "none",
+                         "reviewRequested": false, "activity": 0, "fingerprint": "f" } }
+            }
+            """
+        try Data(older.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.known.items["https://github.com/o/r/pull/1"]?.present == .distantPast)
+    }
+
+    @Test("a file a newer build wrote with a higher version is set aside, as a first run")
+    func newerVersion() throws {
+        let directory = temporaryDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let store = AppStateStore(directory: directory)
+        let newer = #"{"version": \#(AppState.currentVersion + 1), "collapsed": ["shop"]}"#
+        try Data(newer.utf8).write(to: store.url)
+
+        let result = store.load(at: now)
+
+        let aside = directory.appendingPathComponent("state-corrupt-20260925-120000.json")
+        #expect(result == .setAside(aside))
+        #expect(try Data(contentsOf: aside) == Data(newer.utf8))
+        #expect(store.state == AppState())
+
+        // The current version, or none, still loads.
+        try Data(#"{"version": \#(AppState.currentVersion), "collapsed": ["shop"]}"#.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsed == ["shop"])
     }
 
     @Test("the file carries its version")

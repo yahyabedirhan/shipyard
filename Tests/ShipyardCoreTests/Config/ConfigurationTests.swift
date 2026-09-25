@@ -275,6 +275,28 @@ struct ConfigurationValidationTests {
         #expect(ConfigurationReader.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
     }
 
+    @Test("a repository listed twice in one project is rejected, whatever its case")
+    func duplicateRepositories() {
+        let issues = rejection("""
+            [[projects]]
+            name = "a"
+            repositories = [
+              "o/r",
+              "o/other",
+              "o/r",
+              "O/R",
+            ]
+
+            [[projects]]
+            name = "b"
+            repositories = ["o/r"]
+            """)
+        #expect(issues == [
+            ConfigIssue(line: 6, message: "project `a` lists repository `o/r` twice (names aren't case-sensitive)"),
+            ConfigIssue(line: 7, message: "project `a` lists repository `O/R` twice (names aren't case-sensitive)"),
+        ])
+    }
+
     @Test("a project needs a name and at least one repository")
     func projectRequirements() {
         #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n")

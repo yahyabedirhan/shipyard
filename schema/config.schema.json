@@ -124,9 +124,10 @@
           "minLength": 1
         },
         "repositories": {
-          "description": "The project's repositories as owner/name slugs.",
+          "description": "The project's repositories as owner/name slugs, each listed once. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
             "type": "string",
             "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"

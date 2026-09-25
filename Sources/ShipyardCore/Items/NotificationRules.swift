@@ -6,10 +6,12 @@ import Foundation
 /// `[[defaults.notifications]]` (`ProjectSettings.notifications` is already
 /// the right one). An event is notified when a rule names it and the rule's
 /// author filter matches the item's author. Items by an author in
-/// `hide-authors` are never notified, as they're never listed.
+/// `hide-authors`, and draft pull requests in a project whose
+/// `pull-requests.drafts` is off, are never notified, as they're never listed.
 public enum NotificationRules {
     public static func shouldNotify(_ event: Event, settings: ProjectSettings, hiddenAuthors: Set<String> = []) -> Bool {
         if hiddenAuthors.contains(event.item.author.lowercased()) { return false }
+        if event.item.state == .draft, !settings.pullRequests.drafts { return false }
         return settings.notifications.contains { rule in
             rule.event == event.kind && rule.authors.matches(event.item)
         }

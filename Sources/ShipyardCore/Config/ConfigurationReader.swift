@@ -158,8 +158,21 @@ final class ConfigurationReader {
         } else if let repositories, repositories.isEmpty {
             error("project `\(name ?? "")` needs at least one repository", at: node.path + [.key("repositories")])
         }
-        for repository in repositories ?? [] where !Self.isRepositorySlug(repository) {
-            error("repository `\(repository)` isn't `owner/name`", at: node.path + [.key("repositories")], value: repository)
+        var listed = Set<String>()
+        var spelled: [String: Int] = [:]
+        for repository in repositories ?? [] {
+            // Which appearance of this exact spelling it is, to find its line.
+            let occurrence = spelled[repository, default: 0]
+            spelled[repository] = occurrence + 1
+            if !Self.isRepositorySlug(repository) {
+                error("repository `\(repository)` isn't `owner/name`", at: node.path + [.key("repositories")], value: repository)
+            } else if !listed.insert(repository.lowercased()).inserted {
+                // GitHub's names aren't case-sensitive: `o/r` and `O/R` are one repository.
+                errors.append(ConfigIssue(
+                    line: map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence),
+                    message: Self.duplicateRepositoryMessage(repository, project: name ?? "")
+                ))
+            }
         }
         guard let name, let repositories else { return nil }
         return Configuration.Project(
@@ -234,6 +247,11 @@ final class ConfigurationReader {
                 firstLine[name] = .some(line)
             }
         }
+    }
+
+    /// Why a project can't list `repository` again (in any letter case).
+    static func duplicateRepositoryMessage(_ repository: String, project: String) -> String {
+        "project `\(project)` lists repository `\(repository)` twice (names aren't case-sensitive)"
     }
 
     /// `owner/name`: a GitHub login (letters, digits, hyphens) and a
