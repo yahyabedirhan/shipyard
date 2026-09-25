@@ -1,0 +1,303 @@
+import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+@testable import ShipyardCore
+import Testing
+
+private let userURL = GitHubClient.apiURL.appendingPathComponent("user")
+private let viewerAnswer = StubHTTP.Answer.json(#"{"login":"yabepa","id":42,"type":"User"}"#)
+private let unauthorized = StubHTTP.Answer.json(
+    #"{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest","status":"401"}"#, status: 401
+)
+private let withProjects = """
+    [[projects]]
+    name = "shipyard"
+    repositories = ["yahyabedirhan/shipyard"]
+
+    """
+
+/// A `Shipyard` over in-memory ports: a token store, a fake `gh`, stubbed
+/// HTTP, a manual clock and instant sleeps, with its configuration in a
+/// temporary directory.
+@MainActor
+private struct Harness {
+    let stub = StubHTTP()
+    let store: InMemoryTokenStore
+    let gh: FakeGhLookup
+    let sleeper = InstantSleeper(clock: ManualClock())
+    let shipyard: Shipyard
+
+    init(stored: String? = nil, gh ghToken: String? = nil, config: String? = nil) throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("config.toml")
+        if let config {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(config.utf8).write(to: url)
+        }
+        store = InMemoryTokenStore(token: stored)
+        gh = FakeGhLookup(token: ghToken)
+        shipyard = Shipyard(
+            configStore: ConfigStore(url: url),
+            tokenStore: store,
+            gh: gh,
+            transport: stub,
+            clock: sleeper.clock,
+            sleep: sleeper.sleep,
+            oauthClientID: "test-client-id"
+        )
+    }
+
+    var authorizations: [String?] {
+        stub.requests("GET", userURL).map { $0.value(forHTTPHeaderField: "Authorization") }
+    }
+}
+
+@Suite("Signing in")
+@MainActor
+struct SignInTests {
+    // MARK: - Finding a token
+
+    @Test("a token in the token store signs in without asking gh")
+    func storedToken() async throws {
+        let harness = try Harness(stored: "gho_stored", gh: "gho_fromgh")
+        harness.stub.on(userURL, viewerAnswer)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .needsProjects)
+        #expect(harness.shipyard.tokenSource == .tokenStore)
+        #expect(harness.shipyard.viewer == Viewer(login: "yabepa", id: 42))
+        #expect(harness.authorizations == ["Bearer gho_stored"])
+        #expect(harness.gh.lookups == 0)
+    }
+
+    @Test("gh's token signs in silently when the token store is empty, straight to ready with projects")
+    func ghToken() async throws {
+        let harness = try Harness(gh: "gho_fromgh", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .ready)
+        #expect(harness.shipyard.tokenSource == .gh)
+        #expect(harness.authorizations == ["Bearer gho_fromgh"])
+    }
+
+    @Test("with no token anywhere, shipyard stays signed out and asks GitHub nothing")
+    func noToken() async throws {
+        let harness = try Harness()
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.tokenSource == nil)
+        #expect(harness.gh.lookups == 1)
+        #expect(harness.stub.requests.isEmpty)
+    }
+
+    @Test("a revoked stored token signs out and is dropped from the token store")
+    func revokedStoredToken() async throws {
+        let harness = try Harness(stored: "gho_revoked", config: withProjects)
+        harness.stub.on(userURL, unauthorized)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.tokenSource == nil)
+        #expect(try harness.store.token() == nil)
+    }
+
+    @Test("a revoked gh token signs out")
+    func revokedGhToken() async throws {
+        let harness = try Harness(gh: "gho_revoked")
+        harness.stub.on(userURL, unauthorized)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .signedOut)
+    }
+
+    @Test("GitHub out of reach still signs in; the viewer waits for a later request")
+    func offline() async throws {
+        let harness = try Harness(stored: "gho_stored")
+        harness.stub.on(userURL, .failure())
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .needsProjects)
+        #expect(harness.shipyard.viewer == nil)
+    }
+
+    // MARK: - A 401 from any request
+
+    @Test("a 401 from a later request signs out and drops the stored token")
+    func unauthorizedLater() async throws {
+        let harness = try Harness(stored: "gho_stored", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer, unauthorized)
+        await harness.shipyard.start()
+        #expect(harness.shipyard.phase == .ready)
+
+        await #expect(throws: GitHubError.unauthorized) {
+            _ = try await harness.shipyard.request { try await $0.viewer() }
+        }
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.viewer == nil)
+        #expect(try harness.store.token() == nil)
+    }
+
+    @Test("other failures from a request leave shipyard signed in")
+    func otherFailureKeepsSignedIn() async throws {
+        let harness = try Harness(stored: "gho_stored", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer, .status(502))
+        await harness.shipyard.start()
+
+        await #expect(throws: GitHubError.http(502)) {
+            _ = try await harness.shipyard.request { try await $0.viewer() }
+        }
+
+        #expect(harness.shipyard.phase == .ready)
+        #expect(try harness.store.token() == "gho_stored")
+    }
+
+    // MARK: - Device flow
+
+    @Test("the device flow shows the code while polling, then saves the token and signs in")
+    func deviceFlowSignsIn() async throws {
+        let harness = try Harness()
+        let start = harness.sleeper.clock.now
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code(interval: 5))
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.pending, DeviceFlowAnswers.token("gho_device"))
+        harness.stub.on(userURL, viewerAnswer)
+        let seen = Locked<[Phase]>([])
+        let shipyard = harness.shipyard
+        harness.sleeper.onSleep { _, _ in
+            let phase = await shipyard.phase
+            seen.withValue { $0.append(phase) }
+        }
+
+        await harness.shipyard.start()
+        await harness.shipyard.beginDeviceFlow().value
+
+        let code = DeviceCode(
+            userCode: "WDJB-MJHT",
+            verificationURL: URL(string: "https://github.com/login/device")!,
+            expiresAt: start.addingTimeInterval(900)
+        )
+        #expect(seen.current == [.connecting(code), .connecting(code)])
+        #expect(try harness.store.token() == "gho_device")
+        #expect(harness.shipyard.phase == .needsProjects)
+        #expect(harness.shipyard.tokenSource == .tokenStore)
+        #expect(harness.shipyard.viewer == Viewer(login: "yabepa", id: 42))
+        #expect(harness.authorizations == ["Bearer gho_device"])
+        #expect(harness.shipyard.signInError == nil)
+    }
+
+    @Test("a code that expires ends the flow cleanly, and a new flow can start")
+    func expiryAndRestart() async throws {
+        let harness = try Harness(config: withProjects)
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code(userCode: "FIRST-CODE"))
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.pending)
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signInError == .expired)
+        #expect(try harness.store.token() == nil)
+
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code(userCode: "SECOND-CODE"))
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.token("gho_second"))
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .ready)
+        #expect(harness.shipyard.signInError == nil)
+        #expect(try harness.store.token() == "gho_second")
+        #expect(harness.stub.requests("POST", DeviceFlow.codeURL).count == 2)
+    }
+
+    @Test("the user declining returns to signed out with the reason")
+    func denied() async throws {
+        let harness = try Harness()
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.denied)
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signInError == .denied)
+    }
+
+    @Test("cancelling returns to signed out, stops polling and saves nothing")
+    func cancel() async throws {
+        let harness = try Harness()
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.pending, DeviceFlowAnswers.token())
+        let shipyard = harness.shipyard
+        harness.sleeper.onSleep { index, _ in
+            if index == 1 { await shipyard.cancelDeviceFlow() }
+        }
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signInError == nil)
+        #expect(harness.stub.requests("POST", DeviceFlow.tokenURL).count == 1)
+        #expect(try harness.store.token() == nil)
+    }
+
+    @Test("a device-flow token GitHub then rejects signs out")
+    func deviceTokenRejected() async throws {
+        let harness = try Harness()
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.token("gho_bad"))
+        harness.stub.on(userURL, unauthorized)
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(try harness.store.token() == nil)
+    }
+
+    @Test("the device flow only starts when signed out")
+    func onlyWhenSignedOut() async throws {
+        let harness = try Harness(stored: "gho_stored")
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .needsProjects)
+        #expect(harness.stub.requests("POST", DeviceFlow.codeURL).isEmpty)
+    }
+
+    // MARK: - Signing out
+
+    @Test("signing out clears the token store")
+    func signOut() async throws {
+        let harness = try Harness(stored: "gho_stored", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        let result = harness.shipyard.signOut()
+
+        #expect(result == .signedOut)
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.tokenSource == nil)
+        #expect(harness.shipyard.viewer == nil)
+        #expect(try harness.store.token() == nil)
+    }
+
+    @Test("signing out of a gh token says gh is still signed in")
+    func signOutOfGh() async throws {
+        let harness = try Harness(gh: "gho_fromgh")
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.signOut() == .ghStillSignedIn)
+        #expect(harness.shipyard.phase == .signedOut)
+    }
+}

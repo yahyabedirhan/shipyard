@@ -164,8 +164,9 @@ Operations:
 | `open(item)` / `markSeen(item)` | opens URL (or not), `attention.markSeen` | — |
 | `markAllSeen(project?)` | marks every open item seen | — |
 | `toggleCollapsed(project)` | flips app state | — |
-| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth` | only in `signedOut` |
+| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
 | `signOut()` | clears Keychain token → `signedOut` | if the token came from `gh`, says to run `gh auth logout` |
+| `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut`, dropping the stored token when it came from the token store |
 
 ### Configuration — `ShipyardCore/Config/Configuration.swift`
 
@@ -249,13 +250,13 @@ The app's `ConfigWatcher` watches the **directory**, not the file, and calls `re
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `Shipyard/Keychain.swift`)
 
 Kept from ghbar almost as is, because it worked well:
-- `TokenProvider.current()`: Keychain first (the user signed in explicitly), then `gh auth token` found at known paths (`/opt/homebrew/bin/gh`, `/usr/local/bin/gh`, then `PATH`), since an `.app` starts with an almost empty `PATH`.
-- `DeviceFlow`: request code → show code and open github.com/login/device → poll → store in Keychain. Needs a GitHub OAuth App client ID (scopes `repo`, `read:org`).
+- `TokenProvider.current()`: Keychain first (the user signed in explicitly), then `gh auth token` found at known paths (`/opt/homebrew/bin/gh`, `/usr/local/bin/gh`, then `PATH`), since an `.app` starts with an almost empty `PATH`. Spawning `gh` sits behind the `GhTokenLookup` protocol (`GhCLI` runs it with `Process`), so tests use a fake lookup.
+- `DeviceFlow`: request code → show code and open github.com/login/device → poll every `interval` s (+5 s per `slow_down`) → store in Keychain. Stops with `.expired` after the code's 15 minutes. Needs a GitHub OAuth App client ID (scopes `repo`, `read:org`): the one build-time constant `OAuthApp.clientID`, a placeholder until the maintainer registers the app (the flow refuses to start while it's the placeholder). Waiting and the clock are injected, so tests poll without real time passing.
 - `Keychain` (app target): the `TokenStore` port, get/set/delete one token. Tests use an in-memory store.
 
 ### GitHubClient — `ShipyardCore/GitHub/GitHubClient.swift`
 
-State: token, `URLSession`. Operations:
+State: token, `HTTPTransport` (`URLSessionTransport` in the app; tests stub responses at this layer). Operations:
 
 | Operation | Returns / rejects |
 |---|---|
@@ -380,12 +381,13 @@ shipyard/
 │   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
 │   │   └── ConfigStore.swift         # path, reload, last-valid fallback, append projects
 │   ├── GitHub/
+│   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer, rate-limit headers, ETags
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
 │   │   ├── WorkflowRuns.swift        # REST runs request + parse + branch filter
 │   │   └── Auth/
-│   │       ├── TokenProvider.swift   # TokenStore → gh → none
+│   │       ├── TokenProvider.swift   # TokenStore → gh → none; GhCLI finds and runs gh
 │   │       └── DeviceFlow.swift      # OAuth device flow
 │   ├── Items/
 │   │   ├── Item.swift                # Item, Snapshot, fingerprint
@@ -414,7 +416,7 @@ shipyard/
 │           ├── ConnectView.swift
 │           └── ProjectPicker.swift
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; fixtures of GitHub responses
-    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, recording URL opener
+    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, recording URL opener; stub HTTP transport, fake gh, instant sleeper
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation (plus FoundationNetworking on Linux) and TOMLDecoder; the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `Shipyard` app target supplies them: the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.
