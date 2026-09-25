@@ -205,7 +205,7 @@ struct Panel: View {
                 }
                 Spacer()
                 if shipyard.phase == .ready, shipyard.menu.attention.total > 0 {
-                    Button("Mark all seen") {
+                    Button(PanelText.markAllSeen) {
                         withAnimation(.spring(duration: 0.45, bounce: 0.15)) {
                             actions.layoutActions.markAllSeen(nil)
                         }

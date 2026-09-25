@@ -62,8 +62,16 @@ bundle: build
 	@echo "bundled $(APP_BUNDLE) ($(VERSION))"
 
 install: bundle
-	@pkill -x $(APP) 2>/dev/null || true
-	@while pgrep -x $(APP) >/dev/null; do sleep 0.2; done
+	@# Only this user's copy; one that hasn't quit after about 10 s is killed.
+	@pkill -u "$$USER" -x $(APP) 2>/dev/null || true
+	@tries=0; while pgrep -u "$$USER" -x $(APP) >/dev/null; do \
+		if [ $$tries -ge 50 ]; then \
+			echo "$(APP) didn't quit within 10 s; killing it"; \
+			pkill -9 -u "$$USER" -x $(APP) 2>/dev/null || true; \
+			sleep 0.5; break; \
+		fi; \
+		tries=$$((tries + 1)); sleep 0.2; \
+	done
 	rm -rf $(INSTALL_DIR)/$(APP).app
 	ditto $(APP_BUNDLE) $(INSTALL_DIR)/$(APP).app
 	@echo "installed $(INSTALL_DIR)/$(APP).app"

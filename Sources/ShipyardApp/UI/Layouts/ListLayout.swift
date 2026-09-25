@@ -118,7 +118,7 @@ private struct ListSectionHeader: View {
                 } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "checkmark.circle")
-                        Text("Mark all seen")
+                        Text(PanelText.markAllSeen)
                     }
                 }
                 .buttonStyle(TextButtonStyle())

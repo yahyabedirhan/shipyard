@@ -11,6 +11,7 @@ Shipyard shows the pull requests (and, if you turn them on, issues and workflow 
 ### Requirements
 
 - **macOS 14** or later. Shipyard ships for macOS only.
+- **To build from source: the Command Line Tools with Swift 6 or later** (`swift --version` says which you have). The package uses Swift tools version 6.0; Xcode isn't needed.
 - **The [GitHub CLI](https://cli.github.com), installed and signed in.** Shipyard 0.0.x connects to GitHub only through `gh`, picking up its token silently; signing in without `gh` is planned for a later version.
 
   ```sh
@@ -20,7 +21,7 @@ Shipyard shows the pull requests (and, if you turn them on, issues and workflow 
 
 ### From source
 
-You need the Command Line Tools (`xcode-select --install`); Xcode isn't needed.
+You need the Command Line Tools (`xcode-select --install`) with Swift 6 or later; check with `swift --version`. Xcode isn't needed.
 
 ```sh
 git clone https://github.com/yahyabedirhan/shipyard.git
@@ -80,6 +81,14 @@ From a zip, quit shipyard, delete the old copy (`rm -rf /Applications/Shipyard.a
    ```sh
    rm -rf ~/.config/shipyard ~/Library/Application\ Support/Shipyard
    ```
+
+5. If you installed the agent skill, remove it:
+
+   ```sh
+   npx skills remove shipyard -g
+   ```
+
+6. macOS may keep a Shipyard entry under System Settings > Notifications after the app is gone. It's harmless, and System Settings has no button to remove it; leave it, or turn its notifications off there.
 
 `gh` stays signed in; run `gh auth logout` if you want that too.
 

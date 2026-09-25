@@ -28,6 +28,11 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(10) == "10 need attention")
     }
 
+    @Test("the footer's and a section's button to mark everything seen says so")
+    func markAllSeen() {
+        #expect(PanelText.markAllSeen == "Mark all seen")
+    }
+
     @Test("last updated counts minutes, then hours, then days; nothing before the first refresh")
     func lastUpdated() {
         #expect(PanelText.lastUpdated(nil, now: now) == nil)

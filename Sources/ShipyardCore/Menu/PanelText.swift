@@ -50,6 +50,10 @@ public enum PanelText {
         return ["#\(row.number)"] + repository + subject
     }
 
+    /// The button that marks everything it covers seen: the footer's for
+    /// every project, a list section's (on hover) for that project, and the
+    /// All tab's.
+    public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
     /// Said in a row's tooltip, under its URL, while it needs attention.
@@ -126,7 +130,7 @@ public enum PanelText {
     /// The button next to that line: All marks every project seen, a
     /// project's tab only that project.
     public static func markTabSeen(_ tab: MenuTab) -> String {
-        tab == .all ? "Mark all seen" : "Mark seen"
+        tab == .all ? markAllSeen : markRowSeen
     }
 
     /// What a tab with no rows and no error rows says in their place, as
