@@ -243,6 +243,13 @@ public final class Shipyard {
     @discardableResult
     public func reloadConfiguration() async -> ConfigStore.ReloadResult {
         let result = configStore.reload()
+        await follow(result)
+        return result
+    }
+
+    /// Moves the phase with a reload's result and refreshes (or stops the
+    /// timer). Only a valid change moves anything.
+    private func follow(_ result: ConfigStore.ReloadResult) async {
         if case .changed(let configuration) = result {
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // `[attention]` and `[menu-bar]` apply at once, even if the
@@ -254,7 +261,61 @@ public final class Shipyard {
                 timer.disarm()
             }
         }
+    }
+
+    // MARK: - Project picker
+
+    /// The repositories the picker suggests: the viewer's own and those they
+    /// contributed to, most recently pushed first, without archived ones.
+    /// Throws `GitHubError` when GitHub can't answer (a 401 also signs out;
+    /// a spent rate limit also pauses refreshing).
+    public func suggestedRepositories() async throws -> [RepoSummary] {
+        let now = clock.now
+        do {
+            return try await request { try await $0.recentRepositories(at: now) }
+        } catch {
+            recordLimit(error)
+            throw error
+        }
+    }
+
+    /// Checks a repository the user typed (`owner/name`, or a github.com
+    /// link to one) against GitHub before the picker accepts it. Accepted
+    /// repositories carry GitHub's spelling of the name; a rejection says why.
+    public func checkRepository(_ text: String) async -> RepositoryCheck {
+        let typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let slug = RepositoriesQuery.slug(from: typed) else { return .rejected(.notASlug(typed)) }
+        do {
+            return .accepted(try await request { try await $0.repository(slug) })
+        } catch GitHubError.http(404) {
+            return .rejected(.notFound(slug))
+        } catch GitHubError.http(403) {
+            return .rejected(.forbidden(slug))
+        } catch {
+            recordLimit(error)
+            let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
+            return .rejected(.couldNotCheck(slug, failure))
+        }
+    }
+
+    /// Writes the picker's choices to the configuration file, one
+    /// `[[projects]]` block each, appended after whatever is there, and
+    /// follows the reload that comes after: with projects, the phase moves
+    /// to `ready` and the first refresh runs, without a restart. Throws a
+    /// `ConfigError` (and writes nothing) for an empty name, a name already
+    /// used, a project without repositories or a slug that isn't
+    /// `owner/name`; throws the file system's error when it can't write.
+    @discardableResult
+    public func addProjects(_ projects: [NewProject]) async throws -> ConfigStore.ReloadResult {
+        let result = try configStore.append(projects: projects)
+        await follow(result)
         return result
+    }
+
+    /// A limit the picker ran into holds refreshes back too: it's the same limit.
+    private func recordLimit(_ error: any Error) {
+        guard let error = error as? GitHubError else { return }
+        budget.record(error, at: clock.now)
     }
 
     // MARK: - Refreshing

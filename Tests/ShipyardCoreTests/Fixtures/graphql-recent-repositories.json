@@ -1,0 +1,24 @@
+{
+  "data": {
+    "viewer": {
+      "login": "yabepa",
+      "repositories": {
+        "nodes": [
+          { "nameWithOwner": "yahyabedirhan/shipyard", "description": "A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.", "isPrivate": false, "isArchived": false, "pushedAt": "2026-09-25T11:00:00Z" },
+          { "nameWithOwner": "yahyabedirhan/e-commerce-backend", "description": null, "isPrivate": true, "isArchived": false, "pushedAt": "2026-09-24T18:00:00Z" },
+          { "nameWithOwner": "friend/notes", "description": "Shared notes", "isPrivate": true, "isArchived": false, "pushedAt": "2026-09-22T07:15:00Z" },
+          { "nameWithOwner": "yahyabedirhan/job-search", "description": "Tracking applications", "isPrivate": true, "isArchived": false, "pushedAt": "2026-09-20T09:00:00Z" },
+          { "nameWithOwner": "yahyabedirhan/empty", "description": null, "isPrivate": false, "isArchived": false, "pushedAt": null }
+        ]
+      },
+      "repositoriesContributedTo": {
+        "nodes": [
+          { "nameWithOwner": "acme/storefront", "description": "Acme's shop", "isPrivate": true, "isArchived": false, "pushedAt": "2026-09-25T09:30:00Z" },
+          { "nameWithOwner": "oldorg/legacy", "description": "No longer maintained", "isPrivate": false, "isArchived": true, "pushedAt": "2026-09-23T12:00:00Z" },
+          { "nameWithOwner": "Friend/Notes", "description": "Shared notes", "isPrivate": true, "isArchived": false, "pushedAt": "2026-09-22T07:15:00Z" }
+        ]
+      }
+    },
+    "rateLimit": { "limit": 5000, "remaining": 4989, "used": 11, "resetAt": "2026-09-25T12:42:00Z", "cost": 1 }
+  }
+}

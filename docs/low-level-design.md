@@ -109,7 +109,8 @@ Shipyard -> Notifier               post(notification)
 Notifier -> Shipyard               openNotification(itemURL) on a click
 Shipyard -> MenuModel              build(snapshot, config, appState) -> what Panel draws
 Panel    -> Shipyard               click(item), collapse(project), markAllSeen(), refresh()
-Onboarding -> ConfigStore          writes projects (the one writer)
+Onboarding -> Shipyard            suggestedRepositories(), checkRepository(text), addProjects(projects)
+Shipyard -> ConfigStore            append(projects:) (the one writer), then follows the reload
 Snapshot  has  [Project -> [Item]]
 Configuration has [Project], Defaults, [NotificationRule]
 ```
@@ -173,6 +174,9 @@ Operations:
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
+| `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
+| `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
+| `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigError` (empty or used name, no repositories, bad slug) before writing anything |
 | `signOut()` | clears Keychain token → `signedOut`; app state (seen, collapsed) is kept | if the token came from `gh`, says to run `gh auth logout` |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut`, dropping the stored token when it came from the token store |
 
@@ -271,7 +275,8 @@ State: token, `HTTPTransport` (`URLSessionTransport` in the app; tests stub resp
 | `viewer() -> Viewer` (login, id) | 401 → `.unauthorized` |
 | `fetch(projects: [ProjectSettings], at:) -> Snapshot` | one GraphQL call for PRs and issues (all repositories as aliases), plus one REST call per repository for runs when runs are on; partial errors land per repository in the snapshot. The GraphQL query also asks for `rateLimit { limit remaining resetAt cost }`; REST reads the `x-ratelimit-*` headers and sends `If-None-Match` so unchanged runs come back as 304, which GitHub doesn't count against the limit |
 | rate-limit errors | `.rateLimited(resetAt, api)` from `x-ratelimit-reset` (403/429 with `x-ratelimit-remaining: 0`, or GraphQL's 200 with a `RATE_LIMITED` error or with `x-ratelimit-remaining: 0` and an error); `api` comes from `x-ratelimit-resource` (`graphql`, else REST), or the URL without it. `.secondaryLimit(retryAfter)` from `retry-after` (it wins over the reset time), else 60 s for a bare 429 or a 403 whose message says "secondary rate limit"; any other 403 is `.http(403)`. Every response's `x-ratelimit-*` headers are read into a `RateLimit`; the snapshot carries GraphQL's (headers first, `cost` from the body). GraphQL's exhausted case is a 200 with an error, so the check reads headers, not only the status code. REST calls for runs go one after another, never in parallel (GitHub's guidance against secondary limits) |
-| `recentRepositories() -> [RepoSummary]` | for the picker: the viewer's repositories by `pushedAt` plus those they contributed to recently |
+| `recentRepositories(at:) -> [RepoSummary]` | for the picker, one GraphQL request (`GitHub/Repositories.swift`): `viewer.repositories` (owner and collaborator, `isArchived: false`) and `viewer.repositoriesContributedTo`, each `first: 25` ordered by `PUSHED_AT`; merged, each repository once (case-insensitive), archived ones dropped (the contributed list has no `isArchived` argument), newest push first, never-pushed last. Rate-limit errors as for `fetch` |
+| `repository(slug) -> RepoSummary` | REST `GET /repos/{owner}/{repo}`, for the picker's check of a typed name; `full_name` is GitHub's spelling; 404 → `.http(404)` |
 
 The query text lives next to its parser in `GitHub/ProjectQuery.swift` (build + parse, one owner). Each repository is asked for once (aliases `repo0`, `repo1`… with `$owner<i>`/`$name<i>` variables), even when several projects list it, and the query also asks for `viewer { login }` (to tell `me` and the viewer's review requests apart) and `rateLimit`. An alias that comes back `null` with a `NOT_FOUND` (missing, or no access) or `FORBIDDEN` error becomes that repository's error in the snapshot; the others still parse. Per repository alias it asks for: open PRs (first 50), PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally), the same for issues when shown, and per PR `isDraft`, `author { login, __typename }`, `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, `reviewRequests` (to find the viewer), and the head commit's `statusCheckRollup.state`.
 Runs come from REST (`GET /repos/{o}/{r}/actions/runs?created=>…`, plus `status=in_progress`), because GraphQL doesn't list workflow runs.
@@ -411,6 +416,7 @@ shipyard/
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer, rate-limit headers, ETags
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
+│   │   ├── Repositories.swift        # the picker's calls: recent repositories (GraphQL), checking a typed one (REST); RepoSummary, RepositoryCheck
 │   │   ├── WorkflowRuns.swift        # REST runs request + parse + branch filter
 │   │   └── Auth/
 │   │       ├── TokenProvider.swift   # TokenStore → gh → none; GhCLI finds and runs gh
