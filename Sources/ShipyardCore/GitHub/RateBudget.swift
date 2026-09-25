@@ -230,12 +230,15 @@ public struct RateBudget: Equatable, Sendable {
         return delay
     }
 
-    /// What the footer draws, or `nil` when it shows nothing: `show = never`,
-    /// `when-low` while every API is above 25%, or no limit heard of yet.
-    public func indicator(show: RateLimitDisplay, at now: Date) -> RateIndicator? {
+    /// What the footer draws for the APIs in `use`, or `nil` when it shows
+    /// nothing: `show = never`, `when-low` while every such API is above
+    /// 25%, or no limit heard of yet. An API shipyard no longer calls (REST,
+    /// once runs are turned off) drops out, rather than show numbers that
+    /// go stale.
+    public func indicator(show: RateLimitDisplay, in use: Set<RateAPI> = Set(RateAPI.allCases), at now: Date) -> RateIndicator? {
         guard show != .never else { return nil }
         let apis = RateAPI.allCases.compactMap { api -> RateUsage? in
-            guard let limit = limits[api] else { return nil }
+            guard use.contains(api), let limit = limits[api] else { return nil }
             return RateUsage(
                 api: api,
                 remaining: limit.remaining,

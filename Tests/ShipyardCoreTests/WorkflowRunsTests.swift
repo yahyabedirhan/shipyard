@@ -228,6 +228,22 @@ struct WorkflowRunsTests {
         #expect(harness.shipyard.menu.rateIndicator?.apis.map(\.api) == [.graphql])
     }
 
+    @Test("the footer's REST line comes with runs and goes when they're turned off")
+    func restLineFollowsRuns() async throws {
+        let harness = try await Harness.started(
+            config: runsConfig(),
+            graphQL: shopGraphQL(),
+            runs: [shopRepository: [runsFixture()]]
+        )
+        #expect(harness.shipyard.menu.rateIndicator?.apis.map(\.api) == [.graphql, .rest])
+
+        try harness.writeConfig(runsConfig(""))
+        harness.clock.advance(by: 120)
+        await harness.shipyard.reloadConfiguration()
+        #expect(harness.runRows.isEmpty)
+        #expect(harness.shipyard.menu.rateIndicator?.apis.map(\.api) == [.graphql])
+    }
+
     // MARK: - Conditional requests and the rate limit
 
     @Test("each refresh asks once per repository, one after another, with If-None-Match; a 304 reuses the runs and costs nothing")

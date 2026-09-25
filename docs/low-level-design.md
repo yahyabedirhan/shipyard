@@ -375,6 +375,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
         <ProjectSection> ×N   header: chevron (click collapses/expands), name, attention count, "Mark all seen"
           <ItemRow> ×N        attention dot, state icon, title (semibold when it needs attention),
                               "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
+                              a run: workflow name, "#41 · shipyard · main · failed · 12m", no check dot;
                               click opens and marks seen, ⌥-click marks seen only
         footer                last updated · global "Mark all seen" · rate limit indicator (amber low, red exhausted) ·
                               Refresh · Open configuration file · Install agent skill… · Sign out (once signed in) · Quit
@@ -382,7 +383,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 `ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; Install agent skill… (#18) comes with its ticket.
 
-The words the panel shows (a row's age and second line, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes and rereads the notification permission, and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, and tells the panel whether notifications are off.
+The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes and rereads the notification permission, and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, and tells the panel whether notifications are off.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -396,7 +397,7 @@ State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the
 | `record(error, at:)` | `.rateLimited(resetAt, api)` marks that API at 0 and pauses until `resetAt`; `.secondaryLimit(retryAfter)` pauses for `retryAfter` (60 s when it's 0 or less); the later pause wins; other errors change nothing |
 | `nextDelay(configured, sharePercent, at:) -> RefreshDelay` | `paused(until, reason)` while paused; `backedOff(max(600 s, stretched), api)` if any API whose window hasn't reset has under 20% left; else `max(configured, 3600 × cost ÷ (limit × share))` over the APIs, reported as `stretched(seconds, api, cost)` when it beat `configured`, else `configured` |
 | `canRefresh(at:) -> Bool` | false only while paused (⌘R uses this) |
-| `indicator(show, at:) -> RateIndicator?` | what the footer draws: per API remaining / limit, reset time and level (`normal`, `low` under 25% (ghbar's threshold), `exhausted` at 0; a window that has reset counts as normal), and the worst level for the colour; `nil` for `never`, for `when-low` while all are normal, or before any limit is known |
+| `indicator(show, in: apis, at:) -> RateIndicator?` | what the footer draws: per API in use (`Shipyard` passes REST only while some project shows workflow runs, so a REST line doesn't linger stale once runs are off) remaining / limit, reset time and level (`normal`, `low` under 25% (ghbar's threshold), `exhausted` at 0; a window that has reset counts as normal), and the worst level for the colour; `nil` for `never`, for `when-low` while all are normal, or before any limit is known |
 
 After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it (`paused` arms for the time left until the pause ends), so a busy hour slows shipyard down on its own instead of running the limit dry. Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
@@ -450,7 +451,7 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   └── PanelText.swift           # pure: row age and second line, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words
+│   │   └── PanelText.swift           # pure: row age and second line, a state's word and the state icon's VoiceOver label, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words
 │   └── Skill/
 │       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
@@ -514,7 +515,7 @@ refresh()
   budget.record(snapshot.rateLimits, now)
   menu = MenuModel.build(snapshot, config, appState, now)   // Panel re-renders from it
   delay = budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent, now)
-  menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, now)
+  menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, in: [graphql] + [rest if any project shows runs], now)
   for n in toPost: await notifier.post(n)              // after saving: a crash loses one rather than repeating it
   timer.arm(delay.seconds(from: now))
   if gate.finish() then refresh()                     // a queued trigger arrived meanwhile

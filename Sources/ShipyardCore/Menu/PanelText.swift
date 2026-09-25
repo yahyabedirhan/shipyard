@@ -12,12 +12,45 @@ public enum PanelText {
 
     /// A row's second line: "#21 · shipyard · yahyabedirhan · 37m", naming
     /// the repository (without its owner) only when `showingRepository`
-    /// (its project has more than one): "#21 · yahyabedirhan · 37m".
+    /// (its project has more than one): "#21 · yahyabedirhan · 37m". An
+    /// issue reads the same. A workflow run (whose first line is its
+    /// workflow's name) names its branch and state instead of its author:
+    /// "#41 · shipyard · main · failed · 12m", aged from its start while
+    /// running and from its finish after.
     public static func rowDetail(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
         let repository = showingRepository
             ? [row.repository.split(separator: "/").last.map(String.init) ?? row.repository]
             : []
-        return (["#\(row.number)"] + repository + [row.author, age(row.age(at: now))]).joined(separator: " · ")
+        let subject: [String] = switch row.kind {
+        case .pullRequest, .issue: [row.author]
+        case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
+        }
+        return (["#\(row.number)"] + repository + subject + [age(row.age(at: now))]).joined(separator: " · ")
+    }
+
+    /// What the row's state icon says to VoiceOver: its state and kind,
+    /// "open pull request", "closed issue", "failed workflow run".
+    public static func stateLabel(_ row: MenuRow) -> String {
+        let kind = switch row.kind {
+        case .pullRequest: "pull request"
+        case .issue: "issue"
+        case .workflowRun: "workflow run"
+        }
+        return "\(state(row.state)) \(kind)"
+    }
+
+    /// A state in a word: "open", "merged", "running", "failed"…, for a
+    /// run's second line and the state icon's label.
+    public static func state(_ state: ItemState) -> String {
+        switch state {
+        case .open: "open"
+        case .draft: "draft"
+        case .merged: "merged"
+        case .closed: "closed"
+        case .running: "running"
+        case .succeeded: "succeeded"
+        case .failed: "failed"
+        }
     }
 
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before

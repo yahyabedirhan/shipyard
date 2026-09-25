@@ -462,7 +462,14 @@ public final class Shipyard {
     private func publishRateStatus() -> RefreshDelay {
         let delay = nextDelay()
         menu.refreshDelay = delay
-        menu.rateIndicator = budget.indicator(show: configStore.lastValid.rateLimit.show, at: clock.now)
+        let configuration = configStore.lastValid
+        // REST serves workflow runs only: its line shows while some project shows them.
+        let showsRuns = configuration.projects.contains { configuration.settings(for: $0).shows(.workflowRun) }
+        menu.rateIndicator = budget.indicator(
+            show: configuration.rateLimit.show,
+            in: showsRuns ? [.graphql, .rest] : [.graphql],
+            at: clock.now
+        )
         return delay
     }
 

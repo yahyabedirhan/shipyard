@@ -89,6 +89,81 @@ struct PanelTextTests {
         #expect(PanelText.rowDetail(row(), showingRepository: false, now: now) == "#21 · yahyabedirhan · 37m")
     }
 
+    private func issue(state: ItemState) -> MenuRow {
+        MenuRow(Item(
+            kind: .issue,
+            repository: "yahyabedirhan/shipyard",
+            number: 17,
+            title: "Issues and workflow runs in the panel",
+            url: URL(string: "https://github.com/yahyabedirhan/shipyard/issues/17")!,
+            author: "octocat",
+            authorKind: .other,
+            state: state,
+            createdAt: now.addingTimeInterval(-3 * 86_400),
+            updatedAt: now.addingTimeInterval(-3600),
+            closedAt: state == .closed ? now.addingTimeInterval(-2 * 3600) : nil
+        ))
+    }
+
+    @Test("an issue's second line reads like a pull request's")
+    func issueDetail() {
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: false, now: now) == "#17 · octocat · 3d")
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: true, now: now) == "#17 · shipyard · octocat · 3d")
+        #expect(PanelText.rowDetail(issue(state: .closed), showingRepository: false, now: now) == "#17 · octocat · 2h")
+    }
+
+    private func run(state: ItemState, branch: String? = "main") -> MenuRow {
+        MenuRow(Item(
+            kind: .workflowRun,
+            repository: "yahyabedirhan/shipyard",
+            number: 41,
+            title: "CI",
+            url: URL(string: "https://github.com/yahyabedirhan/shipyard/actions/runs/9001")!,
+            author: "yahyabedirhan",
+            authorKind: .me,
+            state: state,
+            createdAt: now.addingTimeInterval(-20 * 60),
+            updatedAt: now.addingTimeInterval(-12 * 60),
+            closedAt: state == .running ? nil : now.addingTimeInterval(-12 * 60),
+            branch: branch
+        ))
+    }
+
+    @Test("a run's second line names its branch and state, and ages from its start or finish", arguments: [
+        (ItemState.running, "#41 · main · running · 20m"),
+        (.succeeded, "#41 · main · succeeded · 12m"),
+        (.failed, "#41 · main · failed · 12m"),
+    ])
+    func runDetail(state: ItemState, text: String) {
+        #expect(PanelText.rowDetail(run(state: state), showingRepository: false, now: now) == text)
+    }
+
+    @Test("a run's second line names the repository only in a project with more than one, and leaves out a missing branch")
+    func runDetailRepository() {
+        #expect(PanelText.rowDetail(run(state: .failed), showingRepository: true, now: now) == "#41 · shipyard · main · failed · 12m")
+        #expect(PanelText.rowDetail(run(state: .failed, branch: nil), showingRepository: false, now: now) == "#41 · failed · 12m")
+    }
+
+    @Test("the state icon reads as the state and the kind, so VoiceOver tells an issue from a pull request")
+    func stateLabel() {
+        #expect(PanelText.stateLabel(row()) == "open pull request")
+        #expect(PanelText.stateLabel(issue(state: .closed)) == "closed issue")
+        #expect(PanelText.stateLabel(run(state: .failed)) == "failed workflow run")
+    }
+
+    @Test("each state has a word, for a run's second line and the state icon's label", arguments: [
+        (ItemState.open, "open"),
+        (.draft, "draft"),
+        (.merged, "merged"),
+        (.closed, "closed"),
+        (.running, "running"),
+        (.succeeded, "succeeded"),
+        (.failed, "failed"),
+    ])
+    func stateName(state: ItemState, text: String) {
+        #expect(PanelText.state(state) == text)
+    }
+
     // MARK: - The rate limit
 
     private let london = TimeZone(identifier: "Europe/London")!

@@ -3,8 +3,10 @@ import ShipyardCore
 import SwiftUI
 
 /// One item: a dot when it needs attention, its state icon in GitHub's
-/// colour, number and title, author and age, and the check dot. Clicking
-/// opens it in the browser and marks it seen; ⌥-click only marks it seen.
+/// colour, its title (a run: its workflow's name), the second line
+/// (number, author and age; a run: number, branch, state and age), and a
+/// pull request's check dot. Clicking opens it in the browser and marks
+/// it seen; ⌥-click only marks it seen.
 struct ItemRow: View {
     let row: MenuRow
     /// Whether the second line names the repository (its project has more than one).
@@ -26,6 +28,7 @@ struct ItemRow: View {
                 Image(systemName: Palette.symbol(row.state, kind: row.kind))
                     .foregroundStyle(Palette.color(row.state, kind: row.kind))
                     .frame(width: 14)
+                    .accessibilityLabel(PanelText.stateLabel(row))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
                         .fontWeight(row.needsAttention ? .semibold : .regular)
@@ -35,6 +38,10 @@ struct ItemRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        // Whatever runs long (a run's branch, an author)
+                        // gives way in the middle, so the age, and a run's
+                        // state, stay readable.
+                        .truncationMode(.middle)
                 }
                 Spacer(minLength: 4)
                 if let checks = row.checks, let color = Palette.color(checks) {
@@ -66,7 +73,7 @@ struct ItemRow: View {
         if flags.contains(.option) { markSeen() } else { open() }
     }
 
-    /// "#21 · shipyard · yahyabedirhan · 37m", or without the repository.
+    /// `PanelText.rowDetail`.
     private var detail: String {
         PanelText.rowDetail(row, showingRepository: showsRepository, now: now)
     }
