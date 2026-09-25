@@ -74,6 +74,15 @@ struct SkillDocumentTests {
         #expect(config.settings(for: issues).issues == IssueSettings(show: true, closedWindowDays: config.defaults.issues.closedWindowDays))
         // "group these repos"
         #expect(blocks.contains { ($0?.projects.first?.repositories.count ?? 0) > 1 })
+        // "hide dependabot"
+        #expect(blocks.contains { $0?.hideAuthors == ["dependabot[bot]"] })
+        // "switch the menu to tabs"
+        #expect(blocks.contains { $0?.menu.layout == .tabs })
+        // "show CI runs for this project and tell me when they fail": runs on for that
+        // project alone, with the default pr.opened rule kept beside run.failed
+        let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
+        #expect(config.settings(for: runs).workflowRuns.finishedWindowHours == config.defaults.workflowRuns.finishedWindowHours)
+        #expect(runs.notifications == [NotificationRule(event: .prOpened, authors: .any), NotificationRule(event: .runFailed, authors: .any)])
     }
 
     @Test("every key the schema declares is named")
@@ -96,6 +105,19 @@ struct SkillDocumentTests {
         })
         for key in leaves.sorted() {
             #expect(named.contains(key), "`\(key)` isn't named")
+        }
+        // A nested key is named beside its table, as `[menu-bar] count` or
+        // `pull-requests.show`, so `show` in one table doesn't cover another's.
+        // Keys of an array's elements (a project's `name`, a rule's `event`)
+        // are named in that element's own table.
+        let spanWords = spans.map { span in
+            Set(span.split { !($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }.map(String.init))
+        }
+        for path in declaredPaths(schema, root: schema).sorted() {
+            let segments = path.split(separator: ".").map(String.init)
+            guard segments.count > 1, !segments[segments.count - 2].hasSuffix("[]") else { continue }
+            let (table, key) = (segments[segments.count - 2], segments[segments.count - 1])
+            #expect(spanWords.contains { $0.contains(table) && $0.contains(key) }, "`\(path)` isn't named beside `\(table)`")
         }
     }
 
@@ -154,6 +176,8 @@ struct SkillDocumentTests {
         #expect(text.contains("~/.config/shipyard/config.toml"))
         #expect(text.contains("#:schema \(Configuration.schemaURL)"))
         #expect(text.contains("taplo check"))
+        // The app's own check: its error banner, in the words the panel shows.
+        #expect(text.contains("Using the last valid configuration."))
         #expect(SkillInstaller.command.contains("skills add yahyabedirhan/shipyard"))
     }
 }

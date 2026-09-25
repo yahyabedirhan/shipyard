@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to watch or group repositories in shipyard, show or hide issues, runs or drafts, switch the menu between a list and tabs, change when it notifies, or fix its configuration file.
+description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to watch or group repositories in shipyard, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file.
 ---
 
 # shipyard configuration
@@ -12,16 +12,18 @@ Shipyard lists the pull requests (and, when turned on, issues and workflow runs)
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.
 - Every key is optional. A missing or empty file means the defaults with no projects (the app then shows its project picker).
 - Keys are kebab-case. The schema is `https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`, named by the file's first line, `#:schema <url>`.
-- A broken save doesn't blank the app: it keeps the last valid configuration and shows the error, with its line, in its panel. Unknown keys are ignored with a warning.
+- A broken save doesn't blank the app: it keeps the last valid configuration and shows the error, with its line, in its panel. Unknown keys are ignored without a banner, so a misspelled key silently does nothing; the schema catches it.
+- A file the app created starts with a commented header that shows settings as commented-out TOML (`# [menu]`, `# layout = "list"`). To set one of those, uncomment its lines and change the value rather than adding a second copy, as long as no top-level key sits below them (see Editing it).
 
 ## Editing it
 
 1. Read the whole file first. The user writes comments in it and edits it by hand.
 2. Make the **smallest edit** that does the job: change or add only the lines the request needs, and keep every comment, blank line and the order of what's there. Shipyard itself never rewrites the file; its project picker only **appends** `[[projects]]` blocks at the end. Hold edits to the same standard.
 3. Put what you add where TOML reads it:
+   - A top-level key (`refresh-interval-seconds`, `hide-authors`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
+   - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
-   - A top-level key (`refresh-interval-seconds`, `hide-authors`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
 4. When the file doesn't exist, create it (and its directory) starting with:
 
@@ -30,7 +32,7 @@ Shipyard lists the pull requests (and, when turned on, issues and workflow runs)
    version = 1
    ```
 
-5. **Validate** before you report done (see Validating). The edit is done when `taplo check` passes and the rules it can't check hold.
+5. **Check the edit** before you report done (see Checking an edit). The edit is done when `taplo check` passes, the rules it can't check hold, and, when the app is running, its panel shows no configuration error.
 
 ## Keys and defaults
 
@@ -56,7 +58,7 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 
-What every project shows, under `[defaults]`, and what a project may override:
+What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
 | Key | Default | Allowed |
 |---|---|---|
@@ -113,21 +115,30 @@ Issue events need the project to show issues, and run events to show workflow ru
 | `others` | anyone but the user and bots |
 | `bots` | a GitHub Bot account or a login ending in `[bot]` |
 
-## Validating
+## Checking an edit
 
-Run [Taplo](https://taplo.tamasfe.dev) on the file; it finds the schema through the `#:schema` line:
+**The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file; it finds the schema through the `#:schema` line:
 
 ```sh
 taplo check ~/.config/shipyard/config.toml
 ```
 
-Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would only warn about, so fix those too.
+Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would silently ignore, so fix those too.
 
 The schema can't check three rules; check them by reading the file:
 
 - Every project `name` is used once.
 - A project lists each repository once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
 - Top-level keys sit above the first `[table]` header.
+
+**The app.** Shipyard rereads the file within a moment of each save. When it rejects the file, the top of its panel shows a banner listing each problem with its line, ending in "Using the last valid configuration.", for example:
+
+```text
+config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?)
+Using the last valid configuration.
+```
+
+The panel is on the user's screen, not yours: when the user reports that banner, fix the line it names. No banner after a save means the app took the edit.
 
 ## Worked requests
 
@@ -158,6 +169,23 @@ notifications = [
 ]
 ```
 
+To add a rule for every project instead, write `[[defaults.notifications]]` blocks, and keep the default `pr.opened` rule among them (see Overrides).
+
+**"Hide dependabot."** A top-level key, above the first table; add to the list when it exists. Use the login as GitHub shows it, `[bot]` suffix included:
+
+```toml
+hide-authors = ["dependabot[bot]"]
+```
+
+**"Switch the menu to tabs."** One key in the `[menu]` table. If the file has the header's commented `# [menu]` and `# layout = "list"` lines and no top-level key follows them, uncomment both and set the value. Otherwise add the table below the last top-level key and above the first `[[projects]]` block: uncommenting `# [menu]` above a top-level key would make that key part of `[menu]`.
+
+```toml
+[menu]
+layout = "tabs"
+```
+
+`"list"`, the default, switches it back.
+
 **"Show issues for this project."** Add an `issues` override inside the project's block; its other keys keep their defaults:
 
 ```toml
@@ -174,17 +202,15 @@ To show issues in every project instead, set it once in the defaults:
 show = true
 ```
 
-**"Tell me when CI fails, and hide dependabot."** A top-level key above the first table, and a default rule list that keeps `pr.opened`:
+**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override turns runs on for this project alone, and its own notification list adds `run.failed` while keeping the default `pr.opened`:
 
 ```toml
-hide-authors = ["dependabot[bot]"]
-
-[defaults.workflow-runs]
-show = true
-
-[[defaults.notifications]]
-event = "pr.opened"
-
-[[defaults.notifications]]
-event = "run.failed"
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard"]
+workflow-runs = { show = true }
+notifications = [
+  { event = "pr.opened" },
+  { event = "run.failed" },
+]
 ```

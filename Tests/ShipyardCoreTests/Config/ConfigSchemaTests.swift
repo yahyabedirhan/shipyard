@@ -244,6 +244,26 @@ struct ConfigSchemaTests {
         ])
     }
 
+    @Test("a new file's commented header is a valid configuration, its examples uncommented too")
+    func headerIsValid() throws {
+        let schema = try loadSchema()
+        let header = decoded(Configuration.header)
+        #expect(header?.warnings == [])
+        #expect(header?.configuration == Configuration())
+        #expect(try violations(Configuration.header, schema: schema) == [])
+        // The header shows settings as commented-out TOML (`# [menu]`,
+        // `# layout = "list"`); uncommenting them must still read cleanly.
+        let uncommented = Configuration.header.components(separatedBy: "\n").map { line in
+            let body = line.dropFirst(2)
+            let isSetting = line.hasPrefix("# ") && (body.hasPrefix("[") || body.contains(" = "))
+            return isSetting ? String(body) : line
+        }.joined(separator: "\n")
+        #expect(uncommented != Configuration.header)
+        let examples = decoded(uncommented)
+        #expect(examples?.warnings == [])
+        #expect(try violations(uncommented, schema: schema) == [])
+    }
+
     @Test("a new file's schema line points at the published schema")
     func schemaLine() throws {
         let schema = try loadSchema()
