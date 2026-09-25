@@ -291,6 +291,15 @@ public struct ProjectSettings: Equatable, Sendable {
         self.workflowRuns = workflowRuns
         self.notifications = notifications
     }
+
+    /// Whether the project lists items of `kind` (its `show` for that kind).
+    public func shows(_ kind: ItemKind) -> Bool {
+        switch kind {
+        case .pullRequest: pullRequests.show
+        case .issue: issues.show
+        case .workflowRun: workflowRuns.show
+        }
+    }
 }
 
 // MARK: - Problems

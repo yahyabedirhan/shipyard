@@ -68,6 +68,11 @@ extension EventKind {
         case (.pullRequest, .reviewRequested): .prReviewRequested
         case (.pullRequest, .checksFailed): .prChecksFailed
         case (.pullRequest, .commented): .prCommented
+        case (.issue, .opened): .issueOpened
+        case (.issue, .closed): .issueClosed
+        case (.issue, .commented): .issueCommented
+        // An issue reopened is no event (the spec lists none); its next
+        // close is `issue.closed` again, as a new occurrence.
         default: nil
         }
     }
@@ -181,8 +186,8 @@ extension ProjectSettings {
     /// The sources a refresh fetches for this project: each repository, for
     /// each kind the project shows.
     var fetchedSources: [ItemSource] {
-        var kinds: [ItemKind] = []
-        if pullRequests.show { kinds.append(.pullRequest) }
+        // Runs join when they're fetched (they come from REST, not this query).
+        let kinds = [ItemKind.pullRequest, .issue].filter { shows($0) }
         return repositories.flatMap { repository in kinds.map { ItemSource(repository: repository, kind: $0) } }
     }
 }

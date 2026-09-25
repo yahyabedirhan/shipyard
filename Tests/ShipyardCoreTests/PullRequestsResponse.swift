@@ -1,8 +1,9 @@
 import Foundation
 
 /// A GraphQL answer for one repository, built in the test, for scenarios
-/// that change a pull request between refreshes (a push, a review request,
-/// failed checks, a merge). It has the recorded fixtures' shape.
+/// that change a pull request or an issue between refreshes (a push, a
+/// review request, failed checks, a merge, a comment). It has the recorded
+/// fixtures' shape.
 struct PullRequestsResponse {
     /// One pull request as GitHub would describe it.
     struct PullRequest {
@@ -49,16 +50,54 @@ struct PullRequestsResponse {
         }
     }
 
+    /// One issue as GitHub would describe it.
+    struct Issue {
+        var number: Int
+        var title = "A problem"
+        /// `OPEN` or `CLOSED`.
+        var state = "OPEN"
+        var author = "octocat"
+        var authorType = "User"
+        var createdAt = "2026-09-25T09:00:00Z"
+        var updatedAt = "2026-09-25T10:00:00Z"
+        var closedAt: String?
+        var comments = 0
+
+        init(_ number: Int) { self.number = number }
+
+        func url(in repository: String) -> URL {
+            URL(string: "https://github.com/\(repository)/issues/\(number)")!
+        }
+
+        func json(in repository: String) -> [String: Any] {
+            [
+                "number": number,
+                "title": title,
+                "url": url(in: repository).absoluteString,
+                "state": state,
+                "createdAt": createdAt,
+                "updatedAt": updatedAt,
+                "closedAt": closedAt.map { $0 as Any } ?? NSNull(),
+                "author": ["login": author, "__typename": authorType],
+                "comments": ["totalCount": comments],
+            ]
+        }
+    }
+
     var repository: String
     var pullRequests: [PullRequest]
+    /// The repository's issues; `nil` answers as GitHub does when the query
+    /// didn't ask for them (no `openIssues`/`closedIssues` keys).
+    var issues: [Issue]?
     var viewer = "yabepa"
     /// Answer as GitHub does for a repository that's gone or out of reach:
     /// a `null` alias and a `NOT_FOUND` error.
     var missing = false
 
-    init(_ repository: String, _ pullRequests: [PullRequest], missing: Bool = false) {
+    init(_ repository: String, _ pullRequests: [PullRequest], issues: [Issue]? = nil, missing: Bool = false) {
         self.repository = repository
         self.pullRequests = pullRequests
+        self.issues = issues
         self.missing = missing
     }
 
@@ -86,11 +125,16 @@ struct PullRequestsResponse {
             }
             let open = response.pullRequests.filter { $0.state == "OPEN" }.map { $0.json(in: response.repository) }
             let closed = response.pullRequests.filter { $0.state != "OPEN" }.map { $0.json(in: response.repository) }
-            data[alias] = [
+            var node: [String: Any] = [
                 "nameWithOwner": response.repository,
                 "openPullRequests": ["nodes": open],
                 "closedPullRequests": ["nodes": closed],
             ]
+            if let issues = response.issues {
+                node["openIssues"] = ["nodes": issues.filter { $0.state == "OPEN" }.map { $0.json(in: response.repository) }]
+                node["closedIssues"] = ["nodes": issues.filter { $0.state != "OPEN" }.map { $0.json(in: response.repository) }]
+            }
+            data[alias] = node
         }
         var body: [String: Any] = ["data": data]
         if !errors.isEmpty { body["errors"] = errors }

@@ -60,11 +60,17 @@ public struct MenuModel: Equatable, Sendable {
             let items = (snapshot.items[project.name] ?? []).filter {
                 shows($0, settings: settings, hiddenAuthors: hidden, now: now)
             }
-            let open = items.filter(\.state.isOpen).sorted { $0.updatedAt > $1.updatedAt }
-            let closed = items.filter { !$0.state.isOpen }.sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
+            // Pull requests, then issues; each kind open first, then closed.
+            let rows = kindOrder.flatMap { kind -> [Item] in
+                let ofKind = items.filter { $0.kind == kind }
+                let open = ofKind.filter(\.state.isOpen).sorted { $0.updatedAt > $1.updatedAt }
+                let closed = ofKind.filter { !$0.state.isOpen }
+                    .sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
+                return open + closed
+            }
             return MenuSection(
                 name: project.name,
-                rows: (open + closed).map { MenuRow($0) },
+                rows: rows.map { MenuRow($0) },
                 errors: project.repositories.compactMap { snapshot.errors[$0].map(MenuErrorRow.init) }
             )
         }
@@ -89,12 +95,20 @@ public struct MenuModel: Equatable, Sendable {
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
     }
 
+    /// The order kinds appear in within a section.
+    static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun]
+
     private static func shows(_ item: Item, settings: ProjectSettings, hiddenAuthors: Set<String>, now: Date) -> Bool {
-        guard item.kind == .pullRequest, settings.pullRequests.show else { return false }
+        guard settings.shows(item.kind) else { return false }
         if hiddenAuthors.contains(item.author.lowercased()) { return false }
         if item.state == .draft, !settings.pullRequests.drafts { return false }
         if !item.state.isOpen {
-            let days = settings.pullRequests.closedWindowDays
+            let days = switch item.kind {
+            case .pullRequest: settings.pullRequests.closedWindowDays
+            case .issue: settings.issues.closedWindowDays
+            // Runs have their own window (ticket #10); none are fetched yet.
+            case .workflowRun: 0
+            }
             guard days > 0, let closedAt = item.closedAt else { return false }
             return closedAt >= now.addingTimeInterval(-TimeInterval(days) * 86_400)
         }
@@ -106,8 +120,9 @@ public struct MenuModel: Equatable, Sendable {
 public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
-    /// Open items first (most recently updated first), then closed ones
-    /// (most recently closed first).
+    /// Pull requests, then issues; within each kind, open items first (most
+    /// recently updated first), then closed ones (most recently closed
+    /// first), each kind within its own closed window.
     public var rows: [MenuRow]
     /// One per repository of this project that couldn't be fetched.
     public var errors: [MenuErrorRow]
@@ -139,7 +154,9 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     public var author: String
     public var authorKind: AuthorKind
     public var url: URL
-    /// Open, draft, merged or closed; the app colours it the way GitHub does.
+    /// Open, draft, merged or closed; the app colours it the way GitHub does,
+    /// by kind: a pull request open green, draft gray, merged purple, closed
+    /// red; an issue (only ever open or closed) open green, closed purple.
     public var state: ItemState
     /// The check dot, for open (and draft) pull requests; `nil` otherwise.
     public var checks: ChecksState?

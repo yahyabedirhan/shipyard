@@ -6,19 +6,24 @@ struct RepositoryRequest: Equatable, Sendable {
     var slug: String
     /// Whether any project with this repository shows pull requests.
     var pullRequests: Bool
+    /// Whether any project with this repository shows issues. Only then does
+    /// the query ask for its issues, so repositories without them cost nothing more.
+    var issues: Bool = false
 
     var owner: String { String(slug.split(separator: "/", maxSplits: 1)[0]) }
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
 }
 
-/// The one GraphQL request a refresh makes: every repository as an alias,
-/// plus the viewer and the rate limit. Builds the query and parses the
+/// The one GraphQL request a refresh makes: every repository as an alias
+/// (its pull requests and, where shown, its issues), plus the viewer and the
+/// rate limit. Builds the query and parses the
 /// answer into items, so the query text and its parser have one owner.
 enum ProjectQuery {
-    /// Open pull requests fetched per repository.
+    /// Open pull requests (and open issues) fetched per repository.
     static let openFirst = 50
-    /// Closed or merged pull requests fetched per repository, most recently
-    /// updated first; the menu keeps those inside the closed window.
+    /// Closed or merged pull requests (and closed issues) fetched per
+    /// repository, most recently updated first; the menu keeps those inside
+    /// the closed window.
     static let closedFirst = 20
     /// Review requests read per pull request, to find the viewer's.
     static let reviewRequestsFirst = 10
@@ -33,9 +38,14 @@ enum ProjectQuery {
                 let key = slug.lowercased()
                 if let at = index[key] {
                     requests[at].pullRequests = requests[at].pullRequests || project.pullRequests.show
+                    requests[at].issues = requests[at].issues || project.issues.show
                 } else {
                     index[key] = requests.count
-                    requests.append(RepositoryRequest(slug: slug, pullRequests: project.pullRequests.show))
+                    requests.append(RepositoryRequest(
+                        slug: slug,
+                        pullRequests: project.pullRequests.show,
+                        issues: project.issues.show
+                    ))
                 }
             }
         }
@@ -65,6 +75,17 @@ enum ProjectQuery {
 
                     """
             }
+            if repository.issues {
+                selection += """
+                        openIssues: issues(states: OPEN, first: \(openFirst), orderBy: {field: UPDATED_AT, direction: DESC}) {
+                          nodes { ...IssueFields }
+                        }
+                        closedIssues: issues(states: CLOSED, first: \(closedFirst), orderBy: {field: UPDATED_AT, direction: DESC}) {
+                          nodes { ...IssueFields }
+                        }
+
+                    """
+            }
             return "  \(alias(index)): repository(owner: $owner\(index), name: $name\(index)) {\n\(selection)  }\n"
         }.joined()
 
@@ -83,6 +104,17 @@ enum ProjectQuery {
                   reviews { totalCount }
                   reviewRequests(first: \(reviewRequestsFirst)) { nodes { requestedReviewer { __typename ... on User { login } } } }
                   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+                }
+
+                """
+        }
+        if repositories.contains(where: \.issues) {
+            text += """
+
+                fragment IssueFields on Issue {
+                  number title url state createdAt updatedAt closedAt
+                  author { login __typename }
+                  comments { totalCount }
                 }
 
                 """
@@ -242,10 +274,14 @@ enum ProjectQuery {
     private struct RepositoryNode: Decodable {
         var openPullRequests: Nodes<PullRequestNode>?
         var closedPullRequests: Nodes<PullRequestNode>?
+        var openIssues: Nodes<IssueNode>?
+        var closedIssues: Nodes<IssueNode>?
 
         func items(in repository: String, viewer: String?) -> [Item] {
-            let nodes = (openPullRequests?.present ?? []) + (closedPullRequests?.present ?? [])
-            return nodes.map { $0.item(in: repository, viewer: viewer) }
+            let pullRequests = (openPullRequests?.present ?? []) + (closedPullRequests?.present ?? [])
+            let issues = (openIssues?.present ?? []) + (closedIssues?.present ?? [])
+            return pullRequests.map { $0.item(in: repository, viewer: viewer) }
+                + issues.map { $0.item(in: repository, viewer: viewer) }
         }
     }
 
@@ -337,6 +373,40 @@ enum ProjectQuery {
             case "FAILURE", "ERROR": .failed
             default: .pending
             }
+        }
+    }
+
+    /// An issue: open or closed (GitHub's `stateReason`, completed or not
+    /// planned, isn't read). No checks and no review requests; its activity
+    /// is its comments.
+    private struct IssueNode: Decodable {
+        var number: Int
+        var title: String
+        var url: URL
+        var state: String
+        var createdAt: Date
+        var updatedAt: Date
+        var closedAt: Date?
+        var author: AuthorNode?
+        var comments: Count?
+
+        func item(in repository: String, viewer: String?) -> Item {
+            let (author, authorKind) = PullRequestNode.author(self.author, viewer: viewer)
+            let state: ItemState = self.state == "CLOSED" ? .closed : .open
+            return Item(
+                kind: .issue,
+                repository: repository,
+                number: number,
+                title: title,
+                url: url,
+                author: author,
+                authorKind: authorKind,
+                state: state,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                closedAt: state.isOpen ? nil : (closedAt ?? updatedAt),
+                activity: comments?.totalCount ?? 0
+            )
         }
     }
 }

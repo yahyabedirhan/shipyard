@@ -55,8 +55,10 @@ public struct GitHubClient: Sendable {
         return viewer
     }
 
-    /// Every project's pull requests in one GraphQL request (each repository
-    /// once, as an alias), with the viewer and the rate limit. A repository
+    /// Every project's pull requests, and its issues where it shows them, in
+    /// one GraphQL request (each repository once, as an alias), with the
+    /// viewer and the rate limit. A project gets only the kinds it shows,
+    /// even when another project asked for more of a shared repository. A repository
     /// GitHub can't resolve becomes an error in the snapshot while the rest
     /// load. The GraphQL limit comes from the response headers, with the
     /// body's `cost`.
@@ -92,8 +94,8 @@ public struct GitHubClient: Sendable {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
                     errors[repository] = RepositoryError(repository: repository, kind: error.kind, message: error.message)
-                } else if project.pullRequests.show {
-                    projectItems += (parsed.items[slug] ?? []).map { item in
+                } else {
+                    projectItems += (parsed.items[slug] ?? []).filter({ project.shows($0.kind) }).map { item in
                         var item = item
                         item.repository = repository
                         return item

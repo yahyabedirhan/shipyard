@@ -33,17 +33,35 @@ private func pr(
     )
 }
 
+private func issue(_ number: Int = 1, state: ItemState = .open, activity: Int = 0, updatedAt: Date = now) -> Item {
+    Item(
+        kind: .issue,
+        repository: "o/r",
+        number: number,
+        title: "Problem \(number)",
+        url: URL(string: "https://github.com/o/r/issues/\(number)")!,
+        author: "octocat",
+        authorKind: .other,
+        state: state,
+        createdAt: now,
+        updatedAt: updatedAt,
+        closedAt: state.isOpen ? nil : now,
+        activity: activity
+    )
+}
+
 private func settings(
     _ name: String = "shop",
     repositories: [String] = ["o/r"],
     pullRequests: Bool = true,
+    issues: Bool = false,
     rules: [NotificationRule] = [NotificationRule(event: .prOpened)]
 ) -> ProjectSettings {
     ProjectSettings(
         name: name,
         repositories: repositories,
         pullRequests: PullRequestSettings(show: pullRequests),
-        issues: IssueSettings(),
+        issues: IssueSettings(show: issues),
         workflowRuns: WorkflowRunSettings(),
         notifications: rules
     )
@@ -96,6 +114,41 @@ struct EventDetectorTests {
     ])
     func transitions(_ transition: Transition) {
         #expect(events(known(transition.before), transition.after) == transition.expected)
+    }
+
+    @Test("issues are opened, closed and commented; a reopen is no event; only while the project shows issues")
+    func issues() {
+        let withIssues = [settings(issues: true)]
+        func issueEvents(_ before: [Item], _ after: [Item], projects: [ProjectSettings] = withIssues) -> [EventKind] {
+            let known = KnownItems().updated(with: snapshot(["shop": before]), projects: projects)
+            return EventDetector.events(known: known, snapshot: snapshot(["shop": after]), projects: projects).map(\.kind)
+        }
+        #expect(issueEvents([issue(1)], [issue(1), issue(2)]) == [.issueOpened])
+        #expect(issueEvents([issue(1)], [issue(1, state: .closed)]) == [.issueClosed])
+        #expect(issueEvents([issue(1)], [issue(1, activity: 2)]) == [.issueCommented])
+        #expect(issueEvents([issue(1)], [issue(1, state: .closed, activity: 1)]) == [.issueClosed, .issueCommented])
+        #expect(issueEvents([issue(1, state: .closed)], [issue(1)]) == [])
+        #expect(issueEvents([issue(1)], [issue(1), issue(2, state: .closed)]) == [])
+
+        // Issues and pull requests are separate sources: issues just shown are
+        // a first sight, even in a project whose pull requests are known.
+        let before = KnownItems().updated(with: snapshot(["shop": [pr(1)]]), projects: [settings()])
+        #expect(!before.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
+        #expect(EventDetector.events(known: before, snapshot: snapshot(["shop": [pr(1), issue(1)]]), projects: withIssues).isEmpty)
+        let shown = before.updated(with: snapshot(["shop": [pr(1), issue(1)]]), projects: withIssues)
+        #expect(shown.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
+
+        // Hiding them forgets the source again.
+        let hidden = shown.updated(with: snapshot(["shop": [pr(1)]]), projects: [settings()])
+        #expect(!hidden.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
+
+        let closed = EventDetector.events(
+            known: KnownItems().updated(with: snapshot(["shop": [issue(1)]]), projects: withIssues),
+            snapshot: snapshot(["shop": [issue(1, state: .closed)]]),
+            projects: withIssues
+        )
+        #expect(closed.first?.headline == "Closed issue #1")
+        #expect(closed.first?.id.hasPrefix("issue.closed https://github.com/o/r/issues/1 ") == true)
     }
 
     @Test("a pull request not known before is opened, drafts too; one first found closed makes nothing")
