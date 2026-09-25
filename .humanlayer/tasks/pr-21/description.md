@@ -12,10 +12,9 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
   - launch at login after a reboot;
   - refresh on wake;
   - offline;
-  - typing in the picker with a real click;
-  - a real-menu look at both layouts and at #39's menu closing, since the screen was locked during the last checks.
+  - typing in the picker with a real click.
 
-  Everything else in the spec's user stories was walked in the real menu on a Mac.
+  Everything else in the spec's user stories was walked in the real menu on a Mac, including both layouts in light and dark (screenshots on #20). One intermittent issue is open: the menu once needed extra clicks to reopen after opening an item (#42).
 - **Choices worth a look:**
   - opening the menu never refreshes (#26);
   - the menu closes after opening an item through the status item's own click, with a guarded private fallback on newer macOS, because SwiftUI can't dismiss a `.window` `MenuBarExtra` (#39);
@@ -64,7 +63,7 @@ What lands where:
 Sources/ShipyardCore/         configuration, GitHub, items, menu model + words, state, skill installer, Shipyard
 Sources/ShipyardApp/          adapters above; UI/Design.swift + Components.swift shared by both layouts
 Tests/ShipyardCoreTests/      332 tests; Harness drives Shipyard end to end over recorded GitHub answers
-Makefile, Packaging/          make install / release (ad-hoc signed zip) / icon, Info.plist, AppIcon.icns
+Makefile, Packaging/          make install / release (ad-hoc signed zip) / icon; origami app icon + sailboat, night, sunset alternates
 schema/, skills/shipyard/     published schema; the user-facing agent skill, checked key by key in tests
 docs/                         low-level design, configuration.md for maintainers, references (incl. end-to-end testing)
 README.md                     install, first launch, everyday use, update, uninstall, configuration
