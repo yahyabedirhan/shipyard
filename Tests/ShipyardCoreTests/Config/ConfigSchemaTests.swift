@@ -7,7 +7,7 @@ import TOMLDecoder
 // validate against with `taplo check`. These tests check it with a small
 // validator that covers the JSON Schema keywords the file uses.
 
-private func loadSchema() throws -> [String: Any] {
+func loadSchema() throws -> [String: Any] {
     let data = try Data(contentsOf: repositoryRoot.appendingPathComponent("schema/config.schema.json"))
     return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
@@ -48,7 +48,7 @@ private func value(of array: TOMLArray) -> Value {
 }
 
 /// The schema violations in `text`, as "path: problem".
-private func violations(_ text: String, schema: [String: Any]) throws -> [String] {
+func violations(_ text: String, schema: [String: Any]) throws -> [String] {
     var found: [String] = []
     check(value(of: try TOMLTable(source: text)), against: schema, root: schema, at: "", into: &found)
     return found
@@ -115,7 +115,7 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
 
 /// Every property path the schema declares, e.g. `defaults.pull-requests.show`
 /// and `projects[].notifications[].event`.
-private func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
+func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
     let schema = resolve(raw, root: root)
     var paths: Set<String> = []
     if let properties = schema["properties"] as? [String: Any] {

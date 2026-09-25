@@ -389,7 +389,13 @@ After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator 
 
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
-Runs the user's login shell (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`) so nvm/asdf/Homebrew `PATH` setups are loaded; reports success, failure output, or "npx not found → copy this command".
+Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (`ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. The app calls `install()` from onboarding and the footer's "Install agent skill…"; the core keeps no state for it.
+
+| Operation | Returns |
+|---|---|
+| `install() async -> SkillInstallResult` | `installed(output)` on status 0; `npxNotFound(command)` on status 127 (the shell couldn't find `npx`), with `SkillInstaller.command` for the Copy button; `failed(output)` otherwise: what it printed, colour codes stripped, or "exited with status N" when it printed nothing, or "couldn't start <shell>" |
+
+The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` looks for a repository's skills (`skills/<name>/SKILL.md`, with `name` and `description` frontmatter). It documents the configuration file for agents; `SkillDocumentTests` decode each of its TOML examples with `Configuration.decode`, check them against the schema, and check that it names every key, default, event and author filter the code has.
 
 ### Folder tree
 
@@ -432,7 +438,7 @@ shipyard/
 │   ├── Menu/
 │   │   └── MenuModel.swift           # pure: sections, rows, semantic state colours, label
 │   └── Skill/
-│       └── SkillInstaller.swift      # runs npx skills add in the login shell
+│       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
 │   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring, builds the core with the adapters below
 │   ├── ConfigWatcher.swift           # watches the config directory, calls Shipyard.reloadConfiguration()
@@ -452,8 +458,9 @@ shipyard/
     ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
     ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
     ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
+    ├── Skill/                        # the installer against a fake shell; the skill document against the code and the schema
     ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
-    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener; stub HTTP transport, fake gh, instant sleeper
+    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener; stub HTTP transport, fake gh, fake shell, instant sleeper
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation (plus FoundationNetworking on Linux) and TOMLDecoder; the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.
