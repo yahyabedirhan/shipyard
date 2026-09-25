@@ -1,52 +1,74 @@
-[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Tickets #2–#12 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Mac handoff](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/.handoff/2026-09-25-shipyard-macos.md)
+[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Phase 1: #2–#12 | Phase 2: #13, #15–#20, #24–#27, #29–#32, #35–#40 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Install](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/README.md#install) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/configuration.md)
 
 ## Why the change
 
-Shipyard's rules — configuration, sign-in, fetching, attention, notifications, rate limits and onboarding — now live in a Foundation-only `ShipyardCore` library, tested end to end on Linux, so the macOS app (phase 2, #13–#20) only has to draw it and supply Apple services.
+This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundation-only core, that shows the pull requests, issues and workflow runs on your chosen projects, says which need you, notifies on the events you pick, and stays within a share of your GitHub rate limit.
 
 ## Special things to note
 
-- **Needs you:** the device flow's OAuth App client ID is a placeholder (`OAuthApp.clientID` in `GitHub/Auth/DeviceFlow.swift`); the flow refuses to start until it's set. `gh` sign-in works without it. The `ShipyardApp` target has never been compiled (Linux) — phase 2 does that first.
-- **Choices the docs didn't settle:** the app target is renamed `ShipyardApp` (executable still `Shipyard`) so it doesn't clash with the core's `Shipyard` orchestrator; the core may import `Observation` so `Shipyard` is `@Observable`; only the *first* launch or a newly added project/repository/kind is silent (a PR opened while shipyard was quit is announced next launch); sign-out keeps seen state; running workflow runs never need attention.
-- **Hand-built fixtures:** there was no network recording on the VPS, so GraphQL/REST fixtures follow GitHub's documented shapes; two lines in `docs/references/github-repositories.md` are marked "not yet confirmed". Workflow runs are fetched with `created>=` (finished window + 1 h), so a run started earlier than that is missed even while running.
+- **0.0.x connects through `gh` only.** Sign-in without `gh` (the device flow, which needs an OAuth App client ID, plus the Keychain) moved to its own effort, #22, with #23 and #14. The device-flow code stays in the core, switched off. With a `gh` token, Sign out only lasts until Try again or the next launch; that is deferred to #22 too.
+- **Still for the maintainer (#20):**
+  - install from the zip through the README's `xattr` step;
+  - launch at login after a reboot;
+  - refresh on wake;
+  - offline;
+  - typing in the picker with a real click;
+  - a real-menu look at both layouts and at #39's menu closing, since the screen was locked during the last checks.
+
+  Everything else in the spec's user stories was walked in the real menu on a Mac.
+- **Choices worth a look:**
+  - opening the menu never refreshes (#26);
+  - the menu closes after opening an item through the status item's own click, with a guarded private fallback on newer macOS, because SwiftUI can't dismiss a `.window` `MenuBarExtra` (#39);
+  - unknown settings warn instead of failing (#38);
+  - the layout is a setting, `[menu] layout = "list" | "tabs"` (#35, #36).
+
+  Phase 1's choices still hold: only a first launch or a newly added project, repository or kind is silent; sign-out keeps seen state; running workflow runs never need attention.
 
 ## Change outline
 
-The orchestrator drives one refresh pipeline; everything under it is pure or behind a port.
+Phase 1 put every rule in `ShipyardCore`. Phase 2 adds the app that draws it and supplies the Apple-only services through the core's ports:
 
 ```text
-Shipyard (@MainActor @Observable)       phase: signedOut → connecting → needsProjects → ready
-  start / beginDeviceFlow / signOut     TokenProvider: token store → gh (/opt/homebrew, /usr/local, PATH) → device flow
-  refresh()  (RefreshGate: one at a time, one queued)
-    ConfigStore.lastValid                TOML → Configuration (+ line-numbered errors, warnings)
-    GitHubClient.fetch                   1 GraphQL request (PRs, issues) + 1 REST/repo for runs (If-None-Match)
-      every call via Shipyard.request    401 → signedOut
-    EventDetector(known, snapshot)       pr.* / issue.* / run.* ; first sight silent
-    NotificationRules → Notifying port   notified once, recorded apart from seen
-    AppStateStore.update                 state.json: seen, known, notified, collapsed
-    MenuModel.build                      sections, rows, attention counts, label, rate indicator
-    RateBudget.nextDelay → RefreshTimer  stretch to share / back off <20% / pause at 0
-  open / markSeen / markAllSeen / toggleCollapsed / openNotification
-  suggestedRepositories / checkRepository / addProjects     (project picker)
-SkillInstaller                           $SHELL -l -i -c "npx -y skills add yahyabedirhan/shipyard -g -y"
+ShipyardApp (@main, MenuBarExtra .window, menu-bar-only)
+  AppServices                      builds Shipyard with the adapters, owns the panel's actions
+    ConfigWatcher                  watches ~/.config/shipyard (debounced, rename-safe) → reloadConfiguration()
+    WakeObserver                   wake → refresh()
+    Notifier                       UNUserNotificationCenter; asks on the first notification; click → openNotification
+    LaunchAtLogin                  SMAppService, follows launch-at-login live
+    Workspace                      open in browser / editor, then closeMenu()
+  Panel                            header · banners · ready body · footer
+    ConnectView                    gh auth login, Copy, Try again           (no usable gh token)
+    ProjectPicker, SkillInstallCard                                          (no projects yet)
+    [menu] layout = "list"  → ListLayout   one line per item, pinned project headers
+                    "tabs"  → TabsLayout   All + a tab per project, grouped by kind
+```
+
+The core gained what the menu needed:
+
+```diff
+ Shipyard
++  signedOutReason, configError, configWarnings     what the connect screen and banners say
++  rebuild the menu on every configuration change   edits show at once, even while paused or offline
+   MenuModel.build(snapshot, …)
++    snapshot may be nil → every project "Not loaded yet"
++    layout, showsRepository (only when a project has several repositories)
++  MenuTabs                                         the tabs, their counts, the fallback to All
++  PanelText                                        every word the menu shows, tested with the model
+   ConfigurationReader
++    [menu] layout; unknown settings → warnings with "did you mean"
 ```
 
 What lands where:
 
 ```text
-Package.swift                 ShipyardCore (+ TOMLDecoder), ShipyardCoreTests, ShipyardApp (macOS only)
-Sources/ShipyardCore/
-├── Config/                   configuration model, reader, source map, store (append-only)
-├── GitHub/                   client, transport, query, runs, repositories, rate budget, auth/
-├── Items/                    item + fingerprint, attention, event detector, notification rules
-├── Menu/MenuModel.swift      every display rule
-├── State/AppStateStore.swift app state (corrupt or newer file → set aside)
-├── Skill/SkillInstaller.swift
-└── Shipyard.swift, Lifecycle.swift, Ports.swift, RefreshScheduler.swift, Version.swift (0.0.1)
-Tests/ShipyardCoreTests/      239 tests; Harness drives Shipyard end to end over StubHTTP + fixtures
-schema/config.schema.json     published JSON Schema (#:schema line)
-skills/shipyard/SKILL.md      agent skill; its TOML examples are decoded and schema-checked in tests
-.github/workflows/ci.yml      swift test on Ubuntu
+Sources/ShipyardCore/         configuration, GitHub, items, menu model + words, state, skill installer, Shipyard
+Sources/ShipyardApp/          adapters above; UI/Design.swift + Components.swift shared by both layouts
+Tests/ShipyardCoreTests/      332 tests; Harness drives Shipyard end to end over recorded GitHub answers
+Makefile, Packaging/          make install / release (ad-hoc signed zip) / icon, Info.plist, AppIcon.icns
+schema/, skills/shipyard/     published schema; the user-facing agent skill, checked key by key in tests
+docs/                         low-level design, configuration.md for maintainers, references (incl. end-to-end testing)
+README.md                     install, first launch, everyday use, update, uninstall, configuration
+.github/workflows/ci.yml      Ubuntu (core) and macOS (everything) jobs
 ```
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
