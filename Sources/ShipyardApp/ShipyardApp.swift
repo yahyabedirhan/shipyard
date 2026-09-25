@@ -78,7 +78,10 @@ final class AppServices {
             loginItem: LaunchAtLogin()
         )
         let shipyard = shipyard
-        notifier.onOpen = { shipyard.openNotification($0) }
+        notifier.onOpen = { [weak self] url in
+            shipyard.openNotification(url)
+            self?.closeMenu()
+        }
     }
 
     /// `~/Library/Application Support/Shipyard/`, where `state.json` lives.
@@ -109,7 +112,10 @@ final class AppServices {
     var layoutActions: LayoutActions {
         let shipyard = shipyard
         return LayoutActions(
-            open: { shipyard.open($0) },
+            open: { [weak self] row in
+                shipyard.open(row)
+                self?.closeMenu()
+            },
             markSeen: { shipyard.markSeen($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) }
@@ -148,6 +154,57 @@ final class AppServices {
             return
         }
         opener.openDocument(url)
+        closeMenu()
+    }
+
+    // MARK: - Closing the menu
+
+    /// Closes the menu's window after an action that opened something in
+    /// another app (an item, a notification's item, the configuration
+    /// file), as a menu bar menu does; otherwise it stays on screen
+    /// without being the key window, and keys go to the other app (#39).
+    /// Actions that only change the menu (⌥-click, collapse, Mark all
+    /// seen) don't call it.
+    ///
+    /// SwiftUI has no API to dismiss a `.window` style `MenuBarExtra`
+    /// (FB11984872), and closing its window directly leaves SwiftUI
+    /// thinking it's open, so the next click on the icon does nothing.
+    /// This closes it the way a click on the icon does, as the
+    /// MenuBarExtraAccess package does: through the status item. On
+    /// macOS 26 and earlier the icon's button toggles the window; from
+    /// macOS 27 the window lives for an "expanded interface session"
+    /// (private, so reached by selector and guarded), which is cancelled.
+    /// It runs on the next turn of the main loop, after the click that
+    /// called it is handled.
+    func closeMenu() {
+        DispatchQueue.main.async {
+            guard let item = Self.menuBarStatusItem() else { return }
+            let delegate = NSSelectorFromString("expandedInterfaceDelegate")
+            let session = NSSelectorFromString("expandedInterfaceSession")
+            if item.responds(to: delegate), item.responds(to: session),
+               item.perform(delegate)?.takeUnretainedValue() != nil {
+                // macOS 27+: SwiftUI drives the window through a session
+                // (the button's target is nil); it's presented while one exists.
+                let cancel = NSSelectorFromString("cancel")
+                if let current = item.perform(session)?.takeUnretainedValue() as? NSObject,
+                   current.responds(to: cancel) {
+                    current.perform(cancel)
+                }
+            } else if let button = item.button, button.state != .off {
+                // macOS 26 and earlier: the button is on while presented.
+                button.performClick(nil)
+            }
+        }
+    }
+
+    /// The menu bar icon's status item: the app has one, found through
+    /// its status bar window (a private `NSWindow` subclass that holds it).
+    private static func menuBarStatusItem() -> NSStatusItem? {
+        let key = "statusItem"
+        for window in NSApp.windows where window.responds(to: NSSelectorFromString(key)) {
+            if let item = window.value(forKey: key) as? NSStatusItem { return item }
+        }
+        return nil
     }
 
     func quit() {
