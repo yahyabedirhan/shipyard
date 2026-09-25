@@ -373,7 +373,10 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
     <Panel>                                   switch shipyard.phase
       signedOut              → <ConnectView>  (Onboarding/)
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
-      needsProjects          → <ProjectPicker>(Onboarding/)
+      needsProjects          → <ProjectPicker>(Onboarding/): a field for owner/name or a link · the suggestions and typed
+                              repositories as checkboxes, each chosen one with its project name and "Group with" ·
+                              "Adds …" summary · Add N projects
+                              <SkillInstallCard> (the offer to install the agent skill, always shown here)
       ready →
         banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error ·
                               notifications off (with a button to System Settings)
@@ -384,13 +387,15 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
                               a run: workflow name, "#41 · shipyard · main · failed · 12m", no check dot;
                               click opens and marks seen, ⌥-click marks seen only
-        footer                last updated · global "Mark all seen" · rate limit indicator (amber low, red exhausted) ·
-                              Refresh · Open configuration file · Install agent skill… · Sign out (once signed in) · Quit
+      <SkillInstallCard>      above the footer, after the footer's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
+      footer                  last updated · global "Mark all seen" · rate limit indicator (amber low, red exhausted) ·
+                              Refresh · Open configuration file · Install agent skill… /
+                              Sign out (once signed in) · Quit
 ```
 
-`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; Install agent skill… (#18) comes with its ticket.
+`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
 
-The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes and rereads the notification permission, and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, and tells the panel whether notifications are off.
+The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes and rereads the notification permission, and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation`.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -410,7 +415,7 @@ After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator 
 
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
-Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (`ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. The app calls `install()` from onboarding and the footer's "Install agent skill…"; the core keeps no state for it.
+Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (`ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`): an interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open. The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state (`idle`, `running`, `finished(result)`, `timedOut(seconds)`); `start()` races the install against a 180 s timeout (the sleep is injected, so tests don't wait), `cancel()` goes back to `idle` at once and stops the shell (a result that arrives after is dropped, so Install can start again straight away), and a timeout stops the shell and says so.
 
 | Operation | Returns |
 |---|---|
@@ -458,9 +463,12 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   └── PanelText.swift           # pure: row age and second line, a state's word and the state icon's VoiceOver label, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words
+│   │   └── PanelText.swift           # pure: row age and second line, a state's word and the state icon's VoiceOver label, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words, the picker's Add button and summary, the skill install card
+│   ├── Onboarding/
+│   │   └── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
 │   └── Skill/
-│       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
+│       ├── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port, cancellable), SkillInstallResult
+│       └── SkillInstallation.swift   # one install as the panel shows it: running, result, timeout, cancel
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
 │   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below, routes notification clicks and holds the panel's actions
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
@@ -475,16 +483,18 @@ shipyard/
 │       ├── ProjectSection.swift
 │       ├── ItemRow.swift
 │       ├── Palette.swift             # semantic state colours → GitHub colours, light/dark
+│       ├── SkillInstallCard.swift    # the skill install: offer, Cancel, result, command to copy
 │       └── Onboarding/
 │           ├── ConnectView.swift     # why signed out, the gh command to copy, Try again
-│           └── ProjectPicker.swift
+│           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module
     ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
     ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
     ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
-    ├── Skill/                        # the installer against a fake shell; the skill document against the code and the schema
+    ├── Onboarding/                   # ProjectChoices: choosing, typing, naming, grouping
+    ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
     ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
-    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake shell, instant sleeper
+    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake shell, hanging shell, instant sleeper
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder, all of which exist on Linux (Observation ships with the Swift toolchain; the rule keeps Apple-only frameworks out); the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.

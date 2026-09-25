@@ -11,12 +11,19 @@ struct Panel: View {
     private static let maxSectionsHeight: CGFloat = 560
     /// The sections' own height, measured, which sizes the list around them.
     @State private var sectionsHeight: CGFloat = 0
+    /// The footer's "Install agent skill…" shows the install card above it.
+    @State private var showsSkillInstall = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(alignment: .leading, spacing: 0) {
                 banners(now: context.date)
                 content(now: context.date)
+                if showsSkillInstall, shipyard.phase != .needsProjects {
+                    SkillInstallCard(installation: actions.skillInstallation) { showsSkillInstall = false }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 10)
+                }
                 Divider()
                 footer(now: context.date)
             }
@@ -37,11 +44,11 @@ struct Panel: View {
         case .signedOut:
             ConnectView(shipyard: shipyard)
         case .needsProjects:
-            message(
-                "No projects yet",
-                detail: "Add a [[projects]] block to config.toml; shipyard picks it up as soon as you save.",
-                action: ("Open configuration file", actions.openConfigurationFile)
-            )
+            // Onboarding's second step, and its offer to install the skill.
+            ProjectPicker(shipyard: shipyard)
+            SkillInstallCard(installation: actions.skillInstallation)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
         case .ready:
             // As tall as the sections, scrolling once they pass the maximum.
             // The height is fixed from the measured sections: the
@@ -70,16 +77,6 @@ struct Panel: View {
             }
         }
         .padding(6)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func message(_ title: String, detail: LocalizedStringKey, action: (String, () -> Void)) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
-            Text(detail).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Button(action.0, action: action.1)
-        }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -159,20 +156,27 @@ struct Panel: View {
             if shipyard.phase == .ready, let indicator = shipyard.menu.rateIndicator {
                 rateIndicator(indicator)
             }
-            HStack(spacing: 12) {
-                Button("Refresh", action: actions.refresh)
-                    .keyboardShortcut("r")
-                    // The model's pause, as the banner and the menu bar icon show it.
-                    .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
-                Button("Open configuration file", action: actions.openConfigurationFile)
-                // Once signed in: while `start()` still asks GitHub, the
-                // token is picked but the panel says it's connecting.
-                if shipyard.phase != .signedOut, shipyard.tokenSource != nil {
-                    Button("Sign out") { shipyard.signOut() }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 12) {
+                    Button("Refresh", action: actions.refresh)
+                        .keyboardShortcut("r")
+                        // The model's pause, as the banner and the menu bar icon show it.
+                        .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
+                    Button("Open configuration file", action: actions.openConfigurationFile)
+                    Button(PanelText.installSkill) { showsSkillInstall = true }
+                        // Onboarding shows the card under the picker already.
+                        .disabled(shipyard.phase == .needsProjects)
                 }
-                Spacer()
-                Button("Quit", action: actions.quit)
-                    .keyboardShortcut("q")
+                HStack(spacing: 12) {
+                    // Once signed in: while `start()` still asks GitHub, the
+                    // token is picked but the panel says it's connecting.
+                    if shipyard.phase != .signedOut, shipyard.tokenSource != nil {
+                        Button("Sign out") { shipyard.signOut() }
+                    }
+                    Spacer()
+                    Button("Quit", action: actions.quit)
+                        .keyboardShortcut("q")
+                }
             }
             .buttonStyle(.link)
             .font(.callout)

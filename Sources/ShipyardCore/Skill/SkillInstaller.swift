@@ -100,32 +100,126 @@ public struct SkillInstaller: Sendable {
 /// Runs the shell with Foundation's `Process`: standard input empty (so an
 /// interactive shell can't wait for it), standard output and error read
 /// together before waiting, so a full pipe can't block it.
+///
+/// Cancelling the task stops the run: it returns `nil` at once, and the shell
+/// and every process under it get SIGTERM, then SIGKILL a second later. The
+/// shell alone isn't enough: an interactive one ignores SIGTERM and runs the
+/// command as a job in its own process group, which outlives it.
 public struct ProcessShellRunner: ShellRunning {
     public init() {}
 
     public func run(_ invocation: ShellInvocation) async -> ShellOutput? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: invocation.executable)
-                process.arguments = invocation.arguments
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                process.standardInput = FileHandle.nullDevice
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                continuation.resume(returning: ShellOutput(
-                    status: process.terminationStatus,
-                    output: String(decoding: data, as: UTF8.self)
-                ))
+        let control = ProcessControl(invocation)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                control.onEnd = { continuation.resume(returning: $0) }
+                DispatchQueue.global(qos: .userInitiated).async { control.runToEnd() }
+            }
+        } onCancel: {
+            control.terminate()
+        }
+    }
+}
+
+/// One shell run that another thread can stop. It ends once, with whichever
+/// comes first: the process's output, or `nil` for a cancel (before or after
+/// the launch).
+private final class ProcessControl: @unchecked Sendable {
+    /// How long the group has after SIGTERM before SIGKILL.
+    private static let killDelay: TimeInterval = 1
+
+    private let lock = NSLock()
+    private let process = Process()
+    private let pipe = Pipe()
+    private var cancelled = false
+    private var ended = false
+    /// Called once, with the run's output or `nil`. Set before `runToEnd()`.
+    var onEnd: ((ShellOutput?) -> Void)?
+
+    init(_ invocation: ShellInvocation) {
+        process.executableURL = URL(fileURLWithPath: invocation.executable)
+        process.arguments = invocation.arguments
+        process.standardOutput = pipe
+        process.standardError = pipe
+        process.standardInput = FileHandle.nullDevice
+    }
+
+    /// Runs the process and waits for it; ends with `nil` when it couldn't start.
+    func runToEnd() {
+        guard launch() else { return end(nil) }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        end(ShellOutput(status: process.terminationStatus, output: String(decoding: data, as: UTF8.self)))
+    }
+
+    /// Stops the run: ends it with `nil` now, and signals the shell and its
+    /// descendants.
+    func terminate() {
+        let shell: pid_t? = locked {
+            cancelled = true
+            return process.isRunning ? process.processIdentifier : nil
+        }
+        end(nil)
+        guard let shell else { return }
+        DispatchQueue.global().async {
+            let pids = [shell] + Self.descendants(of: shell)
+            for pid in pids { kill(pid, SIGTERM) }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.killDelay) {
+                for pid in pids { kill(pid, SIGKILL) }
             }
         }
+    }
+
+    /// Every process under `root`, from `ps` (macOS and Linux alike).
+    private static func descendants(of root: pid_t) -> [pid_t] {
+        let ps = Process()
+        ps.executableURL = URL(fileURLWithPath: "/bin/ps")
+        ps.arguments = ["-A", "-o", "pid=,ppid="]
+        let pipe = Pipe()
+        ps.standardOutput = pipe
+        ps.standardError = FileHandle.nullDevice
+        guard (try? ps.run()) != nil else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        ps.waitUntilExit()
+        var children: [pid_t: [pid_t]] = [:]
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            let fields = line.split(separator: " ").compactMap { pid_t($0) }
+            guard fields.count == 2 else { continue }
+            children[fields[1], default: []].append(fields[0])
+        }
+        var found: [pid_t] = []
+        var queue = children[root] ?? []
+        while let pid = queue.popLast() {
+            found.append(pid)
+            queue += children[pid] ?? []
+        }
+        return found
+    }
+
+    private func launch() -> Bool {
+        locked {
+            guard !cancelled else { return false }
+            do {
+                try process.run()
+                return true
+            } catch {
+                return false
+            }
+        }
+    }
+
+    private func end(_ output: ShellOutput?) {
+        let onEnd: ((ShellOutput?) -> Void)? = locked {
+            guard !ended else { return nil }
+            ended = true
+            return self.onEnd
+        }
+        onEnd?(output)
+    }
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
     }
 }

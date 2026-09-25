@@ -233,4 +233,129 @@ public enum PanelText {
             )
         }
     }
+
+    // MARK: - The project picker
+
+    public static let pickerTitle = "Pick your projects"
+    public static let pickerIntro = "Each repository you choose is a project, one section in the list. Give several the same project name to group them into one."
+    /// The field for a repository that isn't suggested.
+    public static let typeRepository = "owner/name or a github.com link"
+    public static let findingSuggestions = "Finding the repositories you worked on recently…"
+    public static let noSuggestions = "You haven't pushed to any repository lately. Add one by name above."
+    /// Said while a chosen repository's project name is empty; Add waits for it.
+    public static let unnamedProject = "Give every project a name."
+    /// Said when Add wrote the projects but the file around them doesn't load.
+    public static let addedToBrokenFile = "Added to config.toml, but the file has an error (see above). Shipyard picks the projects up once it's fixed."
+
+    /// Why the suggestions didn't load; typing a repository still works.
+    public static func suggestionsFailed(_ error: GitHubError) -> String {
+        "Couldn't load suggestions: \(fetchError(error))"
+    }
+
+    /// Why Add couldn't write the file.
+    public static func couldNotWrite(_ reason: String) -> String {
+        "Couldn't write config.toml: \(reason)"
+    }
+
+    /// The picker's confirm button: "Add 2 projects".
+    public static func addProjects(_ count: Int) -> String {
+        switch count {
+        case 0: "Add projects"
+        case 1: "Add 1 project"
+        default: "Add \(count) projects"
+        }
+    }
+
+    /// What Add writes, above its button: "Adds e-commerce (2 repositories),
+    /// job-search"; `nil` while nothing is chosen.
+    public static func pickedProjects(_ projects: [NewProject]) -> String? {
+        guard !projects.isEmpty else { return nil }
+        let names = projects.map { project in
+            project.repositories.count > 1 ? "\(project.name) (\(project.repositories.count) repositories)" : project.name
+        }
+        return "Adds " + names.joined(separator: ", ")
+    }
+
+    // MARK: - The agent skill
+
+    /// What the skill install card says: a title, what happened or what to
+    /// do, the command's output, the command to copy, and its button.
+    public struct SkillInstall: Equatable, Sendable {
+        /// The card's button: Install, Cancel (while running) or Try again.
+        public enum Action: Equatable, Sendable {
+            case install, cancel, tryAgain
+        }
+
+        /// The card's icon: the offer, a success or a problem.
+        public enum Tone: Equatable, Sendable {
+            case neutral, success, warning
+        }
+
+        /// The card's heading.
+        public var title: String
+        /// What happened or what to do.
+        public var message: String
+        /// What the command printed, when it's worth showing.
+        public var output: String?
+        /// `SkillInstaller.command`, with a Copy button, when running it by hand helps.
+        public var command: String?
+        /// The card's button, if any.
+        public var action: Action?
+        public var tone: Tone = .neutral
+    }
+
+    /// The footer's button for the skill install card.
+    public static let installSkill = "Install agent skill…"
+
+    /// The skill install card for `state`.
+    public static func skillInstall(_ state: SkillInstallation.State) -> SkillInstall {
+        let command = SkillInstaller.command
+        switch state {
+        case .idle:
+            return SkillInstall(
+                title: "Install the agent skill",
+                message: "It teaches your agents shipyard's configuration file, so you can ask one to watch a repository for you. Shipyard runs this in your login shell:",
+                command: command,
+                action: .install
+            )
+        case .running:
+            return SkillInstall(
+                title: "Installing the agent skill…",
+                message: "Running npx in your login shell. It can take a minute.",
+                action: .cancel
+            )
+        case .finished(.installed(let output)):
+            return SkillInstall(
+                title: "Agent skill installed",
+                message: "Your agents can now edit shipyard's configuration file for you.",
+                output: output.isEmpty ? nil : output,
+                tone: .success
+            )
+        case .finished(.failed(let output)):
+            return SkillInstall(
+                title: "Couldn't install the agent skill",
+                message: "The command failed. Try again, or run it in a terminal:",
+                output: output,
+                command: command,
+                action: .tryAgain,
+                tone: .warning
+            )
+        case .finished(.npxNotFound(let command)):
+            return SkillInstall(
+                title: "npx wasn't found",
+                message: "Shipyard couldn't find npx (it comes with Node.js) in your login shell. Run this in a terminal instead:",
+                command: command,
+                action: .tryAgain,
+                tone: .warning
+            )
+        case .timedOut(let seconds):
+            return SkillInstall(
+                title: "The install took too long",
+                message: "It was stopped after \(interval(seconds)). Try again, or run it in a terminal:",
+                command: command,
+                action: .tryAgain,
+                tone: .warning
+            )
+        }
+    }
 }

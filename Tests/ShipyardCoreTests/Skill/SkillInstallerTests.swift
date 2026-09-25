@@ -71,4 +71,33 @@ struct SkillInstallerTests {
         #expect(result.output.contains("err"))
         #expect(await runner.run(ShellInvocation(executable: "/nonexistent/shell", arguments: [])) == nil)
     }
+
+    @Test("cancelling the process runner stops the shell")
+    func processRunnerCancelled() async {
+        let started = Date()
+        let run = Task {
+            await ProcessShellRunner().run(ShellInvocation(executable: "/bin/sh", arguments: ["-c", "sleep 30"]))
+        }
+        try? await Task.sleep(for: .milliseconds(200))
+        run.cancel()
+        let result = await run.value
+        #expect(Date().timeIntervalSince(started) < 10)
+        #expect(result?.status != 0)
+    }
+
+    @Test("cancelling stops an interactive shell (which ignores SIGTERM) and its children, which hold its output open")
+    func processRunnerCancelledWithChildren() async throws {
+        let marker = "31.\(Int.random(in: 1000...9999))"
+        let started = Date()
+        let run = Task {
+            await ProcessShellRunner().run(ShellInvocation(executable: "/bin/sh", arguments: ["-i", "-c", "sleep \(marker) | cat; echo done"]))
+        }
+        try await Task.sleep(for: .milliseconds(500))
+        run.cancel()
+        _ = await run.value
+        #expect(Date().timeIntervalSince(started) < 10)
+        try await Task.sleep(for: .seconds(2))
+        let check = try #require(await ProcessShellRunner().run(ShellInvocation(executable: "/bin/sh", arguments: ["-c", "ps -A -o command | grep 'sleep \(marker)' | grep -v grep"])))
+        #expect(check.output.isEmpty)
+    }
 }

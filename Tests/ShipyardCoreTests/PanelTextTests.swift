@@ -259,4 +259,90 @@ struct PanelTextTests {
         #expect(text.title == "Signed out")
         #expect(text.command == "gh auth login")
     }
+
+    // MARK: - The agent skill
+
+    private let skillCommand = "npx -y skills add yahyabedirhan/shipyard -g -y"
+
+    @Test("the skill offer says what the skill does and shows the command it runs")
+    func skillOffer() {
+        let text = PanelText.skillInstall(.idle)
+        #expect(text.title == "Install the agent skill")
+        #expect(text.tone == .neutral)
+        #expect(text.message.contains("configuration file"))
+        #expect(text.command == skillCommand)
+        #expect(text.output == nil)
+        #expect(text.action == .install)
+    }
+
+    @Test("a running install can be cancelled and shows no command to copy")
+    func skillRunning() {
+        let text = PanelText.skillInstall(.running)
+        #expect(text.title == "Installing the agent skill…")
+        #expect(text.command == nil)
+        #expect(text.action == .cancel)
+    }
+
+    @Test("a finished install says so, with what the command printed")
+    func skillInstalled() {
+        let text = PanelText.skillInstall(.finished(.installed(output: "✓ Installed 1 skill: shipyard")))
+        #expect(text.title == "Agent skill installed")
+        #expect(text.tone == .success)
+        #expect(text.output == "✓ Installed 1 skill: shipyard")
+        #expect(text.command == nil)
+        #expect(text.action == nil)
+    }
+
+    @Test("a failed install shows its output, the command to run by hand, and Try again")
+    func skillFailed() {
+        let text = PanelText.skillInstall(.finished(.failed(output: "npm ERR! network")))
+        #expect(text.title == "Couldn't install the agent skill")
+        #expect(text.tone == .warning)
+        #expect(text.output == "npm ERR! network")
+        #expect(text.command == skillCommand)
+        #expect(text.action == .tryAgain)
+    }
+
+    @Test("without npx the command is there to copy and run in a terminal")
+    func skillNpxNotFound() {
+        let text = PanelText.skillInstall(.finished(.npxNotFound(command: skillCommand)))
+        #expect(text.title == "npx wasn't found")
+        #expect(text.message.contains("Node.js"))
+        #expect(text.message.contains("terminal"))
+        #expect(text.command == skillCommand)
+        #expect(text.output == nil)
+        #expect(text.action == .tryAgain)
+    }
+
+    @Test("an install stopped by the timeout says after how long")
+    func skillTimedOut() {
+        let text = PanelText.skillInstall(.timedOut(seconds: 180))
+        #expect(text.title == "The install took too long")
+        #expect(text.message.contains("3 min"))
+        #expect(text.command == skillCommand)
+        #expect(text.action == .tryAgain)
+    }
+
+    // MARK: - The project picker
+
+    @Test("the picker's Add button counts the projects it writes")
+    func addProjects() {
+        #expect(PanelText.addProjects(0) == "Add projects")
+        #expect(PanelText.addProjects(1) == "Add 1 project")
+        #expect(PanelText.addProjects(3) == "Add 3 projects")
+    }
+
+    @Test("the picker's summary names what Add writes, counting a project's repositories when it groups several")
+    func pickedProjects() {
+        #expect(PanelText.pickedProjects([]) == nil)
+        #expect(PanelText.pickedProjects([
+            NewProject(name: "e-commerce", repositories: ["a/frontend", "a/backend"]),
+            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+        ]) == "Adds e-commerce (2 repositories), job-search")
+    }
+
+    @Test("suggestions that couldn't load say why")
+    func suggestionsFailed() {
+        #expect(PanelText.suggestionsFailed(.unauthorized) == "Couldn't load suggestions: GitHub rejected the token.")
+    }
 }

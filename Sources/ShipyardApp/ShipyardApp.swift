@@ -59,6 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class AppServices {
     let shipyard: Shipyard
+    /// The agent skill install, kept for the app's run so an install goes
+    /// on, and its result stays, while the panel is closed.
+    let skillInstallation = SkillInstallation()
     private let notifier = Notifier()
     private let opener = WorkspaceURLOpener()
     private var configWatcher: ConfigWatcher?
