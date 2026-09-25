@@ -290,6 +290,39 @@ struct AttentionTests {
         #expect(total.shipyard.menu.menuBarLabel.text == nil)
     }
 
+    @Test("without projects the menu bar shows no count; adding them back shows it after the next refresh")
+    func menuBarLabelWithoutProjects() async throws {
+        let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
+        #expect(harness.shipyard.menu.menuBarLabel.text == "6")
+
+        try harness.writeConfig("")
+        await harness.shipyard.reloadConfiguration()
+        #expect(harness.shipyard.phase == .needsProjects)
+        #expect(harness.shipyard.menu.menuBarLabel.text == nil)
+
+        // A collapse recomputes attention; the count stays hidden.
+        harness.shipyard.toggleCollapsed("job-search")
+        #expect(harness.shipyard.menu.menuBarLabel.text == nil)
+
+        try harness.writeConfig(twoProjects)
+        await harness.shipyard.reloadConfiguration()
+        #expect(harness.shipyard.phase == .ready)
+        #expect(harness.shipyard.menu.menuBarLabel.text == "6")
+    }
+
+    @Test("signed out, the menu bar shows no count")
+    func menuBarLabelSignedOut() async throws {
+        let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
+        #expect(harness.shipyard.menu.menuBarLabel.text == "6")
+
+        harness.shipyard.signOut()
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.menu.menuBarLabel.text == nil)
+
+        harness.shipyard.toggleCollapsed("job-search")
+        #expect(harness.shipyard.menu.menuBarLabel.text == nil)
+    }
+
     // MARK: - App state
 
     @Test("collapsed projects and seen items survive a restart")

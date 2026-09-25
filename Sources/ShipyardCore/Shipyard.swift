@@ -294,7 +294,7 @@ public final class Shipyard {
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // `[attention]` and `[menu-bar]` apply at once, even if the
             // refresh below can't run (paused).
-            menu.applyAttention(appStateStore.state, configuration: configuration)
+            applyAttention(configuration)
             if phase.canRefresh {
                 await refresh()
             } else {
@@ -559,7 +559,15 @@ public final class Shipyard {
     /// attention flags, counts and collapsed sections up to date.
     private func updateAppState(_ body: (inout AppState) -> Void) {
         appStateStore.update(body)
-        menu.applyAttention(appStateStore.state, configuration: configStore.lastValid)
+        applyAttention(configStore.lastValid)
+    }
+
+    /// Brings the menu model's attention up to date, with no count in the
+    /// menu bar unless the phase is `ready`: without projects the menu has
+    /// nothing to count, even while it still holds the last snapshot's rows.
+    private func applyAttention(_ configuration: Configuration) {
+        menu.applyAttention(appStateStore.state, configuration: configuration)
+        if phase != .ready { menu.menuBarLabel = .hidden }
     }
 
     private func apply(_ event: LifecycleEvent) {
