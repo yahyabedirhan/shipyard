@@ -21,6 +21,12 @@ An **effort** is one spec issue and the tickets that build it.
 - **Order**: GitHub's native "blocked by" dependencies, as described under Wayfinding operations below. A blocking edge may cross efforts.
 - **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:sign-in-without-gh` on #22 and its tickets). When publishing a new spec, create its label (`gh label create effort:<name>`) and apply it to the spec and each ticket; a ticket moved to another effort swaps its label too. Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
 
+## Bugs and screenshots
+
+- A bug found while building or checking the app gets a ticket, labelled `bug`, in the effort it belongs to, and blocks that effort's verification ticket. If an open ticket already owns the behaviour, update that ticket instead.
+- Attach a screenshot when it shows the bug. `gh` can't upload images to an issue, so screenshots live on the orphan branch `issue-assets` and the issue embeds their raw URL: `![what it shows](https://raw.githubusercontent.com/yahyabedirhan/shipyard/issue-assets/<name>.png)`. Add a file to that branch without touching the working tree: `git hash-object -w`, then `git mktree` over the branch's current tree plus the new entry, then `git commit-tree` with the branch's head as parent, then `git push origin <commit>:refs/heads/issue-assets`.
+- On the maintainer's Mac, agents can click the menu bar and take screenshots (Screen Recording and Accessibility are granted to Ghostty). #27 shows how to open shipyard's real menu and screenshot it.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
