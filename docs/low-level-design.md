@@ -448,7 +448,7 @@ shipyard/
 ├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon), ad-hoc sign, zip, install, redraw the icon
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
-├── Packaging/Icon/                   # make-icon.swift draws the app icon (the menu bar's sailboat); `make icon` packs AppIcon.icns, committed
+├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (origami, the menu bar's sailboat folded from paper, is the app's; sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting

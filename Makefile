@@ -7,7 +7,8 @@
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
-#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=origami)
+#   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
 #   make clean
 
 APP         := Shipyard
@@ -19,8 +20,11 @@ APP_BUNDLE  := $(BUILD_DIR)/$(APP).app
 CONTENTS    := $(APP_BUNDLE)/Contents
 ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
-ICON        := Packaging/Icon/AppIcon.icns
+ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
+# The variant make-icon.swift draws for the app: origami, sailboat, night or sunset.
+ICON        ?= origami
+ALTERNATES  := sailboat night sunset
 
 # With the Command Line Tools alone (no Xcode), swift test can't find the
 # Testing framework the tests use: point the compiler and the test runner at
@@ -35,7 +39,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
 endif
 
-.PHONY: all build test bundle install release run icon clean
+.PHONY: all build test bundle install release run icon icon-alternates clean
 
 all: build
 
@@ -53,7 +57,7 @@ bundle: build
 	@mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
 	cp "$$(swift build -c release --show-bin-path)/$(APP)" $(CONTENTS)/MacOS/$(APP)
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
-	cp $(ICON) $(CONTENTS)/Resources/AppIcon.icns
+	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
 	@# bundle gives it the stable identity notifications and login items need.
@@ -85,10 +89,22 @@ release: test bundle
 	@shasum -a 256 $(ZIP)
 
 # The icon is committed, so bundling doesn't redraw it; run this after
-# changing make-icon.swift.
+# changing make-icon.swift, or with ICON=<variant> to switch the app's icon.
 icon:
-	swift Packaging/Icon/make-icon.swift $(ICONSET)
-	iconutil -c icns $(ICONSET) -o $(ICON)
+	swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $(ICON)
+	iconutil -c icns $(ICONSET) -o $(ICON_FILE)
+	@rm -rf $(ICONSET)
+
+# The variants the app doesn't use, kept to switch to: an .icns and a 512 pt
+# preview of each in Packaging/Icon/alternates/, committed.
+icon-alternates:
+	@mkdir -p Packaging/Icon/alternates
+	@for variant in $(ALTERNATES); do \
+		swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $$variant || exit 1; \
+		iconutil -c icns $(ICONSET) -o Packaging/Icon/alternates/$$variant.icns || exit 1; \
+		cp $(ICONSET)/icon_512x512.png Packaging/Icon/alternates/$$variant.png; \
+		echo "drew Packaging/Icon/alternates/$$variant.icns"; \
+	done
 	@rm -rf $(ICONSET)
 
 clean:
