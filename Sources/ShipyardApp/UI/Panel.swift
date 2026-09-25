@@ -7,6 +7,10 @@ import SwiftUI
 struct Panel: View {
     let shipyard: Shipyard
     let actions: AppServices
+    /// The tallest the list of sections gets before it scrolls.
+    private static let maxSectionsHeight: CGFloat = 560
+    /// The sections' own height, measured, which sizes the list around them.
+    @State private var sectionsHeight: CGFloat = 0
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -39,12 +43,16 @@ struct Panel: View {
                 action: ("Open configuration file", actions.openConfigurationFile)
             )
         case .ready:
-            // As tall as the sections, scrolling once they pass 560 pt.
-            ViewThatFits(in: .vertical) {
+            // As tall as the sections, scrolling once they pass the maximum.
+            // The height is fixed from the measured sections: the
+            // `MenuBarExtra` window sizes the panel from a zero-height
+            // proposal, which a scroll view (or `ViewThatFits`) takes as 0,
+            // leaving only the footer (#27).
+            ScrollView {
                 sections(now: now)
-                ScrollView { sections(now: now) }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { sectionsHeight = $0 }
             }
-            .frame(maxHeight: 560)
+            .frame(height: min(sectionsHeight, Self.maxSectionsHeight))
         }
     }
 

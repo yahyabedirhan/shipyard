@@ -377,8 +377,10 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
       ready →
         banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error ·
                               notifications off (with a button to System Settings)
-        <ProjectSection> ×N   header: chevron (click collapses/expands), name, attention count, "Mark all seen"
-          <ItemRow> ×N        attention dot, state icon, title (semibold when it needs attention),
+        sections list         a scroll view as tall as the measured sections, up to 560 pt; the window sizes the
+                              panel from a zero-height proposal, so the height is fixed rather than flexible (#27)
+          <ProjectSection> ×N header: chevron (click collapses/expands), name, attention count, "Mark all seen"
+            <ItemRow> ×N      attention dot, state icon, title (semibold when it needs attention),
                               "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
                               a run: workflow name, "#41 · shipyard · main · failed · 12m", no check dot;
                               click opens and marks seen, ⌥-click marks seen only
