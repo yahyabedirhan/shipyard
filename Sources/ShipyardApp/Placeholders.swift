@@ -5,8 +5,10 @@ import ShipyardCore
 // Stand-ins for ports later tickets make real. With them the app signs in
 // with `gh`'s token and shows pull requests.
 
-/// Keeps a token only while the app runs. The Keychain replaces it (#14);
-/// until then nothing is stored, so sign-in always falls back to `gh`.
+/// Keeps a token only while the app runs. 0.0.x connects through `gh` only
+/// and never starts the device flow, so nothing is ever saved here and
+/// sign-in always uses `gh`'s token. The Keychain replaces it with sign-in
+/// without `gh` (#22).
 final class SessionTokenStore: TokenStore, @unchecked Sendable {
     private let lock = NSLock()
     private var stored: String?

@@ -10,6 +10,10 @@ Shipyard shows the pull requests (and, if you turn them on, issues and workflow 
 
 Shipyard ships for **macOS only** (macOS 14 or later).
 
+## Connecting to GitHub
+
+Shipyard 0.0.x connects to GitHub through the [GitHub CLI](https://cli.github.com) and **needs `gh`**: install it (`brew install gh`) and sign in with `gh auth login`. Shipyard picks up `gh`'s token silently; until `gh` is signed in, its panel shows how to connect. To disconnect shipyard for good, run `gh auth logout`. Signing in without `gh` is planned for a later version.
+
 The package has two targets:
 
 - `ShipyardCore`: every rule (configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model). It depends only on Foundation, FoundationNetworking, Observation and TOMLDecoder, so it also **builds and tests on Linux, for development**. Linux isn't a supported platform for running shipyard.

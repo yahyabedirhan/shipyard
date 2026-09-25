@@ -25,6 +25,17 @@ public final class Shipyard {
         case ghStillSignedIn
     }
 
+    /// Why shipyard is signed out, so the connect screen can say what to do.
+    public enum SignedOutReason: Equatable, Sendable {
+        /// Neither the token store nor `gh` had a token: `gh` isn't
+        /// installed or isn't signed in.
+        case noToken
+        /// GitHub rejected the token from this source (401): revoked or expired.
+        case rejected(TokenSource)
+        /// The user signed out; the result says whether `gh` still holds a token.
+        case signedOut(SignOutResult)
+    }
+
     /// Where shipyard is in its lifecycle.
     public private(set) var phase: Phase = .signedOut
     /// Where the current token came from; `nil` when signed out.
@@ -35,6 +46,9 @@ public final class Shipyard {
     /// Why the last device flow ended without signing in (for example
     /// `.expired`); cleared when a new one begins. `nil` after a cancel.
     public private(set) var signInError: DeviceFlowError?
+    /// Why shipyard is signed out, for the connect screen; `nil` while signed
+    /// in, and while `start()` is still looking for a token.
+    public private(set) var signedOutReason: SignedOutReason?
 
     /// What the panel draws. A failed refresh keeps the rows and sets
     /// `fetchError` and the time they were last updated.
@@ -107,6 +121,7 @@ public final class Shipyard {
     /// store's token or `gh`'s, if either has one; otherwise stays signed
     /// out. Signing in with projects runs the first refresh.
     public func start() async {
+        signedOutReason = nil
         appStateStore.load(at: clock.now)
         configStore.reload()
         configError = configStore.error
@@ -115,6 +130,7 @@ public final class Shipyard {
         let found = await Task.detached { provider.current() }.value
         guard let found else {
             apply(.signedOut)
+            signedOutReason = .noToken
             return
         }
         await connect(with: found)
@@ -192,6 +208,7 @@ public final class Shipyard {
         }
         guard current == session else { return }
         self.viewer = viewer
+        signedOutReason = nil
         apply(.signedIn(hasProjects: configStore.lastValid.hasProjects))
         await refresh()
     }
@@ -212,8 +229,12 @@ public final class Shipyard {
     /// GitHub rejected the token: forget it, and drop it from the token store
     /// when it came from there, so the next start can fall back to `gh`.
     private func signOutAfterUnauthorized() {
-        if tokenSource == .tokenStore { try? tokenStore.delete() }
+        // A request only runs with a token, so the source is set; were it
+        // not, dropping the stored token is the safe side.
+        let source = tokenSource ?? .tokenStore
+        if source == .tokenStore { try? tokenStore.delete() }
         endSession()
+        signedOutReason = .rejected(source)
     }
 
     /// Clears the token store and returns to `signedOut`. When the token came
@@ -225,7 +246,9 @@ public final class Shipyard {
         try? tokenStore.delete()
         signInError = nil
         endSession()
-        return source == .gh ? .ghStillSignedIn : .signedOut
+        let result: SignOutResult = source == .gh ? .ghStillSignedIn : .signedOut
+        signedOutReason = .signedOut(result)
+        return result
     }
 
     private func endSession() {

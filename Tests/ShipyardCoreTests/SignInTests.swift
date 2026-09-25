@@ -261,4 +261,96 @@ struct SignInTests {
         #expect(harness.shipyard.signOut() == .ghStillSignedIn)
         #expect(harness.shipyard.phase == .signedOut)
     }
+
+    // MARK: - Why shipyard is signed out (the connect screen)
+
+    @Test("before the first look for a token there's no reason yet")
+    func noReasonBeforeStart() throws {
+        let harness = try Harness()
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signedOutReason == nil)
+    }
+
+    @Test("with no gh token the reason is that there's no token")
+    func reasonNoToken() async throws {
+        let harness = try Harness()
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.signedOutReason == .noToken)
+    }
+
+    @Test("a gh token signs in with no reason left")
+    func reasonClearedBySigningIn() async throws {
+        let harness = try Harness(gh: "gho_fromgh", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .ready)
+        #expect(harness.shipyard.signedOutReason == nil)
+    }
+
+    @Test("trying again once gh is signed in connects")
+    func tryAgainAfterGhLogin() async throws {
+        let harness = try Harness(config: withProjects)
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+        #expect(harness.shipyard.signedOutReason == .noToken)
+
+        harness.gh.set("gho_fromgh")
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .ready)
+        #expect(harness.shipyard.tokenSource == .gh)
+        #expect(harness.shipyard.signedOutReason == nil)
+        #expect(harness.authorizations == ["Bearer gho_fromgh"])
+    }
+
+    @Test("a gh token GitHub rejects at start gives the rejected reason")
+    func reasonRejectedAtStart() async throws {
+        let harness = try Harness(gh: "gho_revoked")
+        harness.stub.on(userURL, unauthorized)
+
+        await harness.shipyard.start()
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signedOutReason == .rejected(.gh))
+    }
+
+    @Test("a gh token revoked while signed in brings back the connect screen with the rejected reason")
+    func reasonRejectedLater() async throws {
+        let harness = try Harness(gh: "gho_fromgh", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer, unauthorized)
+        await harness.shipyard.start()
+        #expect(harness.shipyard.phase == .ready)
+
+        _ = try? await harness.shipyard.request { try await $0.viewer() }
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signedOutReason == .rejected(.gh))
+    }
+
+    @Test("signing out of gh's token keeps the reason: gh is still signed in")
+    func reasonSignedOutOfGh() async throws {
+        let harness = try Harness(gh: "gho_fromgh")
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        harness.shipyard.signOut()
+
+        #expect(harness.shipyard.signedOutReason == .signedOut(.ghStillSignedIn))
+    }
+
+    @Test("signing out of a stored token gives the plain signed-out reason")
+    func reasonSignedOutOfStore() async throws {
+        let harness = try Harness(stored: "gho_stored")
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.start()
+
+        harness.shipyard.signOut()
+
+        #expect(harness.shipyard.signedOutReason == .signedOut(.signedOut))
+    }
 }

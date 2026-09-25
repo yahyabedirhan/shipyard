@@ -28,15 +28,11 @@ struct Panel: View {
     private func content(now: Date) -> some View {
         switch shipyard.phase {
         case .connecting:
-            // The device flow's screen is #14's; nothing starts one yet.
+            // Only the device flow connects this way, and 0.0.x doesn't
+            // offer it (#22).
             ProgressView().padding(12)
         case .signedOut:
-            // Until the connect screen (#14): `gh`'s token is the way in.
-            message(
-                "Not connected to GitHub",
-                detail: "Sign in with `gh auth login` in a terminal, then try again.",
-                action: ("Try again", { Task { await shipyard.start() } })
-            )
+            ConnectView(shipyard: shipyard)
         case .needsProjects:
             message(
                 "No projects yet",
@@ -118,6 +114,11 @@ struct Panel: View {
                     .keyboardShortcut("r")
                     .disabled(!shipyard.canRefreshNow || shipyard.phase != .ready)
                 Button("Open configuration file", action: actions.openConfigurationFile)
+                // Once signed in: while `start()` still asks GitHub, the
+                // token is picked but the panel says it's connecting.
+                if shipyard.phase != .signedOut, shipyard.tokenSource != nil {
+                    Button("Sign out") { shipyard.signOut() }
+                }
                 Spacer()
                 Button("Quit", action: actions.quit)
                     .keyboardShortcut("q")

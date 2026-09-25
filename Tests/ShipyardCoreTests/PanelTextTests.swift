@@ -59,4 +59,65 @@ struct PanelTextTests {
     func fetchError(error: GitHubError, text: String) {
         #expect(PanelText.fetchError(error) == text)
     }
+
+    // MARK: - The connect screen
+
+    @Test("with no gh token the connect screen says to install gh and run gh auth login")
+    func connectNoToken() {
+        let text = PanelText.connect(.noToken)
+        #expect(text.title == "Connect to GitHub")
+        #expect(text.message.contains("GitHub CLI"))
+        #expect(text.command == "gh auth login")
+        #expect(text.suggestsInstallingGh)
+        #expect(PanelText.installGh.contains("https://cli.github.com"))
+        #expect(PanelText.installGh.contains("brew install gh"))
+    }
+
+    @Test("while shipyard looks for gh's token the panel says it's connecting")
+    func connecting() {
+        #expect(PanelText.connecting == "Connecting to GitHub…")
+    }
+
+    @Test("a Try again that leaves shipyard signed out says why, so the click doesn't look dead", arguments: [
+        (Shipyard.SignedOutReason.noToken, "gh still isn't signed in."),
+        (.rejected(.gh), "GitHub still rejects gh's token."),
+        (.rejected(.tokenStore), "GitHub still rejects the token."),
+        (.signedOut(.signedOut), "Still not connected."),
+        (.signedOut(.ghStillSignedIn), "Still not connected."),
+    ])
+    func stillSignedOut(reason: Shipyard.SignedOutReason, text: String) {
+        #expect(PanelText.stillSignedOut(reason) == text)
+    }
+
+    @Test("a rejected gh token says it was revoked or expired and to sign gh in again")
+    func connectRejectedGh() {
+        let text = PanelText.connect(.rejected(.gh))
+        #expect(text.title == "GitHub rejected gh's token")
+        #expect(text.message.contains("revoked or has expired"))
+        #expect(text.command == "gh auth login")
+        #expect(!text.suggestsInstallingGh)
+    }
+
+    @Test("a rejected stored token also points at gh auth login")
+    func connectRejectedStored() {
+        let text = PanelText.connect(.rejected(.tokenStore))
+        #expect(text.title == "GitHub rejected shipyard's token")
+        #expect(text.command == "gh auth login")
+    }
+
+    @Test("signing out while gh is still signed in says to run gh auth logout")
+    func connectSignedOutGhStillSignedIn() {
+        let text = PanelText.connect(.signedOut(.ghStillSignedIn))
+        #expect(text.title == "Signed out")
+        #expect(text.message.contains("still signed in"))
+        #expect(text.command == "gh auth logout")
+        #expect(!text.suggestsInstallingGh)
+    }
+
+    @Test("signing out with nothing left signed in points back at gh auth login")
+    func connectSignedOut() {
+        let text = PanelText.connect(.signedOut(.signedOut))
+        #expect(text.title == "Signed out")
+        #expect(text.command == "gh auth login")
+    }
 }

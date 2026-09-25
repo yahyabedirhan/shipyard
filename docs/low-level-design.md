@@ -35,7 +35,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | R10 | Refresh on an interval (default 120 s), when the panel opens, when the Mac wakes, when the configuration changes, and on ⌘R. |
 | R11 | Read everything the user controls from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
 | R12 | Keep app state (seen, known items, collapsed sections, notified) in `~/Library/Application Support/Shipyard/state.json`, never in the configuration. |
-| R13 | Onboarding: connect GitHub (reuse `gh`'s token silently, else device flow with the token in Keychain); then, whenever there are no projects, show the project picker, which writes projects to the configuration. |
+| R13 | Onboarding: connect GitHub by reusing `gh`'s token silently; in 0.0.x `gh` is the only way in, and without a usable `gh` token the panel shows a connect screen explaining `gh auth login` (sign-in without `gh`, the device flow with the token in the Keychain, is deferred to #22); then, whenever there are no projects, show the project picker, which writes projects to the configuration. |
 | R14 | Offer to install the shipyard skill during onboarding and from the panel's menu, by running `npx -y skills add yahyabedirhan/shipyard -g -y` for the user. |
 | R15 | Launch at login (on by default, configurable). |
 | R10a | Spend at most `max-share-percent` (default 10%) of each GitHub hourly limit (GraphQL points, REST requests). If a refresh at the configured interval would spend more, stretch the interval and say so in the panel. |
@@ -54,7 +54,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 |---|---|
 | Configuration file is invalid TOML or fails validation | Keep the last valid configuration, show the error (file, line, message) at the top of the panel. Never blank the list. |
 | No configuration file | Treat as defaults with no projects → project picker. |
-| Token missing or rejected (401) | Go to the signed-out state → onboarding's connect step. |
+| Token missing or rejected (401) | Go to the signed-out state → onboarding's connect step, which says why (no `gh` token, or GitHub rejected it) and to run `gh auth login`. |
 | One repository not found or not accessible | That project shows an error row for it; other repositories and projects still show. |
 | Network down / GitHub 5xx | Keep the last items, show "Last updated 4 min ago · can't reach GitHub" in the panel. Retry on the next trigger. |
 | Rate limit exhausted: GraphQL answers **200** with a rate-limit error and `x-ratelimit-remaining: 0`; REST answers 403/429 | Keep the last items; banner "Rate limit reached · updates resume at 16:42"; the reset time comes from the response (`resetAt` / `x-ratelimit-reset`), not ghbar's one-hour guess. |
@@ -140,6 +140,8 @@ State:
 
 ```text
 phase: signedOut | connecting(DeviceCode) | needsProjects | ready
+signedOutReason: noToken | rejected(TokenSource) | signedOut(SignOutResult) | nil
+                                   (why signedOut, for the connect screen; nil while signed in and while start() looks for a token)
 config: Configuration              (from ConfigStore)
 configError: ConfigError?
 snapshot: Snapshot?                (last good)
@@ -165,7 +167,7 @@ Operations:
 
 | Operation | Does | Rejects / edge |
 |---|---|---|
-| `start()` | load config; resolve token → phase; in `ready`, the first refresh | — |
+| `start()` | load config; resolve token → phase; in `ready`, the first refresh. The connect screen's Try again calls it too | no token → `signedOut` with `noToken` |
 | `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
@@ -173,12 +175,12 @@ Operations:
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
-| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
+| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core, but 0.0.x's app never calls it (#22) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
 | `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigError` (empty or used name, no repositories, bad slug) before writing anything |
-| `signOut()` | clears Keychain token → `signedOut`; app state (seen, collapsed) is kept | if the token came from `gh`, says to run `gh auth logout` |
-| `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut`, dropping the stored token when it came from the token store |
+| `signOut()` | clears the token store → `signedOut` with `signedOut(result)`; app state (seen, collapsed) is kept. The footer's Sign out calls it | if the token came from `gh` (always, in 0.0.x), `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
+| `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut` with `rejected(source)`, dropping the stored token when it came from the token store |
 
 ### Configuration — `ShipyardCore/Config/Configuration.swift`
 
@@ -259,7 +261,9 @@ State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/
 Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (the footer's "Open configuration file": writes the commented header alone when there's no file; never touches one that exists), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
-### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`)
+### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
+
+**0.0.x connects through `gh` only.** The app reads `gh auth token` silently and never starts the device flow; without a usable `gh` token the panel's connect screen says to install `gh` and run `gh auth login`. The device flow and the Keychain below stay in the core, tested, and come to the app with sign-in without `gh` (#22); until then the app's token store is `SessionTokenStore` (`Placeholders.swift`), which nothing writes to.
 
 Kept from ghbar almost as is, because it worked well:
 - `TokenProvider.current()`: Keychain first (the user signed in explicitly), then `gh auth token` found at known paths (`/opt/homebrew/bin/gh`, `/usr/local/bin/gh`, then `PATH`), since an `.app` starts with an almost empty `PATH`. Spawning `gh` sits behind the `GhTokenLookup` protocol (`GhCLI` runs it with `Process`), so tests use a fake lookup.
@@ -362,18 +366,19 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 <ShipyardApp> (ShipyardApp/ShipyardApp.swift)
   <MenuBarExtra label={<MenuBarLabel count>}>
     <Panel>                                   switch shipyard.phase
-      signedOut / connecting → <ConnectView>  (Onboarding/)
+      signedOut              → <ConnectView>  (Onboarding/)
+      connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
       needsProjects          → <ProjectPicker>(Onboarding/)
       ready →
         <StatusBanner>        config error · fetch error · rate limit paused/backed off · last updated
         <ProjectSection> ×N   collapsible header with attention count, "Mark all seen"
           <ItemRow> ×N        colour dot, #number, title, author, age, check dot
-        <PanelFooter>         rate limit indicator · Refresh · Open configuration file · Install agent skill… · Quit
+        <PanelFooter>         rate limit indicator · Refresh · Open configuration file · Install agent skill… · Sign out (once signed in) · Quit
 ```
 
-Until #14 and #18, `signedOut` shows a "Not connected: run `gh auth login`" message with Try again (`start()`), and `needsProjects` points at the configuration file; the footer's rate-limit indicator (#15) and Install agent skill… (#18) come with their tickets.
+`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; the footer's rate-limit indicator (#15) and Install agent skill… (#18) come with their tickets.
 
-The words the panel shows (a row's age, "Last updated 5 min ago", the configuration and fetch error banners) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
+The words the panel shows (a row's age, "Last updated 5 min ago", the configuration and fetch error banners, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -441,7 +446,7 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   └── PanelText.swift           # pure: row age, "Last updated N min ago", config and fetch error banners
+│   │   └── PanelText.swift           # pure: row age, "Last updated N min ago", config and fetch error banners, the connect screen's words
 │   └── Skill/
 │       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
@@ -449,8 +454,8 @@ shipyard/
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # URLOpening on NSWorkspace; opens config.toml in its editor (TextEdit when none)
-│   ├── Placeholders.swift            # session-only token store and logging notifier until Keychain.swift (#14) and Notifier.swift (#16)
-│   ├── Keychain.swift                # TokenStore on the login keychain
+│   ├── Placeholders.swift            # session-only token store (never written in 0.0.x: gh only) and logging notifier until Keychain.swift (#22) and Notifier.swift (#16)
+│   ├── Keychain.swift                # TokenStore on the login keychain (#22, with sign-in without gh)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter
 │   ├── LaunchAtLogin.swift           # SMAppService wrapper
 │   └── UI/
@@ -459,7 +464,7 @@ shipyard/
 │       ├── ItemRow.swift
 │       ├── Palette.swift             # semantic state colours → GitHub colours, light/dark
 │       └── Onboarding/
-│           ├── ConnectView.swift
+│           ├── ConnectView.swift     # why signed out, the gh command to copy, Try again
 │           └── ProjectPicker.swift
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module
     ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
