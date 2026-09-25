@@ -145,7 +145,7 @@ fetchError: FetchError?            (last refresh's failure, if any)
 gate: RefreshGate                  (one refresh at a time, queues one more)
 ```
 
-The phase is a small state machine:
+The phase is a small state machine, declared in `Lifecycle.swift` as `Phase.after(LifecycleEvent)` so its transitions are tested on their own:
 
 ```text
           token found / device flow done
@@ -362,15 +362,18 @@ Runs the user's login shell (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/s
 
 ```text
 shipyard/
-├── Package.swift                     # SwiftPM: ShipyardCore (library) + Shipyard (macOS app) + tests; one dependency: TOMLDecoder
+├── Package.swift                     # SwiftPM: ShipyardCore (library) + Shipyard (macOS app, declared only on macOS) + tests; one dependency: TOMLDecoder
+├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6) for pushes and pull requests
 ├── Makefile                          # build, test, bundle .app, ad-hoc sign, zip, install
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
 ├── Sources/ShipyardCore/             # Foundation only, so agents can build and test it on a Linux VPS
 │   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
+│   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
+│   ├── Version.swift                 # ShipyardVersion.current: the one place the version is recorded
 │   ├── RefreshScheduler.swift        # timer (armed from RateBudget.nextDelay), triggers + RefreshGate
-│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, Clock, URL opener
+│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, URLOpening
 │   ├── Config/
 │   │   ├── Configuration.swift       # file model, defaults, validation, per-project merge
 │   │   └── ConfigStore.swift         # path, load/reload, last-valid fallback, append projects
@@ -409,6 +412,7 @@ shipyard/
 │           ├── ConnectView.swift
 │           └── ProjectPicker.swift
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; fixtures of GitHub responses
+    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, recording URL opener
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation (plus FoundationNetworking on Linux) and TOMLDecoder; the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `Shipyard` app target supplies them: the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.

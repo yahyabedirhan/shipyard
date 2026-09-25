@@ -1,0 +1,17 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core-linux:
+    name: core tests (ubuntu, swift 6)
+    runs-on: ubuntu-latest
+    container: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: build ShipyardCore
+        run: swift build --target ShipyardCore
+      - name: test
+        run: swift test
