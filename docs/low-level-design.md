@@ -130,7 +130,7 @@ Where each rule lives:
 
 ## 3. Class design
 
-### Shipyard (orchestrator) — `App/Shipyard.swift`
+### Shipyard (orchestrator) — `ShipyardCore/Shipyard.swift`
 
 An `@MainActor @Observable` class; the panel observes it.
 
@@ -167,7 +167,7 @@ Operations:
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth` | only in `signedOut` |
 | `signOut()` | clears Keychain token → `signedOut` | if the token came from `gh`, says to run `gh auth logout` |
 
-### Configuration — `Config/Configuration.swift`
+### Configuration — `ShipyardCore/Config/Configuration.swift`
 
 A `Codable` value decoded with TOMLDecoder. Every key is optional; missing keys take defaults, so an empty file is valid. Defaults shown, as the file a user would write:
 
@@ -240,20 +240,20 @@ Operations:
 
 Unknown keys are ignored with a warning, so a newer file doesn't break an older app.
 
-### ConfigStore — `Config/ConfigStore.swift`
+### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url`, `lastValid: Configuration`, `error: ConfigError?`, a file watcher.
-Operations: `load()`, `onChange(handler)`, `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header when missing; never rewrites, so comments survive).
-The watcher watches the **directory**, not the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. Changes are debounced 200 ms.
+Operations: `load()`, `onChange(handler)`, `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header when missing; never rewrites, so comments survive). The core has no file watcher; the app's `ConfigWatcher` calls `reload()`.
+The app's `ConfigWatcher` watches the **directory**, not the file, and calls `reload()`: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. Changes are debounced 200 ms.
 
-### Auth — `GitHub/Auth/`
+### Auth — `ShipyardCore/GitHub/Auth/` (+ `Shipyard/Keychain.swift`)
 
 Kept from ghbar almost as is, because it worked well:
 - `TokenProvider.current()`: Keychain first (the user signed in explicitly), then `gh auth token` found at known paths (`/opt/homebrew/bin/gh`, `/usr/local/bin/gh`, then `PATH`), since an `.app` starts with an almost empty `PATH`.
 - `DeviceFlow`: request code → show code and open github.com/login/device → poll → store in Keychain. Needs a GitHub OAuth App client ID (scopes `repo`, `read:org`).
-- `Keychain`: get/set/delete one token.
+- `Keychain` (app target): the `TokenStore` port, get/set/delete one token. Tests use an in-memory store.
 
-### GitHubClient — `GitHub/GitHubClient.swift`
+### GitHubClient — `ShipyardCore/GitHub/GitHubClient.swift`
 
 State: token, `URLSession`. Operations:
 
@@ -267,7 +267,7 @@ State: token, `URLSession`. Operations:
 The query text lives next to its parser in `GitHub/ProjectQuery.swift` (build + parse, one owner). Per repository alias it asks for: open PRs (first 50), PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally), the same for issues when shown, and per PR `isDraft`, `author { login, __typename }`, `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, `reviewRequests` (to find the viewer), and the head commit's `statusCheckRollup.state`.
 Runs come from REST (`GET /repos/{o}/{r}/actions/runs?created=>…`, plus `status=in_progress`), because GraphQL doesn't list workflow runs.
 
-### Item and Snapshot — `Items/`
+### Item and Snapshot — `ShipyardCore/Items/`
 
 ```text
 Item
@@ -289,7 +289,7 @@ Snapshot
   rateLimits: { graphql: RateLimit, rest: RateLimit? }   (limit, remaining, resetAt, cost of this refresh)
 ```
 
-### Attention — `Items/Attention.swift`
+### Attention — `ShipyardCore/Items/Attention.swift`
 
 Owns the rule, so the rule sits with the data it reads (seen records).
 State: `seen: [ItemID: Fingerprint]`.
@@ -301,33 +301,33 @@ State: `seen: [ItemID: Fingerprint]`.
 | `count(snapshot, toggles) -> Int` / `countByKind` | for the menu bar |
 | `prune(snapshot)` | drops records for items gone for 30 days |
 
-### EventDetector — `Items/EventDetector.swift`
+### EventDetector — `ShipyardCore/Items/EventDetector.swift`
 
 Pure: `events(known: [ItemID: KnownItem], snapshot, newProjects: Set<ProjectName>) -> [Event]`.
 `KnownItem` = the last seen state, checks and activity of each item. Items in a project seen for the first time produce no events. Transitions map to events: absent → open = `pr.opened`; open → merged = `pr.merged`; checks → failed = `pr.checks_failed`; activity went up = `pr.commented`; review requested newly true = `pr.review_requested`; run → failed/succeeded = `run.*`.
 
-### NotificationRules — `Items/NotificationRules.swift`
+### NotificationRules — `ShipyardCore/Items/NotificationRules.swift`
 
 Pure: `shouldNotify(event, settings: ProjectSettings) -> Bool` — the project's rule list contains the event, and the author filter matches (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither).
 
-### AppStateStore — `State/AppStateStore.swift`
+### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
 One JSON file (app-owned, never hand-edited, so Foundation's JSON is enough), versioned: `seen`, `known`, `knownProjects`, `notified: Set<EventID>`, `collapsed: Set<ProjectName>`. Loads at start, saves after a refresh and after clicks (debounced). A corrupt file is renamed aside and starts empty, with no notifications on the first refresh (bootstrap).
 
-### Notifier — `Notify/Notifier.swift`
+### Notifier — `Shipyard/Notifier.swift` (the `Notifying` port; tests use a recording one)
 
 Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts "e-commerce · New PR #107 · Fix checkout totals". Clicking the notification opens the item and marks it seen.
 
-### MenuModel — `UI/MenuModel.swift`
+### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
 Pure: `build(snapshot, config, appState, viewer) -> MenuModel`: sections per project in configuration order, items filtered (kind shown, closed window, `hide-authors`, drafts), sorted (open by `updatedAt` desc, then closed by `closedAt` desc), each row with colour, check dot, attention flag; plus the menu bar label (`total`, `per-kind`, `none`). All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
-### UI — `UI/`
+### UI — `Shipyard/UI/`
 
 SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 ```tsx
-<ShipyardApp> (App/ShipyardApp.swift)
+<ShipyardApp> (Shipyard/ShipyardApp.swift)
   <MenuBarExtra label={<MenuBarLabel count>}>
     <Panel>                                   switch shipyard.phase
       signedOut / connecting → <ConnectView>  (Onboarding/)
@@ -339,7 +339,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
         <PanelFooter>         rate limit indicator · Refresh · Open configuration file · Install agent skill… · Quit
 ```
 
-### RateBudget — `GitHub/RateBudget.swift`
+### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
 Pure value, so the arithmetic is tested without a network. It's the answer to "can we afford the configured interval?".
 
@@ -354,7 +354,7 @@ State: last `RateLimit` per API, a moving average of what one refresh costs per 
 
 `RefreshScheduler` asks `nextDelay` after every refresh and arms its timer with the answer, so a busy hour slows shipyard down on its own instead of running the limit dry.
 
-### SkillInstaller — `Skill/SkillInstaller.swift`
+### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
 Runs the user's login shell (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`) so nvm/asdf/Homebrew `PATH` setups are loaded; reports success, failure output, or "npx not found → copy this command".
 
@@ -362,29 +362,26 @@ Runs the user's login shell (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/s
 
 ```text
 shipyard/
-├── Package.swift                     # SwiftPM, macOS 14, one executable + tests; one dependency: TOMLDecoder
+├── Package.swift                     # SwiftPM: ShipyardCore (library) + Shipyard (macOS app) + tests; one dependency: TOMLDecoder
 ├── Makefile                          # build, test, bundle .app, ad-hoc sign, zip, install
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
-├── Sources/Shipyard/
-│   ├── App/
-│   │   ├── ShipyardApp.swift         # @main, MenuBarExtra wiring
-│   │   ├── Shipyard.swift            # orchestrator: phase, refresh pipeline, user actions
-│   │   ├── RefreshScheduler.swift    # timer (armed from RateBudget.nextDelay), wake, config-change triggers + RefreshGate
-│   │   └── LaunchAtLogin.swift       # SMAppService wrapper
+├── Sources/ShipyardCore/             # Foundation only, so agents can build and test it on a Linux VPS
+│   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
+│   ├── RefreshScheduler.swift        # timer (armed from RateBudget.nextDelay), triggers + RefreshGate
+│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, Clock, URL opener
 │   ├── Config/
 │   │   ├── Configuration.swift       # file model, defaults, validation, per-project merge
-│   │   └── ConfigStore.swift         # path, load, directory watch, last-valid fallback, write
+│   │   └── ConfigStore.swift         # path, load/reload, last-valid fallback, append projects
 │   ├── GitHub/
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer, rate-limit headers, ETags
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
 │   │   ├── WorkflowRuns.swift        # REST runs request + parse + branch filter
 │   │   └── Auth/
-│   │       ├── TokenProvider.swift   # Keychain → gh → none
-│   │       ├── DeviceFlow.swift      # OAuth device flow
-│   │       └── Keychain.swift        # one token in the login keychain
+│   │       ├── TokenProvider.swift   # TokenStore → gh → none
+│   │       └── DeviceFlow.swift      # OAuth device flow
 │   ├── Items/
 │   │   ├── Item.swift                # Item, Snapshot, fingerprint
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
@@ -392,23 +389,29 @@ shipyard/
 │   │   └── NotificationRules.swift   # event + project settings → notify?
 │   ├── State/
 │   │   └── AppStateStore.swift       # state.json: seen, known, notified, collapsed
-│   ├── Notify/
-│   │   └── Notifier.swift            # UNUserNotificationCenter
-│   ├── Skill/
-│   │   └── SkillInstaller.swift      # runs npx skills add in the login shell
+│   ├── Menu/
+│   │   └── MenuModel.swift           # pure: sections, rows, semantic state colours, label
+│   └── Skill/
+│       └── SkillInstaller.swift      # runs npx skills add in the login shell
+├── Sources/Shipyard/                 # macOS app: thin Apple-framework layer over ShipyardCore
+│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring, builds the core with the adapters below
+│   ├── ConfigWatcher.swift           # watches the config directory, calls ConfigStore.reload()
+│   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
+│   ├── Keychain.swift                # TokenStore on the login keychain
+│   ├── Notifier.swift                # Notifying on UNUserNotificationCenter
+│   ├── LaunchAtLogin.swift           # SMAppService wrapper
 │   └── UI/
-│       ├── MenuModel.swift           # pure: what to draw, order, colours, label
 │       ├── Panel.swift               # phase switch, banner, footer
 │       ├── ProjectSection.swift
 │       ├── ItemRow.swift
-│       ├── Palette.swift             # GitHub state colours, light/dark
+│       ├── Palette.swift             # semantic state colours → GitHub colours, light/dark
 │       └── Onboarding/
 │           ├── ConnectView.swift
 │           └── ProjectPicker.swift
-└── Tests/ShipyardTests/              # one file per pure module + fixtures of GitHub responses
+└── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; fixtures of GitHub responses
 ```
 
-The pure modules (`Configuration`, `ProjectQuery` parsing, `Attention`, `EventDetector`, `NotificationRules`, `MenuModel`) hold the rules, and they're what the tests cover. The rest is thin wiring around Apple APIs.
+Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation (plus FoundationNetworking on Linux) and TOMLDecoder; the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `Shipyard` app target supplies them: the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.
 
 ---
 
@@ -548,7 +551,7 @@ Refused for now: a plugin system for item kinds (one registration seam for a cha
 - **Panel technology: SwiftUI `MenuBarExtra` in `.window` style**, not AppKit `NSMenu`. The panel stays open while sections collapse and ⌥-clicks happen, colours and rows are fully controlled, and onboarding lives in the same panel. Cost accepted: it doesn't behave exactly like a native menu (no type-to-select).
 - **A click clears everything about an item until it changes again**, including a review request or failed checks. The attention count means "things to look at", not "work outstanding".
 - **Workflow runs come from REST, one conditional request per repository per refresh**, sent one after another, and only when runs are shown. GraphQL can't list runs.
-- **Decided without asking, for review when building:** macOS 14 minimum; one dependency (dduan/TOMLDecoder, MIT, decode-only); 120 s default refresh (min 30), stretched by a 10% rate budget, backing off below 20% remaining; rate-limit indicator shown `always`; open PRs capped at 50 and closed at 20 per repository per refresh; launch at login on by default; the device flow needs an OAuth App registered under the maintainer's account (one-time, free); versions start at 0.0.1 and stay below 0.1.0 until the public launch.
+- **Decided without asking, for review when building:** macOS 14 minimum (the only platform shipped; `ShipyardCore` builds on Linux for development only); one dependency (dduan/TOMLDecoder, MIT, decode-only); 120 s default refresh (min 30), stretched by a 10% rate budget, backing off below 20% remaining; rate-limit indicator shown `always`; open PRs capped at 50 and closed at 20 per repository per refresh; launch at login on by default; the device flow needs an OAuth App registered under the maintainer's account (one-time, free); versions start at 0.0.1 and stay below 0.1.0 until the public launch.
 
 ---
 
