@@ -61,6 +61,13 @@ public enum PanelText {
         }
     }
 
+    // MARK: - Notifications
+
+    /// The banner while macOS doesn't let shipyard post notifications.
+    public static let notificationsOff = "Notifications are off for shipyard, so it can't tell you when something happens."
+    /// Its button, to shipyard's page in System Settings.
+    public static let openNotificationSettings = "Open notification settings"
+
     // MARK: - The rate limit
 
     /// One API's line in the footer: "GraphQL 4,850 / 5,000 · resets 16:42".

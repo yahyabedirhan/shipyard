@@ -352,7 +352,7 @@ Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()
 
 ### Notifier — `ShipyardApp/Notifier.swift` (the `Notifying` port; tests use a recording one)
 
-Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts a `PostedNotification` as title "e-commerce · New PR #107" (`title`: project · headline) and body "Fix checkout totals" (the item's title), with the event id as the request identifier and the item URL in its user info. Clicking the notification calls `Shipyard.openNotification(itemURL)`, which opens the item and marks it seen.
+Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts a `PostedNotification` as title "e-commerce · New PR #107" (`title`: project · headline) and body "Fix checkout totals" (the item's title), with the event id as the request identifier and the item URL in its user info. Clicking the notification calls `Shipyard.openNotification(itemURL)`, which opens the item and marks it seen. `post` queues the notification and returns at once, so a refresh never waits on the permission prompt; deliveries run in order, and the first one asks. It is `@Observable`: `permission` (unknown, not asked, allowed, denied) is read without asking at launch and whenever the panel opens, and while it's denied the panel shows a "notifications are off" banner with a button to shipyard's page in System Settings. Notifications are shown even while the panel is open (the app is then frontmost), grouped per project. Outside a `.app` bundle (`make run`) there is no notification center, and it only logs.
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
@@ -370,7 +370,8 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
       needsProjects          → <ProjectPicker>(Onboarding/)
       ready →
-        banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error
+        banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error ·
+                              notifications off (with a button to System Settings)
         <ProjectSection> ×N   header: chevron (click collapses/expands), name, attention count, "Mark all seen"
           <ItemRow> ×N        attention dot, state icon, title (semibold when it needs attention),
                               "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
@@ -381,7 +382,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 `ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; Install agent skill… (#18) comes with its ticket.
 
-The words the panel shows (a row's age and second line, "Last updated 5 min ago", the configuration, fetch error and refresh-delay banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
+The words the panel shows (a row's age and second line, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes and rereads the notification permission, and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, and tells the panel whether notifications are off.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -449,17 +450,17 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   └── PanelText.swift           # pure: row age and second line, "Last updated N min ago", config, fetch error and refresh-delay banners, rate-limit lines, the connect screen's words
+│   │   └── PanelText.swift           # pure: row age and second line, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words
 │   └── Skill/
 │       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
-│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below and holds the footer's actions
+│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below, routes notification clicks and holds the panel's actions
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # URLOpening on NSWorkspace; opens config.toml in its editor (TextEdit when none)
-│   ├── Placeholders.swift            # session-only token store (never written in 0.0.x: gh only) and logging notifier until Keychain.swift (#22) and Notifier.swift (#16)
+│   ├── Placeholders.swift            # session-only token store (never written in 0.0.x: gh only) until Keychain.swift (#22)
 │   ├── Keychain.swift                # TokenStore on the login keychain (#22, with sign-in without gh)
-│   ├── Notifier.swift                # Notifying on UNUserNotificationCenter
+│   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # SMAppService wrapper
 │   └── UI/
 │       ├── Panel.swift               # phase switch, banner, footer

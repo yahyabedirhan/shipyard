@@ -1,9 +1,7 @@
 import Foundation
-import os
 import ShipyardCore
 
-// Stand-ins for ports later tickets make real. With them the app signs in
-// with `gh`'s token and shows pull requests.
+// A stand-in for a port a later effort makes real (#22).
 
 /// Keeps a token only while the app runs. 0.0.x connects through `gh` only
 /// and never starts the device flow, so nothing is ever saved here and
@@ -23,14 +21,5 @@ final class SessionTokenStore: TokenStore, @unchecked Sendable {
 
     func delete() throws {
         lock.withLock { stored = nil }
-    }
-}
-
-/// Logs what it would post. The system notification center replaces it (#16).
-struct LoggingNotifier: Notifying {
-    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "notifications")
-
-    func post(_ notification: PostedNotification) async {
-        Self.log.info("would notify: \(notification.title, privacy: .public) · \(notification.body, privacy: .public)")
     }
 }

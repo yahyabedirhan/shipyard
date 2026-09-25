@@ -53,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 final class AppServices {
     let shipyard: Shipyard
+    private let notifier = Notifier()
     private let opener = WorkspaceURLOpener()
     private var configWatcher: ConfigWatcher?
     private var wake: WakeObserver?
@@ -64,8 +65,10 @@ final class AppServices {
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             tokenStore: SessionTokenStore(),
             urlOpener: opener,
-            notifier: LoggingNotifier()
+            notifier: notifier
         )
+        let shipyard = shipyard
+        notifier.onOpen = { shipyard.openNotification($0) }
     }
 
     /// `~/Library/Application Support/Shipyard/`, where `state.json` lives.
@@ -83,13 +86,33 @@ final class AppServices {
         wake = WakeObserver {
             Task { await shipyard.refresh() }
         }
+        // Before a click that launched the app is handled (it's queued
+        // behind this), `start()` has loaded the app state it marks seen in.
         Task { await shipyard.start() }
+        Task { await notifier.checkPermission() }
+        T16Hook.run(notifier) // T16HOOK
     }
 
     // MARK: - Footer actions
 
     func refresh() {
         Task { await shipyard.refresh() }
+    }
+
+    /// Opening the panel refreshes (the rate budget may hold it back), and
+    /// rereads the notification permission (the user may have changed it
+    /// in System Settings).
+    func panelOpened() {
+        refresh()
+        Task { await notifier.checkPermission() }
+    }
+
+    /// Whether the panel says notifications are off (observed: it's the
+    /// notifier's permission).
+    var notificationsAreOff: Bool { notifier.isOff }
+
+    func openNotificationSettings() {
+        notifier.openSettings()
     }
 
     /// Opens `config.toml` in the user's editor, creating it with its

@@ -46,6 +46,12 @@ struct PanelTextTests {
             """)
     }
 
+    @Test("with notifications turned off, the banner says so and where to turn them on")
+    func notificationsOff() {
+        #expect(PanelText.notificationsOff == "Notifications are off for shipyard, so it can't tell you when something happens.")
+        #expect(PanelText.openNotificationSettings == "Open notification settings")
+    }
+
     @Test("a failed refresh says why", arguments: [
         (GitHubError.network("The Internet connection appears to be offline."),
          "Couldn't reach GitHub: The Internet connection appears to be offline."),

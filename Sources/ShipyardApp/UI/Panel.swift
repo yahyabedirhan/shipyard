@@ -18,8 +18,7 @@ struct Panel: View {
             }
         }
         .frame(width: 380)
-        // Opening the panel refreshes (the rate budget may hold it back).
-        .onAppear { actions.refresh() }
+        .onAppear { actions.panelOpened() }
     }
 
     // MARK: - Content
@@ -99,16 +98,31 @@ struct Panel: View {
                 // The rows are kept; the footer says how old they are.
                 banner(PanelText.fetchError(error), symbol: "wifi.exclamationmark", color: Palette.amber)
             }
+            if actions.notificationsAreOff {
+                banner(
+                    PanelText.notificationsOff,
+                    symbol: "bell.slash.fill",
+                    color: Palette.gray,
+                    action: (PanelText.openNotificationSettings, actions.openNotificationSettings)
+                )
+            }
         }
     }
 
-    private func banner(_ text: String, symbol: String, color: Color) -> some View {
+    private func banner(_ text: String, symbol: String, color: Color, action: (String, () -> Void)? = nil) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: symbol).foregroundStyle(color)
-            Text(text)
-                .font(.caption)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text)
+                    .font(.caption)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let action {
+                    Button(action.0, action: action.1)
+                        .buttonStyle(.link)
+                        .font(.caption)
+                }
+            }
         }
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
