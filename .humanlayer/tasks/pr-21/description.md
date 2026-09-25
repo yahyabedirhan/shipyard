@@ -25,6 +25,17 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
 
 ## Change outline
 
+The app on a real Mac, build cbd2c86 (`[menu] layout = "list"` on the left, `"tabs"` on the right):
+
+| list | tabs |
+|---|---|
+| ![List layout, light](https://raw.githubusercontent.com/yahyabedirhan/shipyard/d0edc8a2c44bc26dc47b22ecee55e7df4c296c35/final/list-light.png) | ![Tabs layout, light](https://raw.githubusercontent.com/yahyabedirhan/shipyard/d0edc8a2c44bc26dc47b22ecee55e7df4c296c35/final/tabs-light.png) |
+| ![List layout, dark](https://raw.githubusercontent.com/yahyabedirhan/shipyard/d0edc8a2c44bc26dc47b22ecee55e7df4c296c35/final/list-dark.png) | ![Tabs layout, dark](https://raw.githubusercontent.com/yahyabedirhan/shipyard/d0edc8a2c44bc26dc47b22ecee55e7df4c296c35/final/tabs-dark.png) |
+
+The app icon is origami; sailboat, night and sunset are kept as alternates:
+
+![App icons](https://raw.githubusercontent.com/yahyabedirhan/shipyard/d0edc8a2c44bc26dc47b22ecee55e7df4c296c35/final/icons-final.png)
+
 Phase 1 put every rule in `ShipyardCore`. Phase 2 adds the app that draws it and supplies the Apple-only services through the core's ports:
 
 ```text
