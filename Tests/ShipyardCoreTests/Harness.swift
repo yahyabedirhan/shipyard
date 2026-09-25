@@ -7,12 +7,13 @@ import FoundationNetworking
 /// The main test seam: a real `Shipyard` driven end to end over in-memory
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
-/// directory and the app state in another; the clock, the refresh timer and waiting are manual; the URL
-/// opener and notifier record what they're asked.
+/// directory and the app state in another; the clock, the refresh timer and
+/// waiting are manual; the URL opener and notifier record what they're asked.
 ///
 /// A scenario writes a configuration, registers answers, drives the
 /// orchestrator (`start`, `timer.fire()`, `reloadConfiguration`, clicks) and
-/// asserts on `shipyard.menu` and what the ports recorded.
+/// asserts on `shipyard.menu` and what the ports recorded (URLs opened,
+/// notifications posted).
 @MainActor
 struct Harness {
     /// 2026-09-25 12:00:00 UTC, the "now" the fixtures are written against.
@@ -33,7 +34,6 @@ struct Harness {
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
     let opener = RecordingURLOpener()
-    /// Not wired yet: notifications arrive with the notification rules.
     let notifier = RecordingNotifier()
     /// `config.toml` in a fresh temporary directory.
     let configURL: URL
@@ -70,6 +70,7 @@ struct Harness {
             appStateStore: AppStateStore(directory: stateDirectory),
             tokenStore: store,
             urlOpener: opener,
+            notifier: notifier,
             gh: gh,
             transport: stub,
             clock: sleeper.clock,

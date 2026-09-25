@@ -1,7 +1,7 @@
 import Foundation
 
 /// What kind of thing an item is.
-public enum ItemKind: String, Equatable, Hashable, Sendable {
+public enum ItemKind: String, Codable, Equatable, Hashable, Sendable {
     case pullRequest
     case issue
     case workflowRun
@@ -9,7 +9,7 @@ public enum ItemKind: String, Equatable, Hashable, Sendable {
 
 /// An item's semantic state. The app maps it to GitHub's colours: open
 /// green, draft gray, merged purple, closed red.
-public enum ItemState: String, Equatable, Hashable, Sendable {
+public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     case open
     case draft
     case merged
@@ -20,7 +20,7 @@ public enum ItemState: String, Equatable, Hashable, Sendable {
 }
 
 /// The head commit's combined check status on a pull request.
-public enum ChecksState: String, Equatable, Hashable, Sendable {
+public enum ChecksState: String, Codable, Equatable, Hashable, Sendable {
     /// No checks ran, or none reported yet.
     case none
     case pending

@@ -6,9 +6,11 @@ import Foundation
 /// It signs in (a stored or `gh` token, else the device flow), signs out on
 /// any 401, follows the configuration between `needsProjects` and `ready`,
 /// and in `ready` runs the refresh pipeline: fetch every project's items in
-/// one GraphQL request, publish the menu model (with which rows need
-/// attention), and ask the rate budget when to run next. What the user has
-/// seen and collapsed is app state, kept by `appStateStore`.
+/// one GraphQL request, find the events since the last refresh and post the
+/// ones the notification rules select, publish the menu model (with which
+/// rows need attention), and ask the rate budget when to run next. What the
+/// user has seen and collapsed, the items it knew and the events it notified
+/// are app state, kept by `appStateStore`.
 @MainActor
 public final class Shipyard {
     /// What signing out left behind.
@@ -51,6 +53,7 @@ public final class Shipyard {
     public let appStateStore: AppStateStore
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
+    private let notifier: any Notifying
     private let timer: any RefreshTimer
     private let clock: any WallClock
     private var gate = RefreshGate()
@@ -73,6 +76,7 @@ public final class Shipyard {
         appStateStore: AppStateStore,
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
+        notifier: any Notifying,
         gh: any GhTokenLookup = GhCLI(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
@@ -84,6 +88,7 @@ public final class Shipyard {
         self.appStateStore = appStateStore
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
+        self.notifier = notifier
         self.clock = clock
         self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
@@ -288,9 +293,18 @@ public final class Shipyard {
             self.snapshot = snapshot
             fetchError = nil
             budget.record(snapshot.rateLimits, at: clock.now)
-            appStateStore.update { $0.attention.prune(present: snapshot.items.values.joined(), at: now) }
+            var notifications: [PostedNotification] = []
+            appStateStore.update { state in
+                notifications = Self.notify(snapshot: snapshot, projects: projects, configuration: configuration, state: &state, at: now)
+                state.attention.prune(present: snapshot.items.values.joined(), at: now)
+            }
             menu = MenuModel.build(snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
             publishRateStatus()
+            // Recorded (and saved) before posting: a crash in between loses a
+            // notification rather than repeating one.
+            for notification in notifications {
+                await notifier.post(notification)
+            }
         } catch GitHubError.unauthorized {
             // `request` has signed out already.
         } catch is CancellationError {
@@ -303,6 +317,41 @@ public final class Shipyard {
             menu.fetchError = failure
             publishRateStatus()
         }
+    }
+
+    /// Finds the events in `snapshot` and records them in `state`, returning
+    /// what to post: each event not handled before, once, in the first
+    /// project (in configuration order) whose rules select it. Every event
+    /// is recorded as handled, notified or not. Then `snapshot` becomes the
+    /// known items, and its sources known, so the next refresh compares with it.
+    private static func notify(
+        snapshot: Snapshot,
+        projects: [ProjectSettings],
+        configuration: Configuration,
+        state: inout AppState,
+        at now: Date
+    ) -> [PostedNotification] {
+        let events = EventDetector.events(known: state.known, snapshot: snapshot, projects: projects)
+        let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
+        var byID: [String: [Event]] = [:]
+        var order: [String] = []
+        for event in events {
+            if byID[event.id] == nil { order.append(event.id) }
+            byID[event.id, default: []].append(event)
+        }
+        var notifications: [PostedNotification] = []
+        for id in order {
+            guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
+            let selected = occurrences.first { event in
+                settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, hiddenAuthors: hidden) } ?? false
+            }
+            if let selected { notifications.append(NotificationRules.notification(for: selected)) }
+            state.notified.insert(first, at: now)
+        }
+        state.known = state.known.updated(with: snapshot, projects: projects)
+        state.notified.prune(present: state.known.items.keys, at: now)
+        return notifications
     }
 
     /// When the next refresh runs, from the rate budget and the configuration.
@@ -343,6 +392,20 @@ public final class Shipyard {
     public func open(_ row: MenuRow) {
         urlOpener.open(row.url)
         markSeen(row)
+    }
+
+    /// A notification was clicked: opens its item on GitHub and marks it
+    /// seen, the version the last refresh found (or, before one has listed
+    /// it, the version known from an earlier run). The app's notifier calls
+    /// this with the notification's `itemURL`.
+    public func openNotification(_ itemURL: URL) {
+        urlOpener.open(itemURL)
+        let id = itemURL.absoluteString
+        let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
+            ?? appStateStore.state.known.items[id]?.fingerprint
+        guard let fingerprint else { return }
+        let now = clock.now
+        updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs

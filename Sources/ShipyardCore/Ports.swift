@@ -16,27 +16,42 @@ public protocol TokenStore: Sendable {
     func delete() throws
 }
 
-/// A macOS notification shipyard posts for an event its rules select.
+/// A macOS notification shipyard posts for an event its rules select, such
+/// as "e-commerce · New PR #107" over "Fix checkout totals".
 public struct PostedNotification: Equatable, Hashable, Sendable {
-    /// Unique per event, so the system never shows the same event twice.
+    /// The event's id, unique per event, so the system never shows the same
+    /// event twice.
     public var id: String
-    /// For example "e-commerce · New PR #107".
-    public var title: String
-    /// For example the item's title.
-    public var body: String
-    /// The item the notification is about; clicking it opens this and marks it seen.
+    public var event: EventKind
+    /// The project the event was notified for.
+    public var project: String
+    /// The title text, for example "New PR #107".
+    public var headline: String
+    /// The item's title, for example "Fix checkout totals".
+    public var itemTitle: String
+    /// The item the notification is about. Clicking the notification hands
+    /// it to `Shipyard.openNotification(_:)`, which opens the item and marks
+    /// it seen.
     public var itemURL: URL
 
-    public init(id: String, title: String, body: String, itemURL: URL) {
+    public init(id: String, event: EventKind, project: String, headline: String, itemTitle: String, itemURL: URL) {
         self.id = id
-        self.title = title
-        self.body = body
+        self.event = event
+        self.project = project
+        self.headline = headline
+        self.itemTitle = itemTitle
         self.itemURL = itemURL
     }
+
+    /// The notification's title: "e-commerce · New PR #107".
+    public var title: String { "\(project) · \(headline)" }
+    /// The notification's body: the item's title.
+    public var body: String { itemTitle }
 }
 
-/// Posts notifications. The app wraps the system notification center and
-/// asks for permission on the first post, not at launch.
+/// Posts notifications. The app wraps the system notification center, asks
+/// for permission on the first post (not at launch), and routes a click to
+/// `Shipyard.openNotification(_:)` with the notification's `itemURL`.
 public protocol Notifying: Sendable {
     func post(_ notification: PostedNotification) async
 }

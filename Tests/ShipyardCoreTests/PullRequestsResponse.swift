@@ -52,27 +52,48 @@ struct PullRequestsResponse {
     var repository: String
     var pullRequests: [PullRequest]
     var viewer = "yabepa"
+    /// Answer as GitHub does for a repository that's gone or out of reach:
+    /// a `null` alias and a `NOT_FOUND` error.
+    var missing = false
 
-    init(_ repository: String, _ pullRequests: [PullRequest]) {
+    init(_ repository: String, _ pullRequests: [PullRequest], missing: Bool = false) {
         self.repository = repository
         self.pullRequests = pullRequests
+        self.missing = missing
     }
 
     /// The answer, with GitHub's rate-limit headers.
-    var answer: StubHTTP.Answer {
-        let open = pullRequests.filter { $0.state == "OPEN" }.map { $0.json(in: repository) }
-        let closed = pullRequests.filter { $0.state != "OPEN" }.map { $0.json(in: repository) }
-        let body: [String: Any] = [
-            "data": [
-                "viewer": ["login": viewer],
-                "repo0": [
-                    "nameWithOwner": repository,
-                    "openPullRequests": ["nodes": open],
-                    "closedPullRequests": ["nodes": closed],
-                ],
-                "rateLimit": ["limit": 5000, "remaining": 4990, "used": 10, "resetAt": "2026-09-25T12:42:00Z", "cost": 1],
-            ],
+    var answer: StubHTTP.Answer { Self.answer([self]) }
+
+    /// One answer for several repositories, as `repo0`, `repo1`… in the
+    /// order the query asks for them: the configuration's, each repository once.
+    static func answer(_ responses: [PullRequestsResponse]) -> StubHTTP.Answer {
+        var data: [String: Any] = [
+            "viewer": ["login": responses.first?.viewer ?? "yabepa"],
+            "rateLimit": ["limit": 5000, "remaining": 4990, "used": 10, "resetAt": "2026-09-25T12:42:00Z", "cost": 1],
         ]
+        var errors: [[String: Any]] = []
+        for (index, response) in responses.enumerated() {
+            let alias = "repo\(index)"
+            if response.missing {
+                data[alias] = NSNull()
+                errors.append([
+                    "type": "NOT_FOUND",
+                    "path": [alias],
+                    "message": "Could not resolve to a Repository with the name '\(response.repository)'.",
+                ])
+                continue
+            }
+            let open = response.pullRequests.filter { $0.state == "OPEN" }.map { $0.json(in: response.repository) }
+            let closed = response.pullRequests.filter { $0.state != "OPEN" }.map { $0.json(in: response.repository) }
+            data[alias] = [
+                "nameWithOwner": response.repository,
+                "openPullRequests": ["nodes": open],
+                "closedPullRequests": ["nodes": closed],
+            ]
+        }
+        var body: [String: Any] = ["data": data]
+        if !errors.isEmpty { body["errors"] = errors }
         var answer = StubHTTP.Answer.json("", headers: Harness.rateLimitHeaders(remaining: 4990))
         answer.body = try! JSONSerialization.data(withJSONObject: body)
         return answer

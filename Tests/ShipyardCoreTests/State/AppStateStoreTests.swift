@@ -44,6 +44,29 @@ struct AppStateStoreTests {
         #expect(store.saveError == nil)
     }
 
+    @Test("known items, known projects and notified events read back, apart from the seen records")
+    func notificationFields() throws {
+        let directory = temporaryDirectory()
+        let store = AppStateStore(directory: directory)
+        let project = ProjectSettings(
+            name: "shop", repositories: ["o/r"], pullRequests: PullRequestSettings(), issues: IssueSettings(),
+            workflowRuns: WorkflowRunSettings(), notifications: []
+        )
+        let event = Event(kind: .prOpened, project: "shop", item: item)
+        store.update {
+            $0.known = KnownItems().updated(with: Snapshot(fetchedAt: now, items: ["shop": [item]]), projects: [project])
+            $0.notified.insert(event, at: now)
+        }
+
+        let reloaded = AppStateStore(directory: directory)
+        #expect(reloaded.load(at: now) == .loaded)
+        #expect(reloaded.state == store.state)
+        #expect(reloaded.state.known.items[item.id] == KnownItem(item))
+        #expect(reloaded.state.known.knows(ItemSource(repository: "o/r", kind: .pullRequest), in: "shop"))
+        #expect(reloaded.state.notified.contains(event))
+        #expect(reloaded.state.attention.seen.isEmpty)
+    }
+
     @Test("an update that changes nothing doesn't write")
     func noopUpdate() throws {
         let store = AppStateStore(directory: temporaryDirectory())
@@ -77,7 +100,8 @@ struct AppStateStoreTests {
         let directory = temporaryDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = AppStateStore(directory: directory)
-        // As a later version might write it: the fields #8 adds, and one nobody knows yet.
+        // As a later version might write it: known and notified in shapes this
+        // build can't read (dropped, not fatal), and a field nobody knows yet.
         let later = """
             {
               "version": 1,
@@ -92,6 +116,8 @@ struct AppStateStoreTests {
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.attention.seen["https://github.com/o/r/pull/1"]?.fingerprint == "f")
         #expect(store.state.collapsed.isEmpty)
+        #expect(store.state.known == KnownItems())
+        #expect(store.state.notified == NotifiedEvents())
 
         try Data(#"{"collapsed": ["shop"]}"#.utf8).write(to: store.url)
         #expect(store.load(at: now) == .loaded)

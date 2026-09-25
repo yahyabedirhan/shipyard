@@ -22,11 +22,17 @@ struct PortsTests {
     func notifier() async {
         let notifier = RecordingNotifier()
         let url = URL(string: "https://github.com/yahyabedirhan/shipyard/pull/7")!
-        let first = PostedNotification(id: "pr.opened#7", title: "shipyard · New PR #7", body: "Add core", itemURL: url)
-        let second = PostedNotification(id: "pr.merged#7", title: "shipyard · Merged PR #7", body: "Add core", itemURL: url)
+        let first = PostedNotification(
+            id: "pr.opened \(url)", event: .prOpened, project: "shipyard", headline: "New PR #7", itemTitle: "Add core", itemURL: url
+        )
+        let second = PostedNotification(
+            id: "pr.merged \(url)", event: .prMerged, project: "shipyard", headline: "Merged PR #7", itemTitle: "Add core", itemURL: url
+        )
         await notifier.post(first)
         await notifier.post(second)
         #expect(notifier.posted == [first, second])
+        #expect(first.title == "shipyard · New PR #7")
+        #expect(first.body == "Add core")
     }
 
     @Test("the clock stays put until moved")

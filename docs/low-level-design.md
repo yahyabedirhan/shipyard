@@ -103,9 +103,10 @@ Shipyard -> Auth                   asks for a token; drives device flow
 Shipyard -> GitHubClient           fetch(projects) -> Snapshot (with rate limits)
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
-Shipyard -> EventDetector          diff(known, snapshot) -> [Event]
-Shipyard -> NotificationRules      should(event, project config) -> Bool
-Shipyard -> Notifier               post(event)
+Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]
+Shipyard -> NotificationRules      shouldNotify(event, project settings, hidden authors) -> Bool
+Shipyard -> Notifier               post(notification)
+Notifier -> Shipyard               openNotification(itemURL) on a click
 Shipyard -> MenuModel              build(snapshot, config, appState) -> what Panel draws
 Panel    -> Shipyard               click(item), collapse(project), markAllSeen(), refresh()
 Onboarding -> ConfigStore          writes projects (the one writer)
@@ -168,6 +169,7 @@ Operations:
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing; the store keeps the error |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
+| `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
@@ -311,31 +313,36 @@ State: `seen: [ItemID: SeenRecord]`, where `SeenRecord` = the fingerprint seen a
 
 ### EventDetector — `ShipyardCore/Items/EventDetector.swift`
 
-Pure: `events(known: [ItemID: KnownItem], snapshot, newProjects: Set<ProjectName>) -> [Event]`.
-`KnownItem` = the last seen state, checks and activity of each item. Items in a project seen for the first time produce no events. Transitions map to events: absent → open = `pr.opened`; open → merged = `pr.merged`; checks → failed = `pr.checks_failed`; activity went up = `pr.commented`; review requested newly true = `pr.review_requested`; run → failed/succeeded = `run.*`.
+Pure: `events(known: KnownItems, snapshot, projects: [ProjectSettings]) -> [Event]`, per project in configuration order.
+`KnownItems` = `items: [ItemID: KnownItem]` (the last state, checks, review request, activity, repository and fingerprint of each item) and `sources: [ProjectName: Set<ItemSource>]`, where an `ItemSource` is one repository and one item kind. Items from a source the project hasn't been fetched from before produce no events: the first refresh ever, a project or repository just added, a kind just shown. `known.updated(with: snapshot, projects:)` is what the next refresh compares with: the snapshot's items and fetched sources; a repository that failed keeps its items and sources (so its return isn't a burst); a project, repository or kind no longer fetched is forgotten (adding it back is a first sight again).
+The detector finds generic `ItemChange`s and `EventKind.of(change, for: item.kind)` names them, so issues and runs only add names (and runs their own changes): absent → open (drafts too) = opened (absent → closed is nothing: it may be an old item coming back into the closed list); open → merged = merged; open → closed = closed; closed → open = reopened; review requested newly true (open) = review_requested; checks newly failed (open) = checks_failed; activity went up = commented. An `Event` has the kind, project, item and an occurrence: empty for events that happen once in an item's life (opened, merged), the item's fingerprint for ones that recur; `id` = kind + item URL (+ occurrence), the same in every project.
 
 ### NotificationRules — `ShipyardCore/Items/NotificationRules.swift`
 
-Pure: `shouldNotify(event, settings: ProjectSettings) -> Bool` — the project's rule list contains the event, and the author filter matches (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither).
+Pure: `shouldNotify(event, settings: ProjectSettings, hiddenAuthors) -> Bool` — the project's rule list contains the event, and the author filter matches the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither). Authors in `hide-authors` are never notified, as they're never listed. `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57"), the item's title and URL.
+`NotifiedEvents` (app state, apart from the seen records) holds every event handled, notified or passed over, per item: `contains(event)`, `insert(event, at:)`, and `prune(present:at:)`, which keeps an item's record while it's known and 30 days after, so an item that leaves the list and comes back isn't announced again.
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
-One JSON file, `state.json`, in a directory the app provides (`~/Library/Application Support/Shipyard/`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records) and `collapsed: Set<ProjectName>`; notification rules add `known`, `knownProjects` and `notified: Set<EventID>` next to them.
+One JSON file, `state.json`, in a directory the app provides (`~/Library/Application Support/Shipyard/`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`) and `notified: NotifiedEvents`.
 
 ```json
 {
   "version": 1,
   "seen": { "https://github.com/o/r/pull/57": { "fingerprint": "open|…", "present": "2026-09-25T12:00:00Z" } },
-  "collapsed": ["job-search"]
+  "collapsed": ["job-search"],
+  "known": { "https://github.com/o/r/pull/57": { "repository": "o/r", "state": "open", "checks": "pending", "reviewRequested": false, "activity": 0, "fingerprint": "open|…" } },
+  "knownProjects": { "e-commerce": [{ "repository": "o/r", "kind": "pullRequest" }] },
+  "notified": { "https://github.com/o/r/pull/57": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
 }
 ```
 
-Every field is optional when read and unknown fields are ignored, so adding a field doesn't bump `version`: an older file loads with the new field empty (a file without `knownProjects` makes the first refresh after the upgrade silent), and a newer file still loads in an older build. `version` changes only for a change an older reader would misunderstand, with a migration in `AppState.init(from:)`.
-Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()`; `update { state in … }` changes the state and saves it (atomically, no debounce: the file is small and changes only on clicks and about once a day from pruning) when it changed. A file that isn't readable app state is renamed to `state-corrupt-<yyyyMMdd-HHmmss>.json` and shipyard starts as on a first run, with no notifications on the first refresh (bootstrap).
+Every field is optional when read and unknown fields are ignored, so adding a field doesn't bump `version`: an older file loads with the new field empty (a file without `knownProjects` makes the first refresh after the upgrade silent), and a newer file still loads in an older build. `known`, `knownProjects` and `notified` that can't be read are dropped rather than failing the file (the next refresh is then silent, the safe way to fail), and an entry inside them this build can't read is skipped. `version` changes only for a change an older reader would misunderstand, with a migration in `AppState.init(from:)`.
+Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()`; `update { state in … }` changes the state and saves it (atomically, no debounce: the file is small and changes on clicks, on refreshes that found a change, and about once a day from pruning) when it changed. A file that isn't readable app state is renamed to `state-corrupt-<yyyyMMdd-HHmmss>.json` and shipyard starts as on a first run, with no notifications on the first refresh (bootstrap).
 
 ### Notifier — `ShipyardApp/Notifier.swift` (the `Notifying` port; tests use a recording one)
 
-Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts "e-commerce · New PR #107 · Fix checkout totals". Clicking the notification opens the item and marks it seen.
+Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts a `PostedNotification` as title "e-commerce · New PR #107" (`title`: project · headline) and body "Fix checkout totals" (the item's title), with the event id as the request identifier and the item URL in its user info. Clicking the notification calls `Shipyard.openNotification(itemURL)`, which opens the item and marks it seen.
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
@@ -411,10 +418,10 @@ shipyard/
 │   ├── Items/
 │   │   ├── Item.swift                # Item, Snapshot, RepositoryError, RateLimit, fingerprint
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
-│   │   ├── EventDetector.swift       # known + snapshot → events
-│   │   └── NotificationRules.swift   # event + project settings → notify?
+│   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
+│   │   └── NotificationRules.swift   # event + project settings → notify?; what to post; NotifiedEvents
 │   ├── State/
-│   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed (known, notified with the rules); tolerant, versioned
+│   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   └── MenuModel.swift           # pure: sections, rows, semantic state colours, label
 │   └── Skill/
@@ -463,19 +470,21 @@ refresh()
     budget.record(error, now); fetchError = error; menu.fetchError = error; gate.finish(); timer.arm(budget.nextDelay(…)); return
   catch other
     fetchError = other; menu.fetchError = other; gate.finish(); return   // keep old snapshot, rows and lastUpdated
-  newProjects = config.projectNames - appState.knownProjects
-  events = EventDetector.events(appState.known, snapshot, newProjects)
-  for e in events where e.id ∉ appState.notified
-    if NotificationRules.shouldNotify(e, config.settings(for: e.project))
-      notifier.post(e)
-    appState.notified.insert(e.id)
-  appState.known = snapshot.knownItems; appState.knownProjects ∪= newProjects
-  appStateStore.update { $0.attention.prune(present: snapshot items, now) }   // saves only if it changed
+  appStateStore.update { state in                     // saves only if it changed
+    events = EventDetector.events(state.known, snapshot, projects)   // first sight of a project's source: none
+    for id, occurrences in events grouped by id where id ∉ state.notified   // an item in two projects: one event
+      if first occurrence whose project's rules select it (NotificationRules.shouldNotify, hide-authors)
+        toPost.append(NotificationRules.notification(for: it))
+      state.notified.insert(id)                         // notified or not, never again
+    state.known = state.known.updated(with: snapshot, projects); state.notified.prune(present: known items, now)
+    state.attention.prune(present: snapshot items, now)
+  }
   self.snapshot = snapshot; fetchError = nil
   budget.record(snapshot.rateLimits, now)
   menu = MenuModel.build(snapshot, config, appState, now)   // Panel re-renders from it
   delay = budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent, now)
   menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, now)
+  for n in toPost: await notifier.post(n)              // after saving: a crash loses one rather than repeating it
   timer.arm(delay.seconds(from: now))
   if gate.finish() then refresh()                     // a queued trigger arrived meanwhile
 ```
@@ -527,8 +536,8 @@ Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backe
 | 2 | `GitHubClient.fetch` (GitHub/) | snapshot has 4 open PRs, #57 `checks: pending`, `author: me` |
 | 3 | `EventDetector.events` (Items/) | `[pr.opened #57 author=me]` |
 | 4 | `NotificationRules.shouldNotify` (Items/) | default rule `pr.opened any` → true |
-| 5 | `Notifier.post` | macOS notification "e-commerce · New PR #57 · …"; `notified += pr.opened#57` |
-| 6 | `AppStateStore.save` | `known` has #57 (checks pending) |
+| 5 | `AppStateStore.update` (saved before posting) | `notified` has #57's `pr.opened`; `known` has #57 (checks pending) |
+| 6 | `Notifier.post` | macOS notification "e-commerce · New PR #57" / "Add order export" |
 | 7 | `MenuModel.build` → `MenuBarLabel` | #57 unseen → count **1**, green row, gray check dot |
 | 8 | 2 min later CI fails; refresh | fingerprint changed; event `pr.checks_failed` (no rule → silent); still unseen → count 1, red check dot |
 | 9 | user clicks #57 → `Shipyard.open` → `Attention.markSeen` | `seen[#57] = fingerprint`; count **0**; browser opens |
@@ -557,7 +566,7 @@ Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agent
 | 5 | menu bar icon shows the paused glyph; ⌘R does nothing and says why | last snapshot still listed, "Last updated 14 min ago" |
 | 6 | 16:42: timer armed for `pausedUntil` fires | quota back to 5,000; next delay 120 s; banner gone |
 
-What the traces turned up and the design now handles: the first refresh after adding a project must not notify for every existing PR (the `newProjects` guard in step 3), and `pr.checks_failed` has to be an event whether or not a rule is enabled, so a rule added later behaves the same.
+What the traces turned up and the design now handles: the first refresh after adding a project must not notify for every existing PR (the first-sight guard in step 3: a project's sources not fetched before make no events), and `pr.checks_failed` has to be an event whether or not a rule is enabled, so a rule added later behaves the same.
 
 ---
 

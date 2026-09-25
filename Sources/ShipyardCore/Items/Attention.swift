@@ -58,7 +58,14 @@ public struct Attention: Equatable, Sendable {
 
     /// Records the version of `item` the user has seen now.
     public mutating func markSeen(_ item: Item, at now: Date) {
-        seen[item.id] = SeenRecord(fingerprint: item.fingerprint, present: now)
+        markSeen(id: item.id, fingerprint: item.fingerprint, at: now)
+    }
+
+    /// Records that the user saw the version of item `id` with `fingerprint`,
+    /// for when only what's known about the item is at hand (a notification
+    /// clicked before a refresh listed it again).
+    public mutating func markSeen(id: String, fingerprint: String, at now: Date) {
+        seen[id] = SeenRecord(fingerprint: fingerprint, present: now)
     }
 
     /// How many of `items` need attention, per kind. An item listed twice

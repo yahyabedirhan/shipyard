@@ -14,10 +14,23 @@ public struct AppState: Equatable, Sendable {
     public var attention = Attention()
     /// Projects whose sections are collapsed, by name.
     public var collapsed: Set<String> = []
+    /// What the refreshes so far found, for finding events: each item's last
+    /// version and the sources each project was fetched from.
+    public var known = KnownItems()
+    /// Events already notified or passed over, so none is notified twice.
+    /// Kept apart from `attention`: seeing an item says nothing about its events.
+    public var notified = NotifiedEvents()
 
-    public init(attention: Attention = Attention(), collapsed: Set<String> = []) {
+    public init(
+        attention: Attention = Attention(),
+        collapsed: Set<String> = [],
+        known: KnownItems = KnownItems(),
+        notified: NotifiedEvents = NotifiedEvents()
+    ) {
         self.attention = attention
         self.collapsed = collapsed
+        self.known = known
+        self.notified = notified
     }
 }
 
@@ -26,17 +39,26 @@ public struct AppState: Equatable, Sendable {
 //     {
 //       "version": 1,
 //       "seen": { "<item url>": { "fingerprint": "…", "present": "2026-09-25T12:00:00Z" } },
-//       "collapsed": ["job-search"]
+//       "collapsed": ["job-search"],
+//       "known": { "<item url>": { "repository": "o/r", "state": "open", "checks": "pending",
+//                                  "reviewRequested": false, "activity": 0, "fingerprint": "…" } },
+//       "knownProjects": { "job-search": [{ "repository": "o/r", "kind": "pullRequest" }] },
+//       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
 //     }
 //
-// Notification rules (#8) add `known`, `knownProjects` and `notified` next
-// to these, each optional, so a file written before them still loads (and,
-// with no known projects, the first refresh after the upgrade stays silent).
+// `known`, `knownProjects` and `notified` came with notification rules (#8).
+// Each is optional, and one that can't be read is dropped rather than making
+// the whole file unreadable: without them the next refresh is silent (no
+// project is known), which is the safe way to fail. Inside them, an entry a
+// newer build wrote that this one can't read (a new state, say) is skipped.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version
         case seen
         case collapsed
+        case known
+        case knownProjects
+        case notified
     }
 
     public init(from decoder: any Decoder) throws {
@@ -45,6 +67,14 @@ extension AppState: Codable {
         let seen = try container.decodeIfPresent([String: Attention.SeenRecord].self, forKey: .seen) ?? [:]
         attention = Attention(seen: seen)
         collapsed = try container.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
+        let items = (try? container.decodeIfPresent([String: Lossy<KnownItem>].self, forKey: .known)) ?? [:]
+        let sources = (try? container.decodeIfPresent([String: [Lossy<ItemSource>]].self, forKey: .knownProjects)) ?? [:]
+        known = KnownItems(
+            items: items.compactMapValues(\.value),
+            sources: sources.mapValues { Set($0.compactMap(\.value)) }
+        )
+        let records = (try? container.decodeIfPresent([String: Lossy<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
+        notified = NotifiedEvents(records: records.compactMapValues(\.value))
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -52,6 +82,19 @@ extension AppState: Codable {
         try container.encode(Self.currentVersion, forKey: .version)
         try container.encode(attention.seen, forKey: .seen)
         try container.encode(collapsed.sorted(), forKey: .collapsed)
+        try container.encode(known.items, forKey: .known)
+        try container.encode(known.sources.mapValues { $0.sorted() }, forKey: .knownProjects)
+        try container.encode(notified.records, forKey: .notified)
+    }
+}
+
+/// Decodes a value, or `nil` when it can't, so one unreadable entry doesn't
+/// fail the collection around it.
+private struct Lossy<Value: Decodable>: Decodable {
+    var value: Value?
+
+    init(from decoder: any Decoder) throws {
+        value = try? Value(from: decoder)
     }
 }
 
