@@ -15,3 +15,18 @@ jobs:
         run: swift build --target ShipyardCore
       - name: test
         run: swift test
+
+  macos:
+    name: build and test (macos)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: build everything
+        run: swift build
+      - name: bundle the app
+        run: make bundle
+      - name: test
+        run: make test

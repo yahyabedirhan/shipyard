@@ -85,6 +85,20 @@ public final class ConfigStore: @unchecked Sendable {
         }
     }
 
+    /// Creates the file (and its directory) with the commented header and
+    /// the `#:schema` line when it's missing, so "Open configuration file"
+    /// has something to open. Returns whether it created it; an existing
+    /// file is never touched.
+    @discardableResult
+    public func createIfMissing() throws -> Bool {
+        let fileManager = FileManager.default
+        guard !fileManager.fileExists(atPath: url.path) else { return false }
+        try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // `withoutOverwriting`: a file an editor wrote meanwhile wins.
+        try Data(Configuration.header.utf8).write(to: url, options: .withoutOverwriting)
+        return true
+    }
+
     /// Adds `projects` as `[[projects]]` blocks at the end of the file,
     /// creating it (and its directory) with a commented header and the
     /// `#:schema` line when it's missing. Existing text is never rewritten.
@@ -94,14 +108,7 @@ public final class ConfigStore: @unchecked Sendable {
     @discardableResult
     public func append(projects: [NewProject]) throws -> ReloadResult {
         try validate(projects)
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: url.path) {
-            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let text = Configuration.header + Configuration.appendText(projects: projects)
-            try Data(text.utf8).write(to: url)
-            return reload()
-        }
-
+        try createIfMissing()
         let existing = try Data(contentsOf: url)
         var addition = Configuration.appendText(projects: projects)
         if let last = existing.last, last != UInt8(ascii: "\n") { addition = "\n" + addition }

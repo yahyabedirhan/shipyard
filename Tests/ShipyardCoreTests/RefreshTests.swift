@@ -377,6 +377,31 @@ struct RefreshTests {
         #expect(harness.graphQLRequests.count == 1)
     }
 
+    @Test("a broken edit's error is published for the banner until the file is fixed")
+    func brokenEditError() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests())
+        #expect(harness.shipyard.configError == nil)
+
+        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        let error = try #require(harness.shipyard.configError)
+        #expect(error.issues.first?.line == 1)
+
+        try harness.writeConfig(projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configError == nil)
+    }
+
+    @Test("a file broken at launch is published for the banner")
+    func brokenAtLaunch() async throws {
+        let harness = try await Harness.started(config: "version = \"one\"\n", graphQL: pullRequests())
+
+        #expect(harness.shipyard.configError != nil)
+        #expect(harness.shipyard.phase == .needsProjects)
+    }
+
     // MARK: - Opening an item
 
     @Test("opening a row opens its URL through the URL opener")

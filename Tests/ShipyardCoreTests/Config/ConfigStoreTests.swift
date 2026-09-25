@@ -113,6 +113,34 @@ struct ConfigStoreTests {
     }
 }
 
+@Suite("Configuration store: creating the file")
+struct ConfigStoreCreateTests {
+    @Test("a missing file is created with the header alone, and reads as no projects")
+    func createsMissing() throws {
+        let url = temporaryConfigURL()
+        let store = ConfigStore(url: url)
+
+        let created = try store.createIfMissing()
+
+        #expect(created)
+        #expect(try contents(of: url) == Configuration.header)
+        #expect(store.reload() == .unchanged)
+        #expect(store.error == nil)
+    }
+
+    @Test("an existing file is left untouched")
+    func keepsExisting() throws {
+        let url = temporaryConfigURL()
+        try write(valid, to: url)
+        let store = ConfigStore(url: url)
+
+        let created = try store.createIfMissing()
+
+        #expect(!created)
+        #expect(try contents(of: url) == valid)
+    }
+}
+
 @Suite("Configuration store: appending projects")
 struct ConfigStoreAppendTests {
     @Test("appending to a missing file creates it with a header and the schema line")

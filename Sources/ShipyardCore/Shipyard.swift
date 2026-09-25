@@ -45,6 +45,10 @@ public final class Shipyard {
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
     public var isRefreshing: Bool { gate.isRunning }
+    /// Why the configuration file was rejected, for the panel's banner;
+    /// `nil` while it reads cleanly. Shipyard keeps running on the last
+    /// valid configuration meanwhile.
+    public private(set) var configError: ConfigError?
     /// What the rate budget knows: limits, recent costs, a pause.
     public private(set) var budget = RateBudget()
     /// Whether ⌘R may refresh now: false only while the rate budget pauses
@@ -105,6 +109,7 @@ public final class Shipyard {
     public func start() async {
         appStateStore.load(at: clock.now)
         configStore.reload()
+        configError = configStore.error
         let provider = tokenProvider
         // `gh auth token` spawns a process; keep it off the main actor.
         let found = await Task.detached { provider.current() }.value
@@ -253,6 +258,7 @@ public final class Shipyard {
     /// Moves the phase with a reload's result and refreshes (or stops the
     /// timer). Only a valid change moves anything.
     private func follow(_ result: ConfigStore.ReloadResult) async {
+        configError = configStore.error
         if case .changed(let configuration) = result {
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // `[attention]` and `[menu-bar]` apply at once, even if the

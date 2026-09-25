@@ -168,7 +168,7 @@ Operations:
 | `start()` | load config; resolve token → phase; in `ready`, the first refresh | — |
 | `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
-| `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing; the store keeps the error |
+| `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
@@ -256,8 +256,8 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`.
-Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
-The app's `ConfigWatcher` watches the **directory**, not the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. Changes are debounced 200 ms.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (the footer's "Open configuration file": writes the commented header alone when there's no file; never touches one that exists), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
+The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`)
 
@@ -371,6 +371,10 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
         <PanelFooter>         rate limit indicator · Refresh · Open configuration file · Install agent skill… · Quit
 ```
 
+Until #14 and #18, `signedOut` shows a "Not connected: run `gh auth login`" message with Try again (`start()`), and `needsProjects` points at the configuration file; the footer's rate-limit indicator (#15) and Install agent skill… (#18) come with their tickets.
+
+The words the panel shows (a row's age, "Last updated 5 min ago", the configuration and fetch error banners) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
+
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
 Pure value, so the arithmetic is tested without a network. It's the answer to "can we afford the configured interval?".
@@ -402,8 +406,8 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 ```text
 shipyard/
 ├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
-├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6) for pushes and pull requests
-├── Makefile                          # build, test, bundle .app, ad-hoc sign, zip, install
+├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
+├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app, ad-hoc sign, zip, install
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
@@ -436,13 +440,16 @@ shipyard/
 │   ├── State/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
-│   │   └── MenuModel.swift           # pure: sections, rows, semantic state colours, label
+│   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
+│   │   └── PanelText.swift           # pure: row age, "Last updated N min ago", config and fetch error banners
 │   └── Skill/
 │       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
-│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring, builds the core with the adapters below
-│   ├── ConfigWatcher.swift           # watches the config directory, calls Shipyard.reloadConfiguration()
+│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below and holds the footer's actions
+│   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
+│   ├── Workspace.swift               # URLOpening on NSWorkspace; opens config.toml in its editor (TextEdit when none)
+│   ├── Placeholders.swift            # session-only token store and logging notifier until Keychain.swift (#14) and Notifier.swift (#16)
 │   ├── Keychain.swift                # TokenStore on the login keychain
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter
 │   ├── LaunchAtLogin.swift           # SMAppService wrapper
