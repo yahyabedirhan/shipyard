@@ -476,6 +476,29 @@ struct RefreshTests {
         #expect(harness.shipyard.configWarnings.isEmpty)
     }
 
+    @Test("a file that breaks shows only its error, not the warnings from before it broke")
+    func warningClearedByBrokenFile() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests())
+
+        try harness.writeConfig("refresh-interval-second = 300\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configError == nil)
+        #expect(harness.shipyard.configWarnings.count == 1)
+
+        try harness.writeConfig("refresh-interval-second = 300\nrefresh-interval-seconds = 5\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configError != nil)
+        #expect(harness.shipyard.configWarnings.isEmpty)
+
+        try harness.writeConfig("refresh-interval-seconds = 300\n\n" + projects)
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.shipyard.configError == nil)
+        #expect(harness.shipyard.configWarnings.isEmpty)
+    }
+
     @Test("a file broken at launch is published for the banner")
     func brokenAtLaunch() async throws {
         let harness = try await Harness.started(config: "version = \"one\"\n", graphQL: pullRequests())

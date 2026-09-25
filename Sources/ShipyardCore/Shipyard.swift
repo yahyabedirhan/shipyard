@@ -64,7 +64,7 @@ public final class Shipyard {
     /// valid configuration meanwhile.
     public private(set) var configError: ConfigError?
     /// Unknown settings the last clean read ignored, for the panel's quiet
-    /// banner; empty when there are none.
+    /// banner; empty when there are none or the latest read failed.
     public private(set) var configWarnings: [ConfigIssue] = []
     /// What the rate budget knows: limits, recent costs, a pause.
     public private(set) var budget = RateBudget()

@@ -54,12 +54,12 @@ public final class ConfigStore: @unchecked Sendable {
     /// Why the latest reload failed; `nil` once a reload succeeds.
     public var error: ConfigError? { synchronized { _error } }
 
-    /// Unknown keys found by the latest successful reload.
+    /// Unknown keys found by the latest reload; empty when it failed.
     public var warnings: [ConfigIssue] { synchronized { _warnings } }
 
     /// Reads the file again. A missing or empty file is the defaults with no
-    /// projects. A broken file keeps the last valid configuration and sets
-    /// `error`; a valid one clears it.
+    /// projects. A broken file keeps the last valid configuration, sets
+    /// `error` and clears `warnings`; a valid one clears the error.
     @discardableResult
     public func reload() -> ReloadResult {
         let outcome: Result<Configuration.Decoded, ConfigError>
@@ -73,6 +73,8 @@ public final class ConfigStore: @unchecked Sendable {
             switch outcome {
             case .failure(let error):
                 _error = error
+                // Warnings from an older read carry stale line numbers.
+                _warnings = []
                 return .invalid(error)
             case .success(let decoded):
                 let hadError = _error != nil
