@@ -90,7 +90,6 @@ final class AppServices {
         // behind this), `start()` has loaded the app state it marks seen in.
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
-        T16Hook.run(notifier) // T16HOOK
     }
 
     // MARK: - Footer actions
