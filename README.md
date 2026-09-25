@@ -8,19 +8,80 @@ Shipyard shows the pull requests (and, if you turn them on, issues and workflow 
 
 ## Install
 
-Shipyard ships for **macOS only** (macOS 14 or later), as a zip from the [releases page](https://github.com/yahyabedirhan/shipyard/releases). Releases are ad-hoc signed, not notarized, so macOS blocks the first launch of a downloaded copy. Unzip it, move `Shipyard.app` to `/Applications`, and clear the quarantine flag:
+### Requirements
+
+- **macOS 14** or later. Shipyard ships for macOS only.
+- **The [GitHub CLI](https://cli.github.com), installed and signed in.** Shipyard 0.0.x connects to GitHub only through `gh`, picking up its token silently; signing in without `gh` is planned for a later version.
+
+  ```sh
+  brew install gh
+  gh auth login
+  ```
+
+### From source
+
+You need the Command Line Tools (`xcode-select --install`); Xcode isn't needed.
 
 ```sh
+git clone https://github.com/yahyabedirhan/shipyard.git
+cd shipyard
+make install    # builds, ad-hoc signs, copies Shipyard.app to /Applications and opens it
+```
+
+### From a release zip
+
+There's no GitHub release yet, so build the zip yourself with `make release` in a clone (it runs the tests and writes `build/Shipyard-<version>-macos.zip`). The zip is ad-hoc signed, not notarized, so macOS blocks the first launch of a copy that was downloaded. Unzip it, move `Shipyard.app` to `/Applications`, clear the quarantine flag and open it:
+
+```sh
+unzip Shipyard-<version>-macos.zip
+mv Shipyard.app /Applications/
 xattr -dr com.apple.quarantine /Applications/Shipyard.app
+open /Applications/Shipyard.app
 ```
 
 Or, on macOS 15 and later, open it once, dismiss the warning, then choose **Open Anyway** in System Settings > Privacy & Security.
 
+### First launch
+
+Shipyard has no Dock icon: it lives in the menu bar. Click its icon to open the panel.
+
+1. Until `gh` is signed in, the panel shows the command to run and a **Try again** button.
+2. Then it offers your repositories to pick from (or type `owner/name`). Name each project, or give several repositories the same name to group them, and **Add** them. The panel also offers to install the agent skill (see [Configuration](#configuration)).
+3. The first time something is worth notifying, macOS asks whether shipyard may send notifications. If you decline, the panel says notifications are off, with a button to System Settings.
+
 Shipyard starts at login: it registers itself as a login item when it launches. Set `launch-at-login = false` in the configuration to remove it; switching it off in System Settings > General > Login Items also sticks.
 
-## Connecting to GitHub
+### Everyday use
 
-Shipyard 0.0.x connects to GitHub through the [GitHub CLI](https://cli.github.com) and **needs `gh`**: install it (`brew install gh`) and sign in with `gh auth login`. Shipyard picks up `gh`'s token silently; until `gh` is signed in, its panel shows how to connect. To disconnect shipyard for good, run `gh auth logout`. Signing in without `gh` is planned for a later version.
+- The number in the menu bar counts the items that still need your attention.
+- Click an item to open it on GitHub and mark it seen; **⌥-click** marks it seen without opening it.
+- **⌘R** refreshes now; otherwise shipyard refreshes on its own, within GitHub's rate limit.
+- Choose the layout in the configuration: `[menu] layout = "list"` (the default) puts every project in one scrolling list; `"tabs"` shows one project at a time.
+- Projects, what's shown and when you're notified live in `~/.config/shipyard/config.toml`; see [Configuration](#configuration). What you've seen lives in `~/Library/Application Support/Shipyard/`.
+
+### Update
+
+From source, pull and install again (it quits the running copy first):
+
+```sh
+git pull
+make install
+```
+
+From a zip, quit shipyard, delete the old copy (`rm -rf /Applications/Shipyard.app`), then install the newer zip as [above](#from-a-release-zip).
+
+### Uninstall
+
+1. Quit shipyard (**Quit** in its panel, or ⌘Q while it's open).
+2. Delete the app: `rm -rf /Applications/Shipyard.app`.
+3. If it's still listed in System Settings > General > Login Items, remove it there.
+4. Delete its configuration and state:
+
+   ```sh
+   rm -rf ~/.config/shipyard ~/Library/Application\ Support/Shipyard
+   ```
+
+`gh` stays signed in; run `gh auth logout` if you want that too.
 
 ## Configuration
 
