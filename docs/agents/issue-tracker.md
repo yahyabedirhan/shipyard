@@ -13,6 +13,14 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Efforts
+
+An **effort** is one spec issue and the tickets that build it.
+
+- **Tickets under the spec**: each ticket is a GitHub sub-issue of its spec (`gh api --method POST repos/<owner>/<repo>/issues/<spec>/sub_issues -F sub_issue_id=<ticket-db-id>`), with `## Parent` naming the spec in its body. Moving a ticket to another effort means removing it from the old spec's sub-issues and adding it to the new one's.
+- **Order**: GitHub's native "blocked by" dependencies, as described under Wayfinding operations below. A blocking edge may cross efforts.
+- **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:sign-in-without-gh` on #22 and its tickets). When publishing a new spec, create its label (`gh label create effort:<name>`) and apply it to the spec and each ticket; a ticket moved to another effort swaps its label too. Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
