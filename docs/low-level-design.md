@@ -446,8 +446,9 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 shipyard/
 ├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
 ├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
-├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app, ad-hoc sign, zip, install
-├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version
+├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon), ad-hoc sign, zip, install, redraw the icon
+├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
+├── Packaging/Icon/                   # make-icon.swift draws the app icon (the menu bar's sailboat); `make icon` packs AppIcon.icns, committed
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
 ├── Sources/ShipyardCore/             # Foundation, FoundationNetworking, Observation and TOMLDecoder only, so agents can build and test it on a Linux VPS

@@ -7,6 +7,7 @@
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift
 #   make clean
 
 APP         := Shipyard
@@ -18,6 +19,8 @@ APP_BUNDLE  := $(BUILD_DIR)/$(APP).app
 CONTENTS    := $(APP_BUNDLE)/Contents
 ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
+ICON        := Packaging/Icon/AppIcon.icns
+ICONSET     := $(BUILD_DIR)/AppIcon.iconset
 
 # With the Command Line Tools alone (no Xcode), swift test can't find the
 # Testing framework the tests use: point the compiler and the test runner at
@@ -32,7 +35,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
 endif
 
-.PHONY: all build test bundle install release run clean
+.PHONY: all build test bundle install release run icon clean
 
 all: build
 
@@ -50,6 +53,7 @@ bundle: build
 	@mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
 	cp "$$(swift build -c release --show-bin-path)/$(APP)" $(CONTENTS)/MacOS/$(APP)
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
+	cp $(ICON) $(CONTENTS)/Resources/AppIcon.icns
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
 	@# bundle gives it the stable identity notifications and login items need.
@@ -70,6 +74,13 @@ release: test bundle
 	@# and the signature doesn't need them. So unzip leaves no __MACOSX folder.
 	cd $(BUILD_DIR) && ditto -c -k --keepParent --norsrc --noextattr --noacl $(APP).app $(notdir $(ZIP))
 	@shasum -a 256 $(ZIP)
+
+# The icon is committed, so bundling doesn't redraw it; run this after
+# changing make-icon.swift.
+icon:
+	swift Packaging/Icon/make-icon.swift $(ICONSET)
+	iconutil -c icns $(ICONSET) -o $(ICON)
+	@rm -rf $(ICONSET)
 
 clean:
 	rm -rf $(BUILD_DIR) .build
