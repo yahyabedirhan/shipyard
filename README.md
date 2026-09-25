@@ -91,6 +91,7 @@ The menu comes in two layouts, chosen with `[menu] layout`: `"list"` (the defaul
 
 - The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
 - The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.
+- For maintainers, [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code and lists every place to touch when adding a setting.
 
 ## Development
 

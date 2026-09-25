@@ -63,6 +63,7 @@ bundle: build
 
 install: bundle
 	@pkill -x $(APP) 2>/dev/null || true
+	@while pgrep -x $(APP) >/dev/null; do sleep 0.2; done
 	rm -rf $(INSTALL_DIR)/$(APP).app
 	ditto $(APP_BUNDLE) $(INSTALL_DIR)/$(APP).app
 	@echo "installed $(INSTALL_DIR)/$(APP).app"

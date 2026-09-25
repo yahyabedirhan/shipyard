@@ -12,7 +12,7 @@ Shipyard lists the pull requests (and, when turned on, issues and workflow runs)
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.
 - Every key is optional. A missing or empty file means the defaults with no projects (the app then shows its project picker).
 - Keys are kebab-case. The schema is `https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`, named by the file's first line, `#:schema <url>`.
-- A broken save doesn't blank the app: it keeps the last valid configuration and shows the error, with its line, in its panel. Unknown keys are ignored without a banner, so a misspelled key silently does nothing; the schema catches it.
+- A broken save doesn't blank the app: it keeps the last valid configuration and shows the error, with its line, in its panel. Unknown keys are ignored and shown as a quiet gray warning with their line ("unknown setting `x` (ignored; did you mean `y`?)"), so a misspelled key does nothing; the schema catches it before the user sees it.
 - A file the app created starts with a commented header that shows settings as commented-out TOML (`# [menu]`, `# layout = "list"`). To set one of those, uncomment its lines and change the value rather than adding a second copy, as long as no top-level key sits below them (see Editing it).
 
 ## Editing it
@@ -123,7 +123,7 @@ Issue events need the project to show issues, and run events to show workflow ru
 taplo check ~/.config/shipyard/config.toml
 ```
 
-Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would silently ignore, so fix those too.
+Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would only warn about and ignore, so fix those too.
 
 The schema can't check three rules; check them by reading the file:
 
