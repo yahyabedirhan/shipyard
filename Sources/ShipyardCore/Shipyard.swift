@@ -6,8 +6,9 @@ import Foundation
 /// It signs in (a stored or `gh` token, else the device flow), signs out on
 /// any 401, follows the configuration between `needsProjects` and `ready`,
 /// and in `ready` runs the refresh pipeline: fetch every project's items in
-/// one GraphQL request, publish the menu model, and ask the rate budget when
-/// to run next.
+/// one GraphQL request, publish the menu model (with which rows need
+/// attention), and ask the rate budget when to run next. What the user has
+/// seen and collapsed is app state, kept by `appStateStore`.
 @MainActor
 public final class Shipyard {
     /// What signing out left behind.
@@ -46,6 +47,8 @@ public final class Shipyard {
     public var canRefreshNow: Bool { budget.canRefresh(at: clock.now) }
 
     public let configStore: ConfigStore
+    /// Seen items and collapsed projects, in `state.json`.
+    public let appStateStore: AppStateStore
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
     private let timer: any RefreshTimer
@@ -67,6 +70,7 @@ public final class Shipyard {
 
     public init(
         configStore: ConfigStore,
+        appStateStore: AppStateStore,
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
         gh: any GhTokenLookup = GhCLI(),
@@ -77,6 +81,7 @@ public final class Shipyard {
         oauthClientID: String = OAuthApp.clientID
     ) {
         self.configStore = configStore
+        self.appStateStore = appStateStore
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
         self.clock = clock
@@ -86,10 +91,11 @@ public final class Shipyard {
         self.transport = transport
     }
 
-    /// Loads the configuration and signs in with the token store's token or
-    /// `gh`'s, if either has one; otherwise stays signed out. Signing in with
-    /// projects runs the first refresh.
+    /// Loads the app state and the configuration and signs in with the token
+    /// store's token or `gh`'s, if either has one; otherwise stays signed
+    /// out. Signing in with projects runs the first refresh.
     public func start() async {
+        appStateStore.load(at: clock.now)
         configStore.reload()
         let provider = tokenProvider
         // `gh auth token` spawns a process; keep it off the main actor.
@@ -234,6 +240,9 @@ public final class Shipyard {
         let result = configStore.reload()
         if case .changed(let configuration) = result {
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
+            // `[attention]` and `[menu-bar]` apply at once, even if the
+            // refresh below can't run (paused).
+            menu.applyAttention(appStateStore.state, configuration: configuration)
             if phase.canRefresh {
                 await refresh()
             } else {
@@ -279,7 +288,8 @@ public final class Shipyard {
             self.snapshot = snapshot
             fetchError = nil
             budget.record(snapshot.rateLimits, at: clock.now)
-            menu = MenuModel.build(snapshot: snapshot, configuration: configuration, now: clock.now)
+            appStateStore.update { $0.attention.prune(present: snapshot.items.values.joined(), at: now) }
+            menu = MenuModel.build(snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
             publishRateStatus()
         } catch GitHubError.unauthorized {
             // `request` has signed out already.
@@ -329,9 +339,45 @@ public final class Shipyard {
 
     // MARK: - User actions
 
-    /// Opens the row's item on GitHub in the browser.
+    /// Opens the row's item on GitHub in the browser and marks it seen.
     public func open(_ row: MenuRow) {
         urlOpener.open(row.url)
+        markSeen(row)
+    }
+
+    /// Marks the row's item seen without opening it (⌥-click): it needs
+    /// attention again only once it changes.
+    public func markSeen(_ row: MenuRow) {
+        updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
+    }
+
+    /// Marks every open row seen, in the project named `project`, or in
+    /// every project when it's `nil`.
+    public func markAllSeen(project: String? = nil) {
+        let rows = menu.sections
+            .filter { project == nil || $0.name == project }
+            .flatMap(\.rows)
+            .filter(\.item.state.isOpen)
+        guard !rows.isEmpty else { return }
+        let now = clock.now
+        updateAppState { state in
+            for row in rows { state.attention.markSeen(row.item, at: now) }
+        }
+    }
+
+    /// Collapses the project's section, or expands it if it's collapsed.
+    /// Remembered across restarts.
+    public func toggleCollapsed(_ project: String) {
+        updateAppState { state in
+            if state.collapsed.remove(project) == nil { state.collapsed.insert(project) }
+        }
+    }
+
+    /// Changes the app state, saves it, and brings the menu model's
+    /// attention flags, counts and collapsed sections up to date.
+    private func updateAppState(_ body: (inout AppState) -> Void) {
+        appStateStore.update(body)
+        menu.applyAttention(appStateStore.state, configuration: configStore.lastValid)
     }
 
     private func apply(_ event: LifecycleEvent) {

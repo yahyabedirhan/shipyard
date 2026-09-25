@@ -7,7 +7,7 @@ import FoundationNetworking
 /// The main test seam: a real `Shipyard` driven end to end over in-memory
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
-/// directory; the clock, the refresh timer and waiting are manual; the URL
+/// directory and the app state in another; the clock, the refresh timer and waiting are manual; the URL
 /// opener and notifier record what they're asked.
 ///
 /// A scenario writes a configuration, registers answers, drives the
@@ -29,6 +29,7 @@ struct Harness {
     let stub = StubHTTP()
     let store: InMemoryTokenStore
     let gh: FakeGhLookup
+    private let ghToken: String?
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
     let opener = RecordingURLOpener()
@@ -36,27 +37,37 @@ struct Harness {
     let notifier = RecordingNotifier()
     /// `config.toml` in a fresh temporary directory.
     let configURL: URL
-    /// A fresh temporary directory for app state, for the app-state store.
+    /// A fresh temporary directory for app state (`state.json`).
     let stateDirectory: URL
     let shipyard: Shipyard
 
     var clock: ManualClock { sleeper.clock }
+    /// `state.json` in `stateDirectory`.
+    var stateURL: URL { shipyard.appStateStore.url }
 
     /// A harness with the given token store and `gh` tokens and, when
     /// `config` isn't `nil`, that configuration file.
     init(stored: String? = nil, gh ghToken: String? = nil, config: String? = nil) throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
-        configURL = root.appendingPathComponent("config", isDirectory: true).appendingPathComponent("config.toml")
-        stateDirectory = root.appendingPathComponent("state", isDirectory: true)
+        let configURL = root.appendingPathComponent("config", isDirectory: true).appendingPathComponent("config.toml")
+        let stateDirectory = root.appendingPathComponent("state", isDirectory: true)
         try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         if let config { try Data(config.utf8).write(to: configURL) }
+        self.init(configURL: configURL, stateDirectory: stateDirectory, store: InMemoryTokenStore(token: stored), gh: ghToken)
+    }
 
-        store = InMemoryTokenStore(token: stored)
+    /// A harness over existing configuration and app-state directories.
+    private init(configURL: URL, stateDirectory: URL, store: InMemoryTokenStore, gh ghToken: String?) {
+        self.configURL = configURL
+        self.stateDirectory = stateDirectory
+        self.store = store
+        self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
+            appStateStore: AppStateStore(directory: stateDirectory),
             tokenStore: store,
             urlOpener: opener,
             gh: gh,
@@ -77,6 +88,15 @@ struct Harness {
         if !answers.isEmpty { harness.graphQL(answers) }
         await harness.shipyard.start()
         return harness
+    }
+
+    /// The app quit and started again: a new `Shipyard` (and doubles) over
+    /// the same configuration file, app-state directory and token store,
+    /// with the clock where this one's is, not started yet.
+    func relaunched() -> Harness {
+        let next = Harness(configURL: configURL, stateDirectory: stateDirectory, store: store, gh: ghToken)
+        next.clock.set(clock.now)
+        return next
     }
 
     /// A recorded GraphQL answer from `Fixtures/`, with GitHub's rate-limit headers.

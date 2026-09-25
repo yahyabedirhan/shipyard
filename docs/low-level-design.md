@@ -144,6 +144,7 @@ snapshot: Snapshot?                (last good)
 fetchError: GitHubError?           (last refresh's failure, if any)
 menu: MenuModel                    (what the panel draws; a failed refresh keeps its rows and sets fetchError)
 budget: RateBudget                 (limits, recent costs, pause; reset on sign-out)
+appStateStore: AppStateStore       (seen, collapsed; loaded at start, kept on sign-out)
 gate: RefreshGate                  (one refresh at a time, queues one more)
 timer: RefreshTimer                (port; armed with the budget's delay after every refresh, disarmed outside ready)
 ```
@@ -166,11 +167,11 @@ Operations:
 | `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing; the store keeps the error |
-| `open(row)` / `markSeen(item)` | opens the URL through the `URLOpening` port (or not), `attention.markSeen` | — |
-| `markAllSeen(project?)` | marks every open item seen | — |
-| `toggleCollapsed(project)` | flips app state | — |
+| `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
+| `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
+| `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
-| `signOut()` | clears Keychain token → `signedOut` | if the token came from `gh`, says to run `gh auth logout` |
+| `signOut()` | clears Keychain token → `signedOut`; app state (seen, collapsed) is kept | if the token came from `gh`, says to run `gh auth logout` |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut`, dropping the stored token when it came from the token store |
 
 ### Configuration — `ShipyardCore/Config/Configuration.swift`
@@ -298,15 +299,15 @@ Snapshot
 
 ### Attention — `ShipyardCore/Items/Attention.swift`
 
-Owns the rule, so the rule sits with the data it reads (seen records).
-State: `seen: [ItemID: Fingerprint]`.
+Owns the rule, so the rule sits with the data it reads (seen records). It's keyed on the generic `Item`, so issues and runs reuse it.
+State: `seen: [ItemID: SeenRecord]`, where `SeenRecord` = the fingerprint seen and `present`, the last time a refresh still listed the item (bumped at most once a day, so the file isn't rewritten every refresh).
 
 | Operation | Returns |
 |---|---|
 | `needsAttention(item, toggles) -> Bool` | false if closed; true if unseen, or `seen[id] != fingerprint`, or review requested, or checks failed, each gated by its toggle, and **all cleared by a click until the fingerprint changes** |
-| `markSeen(item)` | stores the current fingerprint |
-| `count(snapshot, toggles) -> Int` / `countByKind` | for the menu bar |
-| `prune(snapshot)` | drops records for items gone for 30 days |
+| `markSeen(item, at:)` | stores the current fingerprint |
+| `counts(items, toggles) -> AttentionCounts` | per kind (`pullRequests`, `issues`, `workflowRuns`) and `total`; an item listed in two projects counts once |
+| `prune(present: items, at:) -> Bool` | bumps `present` for listed items, drops records for items gone for 30 days; says whether to save |
 
 ### EventDetector — `ShipyardCore/Items/EventDetector.swift`
 
@@ -319,7 +320,18 @@ Pure: `shouldNotify(event, settings: ProjectSettings) -> Bool` — the project's
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
-One JSON file (app-owned, never hand-edited, so Foundation's JSON is enough), versioned: `seen`, `known`, `knownProjects`, `notified: Set<EventID>`, `collapsed: Set<ProjectName>`. Loads at start, saves after a refresh and after clicks (debounced). A corrupt file is renamed aside and starts empty, with no notifications on the first refresh (bootstrap).
+One JSON file, `state.json`, in a directory the app provides (`~/Library/Application Support/Shipyard/`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records) and `collapsed: Set<ProjectName>`; notification rules add `known`, `knownProjects` and `notified: Set<EventID>` next to them.
+
+```json
+{
+  "version": 1,
+  "seen": { "https://github.com/o/r/pull/57": { "fingerprint": "open|…", "present": "2026-09-25T12:00:00Z" } },
+  "collapsed": ["job-search"]
+}
+```
+
+Every field is optional when read and unknown fields are ignored, so adding a field doesn't bump `version`: an older file loads with the new field empty (a file without `knownProjects` makes the first refresh after the upgrade silent), and a newer file still loads in an older build. `version` changes only for a change an older reader would misunderstand, with a migration in `AppState.init(from:)`.
+Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()`; `update { state in … }` changes the state and saves it (atomically, no debounce: the file is small and changes only on clicks and about once a day from pruning) when it changed. A file that isn't readable app state is renamed to `state-corrupt-<yyyyMMdd-HHmmss>.json` and shipyard starts as on a first run, with no notifications on the first refresh (bootstrap).
 
 ### Notifier — `ShipyardApp/Notifier.swift` (the `Notifying` port; tests use a recording one)
 
@@ -327,7 +339,7 @@ Wraps `UNUserNotificationCenter`: asks permission on the first notification (not
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot, config, now) -> MenuModel` (app state joins it with attention): sections per project in configuration order, items filtered (kind shown, closed window counted back from `now` with 0 hiding closed items, `hide-authors`, drafts), sorted (open by `updatedAt` desc, then closed by `closedAt` desc), each row with its number, title, author, URL, semantic state (open, draft, merged, closed; the app's `Palette` colours it), check dot (open and draft PRs only), `since` for its age (opened, or closed), and later its attention flag; an error row per repository that failed; `lastUpdated` and `fetchError` for the banner; `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, with attention, the menu bar label (`total`, `per-kind`, `none`). All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(snapshot, config, appState, now) -> MenuModel`: sections per project in configuration order, items filtered (kind shown, closed window counted back from `now` with 0 hiding closed items, `hide-authors`, drafts), sorted (open by `updatedAt` desc, then closed by `closedAt` desc), each row with its number, title, author, URL, semantic state (open, draft, merged, closed; the app's `Palette` colours it), check dot (open and draft PRs only), `since` for its age (opened, or closed), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository that failed; `lastUpdated` and `fetchError` for the banner; `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
 ### UI — `ShipyardApp/UI/`
 
@@ -402,7 +414,7 @@ shipyard/
 │   │   ├── EventDetector.swift       # known + snapshot → events
 │   │   └── NotificationRules.swift   # event + project settings → notify?
 │   ├── State/
-│   │   └── AppStateStore.swift       # state.json: seen, known, notified, collapsed
+│   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed (known, notified with the rules); tolerant, versioned
 │   ├── Menu/
 │   │   └── MenuModel.swift           # pure: sections, rows, semantic state colours, label
 │   └── Skill/
@@ -423,7 +435,8 @@ shipyard/
 │           ├── ConnectView.swift
 │           └── ProjectPicker.swift
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module
-    ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers
+    ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
+    ├── PullRequestsResponse.swift    # builds a one-repository GraphQL answer, for scenarios that change a PR between refreshes
     ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, errors); excluded from the target, read from the source tree
     └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener; stub HTTP transport, fake gh, instant sleeper
 ```
@@ -457,10 +470,10 @@ refresh()
       notifier.post(e)
     appState.notified.insert(e.id)
   appState.known = snapshot.knownItems; appState.knownProjects ∪= newProjects
-  appState.attention.prune(snapshot); appStateStore.save()
+  appStateStore.update { $0.attention.prune(present: snapshot items, now) }   // saves only if it changed
   self.snapshot = snapshot; fetchError = nil
   budget.record(snapshot.rateLimits, now)
-  menu = MenuModel.build(snapshot, config, now)       // Panel re-renders from it
+  menu = MenuModel.build(snapshot, config, appState, now)   // Panel re-renders from it
   delay = budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent, now)
   menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, now)
   timer.arm(delay.seconds(from: now))

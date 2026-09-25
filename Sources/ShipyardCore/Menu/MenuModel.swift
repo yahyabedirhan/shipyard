@@ -1,11 +1,18 @@
 import Foundation
 
 /// What the panel draws: one section per project, in configuration order,
-/// and when the list was last brought up to date. Every display rule (what
-/// the closed window keeps, drafts, hidden authors, order, state and check
-/// dot) lives here, so tests reach them without SwiftUI.
+/// the attention count and menu bar label, and when the list was last
+/// brought up to date. Every display rule (what the closed window keeps,
+/// drafts, hidden authors, order, state and check dot, which rows need
+/// attention, what the menu bar says) lives here, so tests reach them
+/// without SwiftUI.
 public struct MenuModel: Equatable, Sendable {
     public var sections: [MenuSection]
+    /// Rows needing attention across all projects, per kind; a row listed
+    /// in two projects counts once. `attention.total` is the attention count.
+    public var attention: AttentionCounts
+    /// What the menu bar shows next to the icon, per `[menu-bar] count`.
+    public var menuBarLabel: MenuBarLabel
     /// When the rows were fetched; `nil` before the first refresh succeeded.
     public var lastUpdated: Date?
     /// Why the latest refresh failed, while the rows above are kept from an
@@ -22,12 +29,16 @@ public struct MenuModel: Equatable, Sendable {
 
     public init(
         sections: [MenuSection] = [],
+        attention: AttentionCounts = AttentionCounts(),
+        menuBarLabel: MenuBarLabel = .hidden,
         lastUpdated: Date? = nil,
         fetchError: GitHubError? = nil,
         refreshDelay: RefreshDelay? = nil,
         rateIndicator: RateIndicator? = nil
     ) {
         self.sections = sections
+        self.attention = attention
+        self.menuBarLabel = menuBarLabel
         self.lastUpdated = lastUpdated
         self.fetchError = fetchError
         self.refreshDelay = refreshDelay
@@ -40,9 +51,9 @@ public struct MenuModel: Equatable, Sendable {
     /// Before anything was fetched.
     public static let empty = MenuModel()
 
-    /// The model for `snapshot` under `configuration`, as of `now` (which
-    /// the closed window counts back from).
-    public static func build(snapshot: Snapshot, configuration: Configuration, now: Date) -> MenuModel {
+    /// The model for `snapshot` under `configuration` and what the user has
+    /// seen and collapsed, as of `now` (which the closed window counts back from).
+    public static func build(snapshot: Snapshot, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
         let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
@@ -53,11 +64,29 @@ public struct MenuModel: Equatable, Sendable {
             let closed = items.filter { !$0.state.isOpen }.sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
             return MenuSection(
                 name: project.name,
-                rows: (open + closed).map(MenuRow.init),
+                rows: (open + closed).map { MenuRow($0) },
                 errors: project.repositories.compactMap { snapshot.errors[$0].map(MenuErrorRow.init) }
             )
         }
-        return MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)
+        var model = MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)
+        model.applyAttention(state, configuration: configuration)
+        return model
+    }
+
+    /// Sets each row's attention flag, each section's count and collapsed
+    /// flag, the totals and the menu bar label from `state`, keeping the
+    /// rows. Clicks, "mark all seen" and collapsing come here without a refresh.
+    public mutating func applyAttention(_ state: AppState, configuration: Configuration) {
+        let toggles = configuration.attention
+        for index in sections.indices {
+            for row in sections[index].rows.indices {
+                sections[index].rows[row].needsAttention = state.attention.needsAttention(sections[index].rows[row].item, toggles: toggles)
+            }
+            sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
+            sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
+        }
+        attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
+        menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
     }
 
     private static func shows(_ item: Item, settings: ProjectSettings, hiddenAuthors: Set<String>, now: Date) -> Bool {
@@ -82,13 +111,20 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     public var rows: [MenuRow]
     /// One per repository of this project that couldn't be fetched.
     public var errors: [MenuErrorRow]
+    /// Rows in this section needing attention, for its header.
+    public var attentionCount: Int
+    /// Whether the user collapsed it. Its rows are still here, and still
+    /// count towards the attention count.
+    public var isCollapsed: Bool
 
     public var id: String { name }
 
-    public init(name: String, rows: [MenuRow], errors: [MenuErrorRow] = []) {
+    public init(name: String, rows: [MenuRow], errors: [MenuErrorRow] = [], attentionCount: Int = 0, isCollapsed: Bool = false) {
         self.name = name
         self.rows = rows
         self.errors = errors
+        self.attentionCount = attentionCount
+        self.isCollapsed = isCollapsed
     }
 }
 
@@ -110,8 +146,15 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// What the age counts from: when it was opened, or for a closed item
     /// when it was closed.
     public var since: Date
+    /// Whether the item needs attention (unseen, changed since seen, review
+    /// requested or checks failed, as `[attention]` allows).
+    public var needsAttention: Bool
+    /// The item as fetched: marking the row seen records this version.
+    public var item: Item
 
-    public init(_ item: Item) {
+    public init(_ item: Item, needsAttention: Bool = false) {
+        self.item = item
+        self.needsAttention = needsAttention
         id = item.id
         kind = item.kind
         repository = item.repository
@@ -128,6 +171,46 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// How old the row is at `now`, never negative.
     public func age(at now: Date) -> TimeInterval {
         max(0, now.timeIntervalSince(since))
+    }
+}
+
+/// What the menu bar shows next to the icon.
+public enum MenuBarLabel: Equatable, Sendable {
+    /// `count = "total"`: the attention count.
+    case total(Int)
+    /// `count = "per-kind"`: the attention count split by kind.
+    case perKind(AttentionCounts)
+    /// `count = "none"`, or before anything was fetched: the icon alone.
+    case hidden
+
+    public init(_ counts: AttentionCounts, style: MenuBarCount) {
+        switch style {
+        case .total: self = .total(counts.total)
+        case .perKind: self = .perKind(counts)
+        case .none: self = .hidden
+        }
+    }
+
+    /// The text next to the icon, for example "3" or "2 PRs · 1 run";
+    /// `nil` when nothing needs attention or the count is hidden.
+    public var text: String? {
+        switch self {
+        case .total(let count):
+            return count > 0 ? String(count) : nil
+        case .perKind(let counts):
+            let parts = [
+                Self.part(counts.pullRequests, "PR", "PRs"),
+                Self.part(counts.issues, "issue", "issues"),
+                Self.part(counts.workflowRuns, "run", "runs"),
+            ].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " · ")
+        case .hidden:
+            return nil
+        }
+    }
+
+    private static func part(_ count: Int, _ one: String, _ many: String) -> String? {
+        count > 0 ? "\(count) \(count == 1 ? one : many)" : nil
     }
 }
 
