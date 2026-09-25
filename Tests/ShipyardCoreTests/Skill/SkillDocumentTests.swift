@@ -110,6 +110,7 @@ struct SkillDocumentTests {
             ("launch-at-login", "\(c.launchAtLogin)"),
             ("hide-authors", c.hideAuthors.isEmpty ? "[]" : "?"),
             ("[menu-bar] count", literal(c.menuBar.count)),
+            ("[menu] layout", literal(c.menu.layout)),
             ("[rate-limit] show", literal(c.rateLimit.show)),
             ("[rate-limit] max-share-percent", "\(c.rateLimit.maxSharePercent)"),
             ("[attention] unseen", "\(c.attention.unseen)"),
@@ -136,7 +137,7 @@ struct SkillDocumentTests {
     func choices() throws {
         let text = try skill()
         let values = EventKind.allCases.map(\.rawValue) + AuthorFilter.allCases.map(\.rawValue)
-            + MenuBarCount.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
+            + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
             + WorkflowRunBranches.allCases.map(\.rawValue)
         for value in values {
             #expect(text.contains("`\(value)`") || text.contains("`\"\(value)\"`"), "`\(value)` isn't listed")

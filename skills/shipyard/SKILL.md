@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to watch or group repositories in shipyard, show or hide issues, runs or drafts, change when it notifies, or fix its configuration file.
+description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to watch or group repositories in shipyard, show or hide issues, runs or drafts, switch the menu between a list and tabs, change when it notifies, or fix its configuration file.
 ---
 
 # shipyard configuration
@@ -48,6 +48,7 @@ Tables:
 | Key | Default | Allowed |
 |---|---|---|
 | `[menu-bar] count` | `"total"` | `"total"`, `"per-kind"` (PRs, issues, runs apart), `"none"` |
+| `[menu] layout` | `"list"` | `"list"` (every project in one scrolling list, one line per item), `"tabs"` (one project at a time) |
 | `[rate-limit] show` | `"always"` | `"always"`, `"when-low"` (below 25%), `"never"` |
 | `[rate-limit] max-share-percent` | `10` | `1`–`50`: the share of each hourly GitHub limit shipyard may spend (it's shared with the user's agents) |
 | `[attention] unseen` | `true` | an item not clicked yet needs attention |

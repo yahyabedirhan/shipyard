@@ -4,6 +4,18 @@ import Foundation
 /// hold: a row's age, when the list was last updated, and why the
 /// configuration or a refresh failed. Pure, so tests reach them without SwiftUI.
 public enum PanelText {
+    /// The panel's heading.
+    public static let title = "Shipyard"
+
+    /// Next to the heading: "3 need attention"; `nil` when nothing does.
+    public static func attentionSummary(_ count: Int) -> String? {
+        switch count {
+        case ..<1: nil
+        case 1: "1 needs attention"
+        default: "\(count) need attention"
+        }
+    }
+
     /// A row's age: "now" under a minute, then "5m", "3h", "2d".
     public static func age(_ seconds: TimeInterval) -> String {
         guard let (count, unit) = span(seconds) else { return "now" }

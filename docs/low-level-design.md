@@ -180,7 +180,7 @@ Operations:
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
 | `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigError` (empty or used name, no repositories, bad slug) before writing anything |
-| `signOut()` | clears the token store → `signedOut` with `signedOut(result)`; app state (seen, collapsed) is kept. The footer's Sign out calls it | if the token came from `gh` (always, in 0.0.x), `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
+| `signOut()` | clears the token store → `signedOut` with `signedOut(result)`; app state (seen, collapsed) is kept. The header's gear menu has Sign out | if the token came from `gh` (always, in 0.0.x), `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut` with `rejected(source)`, dropping the stored token when it came from the token store |
 
 ### Configuration — `ShipyardCore/Config/Configuration.swift`
@@ -197,6 +197,9 @@ hide-authors = []                # logins, e.g. "dependabot[bot]"
 
 [menu-bar]
 count = "total"                  # "total" | "per-kind" | "none"
+
+[menu]
+layout = "list"                  # "list" | "tabs"
 
 [rate-limit]
 show = "always"                  # "always" | "when-low" | "never"
@@ -259,7 +262,7 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`.
-Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (the footer's "Open configuration file": writes the commented header alone when there's no file; never touches one that exists), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (the gear menu's "Open configuration file": writes the commented header alone when there's no file; never touches one that exists), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
@@ -361,7 +364,7 @@ Wraps `SMAppService.mainApp`: `setEnabled(true)` registers the running `.app` (n
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot?, config, appState, now) -> MenuModel`: sections per project in configuration order (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(snapshot?, config, appState, now) -> MenuModel`: sections per project in configuration order (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `layout` (`list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel), the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
 ### UI — `ShipyardApp/UI/`
 
@@ -370,32 +373,41 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 ```tsx
 <ShipyardApp> (ShipyardApp/ShipyardApp.swift)
   <MenuBarExtra label={<MenuBarLabelView>}>   icon (a pause glyph while paused) + menuBarLabel.text
-    <Panel>                                   switch shipyard.phase
+    <Panel>                                   the shared frame; switch shipyard.phase
+      header                  "Shipyard" · "3 need attention" · Refresh (⌘R, spins while refreshing) ·
+                              gear menu: Open configuration file · Install agent skill… · Sign out (once signed in)
       signedOut              → <ConnectView>  (Onboarding/)
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
       needsProjects          → <ProjectPicker>(Onboarding/): a field for owner/name or a link · the suggestions and typed
                               repositories as checkboxes, each chosen one with its project name and "Group with" ·
                               "Adds …" summary · Add N projects
                               <SkillInstallCard> (the offer to install the agent skill, always shown here)
-      ready →
-        banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error ·
-                              notifications off (with a button to System Settings)
-        sections list         a scroll view as tall as the measured sections, up to 560 pt; the window sizes the
-                              panel from a zero-height proposal, so the height is fixed rather than flexible (#27)
-          <ProjectSection> ×N header: chevron (click collapses/expands), name, attention count, "Mark all seen"
-            <ItemRow> ×N      attention dot, state icon, title (semibold when it needs attention),
-                              "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
-                              a run: workflow name, "#41 · shipyard · main · failed · 12m", no check dot;
+      banners                 config error (any phase) · once ready: refresh delay (stretched, backed off: amber;
+                              paused: red) · fetch error · notifications off (with a button to System Settings);
+                              each slides in and out
+      ready → switch menu.layout ([menu] layout), each given the menu model and LayoutActions
+        <ListLayout>          (Layouts/) "list": a scroll view as tall as the measured rows, up to 560 pt; the window
+                              sizes the panel from a zero-height proposal, so the height is fixed rather than
+                              flexible (#27, MeasuredScrollView)
+          header ×N           pinned while its rows scroll: chevron (click collapses/expands, spring), folder, name,
+                              attention count (muted while expanded), "Nothing open" / "Not loaded yet", or on hover
+                              "Mark all seen"
+          row ×N              one line in columns: attention dot, state icon (check dot on it; a running run pulses),
+                              number, title (semibold when it needs attention; a run: workflow name and its branch
+                              as a chip), author (the repository in multi-repository projects), age; a line where
+                              the kind changes; the tooltip holds the state and the full "#21 · …" detail;
                               click opens and marks seen, ⌥-click marks seen only
-      <SkillInstallCard>      above the footer, after the footer's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
-      footer                  last updated · global "Mark all seen" · rate limit indicator (amber low, red exhausted) ·
-                              Refresh · Open configuration file · Install agent skill… /
-                              Sign out (once signed in) · Quit
+        <TabsLayout>          (Layouts/) "tabs": one project at a time (#36)
+      <SkillInstallCard>      above the footer, after the gear menu's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
+      footer                  last updated · global "Mark all seen" · Quit (⌘Q) · rate limit lines, each with a bar
+                              (amber low, red exhausted)
 ```
 
-`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
+The frame and the layouts share `Design.swift`'s tokens (the spacing `Grid`, the `TypeScale`, the `Palette` of state and surface colours for light and dark, and `Motion`) and `Components.swift`'s pieces (`MeasuredScrollView`, `Banner`, `CountBadge`, `CommandBox`, the icon, pill and text button styles). A layout is a view `(model: MenuModel, actions: LayoutActions)`; `LayoutActions` (`open`, `markSeen`, `markAllSeen`, `toggleCollapsed`) comes from `AppServices`, and a layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
 
-The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel only rereads the notification permission (it doesn't refresh), and ⌘R is the footer's Refresh button. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation`.
+`ConnectView` draws `PanelText.connect(signedOutReason)`: the app's icon and a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The header's gear menu has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
+
+The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, the header ("Shipyard", "3 need attention"), "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel only rereads the notification permission (it doesn't refresh), ⌘R is the header's Refresh button, and `layoutActions` hands the layouts their `LayoutActions`. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation`.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -479,11 +491,14 @@ shipyard/
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   └── UI/
-│       ├── Panel.swift               # phase switch, banner, footer
-│       ├── ProjectSection.swift
-│       ├── ItemRow.swift
-│       ├── Palette.swift             # semantic state colours → GitHub colours, light/dark
+│       ├── Panel.swift               # the shared frame: header, banners, phase switch, layout switch, footer
+│       ├── Design.swift              # design tokens: spacing grid, type scale, Palette (state and surface colours, light/dark), motion
+│       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, button styles
 │       ├── SkillInstallCard.swift    # the skill install: offer, Cancel, result, command to copy
+│       ├── Layouts/
+│       │   ├── LayoutActions.swift   # what a layout can do: open, mark seen, mark all seen, collapse
+│       │   ├── ListLayout.swift      # [menu] layout = "list": pinned project headers, one line per item
+│       │   └── TabsLayout.swift      # [menu] layout = "tabs" (#36)
 │       └── Onboarding/
 │           ├── ConnectView.swift     # why signed out, the gh command to copy, Try again
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
@@ -627,7 +642,7 @@ What the traces turned up and the design now handles: the first refresh after ad
 |---|---|
 | New event (e.g. `pr.review_submitted`) | `EventDetector` (one transition), the event enum in `Configuration`, `schema/`, `SKILL.md` |
 | Split count by kind in the menu bar | nothing: `[menu-bar] count = "per-kind"` already exists |
-| Quick actions (merge, close) | `GitHubClient` (one mutation), `ItemRow` context menu |
+| Quick actions (merge, close) | `GitHubClient` (one mutation), `ListLayout` row context menu |
 | Mark agent PRs (body marker / co-author trailer) | `ProjectQuery` fetches `body` tail, `Item.isAgent`, author filter gains `agents` |
 | New item kind (discussions, releases) | `Item.kind`, a query fragment, `MenuModel`, config section, schema. Five files, accepted: it's rare |
 | Quiet hours / Do-Not-Disturb rules | `NotificationRules` + a config field |

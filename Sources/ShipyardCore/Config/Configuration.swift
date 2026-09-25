@@ -18,6 +18,7 @@ public struct Configuration: Equatable, Sendable {
     /// Logins whose items are hidden, e.g. `dependabot[bot]`.
     public var hideAuthors: [String] = []
     public var menuBar = MenuBar()
+    public var menu = Menu()
     public var rateLimit = RateLimitSettings()
     public var attention = AttentionToggles()
     /// What every project shows unless it overrides it.
@@ -51,6 +52,12 @@ extension Configuration {
     public struct MenuBar: Equatable, Sendable {
         public var count: MenuBarCount = .total
         public init(count: MenuBarCount = .total) { self.count = count }
+    }
+
+    /// `[menu]`
+    public struct Menu: Equatable, Sendable {
+        public var layout: MenuLayout = .list
+        public init(layout: MenuLayout = .list) { self.layout = layout }
     }
 
     /// `[rate-limit]`
@@ -125,6 +132,14 @@ public enum MenuBarCount: String, CaseIterable, Sendable {
     case total
     case perKind = "per-kind"
     case none
+}
+
+/// `[menu] layout`: how the panel draws the projects once shipyard is
+/// ready. `list` puts every project's rows in one scrolling list, under
+/// pinned project headers; `tabs` shows one project at a time.
+public enum MenuLayout: String, CaseIterable, Sendable {
+    case list
+    case tabs
 }
 
 /// `[rate-limit] show`
@@ -365,6 +380,11 @@ extension Configuration {
         # applies changes live and never rewrites it (it only appends projects).
         # Every key is optional. Keys, defaults and events are in the schema above.
         version = \(supportedVersion)
+
+        # How the menu draws your projects: "list" (the default: every project
+        # in one scrolling list) or "tabs" (one project at a time).
+        # [menu]
+        # layout = "list"
 
         """
 

@@ -24,7 +24,9 @@ Shipyard 0.0.x connects to GitHub through the [GitHub CLI](https://cli.github.co
 
 ## Configuration
 
-Everything shipyard shows and when it notifies lives in `~/.config/shipyard/config.toml` (`$XDG_CONFIG_HOME/shipyard/` when that's set). Every key is optional, edits apply live, and a broken edit keeps the last valid configuration and shows the error in the panel. The footer's **Open configuration file** opens it.
+Everything shipyard shows and when it notifies lives in `~/.config/shipyard/config.toml` (`$XDG_CONFIG_HOME/shipyard/` when that's set). Every key is optional, edits apply live, and a broken edit keeps the last valid configuration and shows the error in the panel. **Open configuration file**, in the panel's gear menu, opens it.
+
+The menu comes in two layouts, chosen with `[menu] layout`: `"list"` (the default) puts every project in one scrolling list, one line per item under pinned project headers; `"tabs"` shows one project at a time.
 
 - The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
 - The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.

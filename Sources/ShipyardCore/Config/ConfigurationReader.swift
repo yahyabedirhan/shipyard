@@ -84,7 +84,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "rate-limit", "attention", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -107,6 +107,11 @@ final class ConfigurationReader {
         if let menuBar = table(node, "menu-bar") {
             warnUnknownKeys(in: menuBar, known: ["count"])
             if let count = choice(menuBar, "count", MenuBarCount.self) { config.menuBar.count = count }
+        }
+
+        if let menu = table(node, "menu") {
+            warnUnknownKeys(in: menu, known: ["layout"])
+            if let layout = choice(menu, "layout", MenuLayout.self) { config.menu.layout = layout }
         }
 
         if let rateLimit = table(node, "rate-limit") {

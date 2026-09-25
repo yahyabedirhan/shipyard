@@ -42,6 +42,19 @@
         }
       }
     },
+    "menu": {
+      "description": "How the panel draws your projects.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "description": "One scrolling list of every project, one line per item under pinned project headers, or one project at a time in tabs.",
+          "type": "string",
+          "enum": ["list", "tabs"],
+          "default": "list"
+        }
+      }
+    },
     "rate-limit": {
       "description": "How much of your GitHub rate limit shipyard may use, and whether the panel shows it. The limit is shared with every other tool using your account, your agents included.",
       "type": "object",

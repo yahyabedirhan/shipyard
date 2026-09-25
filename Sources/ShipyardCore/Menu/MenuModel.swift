@@ -13,6 +13,8 @@ public struct MenuModel: Equatable, Sendable {
     public var attention: AttentionCounts
     /// What the menu bar shows next to the icon, per `[menu-bar] count`.
     public var menuBarLabel: MenuBarLabel
+    /// How the panel draws the sections, per `[menu] layout`.
+    public var layout: MenuLayout
     /// When the rows were fetched; `nil` before the first refresh succeeded.
     public var lastUpdated: Date?
     /// Why the latest refresh failed, while the rows above are kept from an
@@ -31,6 +33,7 @@ public struct MenuModel: Equatable, Sendable {
         sections: [MenuSection] = [],
         attention: AttentionCounts = AttentionCounts(),
         menuBarLabel: MenuBarLabel = .hidden,
+        layout: MenuLayout = .list,
         lastUpdated: Date? = nil,
         fetchError: GitHubError? = nil,
         refreshDelay: RefreshDelay? = nil,
@@ -39,6 +42,7 @@ public struct MenuModel: Equatable, Sendable {
         self.sections = sections
         self.attention = attention
         self.menuBarLabel = menuBarLabel
+        self.layout = layout
         self.lastUpdated = lastUpdated
         self.fetchError = fetchError
         self.refreshDelay = refreshDelay
@@ -72,7 +76,7 @@ public struct MenuModel: Equatable, Sendable {
             let sections = configuration.projects.map { project in
                 MenuSection(name: project.name, rows: [], showsRepository: project.repositories.count > 1, isLoaded: false)
             }
-            var model = MenuModel(sections: sections)
+            var model = MenuModel(sections: sections, layout: configuration.menu.layout)
             model.applyAttention(state, configuration: configuration)
             return model
         }
@@ -107,7 +111,7 @@ public struct MenuModel: Equatable, Sendable {
                 isLoaded: snapshot.items[project.name] != nil
             )
         }
-        var model = MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)
+        var model = MenuModel(sections: sections, layout: configuration.menu.layout, lastUpdated: snapshot.fetchedAt)
         model.applyAttention(state, configuration: configuration)
         return model
     }

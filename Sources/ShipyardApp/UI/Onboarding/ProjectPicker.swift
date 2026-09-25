@@ -27,24 +27,22 @@ struct ProjectPicker: View {
     @State private var rejection: String?
     @State private var isAdding = false
     @State private var addError: String?
-    /// The list's own height, measured: the `MenuBarExtra` window proposes
-    /// zero height, which a scroll view would take (#27).
-    @State private var listHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(PanelText.pickerTitle).font(.headline)
+                Text(PanelText.pickerTitle).font(TypeScale.display)
                 Text(PanelText.pickerIntro)
-                    .font(.callout)
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
+                    .lineSpacing(1.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
             addField
             repositories
             footer
         }
-        .padding(12)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .task { await loadSuggestions() }
     }
@@ -61,11 +59,12 @@ struct ProjectPicker: View {
                     ProgressView().controlSize(.small)
                 }
                 Button("Add", action: check)
+                    .buttonStyle(PillButtonStyle())
                     .disabled(isTypedEmpty || isChecking)
             }
             if let rejection {
                 Text(LocalizedStringKey(rejection))
-                    .font(.caption)
+                    .font(TypeScale.caption)
                     .foregroundStyle(Palette.red)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -104,7 +103,7 @@ struct ProjectPicker: View {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
                 Text(PanelText.findingSuggestions)
-                    .font(.callout)
+                    .font(TypeScale.body)
                     .foregroundStyle(.secondary)
             }
         case .failed(let message) where choices.offered.isEmpty:
@@ -114,7 +113,7 @@ struct ProjectPicker: View {
                 if case .failed(let message) = suggestions { failed(message) }
                 if choices.offered.isEmpty {
                     Text(PanelText.noSuggestions)
-                        .font(.callout)
+                        .font(TypeScale.body)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
@@ -127,27 +126,26 @@ struct ProjectPicker: View {
     private func failed(_ message: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(message)
-                .font(.caption)
+                .font(TypeScale.caption)
                 .foregroundStyle(Palette.amber)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Retry") { Task { await loadSuggestions() } }
-                .buttonStyle(.link)
-                .font(.caption)
+                .buttonStyle(TextButtonStyle())
         }
     }
 
+    /// Scrolls inside a measured height, like the menu's list (#27).
     private var list: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(choices.offered) { repository in
+        MeasuredScrollView(maxHeight: Self.maxListHeight) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(choices.offered.enumerated()), id: \.element.id) { index, repository in
+                    if index > 0 { Hairline().padding(.leading, 28) }
                     row(repository)
                 }
             }
             .padding(.vertical, 2)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
         }
-        .frame(height: min(listHeight, Self.maxListHeight))
-        .background(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.1)))
+        .card()
     }
 
     private func row(_ repository: RepoSummary) -> some View {
@@ -158,7 +156,10 @@ struct ProjectPicker: View {
                 set: { _ in choices.toggle(repository) }
             )) {
                 HStack(spacing: 4) {
-                    Text(repository.slug).lineLimit(1).truncationMode(.middle)
+                    Text(repository.slug)
+                        .font(choice != nil ? TypeScale.bodyEmphasis : TypeScale.body)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                     if repository.isPrivate {
                         Image(systemName: "lock.fill")
                             .font(.caption2)
@@ -173,15 +174,17 @@ struct ProjectPicker: View {
                     .padding(.leading, 20)
             } else if let description = repository.description, !description.isEmpty {
                 Text(description)
-                    .font(.caption)
+                    .font(TypeScale.meta)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .padding(.leading, 20)
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(choice != nil ? Palette.accent.opacity(0.06) : .clear)
+        .animation(Motion.hover, value: choice != nil)
     }
 
     /// The chosen repository's project name, and a menu that groups it with
@@ -190,7 +193,7 @@ struct ProjectPicker: View {
         let others = choices.projectNames.filter { $0 != choice.name }
         return HStack(spacing: 6) {
             Text("Project")
-                .font(.caption)
+                .font(TypeScale.meta)
                 .foregroundStyle(.secondary)
             TextField("Project name", text: Binding(
                 get: { choice.project },
@@ -218,25 +221,26 @@ struct ProjectPicker: View {
             let projects = choices.projects
             if let summary = PanelText.pickedProjects(projects) {
                 Text(summary)
-                    .font(.caption)
+                    .font(TypeScale.meta)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 if choices.hasUnnamedProject {
-                    Text(PanelText.unnamedProject).font(.caption).foregroundStyle(Palette.red)
+                    Text(PanelText.unnamedProject).font(TypeScale.caption).foregroundStyle(Palette.red)
                 }
                 Spacer()
                 if isAdding {
                     ProgressView().controlSize(.small)
                 }
                 Button(PanelText.addProjects(projects.count), action: add)
+                    .buttonStyle(PillButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!choices.canConfirm || isAdding)
             }
             if let addError {
                 Text(addError)
-                    .font(.caption)
+                    .font(TypeScale.caption)
                     .foregroundStyle(Palette.red)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)

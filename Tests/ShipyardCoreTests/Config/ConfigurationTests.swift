@@ -51,6 +51,9 @@ let everyKey = """
     [menu-bar]
     count = "per-kind"
 
+    [menu]
+    layout = "tabs"
+
     [rate-limit]
     show = "when-low"
     max-share-percent = 25
@@ -113,6 +116,7 @@ struct ConfigurationDecodingTests {
         #expect(config.launchAtLogin)
         #expect(config.hideAuthors.isEmpty)
         #expect(config.menuBar.count == .total)
+        #expect(config.menu.layout == .list)
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
         #expect(config.defaults.pullRequests == .init(show: true, closedWindowDays: 7, drafts: true))
@@ -154,6 +158,7 @@ struct ConfigurationDecodingTests {
         #expect(!config.launchAtLogin)
         #expect(config.hideAuthors == ["dependabot[bot]", "renovate[bot]"])
         #expect(config.menuBar.count == .perKind)
+        #expect(config.menu.layout == .tabs)
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.defaults.pullRequests == .init(show: false, closedWindowDays: 14, drafts: false))
@@ -247,6 +252,12 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 3, message: "unknown value `bot` for `authors` (did you mean `bots`?)")])
         #expect(rejection("[menu-bar]\ncount = \"per_kind\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `per_kind` for `count` (did you mean `per-kind`?)")])
+        #expect(rejection("[menu]\nlayout = \"tab\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `tab` for `layout` (did you mean `tabs`?)")])
+        #expect(rejection("[menu]\nlayout = \"grid\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
+        #expect(rejection("[menu]\nlayout = 2\n")
+            == [ConfigIssue(line: 2, message: "`menu.layout` must be a string")])
         #expect(rejection("[rate-limit]\nshow = \"sometimes\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
         #expect(rejection("[defaults.workflow-runs]\nbranches = \"al\"\n")

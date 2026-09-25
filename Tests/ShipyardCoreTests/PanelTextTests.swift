@@ -20,6 +20,14 @@ struct PanelTextTests {
         #expect(PanelText.age(seconds) == text)
     }
 
+    @Test("the header names the app and how many items need attention, saying nothing at 0")
+    func header() {
+        #expect(PanelText.title == "Shipyard")
+        #expect(PanelText.attentionSummary(0) == nil)
+        #expect(PanelText.attentionSummary(1) == "1 needs attention")
+        #expect(PanelText.attentionSummary(10) == "10 need attention")
+    }
+
     @Test("last updated counts minutes, then hours, then days; nothing before the first refresh")
     func lastUpdated() {
         #expect(PanelText.lastUpdated(nil, now: now) == nil)

@@ -102,7 +102,21 @@ final class AppServices {
         Task { await notifier.checkPermission() }
     }
 
-    // MARK: - Footer actions
+    // MARK: - Layout actions
+
+    /// What the menu's layout can do: open or mark seen a row, mark a
+    /// project (or every project) seen, collapse a project.
+    var layoutActions: LayoutActions {
+        let shipyard = shipyard
+        return LayoutActions(
+            open: { shipyard.open($0) },
+            markSeen: { shipyard.markSeen($0) },
+            markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
+            toggleCollapsed: { shipyard.toggleCollapsed($0.name) }
+        )
+    }
+
+    // MARK: - Panel actions
 
     func refresh() {
         Task { await shipyard.refresh() }
