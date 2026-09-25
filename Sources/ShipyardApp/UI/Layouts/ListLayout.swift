@@ -43,7 +43,7 @@ struct ListLayout: View {
                     SkeletonRow(width: 190)
                     SkeletonRow(width: 140)
                 }
-                ForEach(section.errors) { ListErrorRow(error: $0) }
+                ForEach(section.errors) { ErrorRow(error: $0) }
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     ListRow(
                         row: row,
@@ -157,14 +157,8 @@ private struct ListRow: View {
     var body: some View {
         Button(action: click) {
             HStack(spacing: 0) {
-                Circle()
-                    .fill(Palette.accent)
-                    .frame(width: 6, height: 6)
-                    .opacity(row.needsAttention ? 1 : 0)
-                    .scaleEffect(row.needsAttention ? 1 : 0.2)
+                AttentionDot(isOn: row.needsAttention)
                     .frame(width: Grid.dotColumn, alignment: .leading)
-                    .accessibilityHidden(!row.needsAttention)
-                    .accessibilityLabel("Needs attention")
                 stateIcon
                 Text(String(row.number))
                     .font(TypeScale.meta)
@@ -208,36 +202,22 @@ private struct ListRow: View {
             .frame(height: Grid.rowHeight)
             .contentShape(Rectangle())
         }
-        .buttonStyle(ListRowButtonStyle(isHovered: isHovered, hoverSpace: hoverSpace))
+        .buttonStyle(RowButtonStyle(isHovered: isHovered, hoverSpace: hoverSpace))
         .onHover { inside in
             if inside { hovered = row.id } else if hovered == row.id { hovered = nil }
         }
         // ⌥-click's equivalent for the keyboard and VoiceOver.
-        .accessibilityAction(named: "Mark seen") { actions.markSeen(row) }
+        .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
         .help(help)
         .animation(Motion.seen, value: row.needsAttention)
         .animation(.spring(duration: 0.3, bounce: 0.15), value: hovered)
     }
 
     private var stateIcon: some View {
-        Image(systemName: Palette.symbol(row.state, kind: row.kind))
-            .symbolRenderingMode(.hierarchical)
-            .font(.system(size: 11.5, weight: .semibold))
-            .foregroundStyle(Palette.color(row.state, kind: row.kind))
-            .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
+        StateSymbol(row: row)
             .frame(width: Grid.iconColumn, alignment: .center)
-            .overlay(alignment: .bottomTrailing) {
-                // The check dot rides on the state icon, like a status badge.
-                if let checks = row.checks, let color = Palette.color(checks) {
-                    ZStack {
-                        Circle().fill(Palette.panel).frame(width: 8, height: 8)
-                        Circle().fill(color).frame(width: 5.5, height: 5.5)
-                    }
-                    .offset(x: 2, y: 2)
-                    .accessibilityLabel(checksLabel(checks))
-                }
-            }
-            .accessibilityLabel(PanelText.stateLabel(row))
+            // The check dot rides on the state icon, like a status badge.
+            .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
     }
 
     /// The author, or in a project of several repositories, the repository
@@ -255,7 +235,7 @@ private struct ListRow: View {
     /// The row's state and its full second line, and the ⌥-click hint.
     private var help: String {
         let detail = "\(PanelText.stateLabel(row)) · \(PanelText.rowDetail(row, showingRepository: showsRepository, now: now))"
-        return row.needsAttention ? "\(detail)\n⌥-click to mark seen" : detail
+        return row.needsAttention ? "\(detail)\n\(PanelText.optionClickHint)" : detail
     }
 
     /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
@@ -266,32 +246,6 @@ private struct ListRow: View {
         }
     }
 
-    private func checksLabel(_ checks: ChecksState) -> String {
-        switch checks {
-        case .none: ""
-        case .pending: "Checks running"
-        case .passed: "Checks passed"
-        case .failed: "Checks failed"
-        }
-    }
-}
-
-/// The row's hover highlight, one shape gliding between rows, darker while pressed.
-private struct ListRowButtonStyle: ButtonStyle {
-    let isHovered: Bool
-    let hoverSpace: Namespace.ID
-
-    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        configuration.label
-            .background {
-                if isHovered {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(configuration.isPressed ? Palette.pressed : Palette.hover)
-                        .matchedGeometryEffect(id: "hover", in: hoverSpace)
-                        .padding(.horizontal, Grid.inset)
-                }
-            }
-    }
 }
 
 /// A run's branch, after its workflow's name.
@@ -310,31 +264,6 @@ private struct BranchChip: View {
         .padding(.horizontal, 5)
         .frame(height: 16)
         .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Palette.fill))
-    }
-}
-
-/// A repository of the project that couldn't be fetched.
-private struct ListErrorRow: View {
-    let error: MenuErrorRow
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, Palette.amber)
-                .font(.system(size: 10.5))
-                .frame(width: Grid.iconColumn)
-            Text(error.message)
-                .font(TypeScale.meta)
-                .foregroundStyle(.primary.opacity(0.75))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(error.message)
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
-        .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
     }
 }
 

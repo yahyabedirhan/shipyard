@@ -1,4 +1,5 @@
 import AppKit
+import ShipyardCore
 import SwiftUI
 
 // The small pieces the frame and the layouts share, drawn from the tokens
@@ -96,6 +97,81 @@ struct Banner: View {
     }
 }
 
+// MARK: - A row's pieces
+
+/// A row's state icon: its symbol in its state's colour, a running run
+/// pulsing.
+struct StateSymbol: View {
+    let row: MenuRow
+
+    var body: some View {
+        Image(systemName: Palette.symbol(row.state, kind: row.kind))
+            .symbolRenderingMode(.hierarchical)
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(Palette.color(row.state, kind: row.kind))
+            .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
+            .accessibilityLabel(PanelText.stateLabel(row))
+    }
+}
+
+/// A pull request's check dot, cut out of what it sits on like a status
+/// badge; nothing when there are no checks.
+struct CheckDot: View {
+    let checks: ChecksState?
+
+    var body: some View {
+        if let checks, let color = Palette.color(checks) {
+            ZStack {
+                Circle().fill(Palette.panel).frame(width: 8, height: 8)
+                Circle().fill(color).frame(width: 5.5, height: 5.5)
+            }
+            .help(PanelText.checks(checks) ?? "")
+            .accessibilityLabel(PanelText.checks(checks) ?? "")
+        }
+    }
+}
+
+/// The attention dot: shown while the row needs attention, shrinking away
+/// once it's seen.
+struct AttentionDot: View {
+    let isOn: Bool
+
+    var body: some View {
+        Circle()
+            .fill(Palette.accent)
+            .frame(width: 6, height: 6)
+            .opacity(isOn ? 1 : 0)
+            .scaleEffect(isOn ? 1 : 0.2)
+            .accessibilityHidden(!isOn)
+            .accessibilityLabel(PanelText.needsAttention)
+    }
+}
+
+/// A repository of a project that couldn't be fetched, in a row's place.
+struct ErrorRow: View {
+    let error: MenuErrorRow
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, Palette.amber)
+                .font(.system(size: 10.5))
+                .frame(width: Grid.iconColumn)
+            Text(error.message)
+                .font(TypeScale.meta)
+                .foregroundStyle(.primary.opacity(0.75))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help(error.message)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
+        .padding(.trailing, Grid.gutter)
+        .frame(height: Grid.rowHeight)
+    }
+}
+
 /// A command to run in a terminal, in a box with a Copy button.
 struct CommandBox: View {
     let command: String
@@ -154,7 +230,7 @@ extension View {
 
 /// A borderless icon button with hover and pressed states.
 struct IconButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         IconButtonBody(configuration: configuration)
     }
 }
@@ -185,7 +261,7 @@ private struct IconButtonBody: View {
 struct PillButtonStyle: ButtonStyle {
     var prominent = false
 
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         PillButtonBody(configuration: configuration, prominent: prominent)
     }
 }
@@ -220,13 +296,42 @@ private struct PillButtonBody: View {
     }
 }
 
+/// A row's hover highlight: one shape gliding between the rows that share
+/// `hoverSpace`, darker while pressed.
+struct RowButtonStyle: ButtonStyle {
+    let isHovered: Bool
+    let hoverSpace: Namespace.ID
+
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        configuration.label
+            .background {
+                if isHovered {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(configuration.isPressed ? Palette.pressed : Palette.hover)
+                        .matchedGeometryEffect(id: "hover", in: hoverSpace)
+                        .padding(.horizontal, Grid.inset)
+                }
+            }
+    }
+}
+
+/// A plain button that dims and shrinks a hair while pressed (a tab).
+struct PressButtonStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
 /// A small text button ("Mark all seen", "Quit"): quiet until hovered,
 /// then tinted.
 struct TextButtonStyle: ButtonStyle {
     var tint: Color = Palette.accent
     var font: Font = TypeScale.captionEmphasis
 
-    func makeBody(configuration: Configuration) -> some View {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         TextButtonBody(configuration: configuration, tint: tint, font: font)
     }
 }

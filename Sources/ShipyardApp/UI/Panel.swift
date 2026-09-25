@@ -178,12 +178,7 @@ struct Panel: View {
         case .list:
             ListLayout(model: shipyard.menu, actions: actions.layoutActions)
         case .tabs:
-            #if SHIPYARD_TABS_LAYOUT
             TabsLayout(model: shipyard.menu, actions: actions.layoutActions)
-            #else
-            // TODO(#36): the tabs layout; until it lands, `tabs` draws the list.
-            ListLayout(model: shipyard.menu, actions: actions.layoutActions)
-            #endif
         }
     }
 

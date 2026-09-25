@@ -30,6 +30,16 @@ public enum PanelText {
     /// "#41 · shipyard · main · failed · 12m", aged from its start while
     /// running and from its finish after.
     public static func rowDetail(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
+        (detailParts(row, showingRepository: showingRepository) + [age(row.age(at: now))]).joined(separator: " · ")
+    }
+
+    /// The same second line without the age, for a layout that shows the
+    /// age apart, aligned on the right: "#21 · shipyard · yahyabedirhan".
+    public static func rowDetail(_ row: MenuRow, showingRepository: Bool) -> String {
+        detailParts(row, showingRepository: showingRepository).joined(separator: " · ")
+    }
+
+    private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
         let repository = showingRepository
             ? [row.repository.split(separator: "/").last.map(String.init) ?? row.repository]
             : []
@@ -37,7 +47,24 @@ public enum PanelText {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         }
-        return (["#\(row.number)"] + repository + subject + [age(row.age(at: now))]).joined(separator: " · ")
+        return ["#\(row.number)"] + repository + subject
+    }
+
+    /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
+    public static let markRowSeen = "Mark seen"
+    /// Said in a row's tooltip, under its URL, while it needs attention.
+    public static let optionClickHint = "⌥-click to mark seen"
+    /// What the attention dot says to VoiceOver.
+    public static let needsAttention = "Needs attention"
+
+    /// What a pull request's check dot means, for its tooltip; `nil` with no checks.
+    public static func checks(_ checks: ChecksState) -> String? {
+        switch checks {
+        case .none: nil
+        case .pending: "Checks running"
+        case .passed: "Checks passed"
+        case .failed: "Checks failed"
+        }
     }
 
     /// What the row's state icon says to VoiceOver: its state and kind,
@@ -71,6 +98,51 @@ public enum PanelText {
     public static func emptySection(_ section: MenuSection) -> String? {
         if !section.isLoaded { return "Not loaded yet" }
         return section.rows.isEmpty && section.errors.isEmpty ? "Nothing open" : nil
+    }
+
+    // MARK: - The tabs layout
+
+    /// A tab's title: "All", or its project's name.
+    public static func tabTitle(_ tab: MenuTab) -> String {
+        switch tab {
+        case .all: "All"
+        case .project(let name): name
+        }
+    }
+
+    /// The line under the tab strip: "5 need attention · 4 projects" on
+    /// All, "2 need attention" on a project's tab, and "All caught up" in
+    /// place of the count when nothing needs attention.
+    public static func tabSummary(attention: Int, projects: Int, tab: MenuTab) -> String {
+        let count = switch attention {
+        case 0: "All caught up"
+        case 1: "1 needs attention"
+        default: "\(attention) need attention"
+        }
+        guard tab == .all else { return count }
+        return "\(count) · \(projects) \(projects == 1 ? "project" : "projects")"
+    }
+
+    /// The button next to that line: All marks every project seen, a
+    /// project's tab only that project.
+    public static func markTabSeen(_ tab: MenuTab) -> String {
+        tab == .all ? "Mark all seen" : "Mark seen"
+    }
+
+    /// What a tab with no rows and no error rows says in their place, as
+    /// `emptySection` does for a section; `nil` when it has something to list.
+    public static func emptyTab(_ content: MenuTabContent) -> String? {
+        guard content.groups.isEmpty, content.errors.isEmpty else { return nil }
+        return content.isLoaded ? "Nothing open" : "Not loaded yet"
+    }
+
+    /// The small header over a kind's rows in a tab.
+    public static func kindGroup(_ kind: ItemKind) -> String {
+        switch kind {
+        case .pullRequest: "Pull requests"
+        case .issue: "Issues"
+        case .workflowRun: "Runs"
+        }
     }
 
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before

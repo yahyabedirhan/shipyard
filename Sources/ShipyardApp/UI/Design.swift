@@ -35,6 +35,12 @@ enum Grid {
     /// Rounded corners: small controls, and cards and banners.
     static let smallRadius: CGFloat = 5
     static let radius: CGFloat = 7
+    /// The tabs layout: the widest a tab's title gets, how far the strip's
+    /// ends fade where tabs are hidden past them, and how far the list
+    /// slides when the tab changes.
+    static let maxTabTitleWidth: CGFloat = 140
+    static let tabFade: CGFloat = 24
+    static let tabSlide: CGFloat = 40
 }
 
 /// The type scale: one family (SF Pro), a few sizes, weights for emphasis,
@@ -52,6 +58,8 @@ enum TypeScale {
     static let meta = Font.system(size: 11).monospacedDigit()
     /// A project's name.
     static let section = Font.system(size: 11, weight: .semibold)
+    /// A small uppercase header over a kind's rows, in the tabs layout.
+    static let eyebrow = Font.system(size: 10, weight: .semibold)
     /// The footer, and small print.
     static let caption = Font.system(size: 10.5).monospacedDigit()
     static let captionEmphasis = Font.system(size: 10.5, weight: .medium)
@@ -74,6 +82,8 @@ enum Motion {
     static let seen = Animation.easeOut(duration: 0.5)
     /// Hover and press highlights.
     static let hover = Animation.easeOut(duration: 0.12)
+    /// The tabs layout's selected pill sliding, and its list following.
+    static let tab = Animation.spring(response: 0.36, dampingFraction: 0.86)
 }
 
 /// The colours, each resolving for light or dark: GitHub's colours for the
@@ -107,6 +117,11 @@ enum Palette {
     static let pressed = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.12)
     /// A card's, command box's or chip's fill.
     static let fill = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.045, darkAlpha: 0.06)
+    /// The tabs layout's strip, sunk under its pills.
+    static let track = dynamic(light: 0xE8E8EB, dark: 0x18181A)
+    /// The selected tab's pill, raised off the track, and its shadow.
+    static let raised = dynamic(light: 0xFFFFFF, dark: 0x3F3F44)
+    static let raisedShadow = dynamic(light: 0x000000, dark: 0x000000, lightAlpha: 0.08, darkAlpha: 0.35)
 
     // MARK: What the model says
 

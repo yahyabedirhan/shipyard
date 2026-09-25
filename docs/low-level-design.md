@@ -397,17 +397,20 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               as a chip), author (the repository in multi-repository projects), age; a line where
                               the kind changes; the tooltip holds the state and the full "#21 · …" detail;
                               click opens and marks seen, ⌥-click marks seen only
-        <TabsLayout>          (Layouts/) "tabs": one project at a time (#36)
+        <TabsLayout>          (Layouts/) "tabs": a pill strip (All, one tab per project, attention counts), the
+                              line under it with Mark all seen or Mark seen, the tab's rows grouped by kind (#36)
       <SkillInstallCard>      above the footer, after the gear menu's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
       footer                  last updated · global "Mark all seen" · Quit (⌘Q) · rate limit lines, each with a bar
                               (amber low, red exhausted)
 ```
 
-The frame and the layouts share `Design.swift`'s tokens (the spacing `Grid`, the `TypeScale`, the `Palette` of state and surface colours for light and dark, and `Motion`) and `Components.swift`'s pieces (`MeasuredScrollView`, `Banner`, `CountBadge`, `CommandBox`, the icon, pill and text button styles). A layout is a view `(model: MenuModel, actions: LayoutActions)`; `LayoutActions` (`open`, `markSeen`, `markAllSeen`, `toggleCollapsed`) comes from `AppServices`, and a layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
+The frame and the layouts share `Design.swift`'s tokens (the spacing `Grid`, the `TypeScale`, the `Palette` of state and surface colours for light and dark, and `Motion`) and `Components.swift`'s pieces (`MeasuredScrollView`, `Banner`, `CountBadge`, `CommandBox`; a row's `StateSymbol`, `CheckDot`, `AttentionDot` and `ErrorRow`; the row, press, icon, pill and text button styles), so the two layouts look like one app. A layout is a view `(model: MenuModel, actions: LayoutActions)`; `LayoutActions` (`open`, `markSeen`, `markAllSeen`, `toggleCollapsed`) comes from `AppServices`, and a layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
 
 `ConnectView` draws `PanelText.connect(signedOutReason)`: the app's icon and a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The header's gear menu has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
 
 The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one), a state's word and the state icon's VoiceOver label, the header ("Shipyard", "3 need attention"), "Last updated 5 min ago", the configuration, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel only rereads the notification permission (it doesn't refresh), ⌘R is the header's Refresh button, and `layoutActions` hands the layouts their `LayoutActions`. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation`.
+
+`TabsLayout` (`UI/Layouts/`, `[menu] layout = "tabs"`) is the ready state's body built from the `MenuModel` and `LayoutActions`: a pill strip with All and one tab per project, each with its attention count (All's is the model's attention count, so a row listed in two projects counts once); under it "5 need attention · 4 projects" (a project's tab leaves out the project count) with Mark all seen, or Mark seen for one project; then the tab's error rows and its rows grouped under Pull requests, Issues and Runs (All: every project's rows in project order, each row once, naming the repository once there's more than one project), each with its age on the right. The rules live in `MenuTabs.swift` (`tabs`, `attentionCount(for:)`, `resolved(_:)`, `tabContent(for:)`) and the words in `PanelText`. The selected tab is view state, kept while the menu is open, and falls back to All when its project leaves the configuration. More tabs than fit scroll sideways: choosing one scrolls it into view, and an end fades while tabs are hidden past it. The strip and the list are measured and fixed in height, like the list layout (#27, `MeasuredScrollView`).
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -475,6 +478,7 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
+│   │   ├── MenuTabs.swift            # pure: the tabs layout's tabs, their counts, the selection's fallback to All, a tab's rows grouped by kind
 │   │   └── PanelText.swift           # pure: row age and second line, a state's word and the state icon's VoiceOver label, "Last updated N min ago", config, fetch error, refresh-delay and notifications-off banners, rate-limit lines, the connect screen's words, the picker's Add button and summary, the skill install card
 │   ├── Onboarding/
 │   │   └── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
@@ -493,12 +497,12 @@ shipyard/
 │   └── UI/
 │       ├── Panel.swift               # the shared frame: header, banners, phase switch, layout switch, footer
 │       ├── Design.swift              # design tokens: spacing grid, type scale, Palette (state and surface colours, light/dark), motion
-│       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, button styles
+│       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, button styles
 │       ├── SkillInstallCard.swift    # the skill install: offer, Cancel, result, command to copy
 │       ├── Layouts/
-│       │   ├── LayoutActions.swift   # what a layout can do: open, mark seen, mark all seen, collapse
+│       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, mark all seen, collapse
 │       │   ├── ListLayout.swift      # [menu] layout = "list": pinned project headers, one line per item
-│       │   └── TabsLayout.swift      # [menu] layout = "tabs" (#36)
+│       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows grouped by kind
 │       └── Onboarding/
 │           ├── ConnectView.swift     # why signed out, the gh command to copy, Try again
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
