@@ -63,6 +63,8 @@ struct RateLimitTests {
         #expect(harness.timer.armed == pausedFor)
         #expect(shipyard.menu.rateIndicator?.level == .exhausted)
         #expect(shipyard.menu.rateIndicator?.apis.first?.remaining == 0)
+        // The pause banner says why; the fetch error's banner doesn't repeat it.
+        #expect(shipyard.menu.bannerFetchError == nil)
         #expect(shipyard.menu.sections == rows)
         #expect(shipyard.menu.lastUpdated == Harness.now.addingTimeInterval(120))
         #expect(!shipyard.menu.canRefreshNow)
@@ -129,6 +131,7 @@ struct RateLimitTests {
         #expect(harness.shipyard.fetchError == .secondaryLimit(retryAfter: 30))
         #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.now.addingTimeInterval(30), reason: .secondaryLimit))
         #expect(harness.timer.armed == 30)
+        #expect(harness.shipyard.menu.bannerFetchError == nil)
         await harness.shipyard.refresh()
         #expect(harness.graphQLRequests.count == 2)
 

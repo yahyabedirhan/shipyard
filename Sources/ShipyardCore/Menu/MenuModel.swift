@@ -48,6 +48,17 @@ public struct MenuModel: Equatable, Sendable {
     /// Whether ⌘R and the Refresh button work: not while paused.
     public var canRefreshNow: Bool { !(refreshDelay?.isPaused ?? false) }
 
+    /// The fetch error the panel's banner shows: `fetchError`, unless it's a
+    /// rate limit that paused refreshing, which the pause banner explains.
+    public var bannerFetchError: GitHubError? {
+        switch fetchError {
+        case .rateLimited, .secondaryLimit:
+            canRefreshNow ? fetchError : nil
+        default:
+            fetchError
+        }
+    }
+
     /// Before anything was fetched.
     public static let empty = MenuModel()
 
@@ -79,7 +90,8 @@ public struct MenuModel: Equatable, Sendable {
                         .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
                         .first
                         .map(MenuErrorRow.init)
-                }
+                },
+                showsRepository: project.repositories.count > 1
             )
         }
         var model = MenuModel(sections: sections, lastUpdated: snapshot.fetchedAt)
@@ -136,6 +148,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     public var rows: [MenuRow]
     /// One per repository of this project that couldn't be fetched.
     public var errors: [MenuErrorRow]
+    /// Whether a row's second line names its repository: only when the
+    /// project has more than one.
+    public var showsRepository: Bool
     /// Rows in this section needing attention, for its header.
     public var attentionCount: Int
     /// Whether the user collapsed it. Its rows are still here, and still
@@ -144,10 +159,18 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
 
     public var id: String { name }
 
-    public init(name: String, rows: [MenuRow], errors: [MenuErrorRow] = [], attentionCount: Int = 0, isCollapsed: Bool = false) {
+    public init(
+        name: String,
+        rows: [MenuRow],
+        errors: [MenuErrorRow] = [],
+        showsRepository: Bool = false,
+        attentionCount: Int = 0,
+        isCollapsed: Bool = false
+    ) {
         self.name = name
         self.rows = rows
         self.errors = errors
+        self.showsRepository = showsRepository
         self.attentionCount = attentionCount
         self.isCollapsed = isCollapsed
     }

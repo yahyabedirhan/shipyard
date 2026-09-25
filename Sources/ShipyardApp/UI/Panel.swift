@@ -52,7 +52,14 @@ struct Panel: View {
     private func sections(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(shipyard.menu.sections) { section in
-                ProjectSection(section: section, now: now) { shipyard.open($0) }
+                ProjectSection(
+                    section: section,
+                    now: now,
+                    open: { shipyard.open($0) },
+                    markSeen: { shipyard.markSeen($0) },
+                    markAllSeen: { shipyard.markAllSeen(project: section.name) },
+                    toggleCollapsed: { shipyard.toggleCollapsed(section.name) }
+                )
             }
         }
         .padding(6)
@@ -76,9 +83,22 @@ struct Panel: View {
         if let error = shipyard.configError {
             banner(PanelText.configError(error), symbol: "exclamationmark.octagon.fill", color: Palette.red)
         }
-        if shipyard.phase == .ready, let error = shipyard.menu.fetchError {
-            // The rows are kept; the footer says how old they are.
-            banner(PanelText.fetchError(error), symbol: "wifi.exclamationmark", color: Palette.amber)
+        if shipyard.phase == .ready {
+            let menu = shipyard.menu
+            if let text = PanelText.refreshDelay(
+                menu.refreshDelay,
+                sharePercent: shipyard.configStore.lastValid.rateLimit.maxSharePercent
+            ) {
+                if menu.canRefreshNow {
+                    banner(text, symbol: "tortoise.fill", color: Palette.amber)
+                } else {
+                    banner(text, symbol: "pause.circle.fill", color: Palette.red)
+                }
+            }
+            if let error = menu.bannerFetchError {
+                // The rows are kept; the footer says how old they are.
+                banner(PanelText.fetchError(error), symbol: "wifi.exclamationmark", color: Palette.amber)
+            }
         }
     }
 
@@ -106,13 +126,22 @@ struct Panel: View {
                 } else if let updated = PanelText.lastUpdated(shipyard.menu.lastUpdated, now: now) {
                     Text(updated)
                 }
+                Spacer()
+                if shipyard.phase == .ready, shipyard.menu.attention.total > 0 {
+                    Button("Mark all seen") { shipyard.markAllSeen() }
+                        .buttonStyle(.link)
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            if shipyard.phase == .ready, let indicator = shipyard.menu.rateIndicator {
+                rateIndicator(indicator)
+            }
             HStack(spacing: 12) {
                 Button("Refresh", action: actions.refresh)
                     .keyboardShortcut("r")
-                    .disabled(!shipyard.canRefreshNow || shipyard.phase != .ready)
+                    // The model's pause, as the banner and the menu bar icon show it.
+                    .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
                 Button("Open configuration file", action: actions.openConfigurationFile)
                 // Once signed in: while `start()` still asks GitHub, the
                 // token is picked but the panel says it's connecting.
@@ -127,5 +156,20 @@ struct Panel: View {
             .font(.callout)
         }
         .padding(10)
+    }
+
+    /// Remaining / limit and the reset time per API, amber when low and
+    /// red when exhausted (the worst API's level colours the whole indicator).
+    private func rateIndicator(_ indicator: RateIndicator) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "gauge.with.dots.needle.33percent")
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(indicator.apis, id: \.api) { usage in
+                    Text(PanelText.rateUsage(usage))
+                }
+            }
+        }
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(Palette.color(indicator.level))
     }
 }

@@ -10,6 +10,16 @@ public enum PanelText {
         return "\(count)\(unit.prefix(1))"
     }
 
+    /// A row's second line: "#21 · shipyard · yahyabedirhan · 37m", naming
+    /// the repository (without its owner) only when `showingRepository`
+    /// (its project has more than one): "#21 · yahyabedirhan · 37m".
+    public static func rowDetail(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
+        let repository = showingRepository
+            ? [row.repository.split(separator: "/").last.map(String.init) ?? row.repository]
+            : []
+        return (["#\(row.number)"] + repository + [row.author, age(row.age(at: now))]).joined(separator: " · ")
+    }
+
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before
     /// the first refresh succeeded.
     public static func lastUpdated(_ date: Date?, now: Date) -> String? {
@@ -49,6 +59,69 @@ public enum PanelText {
         case .rateLimited(_, let api): "The \(api.name) rate limit ran out."
         case .secondaryLimit: "GitHub asked shipyard to slow down."
         }
+    }
+
+    // MARK: - The rate limit
+
+    /// One API's line in the footer: "GraphQL 4,850 / 5,000 · resets 16:42".
+    public static func rateUsage(_ usage: RateUsage, locale: Locale = .current, timeZone: TimeZone = .current) -> String {
+        let numbers = NumberFormatter()
+        numbers.locale = locale
+        numbers.numberStyle = .decimal
+        let count = { (value: Int) in numbers.string(from: NSNumber(value: value)) ?? String(value) }
+        return "\(usage.api.name) \(count(usage.remaining)) / \(count(usage.limit)) · resets \(clockTime(usage.resetAt, locale: locale, timeZone: timeZone))"
+    }
+
+    /// The banner for a refresh delay that isn't the configured interval:
+    /// why it's stretched (to stay within `sharePercent`, `[rate-limit]
+    /// max-share-percent`), backed off or paused, and until when; `nil` for
+    /// the configured interval or before the first refresh.
+    public static func refreshDelay(
+        _ delay: RefreshDelay?,
+        sharePercent: Int,
+        locale: Locale = .current,
+        timeZone: TimeZone = .current
+    ) -> String? {
+        switch delay {
+        case nil, .configured:
+            return nil
+        case .stretched(let seconds, let api, let cost):
+            let cost = Int(cost.rounded())
+            let unit = switch api {
+            case .graphql: cost == 1 ? "point" : "points"
+            case .rest: cost == 1 ? "request" : "requests"
+            }
+            return "Refreshing every \(interval(seconds)) to stay within \(sharePercent)% of your \(api.name) rate limit (a refresh costs \(cost) \(unit))."
+        case .backedOff(let seconds, let api):
+            return "Your \(api.name) rate limit is low (other tools are using it). Refreshing every \(interval(seconds))."
+        case .paused(let until, let reason):
+            let why = switch reason {
+            case .exhausted(let api): "\(api.name) rate limit reached"
+            case .secondaryLimit: "GitHub asked shipyard to slow down"
+            }
+            return "\(why) · updates resume at \(clockTime(until, locale: locale, timeZone: timeZone))"
+        }
+    }
+
+    /// An interval in whole minutes, rounded up: "4 min", "1 h", "1 h 30 min".
+    private static func interval(_ seconds: TimeInterval) -> String {
+        let minutes = max(1, Int((seconds / 60).rounded(.up)))
+        let (hours, rest) = minutes.quotientAndRemainder(dividingBy: 60)
+        switch (hours, rest) {
+        case (0, _): return "\(rest) min"
+        case (_, 0): return "\(hours) h"
+        default: return "\(hours) h \(rest) min"
+        }
+    }
+
+    /// A time of day the way the user's clock shows it, e.g. "16:42".
+    private static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 
     // MARK: - The connect screen

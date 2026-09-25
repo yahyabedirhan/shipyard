@@ -60,6 +60,64 @@ struct PanelTextTests {
         #expect(PanelText.fetchError(error) == text)
     }
 
+    // MARK: - Rows
+
+    private func row(repository: String = "yahyabedirhan/shipyard", number: Int = 21, author: String = "yahyabedirhan") -> MenuRow {
+        MenuRow(Item(
+            kind: .pullRequest,
+            repository: repository,
+            number: number,
+            title: "Attention in the panel",
+            url: URL(string: "https://github.com/\(repository)/pull/\(number)")!,
+            author: author,
+            authorKind: .me,
+            state: .open,
+            createdAt: now.addingTimeInterval(-37 * 60),
+            updatedAt: now.addingTimeInterval(-37 * 60)
+        ))
+    }
+
+    @Test("a row's second line names the repository only in a project with more than one")
+    func rowDetail() {
+        #expect(PanelText.rowDetail(row(), showingRepository: true, now: now) == "#21 · shipyard · yahyabedirhan · 37m")
+        #expect(PanelText.rowDetail(row(), showingRepository: false, now: now) == "#21 · yahyabedirhan · 37m")
+    }
+
+    // MARK: - The rate limit
+
+    private let london = TimeZone(identifier: "Europe/London")!
+    private let british = Locale(identifier: "en_GB")
+    /// 12:42 UTC, 13:42 in London (summer time).
+    private var reset: Date { now.addingTimeInterval(42 * 60) }
+
+    @Test("the footer's rate-limit line: remaining / limit per API and when it resets")
+    func rateUsage() {
+        let usage = RateUsage(api: .graphql, remaining: 4850, limit: 5000, resetAt: reset, level: .normal)
+        #expect(PanelText.rateUsage(usage, locale: british, timeZone: london) == "GraphQL 4,850 / 5,000 · resets 13:42")
+        let rest = RateUsage(api: .rest, remaining: 0, limit: 5000, resetAt: reset, level: .exhausted)
+        #expect(PanelText.rateUsage(rest, locale: british, timeZone: london) == "REST 0 / 5,000 · resets 13:42")
+    }
+
+    @Test("the banner says why refreshing is slower or stopped; nothing at the configured interval", arguments: [
+        (RefreshDelay?.none, nil),
+        (.configured(120), nil),
+        (.stretched(216, api: .graphql, cost: 3),
+         "Refreshing every 4 min to stay within 10% of your GraphQL rate limit (a refresh costs 3 points)."),
+        (.stretched(5400, api: .rest, cost: 1),
+         "Refreshing every 1 h 30 min to stay within 10% of your REST rate limit (a refresh costs 1 request)."),
+        (.stretched(90, api: .rest, cost: 12.4),
+         "Refreshing every 2 min to stay within 10% of your REST rate limit (a refresh costs 12 requests)."),
+        (.backedOff(600, api: .graphql),
+         "Your GraphQL rate limit is low (other tools are using it). Refreshing every 10 min."),
+        (.paused(until: Date(timeIntervalSince1970: 1_790_340_120), reason: .exhausted(.graphql)),
+         "GraphQL rate limit reached · updates resume at 13:42"),
+        (.paused(until: Date(timeIntervalSince1970: 1_790_340_120), reason: .secondaryLimit),
+         "GitHub asked shipyard to slow down · updates resume at 13:42"),
+    ] as [(RefreshDelay?, String?)])
+    func refreshDelay(delay: RefreshDelay?, text: String?) {
+        #expect(PanelText.refreshDelay(delay, sharePercent: 10, locale: british, timeZone: london) == text)
+    }
+
     // MARK: - The connect screen
 
     @Test("with no gh token the connect screen says to install gh and run gh auth login")

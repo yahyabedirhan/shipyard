@@ -57,7 +57,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Token missing or rejected (401) | Go to the signed-out state → onboarding's connect step, which says why (no `gh` token, or GitHub rejected it) and to run `gh auth login`. |
 | One repository not found or not accessible | That project shows an error row for it; other repositories and projects still show. |
 | Network down / GitHub 5xx | Keep the last items, show "Last updated 4 min ago · can't reach GitHub" in the panel. Retry on the next trigger. |
-| Rate limit exhausted: GraphQL answers **200** with a rate-limit error and `x-ratelimit-remaining: 0`; REST answers 403/429 | Keep the last items; banner "Rate limit reached · updates resume at 16:42"; the reset time comes from the response (`resetAt` / `x-ratelimit-reset`), not ghbar's one-hour guess. |
+| Rate limit exhausted: GraphQL answers **200** with a rate-limit error and `x-ratelimit-remaining: 0`; REST answers 403/429 | Keep the last items; banner "GraphQL rate limit reached · updates resume at 16:42" (`PanelText.refreshDelay`); the reset time comes from the response (`resetAt` / `x-ratelimit-reset`), not ghbar's one-hour guess. |
 | Secondary rate limit (403/429 with `retry-after`) | Wait `retry-after` seconds, then resume; banner says so. |
 | `npx` not found | Show the command with a Copy button instead of running it. |
 
@@ -356,7 +356,7 @@ Wraps `UNUserNotificationCenter`: asks permission on the first notification (not
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot, config, appState, now) -> MenuModel`: sections per project in configuration order, items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); `lastUpdated` and `fetchError` for the banner; `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(snapshot, config, appState, now) -> MenuModel`: sections per project in configuration order, items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
 ### UI — `ShipyardApp/UI/`
 
@@ -364,21 +364,24 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 ```tsx
 <ShipyardApp> (ShipyardApp/ShipyardApp.swift)
-  <MenuBarExtra label={<MenuBarLabel count>}>
+  <MenuBarExtra label={<MenuBarLabelView>}>   icon (a pause glyph while paused) + menuBarLabel.text
     <Panel>                                   switch shipyard.phase
       signedOut              → <ConnectView>  (Onboarding/)
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
       needsProjects          → <ProjectPicker>(Onboarding/)
       ready →
-        <StatusBanner>        config error · fetch error · rate limit paused/backed off · last updated
-        <ProjectSection> ×N   collapsible header with attention count, "Mark all seen"
-          <ItemRow> ×N        colour dot, #number, title, author, age, check dot
-        <PanelFooter>         rate limit indicator · Refresh · Open configuration file · Install agent skill… · Sign out (once signed in) · Quit
+        banners               config error · refresh delay (stretched, backed off: amber; paused: red) · fetch error
+        <ProjectSection> ×N   header: chevron (click collapses/expands), name, attention count, "Mark all seen"
+          <ItemRow> ×N        attention dot, state icon, title (semibold when it needs attention),
+                              "#21 · shipyard · author · 37m" (repository only in multi-repository projects), check dot;
+                              click opens and marks seen, ⌥-click marks seen only
+        footer                last updated · global "Mark all seen" · rate limit indicator (amber low, red exhausted) ·
+                              Refresh · Open configuration file · Install agent skill… · Sign out (once signed in) · Quit
 ```
 
-`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; the footer's rate-limit indicator (#15) and Install agent skill… (#18) come with their tickets.
+`ConnectView` draws `PanelText.connect(signedOutReason)`: a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The footer has Sign out once signed in (not while `start()` is still connecting). Until #18, `needsProjects` points at the configuration file; Install agent skill… (#18) comes with its ticket.
 
-The words the panel shows (a row's age, "Last updated 5 min ago", the configuration and fetch error banners, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
+The words the panel shows (a row's age and second line, "Last updated 5 min ago", the configuration, fetch error and refresh-delay banners, the rate-limit lines, the connect screen) come from `PanelText` in `ShipyardCore/Menu/`, so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel refreshes, and ⌘R is the footer's Refresh button.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
@@ -446,7 +449,7 @@ shipyard/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   └── PanelText.swift           # pure: row age, "Last updated N min ago", config and fetch error banners, the connect screen's words
+│   │   └── PanelText.swift           # pure: row age and second line, "Last updated N min ago", config, fetch error and refresh-delay banners, rate-limit lines, the connect screen's words
 │   └── Skill/
 │       └── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port), SkillInstallResult
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
@@ -551,7 +554,7 @@ Two separate hourly limits, both 5,000 for a signed-in user, and **both shared w
 | REST runs, 10 repositories, nothing changed (304) | 10 requests, 0 counted | 0 | 0% |
 | REST runs, 10 repositories, all changed | 10 requests | 300 | 6% |
 
-GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists (`reviewRequests`, last commit's checks) dominate it. To keep it low, `reviewRequests` asks for `first: 10` and the head commit for `last: 1`, and closed items for `first: 20`. The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it. The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table. So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your rate limit".
+GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists (`reviewRequests`, last commit's checks) dominate it. To keep it low, `reviewRequests` asks for `first: 10` and the head commit for `last: 1`, and closed items for `first: 20`. The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it. The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table. So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your GraphQL rate limit (a refresh costs 56 points)".
 
 ### Trace 1: an agent opens a PR (happy path)
 
@@ -588,7 +591,7 @@ Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agent
 |---|---|---|
 | 1 | refresh → `fetch` returns `graphql.remaining = 900 / 5,000` (18%) | snapshot fine |
 | 2 | `RateBudget.nextDelay(120, 10%)` | below 20% → `backedOff(600 s)` |
-| 3 | `Panel` | amber footer `GraphQL 900 / 5,000 · resets 16:42`, banner "Your rate limit is low (other tools are using it). Refreshing every 10 min." |
+| 3 | `Panel` | amber footer `GraphQL 900 / 5,000 · resets 16:42`, banner "Your GraphQL rate limit is low (other tools are using it). Refreshing every 10 min." |
 | 4 | agents keep going; next refresh gets 403, `x-ratelimit-remaining: 0`, `x-ratelimit-reset` = 16:42 | `pausedUntil = 16:42`, `fetchError = rateLimited` |
 | 5 | menu bar icon shows the paused glyph; ⌘R does nothing and says why | last snapshot still listed, "Last updated 14 min ago" |
 | 6 | 16:42: timer armed for `pausedUntil` fires | quota back to 5,000; next delay 120 s; banner gone |

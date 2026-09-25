@@ -35,6 +35,16 @@ enum Palette {
         }
     }
 
+    /// The rate-limit indicator: normal in the secondary colour, low
+    /// amber, exhausted red.
+    static func color(_ level: RateLevel) -> Color {
+        switch level {
+        case .normal: .secondary
+        case .low: amber
+        case .exhausted: red
+        }
+    }
+
     /// The row's icon (SF Symbols has no GitHub octicons).
     static func symbol(_ state: ItemState, kind: ItemKind) -> String {
         switch (kind, state) {

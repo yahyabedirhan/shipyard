@@ -1,22 +1,34 @@
+import AppKit
 import ShipyardCore
 import SwiftUI
 
-/// One item: its state icon in GitHub's colour, number and title, author
-/// and age, and the check dot. Clicking opens it in the browser.
+/// One item: a dot when it needs attention, its state icon in GitHub's
+/// colour, number and title, author and age, and the check dot. Clicking
+/// opens it in the browser and marks it seen; ⌥-click only marks it seen.
 struct ItemRow: View {
     let row: MenuRow
+    /// Whether the second line names the repository (its project has more than one).
+    let showsRepository: Bool
     let now: Date
     let open: () -> Void
+    let markSeen: () -> Void
     @State private var isHovered = false
 
     var body: some View {
-        Button(action: open) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        Button(action: click) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Circle()
+                    .fill(row.needsAttention ? Color.accentColor : .clear)
+                    .frame(width: 6, height: 6)
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                    .accessibilityHidden(!row.needsAttention)
+                    .accessibilityLabel("Needs attention")
                 Image(systemName: Palette.symbol(row.state, kind: row.kind))
                     .foregroundStyle(Palette.color(row.state, kind: row.kind))
                     .frame(width: 14)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.title)
+                        .fontWeight(row.needsAttention ? .semibold : .regular)
                         .lineLimit(1)
                         .truncationMode(.tail)
                     Text(detail)
@@ -32,7 +44,8 @@ struct ItemRow: View {
                         .help(checksHelp(checks))
                 }
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 4)
+            .padding(.trailing, 8)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
             .background(
@@ -41,14 +54,21 @@ struct ItemRow: View {
             )
         }
         .buttonStyle(.plain)
+        // ⌥-click's equivalent for the keyboard and VoiceOver.
+        .accessibilityAction(named: "Mark seen", markSeen)
         .onHover { isHovered = $0 }
-        .help(row.url.absoluteString)
+        .help(row.needsAttention ? "\(row.url.absoluteString)\n⌥-click to mark seen" : row.url.absoluteString)
     }
 
-    /// "#12 · owner/repo · yabepa · 3h".
+    /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
+    private func click() {
+        let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
+        if flags.contains(.option) { markSeen() } else { open() }
+    }
+
+    /// "#21 · shipyard · yahyabedirhan · 37m", or without the repository.
     private var detail: String {
-        let repository = row.repository.split(separator: "/").last.map(String.init) ?? row.repository
-        return ["#\(row.number)", repository, row.author, PanelText.age(row.age(at: now))].joined(separator: " · ")
+        PanelText.rowDetail(row, showingRepository: showsRepository, now: now)
     }
 
     private func checksHelp(_ checks: ChecksState) -> String {

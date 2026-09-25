@@ -62,6 +62,14 @@ struct RefreshTests {
         #expect(menu.fetchError == nil)
     }
 
+    @Test("a row names its repository only in a project with more than one")
+    func repositoryShownInMultiRepositoryProjects() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests())
+
+        #expect(harness.section("e-commerce")?.showsRepository == true)
+        #expect(harness.section("job-search")?.showsRepository == false)
+    }
+
     @Test("rows carry number, title, author, age, URL, state and, for open pull requests, a check state")
     func rows() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
@@ -206,6 +214,7 @@ struct RefreshTests {
             Issue.record("expected a network error, got \(String(describing: after.fetchError))")
             return
         }
+        #expect(after.bannerFetchError == after.fetchError)
         #expect(harness.shipyard.phase == .ready)
 
         harness.clock.advance(by: 120)
