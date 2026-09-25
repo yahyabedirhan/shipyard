@@ -8,6 +8,8 @@ import Foundation
 /// switchable in `[attention]`. Seeing an item clears all of them until its
 /// fingerprint changes again, whoever made the change (the user's own pushes,
 /// made by their agents, count). Closed and merged items never need attention.
+/// A workflow run needs attention only once it failed (its `checks` are
+/// failed too, so `checks-failed` covers it); running and succeeded runs never do.
 ///
 /// The rule is keyed on `Item`, so pull requests, issues and workflow runs
 /// share it; `counts` splits by kind.
@@ -51,9 +53,10 @@ public struct Attention: Equatable, Sendable {
     }
 
     /// Whether an item in this state may need attention at all: open ones
-    /// only (drafts included). Closed and merged never do.
+    /// (drafts included) and failed workflow runs. Closed, merged, running
+    /// and succeeded never do.
     static func canNeedAttention(_ item: Item) -> Bool {
-        item.state.isOpen
+        item.state.isOpen || item.state == .failed
     }
 
     /// Records the version of `item` the user has seen now.

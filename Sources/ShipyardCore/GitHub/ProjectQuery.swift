@@ -9,6 +9,13 @@ struct RepositoryRequest: Equatable, Sendable {
     /// Whether any project with this repository shows issues. Only then does
     /// the query ask for its issues, so repositories without them cost nothing more.
     var issues: Bool = false
+    /// The widest `finished-window-hours` of the projects with this
+    /// repository that show workflow runs; `nil` when none does. Runs come
+    /// from REST, not this query.
+    var runsWindowHours: Int? = nil
+    /// Whether a project keeps this repository's runs only on the default
+    /// branch and open pull requests' heads: then the query asks for both.
+    var runBranches: Bool = false
 
     var owner: String { String(slug.split(separator: "/", maxSplits: 1)[0]) }
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
@@ -36,16 +43,17 @@ enum ProjectQuery {
         for project in projects {
             for slug in project.repositories {
                 let key = slug.lowercased()
-                if let at = index[key] {
-                    requests[at].pullRequests = requests[at].pullRequests || project.pullRequests.show
-                    requests[at].issues = requests[at].issues || project.issues.show
-                } else {
-                    index[key] = requests.count
-                    requests.append(RepositoryRequest(
-                        slug: slug,
-                        pullRequests: project.pullRequests.show,
-                        issues: project.issues.show
-                    ))
+                let at = index[key] ?? requests.count
+                if at == requests.count {
+                    index[key] = at
+                    requests.append(RepositoryRequest(slug: slug, pullRequests: false))
+                }
+                requests[at].pullRequests = requests[at].pullRequests || project.pullRequests.show
+                requests[at].issues = requests[at].issues || project.issues.show
+                let runs = project.workflowRuns
+                if runs.show {
+                    requests[at].runsWindowHours = max(requests[at].runsWindowHours ?? 0, runs.finishedWindowHours)
+                    requests[at].runBranches = requests[at].runBranches || runs.branches == .defaultAndPullRequests
                 }
             }
         }
@@ -64,6 +72,17 @@ enum ProjectQuery {
             .joined(separator: ", ")
         let fields = repositories.enumerated().map { index, repository in
             var selection = "    nameWithOwner\n"
+            if repository.runBranches {
+                selection += "    defaultBranchRef { name }\n"
+                if !repository.pullRequests {
+                    selection += """
+                            openPullRequestHeads: pullRequests(states: OPEN, first: \(openFirst), orderBy: {field: UPDATED_AT, direction: DESC}) {
+                              nodes { headRefName }
+                            }
+
+                        """
+                }
+            }
             if repository.pullRequests {
                 selection += """
                         openPullRequests: pullRequests(states: OPEN, first: \(openFirst), orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -98,7 +117,7 @@ enum ProjectQuery {
             text += """
 
                 fragment PullRequestFields on PullRequest {
-                  number title url isDraft state createdAt updatedAt closedAt mergedAt
+                  number title url isDraft state createdAt updatedAt closedAt mergedAt headRefName
                   author { login __typename }
                   comments { totalCount }
                   reviews { totalCount }
@@ -153,6 +172,9 @@ enum ProjectQuery {
         var rateLimit: RateLimit?
         /// GitHub said the GraphQL limit ran out (status 200, `RATE_LIMITED`).
         var rateLimited = false
+        /// Per repository slug that asked (`runBranches`): its default branch
+        /// and open pull requests' heads, for the runs' branch filter.
+        var branches: [String: RunBranches] = [:]
     }
 
     /// Reads GitHub's answer. A body that isn't GraphQL's shape throws
@@ -187,6 +209,7 @@ enum ProjectQuery {
             let alias = alias(index)
             if let node = payload.repositories[alias] ?? nil {
                 parsed.items[repository.slug] = node.items(in: repository.slug, viewer: viewer)
+                if repository.runBranches { parsed.branches[repository.slug] = node.branches }
             } else {
                 let error = errors.first { $0.path?.first == .key(alias) }
                 parsed.errors[repository.slug] = RepositoryError(
@@ -276,6 +299,17 @@ enum ProjectQuery {
         var closedPullRequests: Nodes<PullRequestNode>?
         var openIssues: Nodes<IssueNode>?
         var closedIssues: Nodes<IssueNode>?
+        var defaultBranchRef: BranchNode?
+        var openPullRequestHeads: Nodes<HeadNode>?
+
+        struct BranchNode: Decodable { var name: String }
+        struct HeadNode: Decodable { var headRefName: String? }
+
+        var branches: RunBranches {
+            let heads = (openPullRequests?.present ?? []).compactMap(\.headRefName)
+                + (openPullRequestHeads?.present ?? []).compactMap(\.headRefName)
+            return RunBranches(defaultBranch: defaultBranchRef?.name, pullRequestHeads: Set(heads))
+        }
 
         func items(in repository: String, viewer: String?) -> [Item] {
             let pullRequests = (openPullRequests?.present ?? []) + (closedPullRequests?.present ?? [])
@@ -316,6 +350,7 @@ enum ProjectQuery {
         var updatedAt: Date
         var closedAt: Date?
         var mergedAt: Date?
+        var headRefName: String?
         var author: AuthorNode?
         var comments: Count?
         var reviews: Count?

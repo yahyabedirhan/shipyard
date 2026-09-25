@@ -82,6 +82,19 @@ struct AttentionRuleTests {
         #expect(!attention.needsAttention(item(state: state, checks: .failed, reviewRequested: true), toggles: Toggles()))
     }
 
+    @Test("a failed run needs attention until seen, by `unseen` or `checks-failed`; running and succeeded runs never do")
+    func runs() {
+        var attention = Attention()
+        let failed = item(kind: .workflowRun, state: .failed, checks: .failed)
+        #expect(attention.needsAttention(failed, toggles: Toggles()))
+        #expect(attention.needsAttention(failed, toggles: Toggles(unseen: false)))
+        #expect(!attention.needsAttention(failed, toggles: Toggles(unseen: false, checksFailed: false)))
+        #expect(!attention.needsAttention(item(kind: .workflowRun, state: .running), toggles: Toggles()))
+        #expect(!attention.needsAttention(item(kind: .workflowRun, state: .succeeded, checks: .passed), toggles: Toggles()))
+        attention.markSeen(failed, at: now)
+        #expect(!attention.needsAttention(failed, toggles: Toggles()))
+    }
+
     @Test("drafts are open and can need attention")
     func drafts() {
         #expect(Attention().needsAttention(item(state: .draft), toggles: Toggles()))
@@ -91,7 +104,7 @@ struct AttentionRuleTests {
     func counts() {
         let pr = item(1)
         let counts = Attention().counts(
-            [pr, pr, item(2, kind: .issue), item(3, kind: .workflowRun), item(4, state: .merged)],
+            [pr, pr, item(2, kind: .issue), item(3, kind: .workflowRun, state: .failed, checks: .failed), item(4, state: .merged)],
             toggles: Toggles()
         )
         #expect(counts == AttentionCounts(pullRequests: 1, issues: 1, workflowRuns: 1))

@@ -60,11 +60,12 @@ public struct MenuModel: Equatable, Sendable {
             let items = (snapshot.items[project.name] ?? []).filter {
                 shows($0, settings: settings, hiddenAuthors: hidden, now: now)
             }
-            // Pull requests, then issues; each kind open first, then closed.
+            // Pull requests, then issues, then runs; each kind open (or
+            // running) first, then closed (or finished).
             let rows = kindOrder.flatMap { kind -> [Item] in
                 let ofKind = items.filter { $0.kind == kind }
-                let open = ofKind.filter(\.state.isOpen).sorted { $0.updatedAt > $1.updatedAt }
-                let closed = ofKind.filter { !$0.state.isOpen }
+                let open = ofKind.filter(\.state.isActive).sorted { $0.updatedAt > $1.updatedAt }
+                let closed = ofKind.filter { !$0.state.isActive }
                     .sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
                 return open + closed
             }
@@ -102,15 +103,16 @@ public struct MenuModel: Equatable, Sendable {
         guard settings.shows(item.kind) else { return false }
         if hiddenAuthors.contains(item.author.lowercased()) { return false }
         if item.state == .draft, !settings.pullRequests.drafts { return false }
-        if !item.state.isOpen {
-            let days = switch item.kind {
-            case .pullRequest: settings.pullRequests.closedWindowDays
-            case .issue: settings.issues.closedWindowDays
-            // Runs have their own window (ticket #10); none are fetched yet.
-            case .workflowRun: 0
+        if !item.state.isActive {
+            // Closed items stay for their kind's closed window in days;
+            // finished runs for `finished-window-hours`.
+            let window: TimeInterval = switch item.kind {
+            case .pullRequest: TimeInterval(settings.pullRequests.closedWindowDays) * 86_400
+            case .issue: TimeInterval(settings.issues.closedWindowDays) * 86_400
+            case .workflowRun: TimeInterval(settings.workflowRuns.finishedWindowHours) * 3600
             }
-            guard days > 0, let closedAt = item.closedAt else { return false }
-            return closedAt >= now.addingTimeInterval(-TimeInterval(days) * 86_400)
+            guard window > 0, let closedAt = item.closedAt else { return false }
+            return closedAt >= now.addingTimeInterval(-window)
         }
         return true
     }
@@ -120,9 +122,10 @@ public struct MenuModel: Equatable, Sendable {
 public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
-    /// Pull requests, then issues; within each kind, open items first (most
-    /// recently updated first), then closed ones (most recently closed
-    /// first), each kind within its own closed window.
+    /// Pull requests, then issues, then workflow runs; within each kind, open
+    /// (or running) items first (most recently updated first), then closed
+    /// (or finished) ones (most recently closed first), each kind within its
+    /// own window.
     public var rows: [MenuRow]
     /// One per repository of this project that couldn't be fetched.
     public var errors: [MenuErrorRow]
@@ -156,12 +159,16 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     public var url: URL
     /// Open, draft, merged or closed; the app colours it the way GitHub does,
     /// by kind: a pull request open green, draft gray, merged purple, closed
-    /// red; an issue (only ever open or closed) open green, closed purple.
+    /// red; an issue (only ever open or closed) open green, closed purple. A
+    /// workflow run is running, succeeded or failed.
     public var state: ItemState
+    /// A workflow run's branch; `nil` for pull requests and issues. (Its
+    /// `title` is the workflow's name.)
+    public var branch: String?
     /// The check dot, for open (and draft) pull requests; `nil` otherwise.
     public var checks: ChecksState?
-    /// What the age counts from: when it was opened, or for a closed item
-    /// when it was closed.
+    /// What the age counts from: when it was opened (a run: started), or
+    /// for a closed item (a finished run) when it was closed (finished).
     public var since: Date
     /// Whether the item needs attention (unseen, changed since seen, review
     /// requested or checks failed, as `[attention]` allows).
@@ -181,8 +188,9 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
         authorKind = item.authorKind
         url = item.url
         state = item.state
+        branch = item.branch
         checks = item.kind == .pullRequest && item.state.isOpen ? item.checks : nil
-        since = item.state.isOpen ? item.createdAt : (item.closedAt ?? item.updatedAt)
+        since = item.state.isActive ? item.createdAt : (item.closedAt ?? item.updatedAt)
     }
 
     /// How old the row is at `now`, never negative.

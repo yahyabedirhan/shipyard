@@ -51,6 +51,10 @@ public enum ItemChange: Equatable, Hashable, Sendable {
     case checksFailed
     /// More comments and reviews than before.
     case commented
+    /// A workflow run failed: found failed, or failed after it wasn't (a re-run).
+    case failed
+    /// A workflow run succeeded: found succeeded, or succeeded after it wasn't.
+    case succeeded
 
     /// Whether it can happen only once in an item's life.
     var happensOnce: Bool { self == .opened || self == .merged }
@@ -71,6 +75,8 @@ extension EventKind {
         case (.issue, .opened): .issueOpened
         case (.issue, .closed): .issueClosed
         case (.issue, .commented): .issueCommented
+        case (.workflowRun, .failed): .runFailed
+        case (.workflowRun, .succeeded): .runSucceeded
         // An issue reopened is no event (the spec lists none); its next
         // close is `issue.closed` again, as a new occurrence.
         default: nil
@@ -186,8 +192,7 @@ extension ProjectSettings {
     /// The sources a refresh fetches for this project: each repository, for
     /// each kind the project shows.
     var fetchedSources: [ItemSource] {
-        // Runs join when they're fetched (they come from REST, not this query).
-        let kinds = [ItemKind.pullRequest, .issue].filter { shows($0) }
+        let kinds = [ItemKind.pullRequest, .issue, .workflowRun].filter { shows($0) }
         return repositories.flatMap { repository in kinds.map { ItemSource(repository: repository, kind: $0) } }
     }
 }
@@ -217,8 +222,15 @@ public enum EventDetector {
 
     /// What changed from `before` (`nil` when the item wasn't known) to `item`.
     /// An item first found already closed makes nothing: it may be an old
-    /// one coming back into the closed list.
+    /// one coming back into the closed list. A workflow run is different: one
+    /// first found finished ran between two refreshes (the runs asked for are
+    /// only recent ones), so it failed or succeeded now.
     static func changes(from before: KnownItem?, to item: Item) -> [ItemChange] {
+        if item.kind == .workflowRun {
+            if item.state == .failed, before?.state != .failed { return [.failed] }
+            if item.state == .succeeded, before?.state != .succeeded { return [.succeeded] }
+            return []
+        }
         guard let before else { return item.state.isOpen ? [.opened] : [] }
         var changes: [ItemChange] = []
         if before.state.isOpen {

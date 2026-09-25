@@ -22,7 +22,8 @@ public enum NotificationRules {
             event: event.kind,
             project: event.project,
             headline: event.headline,
-            itemTitle: event.item.title,
+            // A run's title is its workflow; its branch says which change it tested.
+            itemTitle: event.item.branch.map { "\(event.item.title) · \($0)" } ?? event.item.title,
             itemURL: event.item.url
         )
     }

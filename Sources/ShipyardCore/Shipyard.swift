@@ -475,13 +475,13 @@ public final class Shipyard {
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
     }
 
-    /// Marks every open row seen, in the project named `project`, or in
-    /// every project when it's `nil`.
+    /// Marks every row that can need attention (open ones, failed runs)
+    /// seen, in the project named `project`, or in every project when it's `nil`.
     public func markAllSeen(project: String? = nil) {
         let rows = menu.sections
             .filter { project == nil || $0.name == project }
             .flatMap(\.rows)
-            .filter(\.item.state.isOpen)
+            .filter { Attention.canNeedAttention($0.item) }
         guard !rows.isEmpty else { return }
         let now = clock.now
         updateAppState { state in

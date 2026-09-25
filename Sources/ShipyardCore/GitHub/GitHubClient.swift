@@ -41,6 +41,9 @@ public struct GitHubClient: Sendable {
 
     private let token: String
     private let transport: any HTTPTransport
+    /// Each repository's last runs answer and its `ETag`, for as long as
+    /// this client (one sign-in) lives.
+    private let runCache = WorkflowRunCache()
 
     public init(token: String, transport: any HTTPTransport) {
         self.token = token
@@ -62,6 +65,15 @@ public struct GitHubClient: Sendable {
     /// GitHub can't resolve becomes an error in the snapshot while the rest
     /// load. The GraphQL limit comes from the response headers, with the
     /// body's `cost`.
+    ///
+    /// Where a project shows workflow runs, each of its repositories' runs
+    /// then come from REST, one conditional request per repository, one after
+    /// another (a `304` reuses the runs from before and doesn't count against
+    /// the limit); the REST limit comes from their headers, with the requests
+    /// that counted as its `cost`. A project keeps the runs on the branches
+    /// its `branches` allows. A repository whose runs can't be read gets an
+    /// error in the snapshot; a spent limit, a 401 or a network failure fails
+    /// the fetch.
     public func fetch(projects: [ProjectSettings], at fetchedAt: Date) async throws -> Snapshot {
         let repositories = ProjectQuery.plan(projects)
         var request = URLRequest(url: Self.graphQLURL)
@@ -85,6 +97,12 @@ public struct GitHubClient: Sendable {
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
 
+        let runs = try await workflowRuns(
+            of: repositories.filter { $0.runsWindowHours != nil && parsed.errors[$0.slug] == nil },
+            viewer: parsed.viewerLogin,
+            at: fetchedAt
+        )
+
         var items: [String: [Item]] = [:]
         var errors: [String: RepositoryError] = [:]
         let slugs = Dictionary(repositories.map { ($0.slug.lowercased(), $0.slug) }, uniquingKeysWith: { first, _ in first })
@@ -94,12 +112,24 @@ public struct GitHubClient: Sendable {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
                     errors[repository] = RepositoryError(repository: repository, kind: error.kind, message: error.message)
-                } else {
-                    projectItems += (parsed.items[slug] ?? []).filter({ project.shows($0.kind) }).map { item in
-                        var item = item
-                        item.repository = repository
-                        return item
-                    }
+                    continue
+                }
+                var found = (parsed.items[slug] ?? []).filter { project.shows($0.kind) }
+                // Runs that couldn't be read leave the pull requests and
+                // issues listed, with an error row for the runs.
+                if project.workflowRuns.show, let error = runs.errors[slug] {
+                    errors[repository] = RepositoryError(repository: repository, kind: error.kind, message: error.message)
+                } else if project.workflowRuns.show {
+                    found += WorkflowRuns.filter(
+                        runs.items[slug] ?? [],
+                        branches: project.workflowRuns.branches,
+                        known: parsed.branches[slug]
+                    )
+                }
+                projectItems += found.map { item in
+                    var item = item
+                    item.repository = repository
+                    return item
                 }
             }
             items[project.name] = projectItems
@@ -108,16 +138,77 @@ public struct GitHubClient: Sendable {
             fetchedAt: fetchedAt,
             items: items,
             errors: errors,
-            rateLimits: RateLimits(graphql: graphql),
+            rateLimits: RateLimits(graphql: graphql, rest: runs.rateLimit),
             viewerLogin: parsed.viewerLogin
         )
+    }
+
+    /// What the runs requests of one refresh found.
+    private struct RunsFetch {
+        /// Per repository slug, before any project's branch filter.
+        var items: [String: [Item]] = [:]
+        var errors: [String: RepositoryError] = [:]
+        /// The latest REST limit reported, with the requests that counted as its cost.
+        var rateLimit: RateLimit?
+    }
+
+    /// Asks for each repository's runs in turn, conditionally: a `304`
+    /// reuses the runs of the last answer to the same URL.
+    private func workflowRuns(of repositories: [RepositoryRequest], viewer: String?, at now: Date) async throws -> RunsFetch {
+        var fetch = RunsFetch()
+        var counted = 0
+        var latest: RateLimit?
+        for repository in repositories {
+            let url = WorkflowRuns.url(
+                for: repository.slug,
+                since: WorkflowRuns.since(windowHours: repository.runsWindowHours ?? 0, at: now)
+            )
+            var request = URLRequest(url: url)
+            // The ETag is ours to send; a cache in between would answer for it.
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            let cached = runCache.entry(repository.slug, url: url)
+            if let cached { request.setValue(cached.etag, forHTTPHeaderField: "If-None-Match") }
+            do {
+                let (data, response) = try await send(request, acceptingNotModified: cached != nil)
+                if let limit = RateLimit(headers: response) { latest = limit }
+                if response.statusCode == 304, let cached {
+                    fetch.items[repository.slug] = cached.runs
+                    continue
+                }
+                counted += 1
+                let runs = try WorkflowRuns.parse(data, repository: repository.slug, viewer: viewer)
+                fetch.items[repository.slug] = runs
+                let etag = response.value(forHTTPHeaderField: "ETag")
+                runCache.store(etag.map { WorkflowRunCache.Entry(url: url, etag: $0, runs: runs) }, for: repository.slug)
+            } catch GitHubError.http(let status) {
+                counted += 1
+                fetch.errors[repository.slug] = RepositoryError(
+                    repository: repository.slug,
+                    kind: status == 403 ? .forbidden : .other,
+                    message: "workflow runs: HTTP \(status)"
+                )
+            } catch GitHubError.malformed {
+                fetch.errors[repository.slug] = RepositoryError(
+                    repository: repository.slug,
+                    kind: .other,
+                    message: "workflow runs: GitHub's answer couldn't be read"
+                )
+            }
+        }
+        if var latest {
+            latest.cost = counted
+            fetch.rateLimit = latest
+        }
+        return fetch
     }
 
     /// Sends `request` with the token and GitHub's headers. A 401 throws
     /// `.unauthorized`; other non-2xx statuses throw `.http`, or `.rateLimited` /
     /// `.secondaryLimit` for a 403 or 429 that says a limit was hit; transport
     /// failures throw `.network`; cancellation throws `CancellationError`.
-    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    /// With `acceptingNotModified`, a `304` (the answer to `If-None-Match`)
+    /// returns like a success.
+    func send(_ request: URLRequest, acceptingNotModified: Bool = false) async throws -> (Data, HTTPURLResponse) {
         var request = request
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -136,6 +227,7 @@ public struct GitHubClient: Sendable {
         }
         switch response.statusCode {
         case 200..<300: return (data, response)
+        case 304 where acceptingNotModified: return (data, response)
         case 401: throw GitHubError.unauthorized
         case 403, 429:
             // GitHub's guidance: obey `retry-after`; else, with nothing

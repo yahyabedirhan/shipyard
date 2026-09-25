@@ -8,15 +8,28 @@ public enum ItemKind: String, Codable, Equatable, Hashable, Sendable {
 }
 
 /// An item's semantic state. The app maps it to GitHub's colours: open
-/// green, draft gray, merged purple, closed red.
+/// green, draft gray, merged purple, closed red; a workflow run running
+/// amber, succeeded green, failed red.
 public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     case open
     case draft
     case merged
     case closed
+    /// A workflow run queued, waiting or in progress.
+    case running
+    /// A workflow run that finished well (GitHub's `success` or `neutral`).
+    case succeeded
+    /// A workflow run that finished badly (`failure`, `timed_out` or `startup_failure`).
+    case failed
 
-    /// Open and draft items are still open on GitHub; merged and closed ones aren't.
+    /// Open and draft items are still open on GitHub; merged and closed ones
+    /// aren't. A workflow run is never open: it runs, then it's finished.
     public var isOpen: Bool { self == .open || self == .draft }
+
+    /// Not finished yet: an open (or draft) pull request or issue, or a
+    /// running workflow run. The menu lists these first and ages them from
+    /// when they started; finished ones count back from `closedAt`.
+    public var isActive: Bool { isOpen || self == .running }
 }
 
 /// The head commit's combined check status on a pull request.
@@ -52,15 +65,21 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     public var author: String
     public var authorKind: AuthorKind
     public var state: ItemState
+    /// A pull request's head commit checks. A workflow run's own result in
+    /// the same terms (running pending, succeeded passed, failed failed), so
+    /// `[attention] checks-failed` covers failed runs too.
     public var checks: ChecksState
     /// Whether the viewer is asked to review it.
     public var reviewRequestedFromViewer: Bool
     public var createdAt: Date
     public var updatedAt: Date
-    /// When it was closed or merged; `nil` while open.
+    /// When it was closed or merged, or a workflow run finished; `nil` while
+    /// open or running.
     public var closedAt: Date?
     /// Comments plus reviews.
     public var activity: Int
+    /// A workflow run's head branch; `nil` for pull requests and issues.
+    public var branch: String?
 
     public init(
         kind: ItemKind,
@@ -76,7 +95,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         createdAt: Date,
         updatedAt: Date,
         closedAt: Date? = nil,
-        activity: Int = 0
+        activity: Int = 0,
+        branch: String? = nil
     ) {
         self.kind = kind
         self.repository = repository
@@ -92,6 +112,7 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         self.updatedAt = updatedAt
         self.closedAt = closedAt
         self.activity = activity
+        self.branch = branch
     }
 
     /// Everything whose change makes a seen item "changed": state, update

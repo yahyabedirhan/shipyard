@@ -23,6 +23,8 @@ struct PullRequestsResponse {
         var reviewRequests: [String] = []
         /// `statusCheckRollup.state`: `SUCCESS`, `FAILURE`, `PENDING`…; `nil` for none.
         var checks: String? = "PENDING"
+        /// The branch it would merge; `change-<number>` unless set.
+        var headRefName: String?
 
         init(_ number: Int) { self.number = number }
 
@@ -41,6 +43,7 @@ struct PullRequestsResponse {
                 "updatedAt": updatedAt,
                 "closedAt": closedAt.map { $0 as Any } ?? NSNull(),
                 "mergedAt": state == "MERGED" ? (closedAt ?? updatedAt) as Any : NSNull(),
+                "headRefName": headRefName ?? "change-\(number)",
                 "author": ["login": author, "__typename": authorType],
                 "comments": ["totalCount": comments],
                 "reviews": ["totalCount": reviews],
@@ -90,6 +93,11 @@ struct PullRequestsResponse {
     /// didn't ask for them (no `openIssues`/`closedIssues` keys).
     var issues: [Issue]?
     var viewer = "yabepa"
+    /// The repository's default branch, answered as `defaultBranchRef`.
+    var defaultBranch = "main"
+    /// Answer as GitHub does when the query asked only for open pull
+    /// requests' heads (runs shown, pull requests not): `openPullRequestHeads`.
+    var headsOnly = false
     /// Answer as GitHub does for a repository that's gone or out of reach:
     /// a `null` alias and a `NOT_FOUND` error.
     var missing = false
@@ -127,9 +135,16 @@ struct PullRequestsResponse {
             let closed = response.pullRequests.filter { $0.state != "OPEN" }.map { $0.json(in: response.repository) }
             var node: [String: Any] = [
                 "nameWithOwner": response.repository,
-                "openPullRequests": ["nodes": open],
-                "closedPullRequests": ["nodes": closed],
+                "defaultBranchRef": ["name": response.defaultBranch],
             ]
+            if response.headsOnly {
+                node["openPullRequestHeads"] = ["nodes": response.pullRequests.filter { $0.state == "OPEN" }.map {
+                    ["headRefName": $0.headRefName ?? "change-\($0.number)"]
+                }]
+            } else {
+                node["openPullRequests"] = ["nodes": open]
+                node["closedPullRequests"] = ["nodes": closed]
+            }
             if let issues = response.issues {
                 node["openIssues"] = ["nodes": issues.filter { $0.state == "OPEN" }.map { $0.json(in: response.repository) }]
                 node["closedIssues"] = ["nodes": issues.filter { $0.state != "OPEN" }.map { $0.json(in: response.repository) }]
