@@ -24,8 +24,8 @@ struct ProjectSection: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                 }
-                if section.rows.isEmpty && section.errors.isEmpty {
-                    Text("Nothing open")
+                if let empty = PanelText.emptySection(section) {
+                    Text(empty)
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 8)

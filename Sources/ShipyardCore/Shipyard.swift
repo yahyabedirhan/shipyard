@@ -419,7 +419,11 @@ public final class Shipyard {
         } catch {
             guard current == session else { return }
             // Keep the rows and when they were fetched; say why they're old.
+            // Before any refresh succeeded, still list every project.
             let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
+            if snapshot == nil {
+                menu = MenuModel.build(snapshot: nil, configuration: configuration, state: appStateStore.state, now: clock.now)
+            }
             fetchError = failure
             budget.record(failure, at: clock.now)
             menu.fetchError = failure

@@ -64,7 +64,17 @@ public struct MenuModel: Equatable, Sendable {
 
     /// The model for `snapshot` under `configuration` and what the user has
     /// seen and collapsed, as of `now` (which the closed window counts back from).
-    public static func build(snapshot: Snapshot, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
+    /// Without a snapshot (no refresh has succeeded yet) every configured
+    /// project still gets a section, empty and not loaded yet.
+    public static func build(snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
+        guard let snapshot else {
+            let sections = configuration.projects.map { project in
+                MenuSection(name: project.name, rows: [], showsRepository: project.repositories.count > 1, isLoaded: false)
+            }
+            var model = MenuModel(sections: sections)
+            model.applyAttention(state, configuration: configuration)
+            return model
+        }
         let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
@@ -156,6 +166,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether the user collapsed it. Its rows are still here, and still
     /// count towards the attention count.
     public var isCollapsed: Bool
+    /// Whether its rows were fetched: `false` before the first refresh
+    /// succeeded, when the section is listed without rows.
+    public var isLoaded: Bool
 
     public var id: String { name }
 
@@ -165,7 +178,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         errors: [MenuErrorRow] = [],
         showsRepository: Bool = false,
         attentionCount: Int = 0,
-        isCollapsed: Bool = false
+        isCollapsed: Bool = false,
+        isLoaded: Bool = true
     ) {
         self.name = name
         self.rows = rows
@@ -173,6 +187,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         self.showsRepository = showsRepository
         self.attentionCount = attentionCount
         self.isCollapsed = isCollapsed
+        self.isLoaded = isLoaded
     }
 }
 

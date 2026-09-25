@@ -53,8 +53,8 @@ struct PanelTextTests {
     }
 
     @Test("a failed refresh says why", arguments: [
-        (GitHubError.network("The Internet connection appears to be offline."),
-         "Couldn't reach GitHub: The Internet connection appears to be offline."),
+        (GitHubError.network("The operation couldn’t be completed. (NSURLErrorDomain error -1009.)"),
+         "Can't reach GitHub. Check your connection. Shipyard will try again."),
         (.http(502), "GitHub answered with HTTP 502."),
         (.malformed, "GitHub's answer couldn't be read."),
         (.graphQL("Something went wrong"), "GitHub: Something went wrong"),
@@ -64,6 +64,14 @@ struct PanelTextTests {
     ] as [(GitHubError, String)])
     func fetchError(error: GitHubError, text: String) {
         #expect(PanelText.fetchError(error) == text)
+    }
+
+    @Test("a section with nothing to list says why: not loaded yet, or nothing open")
+    func emptySection() {
+        #expect(PanelText.emptySection(MenuSection(name: "a", rows: [], isLoaded: false)) == "Not loaded yet")
+        #expect(PanelText.emptySection(MenuSection(name: "a", rows: [])) == "Nothing open")
+        let error = MenuErrorRow(RepositoryError(repository: "o/gone", kind: .notFound, message: ""))
+        #expect(PanelText.emptySection(MenuSection(name: "a", rows: [], errors: [error])) == nil)
     }
 
     // MARK: - Rows

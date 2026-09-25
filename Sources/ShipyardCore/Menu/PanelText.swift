@@ -53,6 +53,14 @@ public enum PanelText {
         }
     }
 
+    /// What a section with no rows and no error rows says in their place:
+    /// "Not loaded yet" before the first refresh succeeded, else "Nothing
+    /// open"; `nil` when it has something to list.
+    public static func emptySection(_ section: MenuSection) -> String? {
+        if !section.isLoaded { return "Not loaded yet" }
+        return section.rows.isEmpty && section.errors.isEmpty ? "Nothing open" : nil
+    }
+
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before
     /// the first refresh succeeded.
     public static func lastUpdated(_ date: Date?, now: Date) -> String? {
@@ -86,7 +94,8 @@ public enum PanelText {
         switch error {
         case .unauthorized: "GitHub rejected the token."
         case .http(let status): "GitHub answered with HTTP \(status)."
-        case .network(let message): "Couldn't reach GitHub: \(message)"
+        // The system's own text names an error domain and code; say it plainly.
+        case .network: "Can't reach GitHub. Check your connection. Shipyard will try again."
         case .malformed: "GitHub's answer couldn't be read."
         case .graphQL(let message): "GitHub: \(message)"
         case .rateLimited(_, let api): "The \(api.name) rate limit ran out."

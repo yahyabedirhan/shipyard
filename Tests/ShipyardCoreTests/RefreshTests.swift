@@ -224,6 +224,30 @@ struct RefreshTests {
         #expect(harness.shipyard.menu.lastUpdated == Harness.now.addingTimeInterval(240))
     }
 
+    @Test("a failed first refresh lists every project as not loaded yet; the next success fills them in")
+    func failedFirstRefreshListsProjects() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: .failure(), pullRequests())
+
+        let menu = harness.shipyard.menu
+        #expect(harness.shipyard.phase == .ready)
+        #expect(menu.sections.map(\.name) == ["e-commerce", "job-search"])
+        #expect(menu.sections.allSatisfy { !$0.isLoaded && $0.rows.isEmpty && $0.errors.isEmpty })
+        #expect(menu.sections.map(PanelText.emptySection) == ["Not loaded yet", "Not loaded yet"])
+        #expect(menu.lastUpdated == nil)
+        let error = try #require(menu.bannerFetchError)
+        #expect(PanelText.fetchError(error) == "Can't reach GitHub. Check your connection. Shipyard will try again.")
+
+        harness.clock.advance(by: 120)
+        await harness.timer.fire()
+
+        let filled = harness.shipyard.menu
+        #expect(filled.fetchError == nil)
+        #expect(filled.sections.allSatisfy { $0.isLoaded })
+        #expect(filled.sections[0].rows.map(\.number) == [14, 57, 12, 56, 55, 54, 9])
+        #expect(filled.sections[1].rows.map(\.number) == [3])
+        #expect(filled.sections.map(PanelText.emptySection) == [nil, nil])
+    }
+
     @Test("a GitHub server error keeps the last model too")
     func serverErrorKeepsModel() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests(), .status(502))
