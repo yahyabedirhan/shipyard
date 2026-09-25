@@ -1,0 +1,120 @@
+{
+  "data": {
+    "viewer": { "login": "yabepa" },
+    "repo0": {
+      "nameWithOwner": "yahyabedirhan/e-commerce-frontend",
+      "openPullRequests": {
+        "nodes": [
+          {
+            "number": 14, "title": "WIP: new cart drawer", "url": "https://github.com/yahyabedirhan/e-commerce-frontend/pull/14",
+            "isDraft": true, "state": "OPEN",
+            "createdAt": "2026-09-25T10:00:00Z", "updatedAt": "2026-09-25T11:00:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "PENDING" } } } ] }
+          },
+          {
+            "number": 12, "title": "Fix checkout totals", "url": "https://github.com/yahyabedirhan/e-commerce-frontend/pull/12",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-25T09:00:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 2 }, "reviews": { "totalCount": 1 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          }
+        ]
+      },
+      "closedPullRequests": {
+        "nodes": [
+          {
+            "number": 9, "title": "Update README", "url": "https://github.com/yahyabedirhan/e-commerce-frontend/pull/9",
+            "isDraft": false, "state": "MERGED",
+            "createdAt": "2026-09-22T09:00:00Z", "updatedAt": "2026-09-23T15:00:05Z", "closedAt": "2026-09-23T15:00:00Z", "mergedAt": "2026-09-23T15:00:00Z",
+            "author": { "login": "octocat", "__typename": "User" },
+            "comments": { "totalCount": 1 }, "reviews": { "totalCount": 1 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          },
+          {
+            "number": 8, "title": "Old experiment", "url": "https://github.com/yahyabedirhan/e-commerce-frontend/pull/8",
+            "isDraft": false, "state": "CLOSED",
+            "createdAt": "2026-09-01T09:00:00Z", "updatedAt": "2026-09-10T10:00:00Z", "closedAt": "2026-09-10T10:00:00Z", "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
+          }
+        ]
+      }
+    },
+    "repo1": {
+      "nameWithOwner": "yahyabedirhan/e-commerce-backend",
+      "openPullRequests": {
+        "nodes": [
+          {
+            "number": 57, "title": "Add order export", "url": "https://github.com/yahyabedirhan/e-commerce-backend/pull/57",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-25T07:00:00Z", "updatedAt": "2026-09-25T10:30:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          },
+          {
+            "number": 56, "title": "Tidy logging", "url": "https://github.com/yahyabedirhan/e-commerce-backend/pull/56",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-23T12:00:00Z", "updatedAt": "2026-09-24T12:00:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "octocat", "__typename": "User" },
+            "comments": { "totalCount": 3 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [
+              { "requestedReviewer": { "__typename": "User", "login": "yabepa" } },
+              { "requestedReviewer": { "__typename": "Team" } }
+            ] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
+          },
+          {
+            "number": 55, "title": "Bump lodash from 4.17.20 to 4.17.21", "url": "https://github.com/yahyabedirhan/e-commerce-backend/pull/55",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-22T06:00:00Z", "updatedAt": "2026-09-22T06:10:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "dependabot", "__typename": "Bot" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          }
+        ]
+      },
+      "closedPullRequests": {
+        "nodes": [
+          {
+            "number": 54, "title": "Drop legacy endpoint", "url": "https://github.com/yahyabedirhan/e-commerce-backend/pull/54",
+            "isDraft": false, "state": "CLOSED",
+            "createdAt": "2026-09-20T12:00:00Z", "updatedAt": "2026-09-24T18:00:00Z", "closedAt": "2026-09-24T18:00:00Z", "mergedAt": null,
+            "author": null,
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
+          }
+        ]
+      }
+    },
+    "repo2": {
+      "nameWithOwner": "yahyabedirhan/job-search",
+      "openPullRequests": {
+        "nodes": [
+          {
+            "number": 3, "title": "Track applications in a table", "url": "https://github.com/yahyabedirhan/job-search/pull/3",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-25T08:00:00Z", "updatedAt": "2026-09-25T08:30:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "ERROR" } } } ] }
+          }
+        ]
+      },
+      "closedPullRequests": { "nodes": [] }
+    },
+    "rateLimit": { "limit": 5000, "remaining": 4993, "used": 7, "resetAt": "2026-09-25T12:42:00Z", "cost": 3 }
+  }
+}

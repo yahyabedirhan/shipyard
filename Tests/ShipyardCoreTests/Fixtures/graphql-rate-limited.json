@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "type": "RATE_LIMITED",
+      "message": "API rate limit exceeded for user ID 42. If you reach out to GitHub Support for help, please include the request ID ABCD:1234:5678:9ABC:DEF0 and timestamp 2026-09-25 12:00:00 UTC."
+    }
+  ]
+}

@@ -3,9 +3,10 @@ import Foundation
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
 /// The app builds one with its adapters and the panel draws from it.
 ///
-/// This holds the sign-in part of the lifecycle: finding a token, the device
-/// flow, sign-out, and signing out when GitHub answers 401. The refresh
-/// pipeline builds on it.
+/// It signs in (a stored or `gh` token, else the device flow), signs out on
+/// any 401, follows the configuration between `needsProjects` and `ready`,
+/// and in `ready` runs the refresh pipeline: fetch every project's items in
+/// one GraphQL request and publish the menu model.
 @MainActor
 public final class Shipyard {
     /// What signing out left behind.
@@ -28,8 +29,22 @@ public final class Shipyard {
     /// `.expired`); cleared when a new one begins. `nil` after a cancel.
     public private(set) var signInError: DeviceFlowError?
 
+    /// What the panel draws. A failed refresh keeps the rows and sets
+    /// `fetchError` and the time they were last updated.
+    public private(set) var menu = MenuModel.empty
+    /// The last refresh that succeeded; `nil` before one did.
+    public private(set) var snapshot: Snapshot?
+    /// Why the latest refresh failed; `nil` once one succeeds.
+    public private(set) var fetchError: GitHubError?
+    /// Whether a refresh is running now.
+    public var isRefreshing: Bool { gate.isRunning }
+
     public let configStore: ConfigStore
     private let tokenStore: any TokenStore
+    private let urlOpener: any URLOpening
+    private let timer: any RefreshTimer
+    private let clock: any WallClock
+    private var gate = RefreshGate()
     private let tokenProvider: TokenProvider
     private let deviceFlow: DeviceFlow
     private let transport: any HTTPTransport
@@ -47,21 +62,27 @@ public final class Shipyard {
     public init(
         configStore: ConfigStore,
         tokenStore: any TokenStore,
+        urlOpener: any URLOpening,
         gh: any GhTokenLookup = GhCLI(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
+        timer: any RefreshTimer = TaskRefreshTimer(),
         sleep: @escaping DeviceFlow.Sleep = DeviceFlow.systemSleep,
         oauthClientID: String = OAuthApp.clientID
     ) {
         self.configStore = configStore
         self.tokenStore = tokenStore
+        self.urlOpener = urlOpener
+        self.clock = clock
+        self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
         self.deviceFlow = DeviceFlow(clientID: oauthClientID, transport: transport, clock: clock, sleep: sleep)
         self.transport = transport
     }
 
     /// Loads the configuration and signs in with the token store's token or
-    /// `gh`'s, if either has one; otherwise stays signed out.
+    /// `gh`'s, if either has one; otherwise stays signed out. Signing in with
+    /// projects runs the first refresh.
     public func start() async {
         configStore.reload()
         let provider = tokenProvider
@@ -147,6 +168,7 @@ public final class Shipyard {
         guard current == session else { return }
         self.viewer = viewer
         apply(.signedIn(hasProjects: configStore.lastValid.hasProjects))
+        await refresh()
     }
 
     /// Runs `body` with the current client. Every request to GitHub's API goes
@@ -186,7 +208,93 @@ public final class Shipyard {
         github = nil
         tokenSource = nil
         viewer = nil
+        snapshot = nil
+        fetchError = nil
+        menu = .empty
+        timer.disarm()
         apply(.signedOut)
+    }
+
+    // MARK: - Configuration
+
+    /// Reads the configuration file again and follows it: a change with
+    /// projects moves to `ready` and refreshes, one without moves to
+    /// `needsProjects` and stops the timer. A rejected edit changes nothing
+    /// (the store keeps the last valid configuration and its error). The
+    /// app's configuration watcher calls this.
+    @discardableResult
+    public func reloadConfiguration() async -> ConfigStore.ReloadResult {
+        let result = configStore.reload()
+        if case .changed(let configuration) = result {
+            apply(.configurationChanged(hasProjects: configuration.hasProjects))
+            if phase.canRefresh {
+                await refresh()
+            } else {
+                timer.disarm()
+            }
+        }
+        return result
+    }
+
+    // MARK: - Refreshing
+
+    /// Fetches every project's items and publishes the menu model. The timer,
+    /// opening the panel, ⌘R, waking and a configuration change all come here.
+    /// Does nothing outside `ready`. One refresh runs at a time: a call while
+    /// one runs returns at once and the running one goes again when it's done
+    /// (several calls meanwhile make one more run). Afterwards the timer is
+    /// armed for the next one.
+    public func refresh() async {
+        guard phase.canRefresh, gate.begin() else { return }
+        while true {
+            await performRefresh()
+            guard gate.finish() else { break }
+            guard phase.canRefresh, gate.begin() else { break }
+        }
+        armTimer()
+    }
+
+    private func performRefresh() async {
+        let configuration = configStore.lastValid
+        let projects = configuration.projects.map(configuration.settings(for:))
+        let current = session
+        let now = clock.now
+        do {
+            let snapshot = try await request { try await $0.fetch(projects: projects, at: now) }
+            guard current == session else { return }
+            self.snapshot = snapshot
+            fetchError = nil
+            menu = MenuModel.build(snapshot: snapshot, configuration: configuration, now: clock.now)
+        } catch GitHubError.unauthorized {
+            // `request` has signed out already.
+        } catch is CancellationError {
+        } catch {
+            guard current == session else { return }
+            // Keep the rows and when they were fetched; say why they're old.
+            let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
+            fetchError = failure
+            menu.fetchError = failure
+        }
+    }
+
+    /// Arms the timer for the configured interval while refreshes may run,
+    /// and stops it otherwise. (The rate budget will stretch the interval.)
+    private func armTimer() {
+        guard phase.canRefresh else {
+            timer.disarm()
+            return
+        }
+        let interval = TimeInterval(configStore.lastValid.refreshIntervalSeconds)
+        timer.arm(after: interval) { [weak self] in
+            await self?.refresh()
+        }
+    }
+
+    // MARK: - User actions
+
+    /// Opens the row's item on GitHub in the browser.
+    public func open(_ row: MenuRow) {
+        urlOpener.open(row.url)
     }
 
     private func apply(_ event: LifecycleEvent) {

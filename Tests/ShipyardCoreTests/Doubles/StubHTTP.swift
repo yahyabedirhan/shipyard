@@ -11,7 +11,8 @@ import ShipyardCore
 /// matches any query on the same path; one with a query matches only that
 /// query. Answers are given in order and the last one repeats. A request
 /// nothing matches fails with `URLError(.unsupportedURL)` and is listed in
-/// `unmatched`.
+/// `unmatched`. A hook set with `onSend` runs while a request is in flight,
+/// for example to trigger something mid-refresh.
 final class StubHTTP: HTTPTransport {
     /// One recorded answer: a response, or a transport failure.
     struct Answer: Sendable {
@@ -59,6 +60,7 @@ final class StubHTTP: HTTPTransport {
     private let routes = Locked<[Route]>([])
     private let log = Locked<[URLRequest]>([])
     private let missed = Locked<[URLRequest]>([])
+    private let hook = Locked<(@Sendable (URLRequest) async -> Void)?>(nil)
 
     /// Every request sent, in order.
     var requests: [URLRequest] { log.current }
@@ -81,6 +83,17 @@ final class StubHTTP: HTTPTransport {
         register(method, url, answers)
     }
 
+    /// Answers `method url` with `answers` in order, the last repeating.
+    func on(_ method: String, _ url: URL, answers: [Answer]) {
+        register(method, url, answers)
+    }
+
+    /// Runs `body` for every request, after it's recorded and before it's
+    /// answered.
+    func onSend(_ body: @escaping @Sendable (URLRequest) async -> Void) {
+        hook.withValue { $0 = body }
+    }
+
     private func register(_ method: String, _ url: URL, _ answers: [Answer]) {
         precondition(!answers.isEmpty, "a route needs at least one answer")
         routes.withValue { routes in
@@ -92,6 +105,7 @@ final class StubHTTP: HTTPTransport {
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         try Task.checkCancellation()
         log.withValue { $0.append(request) }
+        if let body = hook.current { await body(request) }
         let method = request.httpMethod ?? "GET"
         let answer: Answer? = routes.withValue { routes in
             // A route with a query is more specific, so it's tried first.

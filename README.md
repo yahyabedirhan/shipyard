@@ -13,7 +13,7 @@ Shipyard ships for **macOS only** (macOS 14 or later).
 The package has two targets:
 
 - `ShipyardCore`: every rule (configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model). It depends only on Foundation and TOMLDecoder, so it also **builds and tests on Linux, for development**. Linux isn't a supported platform for running shipyard.
-- `Shipyard`: the macOS app, a thin layer of Apple frameworks over the core. It's only part of the package on macOS.
+- `ShipyardApp`: the macOS app (the `Shipyard` executable), a thin layer of Apple frameworks over the core. It's only part of the package on macOS.
 
 ## Development
 

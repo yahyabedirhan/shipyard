@@ -2,8 +2,10 @@
 import PackageDescription
 
 // ShipyardCore holds every rule and builds on Linux, where agents develop it.
-// The Shipyard app target uses Apple-only frameworks, so it only exists on macOS:
-// `swift build` and `swift test` on Linux never see it.
+// The ShipyardApp target (the `Shipyard` executable) uses Apple-only
+// frameworks, so it only exists on macOS: `swift build` and `swift test` on
+// Linux never see it. The app module isn't named `Shipyard` because that's the
+// core's orchestrator class.
 var targets: [Target] = [
     .target(
         name: "ShipyardCore",
@@ -13,26 +15,31 @@ var targets: [Target] = [
     .testTarget(
         name: "ShipyardCoreTests",
         dependencies: ["ShipyardCore", .product(name: "TOMLDecoder", package: "TOMLDecoder")],
-        path: "Tests/ShipyardCoreTests"
+        path: "Tests/ShipyardCoreTests",
+        // Recorded GitHub responses, read from the source tree by `StubHTTP.Answer.fixture`.
+        exclude: ["Fixtures"]
     ),
+]
+
+var products: [Product] = [
+    .library(name: "ShipyardCore", targets: ["ShipyardCore"]),
 ]
 
 #if os(macOS)
 targets.append(
     .executableTarget(
-        name: "Shipyard",
+        name: "ShipyardApp",
         dependencies: ["ShipyardCore"],
-        path: "Sources/Shipyard"
+        path: "Sources/ShipyardApp"
     )
 )
+products.append(.executable(name: "Shipyard", targets: ["ShipyardApp"]))
 #endif
 
 let package = Package(
     name: "Shipyard",
     platforms: [.macOS(.v14)],
-    products: [
-        .library(name: "ShipyardCore", targets: ["ShipyardCore"]),
-    ],
+    products: products,
     dependencies: [
         .package(url: "https://github.com/dduan/TOMLDecoder", from: "0.4.5"),
     ],

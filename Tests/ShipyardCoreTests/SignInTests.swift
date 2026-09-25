@@ -5,54 +5,15 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-private let userURL = GitHubClient.apiURL.appendingPathComponent("user")
-private let viewerAnswer = StubHTTP.Answer.json(#"{"login":"yabepa","id":42,"type":"User"}"#)
-private let unauthorized = StubHTTP.Answer.json(
-    #"{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest","status":"401"}"#, status: 401
-)
+private let userURL = Harness.userURL
+private let viewerAnswer = Harness.viewerAnswer
+private let unauthorized = Harness.unauthorized
 private let withProjects = """
     [[projects]]
     name = "shipyard"
     repositories = ["yahyabedirhan/shipyard"]
 
     """
-
-/// A `Shipyard` over in-memory ports: a token store, a fake `gh`, stubbed
-/// HTTP, a manual clock and instant sleeps, with its configuration in a
-/// temporary directory.
-@MainActor
-private struct Harness {
-    let stub = StubHTTP()
-    let store: InMemoryTokenStore
-    let gh: FakeGhLookup
-    let sleeper = InstantSleeper(clock: ManualClock())
-    let shipyard: Shipyard
-
-    init(stored: String? = nil, gh ghToken: String? = nil, config: String? = nil) throws {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
-            .appendingPathComponent("config.toml")
-        if let config {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Data(config.utf8).write(to: url)
-        }
-        store = InMemoryTokenStore(token: stored)
-        gh = FakeGhLookup(token: ghToken)
-        shipyard = Shipyard(
-            configStore: ConfigStore(url: url),
-            tokenStore: store,
-            gh: gh,
-            transport: stub,
-            clock: sleeper.clock,
-            sleep: sleeper.sleep,
-            oauthClientID: "test-client-id"
-        )
-    }
-
-    var authorizations: [String?] {
-        stub.requests("GET", userURL).map { $0.value(forHTTPHeaderField: "Authorization") }
-    }
-}
 
 @Suite("Signing in")
 @MainActor
