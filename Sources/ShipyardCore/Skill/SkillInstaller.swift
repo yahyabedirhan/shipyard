@@ -112,7 +112,7 @@ public struct ProcessShellRunner: ShellRunning {
         let control = ProcessControl(invocation)
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                control.onEnd = { continuation.resume(returning: $0) }
+                guard control.whenEnded({ continuation.resume(returning: $0) }) else { return }
                 DispatchQueue.global(qos: .userInitiated).async { control.runToEnd() }
             }
         } onCancel: {
@@ -132,9 +132,10 @@ private final class ProcessControl: @unchecked Sendable {
     private let process = Process()
     private let pipe = Pipe()
     private var cancelled = false
-    private var ended = false
-    /// Called once, with the run's output or `nil`. Set before `runToEnd()`.
-    var onEnd: ((ShellOutput?) -> Void)?
+    /// The run's result, once it has ended.
+    private var ended: ShellOutput?? = nil
+    /// Called once, with the run's output or `nil`.
+    private var onEnd: ((ShellOutput?) -> Void)?
 
     init(_ invocation: ShellInvocation) {
         process.executableURL = URL(fileURLWithPath: invocation.executable)
@@ -142,6 +143,19 @@ private final class ProcessControl: @unchecked Sendable {
         process.standardOutput = pipe
         process.standardError = pipe
         process.standardInput = FileHandle.nullDevice
+    }
+
+    /// Sets what the run calls when it ends. When it has already ended (a
+    /// cancel before the start), calls `body` at once and returns false: there
+    /// is nothing left to run.
+    func whenEnded(_ body: @escaping (ShellOutput?) -> Void) -> Bool {
+        let result: ShellOutput?? = locked {
+            if ended == nil { onEnd = body }
+            return ended
+        }
+        guard let result else { return true }
+        body(result)
+        return false
     }
 
     /// Runs the process and waits for it; ends with `nil` when it couldn't start.
@@ -210,8 +224,9 @@ private final class ProcessControl: @unchecked Sendable {
 
     private func end(_ output: ShellOutput?) {
         let onEnd: ((ShellOutput?) -> Void)? = locked {
-            guard !ended else { return nil }
-            ended = true
+            guard ended == nil else { return nil }
+            ended = .some(output)
+            defer { self.onEnd = nil }
             return self.onEnd
         }
         onEnd?(output)
