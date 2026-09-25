@@ -75,6 +75,7 @@ public final class Shipyard {
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
     private let notifier: any Notifying
+    private let loginItem: any LoginItem
     private let timer: any RefreshTimer
     private let clock: any WallClock
     private var gate = RefreshGate()
@@ -98,6 +99,7 @@ public final class Shipyard {
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
         notifier: any Notifying,
+        loginItem: any LoginItem,
         gh: any GhTokenLookup = GhCLI(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
@@ -110,6 +112,7 @@ public final class Shipyard {
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
         self.notifier = notifier
+        self.loginItem = loginItem
         self.clock = clock
         self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
@@ -117,7 +120,8 @@ public final class Shipyard {
         self.transport = transport
     }
 
-    /// Loads the app state and the configuration and signs in with the token
+    /// Loads the app state and the configuration, registers or removes the
+    /// login item as `launch-at-login` says, and signs in with the token
     /// store's token or `gh`'s, if either has one; otherwise stays signed
     /// out. Signing in with projects runs the first refresh.
     public func start() async {
@@ -125,6 +129,9 @@ public final class Shipyard {
         appStateStore.load(at: clock.now)
         configStore.reload()
         configError = configStore.error
+        // A file broken since launch has no valid configuration behind it,
+        // only the defaults: leave the login item as it is until it's fixed.
+        if configError == nil { followLaunchAtLogin() }
         let provider = tokenProvider
         // `gh auth token` spawns a process; keep it off the main actor.
         let found = await Task.detached { provider.current() }.value
@@ -283,6 +290,7 @@ public final class Shipyard {
     private func follow(_ result: ConfigStore.ReloadResult) async {
         configError = configStore.error
         if case .changed(let configuration) = result {
+            followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // `[attention]` and `[menu-bar]` apply at once, even if the
             // refresh below can't run (paused).
@@ -293,6 +301,13 @@ public final class Shipyard {
                 timer.disarm()
             }
         }
+    }
+
+    /// Registers or removes the login item to match `launch-at-login` in
+    /// the last valid configuration: at start, and on every valid change,
+    /// so an edit applies at once. The login item ignores a repeat.
+    private func followLaunchAtLogin() {
+        loginItem.setEnabled(configStore.lastValid.launchAtLogin)
     }
 
     // MARK: - Project picker

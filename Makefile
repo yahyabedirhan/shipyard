@@ -66,7 +66,9 @@ install: bundle
 
 release: test bundle
 	@rm -f $(ZIP)
-	cd $(BUILD_DIR) && ditto -c -k --keepParent --sequesterRsrc $(APP).app $(notdir $(ZIP))
+	@# Without extended attributes: they're this Mac's (com.apple.provenance),
+	@# and the signature doesn't need them. So unzip leaves no __MACOSX folder.
+	cd $(BUILD_DIR) && ditto -c -k --keepParent --norsrc --noextattr --noacl $(APP).app $(notdir $(ZIP))
 	@shasum -a 256 $(ZIP)
 
 clean:

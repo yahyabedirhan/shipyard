@@ -37,6 +37,12 @@ struct MenuBarLabelView: View {
     }
 }
 
+extension Bundle {
+    /// Whether this is a `.app` bundle: false for `make run`, which runs the
+    /// bare executable, where notifications and login items don't exist.
+    var isAppBundle: Bool { bundleURL.pathExtension == "app" }
+}
+
 /// Builds the core once the app has launched and starts it.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -65,7 +71,8 @@ final class AppServices {
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             tokenStore: SessionTokenStore(),
             urlOpener: opener,
-            notifier: notifier
+            notifier: notifier,
+            loginItem: LaunchAtLogin()
         )
         let shipyard = shipyard
         notifier.onOpen = { shipyard.openNotification($0) }

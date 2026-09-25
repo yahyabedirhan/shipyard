@@ -43,7 +43,7 @@ final class Notifier: NSObject, Notifying {
 
     override init() {
         // `UNUserNotificationCenter.current()` traps outside an app bundle.
-        center = Bundle.main.bundleURL.pathExtension == "app" ? .current() : nil
+        center = Bundle.main.isAppBundle ? .current() : nil
         super.init()
         // Set before launch finishes, so a click that launched the app arrives.
         center?.delegate = self

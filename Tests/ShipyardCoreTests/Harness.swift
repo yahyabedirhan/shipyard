@@ -8,12 +8,13 @@ import FoundationNetworking
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
 /// directory and the app state in another; the clock, the refresh timer and
-/// waiting are manual; the URL opener and notifier record what they're asked.
+/// waiting are manual; the URL opener, notifier and login item record what
+/// they're asked.
 ///
 /// A scenario writes a configuration, registers answers, drives the
 /// orchestrator (`start`, `timer.fire()`, `reloadConfiguration`, clicks) and
 /// asserts on `shipyard.menu` and what the ports recorded (URLs opened,
-/// notifications posted).
+/// notifications posted, the login item).
 @MainActor
 struct Harness {
     /// 2026-09-25 12:00:00 UTC, the "now" the fixtures are written against.
@@ -35,6 +36,7 @@ struct Harness {
     let timer = ManualTimer()
     let opener = RecordingURLOpener()
     let notifier = RecordingNotifier()
+    let loginItem = RecordingLoginItem()
     /// `config.toml` in a fresh temporary directory.
     let configURL: URL
     /// A fresh temporary directory for app state (`state.json`).
@@ -71,6 +73,7 @@ struct Harness {
             tokenStore: store,
             urlOpener: opener,
             notifier: notifier,
+            loginItem: loginItem,
             gh: gh,
             transport: stub,
             clock: sleeper.clock,

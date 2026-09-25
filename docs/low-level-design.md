@@ -151,6 +151,7 @@ budget: RateBudget                 (limits, recent costs, pause; reset on sign-o
 appStateStore: AppStateStore       (seen, collapsed; loaded at start, kept on sign-out)
 gate: RefreshGate                  (one refresh at a time, queues one more)
 timer: RefreshTimer                (port; armed with the budget's delay after every refresh, disarmed outside ready)
+loginItem: LoginItem               (port; told launch-at-login at start and on every valid configuration change)
 ```
 
 The phase is a small state machine, declared in `Lifecycle.swift` as `Phase.after(LifecycleEvent)` so its transitions are tested on their own:
@@ -167,10 +168,10 @@ Operations:
 
 | Operation | Does | Rejects / edge |
 |---|---|---|
-| `start()` | load config; resolve token → phase; in `ready`, the first refresh. The connect screen's Try again calls it too | no token → `signedOut` with `noToken` |
+| `start()` | load config; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Try again calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
 | `refresh()` | the refresh pipeline (§4); the timer, panel open, ⌘R and wake all call it; arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
-| `reloadConfiguration()` | `configStore.reload()`; on a change, phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
+| `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), and phase follows `hasProjects` and refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`) |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
@@ -354,6 +355,10 @@ Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()
 
 Wraps `UNUserNotificationCenter`: asks permission on the first notification (not at launch), posts a `PostedNotification` as title "e-commerce · New PR #107" (`title`: project · headline) and body "Fix checkout totals" (the item's title), with the event id as the request identifier and the item URL in its user info. Clicking the notification calls `Shipyard.openNotification(itemURL)`, which opens the item and marks it seen. `post` queues the notification and returns at once, so a refresh never waits on the permission prompt; deliveries run in order, and the first one asks. It is `@Observable`: `permission` (unknown, not asked, allowed, denied) is read without asking at launch and whenever the panel opens, and while it's denied the panel shows a "notifications are off" banner with a button to shipyard's page in System Settings. Notifications are shown even while the panel is open (the app is then frontmost), grouped per project. Outside a `.app` bundle (`make run`) there is no notification center, and it only logs.
 
+### LaunchAtLogin — `ShipyardApp/LaunchAtLogin.swift` (the `LoginItem` port; tests use a recording one)
+
+Wraps `SMAppService.mainApp`: `setEnabled(true)` registers the running `.app` (normally `/Applications/Shipyard.app`) as a login item, `setEnabled(false)` removes it, on a serial queue off the main thread. It compares with the service's status first, so a repeat changes nothing, and an item the user switched off in System Settings > General > Login Items (`requiresApproval`) isn't registered again at each launch; setting `launch-at-login = false` removes it either way. Failures are logged. Outside a `.app` bundle (`make run`) it only logs.
+
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
 Pure: `build(snapshot, config, appState, now) -> MenuModel`: sections per project in configuration order, items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
@@ -426,7 +431,7 @@ shipyard/
 │   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
 │   ├── Version.swift                 # ShipyardVersion.current: the one place the version is recorded
 │   ├── RefreshScheduler.swift        # RefreshGate (one at a time, queues one more) + RefreshTimer port and its Task-based timer
-│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, URLOpening
+│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, URLOpening, LoginItem
 │   ├── Config/
 │   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
 │   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
@@ -462,7 +467,7 @@ shipyard/
 │   ├── Placeholders.swift            # session-only token store (never written in 0.0.x: gh only) until Keychain.swift (#22)
 │   ├── Keychain.swift                # TokenStore on the login keychain (#22, with sign-in without gh)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
-│   ├── LaunchAtLogin.swift           # SMAppService wrapper
+│   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   └── UI/
 │       ├── Panel.swift               # phase switch, banner, footer
 │       ├── ProjectSection.swift
@@ -477,7 +482,7 @@ shipyard/
     ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
     ├── Skill/                        # the installer against a fake shell; the skill document against the code and the schema
     ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
-    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener; stub HTTP transport, fake gh, fake shell, instant sleeper
+    └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake shell, instant sleeper
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder, all of which exist on Linux (Observation ships with the Swift toolchain; the rule keeps Apple-only frameworks out); the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS.

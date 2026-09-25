@@ -72,3 +72,12 @@ public struct SystemClock: WallClock {
 public protocol URLOpening: Sendable {
     func open(_ url: URL)
 }
+
+/// Starts shipyard when the user logs in. The app registers or removes the
+/// app as a login item (`SMAppService.mainApp`); `Shipyard` tells it which,
+/// following `launch-at-login`.
+public protocol LoginItem: Sendable {
+    /// Registers shipyard as a login item when `enabled`, removes it
+    /// otherwise. Telling it what it already is changes nothing.
+    func setEnabled(_ enabled: Bool)
+}

@@ -4,26 +4,43 @@ A macOS menu bar app for seeing and reviewing the pull requests your agents open
 
 Shipyard shows the pull requests (and, if you turn them on, issues and workflow runs) on the projects you choose, from anyone, you and your agents included. The menu bar shows one number: how many items still need your attention. Clicking an item opens it on GitHub and marks it seen. Everything it shows, and when it notifies you, lives in one commented TOML file under `~/.config/shipyard/` that you or your agents edit.
 
-**Status:** under construction, version 0.0.1. Versions stay below 0.1.0 until the public launch.
+**Status:** under construction, version 0.0.1. Versions stay at 0.0.x until the public launch.
 
-## Platforms
+## Install
 
-Shipyard ships for **macOS only** (macOS 14 or later).
+Shipyard ships for **macOS only** (macOS 14 or later), as a zip from the [releases page](https://github.com/yahyabedirhan/shipyard/releases). Releases are ad-hoc signed, not notarized, so macOS blocks the first launch of a downloaded copy. Unzip it, move `Shipyard.app` to `/Applications`, and clear the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Shipyard.app
+```
+
+Or, on macOS 15 and later, open it once, dismiss the warning, then choose **Open Anyway** in System Settings > Privacy & Security.
+
+Shipyard starts at login: it registers itself as a login item when it launches. Set `launch-at-login = false` in the configuration to remove it; switching it off in System Settings > General > Login Items also sticks.
 
 ## Connecting to GitHub
 
 Shipyard 0.0.x connects to GitHub through the [GitHub CLI](https://cli.github.com) and **needs `gh`**: install it (`brew install gh`) and sign in with `gh auth login`. Shipyard picks up `gh`'s token silently; until `gh` is signed in, its panel shows how to connect. To disconnect shipyard for good, run `gh auth logout`. Signing in without `gh` is planned for a later version.
+
+## Configuration
+
+Everything shipyard shows and when it notifies lives in `~/.config/shipyard/config.toml` (`$XDG_CONFIG_HOME/shipyard/` when that's set). Every key is optional, edits apply live, and a broken edit keeps the last valid configuration and shows the error in the panel. The footer's **Open configuration file** opens it.
+
+- The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
+- The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.
+
+## Development
 
 The package has two targets:
 
 - `ShipyardCore`: every rule (configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model). It depends only on Foundation, FoundationNetworking, Observation and TOMLDecoder, so it also **builds and tests on Linux, for development**. Linux isn't a supported platform for running shipyard.
 - `ShipyardApp`: the macOS app (the `Shipyard` executable), a thin layer of Apple frameworks over the core. It's only part of the package on macOS.
 
-## Development
-
 ```sh
-swift build --target ShipyardCore   # the core, on macOS or Linux
-swift test                           # the core's tests, on macOS or Linux
+make test                            # the tests (plain `swift test` needs Xcode or Linux; the Makefile finds the Testing framework the Command Line Tools ship)
+make install                         # bundle, ad-hoc sign and install /Applications/Shipyard.app, then open it
+make release                         # test, bundle and zip build/Shipyard-<version>-macos.zip
+swift build --target ShipyardCore    # the core alone, on macOS or Linux
 ```
 
 CI runs the core's tests on Ubuntu for every push and pull request.
