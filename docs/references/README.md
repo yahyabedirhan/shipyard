@@ -1,0 +1,9 @@
+# References
+
+Facts from outside documentation that shipyard depends on, with their sources. Read the file for an area before working in it. When a fact changes, update it here with the new check date.
+
+| File | Covers |
+|---|---|
+| [github-rate-limits.md](github-rate-limits.md) | GraphQL and REST rate limits, query cost, running out, secondary limits, conditional requests |
+| [github-workflow-runs.md](github-workflow-runs.md) | Listing workflow runs over REST |
+| [github-device-flow.md](github-device-flow.md) | Signing in with GitHub's OAuth device flow |

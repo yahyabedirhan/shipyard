@@ -1,0 +1,4 @@
+.scratch/
+.build/
+*.app
+.DS_Store
