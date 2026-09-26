@@ -373,18 +373,57 @@ extension Configuration {
     /// Where the published JSON Schema lives; the file's `#:schema` line points here.
     public static let schemaURL = "https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json"
 
-    /// The text a new configuration file starts with.
+    /// The text a new configuration file starts with: the settings people
+    /// reach for first, commented out at their defaults, so uncommenting one
+    /// changes nothing until its value is edited. Top-level keys come above
+    /// every table and tables above the projects the picker appends, so any
+    /// example, or all of them, can be uncommented and the file stays valid.
     public static let header = """
         #:schema \(schemaURL)
         # shipyard configuration. You and your agents edit this file; shipyard
         # applies changes live and never rewrites it (it only appends projects).
         # Every key is optional. Keys, defaults and events are in the schema above.
+        # The settings below are commented out at their defaults: uncomment one
+        # and change its value to use it.
         version = \(supportedVersion)
 
-        # How the menu draws your projects: "list" (the default: every project
-        # in one scrolling list) or "tabs" (one project at a time).
+        # Logins whose items are never listed or notified, e.g. "dependabot[bot]".
+        # hide-authors = []
+
+        # How the menu draws your projects: "list" (every project in one
+        # scrolling list) or "tabs" (one project at a time).
         # [menu]
         # layout = "list"
+
+        # The number next to the menu bar icon: "total" (items that need your
+        # attention), "per-kind" (pull requests, issues and runs apart) or "none".
+        # [menu-bar]
+        # count = "total"
+
+        # List issues too, not only pull requests, in every project: set show
+        # to true. A project can override it in its own block.
+        # [defaults.issues]
+        # show = false
+
+        # List GitHub Actions workflow runs in every project: set show to true.
+        # [defaults.workflow-runs]
+        # show = false
+
+        # When to notify, for every project: one block per rule. The list
+        # replaces the default rule below, so keep it to hear of new pull
+        # requests. Other events include "run.failed" and "pr.review_requested";
+        # authors can be "any", "me", "others" or "bots".
+        # [[defaults.notifications]]
+        # event = "pr.opened"
+        # authors = "any"
+
+        # The largest share of each hourly GitHub rate limit shipyard may spend,
+        # in percent (1 to 50). The limit is shared with your other tools.
+        # [rate-limit]
+        # max-share-percent = 10
+
+        # Projects: one [[projects]] block each, below. The project picker
+        # appends them here.
 
         """
 

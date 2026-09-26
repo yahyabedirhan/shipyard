@@ -127,9 +127,14 @@ public final class Shipyard {
     /// login item as `launch-at-login` says, and signs in with the token
     /// store's token or `gh`'s, if either has one; otherwise stays signed
     /// out. Signing in with projects runs the first refresh.
+    ///
+    /// A missing configuration file is created first, with its commented
+    /// header, on every start, not only the first; one that exists is never
+    /// touched.
     public func start() async {
         signedOutReason = nil
         appStateStore.load(at: clock.now)
+        createConfigurationIfMissing()
         configStore.reload()
         configError = configStore.error
         configWarnings = configStore.warnings
@@ -398,6 +403,22 @@ public final class Shipyard {
             guard phase.canRefresh, canRefreshNow, gate.begin() else { break }
         }
         armTimer()
+    }
+
+    /// The Refresh button (⌘R): creates the configuration file with its
+    /// commented header when it's missing, then refreshes like `refresh()`.
+    /// A file that exists is never touched.
+    public func refreshNow() async {
+        createConfigurationIfMissing()
+        await refresh()
+    }
+
+    /// Creates `config.toml` with its commented header when it's missing, so
+    /// the user and their agents find the common settings to uncomment. A
+    /// file that can't be written changes nothing: a missing file still
+    /// reads as the defaults with no projects.
+    private func createConfigurationIfMissing() {
+        try? configStore.createIfMissing()
     }
 
     private func performRefresh() async {

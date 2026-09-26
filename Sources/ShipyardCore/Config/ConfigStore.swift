@@ -88,9 +88,9 @@ public final class ConfigStore: @unchecked Sendable {
     }
 
     /// Creates the file (and its directory) with the commented header and
-    /// the `#:schema` line when it's missing, so "Open configuration file"
-    /// has something to open. Returns whether it created it; an existing
-    /// file is never touched.
+    /// the `#:schema` line when it's missing: at every start, on the Refresh
+    /// button, and before "Open configuration file" opens it. Returns
+    /// whether it created it; an existing file is never touched.
     @discardableResult
     public func createIfMissing() throws -> Bool {
         let fileManager = FileManager.default

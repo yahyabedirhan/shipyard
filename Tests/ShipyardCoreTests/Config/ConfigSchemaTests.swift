@@ -244,7 +244,7 @@ struct ConfigSchemaTests {
         ])
     }
 
-    @Test("a new file's commented header is a valid configuration, its examples uncommented too")
+    @Test("a new file's commented header is a valid configuration, each example uncommented alone and all together too")
     func headerIsValid() throws {
         let schema = try loadSchema()
         let header = decoded(Configuration.header)
@@ -252,16 +252,33 @@ struct ConfigSchemaTests {
         #expect(header?.configuration == Configuration())
         #expect(try violations(Configuration.header, schema: schema) == [])
         // The header shows settings as commented-out TOML (`# [menu]`,
-        // `# layout = "list"`); uncommenting them must still read cleanly.
-        let uncommented = Configuration.header.components(separatedBy: "\n").map { line in
-            let body = line.dropFirst(2)
-            let isSetting = line.hasPrefix("# ") && (body.hasPrefix("[") || body.contains(" = "))
-            return isSetting ? String(body) : line
-        }.joined(separator: "\n")
-        #expect(uncommented != Configuration.header)
-        let examples = decoded(uncommented)
-        #expect(examples?.warnings == [])
-        #expect(try violations(uncommented, schema: schema) == [])
+        // `# layout = "list"`), each at its default; uncommenting any one
+        // example, or all of them, must still read cleanly and mean the same.
+        let examples = headerExamples()
+        #expect(examples.count >= 7)
+        for example in examples + [Set(examples.joined())] {
+            let text = uncommenting(example)
+            #expect(text != Configuration.header)
+            let read = decoded(text)
+            #expect(read?.warnings == [], "uncommenting lines \(example.sorted())")
+            #expect(read?.configuration == Configuration(), "uncommenting lines \(example.sorted())")
+            #expect(try violations(text, schema: schema) == [], "uncommenting lines \(example.sorted())")
+        }
+    }
+
+    @Test("a new file's header shows the settings people reach for first")
+    func headerShowsCommonSettings() throws {
+        let table = try TOMLTable(source: uncommenting(Set(headerExamples().joined())))
+        #expect(try table.array(forKey: "hide-authors").count == 0)
+        #expect(try table.table(forKey: "menu").string(forKey: "layout") == "list")
+        #expect(try table.table(forKey: "menu-bar").string(forKey: "count") == "total")
+        #expect(try table.table(forKey: "rate-limit").integer(forKey: "max-share-percent") == 10)
+        let defaults = try table.table(forKey: "defaults")
+        #expect(try defaults.table(forKey: "issues").bool(forKey: "show") == false)
+        #expect(try defaults.table(forKey: "workflow-runs").bool(forKey: "show") == false)
+        let rules = try defaults.array(forKey: "notifications")
+        #expect(rules.count == 1)
+        #expect(try rules.table(atIndex: 0).string(forKey: "event") == "pr.opened")
     }
 
     @Test("a new file's schema line points at the published schema")
@@ -271,4 +288,29 @@ struct ConfigSchemaTests {
         #expect(Configuration.header.hasPrefix("#:schema \(Configuration.schemaURL)\n"))
         #expect(try designExample().hasPrefix("#:schema \(Configuration.schemaURL)\n"))
     }
+}
+
+/// The header's commented-out examples: each a run of consecutive setting
+/// lines (`# [table]`, `# key = value`), as line indices.
+private func headerExamples() -> [Set<Int>] {
+    var examples: [Set<Int>] = []
+    var current: Set<Int> = []
+    for (index, line) in Configuration.header.components(separatedBy: "\n").enumerated() {
+        let body = line.dropFirst(2)
+        if line.hasPrefix("# ") && (body.hasPrefix("[") || body.contains(" = ")) {
+            current.insert(index)
+        } else if !current.isEmpty {
+            examples.append(current)
+            current = []
+        }
+    }
+    if !current.isEmpty { examples.append(current) }
+    return examples
+}
+
+/// The header with the lines at `indices` uncommented.
+private func uncommenting(_ indices: Set<Int>) -> String {
+    Configuration.header.components(separatedBy: "\n").enumerated().map { index, line in
+        indices.contains(index) ? String(line.dropFirst(2)) : line
+    }.joined(separator: "\n")
 }

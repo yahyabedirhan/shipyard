@@ -24,8 +24,8 @@ A request to change the user's shipyard is a change to this file, also when you'
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing settings as commented-out TOML (`# [menu]`, `# layout = "list"`). To set one, uncomment its lines and change the value rather than adding a second copy, unless a top-level key sits below them: uncommenting the table header would pull that key into the table.
-3. When the file doesn't exist, create it (and its directory) starting with:
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
    #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json

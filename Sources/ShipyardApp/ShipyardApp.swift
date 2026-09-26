@@ -141,8 +141,10 @@ final class AppServices {
         closeMenu()
     }
 
+    /// The header's Refresh button (⌘R): also creates the configuration
+    /// file when it's missing.
     func refresh() {
-        Task { await shipyard.refresh() }
+        Task { await shipyard.refreshNow() }
     }
 
     /// Opening the panel rereads the notification permission (the user may

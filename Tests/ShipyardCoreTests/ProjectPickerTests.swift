@@ -225,7 +225,8 @@ struct ProjectPickerTests {
             recentRepositories(), pullRequests(), Harness.fixture("graphql-missing-repository.json"),
         ])
         #expect(harness.shipyard.phase == .needsProjects)
-        #expect(!FileManager.default.fileExists(atPath: harness.configURL.path))
+        // Starting without a file created it with the header alone.
+        #expect(try String(contentsOf: harness.configURL, encoding: .utf8) == Configuration.header)
         _ = try await harness.shipyard.suggestedRepositories()
 
         let result = try await harness.shipyard.addProjects(chosen)
@@ -299,7 +300,7 @@ struct ProjectPickerTests {
             ])
         }
 
-        #expect(!FileManager.default.fileExists(atPath: harness.configURL.path))
+        #expect(try String(contentsOf: harness.configURL, encoding: .utf8) == Configuration.header)
         #expect(harness.shipyard.phase == .needsProjects)
         #expect(harness.graphQLRequests.isEmpty)
     }
