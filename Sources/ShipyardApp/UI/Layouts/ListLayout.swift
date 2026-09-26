@@ -66,11 +66,12 @@ struct ListLayout: View {
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
 
-    /// After ← or →: collapses or expands the project it asks for.
+    /// After ← or →: collapses or expands the project it asks for, not
+    /// animated (see `lineTransition`).
     private func fold(_ change: ProjectFold?) -> RowKeyMove {
         guard let change else { return .moved }
         if let section = model.sections.first(where: { $0.name == change.project }) {
-            withAnimation(Motion.collapse) { actions.toggleCollapsed(section) }
+            actions.toggleCollapsed(section)
         }
         return .moved
     }
@@ -129,10 +130,16 @@ struct ListLayout: View {
         }
     }
 
-    /// A project's lines coming in as it expands and going as it collapses.
+    /// A project's lines coming in as it expands and going as it collapses,
+    /// and any line a refresh adds or drops. A fold isn't animated, so the
+    /// lazy stack puts the headers and rows below straight in their new
+    /// places, even past the window, where an animated one holds a header
+    /// over the new rows until its spring ends. The lines carry their own
+    /// animation instead: they fade in where they land, and go at once,
+    /// since the headers below have already moved up over them.
     private static let lineTransition = AnyTransition.asymmetric(
-        insertion: .opacity.combined(with: .offset(y: -6)),
-        removal: .opacity.animation(.easeOut(duration: 0.12))
+        insertion: .opacity.combined(with: .offset(y: -6)).animation(Motion.collapse),
+        removal: .identity
     )
 }
 
@@ -151,13 +158,14 @@ private struct ListSectionHeader: View {
     var body: some View {
         HStack(spacing: 6) {
             Button {
-                withAnimation(Motion.collapse) { actions.toggleCollapsed(section) }
+                // Not animated (see `ListLayout.lineTransition`): the chevron, the count and the lines animate themselves.
+                actions.toggleCollapsed(section)
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.tertiary)
-                        .rotationEffect(.degrees(section.isCollapsed ? 0 : 90))
+                        .animation(Motion.collapse) { $0.rotationEffect(.degrees(section.isCollapsed ? 0 : 90)) }
                         .frame(width: Grid.dotColumn)
                     Image(systemName: "folder.fill")
                         .symbolRenderingMode(.hierarchical)
@@ -170,6 +178,7 @@ private struct ListSectionHeader: View {
                     if section.attentionCount > 0 {
                         // Muted while its rows are in view; the accent once collapsed.
                         CountBadge(count: section.attentionCount, muted: !section.isCollapsed)
+                            .animation(Motion.collapse, value: section.isCollapsed)
                             .transition(.scale(scale: 0.4).combined(with: .opacity))
                     }
                     Spacer(minLength: 8)
