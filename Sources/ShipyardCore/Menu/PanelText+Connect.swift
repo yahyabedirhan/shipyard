@@ -48,7 +48,7 @@ extension PanelText {
     public static let signInWithGitHub = "Sign in with GitHub"
 
     /// Why Sign in with GitHub is off: the build's OAuth App client ID is
-    /// still the placeholder.
+    /// the placeholder.
     public static let signInUnavailable = "Not available in this build: it has no OAuth App client ID."
 
     /// The code screen's button that stops the device flow.

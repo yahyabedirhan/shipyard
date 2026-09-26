@@ -18,4 +18,4 @@ Both count per OAuth App, so every copy of shipyard built with the same client I
 
 ## Where the client ID lives
 
-`OAuthApp.clientID` in `Sources/ShipyardCore/GitHub/Auth/DeviceFlow.swift`. While it's the placeholder, `DeviceFlow.requestCode()` throws `clientIDMissing` and the connect screen shows Sign in with GitHub as unavailable. Forks register their own OAuth App (with **Enable Device Flow** ticked) and put its client ID there; the README says how.
+`OAuthApp.clientID` in `Sources/ShipyardCore/GitHub/Auth/DeviceFlow.swift`: `Ov23li68GZnClULrjIFj`, shipyard's own OAuth App, registered under the maintainer's account with Device Flow enabled (#23; GitHub issues device codes for it). It isn't a secret. With the placeholder (`OAuthApp.placeholderClientID`), `DeviceFlow.requestCode()` throws `clientIDMissing` and the connect screen shows Sign in with GitHub as unavailable. Forks register their own OAuth App (with **Enable Device Flow** ticked) and put its client ID there; the README says how.
