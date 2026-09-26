@@ -1,37 +1,28 @@
-# shipyard
+<p align="center"><img src="docs/assets/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on an olive khaki tile"></p>
+
+<h1 align="center">shipyard</h1>
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
-Shipyard shows the pull requests (and, if you turn them on, issues and workflow runs) on the projects you choose, from anyone, you and your agents included. The menu bar shows one number: how many items still need your attention. Clicking an item opens it on GitHub and marks it seen. Everything it shows, and when it notifies you, lives in one commented TOML file under `~/.config/shipyard/` that you or your agents edit.
+**Status:** under construction. Versions stay at 0.0.x until the public launch; this README describes 0.0.2.
 
-**Status:** under construction, version 0.0.1. Versions stay at 0.0.x until the public launch.
+## Why it exists
+
+Coding agents open pull requests and issues and start workflow runs, often several at once across several repositories. Keeping up means checking GitHub page after page. Shipyard lists them in the menu bar, from anyone, and shows one number: how many items are new, changed since you last opened them, waiting on your review, or failing their checks. It can notify you when something happens. What it shows lives in one TOML file that you, or your agents, edit.
 
 ## Install
 
-### Requirements
+You need macOS 14 or later and a GitHub account. Building from source also needs the Command Line Tools with Swift 6 (`xcode-select --install`).
 
-- **macOS 14** or later. Shipyard ships for macOS only.
-- **To build from source: the Command Line Tools with Swift 6 or later** (`swift --version` says which you have). The package uses Swift tools version 6.0; Xcode isn't needed.
-- **The [GitHub CLI](https://cli.github.com), installed and signed in.** Shipyard 0.0.x connects to GitHub only through `gh`, picking up its token silently; signing in without `gh` is planned for a later version.
-
-  ```sh
-  brew install gh
-  gh auth login
-  ```
-
-### From source
-
-You need the Command Line Tools (`xcode-select --install`) with Swift 6 or later; check with `swift --version`. Xcode isn't needed.
+From source:
 
 ```sh
 git clone https://github.com/yahyabedirhan/shipyard.git
 cd shipyard
-make install    # builds, ad-hoc signs, copies Shipyard.app to /Applications and opens it
+make install    # builds, signs and copies Shipyard.app to /Applications, then opens it
 ```
 
-### From a release zip
-
-There's no GitHub release yet, so build the zip yourself with `make release` in a clone (it runs the tests and writes `build/Shipyard-<version>-macos.zip`). The zip is ad-hoc signed, not notarized, so macOS blocks the first launch of a copy that was downloaded. Unzip it, move `Shipyard.app` to `/Applications`, clear the quarantine flag and open it:
+Or download `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest). It isn't notarized, so clear the quarantine flag before the first launch:
 
 ```sh
 unzip Shipyard-<version>-macos.zip
@@ -40,83 +31,108 @@ xattr -dr com.apple.quarantine /Applications/Shipyard.app
 open /Applications/Shipyard.app
 ```
 
-Or, on macOS 15 and later, open it once, dismiss the warning, then choose **Open Anyway** in System Settings > Privacy & Security.
-
-### First launch
-
-Shipyard has no Dock icon: it lives in the menu bar. Click its icon to open the panel.
-
-1. Until `gh` is signed in, the panel shows the command to run and a **Try again** button.
-2. Then it offers your repositories to pick from (or type `owner/name`). Name each project, or give several repositories the same name to group them, and **Add** them. The panel also offers to install the agent skill (see [Configuration](#configuration)).
-3. The first time something is worth notifying, macOS asks whether shipyard may send notifications. If you decline, the panel says notifications are off, with a button to System Settings.
-
-Shipyard starts at login: it registers itself as a login item when it launches. Set `launch-at-login = false` in the configuration to remove it; switching it off in System Settings > General > Login Items also sticks.
-
-### Everyday use
-
-- The number in the menu bar counts the items that still need your attention.
-- Click an item to open it on GitHub and mark it seen; **⌥-click** marks it seen without opening it.
-- **↑** and **↓** move through the projects and items, wrapping at the ends; **Return** opens the highlighted item and **⌥Return** marks it seen. In the list, **←** goes to the item's project and collapses it, **→** expands it and goes to its first item, and **Return** on a project opens its (first) repository on GitHub. In tabs, **←** and **→** switch tabs.
-- **⌘R** refreshes now; otherwise shipyard refreshes on its own, within GitHub's rate limit.
-- Choose the layout in the configuration: `[menu] layout = "list"` (the default) puts every project in one scrolling list; `"tabs"` shows one project at a time.
-- Projects, what's shown and when you're notified live in `~/.config/shipyard/config.toml`; see [Configuration](#configuration). What you've seen lives in `~/Library/Application Support/Shipyard/`.
-
-### Update
-
-From source, pull and install again (it quits the running copy first):
+To update, run `git pull && make install` again, or replace the app with a newer zip. To uninstall, quit shipyard and delete the app and its files:
 
 ```sh
-git pull
-make install
+rm -rf /Applications/Shipyard.app ~/.config/shipyard ~/Library/Application\ Support/Shipyard
 ```
 
-From a zip, quit shipyard, delete the old copy (`rm -rf /Applications/Shipyard.app`), then install the newer zip as [above](#from-a-release-zip).
+If you signed in with GitHub, choose **Sign out** in the gear menu before deleting the app, and remove the agent skill with `npx skills remove shipyard -g` if you installed it.
 
-### Uninstall
+## Use
 
-1. Quit shipyard (**Quit** in its panel, or ⌘Q while it's open).
-2. Delete the app: `rm -rf /Applications/Shipyard.app`.
-3. If it's still listed in System Settings > General > Login Items, remove it there.
-4. Delete its configuration and state:
+Shipyard lives in the menu bar, with no Dock icon. On first launch the panel asks you to connect GitHub: **Sign in with GitHub**, or use the [GitHub CLI](https://cli.github.com) if `gh` is signed in. It then offers three starting configurations, called presets, and asks which repositories to watch.
 
-   ```sh
-   rm -rf ~/.config/shipyard ~/Library/Application\ Support/Shipyard
-   ```
+- Click an item to open it on GitHub and mark it seen; **⌥-click** marks it seen without opening it.
+- **↑**, **↓** and **Return** move through the items and open one; **⌘R** refreshes.
+- Shipyard starts at login. Set `launch-at-login = false` to stop that.
 
-5. If you installed the agent skill, remove it:
+## Configure
 
-   ```sh
-   npx skills remove shipyard -g
-   ```
+Everything lives in `~/.config/shipyard/config.toml`; **Open configuration file** in the gear menu opens it. Every key is optional and each save applies at once. A broken edit keeps the last good configuration and shows the error in the panel.
 
-6. macOS may keep a Shipyard entry under System Settings > Notifications after the app is gone. It's harmless, and System Settings has no button to remove it; leave it, or turn its notifications off there.
+The file sets the projects (each a section of the menu with its repositories), the layout (`list` or `tabs`), what's shown (pull requests, issues, workflow runs, and whose), how items are grouped and sorted, and which events notify you. [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md) lists every key, its default and its allowed values, with worked examples; [`skills/shipyard/presets.md`](skills/shipyard/presets.md) has the three presets in full; and [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code, for maintainers.
 
-`gh` stays signed in; run `gh auth logout` if you want that too.
+## Use it with an agent
 
-## Configuration
+Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it from the panel's gear menu (**Install agent skill…**) or from a terminal:
 
-Everything shipyard shows and when it notifies lives in `~/.config/shipyard/config.toml` (`$XDG_CONFIG_HOME/shipyard/` when that's set). Every key is optional, edits apply live, and a broken edit keeps the last valid configuration and shows the error in the panel. **Open configuration file**, in the panel's gear menu, opens it.
+```sh
+npx skills add yahyabedirhan/shipyard -g -y
+```
 
-The menu comes in two layouts, chosen with `[menu] layout`: `"list"` (the default) puts every project in one scrolling list, one line per item under pinned project headers; `"tabs"` shows one project at a time.
+Then ask in your own words: "Watch this repo in shipyard", "Hide dependabot's pull requests", "Tell me when CI fails on this project", "Switch shipyard to tabs". The agent edits the file, checks it against the schema, and reads shipyard's verdict on the save.
 
-- The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
-- The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.
-- For maintainers, [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code and lists every place to touch when adding a setting.
+## Examples
+
+Each configuration below produced the screenshot under it, trimmed to the lines that matter. The first three watch two repositories as one project, with issues turned on.
+
+The list layout, grouped by repository under subheaders, four rows a group:
+
+```toml
+[menu]
+layout = "list"
+[defaults]
+group-by = "repository"
+subsections = true
+show-first = 4
+[defaults.issues]
+show = true
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
+```
+
+<img src="docs/assets/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+
+The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
+
+```toml
+[menu]
+layout = "tabs"
+[defaults]
+group-by = "repository"
+subsections = true
+show-first = 4
+[defaults.issues]
+show = true
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
+```
+
+<img src="docs/assets/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
+
+Grouped by date, three rows a group:
+
+```toml
+[menu]
+layout = "list"
+[defaults]
+group-by = "date"
+subsections = true
+show-first = 3
+[defaults.issues]
+show = true
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
+```
+
+<img src="docs/assets/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
+
+A file with no projects (or no file at all): the panel asks how you'll use shipyard, offers the three presets, and offers the agent skill:
+
+```toml
+version = 1
+```
+
+<img src="docs/assets/shipyard-0.0.2/presets.png" width="400" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 
 ## Development
 
-The package has two targets:
+`make test` runs the tests, and `make release` builds the release zip. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`CONTEXT.md`](CONTEXT.md).
 
-- `ShipyardCore`: every rule (configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model). It depends only on Foundation, FoundationNetworking, Observation and TOMLDecoder, so it also **builds and tests on Linux, for development**. Linux isn't a supported platform for running shipyard.
-- `ShipyardApp`: the macOS app (the `Shipyard` executable), a thin layer of Apple frameworks over the core. It's only part of the package on macOS.
+### Forks: your own OAuth App
 
-```sh
-make test                            # the tests (plain `swift test` needs Xcode or Linux; the Makefile finds the Testing framework the Command Line Tools ship)
-make install                         # bundle, ad-hoc sign and install /Applications/Shipyard.app, then open it
-make release                         # test, bundle and zip build/Shipyard-<version>-macos.zip
-swift build --target ShipyardCore    # the core alone, on macOS or Linux
-```
-
-CI runs the core's tests on Ubuntu for every push and pull request.
-
-The design is in `docs/low-level-design.md`, and the glossary in `CONTEXT.md`.
+Sign in with GitHub uses the OAuth App client ID compiled into the build. A fork should use its own: create an OAuth App on GitHub (**Settings > Developer settings > OAuth Apps**), tick **Enable Device Flow**, and put its client ID in `OAuthApp.clientID` in `Sources/ShipyardCore/GitHub/Auth/DeviceFlow.swift`. Without one, the build connects through `gh` only. See [`docs/references/github-device-flow.md`](docs/references/github-device-flow.md) for GitHub's limits.

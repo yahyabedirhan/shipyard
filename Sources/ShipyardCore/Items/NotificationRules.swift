@@ -5,15 +5,14 @@ import Foundation
 /// A project's rules are its own `notifications` list when it has one, else
 /// `[[defaults.notifications]]` (`ProjectSettings.notifications` is already
 /// the right one). An event is notified when a rule names it and the rule's
-/// author filter matches the item's author. Items by an author in
-/// `hide-authors`, and draft pull requests in a project whose
-/// `pull-requests.drafts` is off, are never notified, as they're never listed.
+/// authors cover the item's author. It's asked only for items the project
+/// lists (`Listing`): what the filters leave out is never notified, and a
+/// rule's `authors` can only narrow that further (ADR 0003).
 public enum NotificationRules {
-    public static func shouldNotify(_ event: Event, settings: ProjectSettings, hiddenAuthors: Set<String> = []) -> Bool {
-        if hiddenAuthors.contains(event.item.author.lowercased()) { return false }
-        if event.item.state == .draft, !settings.pullRequests.drafts { return false }
-        return settings.notifications.contains { rule in
-            rule.event == event.kind && rule.authors.matches(event.item)
+    /// `viewer` is the signed-in login, which `me` matches.
+    public static func shouldNotify(_ event: Event, settings: ProjectSettings, viewer: String? = nil) -> Bool {
+        settings.notifications.contains { rule in
+            rule.event == event.kind && rule.covers(event.item, viewer: viewer)
         }
     }
 
@@ -28,21 +27,6 @@ public enum NotificationRules {
             itemTitle: event.item.branch.map { "\(event.item.title) · \($0)" } ?? event.item.title,
             itemURL: event.item.url
         )
-    }
-}
-
-extension AuthorFilter {
-    /// Whether the filter covers `item`'s author: `me` is the signed-in
-    /// user (and so their agents), `bots` a Bot account or a `[bot]` login,
-    /// `others` anyone else.
-    public func matches(_ item: Item) -> Bool {
-        let isBot = item.authorKind == .bot || item.author.lowercased().hasSuffix("[bot]")
-        switch self {
-        case .any: return true
-        case .me: return item.authorKind == .me && !isBot
-        case .bots: return isBot
-        case .others: return item.authorKind == .other && !isBot
-        }
     }
 }
 

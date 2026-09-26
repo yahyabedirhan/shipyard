@@ -28,7 +28,7 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(10) == "10 need attention")
     }
 
-    @Test("the layout button's tooltip and VoiceOver label name the current layout and the next one")
+    @Test("the layout button's hover help and VoiceOver label name the current layout and the next one")
     func layoutButton() {
         #expect(PanelText.layoutButton(.list) == "Layout: list. Click for tabs.")
         #expect(PanelText.layoutButton(.tabs) == "Layout: tabs. Click for list.")
@@ -127,7 +127,12 @@ struct PanelTextTests {
 
     // MARK: - Rows
 
-    private func row(repository: String = "yahyabedirhan/shipyard", number: Int = 21, author: String = "yahyabedirhan") -> MenuRow {
+    private func row(
+        repository: String = "yahyabedirhan/shipyard",
+        number: Int = 21,
+        author: String = "yahyabedirhan",
+        checks: ChecksState = .none
+    ) -> MenuRow {
         MenuRow(Item(
             kind: .pullRequest,
             repository: repository,
@@ -137,6 +142,7 @@ struct PanelTextTests {
             author: author,
             authorKind: .me,
             state: .open,
+            checks: checks,
             createdAt: now.addingTimeInterval(-37 * 60),
             updatedAt: now.addingTimeInterval(-37 * 60)
         ))
@@ -154,22 +160,142 @@ struct PanelTextTests {
         #expect(PanelText.repositoryName("shipyard") == "shipyard")
     }
 
-    @Test("a row's tooltip holds its state and full second line, and the ⌥-click hint while it needs attention")
-    func rowHelp() {
-        let seen = row()
-        #expect(PanelText.rowHelp(seen, showingRepository: true, now: now) == "open pull request · #21 · shipyard · yahyabedirhan · 37m")
-        #expect(PanelText.rowHelp(seen, showingRepository: false, now: now) == "open pull request · #21 · yahyabedirhan · 37m")
-
-        var unseen = seen
-        unseen.needsAttention = true
-        #expect(PanelText.rowHelp(unseen, showingRepository: false, now: now) == """
-            open pull request · #21 · yahyabedirhan · 37m
-            ⌥-click to mark seen
-            """)
-        #expect(PanelText.optionClickHint == "⌥-click to mark seen")
+    @Test("a pull request's card holds only what its row doesn't: branches, size, review, comments and when it last moved")
+    func pullRequestCard() {
+        var pullRequest = row(checks: .passed)
+        pullRequest.item.avatarURL = URL(string: "https://avatars.githubusercontent.com/u/42?v=4")
+        pullRequest.item.updatedAt = now.addingTimeInterval(-5 * 60)
+        pullRequest.item.details = ItemDetails(
+            headBranch: "attention-dot",
+            baseBranch: "main",
+            additions: 120,
+            deletions: 43,
+            changedFiles: 6,
+            review: .approved,
+            comments: 3,
+            reviews: 1
+        )
+        let card = PanelText.rowCard(pullRequest, now: now)
+        #expect(card.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
+        #expect(card.headline == "Attention in the panel")
+        #expect(card.lines == [
+            "attention-dot → main",
+            "+120 −43 · 6 files",
+            "Approved · Checks passed",
+            "3 comments · 1 review · updated 5m ago",
+        ])
+        // The app draws each fact with its icon, a line of them at a time.
+        #expect(card.facts == [
+            [.branches(head: "attention-dot", base: "main")],
+            [.size(additions: 120, deletions: 43), .files(6)],
+            [.review(.approved), .checks(.passed)],
+            [.comments(3), .reviews(1), .updated("5m")],
+        ])
+        #expect(card.reasons == [])
+        #expect(card.attention == nil)
     }
 
-    @Test("a row's action, attention dot and check dot have words for VoiceOver and the tooltip")
+    @Test("a card leaves out what GitHub didn't give, and the update time when it's the row's age")
+    func sparseCard() {
+        let card = PanelText.rowCard(row(), now: now)
+        #expect(card.lines == ["No comments"])
+    }
+
+    @Test("an issue's card leaves out no comments, so a quiet issue is its title and why it needs attention")
+    func issueCard() {
+        var issue = row()
+        issue.kind = .issue
+        issue.item.kind = .issue
+        #expect(PanelText.rowCard(issue, now: now).facts == [])
+
+        issue.item.details.comments = 1
+        #expect(PanelText.rowCard(issue, now: now).lines == ["1 comment"])
+
+        issue.item.details.comments = 0
+        issue.item.updatedAt = now.addingTimeInterval(-2 * 3600)
+        issue.item.createdAt = now.addingTimeInterval(-3 * 86_400)
+        issue = MenuRow(issue.item)
+        #expect(PanelText.rowCard(issue, now: now).facts == [[.updated("2h")]])
+        #expect(PanelText.rowCard(issue, now: now).lines == ["updated 2h ago"])
+    }
+
+    @Test("a card tags a review request and failed checks, in words too, but not new or changed")
+    func attentionCard() {
+        var unseen = row(checks: .failed)
+        unseen.needsAttention = true
+        unseen.attentionReasons = [.unseen, .reviewRequested, .checksFailed]
+        let card = PanelText.rowCard(unseen, now: now)
+        #expect(card.reasons == [.reviewRequested, .checksFailed])
+        #expect(card.kind == .pullRequest)
+        #expect(card.attention == "Your review is requested · Checks failed")
+        #expect(card.spoken == "Checks failed. No comments. Your review is requested · Checks failed")
+
+        var changed = unseen
+        changed.attentionReasons = [.changed]
+        #expect(PanelText.rowCard(changed, now: now).reasons == [])
+        #expect(PanelText.rowCard(changed, now: now).attention == nil)
+    }
+
+    @Test("a run's card has its title, what started it and who, and how long it ran")
+    func runCard() {
+        let started = now.addingTimeInterval(-10 * 60)
+        var item = Item(
+            kind: .workflowRun,
+            repository: "yahyabedirhan/shipyard",
+            number: 41,
+            title: "CI",
+            url: URL(string: "https://github.com/yahyabedirhan/shipyard/actions/runs/41")!,
+            author: "yahyabedirhan",
+            authorKind: .me,
+            state: .failed,
+            checks: .failed,
+            createdAt: started,
+            updatedAt: started.addingTimeInterval(192),
+            closedAt: started.addingTimeInterval(192),
+            branch: "main",
+            details: ItemDetails(runTitle: "Add the hover card", runEvent: "push", runAttempt: 2)
+        )
+        var failed = MenuRow(item, needsAttention: true)
+        failed.attentionReasons = [.checksFailed]
+        let card = PanelText.rowCard(failed, now: now)
+        #expect(card.headline == "Add the hover card")
+        #expect(card.lines == ["Push by yahyabedirhan · attempt 2", "Took 3m 12s"])
+        #expect(card.attention == "Run failed")
+        #expect(card.facts == [
+            [.trigger(event: "push", by: "yahyabedirhan"), .attempt(2)],
+            [.duration("3m 12s", running: false)],
+        ])
+
+        item.state = .running
+        item.closedAt = nil
+        item.details = ItemDetails(runEvent: "workflow_dispatch", runAttempt: 1)
+        let running = PanelText.rowCard(MenuRow(item), now: now)
+        #expect(running.headline == "CI")
+        #expect(running.lines == ["Manual run by yahyabedirhan", "Running for 10m"])
+    }
+
+    @Test("a duration reads in seconds, minutes and seconds, or hours and minutes")
+    func duration() {
+        #expect(PanelText.duration(42) == "42s")
+        #expect(PanelText.duration(180) == "3m")
+        #expect(PanelText.duration(192) == "3m 12s")
+        #expect(PanelText.duration(3600) == "1h")
+        #expect(PanelText.duration(3900) == "1h 5m")
+    }
+
+    @Test("the header's refresh and settings buttons have hover help, refresh naming its shortcut")
+    func headerButtonHelp() {
+        #expect(PanelText.refreshHelp == "Refresh (⌘R)")
+        #expect(PanelText.settings == "Settings")
+    }
+
+    @Test("a list section's header tells VoiceOver what a click does to it")
+    func sectionFoldHelp() {
+        #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: false) == "Collapse shipyard")
+        #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: true) == "Expand shipyard")
+    }
+
+    @Test("a row's action, attention dot and check dot have words for VoiceOver and the hover help")
     func rowWords() {
         #expect(PanelText.markRowSeen == "Mark seen")
         #expect(PanelText.needsAttention == "Needs attention")
@@ -291,26 +417,132 @@ struct PanelTextTests {
 
     // MARK: - The connect screen
 
-    @Test("with no gh token the connect screen says to install gh and run gh auth login")
-    func connectNoToken() {
-        let text = PanelText.connect(.noToken)
-        #expect(text.title == "Connect to GitHub")
-        #expect(text.message.contains("GitHub CLI"))
-        #expect(text.command == "gh auth login")
-        #expect(text.suggestsInstallingGh)
-        #expect(PanelText.installGh.contains("https://cli.github.com"))
-        #expect(PanelText.installGh.contains("brew install gh"))
+    @Test("on first launch, or signed out with nothing signed in, a welcome, Sign in with GitHub leads and gh folds away", arguments: [
+        Shipyard.SignedOutReason.noToken, .userSignedOut(.signedOut),
+    ])
+    func connectFirstLaunch(reason: Shipyard.SignedOutReason) {
+        let text = PanelText.connect(reason, canSignIn: true)
+        #expect(text.title == "Welcome to Shipyard")
+        #expect(text.message == "Connect your GitHub account to see the pull requests your agents open.")
+        #expect(text.lead == .signIn)
+        #expect(text.signInUnavailable == nil)
+        #expect(text.showsInstallHint)
     }
 
-    @Test("while shipyard looks for gh's token the panel says it's connecting")
+    @Test("signed out while gh is still signed in, a welcome back says gh is one click away, and there's no gh auth logout")
+    func connectSignedOutGhStillSignedIn() {
+        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: true)
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:")
+        #expect(text.alternative == "Alternatively, sign in with GitHub, if you'd rather:")
+        #expect(!text.message.contains("logout"))
+        #expect(text.lead == .connectWithGh)
+        #expect(!text.showsInstallHint)
+    }
+
+    @Test("without a client ID, signed out while gh is still signed in has no second block")
+    func connectSignedOutGhStillSignedInWithoutClientID() {
+        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: false)
+        #expect(text.message == "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:")
+        #expect(text.alternative == nil)
+    }
+
+    @Test("only signed out while gh is still signed in splits into two blocks", arguments: [
+        Shipyard.SignedOutReason.noToken, .rejected(.gh), .rejected(.tokenStore), .userSignedOut(.signedOut),
+    ])
+    func connectOneBlock(reason: Shipyard.SignedOutReason) {
+        #expect(PanelText.connect(reason, canSignIn: true).alternative == nil)
+    }
+
+    @Test("a rejected Keychain token says so in a line, then Sign in with GitHub leads")
+    func connectRejectedStored() {
+        let text = PanelText.connect(.rejected(.tokenStore), canSignIn: true)
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.")
+        #expect(text.lead == .signIn)
+        #expect(text.showsInstallHint)
+    }
+
+    @Test("a rejected gh token leads with gh auth login and Connect with gh, then Sign in with GitHub")
+    func connectRejectedGh() {
+        let text = PanelText.connect(.rejected(.gh), canSignIn: true)
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "GitHub rejected the `gh` command's sign-in. Sign `gh` in again in a terminal, then connect.")
+        #expect(text.lead == .ghCommand)
+        #expect(!text.showsInstallHint)
+    }
+
+    @Test("the gh way's words: gh in code font, as a command", arguments: [
+        (PanelText.connectWithGh, "Connect with `gh`"),
+        (PanelText.useGhInstead, "Use the GitHub CLI `gh` instead"),
+        (PanelText.useGhInsteadHelp, "Shipyard reuses the `gh` command's sign-in if you already use it."),
+        (PanelText.installGhHelp, "How to install `gh`"),
+        (PanelText.installGh, "Download it from [cli.github.com](https://cli.github.com), or run:"),
+        (PanelText.ghLogin, "gh auth login"),
+        (PanelText.brewInstallGh, "brew install gh"),
+        (PanelText.signInWithGitHub, "Sign in with GitHub"),
+    ])
+    func connectGhWords(text: String, expected: String) {
+        #expect(text == expected)
+    }
+
+    @Test("without a client ID Sign in with GitHub says why it's unavailable, and gh leads", arguments: [
+        (Shipyard.SignedOutReason.noToken, PanelText.Connect.Lead.ghCommand),
+        (.userSignedOut(.signedOut), .ghCommand),
+        (.rejected(.tokenStore), .ghCommand),
+        (.rejected(.gh), .ghCommand),
+        (.userSignedOut(.ghStillSignedIn), .connectWithGh),
+    ])
+    func connectWithoutClientID(reason: Shipyard.SignedOutReason, lead: PanelText.Connect.Lead) {
+        let text = PanelText.connect(reason, canSignIn: false)
+        #expect(text.signInUnavailable == PanelText.signInUnavailable)
+        #expect(text.lead == lead)
+        #expect(!text.message.lowercased().contains("sign in with github"))
+    }
+
+    @Test("with no token and no client ID the screen says to connect through gh, with the install hint")
+    func connectNoTokenWithoutClientID() {
+        let text = PanelText.connect(.noToken, canSignIn: false)
+        #expect(text.title == "Welcome to Shipyard")
+        #expect(text.message == "Connect your GitHub account through the GitHub CLI `gh`.")
+        #expect(text.showsInstallHint)
+    }
+
+    @Test("gh is always in backticks, so it reads in code font, in every state's words")
+    func connectGhInCodeFont() throws {
+        let reasons: [Shipyard.SignedOutReason] = [
+            .noToken, .rejected(.gh), .rejected(.tokenStore), .userSignedOut(.signedOut), .userSignedOut(.ghStillSignedIn),
+        ]
+        var words = reasons.flatMap { reason in
+            [true, false].flatMap { canSignIn in
+                let text = PanelText.connect(reason, canSignIn: canSignIn)
+                return [text.title, text.message, text.alternative ?? ""]
+            } + [PanelText.stillSignedOut(reason)]
+        }
+        words += [PanelText.connectWithGh, PanelText.useGhInstead, PanelText.useGhInsteadHelp, PanelText.installGhHelp]
+        words += [DeviceFlowError.unauthorized, .rejected("x")].map(PanelText.signInFailed)
+        let code = try Regex("`[^`]*`")
+        let gh = try Regex("\\bgh\\b")
+        for text in words {
+            // Outside the code spans, no gh is left.
+            #expect(text.replacing(code, with: "").firstMatch(of: gh) == nil, "bare gh in: \(text)")
+        }
+    }
+
+    @Test("the unavailable reason is short and names the missing client ID")
+    func signInUnavailableReason() {
+        #expect(PanelText.signInUnavailable == "Not available in this build: it has no OAuth App client ID.")
+    }
+
+    @Test("while shipyard looks for a token the panel says it's connecting")
     func connecting() {
         #expect(PanelText.connecting == "Connecting to GitHub…")
     }
 
-    @Test("a Try again that leaves shipyard signed out says why, so the click doesn't look dead", arguments: [
-        (Shipyard.SignedOutReason.noToken, "gh still isn't signed in."),
-        (.rejected(.gh), "GitHub still rejects gh's token."),
-        (.rejected(.tokenStore), "GitHub still rejects the token."),
+    @Test("a Connect with gh that leaves shipyard signed out says why, so the click doesn't look dead", arguments: [
+        (Shipyard.SignedOutReason.noToken, "The `gh` command still isn't signed in."),
+        (.rejected(.gh), "GitHub still rejects the `gh` command's sign-in."),
+        (.rejected(.tokenStore), "GitHub still rejects the sign-in."),
         (.userSignedOut(.signedOut), "Still not connected."),
         (.userSignedOut(.ghStillSignedIn), "Still not connected."),
     ])
@@ -318,36 +550,39 @@ struct PanelTextTests {
         #expect(PanelText.stillSignedOut(reason) == text)
     }
 
-    @Test("a rejected gh token says it was revoked or expired and to sign gh in again")
-    func connectRejectedGh() {
-        let text = PanelText.connect(.rejected(.gh))
-        #expect(text.title == "GitHub rejected gh's token")
-        #expect(text.message.contains("revoked or has expired"))
-        #expect(text.command == "gh auth login")
-        #expect(!text.suggestsInstallingGh)
+    // MARK: - Sign in with GitHub
+
+    @Test("the code screen shows the code, says where it goes, how to copy it, and how to open GitHub")
+    func deviceCodeScreen() {
+        let code = DeviceCode(
+            userCode: "WDJB-MJHT",
+            verificationURL: URL(string: "https://github.com/login/device")!,
+            expiresAt: Date(timeIntervalSince1970: 1_790_338_500)
+        )
+        let text = PanelText.deviceCode(code, locale: british, timeZone: london)
+        #expect(text.title == "Enter this code on GitHub")
+        #expect(text.code == "WDJB-MJHT")
+        #expect(text.message == "Copy the code, open github.com/login/device and paste it there. Shipyard connects once you approve.")
+        #expect(text.copyCode == "Copy code")
+        #expect(text.copyTitle == "Copy")
+        #expect(text.copied == "Copied")
+        #expect(text.openButton == "Copy code and open GitHub")
+        #expect(text.waiting == "Waiting for approval · the code expires at 13:15")
+        #expect(PanelText.cancelSignIn == "Cancel")
     }
 
-    @Test("a rejected stored token also points at gh auth login")
-    func connectRejectedStored() {
-        let text = PanelText.connect(.rejected(.tokenStore))
-        #expect(text.title == "GitHub rejected shipyard's token")
-        #expect(text.command == "gh auth login")
-    }
-
-    @Test("signing out while gh is still signed in says to run gh auth logout")
-    func connectSignedOutGhStillSignedIn() {
-        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn))
-        #expect(text.title == "Signed out")
-        #expect(text.message.contains("still signed in"))
-        #expect(text.command == "gh auth logout")
-        #expect(!text.suggestsInstallingGh)
-    }
-
-    @Test("signing out with nothing left signed in points back at gh auth login")
-    func connectSignedOut() {
-        let text = PanelText.connect(.userSignedOut(.signedOut))
-        #expect(text.title == "Signed out")
-        #expect(text.command == "gh auth login")
+    @Test("a sign-in that ended without a token says why", arguments: [
+        (DeviceFlowError.expired, "The code expired before it was approved. Sign in again for a new one."),
+        (.denied, "The sign-in was declined on GitHub."),
+        (.clientIDMissing, "Not available in this build: it has no OAuth App client ID."),
+        (.unauthorized, "GitHub refused the sign-in. Try again, or use `gh`."),
+        (.rejected("device_flow_disabled"), "GitHub refused the sign-in (device_flow_disabled). Try again, or use `gh`."),
+        (.http(503), "GitHub answered with an error (HTTP 503). Try again."),
+        (.network("offline"), "GitHub couldn't be reached. Check the connection and try again."),
+        (.malformed, "GitHub's answer couldn't be read. Try again."),
+    ])
+    func signInFailed(error: DeviceFlowError, text: String) {
+        #expect(PanelText.signInFailed(error) == text)
     }
 
     // MARK: - The agent skill
@@ -414,6 +649,26 @@ struct PanelTextTests {
     }
 
     // MARK: - The project picker
+
+    @Test("the preset step speaks to the user and names neither the app nor the configuration file in its description")
+    func presetWords() {
+        #expect(PanelText.presetIntro == "Pick a starting point for your configuration. You can change it at any time.")
+        #expect(!PanelText.presetIntro.contains("config.toml"))
+        #expect(!PanelText.presetIntro.contains("Shipyard"))
+        #expect(Preset.myAgents.title == "You and your agents")
+        #expect(Preset.myAgents.summary == "The pull requests and issues you and your agents open, in the repositories you pick.")
+    }
+
+    @Test("the preset step's button goes on to the picker when repositories are still needed, otherwise starts with the preset")
+    func presetContinue() {
+        #expect(PanelText.presetContinue(PresetChoice()) == "Continue")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .myAgents)) == "Choose repositories")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .reviewQueue)) == "Start with Review queue")
+        var incoming = PresetChoice(preset: .incomingContributions)
+        #expect(PanelText.presetContinue(incoming) == "Start with Incoming contributions")
+        incoming.watchesOwned = false
+        #expect(PanelText.presetContinue(incoming) == "Choose repositories")
+    }
 
     @Test("the picker's Add button counts the projects it writes")
     func addProjects() {

@@ -1,6 +1,7 @@
 {
   "data": {
     "viewer": { "login": "yabepa" },
+    "reviewSearch": { "issueCount": 0, "nodes": [] },
     "repo0": {
       "nameWithOwner": "yahyabedirhan/job-search",
       "openPullRequests": {
@@ -11,7 +12,6 @@
             "createdAt": "2026-09-25T08:00:00Z", "updatedAt": "2026-09-25T08:30:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
           }
         ]

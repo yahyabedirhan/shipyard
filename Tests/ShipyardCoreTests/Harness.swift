@@ -49,7 +49,8 @@ struct Harness {
 
     /// A harness with the given token store and `gh` tokens and, when
     /// `config` isn't `nil`, that configuration file.
-    init(stored: String? = nil, gh ghToken: String? = nil, config: String? = nil) throws {
+    /// `clientID` is the OAuth App client ID the device flow uses.
+    init(stored: String? = nil, gh ghToken: String? = nil, config: String? = nil, clientID: String = "test-client-id") throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
         let configURL = root.appendingPathComponent("config", isDirectory: true).appendingPathComponent("config.toml")
@@ -57,11 +58,11 @@ struct Harness {
         try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         if let config { try Data(config.utf8).write(to: configURL) }
-        self.init(configURL: configURL, stateDirectory: stateDirectory, store: InMemoryTokenStore(token: stored), gh: ghToken)
+        self.init(configURL: configURL, stateDirectory: stateDirectory, store: InMemoryTokenStore(token: stored), gh: ghToken, clientID: clientID)
     }
 
     /// A harness over existing configuration and app-state directories.
-    private init(configURL: URL, stateDirectory: URL, store: InMemoryTokenStore, gh ghToken: String?) {
+    private init(configURL: URL, stateDirectory: URL, store: InMemoryTokenStore, gh ghToken: String?, clientID: String = "test-client-id") {
         self.configURL = configURL
         self.stateDirectory = stateDirectory
         self.store = store
@@ -80,7 +81,7 @@ struct Harness {
             clock: sleeper.clock,
             timer: timer,
             sleep: sleeper.sleep,
-            oauthClientID: "test-client-id"
+            oauthClientID: clientID
         )
     }
 

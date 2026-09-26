@@ -44,20 +44,41 @@ struct Hairline: View {
 
 /// A count in a capsule that rolls to its new number: the accent colour
 /// when it asks to be seen, muted when the rows it counts are in view.
+///
+/// Both colourings are drawn, one over the other, and muting fades between
+/// them. Restyling the number instead would change the text itself, and
+/// its numeric content transition would roll the digits on a colour change
+/// alone; this way only a new count rolls them.
 struct CountBadge: View {
     let count: Int
     var muted = false
 
     var body: some View {
+        ZStack {
+            number.foregroundStyle(.secondary).opacity(muted ? 1 : 0)
+            number.foregroundStyle(Color.white).opacity(muted ? 0 : 1)
+        }
+        // Fixed, so a tab's label style changing around the badge doesn't
+        // restyle the muted number either.
+        .foregroundStyle(Color.primary)
+        .padding(.horizontal, 5)
+        .frame(minWidth: 17, minHeight: 15)
+        .background {
+            ZStack {
+                Capsule().fill(Color.primary.opacity(0.09)).opacity(muted ? 1 : 0)
+                Capsule().fill(Palette.accent).opacity(muted ? 0 : 1)
+            }
+        }
+        .animation(Motion.tint, value: muted)
+        .animation(Motion.count, value: count)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(count) need attention")
+    }
+
+    private var number: some View {
         Text(String(count))
             .font(TypeScale.badge)
             .contentTransition(.numericText(value: Double(count)))
-            .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.white))
-            .padding(.horizontal, 5)
-            .frame(minWidth: 17, minHeight: 15)
-            .background(Capsule().fill(muted ? Color.primary.opacity(0.09) : Palette.accent))
-            .animation(Motion.count, value: count)
-            .accessibilityLabel("\(count) need attention")
     }
 }
 
@@ -125,7 +146,7 @@ struct CheckDot: View {
                 Circle().fill(Palette.panel).frame(width: 8, height: 8)
                 Circle().fill(color).frame(width: 5.5, height: 5.5)
             }
-            .help(PanelText.checks(checks) ?? "")
+            // Its words are in the row's hover card (`PanelText.rowCard`).
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
     }
@@ -150,7 +171,7 @@ struct AttentionDot: View {
 extension View {
     /// An item's row at `place`, in either layout: clicking opens it and
     /// marks it seen, ⌥-click (or the VoiceOver action) only marks it seen;
-    /// the tooltip holds its state and full second line; the attention
+    /// its hover card holds what the row doesn't show (`PanelText.rowCard`); the attention
     /// dot and weight animate as it's seen; and it's `highlightable`. The
     /// layout still puts `.id(place)` on the lazy list's own child.
     func itemRow(
@@ -178,7 +199,7 @@ private struct ItemRow: ViewModifier {
             .buttonStyle(RowButtonStyle())
             // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-            .help(PanelText.rowHelp(row, showingRepository: showsRepository, now: now))
+            .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
             .animation(Motion.seen, value: row.needsAttention)
             .highlightable(place, $highlight)
     }
@@ -192,12 +213,40 @@ private struct ItemRow: ViewModifier {
     }
 }
 
-/// A repository of a project that couldn't be fetched, in a row's place.
-struct ErrorRow: View {
-    let error: MenuErrorRow
+/// A note about a project's list, in a row's place, such as the review
+/// search's limit: information, not a failure. It wraps rather than
+/// truncating, so it needs no hover help.
+struct NoteRow: View {
+    let note: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 10.5))
+                .frame(width: Grid.iconColumn)
+            Text(note)
+                .font(TypeScale.meta)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
+        .padding(.trailing, Grid.gutter)
+        .padding(.vertical, 5)
+        .frame(minHeight: Grid.rowHeight)
+    }
+}
+
+/// A repository of a project that couldn't be fetched, in a row's place.
+/// Its message wraps, up to `maxLines`, rather than truncating, so it needs
+/// no hover help; VoiceOver reads it whole.
+struct ErrorRow: View {
+    let error: MenuErrorRow
+    private static let maxLines = 3
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, Palette.amber)
@@ -206,14 +255,15 @@ struct ErrorRow: View {
             Text(error.message)
                 .font(TypeScale.meta)
                 .foregroundStyle(.primary.opacity(0.75))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(error.message)
+                .lineLimit(Self.maxLines)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
             Spacer(minLength: 0)
         }
         .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
         .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
+        .padding(.vertical, 5)
+        .frame(minHeight: Grid.rowHeight)
     }
 }
 
@@ -223,7 +273,7 @@ struct CommandBox: View {
     /// Whether it starts with a `$` prompt (a single-line shell command).
     var prompt = true
     var font = TypeScale.code
-    @State private var copied = false
+    @State private var copiedAt: Date?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -235,18 +285,8 @@ struct CommandBox: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
-                withAnimation(.spring(duration: 0.3)) { copied = true }
-            } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(IconButtonStyle())
-            .help(copied ? "Copied" : "Copy")
-            .accessibilityLabel(copied ? "Copied" : "Copy")
-            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            CopyButton(text: command, copiedAt: $copiedAt)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
         }
         .padding(.leading, 10)
         .padding(.trailing, 4)
@@ -254,7 +294,78 @@ struct CommandBox: View {
         .frame(minHeight: 30)
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
-        .onChange(of: command) { copied = false }
+        .onChange(of: command) { copiedAt = nil }
+    }
+}
+
+/// The copy icon beside text to copy (a `CommandBox`'s command, the
+/// sign-in code): puts `text` on the clipboard and turns into a checkmark.
+/// No hover help: the checkmark says it was copied. With a `title` it has a
+/// short word beside the icon ("Copy"), which rolls to `copiedTitle`
+/// ("Copied") with the counts' text transition. Ten seconds after the last
+/// copy it turns back, with the same animations; another copy before then
+/// starts the ten seconds again. `copiedAt` (when it was last copied; `nil`
+/// shows the copy icon) is the caller's, so another way of copying the same
+/// text can show it too, through `CopyButton.copied(_:)`, and new text can
+/// reset it at once.
+struct CopyButton: View {
+    /// How long the checkmark stays after a copy.
+    static let resetDelay: Duration = .seconds(10)
+
+    /// Marks `copiedAt` as copied now, with the icon's animation.
+    static func copied(_ copiedAt: Binding<Date?>) {
+        withAnimation(.spring(duration: 0.3)) { copiedAt.wrappedValue = Date() }
+    }
+
+    let text: String
+    /// VoiceOver's label before and after copying.
+    var label = "Copy"
+    var copiedLabel = "Copied"
+    /// The word beside the icon before and after copying; none without it.
+    var title: String? = nil
+    var copiedTitle: String? = nil
+    @Binding var copiedAt: Date?
+
+    private var copied: Bool { copiedAt != nil }
+
+    var body: some View {
+        Button {
+            Clipboard.copy(text)
+            Self.copied($copiedAt)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .contentTransition(.symbolEffect(.replace))
+                if let title {
+                    let after = copiedTitle ?? title
+                    // Sized for the longer word, so the icon doesn't shift as it rolls.
+                    ZStack(alignment: .leading) {
+                        Text(title.count > after.count ? title : after).hidden()
+                        Text(copied ? after : title)
+                            .contentTransition(.numericText())
+                            .animation(Motion.count, value: copied)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                }
+            }
+        }
+        .buttonStyle(IconButtonStyle(labeled: title != nil))
+        .accessibilityLabel(copied ? copiedLabel : label)
+        // Restarts with each copy and is cancelled when the button goes away.
+        .task(id: copiedAt) {
+            guard copiedAt != nil else { return }
+            do { try await Task.sleep(for: Self.resetDelay) } catch { return }
+            withAnimation(.spring(duration: 0.3)) { copiedAt = nil }
+        }
+    }
+}
+
+/// The general pasteboard, for text.
+enum Clipboard {
+    /// Puts exactly `text` on the clipboard, in place of what was there.
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 
@@ -275,13 +386,17 @@ extension View {
 
 /// A borderless icon button with hover and pressed states.
 struct IconButtonStyle: ButtonStyle {
+    /// An icon with a word beside it: as wide as both, rather than square.
+    var labeled = false
+
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        IconButtonBody(configuration: configuration)
+        IconButtonBody(configuration: configuration, labeled: labeled)
     }
 }
 
 private struct IconButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let labeled: Bool
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
 
@@ -290,7 +405,8 @@ private struct IconButtonBody: View {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(hover && isEnabled ? .primary : .secondary)
             .opacity(isEnabled ? 1 : 0.4)
-            .frame(width: 24, height: 22)
+            .padding(.horizontal, labeled ? 6 : 0)
+            .frame(width: labeled ? nil : 24, height: 22)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(configuration.isPressed ? Palette.pressed : hover && isEnabled ? Palette.hover : .clear)
@@ -305,15 +421,18 @@ private struct IconButtonBody: View {
 /// or quiet.
 struct PillButtonStyle: ButtonStyle {
     var prominent = false
+    /// 24 in a row of buttons; taller for a screen's stacked, full-width actions.
+    var height: CGFloat = 24
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        PillButtonBody(configuration: configuration, prominent: prominent)
+        PillButtonBody(configuration: configuration, prominent: prominent, height: height)
     }
 }
 
 private struct PillButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let prominent: Bool
+    let height: CGFloat
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
 
@@ -322,7 +441,7 @@ private struct PillButtonBody: View {
             .font(TypeScale.button)
             .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 12)
-            .frame(height: 24)
+            .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(prominent ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.07)))
@@ -451,5 +570,46 @@ private struct TextButtonBody: View {
             .contentShape(Rectangle())
             .onHover { hover = $0 }
             .animation(Motion.hover, value: hover)
+    }
+}
+
+/// Inline Markdown from `PanelText` (a command in backticks, a link) as
+/// the panel draws it: `size` points, with each code span monospaced on a
+/// faint chip. The chip is what makes it read as code: SF Mono's "g" and "h"
+/// are drawn almost like SF Pro's, so a short command such as `gh` in the
+/// monospaced font alone looks like the words around it.
+enum CodeText {
+    /// The chip behind a code span.
+    static let chip = Color.primary.opacity(0.09)
+    /// The chip's padding at each end: a thin space, so it doesn't hug the letters.
+    static let padding = "\u{2009}"
+
+    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        let parsed = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
+        let code = Font.system(size: size, weight: weight, design: .monospaced)
+        var text = AttributedString()
+        for run in parsed.runs {
+            var piece = AttributedString(parsed[run.range])
+            piece.font = .system(size: size, weight: weight)
+            if run.inlinePresentationIntent?.contains(.code) == true {
+                piece.font = code
+                piece.backgroundColor = chip
+                var pad = AttributedString(padding)
+                pad.font = .system(size: size, weight: weight)
+                pad.backgroundColor = chip
+                piece = pad + piece + pad
+            }
+            text += piece
+        }
+        return text
+    }
+}
+
+extension Text {
+    /// `CodeText.attributed(markdown, size:weight:)`: the font is in the
+    /// runs, so a `.font(_:)` on the view doesn't change it.
+    init(markdown: String, size: CGFloat, weight: Font.Weight = .regular) {
+        self.init(CodeText.attributed(markdown, size: size, weight: weight))
     }
 }

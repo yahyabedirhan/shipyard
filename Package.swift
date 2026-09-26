@@ -33,6 +33,14 @@ targets.append(
         path: "Sources/ShipyardApp"
     )
 )
+// The app's own pure helpers (how the panel builds its text), tested on macOS.
+targets.append(
+    .testTarget(
+        name: "ShipyardAppTests",
+        dependencies: ["ShipyardApp"],
+        path: "Tests/ShipyardAppTests"
+    )
+)
 products.append(.executable(name: "Shipyard", targets: ["ShipyardApp"]))
 #endif
 

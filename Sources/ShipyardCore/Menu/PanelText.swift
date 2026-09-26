@@ -32,7 +32,12 @@ public enum PanelText {
         "Open @\(viewer.login)'s profile on GitHub"
     }
 
-    /// The header's layout button, as its tooltip and VoiceOver label: the
+    /// The header's Refresh button's hover help, with its shortcut.
+    public static let refreshHelp = "Refresh (⌘R)"
+    /// The header's settings menu, as its hover help and VoiceOver label.
+    public static let settings = "Settings"
+
+    /// The header's layout button, as its hover help and VoiceOver label: the
     /// layout shown and the one a click switches to. "Layout: list. Click for tabs."
     public static func layoutButton(_ current: MenuLayout) -> String {
         "Layout: \(current.rawValue). Click for \(current.next.rawValue)."
@@ -84,11 +89,10 @@ public enum PanelText {
         repository.split(separator: "/").last.map(String.init) ?? repository
     }
 
-    /// A row's tooltip, in either layout: its state and its full second
-    /// line, then, while it needs attention, the ⌥-click hint.
-    public static func rowHelp(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
-        let detail = "\(stateLabel(row)) · \(rowDetail(row, showingRepository: showingRepository, now: now))"
-        return row.needsAttention ? "\(detail)\n\(optionClickHint)" : detail
+    /// A list section's header, for VoiceOver's hint: what a click does to
+    /// it. "Collapse shipyard", "Expand shipyard".
+    public static func sectionFoldHelp(_ name: String, isCollapsed: Bool) -> String {
+        "\(isCollapsed ? "Expand" : "Collapse") \(name)"
     }
 
     /// The button that marks everything it covers seen: the footer's for
@@ -97,12 +101,11 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
-    /// Said in a row's tooltip, under its detail, while it needs attention.
-    public static let optionClickHint = "⌥-click to mark seen"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 
-    /// What a pull request's check dot means, for its tooltip; `nil` with no checks.
+    /// What a pull request's check dot means, for VoiceOver and the row's
+    /// hover help; `nil` with no checks.
     public static func checks(_ checks: ChecksState) -> String? {
         switch checks {
         case .none: nil
@@ -179,15 +182,6 @@ public enum PanelText {
     public static func emptyTab(_ content: MenuTabContent) -> String? {
         guard content.groups.isEmpty, content.errors.isEmpty else { return nil }
         return content.isLoaded ? "Nothing open" : "Not loaded yet"
-    }
-
-    /// The small header over a kind's rows in a tab.
-    public static func kindGroup(_ kind: ItemKind) -> String {
-        switch kind {
-        case .pullRequest: "Pull requests"
-        case .issue: "Issues"
-        case .workflowRun: "Runs"
-        }
     }
 
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before
@@ -304,7 +298,7 @@ public enum PanelText {
     }
 
     /// A time of day the way the user's clock shows it, e.g. "16:42".
-    private static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
+    static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone

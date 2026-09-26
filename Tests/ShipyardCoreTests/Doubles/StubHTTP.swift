@@ -9,7 +9,9 @@ import ShipyardCore
 ///
 /// Register answers per method and URL with `on`. A URL without a query
 /// matches any query on the same path; one with a query matches only that
-/// query. Answers are given in order and the last one repeats. A request
+/// query. A route registered with a body marker matches only requests whose
+/// body contains it (GraphQL requests share one URL), and is tried before
+/// the others. Answers are given in order and the last one repeats. A request
 /// nothing matches fails with `URLError(.unsupportedURL)` and is listed in
 /// `unmatched`. A hook set with `onSend` runs while a request is in flight,
 /// for example to trigger something mid-refresh.
@@ -54,7 +56,15 @@ final class StubHTTP: HTTPTransport {
     private struct Route {
         var method: String
         var url: URL
+        /// Text the request's body must contain; `nil` for any body.
+        var body: String?
         var answers: [Answer]
+
+        func matches(_ request: URLRequest) -> Bool {
+            request.httpMethod ?? "GET" == method
+                && StubHTTP.matches(route: url, request: request.url)
+                && body.map { request.bodyText.contains($0) } ?? true
+        }
     }
 
     private let routes = Locked<[Route]>([])
@@ -88,17 +98,29 @@ final class StubHTTP: HTTPTransport {
         register(method, url, answers)
     }
 
+    /// Answers `method url` requests whose body contains `marker` with
+    /// `answers` in order, the last repeating, before any route without a
+    /// marker. Replaces an earlier registration for the same marker.
+    func on(_ method: String, _ url: URL, body marker: String, answers: [Answer]) {
+        register(method, url, answers, body: marker)
+    }
+
+    /// Requests sent to `url` with `method` whose body contains `marker`.
+    func requests(_ method: String, _ url: URL, body marker: String) -> [URLRequest] {
+        requests(method, url).filter { $0.bodyText.contains(marker) }
+    }
+
     /// Runs `body` for every request, after it's recorded and before it's
     /// answered.
     func onSend(_ body: @escaping @Sendable (URLRequest) async -> Void) {
         hook.withValue { $0 = body }
     }
 
-    private func register(_ method: String, _ url: URL, _ answers: [Answer]) {
+    private func register(_ method: String, _ url: URL, _ answers: [Answer], body: String? = nil) {
         precondition(!answers.isEmpty, "a route needs at least one answer")
         routes.withValue { routes in
-            routes.removeAll { $0.method == method && $0.url == url }
-            routes.append(Route(method: method, url: url, answers: answers))
+            routes.removeAll { $0.method == method && $0.url == url && $0.body == body }
+            routes.append(Route(method: method, url: url, body: body, answers: answers))
         }
     }
 
@@ -106,13 +128,11 @@ final class StubHTTP: HTTPTransport {
         try Task.checkCancellation()
         log.withValue { $0.append(request) }
         if let body = hook.current { await body(request) }
-        let method = request.httpMethod ?? "GET"
         let answer: Answer? = routes.withValue { routes in
-            // A route with a query is more specific, so it's tried first.
-            let order = routes.indices.sorted { (routes[$0].url.query != nil) && (routes[$1].url.query == nil) }
-            guard let index = order.first(where: {
-                routes[$0].method == method && Self.matches(route: routes[$0].url, request: request.url)
-            }) else { return nil }
+            // A route with a body marker or a query is more specific, so it's tried first.
+            func specificity(_ route: Route) -> Int { (route.body != nil ? 2 : 0) + (route.url.query != nil ? 1 : 0) }
+            let order = routes.indices.sorted { specificity(routes[$0]) > specificity(routes[$1]) }
+            guard let index = order.first(where: { routes[$0].matches(request) }) else { return nil }
             let answers = routes[index].answers
             if answers.count > 1 { routes[index].answers.removeFirst() }
             return answers[0]
@@ -126,7 +146,7 @@ final class StubHTTP: HTTPTransport {
         return (answer.body, response)
     }
 
-    private static func matches(route: URL, request: URL?) -> Bool {
+    fileprivate static func matches(route: URL, request: URL?) -> Bool {
         guard let request else { return false }
         if route.query != nil { return route.absoluteString == request.absoluteString }
         var components = URLComponents(url: request, resolvingAgainstBaseURL: false)

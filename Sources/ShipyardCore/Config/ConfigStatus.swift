@@ -13,7 +13,7 @@ public struct ConfigStatus: Equatable, Sendable {
     public var configModified: Date?
     /// Why the file was rejected; `nil` when it was accepted.
     public var error: ConfigError?
-    /// Unknown settings an accepted file has, which the app ignores.
+    /// Unknown settings an accepted file has, which the app ignores, and old forms it still reads.
     public var warnings: [ConfigIssue]
 
     public init(checked: Date, config: URL, configModified: Date?, error: ConfigError?, warnings: [ConfigIssue]) {

@@ -13,7 +13,7 @@ private let blogRepository = "yahyabedirhan/blog"
 private let issuesEverywhere = """
     [defaults.issues]
     show = true
-    closed-window-days = 3
+    closed-window = "3d"
 
     [[projects]]
     name = "shop"
@@ -109,14 +109,13 @@ struct IssuesTests {
         #expect(rows[5].since == date("2026-09-24T12:00:00Z"))
     }
 
-    @Test("a closed window of 0 hides closed issues; hide-authors hides issues too")
+    @Test("a closed window of 0 hides closed issues; authors hides issues by their author")
     func closedWindowAndHiddenAuthors() async throws {
         let config = """
-            hide-authors = ["renovate[bot]"]
-
             [defaults.issues]
             show = true
-            closed-window-days = 0
+            closed-window = "0"
+            authors = { hide = ["@renovate[bot]"] }
 
             [[projects]]
             name = "shop"
@@ -151,7 +150,7 @@ struct IssuesTests {
             [[projects]]
             name = "shop"
             repositories = ["yahyabedirhan/shop"]
-            issues = { show = true, closed-window-days = 3 }
+            issues = { show = true, closed-window = "3d" }
 
             [[projects]]
             name = "blog"
@@ -273,7 +272,7 @@ struct IssuesTests {
             notifications = [
               { event = "issue.opened" },
               { event = "issue.closed" },
-              { event = "issue.commented", authors = "others" },
+              { event = "issue.commented", authors = ["others"] },
             ]
 
             """

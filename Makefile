@@ -7,8 +7,9 @@
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
-#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=origami)
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=olive-khaki)
 #   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
+#   make icon-exploration redraw the minimal sailboat options and their comparison sheet
 #   make clean
 
 APP         := Shipyard
@@ -22,9 +23,15 @@ ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
 ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
-# The variant make-icon.swift draws for the app: origami, sailboat, night or sunset.
-ICON        ?= origami
-ALTERNATES  := sailboat night sunset
+# The variant make-icon.swift draws for the app: olive-khaki (shipyard's logo),
+# origami, sailboat, night or sunset.
+ICON        ?= olive-khaki
+ALTERNATES  := origami sailboat night sunset
+# make-icon.swift is compiled with the app's sailboat path and logo, so the
+# icon, the menu bar item and the badge draw one figure in the same colours. swiftc runs top-level code only
+# from a main.swift, so the script is copied in under that name.
+ICON_TOOL   := $(BUILD_DIR)/make-icon/make-icon
+BRAND       := Sources/ShipyardApp/Brand/Sailboat.swift Sources/ShipyardApp/Brand/Logo.swift
 
 # With the Command Line Tools alone (no Xcode), swift test can't find the
 # Testing framework the tests use: point the compiler and the test runner at
@@ -39,7 +46,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
 endif
 
-.PHONY: all build test bundle install release run icon icon-alternates clean
+.PHONY: all build test bundle install release run icon icon-alternates icon-exploration clean
 
 all: build
 
@@ -90,22 +97,32 @@ release: test bundle
 
 # The icon is committed, so bundling doesn't redraw it; run this after
 # changing make-icon.swift, or with ICON=<variant> to switch the app's icon.
-icon:
-	swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $(ICON)
+$(ICON_TOOL): Packaging/Icon/make-icon.swift $(BRAND)
+	@mkdir -p $(dir $@)
+	cp Packaging/Icon/make-icon.swift $(dir $@)main.swift
+	swiftc -o $@ $(dir $@)main.swift $(BRAND)
+
+icon: $(ICON_TOOL)
+	$(ICON_TOOL) $(ICONSET) --variant $(ICON)
 	iconutil -c icns $(ICONSET) -o $(ICON_FILE)
 	@rm -rf $(ICONSET)
 
 # The variants the app doesn't use, kept to switch to: an .icns and a 512 pt
 # preview of each in Packaging/Icon/alternates/, committed.
-icon-alternates:
+icon-alternates: $(ICON_TOOL)
 	@mkdir -p Packaging/Icon/alternates
 	@for variant in $(ALTERNATES); do \
-		swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $$variant || exit 1; \
+		$(ICON_TOOL) $(ICONSET) --variant $$variant || exit 1; \
 		iconutil -c icns $(ICONSET) -o Packaging/Icon/alternates/$$variant.icns || exit 1; \
 		cp $(ICONSET)/icon_512x512.png Packaging/Icon/alternates/$$variant.png; \
 		echo "drew Packaging/Icon/alternates/$$variant.icns"; \
 	done
 	@rm -rf $(ICONSET)
+
+# The minimal sailboat options, not yet the app's icon: a 512 pt PNG of each and
+# a comparison sheet (with the menu bar item and the badge) in the exploration folder.
+icon-exploration: $(ICON_TOOL)
+	$(ICON_TOOL) --exploration docs/assets/app-icon/exploration
 
 clean:
 	rm -rf $(BUILD_DIR) .build

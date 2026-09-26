@@ -1,0 +1,343 @@
+import Foundation
+
+/// How a project's listed items are drawn: grouped by `group-by`, each
+/// group sorted by `sort-by` with open (or running) items before closed (or
+/// finished) ones, and each group shown under a subheader or after a
+/// divider. Pure, so every rule is tested without SwiftUI.
+public enum Arrangement {
+    /// The groups `items` fall into for `project`, in order: kinds in the
+    /// menu's kind order, repositories and authors A to Z, dates newest
+    /// first; `none` makes one group. Empty groups are left out, so no
+    /// items make no groups. Rows come without attention flags, which
+    /// `MenuModel.applyAttention` sets.
+    ///
+    /// `folded` marks the subsections the user folded (a group drawn after
+    /// a divider never is); `expanded` is for the groups shown past their
+    /// cap. A group longer than `show-first` shows its first rows and keeps
+    /// the rest as `hiddenRows`, unless it's expanded.
+    public static func groups(
+        _ items: [Item],
+        project: String,
+        settings: ArrangementSettings,
+        layout: MenuLayout,
+        folded: Set<GroupID> = [],
+        expanded: Set<GroupID> = [],
+        now: Date,
+        calendar: Calendar = .current
+    ) -> [RowGroup] {
+        groups(
+            rows: items.map { MenuRow($0) },
+            project: project,
+            settings: settings,
+            layout: layout,
+            folded: folded,
+            expanded: expanded,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    /// `groups(_:…)` over rows that already carry their attention flags,
+    /// each group counting its rows that need attention.
+    static func groups(
+        rows: [MenuRow],
+        project: String,
+        settings: ArrangementSettings,
+        layout: MenuLayout,
+        folded: Set<GroupID> = [],
+        expanded: Set<GroupID> = [],
+        now: Date,
+        calendar: Calendar = .current
+    ) -> [RowGroup] {
+        let indexed = rows.enumerated().map { (offset: $0.offset, row: $0.element) }
+        let buckets = Dictionary(grouping: indexed) { key(for: $0.row.item, settings: settings, now: now, calendar: calendar) }
+        return buckets.keys.sorted(by: groupOrder).map { key in
+            let sorted = buckets[key]!.sorted { comesFirst($0, $1, sortBy: settings.sortBy) }.map(\.row)
+            let id = GroupID(project: project, key: key)
+            let showsHeader = key != .ungrouped && (settings.subsections ?? layout.subheadersByDefault)
+            return RowGroup(
+                id: id,
+                title: PanelText.groupTitle(key),
+                rows: sorted,
+                attentionCount: sorted.filter(\.needsAttention).count,
+                showsHeader: showsHeader,
+                isFolded: showsHeader && folded.contains(id)
+            ).capped(at: settings.showFirst, expanded: expanded.contains(id))
+        }
+    }
+
+    /// The group `item` falls into.
+    static func key(for item: Item, settings: ArrangementSettings, now: Date, calendar: Calendar) -> GroupKey {
+        switch settings.groupBy {
+        case .kind: .kind(item.kind)
+        case .repository: .repository(item.repository)
+        case .date: .date(DateBucket(sortDate(item, settings.sortBy == .created ? .created : .updated), now: now, calendar: calendar))
+        case .author: .author(item.author)
+        case .none: .ungrouped
+        }
+    }
+
+    /// The date an item sorts and buckets by: when it was created, or when
+    /// it last changed (for a closed or finished one, when it closed).
+    static func sortDate(_ item: Item, _ sortBy: SortBy) -> Date {
+        switch sortBy {
+        case .created: item.createdAt
+        case .updated, .title: item.state.isActive ? item.updatedAt : (item.closedAt ?? item.updatedAt)
+        }
+    }
+
+    /// Open (or running) first; then newest first, or A to Z by title
+    /// (newest first between equal titles); then in the order given.
+    private static func comesFirst(
+        _ a: (offset: Int, row: MenuRow),
+        _ b: (offset: Int, row: MenuRow),
+        sortBy: SortBy
+    ) -> Bool {
+        let (left, right) = (a.row.item, b.row.item)
+        if left.state.isActive != right.state.isActive { return left.state.isActive }
+        if sortBy == .title {
+            let order = left.title.localizedStandardCompare(right.title)
+            if order != .orderedSame { return order == .orderedAscending }
+        }
+        let (leftDate, rightDate) = (sortDate(left, sortBy), sortDate(right, sortBy))
+        if leftDate != rightDate { return leftDate > rightDate }
+        return a.offset < b.offset
+    }
+
+    /// Kinds in the menu's kind order, dates newest first, repositories and
+    /// authors A to Z ignoring case.
+    private static func groupOrder(_ a: GroupKey, _ b: GroupKey) -> Bool {
+        switch (a, b) {
+        case (.kind(let left), .kind(let right)):
+            MenuModel.kindOrder.firstIndex(of: left)! < MenuModel.kindOrder.firstIndex(of: right)!
+        case (.date(let left), .date(let right)):
+            left.rawValue < right.rawValue
+        case (.repository(let left), .repository(let right)), (.author(let left), .author(let right)):
+            left.lowercased() == right.lowercased() ? left < right : left.lowercased() < right.lowercased()
+        default:
+            // One project's groups all have the same kind of key.
+            false
+        }
+    }
+}
+
+/// The key a group is known by: what its items share.
+public enum GroupKey: Hashable, Sendable {
+    case kind(ItemKind)
+    /// `owner/name`
+    case repository(String)
+    case date(DateBucket)
+    /// The author's login, without `@`.
+    case author(String)
+    /// The one group of `group-by = "none"`.
+    case ungrouped
+}
+
+extension GroupKey {
+    /// The key as written in `state.json`: "kind:pullRequest",
+    /// "repository:owner/name", "date:today", "author:login", "ungrouped".
+    public var text: String {
+        switch self {
+        case .kind(let kind): "kind:\(kind.rawValue)"
+        case .repository(let repository): "repository:\(repository)"
+        case .date(let bucket): "date:\(bucket.name)"
+        case .author(let login): "author:\(login)"
+        case .ungrouped: "ungrouped"
+        }
+    }
+
+    /// The key `text` writes, or `nil` for one this build doesn't know.
+    public init?(text: String) {
+        guard text != "ungrouped" else {
+            self = .ungrouped
+            return
+        }
+        guard let colon = text.firstIndex(of: ":") else { return nil }
+        let value = String(text[text.index(after: colon)...])
+        switch text[..<colon] {
+        case "kind":
+            guard let kind = ItemKind(rawValue: value) else { return nil }
+            self = .kind(kind)
+        case "repository" where !value.isEmpty:
+            self = .repository(value)
+        case "date":
+            guard let bucket = DateBucket.allCases.first(where: { $0.name == value }) else { return nil }
+            self = .date(bucket)
+        case "author" where !value.isEmpty:
+            self = .author(value)
+        default:
+            return nil
+        }
+    }
+}
+
+/// A group of one project (or of the All tab, whose project is empty): the
+/// key a fold or an expansion is remembered by.
+public struct GroupID: Hashable, Sendable {
+    public var project: String
+    public var key: GroupKey
+
+    public init(project: String, key: GroupKey) {
+        self.project = project
+        self.key = key
+    }
+
+    /// The All tab's group of `key`: the All tab has no project.
+    public static func allTab(_ key: GroupKey) -> GroupID {
+        GroupID(project: "", key: key)
+    }
+}
+
+// In `state.json`: `{ "project": "shop", "group": "kind:pullRequest" }`. A
+// group key this build doesn't know fails the decode, and the app state
+// skips that entry.
+extension GroupID: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case project
+        case group
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        project = try container.decode(String.self, forKey: .project)
+        let text = try container.decode(String.self, forKey: .group)
+        guard let key = GroupKey(text: text) else {
+            throw DecodingError.dataCorruptedError(forKey: .group, in: container, debugDescription: "unknown group \(text)")
+        }
+        self.key = key
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(project, forKey: .project)
+        try container.encode(key.text, forKey: .group)
+    }
+}
+
+extension GroupID: Comparable {
+    /// By project, then by the key as written: the order `state.json`
+    /// lists folds in.
+    public static func < (a: GroupID, b: GroupID) -> Bool {
+        (a.project, a.key.text) < (b.project, b.key.text)
+    }
+}
+
+/// When an item last changed (or was created), counted in calendar days
+/// back from now. Newest first.
+public enum DateBucket: Int, CaseIterable, Hashable, Sendable {
+    case today
+    case yesterday
+    case thisWeek
+    case thisMonth
+    case older
+
+    /// The bucket `date` falls into at `now`: the same day (or later, for a
+    /// clock a little ahead), the day before, the same week, the same month,
+    /// or earlier.
+    public init(_ date: Date, now: Date, calendar: Calendar) {
+        let today = calendar.startOfDay(for: now)
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today) ?? today
+        let week = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? today
+        let month = calendar.dateInterval(of: .month, for: now)?.start ?? today
+        self = if date >= today { .today }
+            else if date >= yesterday { .yesterday }
+            else if date >= week { .thisWeek }
+            else if date >= month { .thisMonth }
+            else { .older }
+    }
+
+    /// The bucket's name in `state.json`.
+    public var name: String {
+        switch self {
+        case .today: "today"
+        case .yesterday: "yesterday"
+        case .thisWeek: "thisWeek"
+        case .thisMonth: "thisMonth"
+        case .older: "older"
+        }
+    }
+}
+
+/// One group of a project's rows, drawn under a subheader (a subsection)
+/// or after a divider.
+public struct RowGroup: Equatable, Sendable, Identifiable {
+    public var id: GroupID
+    /// "Pull requests", "owner/name", "Today", "@login"; empty for `none`.
+    public var title: String
+    /// The rows drawn, sorted: open (or running) first, then by `sort-by`.
+    /// A capped group holds its first `show-first` here and the rest in
+    /// `hiddenRows`.
+    public var rows: [MenuRow]
+    /// The rows past the cap, which Show more reveals: still the group's,
+    /// so they count, in the order they'd be drawn.
+    public var hiddenRows: [MenuRow]
+    /// Rows in the group needing attention, hidden ones too.
+    public var attentionCount: Int
+    /// Drawn under a subheader (its title and row count) rather than after
+    /// a divider: `subsections`, or the layout's own when that's unset. The
+    /// one group of `none` has no header.
+    public var showsHeader: Bool
+    /// Whether the user folded this subsection: only its subheader is
+    /// drawn, still with its count, and its rows stay here and still count.
+    /// A group without a subheader never is.
+    public var isFolded: Bool
+    /// Whether the user asked to see the group past its cap (Show more)
+    /// and it has rows past it: its Show less row caps it again.
+    public var isExpanded: Bool
+
+    public init(
+        id: GroupID,
+        title: String,
+        rows: [MenuRow],
+        attentionCount: Int = 0,
+        showsHeader: Bool = false,
+        isFolded: Bool = false,
+        hiddenRows: [MenuRow] = [],
+        isExpanded: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.rows = rows
+        self.attentionCount = attentionCount
+        self.showsHeader = showsHeader
+        self.isFolded = isFolded
+        self.hiddenRows = hiddenRows
+        self.isExpanded = isExpanded
+    }
+
+    /// Rows left out of `rows` by a cap: the N of "Show N more".
+    public var hiddenCount: Int { hiddenRows.count }
+
+    /// Every row of the group, shown or hidden, in order.
+    public var allRows: [MenuRow] { rows + hiddenRows }
+
+    /// Whether the group has a cap to toggle: a Show more row while it's
+    /// capped, a Show less row while it's expanded. Drawn, and a place the
+    /// keys reach, only while the group isn't folded.
+    public var hasShowMore: Bool { hiddenCount > 0 || isExpanded }
+
+    /// The group with its rows capped at `showFirst` (`0`: no cap): its
+    /// first rows shown and the rest hidden, or, when `expanded` and it has
+    /// more rows than the cap, every row shown and `isExpanded` set.
+    public func capped(at showFirst: Int, expanded: Bool) -> RowGroup {
+        var group = self
+        let rows = allRows
+        let hides = showFirst > 0 && rows.count > showFirst && !expanded
+        group.rows = hides ? Array(rows.prefix(showFirst)) : rows
+        group.hiddenRows = hides ? Array(rows.dropFirst(showFirst)) : []
+        group.isExpanded = showFirst > 0 && rows.count > showFirst && expanded
+        return group
+    }
+}
+
+extension MenuLayout {
+    /// Whether a group is drawn under a subheader when `subsections` is
+    /// unset: in a tab it is, as the kind headers always were; the list
+    /// draws a divider, as it always did.
+    public var subheadersByDefault: Bool {
+        switch self {
+        case .list: false
+        case .tabs: true
+        }
+    }
+}

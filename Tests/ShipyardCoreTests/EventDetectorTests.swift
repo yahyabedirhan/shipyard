@@ -52,7 +52,7 @@ private func issue(_ number: Int = 1, state: ItemState = .open, activity: Int = 
 
 private func settings(
     _ name: String = "shop",
-    repositories: [String] = ["o/r"],
+    repositories: [RepositorySelector] = ["o/r"],
     pullRequests: Bool = true,
     issues: Bool = false,
     rules: [NotificationRule] = [NotificationRule(event: .prOpened)]
@@ -304,32 +304,13 @@ struct NotificationRulesTests {
         Event(kind: kind, project: "shop", item: pr(author: author, authorKind: authorKind))
     }
 
-    struct AuthorCase: Sendable, CustomTestStringConvertible {
-        var author: String
-        var kind: AuthorKind
-        var matches: [AuthorFilter]
-        var testDescription: String { author }
-    }
-
-    @Test("the author filter matches me, bots and others", arguments: [
-        AuthorCase(author: "yabepa", kind: .me, matches: [.any, .me]),
-        AuthorCase(author: "octocat", kind: .other, matches: [.any, .others]),
-        AuthorCase(author: "dependabot[bot]", kind: .bot, matches: [.any, .bots]),
-        // A `[bot]` login counts as a bot even where the account type didn't say.
-        AuthorCase(author: "renovate[bot]", kind: .other, matches: [.any, .bots]),
-    ])
-    func authorFilter(_ author: AuthorCase) {
-        let item = pr(author: author.author, authorKind: author.kind)
-        #expect(AuthorFilter.allCases.filter { $0.matches(item) } == author.matches)
-    }
-
-    @Test("a rule has to name the event and match the author")
+    @Test("a rule has to name the event and cover the author")
     func rules() {
         let defaults = settings()
         #expect(NotificationRules.shouldNotify(event(), settings: defaults))
         #expect(!NotificationRules.shouldNotify(event(.prMerged), settings: defaults))
 
-        let own = settings(rules: [NotificationRule(event: .prMerged, authors: .me), NotificationRule(event: .prOpened, authors: .bots)])
+        let own = settings(rules: [NotificationRule(event: .prMerged, authors: [.me]), NotificationRule(event: .prOpened, authors: [.bots])])
         #expect(!NotificationRules.shouldNotify(event(), settings: own))
         #expect(NotificationRules.shouldNotify(event(author: "dependabot[bot]", authorKind: .bot), settings: own))
         #expect(NotificationRules.shouldNotify(event(.prMerged, author: "yabepa", authorKind: .me), settings: own))
@@ -338,20 +319,16 @@ struct NotificationRulesTests {
         #expect(!NotificationRules.shouldNotify(event(), settings: settings(rules: [])))
     }
 
-    @Test("hidden authors are never notified")
-    func hiddenAuthors() {
-        #expect(!NotificationRules.shouldNotify(event(author: "Dependabot[bot]", authorKind: .bot), settings: settings(), hiddenAuthors: ["dependabot[bot]"]))
-    }
-
-    @Test("a draft isn't notified where the project hides drafts")
-    func hiddenDrafts() {
-        let draft = Event(kind: .prOpened, project: "shop", item: pr(state: .draft))
-        #expect(NotificationRules.shouldNotify(draft, settings: settings()))
-        var hiding = settings()
-        hiding.pullRequests.drafts = false
-        #expect(!NotificationRules.shouldNotify(draft, settings: hiding))
-        // Once it isn't a draft, it's notified as any other.
-        #expect(NotificationRules.shouldNotify(event(), settings: hiding))
+    @Test("a rule's authors cover an author when any selector matches, and everyone when empty")
+    func ruleAuthors() {
+        let rule = NotificationRule(event: .prOpened, authors: [.login("octocat"), .bots])
+        #expect(rule.covers(pr(author: "OctoCat"), viewer: "yabepa"))
+        #expect(rule.covers(pr(author: "renovate[bot]"), viewer: "yabepa"))
+        #expect(!rule.covers(pr(author: "someone"), viewer: "yabepa"))
+        #expect(NotificationRule(event: .prOpened).covers(pr(author: "someone"), viewer: nil))
+        // `me` is the viewer, even where the item didn't say so.
+        let mine = settings(rules: [NotificationRule(event: .prOpened, authors: [.me])])
+        #expect(NotificationRules.shouldNotify(event(author: "yabepa"), settings: mine, viewer: "yabepa"))
     }
 
     @Test("a notification carries the project, title text, the item's title and its URL")

@@ -1,12 +1,20 @@
-// Draws Shipyard's app icon in one of four variants (see README.md here):
+// Draws Shipyard's app icon in one of five variants (see README.md here):
 //
-//   origami    the menu bar's sailboat folded from paper, on amber (the app's icon)
-//   sailboat   the menu bar's sailboat on a sea-blue squircle
-//   night      the sailboat under a crescent moon and stars
-//   sunset     the sailboat in silhouette against a low sun
+//   olive-khaki  shipyard's logo: the sailboat in cream on olive khaki (the app's icon)
+//   origami      the menu bar's sailboat folded from paper, on amber
+//   sailboat     the menu bar's sailboat on a sea-blue squircle
+//   night        the sailboat under a crescent moon and stars
+//   sunset       the sailboat in silhouette against a low sun
 //
-//   swift Packaging/Icon/make-icon.swift <out.iconset> [--variant <name>]   every size an .iconset needs (origami by default)
-//   swift Packaging/Icon/make-icon.swift --sheet <out.png>                  a contact sheet of every variant, for review
+//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (olive-khaki by default)
+//   make-icon --sheet <out.png>                  a contact sheet of every variant, for review
+//   make-icon --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
+//
+// It's compiled together with the app's Sources/ShipyardApp/Brand/Sailboat.swift
+// (the sailboat) and Brand/Logo.swift (the logo's squircle, colours and figure
+// size), which the menu bar item and the welcome screens' badge draw too, into
+// build/make-icon/make-icon (the Makefile's icon targets do it), so the icon
+// and the app can't drift apart.
 //
 // Command Line Tools only (AppKit and CoreGraphics). `make icon` runs it and
 // packs the iconset with `iconutil -c icns` into Packaging/Icon/AppIcon.icns;
@@ -40,24 +48,6 @@ func grad(_ colors: [CGColor], _ locations: [CGFloat]? = nil) -> CGGradient {
 // MARK: - Shapes (1024 grid, y up)
 
 typealias P = (CGFloat, CGFloat)
-
-/// The macOS 11+ body: an 824-point squircle (superellipse) centred on the grid.
-func squircle(in rect: CGRect) -> CGPath {
-    let path = CGMutablePath()
-    let n: CGFloat = 5
-    let a = rect.width / 2, b = rect.height / 2
-    let steps = 720
-    for i in 0...steps {
-        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
-        let c = cos(t), s = sin(t)
-        let x = a * copysign(pow(abs(c), 2 / n), c)
-        let y = b * copysign(pow(abs(s), 2 / n), s)
-        let p = CGPoint(x: rect.midX + x, y: rect.midY + y)
-        i == 0 ? path.move(to: p) : path.addLine(to: p)
-    }
-    path.closeSubpath()
-    return path
-}
 
 func poly(_ pts: [P]) -> CGPath {
     let p = CGMutablePath()
@@ -201,7 +191,7 @@ func frame(_ ctx: CGContext, pixels: Int, base: CGColor = rgb(0x203050), backgro
            sheen: CGFloat = 0.16, rim: CGFloat = 0.22, _ content: (CGContext, Bool, CGRect) -> Void) {
     let small = pixels < 64
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let shape = squircle(in: body)
+    let shape = Logo.squircle(in: body)
     ctx.saveGState()
     shadow(ctx, dy: -10, blur: 22, color: rgb(0x000000, 0.35))
     fillSolid(ctx, shape, base)
@@ -501,13 +491,77 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
     }
 }
 
+// MARK: - Minimal: shipyard's sailboat, flat, on colour or on white
+
+/// The exploration's two families, drawn from `Sailboat.path` (the figure the
+/// app's menu bar item and badge draw, in Sources/ShipyardApp/Brand/Sailboat.swift):
+/// a coloured body with a white figure, and a white body with the figure in
+/// colour. Navy, the favourite, comes first and has a lighter and a deeper shade.
+enum Minimal: String, CaseIterable {
+    case solidNavy = "solid-navy", solidNavyLight = "solid-navy-light", solidNavyDeep = "solid-navy-deep"
+    case solidBlue = "solid-blue", solidTeal = "solid-teal", solidCoral = "solid-coral"
+    case whiteNavy = "white-navy", whiteBlue = "white-blue", whiteTeal = "white-teal", whiteCoral = "white-coral"
+    // The khaki range, muted and desaturated, from classic khaki to a deep brown
+    // khaki. Sand and a light khaki were tried and left out: under 3:1 against
+    // the figure, they lost it at 32 pixels.
+    case solidKhaki = "solid-khaki", solidOliveKhaki = "solid-olive-khaki", solidDeepKhaki = "solid-deep-khaki"
+    case whiteKhaki = "white-khaki", whiteOliveKhaki = "white-olive-khaki", whiteDeepKhaki = "white-deep-khaki"
+
+    var isKhaki: Bool { rawValue.hasSuffix("khaki") }
+
+    var onWhite: Bool { rawValue.hasPrefix("white-") }
+
+    /// The hue as a top-to-bottom pair: the body's gradient, or the figure's on white.
+    var hue: (top: UInt32, bottom: UInt32) {
+        switch self {
+        case .solidNavyLight: return (0x5476C4, 0x2C4A94)
+        case .solidNavy, .whiteNavy: return (0x30498C, 0x152049)
+        case .solidNavyDeep: return (0x1E2B55, 0x080E26)
+        case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)   // the connect screen's accent, 0x006BED
+        case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
+        case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
+        case .solidKhaki, .whiteKhaki: return (0xAE9B6C, 0x8E7B4E)
+        case .solidOliveKhaki, .whiteOliveKhaki: return (Logo.top, Logo.bottom)   // the logo
+        case .solidDeepKhaki, .whiteDeepKhaki: return (0x7D6A4C, 0x574630)
+        }
+    }
+
+    func draw(_ ctx: CGContext, pixels: Int) {
+        let (top, bottom) = hue
+        let background = onWhite ? grad([rgb(0xFFFFFF), rgb(0xECEFF3)]) : grad([rgb(top), rgb(bottom)])
+        let base = onWhite ? rgb(0xC9CFD8) : rgb(bottom)
+        frame(ctx, pixels: pixels, base: base, background: background,
+              sheen: onWhite ? 0 : Logo.sheen, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
+            // The same path at every size; small sizes only draw it bigger.
+            let b = Sailboat.bounds
+            scaled(ctx, small ? Logo.smallFigureScale : Logo.figureScale, about: CGPoint(x: 512, y: 512)) {
+                ctx.translateBy(x: 512 - b.midX, y: 512 - b.midY)
+                ctx.saveGState()
+                shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
+                ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+                // White on the first colours; cream, warmer, on khaki.
+                fillSolid(ctx, Sailboat.path, rgb(isKhaki ? Logo.figure : 0xFFFFFF))
+                if onWhite {
+                    // Colour the figure with the hue's gradient.
+                    ctx.setBlendMode(.sourceIn)
+                    ctx.drawLinearGradient(grad([rgb(top), rgb(bottom)]), start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.minY),
+                                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                }
+                ctx.endTransparencyLayer()
+                ctx.restoreGState()
+            }
+        }
+    }
+}
+
 // MARK: - Variants
 
 enum Variant: String, CaseIterable {
-    case origami, sailboat, night, sunset
+    case oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
 
     func draw(_ ctx: CGContext, pixels: Int) {
         switch self {
+        case .oliveKhaki: Minimal.solidOliveKhaki.draw(ctx, pixels: pixels)
         case .origami: drawOrigami(ctx, pixels: pixels)
         case .sailboat: drawSailboat(ctx, pixels: pixels)
         case .night: drawNight(ctx, pixels: pixels)
@@ -519,6 +573,10 @@ enum Variant: String, CaseIterable {
 // MARK: - Rendering
 
 func render(_ variant: Variant, pixels: Int) -> NSBitmapImageRep {
+    render(pixels: pixels) { variant.draw($0, pixels: pixels) }
+}
+
+func render(pixels: Int, _ draw: (CGContext) -> Void) -> NSBitmapImageRep {
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -528,7 +586,7 @@ func render(_ variant: Variant, pixels: Int) -> NSBitmapImageRep {
     ctx.setShouldAntialias(true)
     ctx.interpolationQuality = .high
     ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-    variant.draw(ctx, pixels: pixels)
+    draw(ctx)
     graphics.flushGraphics()
     return rep.retagging(with: .sRGB)!
 }
@@ -539,7 +597,7 @@ func writePNG(_ rep: NSBitmapImageRep, to url: URL) throws {
 
 // MARK: - Contact sheet
 
-/// One row per variant (origami first), each at 16, 32, 128 and 512 pixels on
+/// One row per variant (the app's first), each at 16, 32, 128 and 512 pixels on
 /// a light panel and on a dark panel.
 func sheet(to url: URL) throws {
     let sizes = [16, 32, 128, 512]
@@ -580,6 +638,173 @@ func sheet(to url: URL) throws {
     try writePNG(rep, to: url)
 }
 
+// MARK: - Exploration
+
+/// Writes a 512-pixel PNG of each minimal variant into `dir`, and
+/// `comparison.png`, top to bottom: the maintainer's reference shots (when
+/// `dir` has them); the figure as the menu bar's template image at 16, 18 and
+/// 22 points on a light and a dark menu bar, with the connect screen's badge;
+/// then every variant at 512 and 32, a row per family, on a light panel and
+/// then on a dark one.
+func exploration(to dir: URL) throws {
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    for m in Minimal.allCases {
+        try writePNG(render(pixels: 512) { m.draw($0, pixels: 512) }, to: dir.appendingPathComponent("\(m.rawValue).png"))
+    }
+
+    let first = Minimal.allCases.filter { !$0.isKhaki }
+    let families = [first.filter { !$0.onWhite }, first.filter(\.onWhite)]
+    let columns = families.map(\.count).max()!
+    let gap = 40, small = 32, label = 44
+    let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
+    let width = gap + (cellW + gap) * columns
+    let panelH = rowH * families.count + gap
+    let references = ["reference-connect-badge", "reference-menu-bar"].compactMap { name in
+        NSImage(contentsOf: dir.appendingPathComponent("\(name).png")).map { (name, $0) }
+    }
+    let refH = references.isEmpty ? 0 : gap + 400 + 12 + label + gap
+    // The menu bar and badge row, drawn 4 pixels to the point so it reads on the sheet.
+    let zoom: CGFloat = 4
+    let appH = gap + 256 + 12 + label + gap
+    let height = refH + appH + panelH * 2
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    NSGraphicsContext.current!.imageInterpolation = .high
+    let ctx = NSGraphicsContext.current!.cgContext
+    let light = NSColor(white: 0.88, alpha: 1)
+
+    func caption(_ s: String, centredIn x: CGFloat, width w: CGFloat, y: CGFloat, color: NSColor) {
+        let t = NSAttributedString(string: s, attributes: [.font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: color])
+        t.draw(at: NSPoint(x: x + (w - t.size().width) / 2, y: y))
+    }
+
+    NSColor(white: 0.16, alpha: 1).setFill()
+    NSRect(x: 0, y: height - refH - appH, width: width, height: refH + appH).fill()
+
+    if !references.isEmpty {
+        var x = CGFloat(gap)
+        let imageY = CGFloat(height - gap - 400)
+        for (name, image) in references {
+            let w = 400 * image.size.width / image.size.height
+            image.draw(in: NSRect(x: x, y: imageY, width: w, height: 400))
+            caption(name, centredIn: x, width: w, y: imageY - 12 - 32, color: light)
+            x += w + CGFloat(gap)
+        }
+    }
+
+    // The menu bar item: the template image the app draws (`Sailboat.path` fitted
+    // to a square of the menu bar's size), black on a light bar, white on a dark one.
+    let appTop = CGFloat(height - refH)
+    var x = CGFloat(gap)
+    for (bar, ink, name) in [(rgb(0xE8E8EA), rgb(0x000000, 0.85), "light"), (rgb(0x1E1E20), rgb(0xFFFFFF), "dark")] {
+        let barW: CGFloat = (16 + 18 + 22 + 3 * 16 + 16) * zoom
+        let barH: CGFloat = 24 * zoom
+        let barY = appTop - CGFloat(gap) - 128 - barH / 2
+        ctx.setFillColor(bar)
+        ctx.fill(CGRect(x: x, y: barY, width: barW, height: barH))
+        var ix = x + 16 * zoom
+        for points: CGFloat in [16, 18, 22] {
+            let side = points * zoom
+            ctx.saveGState()
+            ctx.addPath(Sailboat.path(in: CGRect(x: ix, y: barY + (barH - side) / 2, width: side, height: side)))
+            ctx.setFillColor(ink); ctx.fillPath()
+            ctx.restoreGState()
+            caption("\(Int(points)) pt", centredIn: ix, width: side, y: barY - 12 - 32, color: light)
+            ix += side + 16 * zoom
+        }
+        caption("menu bar, \(name) (4x)", centredIn: x, width: barW, y: appTop - CGFloat(gap) - 256 - 12 - 32, color: light)
+        x += barW + CGFloat(gap)
+    }
+
+    // The connect screen's badge: the accent's rounded square, the figure at 18 points in white.
+    for badgeZoom: CGFloat in [4, 8] {
+        let side = 32 * badgeZoom
+        let rect = CGRect(x: x, y: appTop - CGFloat(gap) - 128 - side / 2, width: side, height: side)
+        let square = CGPath(roundedRect: rect, cornerWidth: 8 * badgeZoom, cornerHeight: 8 * badgeZoom, transform: nil)
+        ctx.saveGState()
+        ctx.addPath(square); ctx.clip()
+        ctx.drawLinearGradient(grad([rgb(0x006BED), rgb(0x006BED, 0.75)]), start: CGPoint(x: 0, y: rect.maxY), end: CGPoint(x: 0, y: rect.minY), options: [])
+        ctx.restoreGState()
+        let figure = 18 * badgeZoom
+        ctx.addPath(Sailboat.path(in: CGRect(x: rect.midX - figure / 2, y: rect.midY - figure / 2, width: figure, height: figure)))
+        ctx.setFillColor(rgb(0xFFFFFF)); ctx.fillPath()
+        caption("badge (\(Int(badgeZoom))x)", centredIn: x, width: side, y: appTop - CGFloat(gap) - 256 - 12 - 32, color: light)
+        x += side + CGFloat(gap)
+    }
+
+    let panels = [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)]
+    for (p, panel) in panels.enumerated() {
+        let panelTop = height - refH - appH - panelH * p
+        panel.setFill()
+        NSRect(x: 0, y: panelTop - panelH, width: width, height: panelH).fill()
+        let text = p == 0 ? NSColor(white: 0.15, alpha: 1) : light
+        for (f, family) in families.enumerated() {
+            let rowTop = panelTop - rowH * f
+            for (c, m) in family.enumerated() {
+                let x = gap + (cellW + gap) * c
+                let big = NSImage(size: NSSize(width: 512, height: 512))
+                big.addRepresentation(render(pixels: 512) { m.draw($0, pixels: 512) })
+                big.draw(in: NSRect(x: x, y: rowTop - gap - 512, width: 512, height: 512))
+                let tiny = NSImage(size: NSSize(width: small, height: small))
+                tiny.addRepresentation(render(pixels: small) { m.draw($0, pixels: small) })
+                let smallY = rowTop - gap - 512 - 20 - small
+                tiny.draw(in: NSRect(x: x + (cellW - small) / 2, y: smallY, width: small, height: small))
+                caption(m.rawValue, centredIn: CGFloat(x), width: CGFloat(cellW), y: CGFloat(smallY - 12 - 32), color: text)
+            }
+        }
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    try writePNG(rep, to: dir.appendingPathComponent("comparison.png"))
+
+    // The khaki range, with solid-navy (the favourite) first for comparison.
+    let khaki = Minimal.allCases.filter(\.isKhaki)
+    try optionSheet([[.solidNavy] + khaki.filter { !$0.onWhite }, khaki.filter(\.onWhite)],
+                    to: dir.appendingPathComponent("comparison-khaki.png"))
+}
+
+/// A sheet of `families`, a row each, every option at 512 and 32 on a light
+/// panel and then on a dark one.
+func optionSheet(_ families: [[Minimal]], to url: URL) throws {
+    let gap = 40, small = 32, label = 44
+    let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
+    let width = gap + (cellW + gap) * families.map(\.count).max()!
+    let panelH = rowH * families.count + gap
+    let height = panelH * 2
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    for (p, panel) in [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)].enumerated() {
+        let panelTop = height - panelH * p
+        panel.setFill()
+        NSRect(x: 0, y: panelTop - panelH, width: width, height: panelH).fill()
+        let text = p == 0 ? NSColor(white: 0.15, alpha: 1) : NSColor(white: 0.88, alpha: 1)
+        for (f, family) in families.enumerated() {
+            let rowTop = panelTop - rowH * f
+            for (c, m) in family.enumerated() {
+                let x = gap + (cellW + gap) * c
+                let big = NSImage(size: NSSize(width: 512, height: 512))
+                big.addRepresentation(render(pixels: 512) { m.draw($0, pixels: 512) })
+                big.draw(in: NSRect(x: x, y: rowTop - gap - 512, width: 512, height: 512))
+                let tiny = NSImage(size: NSSize(width: small, height: small))
+                tiny.addRepresentation(render(pixels: small) { m.draw($0, pixels: small) })
+                let smallY = rowTop - gap - 512 - 20 - small
+                tiny.draw(in: NSRect(x: x + (cellW - small) / 2, y: smallY, width: small, height: small))
+                let t = NSAttributedString(string: m.rawValue, attributes: [.font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: text])
+                t.draw(at: NSPoint(x: CGFloat(x) + (CGFloat(cellW) - t.size().width) / 2, y: CGFloat(smallY - 12 - 32)))
+            }
+        }
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    try writePNG(rep, to: url)
+}
+
 // MARK: - Main
 
 func fail(_ message: String) -> Never {
@@ -588,7 +813,7 @@ func fail(_ message: String) -> Never {
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
-var variant = Variant.origami
+var variant = Variant.oliveKhaki
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }
     guard let chosen = Variant(rawValue: arguments[flag + 1]) else { fail("unknown variant \(arguments[flag + 1])") }
@@ -596,7 +821,9 @@ if let flag = arguments.firstIndex(of: "--variant") {
     arguments.removeSubrange(flag...flag + 1)
 }
 
-if arguments.count == 2, arguments[0] == "--sheet" {
+if arguments.count == 2, arguments[0] == "--exploration" {
+    try exploration(to: URL(fileURLWithPath: arguments[1], isDirectory: true))
+} else if arguments.count == 2, arguments[0] == "--sheet" {
     try sheet(to: URL(fileURLWithPath: arguments[1]))
 } else if arguments.count == 1 {
     let iconset = URL(fileURLWithPath: arguments[0], isDirectory: true)

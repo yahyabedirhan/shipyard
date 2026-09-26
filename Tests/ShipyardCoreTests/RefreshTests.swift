@@ -84,6 +84,19 @@ struct RefreshTests {
         #expect(fix.kind == .pullRequest)
         #expect(fix.since == date("2026-09-24T08:00:00Z"))
         #expect(fix.age(at: Harness.now) == 28 * 3600)
+        // What only the hover card shows.
+        #expect(fix.item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
+        #expect(fix.item.details == ItemDetails(
+            headBranch: "fix-totals",
+            baseBranch: "main",
+            additions: 120,
+            deletions: 43,
+            changedFiles: 6,
+            review: .approved,
+            comments: 2,
+            reviews: 1
+        ))
+        #expect(rows[14]?.item.details.review == nil)
 
         #expect(rows.mapValues(\.state) == [
             14: .draft, 57: .open, 12: .open, 56: .open, 55: .open, 54: .closed, 9: .merged, 3: .open,
@@ -100,10 +113,10 @@ struct RefreshTests {
         #expect(rows[56]?.authorKind == .other)
     }
 
-    @Test("closed-window-days sets how far back closed pull requests show")
+    @Test("closed-window sets how far back closed pull requests show")
     func closedWindow() async throws {
         let harness = try await Harness.started(
-            config: "[defaults.pull-requests]\nclosed-window-days = 1\n\n" + projects,
+            config: "[defaults.pull-requests]\nclosed-window = \"1d\"\n\n" + projects,
             graphQL: pullRequests()
         )
 
@@ -117,7 +130,7 @@ struct RefreshTests {
             [[projects]]
             name = "e-commerce"
             repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
-            pull-requests = { closed-window-days = 0 }
+            pull-requests = { closed-window = "0" }
 
             [[projects]]
             name = "job-search"
@@ -129,10 +142,10 @@ struct RefreshTests {
         #expect(harness.section("e-commerce")?.rows.map(\.number) == [14, 57, 12, 56, 55])
     }
 
-    @Test("drafts = false hides drafts, and hide-authors hides those authors")
+    @Test("drafts = false hides drafts, and authors hides those authors")
     func draftsAndHiddenAuthors() async throws {
         let harness = try await Harness.started(
-            config: "hide-authors = [\"dependabot[bot]\"]\n\n[defaults.pull-requests]\ndrafts = false\n\n" + projects,
+            config: "[defaults.pull-requests]\ndrafts = false\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + projects,
             graphQL: pullRequests()
         )
 
@@ -382,7 +395,7 @@ struct RefreshTests {
                 return count
             }
             guard count == 1 else { return }
-            try? Data(("hide-authors = [\"dependabot[bot]\"]\n\n" + projects).utf8).write(to: configURL)
+            try? Data(("[defaults.pull-requests]\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + projects).utf8).write(to: configURL)
             await shipyard.reloadConfiguration()
         }
 

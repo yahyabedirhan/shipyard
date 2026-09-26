@@ -8,14 +8,20 @@ public enum OAuthApp {
     /// The OAuth App's client ID, compiled in. Not a secret: the device flow
     /// has no client secret, so it's safe in a desktop app.
     ///
-    /// The maintainer supplies it: register an OAuth App under the maintainer's
-    /// GitHub account with device flow enabled, and put its client ID here.
-    /// Forks put their own.
-    public static let clientID = "REPLACE_WITH_OAUTH_APP_CLIENT_ID"
+    /// Shipyard's own OAuth App, registered under the maintainer's GitHub
+    /// account with device flow enabled. Forks put their own here (the README
+    /// says how). A build whose client ID is the placeholder shows Sign in
+    /// with GitHub as unavailable, and `gh` stays the way in.
+    public static let clientID = "Ov23li68GZnClULrjIFj"
 
-    /// Stands in for the client ID until the maintainer supplies it; the
-    /// device flow refuses to start while it's still set.
+    /// Stands in for a client ID a build doesn't have; the device flow
+    /// refuses to start with it.
     public static let placeholderClientID = "REPLACE_WITH_OAUTH_APP_CLIENT_ID"
+
+    /// Whether `clientID` is a real client ID rather than the placeholder.
+    public static func isSet(_ clientID: String) -> Bool {
+        !clientID.isEmpty && clientID != placeholderClientID
+    }
 
     /// Private repositories' pull requests and issues, and organisation repositories.
     public static let scopes = "repo read:org"
@@ -52,7 +58,7 @@ public struct DeviceAuthorization: Equatable, Sendable {
 
 /// Why the device flow ended without a token.
 public enum DeviceFlowError: Error, Equatable, Sendable {
-    /// `OAuthApp.clientID` is still the placeholder.
+    /// The client ID is the placeholder.
     case clientIDMissing
     /// The code expired (15 minutes) before the user entered it; start over.
     case expired
@@ -103,7 +109,7 @@ public struct DeviceFlow: Sendable {
 
     /// Asks GitHub for a device code and the user code to show.
     public func requestCode() async throws -> DeviceAuthorization {
-        guard clientID != OAuthApp.placeholderClientID else { throw DeviceFlowError.clientIDMissing }
+        guard OAuthApp.isSet(clientID) else { throw DeviceFlowError.clientIDMissing }
         let requestedAt = clock.now
         let answer: CodeAnswer = try await post(Self.codeURL, form: ["client_id": clientID, "scope": OAuthApp.scopes])
         if let error = answer.error { throw DeviceFlowError.rejected(error) }

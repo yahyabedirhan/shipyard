@@ -19,9 +19,10 @@ struct ShipyardMenuBarApp: App {
     }
 }
 
-/// The menu bar icon and the attention count next to it (the model's
-/// label: none at 0, or when `[menu-bar] count = "none"`). While the rate
-/// budget pauses refreshing, the icon is a pause glyph.
+/// The menu bar icon, shipyard's sailboat (the app icon's figure), and the
+/// attention count next to it (the model's label: none at 0, or when
+/// `[menu-bar] count = "none"`). While the rate budget pauses refreshing, the
+/// icon is a pause glyph.
 struct MenuBarLabelView: View {
     let shipyard: Shipyard
 
@@ -29,7 +30,11 @@ struct MenuBarLabelView: View {
         // Read in the view's body, so it redraws when the model changes.
         let menu = shipyard.menu
         HStack(spacing: 3) {
-            Image(systemName: menu.canRefreshNow ? "sailboat" : "pause.circle")
+            if menu.canRefreshNow {
+                Image(nsImage: SailboatImage.menuBar())
+            } else {
+                Image(systemName: "pause.circle")
+            }
             if let text = menu.menuBarLabel.text {
                 Text(text).monospacedDigit()
             }
@@ -78,7 +83,7 @@ final class AppServices {
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
-            tokenStore: SessionTokenStore(),
+            tokenStore: Keychain(),
             urlOpener: opener,
             notifier: notifier,
             loginItem: LaunchAtLogin()
@@ -127,6 +132,10 @@ final class AppServices {
             markSeen: { shipyard.markSeen($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
+            toggleGroup: { shipyard.toggleGroup($0.id) },
+            toggleShowMore: { group in
+                if group.isExpanded { shipyard.showLess(group.id) } else { shipyard.showMore(group.id) }
+            },
             openRepository: { [weak self] project in
                 shipyard.openRepository(of: project)
                 self?.closeMenu()
@@ -160,6 +169,12 @@ final class AppServices {
     /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
         Task { await notifier.checkPermission() }
+    }
+
+    /// Closing the panel caps every group Show more revealed, so the menu
+    /// opens with every cap back.
+    func panelClosed() {
+        shipyard.panelClosed()
     }
 
     /// Whether the panel says notifications are off (observed: it's the

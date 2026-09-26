@@ -145,11 +145,13 @@ struct DeviceFlowTests {
         let stub = StubHTTP()
         stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
         let device = DeviceFlow(transport: stub, clock: ManualClock())
-        if OAuthApp.clientID == OAuthApp.placeholderClientID {
-            await #expect(throws: DeviceFlowError.clientIDMissing) { _ = try await device.requestCode() }
-        } else {
-            _ = try await device.requestCode()
-            #expect(stub.requests.first?.formFields["client_id"] == OAuthApp.clientID)
-        }
+        _ = try await device.requestCode()
+        #expect(stub.requests.first?.formFields["client_id"] == OAuthApp.clientID)
+    }
+
+    @Test("the shipped client ID is shipyard's OAuth App, not the placeholder")
+    func shippedClientID() {
+        #expect(OAuthApp.clientID != OAuthApp.placeholderClientID)
+        #expect(OAuthApp.isSet(OAuthApp.clientID))
     }
 }

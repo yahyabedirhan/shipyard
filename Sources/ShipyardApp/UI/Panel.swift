@@ -27,10 +27,12 @@ struct Panel: View {
                 footer(now: context.date)
             }
             .environment(\.panelNow, context.date)
+            .hoverHelpHost()
         }
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
         .onAppear { actions.panelOpened() }
+        .onDisappear { actions.panelClosed() }
     }
 
     // MARK: - Header
@@ -62,7 +64,7 @@ struct Panel: View {
                         .contentTransition(.symbolEffect(.replace, options: .speed(1.5)))
                 }
                 .buttonStyle(IconButtonStyle())
-                .help(PanelText.layoutButton(layout))
+                .hoverHelp(PanelText.layoutButton(layout))
                 .accessibilityLabel(PanelText.layoutButton(layout))
             }
             Button(action: actions.refresh) {
@@ -81,7 +83,7 @@ struct Panel: View {
             .keyboardShortcut("r")
             // The model's pause, as the banner and the menu bar icon show it.
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
-            .help("Refresh (⌘R)")
+            .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
             Menu {
                 Button("Open configuration file", action: actions.openConfigurationFile)
@@ -101,7 +103,8 @@ struct Panel: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .frame(width: 24, height: 22)
-            .help("Settings")
+            .hoverHelp(PanelText.settings)
+            .accessibilityLabel(PanelText.settings)
         }
         .padding(.leading, Grid.gutter)
         .padding(.trailing, 8)
@@ -173,18 +176,17 @@ struct Panel: View {
     @ViewBuilder
     private var content: some View {
         switch shipyard.phase {
-        case .connecting:
-            // Only the device flow connects this way, and 0.0.x doesn't
-            // offer it.
-            ProgressView()
-                .controlSize(.small)
-                .padding(Grid.gutter)
-                .frame(maxWidth: .infinity)
-        case .signedOut:
+        case .signedOut, .connecting:
+            // Signed out, or the device flow's code waiting for approval.
             ConnectView(shipyard: shipyard)
         case .needsProjects:
-            // Onboarding's second step, and its offer to install the skill.
-            ProjectPicker(shipyard: shipyard)
+            // Onboarding's preset step while the file holds nothing but
+            // `version`, else the plain picker; and its offer to install the skill.
+            if shipyard.presets.isEmpty {
+                ProjectPicker(shipyard: shipyard)
+            } else {
+                PresetPicker(shipyard: shipyard)
+            }
             SkillInstallCard(installation: actions.skillInstallation)
                 .padding(.horizontal, Grid.gutter)
                 .padding(.bottom, Grid.gutter)
@@ -301,7 +303,7 @@ private struct AccountButton: View {
             hover = false
         }
         .animation(Motion.hover, value: hover)
-        .help(PanelText.profileHelp(viewer))
+        .hoverHelp(PanelText.profileHelp(viewer), leadingInset: 0)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PanelText.profileAccessibilityLabel(viewer))
         .accessibilityAddTraits(.isLink)

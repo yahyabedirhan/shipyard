@@ -76,6 +76,8 @@ enum Motion {
     static let collapse = Animation.spring(duration: 0.32, bounce: 0.08)
     /// A count rolling to its new number.
     static let count = Animation.spring(duration: 0.4, bounce: 0.2)
+    /// A count badge fading between the accent and muted.
+    static let tint = Animation.easeInOut(duration: 0.2)
     /// A banner sliding in or out.
     static let banner = Animation.spring(duration: 0.35, bounce: 0.1)
     /// Marking seen: the dot fading, the title losing its weight.

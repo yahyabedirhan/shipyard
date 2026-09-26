@@ -128,6 +128,11 @@ struct WorkflowRunsTests {
         #expect(runs[1].authorKind == .bot)
         #expect(runs[2].authorKind == .me)
         #expect(runs[2].url == URL(string: "https://github.com/yahyabedirhan/shop/actions/runs/9041"))
+        // What only the hover card shows: the run's title, what started it and who.
+        #expect(runs[0].item.details.runTitle == "Add order export")
+        #expect(runs[0].item.details.runEvent == "pull_request")
+        #expect(runs[0].item.details.runAttempt == 1)
+        #expect(runs[0].item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
         // Age: a running run's from when it started, a finished one's from when it finished.
         #expect(runs[1].since == date("2026-09-25T11:55:10Z"))
         #expect(runs[1].age(at: Harness.now) == 290)
@@ -147,6 +152,9 @@ struct WorkflowRunsTests {
         let query = try harness.lastQuery()
         #expect(query.contains("defaultBranchRef { name }"))
         #expect(query.contains("headRefName"))
+        // The hover card's fields are plain fields, so they cost nothing more.
+        #expect(query.contains("baseRefName additions deletions changedFiles reviewDecision"))
+        #expect(query.contains("author { login __typename avatarUrl }"))
     }
 
     @Test("branches = \"all\" keeps runs on every branch, and asks GraphQL for no branches")
@@ -190,10 +198,10 @@ struct WorkflowRunsTests {
         #expect(harness.section("shop")?.rows.map(\.number) == [11])
     }
 
-    @Test("finished runs stay for finished-window-hours; running ones stay however long they run")
+    @Test("finished runs stay for finished-window; running ones stay however long they run")
     func finishedWindow() async throws {
         let harness = try await Harness.started(
-            config: runsConfig("workflow-runs = { show = true, finished-window-hours = 4 }"),
+            config: runsConfig("workflow-runs = { show = true, finished-window = \"4h\" }"),
             graphQL: shopGraphQL(),
             runs: [shopRepository: [runsFixture()]]
         )
@@ -210,10 +218,48 @@ struct WorkflowRunsTests {
         #expect(harness.runsRequests.last?.url?.absoluteString.contains("created=%3E%3D2026-09-25T10:00:00Z") == true)
 
         // A window of 0 lists only running runs.
-        try harness.writeConfig(runsConfig("workflow-runs = { show = true, finished-window-hours = 0 }"))
+        try harness.writeConfig(runsConfig("workflow-runs = { show = true, finished-window = \"0\" }"))
         harness.stub.on("GET", WorkflowRunsResponse.url(shopRepository), shopRuns([run(42, "running"), run(41, "failure")]))
         await harness.shipyard.reloadConfiguration()
         #expect(harness.runRows.map(\.number) == [42])
+    }
+
+    @Test("states picks runs by where they stand: a queued run is in progress, a timed-out or never-started one failed")
+    func states() async throws {
+        var queued = run(45, "running")
+        queued.status = "queued"
+        let runs = [queued, run(44, "running"), run(43, "timed_out"), run(42, "startup_failure"), run(41, "failure"), run(40)]
+        let harness = try await Harness.started(
+            config: runsConfig(#"workflow-runs = { show = true, states = ["in-progress"] }"#),
+            graphQL: shopGraphQL(),
+            runs: [shopRepository: [shopRuns(runs)]]
+        )
+        #expect(harness.runRows.map(\.number) == [45, 44])
+
+        try harness.writeConfig(runsConfig(#"workflow-runs = { show = true, states = ["failed"] }"#))
+        harness.stub.on("GET", WorkflowRunsResponse.url(shopRepository), shopRuns(runs))
+        await harness.shipyard.reloadConfiguration()
+        #expect(harness.runRows.map(\.number) == [43, 42, 41])
+
+        try harness.writeConfig(runsConfig(#"workflow-runs = { show = true, states = ["succeeded"] }"#))
+        harness.stub.on("GET", WorkflowRunsResponse.url(shopRepository), shopRuns(runs))
+        await harness.shipyard.reloadConfiguration()
+        #expect(harness.runRows.map(\.number) == [40])
+    }
+
+    @Test("a run that fails where only succeeded runs are listed isn't notified")
+    func unlistedStateNotNotified() async throws {
+        let config = runsConfig("""
+            workflow-runs = { show = true, states = ["succeeded"] }
+            notifications = [{ event = "run.failed" }, { event = "run.succeeded" }]
+            """)
+        let harness = try await Harness.started(config: config, graphQL: shopGraphQL(), runs: [shopRepository: [shopRuns([run(40)])]])
+        await harness.refresh(runs: shopRuns([
+            run(42, updatedAt: "2026-09-25T12:01:00Z"),
+            run(41, "failure", updatedAt: "2026-09-25T12:01:00Z"),
+            run(40),
+        ]))
+        #expect(harness.titles == ["shop · Run #42 succeeded"])
     }
 
     @Test("off by default: no runs requested, no branches asked for")
@@ -399,7 +445,7 @@ struct WorkflowRunsTests {
     func notifications() async throws {
         let config = runsConfig("""
             workflow-runs = { show = true }
-            notifications = [{ event = "run.failed" }, { event = "run.succeeded", authors = "me" }]
+            notifications = [{ event = "run.failed" }, { event = "run.succeeded", authors = ["me"] }]
             """)
         let harness = try await Harness.started(
             config: config,
