@@ -38,8 +38,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
     /// project per repository, issues shown, grouped by kind.
     public static let myAgents = Preset(
         name: "my-agents",
-        title: "My agents",
-        summary: "The pull requests and issues you and your agents open, one project per repository.",
+        title: "You and your agents",
+        summary: "The pull requests and issues you and your agents open, in the repositories you pick.",
         asks: .repositories,
         kind: .myAgents
     )
