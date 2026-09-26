@@ -62,7 +62,7 @@ struct SailboatTests {
         let makefile = try String(contentsOf: Self.root.appendingPathComponent("Makefile"), encoding: .utf8)
         #expect(makefile.contains("BRAND       := Sources/ShipyardApp/Brand/Sailboat.swift Sources/ShipyardApp/Brand/Logo.swift"))
         #expect(makefile.contains("swiftc -o $@ $(dir $@)main.swift $(BRAND)"))
-        #expect(makefile.contains("ICON        ?= olive-khaki"))
+        #expect(makefile.contains("ICON        ?= khaki-green"))
         let script = try String(contentsOf: Self.root.appendingPathComponent("Packaging/Icon/make-icon.swift"), encoding: .utf8)
         #expect(script.contains("Sailboat.path"))
         #expect(script.contains("(Logo.top, Logo.bottom)"))
@@ -117,7 +117,7 @@ struct SailboatTests {
         let iconFigure = iconColour(inIcon), badgeFigure = badgeColour(inBadge)
         #expect(Self.near(iconBody, badgeBody))
         #expect(Self.near(iconFigure, badgeFigure))
-        // And they are the logo's: an olive body (red and green over blue) and a cream figure.
+        // And they are the logo's: a khaki green body (red and green over blue) and a cream figure.
         #expect(badgeBody.redComponent > badgeBody.blueComponent + 0.1 && badgeBody.greenComponent > badgeBody.blueComponent + 0.1)
         #expect(badgeFigure.redComponent > 0.95 && badgeFigure.blueComponent < badgeFigure.redComponent)
     }

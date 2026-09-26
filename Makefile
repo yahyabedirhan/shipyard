@@ -7,7 +7,7 @@
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
-#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=olive-khaki)
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=khaki-green)
 #   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
 #   make icon-exploration redraw the minimal sailboat options and their comparison sheet
 #   make clean
@@ -23,10 +23,10 @@ ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
 ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
-# The variant make-icon.swift draws for the app: olive-khaki (shipyard's logo),
-# origami, sailboat, night or sunset.
-ICON        ?= olive-khaki
-ALTERNATES  := origami sailboat night sunset
+# The variant make-icon.swift draws for the app: khaki-green (shipyard's logo),
+# olive-khaki, origami, sailboat, night or sunset.
+ICON        ?= khaki-green
+ALTERNATES  := olive-khaki origami sailboat night sunset
 # make-icon.swift is compiled with the app's sailboat path and logo, so the
 # icon, the menu bar item and the badge draw one figure in the same colours. swiftc runs top-level code only
 # from a main.swift, so the script is copied in under that name.

@@ -1,12 +1,13 @@
-// Draws Shipyard's app icon in one of five variants (see README.md here):
+// Draws Shipyard's app icon in one of six variants (see README.md here):
 //
-//   olive-khaki  shipyard's logo: the sailboat in cream on olive khaki (the app's icon)
+//   khaki-green  shipyard's logo: the sailboat in cream on khaki green (the app's icon)
+//   olive-khaki  the sailboat in cream on olive khaki
 //   origami      the menu bar's sailboat folded from paper, on amber
 //   sailboat     the menu bar's sailboat on a sea-blue squircle
 //   night        the sailboat under a crescent moon and stars
 //   sunset       the sailboat in silhouette against a low sun
 //
-//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (olive-khaki by default)
+//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (khaki-green by default)
 //   make-icon --sheet <out.png>                  a contact sheet of every variant, for review
 //   make-icon --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
 //
@@ -521,12 +522,19 @@ enum Minimal: String, CaseIterable {
         case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
         case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
         case .solidKhaki, .whiteKhaki: return (0xAE9B6C, 0x8E7B4E)
-        case .solidOliveKhaki, .whiteOliveKhaki: return (Logo.top, Logo.bottom)   // the logo
+        case .solidOliveKhaki, .whiteOliveKhaki: return (0x8C8660, 0x6A6541)
         case .solidDeepKhaki, .whiteDeepKhaki: return (0x7D6A4C, 0x574630)
         }
     }
 
     func draw(_ ctx: CGContext, pixels: Int) {
+        // White on the first colours; cream, warmer, on khaki.
+        Self.draw(ctx, pixels: pixels, hue: hue, figure: isKhaki ? Logo.figure : 0xFFFFFF, onWhite: onWhite)
+    }
+
+    /// Draws the figure in `figure` on a body of `hue`, or in `hue` on white:
+    /// the options above, and the logo, which isn't one of them.
+    static func draw(_ ctx: CGContext, pixels: Int, hue: (top: UInt32, bottom: UInt32), figure: UInt32, onWhite: Bool) {
         let (top, bottom) = hue
         let background = onWhite ? grad([rgb(0xFFFFFF), rgb(0xECEFF3)]) : grad([rgb(top), rgb(bottom)])
         let base = onWhite ? rgb(0xC9CFD8) : rgb(bottom)
@@ -539,8 +547,7 @@ enum Minimal: String, CaseIterable {
                 ctx.saveGState()
                 shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
                 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-                // White on the first colours; cream, warmer, on khaki.
-                fillSolid(ctx, Sailboat.path, rgb(isKhaki ? Logo.figure : 0xFFFFFF))
+                fillSolid(ctx, Sailboat.path, rgb(figure))
                 if onWhite {
                     // Colour the figure with the hue's gradient.
                     ctx.setBlendMode(.sourceIn)
@@ -557,10 +564,11 @@ enum Minimal: String, CaseIterable {
 // MARK: - Variants
 
 enum Variant: String, CaseIterable {
-    case oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
+    case khakiGreen = "khaki-green", oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
 
     func draw(_ ctx: CGContext, pixels: Int) {
         switch self {
+        case .khakiGreen: Minimal.draw(ctx, pixels: pixels, hue: (Logo.top, Logo.bottom), figure: Logo.figure, onWhite: false)
         case .oliveKhaki: Minimal.solidOliveKhaki.draw(ctx, pixels: pixels)
         case .origami: drawOrigami(ctx, pixels: pixels)
         case .sailboat: drawSailboat(ctx, pixels: pixels)
@@ -813,7 +821,7 @@ func fail(_ message: String) -> Never {
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
-var variant = Variant.oliveKhaki
+var variant = Variant.khakiGreen
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }
     guard let chosen = Variant(rawValue: arguments[flag + 1]) else { fail("unknown variant \(arguments[flag + 1])") }

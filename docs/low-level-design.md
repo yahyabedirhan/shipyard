@@ -716,7 +716,7 @@ shipyard/
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   ├── Brand/
 │   │   ├── Sailboat.swift            # shipyard's sailboat, one CGPath (CoreGraphics only): make-icon.swift compiles this file, so the app icon, the menu bar item and the badge draw one figure (#80)
-│   │   ├── Logo.swift                # the logo (CoreGraphics only, compiled into make-icon.swift too): the icon's squircle, olive khaki gradient, sheen, cream figure colour and the figure's size against the body
+│   │   ├── Logo.swift                # the logo (CoreGraphics only, compiled into make-icon.swift too): the icon's squircle, khaki green gradient, sheen, cream figure colour and the figure's size against the body
 │   │   ├── LogoBadge.swift           # the logo as a SwiftUI view: the welcome screens' badge (ConnectView's heading)
 │   │   └── SailboatImage.swift       # the menu bar item: a template NSImage of the path
 │   └── UI/
