@@ -516,6 +516,13 @@ enum Minimal: String, CaseIterable {
     case solidNavy = "solid-navy", solidNavyLight = "solid-navy-light", solidNavyDeep = "solid-navy-deep"
     case solidBlue = "solid-blue", solidTeal = "solid-teal", solidCoral = "solid-coral"
     case whiteNavy = "white-navy", whiteBlue = "white-blue", whiteTeal = "white-teal", whiteCoral = "white-coral"
+    // The khaki range, muted and desaturated, from classic khaki to a deep brown
+    // khaki. Sand and a light khaki were tried and left out: under 3:1 against
+    // the figure, they lost it at 32 pixels.
+    case solidKhaki = "solid-khaki", solidOliveKhaki = "solid-olive-khaki", solidDeepKhaki = "solid-deep-khaki"
+    case whiteKhaki = "white-khaki", whiteOliveKhaki = "white-olive-khaki", whiteDeepKhaki = "white-deep-khaki"
+
+    var isKhaki: Bool { rawValue.hasSuffix("khaki") }
 
     var onWhite: Bool { rawValue.hasPrefix("white-") }
 
@@ -528,6 +535,9 @@ enum Minimal: String, CaseIterable {
         case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)   // the connect screen's accent, 0x006BED
         case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
         case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
+        case .solidKhaki, .whiteKhaki: return (0xAE9B6C, 0x8E7B4E)
+        case .solidOliveKhaki, .whiteOliveKhaki: return (0x8C8660, 0x6A6541)
+        case .solidDeepKhaki, .whiteDeepKhaki: return (0x7D6A4C, 0x574630)
         }
     }
 
@@ -544,7 +554,8 @@ enum Minimal: String, CaseIterable {
                 ctx.saveGState()
                 shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
                 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
-                fillSolid(ctx, Sailboat.path, rgb(0xFFFFFF))
+                // White on the first colours; cream, warmer, on khaki.
+                fillSolid(ctx, Sailboat.path, rgb(isKhaki ? 0xFBF6EA : 0xFFFFFF))
                 if onWhite {
                     // Colour the figure with the hue's gradient.
                     ctx.setBlendMode(.sourceIn)
@@ -655,7 +666,8 @@ func exploration(to dir: URL) throws {
         try writePNG(render(pixels: 512) { m.draw($0, pixels: 512) }, to: dir.appendingPathComponent("\(m.rawValue).png"))
     }
 
-    let families = [Minimal.allCases.filter { !$0.onWhite }, Minimal.allCases.filter(\.onWhite)]
+    let first = Minimal.allCases.filter { !$0.isKhaki }
+    let families = [first.filter { !$0.onWhite }, first.filter(\.onWhite)]
     let columns = families.map(\.count).max()!
     let gap = 40, small = 32, label = 44
     let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
@@ -761,6 +773,50 @@ func exploration(to dir: URL) throws {
     }
     NSGraphicsContext.restoreGraphicsState()
     try writePNG(rep, to: dir.appendingPathComponent("comparison.png"))
+
+    // The khaki range, with solid-navy (the favourite) first for comparison.
+    let khaki = Minimal.allCases.filter(\.isKhaki)
+    try optionSheet([[.solidNavy] + khaki.filter { !$0.onWhite }, khaki.filter(\.onWhite)],
+                    to: dir.appendingPathComponent("comparison-khaki.png"))
+}
+
+/// A sheet of `families`, a row each, every option at 512 and 32 on a light
+/// panel and then on a dark one.
+func optionSheet(_ families: [[Minimal]], to url: URL) throws {
+    let gap = 40, small = 32, label = 44
+    let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
+    let width = gap + (cellW + gap) * families.map(\.count).max()!
+    let panelH = rowH * families.count + gap
+    let height = panelH * 2
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    for (p, panel) in [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)].enumerated() {
+        let panelTop = height - panelH * p
+        panel.setFill()
+        NSRect(x: 0, y: panelTop - panelH, width: width, height: panelH).fill()
+        let text = p == 0 ? NSColor(white: 0.15, alpha: 1) : NSColor(white: 0.88, alpha: 1)
+        for (f, family) in families.enumerated() {
+            let rowTop = panelTop - rowH * f
+            for (c, m) in family.enumerated() {
+                let x = gap + (cellW + gap) * c
+                let big = NSImage(size: NSSize(width: 512, height: 512))
+                big.addRepresentation(render(pixels: 512) { m.draw($0, pixels: 512) })
+                big.draw(in: NSRect(x: x, y: rowTop - gap - 512, width: 512, height: 512))
+                let tiny = NSImage(size: NSSize(width: small, height: small))
+                tiny.addRepresentation(render(pixels: small) { m.draw($0, pixels: small) })
+                let smallY = rowTop - gap - 512 - 20 - small
+                tiny.draw(in: NSRect(x: x + (cellW - small) / 2, y: smallY, width: small, height: small))
+                let t = NSAttributedString(string: m.rawValue, attributes: [.font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: text])
+                t.draw(at: NSPoint(x: CGFloat(x) + (CGFloat(cellW) - t.size().width) / 2, y: CGFloat(smallY - 12 - 32)))
+            }
+        }
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    try writePNG(rep, to: url)
 }
 
 // MARK: - Main
