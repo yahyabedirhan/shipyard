@@ -1,4 +1,4 @@
-[Spec #54](https://github.com/yahyabedirhan/shipyard/issues/54) | Tickets: #55–#66, #14, #23, #73, #74 | QA: #67–#70, #76 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/low-level-design.md) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/configuration.md) | [Decisions](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/.handoff/2026-09-26-shipyard-0.0.2-decisions.md)
+[Spec #54](https://github.com/yahyabedirhan/shipyard/issues/54) | Tickets: #55–#66, #14, #23, #72, #73, #74 | QA: #67–#70, #76 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/low-level-design.md) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/configuration.md) | [Decisions](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/.handoff/2026-09-26-shipyard-0.0.2-decisions.md)
 
 ## Why the change
 
@@ -16,7 +16,7 @@ Shipyard 0.0.2 makes it a superset of ghbar through configuration, while the mai
 - **QA is non-blocking:** #67 (group and sort), #68 (fold), #69 (Show more) and #70 (preset onboarding) and #76 (sign-in) carry the real-menu checks and don't hold this PR. Agents took the screenshots below in the real app with a test config that watches public repositories only. Clicking inside the panel wasn't possible, so folding and the keys weren't shot.
   - Your `config.toml` and `state.json` were restored from backups afterwards.
   - `.scratch/shipyard-0-0-2/mac.lock` is kept with the backups; remove it when you're happy.
-  - `/Applications/Shipyard.app` is currently the #72 hover-help prototype (branch `feat/hover-help`); run `make install` from this branch to try the PR.
+  - `/Applications/Shipyard.app` is a build of `feat/hover-help`, which is now merged here; run `make install` from this branch to try the whole PR.
 
 ## Change outline
 
@@ -95,6 +95,6 @@ Where the new responsibilities live:
 +   presets.md                the three presets, tested equal to the app's
 ```
 
-Commits, one per ticket: #55 `887d33c`, #57 `fbb70ca`, #56 `aae03e7`, #14 `71431da` and `f2d6408`, #59 `7c1c559`, #62 `dbfc390`, #58 `f87ea62`, #60 `6421bb8`, #63 `f3d1687`, #61 `b52835b`, #65 `f23a938`, #64 `6a7f547`, #66 `8b546fd`, the final review's tidy-up in `05e285e`, screenshots moved into `docs/assets/` for #73 (`23901d4`, `e164484`, `45b4518`), and the README rewrite for #74 (`12ba5be`). `make test`: 612 tests pass. The release build has no warnings.
+Commits, one per ticket: #55 `887d33c`, #57 `fbb70ca`, #56 `aae03e7`, #14 `71431da` and `f2d6408`, #59 `7c1c559`, #62 `dbfc390`, #58 `f87ea62`, #60 `6421bb8`, #63 `f3d1687`, #61 `b52835b`, #65 `f23a938`, #64 `6a7f547`, #66 `8b546fd`, the final review's tidy-up in `05e285e`, screenshots moved into `docs/assets/` for #73 (`23901d4`, `e164484`, `45b4518`), and the README rewrite for #74 (`12ba5be`), and the hover help card from #72, which replaces native tooltips (merged from #75 as `fa15396`, tried round by round by the maintainer). `make test`: 626 tests pass. The release build has no warnings.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
