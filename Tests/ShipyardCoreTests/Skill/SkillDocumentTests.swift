@@ -219,6 +219,12 @@ struct SkillDocumentTests {
         #expect(text.contains("taplo check"))
         // The app's own check: its error banner, in the words the panel shows.
         #expect(text.contains("Using the last valid configuration."))
+        // The app's verdict, where an agent reads it, with the fields it names.
+        #expect(text.contains("~/Library/Application Support/Shipyard/\(ConfigStatusStore.fileName)"))
+        for field in ["accepted", "configModified", "problems", "line", "banner", "warnings"] {
+            #expect(text.contains("`\(field)`") || text.contains("\"\(field)\""), "`\(field)` isn't named")
+        }
+        #expect(text.contains("echo \"taplo exit status: $?\""))
         #expect(SkillInstaller.command.contains("skills add yahyabedirhan/shipyard"))
     }
 }

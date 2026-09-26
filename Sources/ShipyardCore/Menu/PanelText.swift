@@ -206,19 +206,21 @@ public enum PanelText {
     /// The banner for a rejected configuration file: each problem with its
     /// line, then that the last valid configuration is still in use.
     public static func configError(_ error: ConfigError) -> String {
-        let lines = error.issues.map { issue in
-            issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
-        }
-        return (lines + ["Using the last valid configuration."]).joined(separator: "\n")
+        (error.issues.map(configIssue) + ["Using the last valid configuration."]).joined(separator: "\n")
+    }
+
+    /// One problem's line in a configuration banner:
+    /// "config.toml line 14: unknown event `pr.openned` …", or without the
+    /// line when it can't be placed. `config-status.json` repeats it.
+    public static func configIssue(_ issue: ConfigIssue) -> String {
+        issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
     }
 
     /// The quiet banner for settings the file has but shipyard ignores, each
     /// with its line; `nil` when there are none.
     public static func configWarnings(_ warnings: [ConfigIssue]) -> String? {
         guard !warnings.isEmpty else { return nil }
-        return warnings.map { issue in
-            issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
-        }.joined(separator: "\n")
+        return warnings.map(configIssue).joined(separator: "\n")
     }
 
     /// Why the latest refresh failed, for the banner above the kept rows.

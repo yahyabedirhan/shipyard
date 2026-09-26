@@ -75,6 +75,9 @@ public final class Shipyard {
     public let configStore: ConfigStore
     /// Seen items and collapsed projects, in `state.json`.
     public let appStateStore: AppStateStore
+    /// The verdict on the configuration file after each reload, in
+    /// `config-status.json`, for agents that can't see the banner.
+    public let configStatusStore: ConfigStatusStore
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
     private let notifier: any Notifying
@@ -99,6 +102,7 @@ public final class Shipyard {
     public init(
         configStore: ConfigStore,
         appStateStore: AppStateStore,
+        configStatusStore: ConfigStatusStore,
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
         notifier: any Notifying,
@@ -112,6 +116,7 @@ public final class Shipyard {
     ) {
         self.configStore = configStore
         self.appStateStore = appStateStore
+        self.configStatusStore = configStatusStore
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
         self.notifier = notifier
@@ -136,8 +141,7 @@ public final class Shipyard {
         appStateStore.load(at: clock.now)
         createConfigurationIfMissing()
         configStore.reload()
-        configError = configStore.error
-        configWarnings = configStore.warnings
+        publishConfigStatus()
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -298,8 +302,7 @@ public final class Shipyard {
     /// last snapshot and refreshes (or stops the timer). Only a valid change
     /// moves anything.
     private func follow(_ result: ConfigStore.ReloadResult) async {
-        configError = configStore.error
-        configWarnings = configStore.warnings
+        publishConfigStatus()
         if case .changed(let configuration) = result {
             followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
@@ -316,6 +319,22 @@ public final class Shipyard {
                 timer.disarm()
             }
         }
+    }
+
+    /// Publishes the latest reload's verdict: `configError` and
+    /// `configWarnings` for the panel's banners, and the same in
+    /// `config-status.json` for agents. Every reload comes through here,
+    /// accepted, rejected or unchanged.
+    private func publishConfigStatus() {
+        configError = configStore.error
+        configWarnings = configStore.warnings
+        configStatusStore.record(ConfigStatus(
+            checked: clock.now,
+            config: configStore.url,
+            configModified: configStore.modified,
+            error: configError,
+            warnings: configWarnings
+        ))
     }
 
     /// Registers or removes the login item to match `launch-at-login` in

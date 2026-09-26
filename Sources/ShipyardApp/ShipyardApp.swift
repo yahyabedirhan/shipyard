@@ -77,6 +77,7 @@ final class AppServices {
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
+            configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
             tokenStore: SessionTokenStore(),
             urlOpener: opener,
             notifier: notifier,
@@ -89,7 +90,8 @@ final class AppServices {
         }
     }
 
-    /// `~/Library/Application Support/Shipyard/`, where `state.json` lives.
+    /// `~/Library/Application Support/Shipyard/`, where `state.json` and
+    /// `config-status.json` live.
     static var appSupportDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Shipyard", isDirectory: true)

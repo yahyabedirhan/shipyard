@@ -25,6 +25,7 @@ public final class ConfigStore: @unchecked Sendable {
     private var _lastValid = Configuration()
     private var _error: ConfigError?
     private var _warnings: [ConfigIssue] = []
+    private var _modified: Date?
 
     public init(url: URL) {
         self.url = url
@@ -57,11 +58,18 @@ public final class ConfigStore: @unchecked Sendable {
     /// Unknown keys found by the latest reload; empty when it failed.
     public var warnings: [ConfigIssue] { synchronized { _warnings } }
 
+    /// The file's modification time as the latest reload read it; `nil`
+    /// before any reload and when there was no file.
+    public var modified: Date? { synchronized { _modified } }
+
     /// Reads the file again. A missing or empty file is the defaults with no
     /// projects. A broken file keeps the last valid configuration, sets
     /// `error` and clears `warnings`; a valid one clears the error.
     @discardableResult
     public func reload() -> ReloadResult {
+        // Taken before the bytes: a save in between gets a later time and
+        // another reload, so the time never claims a newer file than was read.
+        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         let outcome: Result<Configuration.Decoded, ConfigError>
         do throws(ConfigError) {
             outcome = .success(try Configuration.decode(read()))
@@ -70,6 +78,7 @@ public final class ConfigStore: @unchecked Sendable {
         }
 
         return synchronized {
+            _modified = modified
             switch outcome {
             case .failure(let error):
                 _error = error

@@ -32,7 +32,7 @@ A request to change the user's shipyard is a change to this file, also when you'
    version = 1
    ```
 
-4. Check the edit (see Checking an edit). It is done when `taplo check` passes and the rules it can't check hold.
+4. Check the edit (see Checking an edit). It is done when `taplo check` exits 0, the rules it can't check hold, and the app's record says `"accepted": true` for your save.
 
 ## Keys and defaults
 
@@ -117,13 +117,13 @@ Issue events need the project to show issues, and run events to show workflow ru
 
 ## Checking an edit
 
-**The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file; it finds the schema through the `#:schema` line:
+**The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file and print its exit status; it finds the schema through the `#:schema` line:
 
 ```sh
-taplo check ~/.config/shipyard/config.toml
+taplo check ~/.config/shipyard/config.toml; echo "taplo exit status: $?"
 ```
 
-Without Taplo installed, `npx -y @taplo/cli check <file>` or `brew install taplo`. When the file has no `#:schema` line, pass `--schema <url>` with the schema URL above. The schema is stricter than the app about unknown keys: it rejects what the app would only warn about and ignore, so fix those too.
+Exit status 0 is a pass; anything else is a fail, and the lines above it say why. Don't pipe the output through `tail`, `grep` or `head`: on success Taplo prints only an INFO line, and a pipe hides the exit status. Without Taplo installed, run `npx -y @taplo/cli check <file>` the same way, or `brew install taplo`. When the file has no `#:schema` line, or its schema URL can't be fetched, pass `--schema <url>` with the schema URL above (a local copy works as `file://<absolute path>`). The schema is stricter than the app about unknown keys: it rejects what the app would only warn about and ignore, so fix those too.
 
 The schema can't check three rules; check them by reading the file:
 
@@ -131,14 +131,36 @@ The schema can't check three rules; check them by reading the file:
 - A project lists each repository once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
 - Top-level keys sit above the first `[table]` header.
 
-**The app.** Shipyard rereads the file within a moment of each save. When it rejects the file, the top of its panel shows a banner listing each problem with its line, ending in "Using the last valid configuration.", for example:
+**The app.** Shipyard rereads the file within a moment of each save and writes its verdict to `~/Library/Application Support/Shipyard/config-status.json`. After saving, wait a second, then read the record and the modification time of the file you edited (under `$XDG_CONFIG_HOME` when it is set):
 
-```text
-config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?)
-Using the last valid configuration.
+```sh
+cat ~/Library/Application\ Support/Shipyard/config-status.json
+date -u -r ~/.config/shipyard/config.toml +%Y-%m-%dT%H:%M:%SZ
 ```
 
-The panel is on the user's screen, not yours: when the user reports that banner, fix the line it names. No banner after a save means the app took the edit.
+```json
+{
+  "accepted" : false,
+  "checked" : "2026-09-25T12:05:01Z",
+  "config" : "/Users/me/.config/shipyard/config.toml",
+  "configModified" : "2026-09-25T12:05:00Z",
+  "problems" : [
+    {
+      "banner" : "config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?)",
+      "line" : 14,
+      "message" : "unknown event `pr.openned` (did you mean `pr.opened`?)"
+    }
+  ],
+  "version" : 1,
+  "warnings" : []
+}
+```
+
+- **Is it about your save?** Only when `configModified` equals the `date` output (both UTC, whole seconds) and `config` is the file you edited. When it's older, the app hasn't reread yet: wait a moment and read it again. When it never catches up, shipyard isn't running; say so rather than claiming the app took the edit.
+- **`"accepted": true`**: the app took the edit. `warnings` lists settings it ignored, each with its `line`: usually a misspelled key, so fix it.
+- **`"accepted": false`**: the app rejected the file and keeps running on the last valid configuration. Fix every entry in `problems` at its `line` (`null` when it can't be placed), save, and read the record again. `banner` is the same line the user sees in the panel's banner, which ends in "Using the last valid configuration.".
+
+The record also catches what only the app checks, including the three rules above.
 
 ## Worked requests
 

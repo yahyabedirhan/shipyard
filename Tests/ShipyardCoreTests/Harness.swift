@@ -70,6 +70,7 @@ struct Harness {
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: stateDirectory),
+            configStatusStore: ConfigStatusStore(directory: stateDirectory),
             tokenStore: store,
             urlOpener: opener,
             notifier: notifier,

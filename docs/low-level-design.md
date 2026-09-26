@@ -35,6 +35,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | R10 | Refresh on an interval (default 120 s), when the Mac wakes, when the configuration changes, and on ⌘R. Opening the panel doesn't refresh: it shows the last fetched data and spends no GitHub request. |
 | R11 | Read everything the user controls from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
 | R12 | Keep app state (seen, known items, collapsed sections, notified) in `~/Library/Application Support/Shipyard/state.json`, never in the configuration. |
+| R11a | After every reload, record the verdict on the configuration file (accepted, or each problem with its line and the banner's text) in `~/Library/Application Support/Shipyard/config-status.json`, with when it was checked and the file's modification time, so an agent can confirm the app took its edit without seeing the banner (#48). |
 | R13 | Onboarding: connect GitHub by reusing `gh`'s token silently; in 0.0.x `gh` is the only way in, and without a usable `gh` token the panel shows a connect screen explaining `gh auth login` (sign-in without `gh`, the device flow with the token in the Keychain, is deferred to #22); then, whenever there are no projects, show the project picker, which writes projects to the configuration. |
 | R14 | Offer to install the shipyard skill during onboarding and from the panel's menu, by running `npx -y skills add yahyabedirhan/shipyard -g -y` for the user. |
 | R15 | Launch at login (on by default, configurable). |
@@ -52,7 +53,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 
 | Situation | Behaviour |
 |---|---|
-| Configuration file is invalid TOML or fails validation | Keep the last valid configuration, show the error (file, line, message) at the top of the panel. Never blank the list. |
+| Configuration file is invalid TOML or fails validation | Keep the last valid configuration, show the error (file, line, message) at the top of the panel and record it in `config-status.json`. Never blank the list. |
 | No configuration file | Treat as defaults with no projects → project picker. |
 | Token missing or rejected (401) | Go to the signed-out state → onboarding's connect step, which says why (no `gh` token, or GitHub rejected it) and to run `gh auth login`. |
 | One repository not found or not accessible | That project shows an error row for it; other repositories and projects still show. |
@@ -103,6 +104,7 @@ Shipyard -> Auth                   asks for a token; drives device flow
 Shipyard -> GitHubClient           fetch(projects) -> Snapshot (with rate limits)
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
+Shipyard -> ConfigStatusStore      record(verdict) after every reload, for agents
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]
 Shipyard -> NotificationRules      shouldNotify(event, project settings, hidden authors) -> Bool
 Shipyard -> Notifier               post(notification)
@@ -149,6 +151,7 @@ fetchError: GitHubError?           (last refresh's failure, if any)
 menu: MenuModel                    (what the panel draws; a failed refresh keeps its rows and sets fetchError; before any succeeded, it lists every project not loaded yet)
 budget: RateBudget                 (limits, recent costs, pause; reset on sign-out)
 appStateStore: AppStateStore       (seen, collapsed; loaded at start, kept on sign-out)
+configStatusStore: ConfigStatusStore (config-status.json: the verdict after every reload, for agents; write-only)
 gate: RefreshGate                  (one refresh at a time, queues one more)
 timer: RefreshTimer                (port; armed with the budget's delay after every refresh, disarmed outside ready)
 loginItem: LoginItem               (port; told launch-at-login at start and on every valid configuration change)
@@ -172,7 +175,7 @@ Operations:
 | `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()` | as `refresh()`; an existing file is never touched |
 | `refresh()` | the refresh pipeline (§4); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
-| `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
+| `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`, in `publishConfigStatus()`, which also writes the verdict to `configStatusStore`, accepted, rejected or unchanged); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
 | `openRepository(of: section)` | Return on a project's header (#45): opens the section's `repositoryURL`, the first repository the configuration lists for the project, on GitHub; marks nothing seen | a section without repositories opens nothing |
 | `openProfile()` | a click on the header's account (#49): opens `viewer.profileURL` through `URLOpening`; the app then closes the menu, as for a row | opens nothing while `viewer` is `nil` |
@@ -264,9 +267,13 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
-State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`.
+State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
 Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
+
+### ConfigStatusStore — `ShipyardCore/Config/ConfigStatus.swift`
+
+Writes the latest `ConfigStatus` (`checked`, `config`, `configModified`, `error`, `warnings`) to `config-status.json` in a directory the app provides, the same one as `state.json` (tests pass a temporary one). Not beside `config.toml`: `ConfigWatcher` watches that directory, so a write there would reload again. Write-only and replaced atomically; the app never reads it back. Each problem is written with its `line`, `message` and `banner`, the banner's line from `PanelText.configIssue`. The format is in `docs/configuration.md`.
 
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
 
@@ -482,7 +489,8 @@ shipyard/
 │   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
 │   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
 │   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
-│   │   └── ConfigStore.swift         # path, reload, last-valid fallback, append projects
+│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects
+│   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer (login, name, avatar, profile), rate-limit headers, ETags
@@ -608,9 +616,11 @@ onDirectoryEvent (debounced)
   data = read(url)                    // missing file → Configuration() with no projects
   try config = Configuration.decode(data)
     lastValid = config; error = nil
+    configStatusStore.record(accepted)  // unchanged saves too
     shipyard.follow(.changed(config))  // phase may move to/from needsProjects; rebuildMenu(config) from the last snapshot at once (paused or failing too); triggers refresh
   catch e
     error = ConfigError(e, line)       // lastValid untouched
+    configStatusStore.record(rejected: each issue with its line and banner text)
 ```
 
 ### Rate limit arithmetic: does 2 minutes fit?
@@ -649,10 +659,10 @@ Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backe
 | Step | Call | State after |
 |---|---|---|
 | 1 | agent writes `config.toml` with `event = "pr.openned"` | — |
-| 2 | directory watch → `ConfigStore` → `Configuration.decode` throws `unknownEvent("pr.openned", line 14)` | `lastValid` unchanged, `error` set |
+| 2 | directory watch → `ConfigStore` → `Configuration.decode` throws `unknownEvent("pr.openned", line 14)` | `lastValid` unchanged, `error` set; `config-status.json` says `"accepted": false` with the problem at line 14 and the file's modification time |
 | 3 | `Panel` | banner: "config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?). Using the last valid configuration." |
 | 4 | refreshes keep running with `lastValid` | list unchanged |
-| 5 | agent fixes the file | `error = nil`, banner gone, refresh triggered |
+| 5 | agent reads `config-status.json`, fixes the file, reads it again | `error = nil`, banner gone, record says `"accepted": true` for the new modification time, refresh triggered |
 
 ### Trace 3: agents drain the limit (rejection by budget)
 

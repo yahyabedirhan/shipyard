@@ -36,6 +36,28 @@ The module design (state, operations, the refresh pipeline, the broken-edit trac
 
 The core has no file watcher of its own: tests drive the same path by writing the file (`Harness.writeConfig`) and calling `reloadConfiguration()`.
 
+## The verdict record, for agents
+
+Agents edit the file but can't see the panel's banner, so after every reload (at launch, on each save the watcher sees, and after the picker appends projects) `Shipyard` also writes its verdict to `~/Library/Application Support/Shipyard/config-status.json`, through `ConfigStatusStore` (in `ConfigStatus.swift`). The skill's "Checking an edit" tells agents to read it after saving.
+
+```json
+{
+  "accepted" : false,
+  "checked" : "2026-09-25T12:05:01Z",
+  "config" : "/Users/me/.config/shipyard/config.toml",
+  "configModified" : "2026-09-25T12:05:00Z",
+  "problems" : [
+    { "banner" : "config.toml line 1: …", "line" : 1, "message" : "…" }
+  ],
+  "version" : 1,
+  "warnings" : []
+}
+```
+
+- `checked` is when the app read the file; `configModified` is the file's modification time as it read it (taken before the bytes, so it never claims a newer file than was read), `null` when there was no file. Both are UTC in whole seconds, the form `date -u -r <file> +%Y-%m-%dT%H:%M:%SZ` prints, so an agent can tell the verdict is for its own save.
+- `accepted` is `false` exactly when the banner shows. `problems` then lists every issue of the `ConfigError`, in file order; `warnings` lists the unknown settings an accepted file has. Each entry has its `line` (`null` when it can't be placed), the `message`, and `banner`, the entry's line in the panel's banner word for word (`PanelText.configIssue`, which the banners use too).
+- It sits beside `state.json`, not beside `config.toml`: the watcher watches the configuration's directory, so a write there would trigger another reload. It's app-owned, replaced atomically on every reload (unchanged ones too), and never read back by the app. `version` follows the same rule as `state.json`'s: a new field isn't a new version, a renamed or changed one is.
+
 ## Configuration and app state
 
 Two stores, kept apart on purpose (ADR 0001; the terms are in `CONTEXT.md`):
