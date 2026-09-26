@@ -32,7 +32,12 @@ public enum PanelText {
         "Open @\(viewer.login)'s profile on GitHub"
     }
 
-    /// The header's layout button, as its tooltip and VoiceOver label: the
+    /// The header's Refresh button's hover help, with its shortcut.
+    public static let refreshHelp = "Refresh (⌘R)"
+    /// The header's settings menu, as its hover help and VoiceOver label.
+    public static let settings = "Settings"
+
+    /// The header's layout button, as its hover help and VoiceOver label: the
     /// layout shown and the one a click switches to. "Layout: list. Click for tabs."
     public static func layoutButton(_ current: MenuLayout) -> String {
         "Layout: \(current.rawValue). Click for \(current.next.rawValue)."
@@ -84,11 +89,20 @@ public enum PanelText {
         repository.split(separator: "/").last.map(String.init) ?? repository
     }
 
-    /// A row's tooltip, in either layout: its state and its full second
-    /// line, then, while it needs attention, the ⌥-click hint.
+    /// A row's hover help, in either layout: its state and its full second
+    /// line; under it, a pull request's checks (what its check dot means);
+    /// then, while it needs attention, the ⌥-click hint. One line each.
     public static func rowHelp(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
         let detail = "\(stateLabel(row)) · \(rowDetail(row, showingRepository: showingRepository, now: now))"
-        return row.needsAttention ? "\(detail)\n\(optionClickHint)" : detail
+        let checkLine = row.checks.flatMap { Self.checks($0) }
+        let hint = row.needsAttention ? optionClickHint : nil
+        return ([detail, checkLine, hint] as [String?]).compactMap { $0 }.joined(separator: "\n")
+    }
+
+    /// A list section's header, for VoiceOver's hint: what a click does to
+    /// it. "Collapse shipyard", "Expand shipyard".
+    public static func sectionFoldHelp(_ name: String, isCollapsed: Bool) -> String {
+        "\(isCollapsed ? "Expand" : "Collapse") \(name)"
     }
 
     /// The button that marks everything it covers seen: the footer's for
@@ -97,12 +111,13 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
-    /// Said in a row's tooltip, under its detail, while it needs attention.
+    /// Said in a row's hover help, on its last line, while it needs attention.
     public static let optionClickHint = "⌥-click to mark seen"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 
-    /// What a pull request's check dot means, for its tooltip; `nil` with no checks.
+    /// What a pull request's check dot means, for VoiceOver and the row's
+    /// hover help; `nil` with no checks.
     public static func checks(_ checks: ChecksState) -> String? {
         switch checks {
         case .none: nil

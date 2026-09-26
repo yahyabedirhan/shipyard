@@ -223,9 +223,10 @@ private struct ListSectionHeader: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(section.isCollapsed ? "Expand \(section.name)" : "Collapse \(section.name)")
+            // No hover help: the chevron says it collapses. VoiceOver hears what a click does.
             .accessibilityLabel(section.name)
             .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
+            .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
             if let empty = PanelText.emptySection(section) {
                 Text(empty)
                     .font(TypeScale.caption)
@@ -266,7 +267,7 @@ private struct ListSectionHeader: View {
 /// request's check dot on it), the number, the title (bold when it needs
 /// attention; a run's is its workflow's name, followed by its branch as a
 /// chip), the author or, in a multi-repository project, the repository,
-/// and the age. What a click does, its tooltip and its highlight come
+/// and the age. What a click does, its hover help and its highlight come
 /// from `itemRow(…)`.
 private struct ListRow: View {
     let row: MenuRow

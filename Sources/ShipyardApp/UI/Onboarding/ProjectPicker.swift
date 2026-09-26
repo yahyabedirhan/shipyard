@@ -185,7 +185,8 @@ struct ProjectPicker: View {
                         Image(systemName: "lock.fill")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .help("Private")
+                            // No hover help: the lock says private.
+                            .accessibilityLabel("Private")
                     }
                 }
             }

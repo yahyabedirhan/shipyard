@@ -28,7 +28,7 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(10) == "10 need attention")
     }
 
-    @Test("the layout button's tooltip and VoiceOver label name the current layout and the next one")
+    @Test("the layout button's hover help and VoiceOver label name the current layout and the next one")
     func layoutButton() {
         #expect(PanelText.layoutButton(.list) == "Layout: list. Click for tabs.")
         #expect(PanelText.layoutButton(.tabs) == "Layout: tabs. Click for list.")
@@ -127,7 +127,12 @@ struct PanelTextTests {
 
     // MARK: - Rows
 
-    private func row(repository: String = "yahyabedirhan/shipyard", number: Int = 21, author: String = "yahyabedirhan") -> MenuRow {
+    private func row(
+        repository: String = "yahyabedirhan/shipyard",
+        number: Int = 21,
+        author: String = "yahyabedirhan",
+        checks: ChecksState = .none
+    ) -> MenuRow {
         MenuRow(Item(
             kind: .pullRequest,
             repository: repository,
@@ -137,6 +142,7 @@ struct PanelTextTests {
             author: author,
             authorKind: .me,
             state: .open,
+            checks: checks,
             createdAt: now.addingTimeInterval(-37 * 60),
             updatedAt: now.addingTimeInterval(-37 * 60)
         ))
@@ -154,7 +160,7 @@ struct PanelTextTests {
         #expect(PanelText.repositoryName("shipyard") == "shipyard")
     }
 
-    @Test("a row's tooltip holds its state and full second line, and the ⌥-click hint while it needs attention")
+    @Test("a row's hover help holds its state and full second line, and the ⌥-click hint while it needs attention")
     func rowHelp() {
         let seen = row()
         #expect(PanelText.rowHelp(seen, showingRepository: true, now: now) == "open pull request · #21 · shipyard · yahyabedirhan · 37m")
@@ -169,7 +175,35 @@ struct PanelTextTests {
         #expect(PanelText.optionClickHint == "⌥-click to mark seen")
     }
 
-    @Test("a row's action, attention dot and check dot have words for VoiceOver and the tooltip")
+    @Test("a pull request's hover help says what its check dot means, on its own line above the ⌥-click hint")
+    func rowHelpChecks() {
+        var failing = row(checks: .failed)
+        #expect(PanelText.rowHelp(failing, showingRepository: false, now: now) == """
+            open pull request · #21 · yahyabedirhan · 37m
+            Checks failed
+            """)
+        failing.needsAttention = true
+        #expect(PanelText.rowHelp(failing, showingRepository: false, now: now) == """
+            open pull request · #21 · yahyabedirhan · 37m
+            Checks failed
+            ⌥-click to mark seen
+            """)
+        #expect(PanelText.rowHelp(row(checks: .none), showingRepository: false, now: now) == "open pull request · #21 · yahyabedirhan · 37m")
+    }
+
+    @Test("the header's refresh and settings buttons have hover help, refresh naming its shortcut")
+    func headerButtonHelp() {
+        #expect(PanelText.refreshHelp == "Refresh (⌘R)")
+        #expect(PanelText.settings == "Settings")
+    }
+
+    @Test("a list section's header tells VoiceOver what a click does to it")
+    func sectionFoldHelp() {
+        #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: false) == "Collapse shipyard")
+        #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: true) == "Expand shipyard")
+    }
+
+    @Test("a row's action, attention dot and check dot have words for VoiceOver and the hover help")
     func rowWords() {
         #expect(PanelText.markRowSeen == "Mark seen")
         #expect(PanelText.needsAttention == "Needs attention")

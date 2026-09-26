@@ -23,7 +23,7 @@ struct SkillInstallCard: View {
                         Image(systemName: "xmark")
                     }
                     .buttonStyle(IconButtonStyle())
-                    .help("Close")
+                    // No hover help: an ✕ in a card's corner says what it does.
                     .accessibilityLabel("Close")
                 }
             }

@@ -125,7 +125,7 @@ struct CheckDot: View {
                 Circle().fill(Palette.panel).frame(width: 8, height: 8)
                 Circle().fill(color).frame(width: 5.5, height: 5.5)
             }
-            .help(PanelText.checks(checks) ?? "")
+            // Its words are in the row's hover help (`PanelText.rowHelp`).
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
     }
@@ -150,7 +150,7 @@ struct AttentionDot: View {
 extension View {
     /// An item's row at `place`, in either layout: clicking opens it and
     /// marks it seen, ⌥-click (or the VoiceOver action) only marks it seen;
-    /// the tooltip holds its state and full second line; the attention
+    /// its hover help holds its state, full second line and checks; the attention
     /// dot and weight animate as it's seen; and it's `highlightable`. The
     /// layout still puts `.id(place)` on the lazy list's own child.
     func itemRow(
@@ -178,7 +178,7 @@ private struct ItemRow: ViewModifier {
             .buttonStyle(RowButtonStyle())
             // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-            .help(PanelText.rowHelp(row, showingRepository: showsRepository, now: now))
+            .hoverHelp(PanelText.rowHelp(row, showingRepository: showsRepository, now: now), leadingInset: HoverHelp.rowInset)
             .animation(Motion.seen, value: row.needsAttention)
             .highlightable(place, $highlight)
     }
@@ -193,12 +193,13 @@ private struct ItemRow: ViewModifier {
 }
 
 /// A note about a project's list, in a row's place, such as the review
-/// search's limit: information, not a failure.
+/// search's limit: information, not a failure. It wraps rather than
+/// truncating, so it needs no hover help.
 struct NoteRow: View {
     let note: String
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "info.circle")
                 .foregroundStyle(.secondary)
                 .font(.system(size: 10.5))
@@ -206,23 +207,25 @@ struct NoteRow: View {
             Text(note)
                 .font(TypeScale.meta)
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .help(note)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
         .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
+        .padding(.vertical, 5)
+        .frame(minHeight: Grid.rowHeight)
     }
 }
 
 /// A repository of a project that couldn't be fetched, in a row's place.
+/// Its message wraps, up to `maxLines`, rather than truncating, so it needs
+/// no hover help; VoiceOver reads it whole.
 struct ErrorRow: View {
     let error: MenuErrorRow
+    private static let maxLines = 3
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, Palette.amber)
@@ -231,14 +234,15 @@ struct ErrorRow: View {
             Text(error.message)
                 .font(TypeScale.meta)
                 .foregroundStyle(.primary.opacity(0.75))
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .help(error.message)
+                .lineLimit(Self.maxLines)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
             Spacer(minLength: 0)
         }
         .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
         .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
+        .padding(.vertical, 5)
+        .frame(minHeight: Grid.rowHeight)
     }
 }
 
@@ -269,7 +273,7 @@ struct CommandBox: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(IconButtonStyle())
-            .help(copied ? "Copied" : "Copy")
+            // No hover help: the icon turns into a checkmark once copied.
             .accessibilityLabel(copied ? "Copied" : "Copy")
             .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
         }

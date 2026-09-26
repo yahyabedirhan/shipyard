@@ -45,7 +45,7 @@ extension PanelText {
         }
     }
 
-    /// A subheader's tooltip: what a click does to it.
+    /// A subheader's VoiceOver hint: what a click does to it.
     public static func groupFoldHelp(_ group: RowGroup) -> String {
         "\(group.isFolded ? "Unfold" : "Fold") \(group.title)"
     }
