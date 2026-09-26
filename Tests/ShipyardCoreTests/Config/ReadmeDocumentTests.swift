@@ -32,7 +32,7 @@ private func examples(in text: String) throws -> [(image: String, toml: String)]
     let end = text[start...].range(of: "\n## ")?.lowerBound ?? text.endIndex
     return text[start..<end].components(separatedBy: "```toml\n").dropFirst().compactMap { example in
         guard let fence = example.range(of: "```"),
-              let image = spans(in: String(example[fence.upperBound...]), from: "](", to: ")").first
+              let image = spans(in: String(example[fence.upperBound...]), from: "<img src=\"", to: "\"").first
         else { return nil }
         return (image, String(example[..<fence.lowerBound]))
     }

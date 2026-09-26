@@ -81,7 +81,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-![The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each](docs/assets/shipyard-0.0.2/repo-subsections-showfirst.png)
+<img src="docs/assets/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 
 The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
 
@@ -99,7 +99,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-![The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author](docs/assets/shipyard-0.0.2/tabs.png)
+<img src="docs/assets/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
 
 Grouped by date, three rows a group:
 
@@ -117,7 +117,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-![The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group](docs/assets/shipyard-0.0.2/date.png)
+<img src="docs/assets/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
 
 A file with no projects (or no file at all): the panel offers the three presets and the agent skill:
 
@@ -125,7 +125,7 @@ A file with no projects (or no file at all): the panel offers the three presets 
 version = 1
 ```
 
-![Onboarding: the three presets to choose from, and a card offering to install the agent skill](docs/assets/shipyard-0.0.2/presets.png)
+<img src="docs/assets/shipyard-0.0.2/presets.png" width="400" alt="Onboarding: the three presets to choose from, and a card offering to install the agent skill">
 
 ## Development
 
