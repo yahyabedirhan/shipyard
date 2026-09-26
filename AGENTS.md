@@ -39,6 +39,10 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 
 `docs/low-level-design.md` is the agreed module design: requirements, modules and their state, the folder tree, the refresh pipeline and traced flows. Read it before adding or moving a module, and update it in the same change when the design moves.
 
+## Testing
+
+Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac. Accessibility access is blocked for agents on purpose, so clicking, scripting or opening the installed app always fails; don't retry it or look for a way around it. When a change needs a check in the real menu, name the check in the handoff or pull request and leave it to the maintainer.
+
 ## References
 
 Facts from GitHub's documentation that shipyard depends on (rate limits, workflow runs, device flow) live in `docs/references/`. Read the one for an area before changing it, and update it when you learn something new from the source.
