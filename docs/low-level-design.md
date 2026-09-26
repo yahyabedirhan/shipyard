@@ -395,7 +395,8 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               AvatarCache, a plain circle until it's there or when it can't be had ·
                               "3 need attention" · Layout (ready only: the current layout's icon, list.bullet or
                               rectangle.split.3x1; tooltip and VoiceOver PanelText.layoutButton, "Layout: list. Click
-                              for tabs."; a click is switchToNextLayout) · Refresh (⌘R, spins while refreshing) ·
+                              for tabs."; a click is switchToNextLayout) · Refresh (⌘R; while refreshing, the
+                              native mini spinner in place of the arrow) ·
                               gear menu: Open configuration file · Install agent skill… · Sign out (once signed in)
       signedOut              → <ConnectView>  (Onboarding/)
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
@@ -427,7 +428,8 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               ↑/↓ move through the tab's rows, wrapping; ←/→ switch tabs (provisional); a row
                               clicks, tooltips and highlights as the list's does (itemRow)
       <SkillInstallCard>      above the footer, after the gear menu's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
-      footer                  last updated · global "Mark all seen" · Quit (⌘Q) · rate limit lines, each with a bar
+      footer                  last updated (the native mini spinner and "Refreshing…" while a refresh runs) ·
+                              global "Mark all seen" · Quit (⌘Q) · rate limit lines, each with a bar
                               (amber low, red exhausted)
 ```
 

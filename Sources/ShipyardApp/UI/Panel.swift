@@ -66,8 +66,9 @@ struct Panel: View {
                 .accessibilityLabel(PanelText.layoutButton(layout))
             }
             Button(action: actions.refresh) {
-                // While a refresh runs, the footer's native spinner stands in
-                // for the arrow; the hidden arrow keeps the button's size.
+                // While a refresh runs, the native mini spinner (the one the
+                // footer shows) stands in for the arrow; the hidden arrow
+                // keeps the button's size, so the header doesn't shift.
                 Image(systemName: "arrow.clockwise")
                     .opacity(shipyard.isRefreshing ? 0 : 1)
                     .overlay {

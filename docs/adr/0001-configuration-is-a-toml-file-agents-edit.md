@@ -11,3 +11,12 @@ TOML over JSON: the file is edited by hand as often as by agents, and TOML allow
 - A broken edit must never blank the menu. The app keeps the last valid configuration and shows the error with its line.
 - The app never rewrites the file. The project picker only appends `[[projects]]` tables at the end, which is always valid TOML and keeps the user's comments.
 - The schema is a public contract. Changing a key needs a migration, and the file has a `version` key to drive it.
+
+## Amendment, 2026-09-26: two targeted edits
+
+The app now writes to `config.toml` in two targeted ways, and still never rewrites the file as a whole:
+
+- The project picker appends `[[projects]]` tables at the end of the file, as before.
+- The layout button in the menu's header sets `[menu] layout` to the next layout. It replaces the key's value, adds the key under an existing `[menu]`, uncomments the new file's `# [menu]` example, or adds a `[menu]` table above the first table. It refuses a `[menu]` written in a form it doesn't edit, and any edit that wouldn't read back as the same configuration with only the layout changed.
+
+Every other line and comment stays as the user wrote it. The consequence above that "the app never rewrites the file" now means the file as a whole.
