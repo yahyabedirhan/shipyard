@@ -48,7 +48,7 @@ public struct AppState: Equatable, Sendable {
 //       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
 //     }
 //
-// `known`, `knownProjects` and `notified` came with notification rules (#8).
+// `known`, `knownProjects` and `notified` came with notification rules.
 // Each is optional, and one that can't be read is dropped rather than making
 // the whole file unreadable: without them the next refresh is silent (no
 // project is known), which is the safe way to fail. Inside them, an entry a

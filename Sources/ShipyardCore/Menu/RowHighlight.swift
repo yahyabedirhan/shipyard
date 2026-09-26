@@ -22,7 +22,7 @@ public struct MenuRowPlace: Hashable, Sendable {
     }
 
     /// The list layout's header of the project named `project`: a row the
-    /// pointer and the keys highlight like an item (#45).
+    /// pointer and the keys highlight like an item.
     public static func header(_ project: String) -> MenuRowPlace {
         MenuRowPlace(header: project)
     }
@@ -46,7 +46,7 @@ public enum ProjectFold: Equatable, Sendable {
 }
 
 /// Which row a layout highlights: at most one, moved by the pointer and by
-/// the arrow keys (#45). The layouts draw one highlight shape at this place
+/// the arrow keys. The layouts draw one highlight shape at this place
 /// and feed it the pointer's enter and exit events, which can arrive out of
 /// order, and the keys; the rule for what they mean lives here, so it's
 /// tested without SwiftUI.

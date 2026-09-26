@@ -2,7 +2,7 @@ import ShipyardCore
 import SwiftUI
 
 /// Onboarding's connect step. 0.0.x connects through the GitHub CLI only
-/// (sign-in without `gh` is #22), so it says what happened and which `gh`
+/// (sign-in without `gh` comes later), so it says what happened and which `gh`
 /// command to run, with a Copy button, and Try again looks for `gh`'s token
 /// once more. The words come from `PanelText.connect`.
 ///

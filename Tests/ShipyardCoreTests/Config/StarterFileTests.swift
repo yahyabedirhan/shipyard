@@ -3,8 +3,8 @@ import Foundation
 import Testing
 
 // The app creates `config.toml` with its commented header whenever it
-// starts without one, and again when the Refresh button finds it gone
-// (#47). A file that exists is never touched.
+// starts without one, and again when the Refresh button finds it gone.
+// A file that exists is never touched.
 
 private let shop = """
     [[projects]]

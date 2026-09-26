@@ -3,7 +3,7 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// The signed-in account's avatar for the panel's header (#49), kept on
+/// The signed-in account's avatar for the panel's header, kept on
 /// disk: downloaded once, and again only when the viewer's `avatarURL`
 /// changes (GitHub changes its `v=` when the picture changes). The image
 /// bytes are handed back as they came; the app draws them clipped to a circle.

@@ -20,7 +20,7 @@ extension EnvironmentValues {
 /// A scroll view as tall as its content, up to `maxHeight`. The
 /// `MenuBarExtra` window sizes the panel from a zero-height proposal, which a
 /// plain scroll view (or `ViewThatFits`) takes as 0; so the content is
-/// measured and the height fixed from it (#27).
+/// measured and the height fixed from it.
 struct MeasuredScrollView<Content: View>: View {
     var maxHeight: CGFloat = Grid.maxListHeight
     @ViewBuilder var content: Content

@@ -134,7 +134,7 @@ struct ProjectPicker: View {
         }
     }
 
-    /// Scrolls inside a measured height, like the menu's list (#27).
+    /// Scrolls inside a measured height, like the menu's list.
     private var list: some View {
         MeasuredScrollView(maxHeight: Self.maxListHeight) {
             VStack(alignment: .leading, spacing: 0) {

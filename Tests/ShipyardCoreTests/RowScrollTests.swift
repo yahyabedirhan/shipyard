@@ -1,7 +1,7 @@
 @testable import ShipyardCore
 import Testing
 
-/// How the list scrolls to keep the row the keys highlighted in view (#45):
+/// How the list scrolls to keep the row the keys highlighted in view:
 /// not at all while it's visible, just enough to show it otherwise, and
 /// clear of the pinned project header.
 @Suite("Row scroll")

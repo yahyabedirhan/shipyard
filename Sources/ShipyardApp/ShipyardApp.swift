@@ -62,7 +62,7 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
-    /// The account's avatar for the header, kept on disk (#49).
+    /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
         directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
         transport: URLSessionTransport()
@@ -183,7 +183,7 @@ final class AppServices {
     /// Closes the menu's window after an action that opened something in
     /// another app (an item, a notification's item, the account's profile,
     /// the configuration file), as a menu bar menu does; otherwise it stays on screen
-    /// without being the key window, and keys go to the other app (#39).
+    /// without being the key window, and keys go to the other app.
     /// Actions that only change the menu (⌥-click, collapse, Mark all
     /// seen) don't call it.
     ///

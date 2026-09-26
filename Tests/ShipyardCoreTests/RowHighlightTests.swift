@@ -186,7 +186,7 @@ struct RowHighlightTests {
         #expect(menu.tabContent(for: .all).rowPlaces == [place(nil, pull), place(nil, issue), place(nil, run)])
     }
 
-    // MARK: - ↑ and ↓ (#45)
+    // MARK: - ↑ and ↓
 
     private var threeRows: [MenuRowPlace] {
         [place("shipyard", row(.pullRequest, 1)), place("shipyard", row(.issue, 2)), place("mirror", row(.pullRequest, 1))]
@@ -336,7 +336,7 @@ struct RowHighlightTests {
         #expect(highlight.place == nil)
     }
 
-    // MARK: - ← and → in the list layout (#45)
+    // MARK: - ← and → in the list layout
 
     private struct Fold {
         let pull: MenuRow
@@ -436,7 +436,7 @@ struct RowHighlightTests {
         #expect(gone.place == .header("gone"))
     }
 
-    // MARK: - ← and → in the tabs layout (#45)
+    // MARK: - ← and → in the tabs layout
 
     @Test("← and → switch to the previous or next tab, wrapping at the ends")
     func tabSwitch() {

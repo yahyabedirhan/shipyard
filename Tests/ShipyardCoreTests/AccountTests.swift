@@ -12,7 +12,7 @@ private let newAvatarURL = URL(string: "https://avatars.githubusercontent.com/u/
 private let avatarBytes = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])
 private let newAvatarBytes = Data([0x89, 0x50, 0x4E, 0x47, 4, 5, 6])
 
-/// The header's account (#49): who shipyard is signed in as, its profile
+/// The header's account: who shipyard is signed in as, its profile
 /// and its avatar.
 @Suite("The connected account")
 @MainActor

@@ -563,7 +563,7 @@ public final class Shipyard {
     }
 
     /// Opens the project's repository on GitHub in the browser (Return on
-    /// its header, #45): the first one the configuration lists. It marks
+    /// its header): the first one the configuration lists. It marks
     /// nothing seen.
     public func openRepository(of project: MenuSection) {
         guard let url = project.repositoryURL else { return }
@@ -571,7 +571,7 @@ public final class Shipyard {
     }
 
     /// Opens the signed-in account's profile on GitHub in the browser (a
-    /// click on the header's avatar or handle, #49). Opens nothing until
+    /// click on the header's avatar or handle). Opens nothing until
     /// the account is known.
     public func openProfile() {
         guard let viewer else { return }

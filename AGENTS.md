@@ -9,6 +9,7 @@ A request to change the maintainer's shipyard (its layout, projects, notificatio
 ## Git, Commits, And Pull Requests
 
 - Opening a pull request, or changing an existing one's description, goes through the **to-pr** skill, which owns the description's shape and where it is saved. Invoke it as part of the work, without waiting to be asked.
+- Issue and pull request numbers belong in commit messages, pull requests and docs. Code, comments and test names say what they mean in words, so they read without the tracker.
 
 Use lowercase multi-line commit messages with a Conventional Commits type on the subject line:
 

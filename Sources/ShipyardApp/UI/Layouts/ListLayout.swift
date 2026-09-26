@@ -7,7 +7,7 @@ import SwiftUI
 /// collapses its project, shows its attention count and, on hover, Mark
 /// all seen.
 ///
-/// The keys (#45): ↑ and ↓ step through headers and items, wrapping at
+/// The keys: ↑ and ↓ step through headers and items, wrapping at
 /// the ends; ← goes from an item to its header and collapses an expanded
 /// header; → expands a collapsed header and goes from an expanded one to
 /// its first item; Return opens the highlighted item (⌥Return marks it

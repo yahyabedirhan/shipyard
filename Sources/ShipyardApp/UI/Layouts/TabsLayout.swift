@@ -89,7 +89,7 @@ struct TabsLayout: View {
 
     // MARK: - The list
 
-    /// As tall as the rows, scrolling past the maximum (#27). The rows
+    /// As tall as the rows, scrolling past the maximum. The rows
     /// slide in from the direction of travel when the tab changes.
     private func list(_ content: MenuTabContent) -> some View {
         ScrollViewReader { proxy in
@@ -133,7 +133,7 @@ struct TabsLayout: View {
         }
     }
 
-    /// ← and → (#45, provisional): the previous or next tab, wrapping, with
+    /// ← and → (provisional): the previous or next tab, wrapping, with
     /// the highlight on its first row.
     private func switchTab(by step: Int) -> RowKeyMove {
         let next = model.tab(beside: tab, by: step)
@@ -155,7 +155,7 @@ private struct TabStrip: View {
 
     @Namespace private var pill
     /// The pills' height, measured: a scroll view in the menu window has
-    /// no height of its own (#27).
+    /// no height of its own.
     @State private var height: CGFloat = 0
     /// The pills' frame in the strip: its width and how far it's scrolled.
     @State private var content: CGRect = .zero

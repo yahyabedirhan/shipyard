@@ -38,7 +38,7 @@ struct Panel: View {
     private var header: some View {
         let attention = shipyard.phase == .ready ? shipyard.menu.attention.total : 0
         return HStack(spacing: 8) {
-            // The account once it's known (#49); "Shipyard" until then and after signing out.
+            // The account once it's known; "Shipyard" until then and after signing out.
             if let viewer = shipyard.viewer {
                 AccountButton(viewer: viewer, avatars: actions.avatars, action: actions.openProfile)
             } else {
@@ -162,7 +162,7 @@ struct Panel: View {
         switch shipyard.phase {
         case .connecting:
             // Only the device flow connects this way, and 0.0.x doesn't
-            // offer it (#22).
+            // offer it.
             ProgressView()
                 .controlSize(.small)
                 .padding(Grid.gutter)
@@ -181,7 +181,7 @@ struct Panel: View {
     }
 
     /// The configured layout, drawing the menu model. Each layout measures
-    /// its own scrolling area (#27).
+    /// its own scrolling area.
     @ViewBuilder
     private var layout: some View {
         switch shipyard.menu.layout {
@@ -242,7 +242,7 @@ struct Panel: View {
     }
 }
 
-/// The header's account (#49): the round avatar and `@handle`, as one
+/// The header's account: the round avatar and `@handle`, as one
 /// button that opens the profile on GitHub (the caller closes the menu).
 /// The avatar comes from the `AvatarCache`, so opening the panel downloads
 /// nothing once it's stored; until it's there, or when it can't be had, a

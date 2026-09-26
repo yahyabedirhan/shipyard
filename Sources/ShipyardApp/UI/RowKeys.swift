@@ -4,8 +4,7 @@ import SwiftUI
 
 // The row highlight's and the keys' plumbing, which the layouts share:
 // where each row is (for the highlight shape and for scrolling), the
-// pointer's enter and exit, the keys, and the focus on each open (#44,
-// #45). What the highlight looks like is in `Components.swift`.
+// pointer's enter and exit, the keys, and the focus on each open. What the highlight looks like is in `Components.swift`.
 
 /// A row's place in the list it's in: a tab (`list`), or the list
 /// layout's one list (`nil`). Tabs list a row at the same place, and while
@@ -27,7 +26,7 @@ struct RowBoundsKey: PreferenceKey {
 
 /// Where the laid-out rows sit in a layout's scrolling list, in its
 /// visible area, and how tall that area is: what `RowScroll` needs to
-/// keep the keys' highlight in view (#45). A reference kept out of view
+/// keep the keys' highlight in view. A reference kept out of view
 /// state: it changes on every scroll and draws nothing.
 @MainActor
 final class RowFrames {
@@ -93,7 +92,7 @@ extension View {
     /// A row at `place`: reports its bounds to the layout's highlight
     /// (unless it draws its own, like a pinned project header), reports
     /// where it sits in the list for scrolling it into view, and feeds the
-    /// pointer's enter and exit to `highlight` (#44, #45). The layout puts
+    /// pointer's enter and exit to `highlight`. The layout puts
     /// `.id(place)` on the list's own child for the row, so the keys can
     /// scroll to a row the lazy list hasn't laid out.
     func highlightable(_ place: MenuRowPlace, _ highlight: Binding<RowHighlight>, drawsOwnHighlight: Bool = false) -> some View {
@@ -116,7 +115,7 @@ extension View {
         }
     }
 
-    /// The keys for a layout's rows (#45), on its scrolling list. ↑ and ↓
+    /// The keys for a layout's rows, on its scrolling list. ↑ and ↓
     /// move `highlight` through `places`, wrapping at the ends; `left` and
     /// `right` are the layout's ← and →. The highlighted row is kept in
     /// view, clear of a `pinnedHeader` that tall, without animating the

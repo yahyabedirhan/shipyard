@@ -208,7 +208,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         self.repositories = repositories
     }
 
-    /// What Return on the project's header opens (#45): its first
+    /// What Return on the project's header opens: its first
     /// repository in the configuration, on GitHub; `nil` without one.
     public var repositoryURL: URL? {
         repositories.first.flatMap { URL(string: "https://github.com/\($0)") }

@@ -5,7 +5,7 @@
 | Variant | What it is | Where it lives |
 | --- | --- | --- |
 | `origami` | The sailboat folded from paper, on amber. **This is the app's icon.** | `AppIcon.icns` |
-| `sailboat` | The sailboat on a sea-blue squircle, the icon from #40. | `alternates/sailboat.icns`, `alternates/sailboat.png` |
+| `sailboat` | The sailboat on a sea-blue squircle, the app's first icon. | `alternates/sailboat.icns`, `alternates/sailboat.png` |
 | `night` | The sailboat under a crescent moon and stars. | `alternates/night.icns`, `alternates/night.png` |
 | `sunset` | The sailboat in silhouette against a low sun. | `alternates/sunset.icns`, `alternates/sunset.png` |
 

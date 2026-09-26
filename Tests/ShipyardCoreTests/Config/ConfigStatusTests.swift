@@ -123,7 +123,7 @@ struct ConfigStatusTests {
         let harness = try Harness(stored: nil, config: nil)
         await harness.shipyard.start()
 
-        // Start creates a missing file (#47), so delete it afterwards.
+        // Start creates a missing file, so delete it afterwards.
         try FileManager.default.removeItem(at: harness.configURL)
         await harness.shipyard.reloadConfiguration()
 

@@ -51,7 +51,7 @@ extension MenuModel {
     }
 
     /// The tab `step` places from `tab` in the strip (← is -1, → is 1),
-    /// wrapping from the last tab to All and back (#45). A tab whose
+    /// wrapping from the last tab to All and back. A tab whose
     /// project is gone counts as All.
     public func tab(beside tab: MenuTab, by step: Int) -> MenuTab {
         let tabs = tabs

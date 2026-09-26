@@ -14,7 +14,7 @@ public struct RowSpan: Equatable, Sendable {
     public var height: Double { bottom - top }
 }
 
-/// How the list scrolls to keep the row the keys highlighted in view (#45),
+/// How the list scrolls to keep the row the keys highlighted in view,
 /// the way a menu does: not at all while the row is in full view, and
 /// otherwise just far enough to show it at the edge it went past, clear of
 /// the pinned project header. No animation: holding a key repeats at the
