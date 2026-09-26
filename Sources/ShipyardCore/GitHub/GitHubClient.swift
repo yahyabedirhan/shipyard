@@ -167,7 +167,7 @@ public struct GitHubClient: Sendable {
         let reviewRequested = Set(searchPullRequests.map(\.id))
 
         let runs = try await workflowRuns(
-            of: repositories.filter { $0.runsWindowHours != nil && parsed.errors[$0.slug] == nil },
+            of: repositories.filter { $0.runsWindow != nil && parsed.errors[$0.slug] == nil },
             viewer: parsed.viewerLogin,
             at: fetchedAt
         )
@@ -278,7 +278,7 @@ public struct GitHubClient: Sendable {
         for repository in repositories {
             let url = WorkflowRuns.url(
                 for: repository.slug,
-                since: WorkflowRuns.since(windowHours: repository.runsWindowHours ?? 0, at: now)
+                since: WorkflowRuns.since(window: repository.runsWindow ?? 0, at: now)
             )
             var request = URLRequest(url: url)
             // The ETag is ours to send; a cache in between would answer for it.

@@ -76,20 +76,24 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 |---|---|---|
 | `pull-requests.show` | `true` | boolean |
 | `pull-requests.states` | `["open", "merged", "closed"]` | which PRs are listed: any of `"open"` (drafts too), `"merged"`, `"closed"` (closed without merging) |
-| `pull-requests.closed-window-days` | `7` | `0` or more; days closed and merged PRs stay listed; `0` hides them |
+| `pull-requests.closed-window` | `"7d"` | a window (below): how long closed and merged PRs stay listed; `"0"` hides them |
 | `pull-requests.drafts` | `true` | boolean; list draft PRs |
 | `pull-requests.authors` | `{ show = [], hide = [] }` | whose PRs are listed: `authors.show` minus `authors.hide`, each a list of author selectors (see Whose items) |
 | `pull-requests.review-requested` | `false` | boolean; `true` lists only open PRs waiting on the user's review, requested from them or from one of their teams |
 | `issues.show` | `false` | boolean |
 | `issues.states` | `["open", "closed"]` | which issues are listed: any of `"open"`, `"closed"` |
-| `issues.closed-window-days` | `7` | `0` or more |
+| `issues.closed-window` | `"7d"` | a window: how long closed issues stay listed |
 | `issues.authors` | `{ show = [], hide = [] }` | whose issues are listed, as for pull requests |
 | `workflow-runs.show` | `false` | boolean |
 | `workflow-runs.states` | `["in-progress", "failed", "succeeded"]` | which runs are listed: any of `"in-progress"` (queued or running), `"failed"` (timed out and failed to start too), `"succeeded"` |
-| `workflow-runs.finished-window-hours` | `3` | `0` or more; hours finished runs stay listed (running ones always are) |
+| `workflow-runs.finished-window` | `"3h"` | a window: how long finished runs stay listed (running ones always are) |
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
+
+A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
+
+`pull-requests.closed-window-days`, `issues.closed-window-days` and `workflow-runs.finished-window-hours` (a whole number of days or hours) are the old forms. The app still reads them, with a warning; replace each with the new key (`closed-window-days = 3` is `closed-window = "3d"`, `finished-window-hours = 4` is `finished-window = "4h"`). Setting the old and the new key in one table is an error.
 
 How every project's items are grouped and sorted in the menu, set straight under `[defaults]` (not in a sub-table), and what a project may override in its own block:
 
@@ -122,7 +126,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 ## Overrides
 
-- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
+- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
 - `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
 
@@ -149,7 +153,7 @@ A project's `repositories` lists **repository selectors**, in any mix. The synta
 
 ## Which items: states
 
-Each kind's `states` picks its items by where they stand; what it leaves out isn't shown, counted or notified. The closed windows still apply: `states` says which items, `closed-window-days` (or `finished-window-hours`) how long a closed, merged or finished one stays. So `pull-requests = { states = ["open"] }` lists no merged or closed PRs at all, and `states = ["merged"]` lists PRs merged in the last `closed-window-days`. A state the kind doesn't take is rejected with the nearest one it does: "unknown pull request state `merge` (did you mean `merged`?)". `states = []` lists none of the kind's items; to hide a kind, `show = false` says so more plainly.
+Each kind's `states` picks its items by where they stand; what it leaves out isn't shown, counted or notified. The closed windows still apply: `states` says which items, `closed-window` (or `finished-window`) how long a closed, merged or finished one stays. So `pull-requests = { states = ["open"] }` lists no merged or closed PRs at all, and `states = ["merged"]` lists PRs merged within `closed-window`. A state the kind doesn't take is rejected with the nearest one it does: "unknown pull request state `merge` (did you mean `merged`?)". `states = []` lists none of the kind's items; to hide a kind, `show = false` says so more plainly.
 
 ## Whose items: author selectors
 
@@ -293,6 +297,16 @@ authors = { hide = ["@dependabot[bot]"] }
 ```
 
 When the file still has an old `hide-authors` list, move its logins into these `hide` lists (each with `@`) and delete the `hide-authors` line.
+
+**"Keep merged and closed items for 30 minutes."** Set `closed-window` in each kind's defaults (`finished-window` for runs), or inside one project's block for that project alone. Replace an old `closed-window-days` line rather than adding beside it.
+
+```toml
+[defaults.pull-requests]
+closed-window = "30m"
+
+[defaults.issues]
+closed-window = "30m"
+```
 
 **"Only show what other people open in this project."** Hide `me` and `bots` in each kind the project shows, inside its block:
 

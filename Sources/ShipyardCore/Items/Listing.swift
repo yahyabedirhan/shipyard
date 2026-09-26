@@ -45,14 +45,14 @@ public enum Listing {
     }
 
     /// Open and running items always are; closed ones for their kind's
-    /// closed window in days, finished runs for `finished-window-hours`,
+    /// `closed-window`, finished runs for their `finished-window`,
     /// counted back from `now`. A window of 0 leaves them all out.
     private static func inWindow(_ item: Item, project: ProjectSettings, now: Date) -> Bool {
         guard !item.state.isActive else { return true }
         let window: TimeInterval = switch item.kind {
-        case .pullRequest: TimeInterval(project.pullRequests.closedWindowDays) * 86_400
-        case .issue: TimeInterval(project.issues.closedWindowDays) * 86_400
-        case .workflowRun: TimeInterval(project.workflowRuns.finishedWindowHours) * 3600
+        case .pullRequest: project.pullRequests.closedWindow
+        case .issue: project.issues.closedWindow
+        case .workflowRun: project.workflowRuns.finishedWindow
         }
         guard window > 0, let closedAt = item.closedAt else { return false }
         return closedAt >= now.addingTimeInterval(-window)

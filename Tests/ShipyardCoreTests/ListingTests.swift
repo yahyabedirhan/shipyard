@@ -214,7 +214,7 @@ struct ListingTests {
             [[projects]]
             name = "open only"
             repositories = ["\(shopRepository)"]
-            pull-requests = { closed-window-days = 0 }
+            pull-requests = { closed-window = "0" }
 
             [[projects]]
             name = "with history"
@@ -227,6 +227,78 @@ struct ListingTests {
         merged.closedAt = "2026-09-25T11:59:00Z"
         await harness.refresh(answering: shopAnswer(merged))
         #expect(harness.headlines == ["with history · Merged PR #1"])
+    }
+
+    // MARK: - How long
+
+    @Test("closed-window = \"30m\" lists and notifies a merged pull request for 30 minutes, then drops it at the next timer refresh")
+    func thirtyMinuteWindow() async throws {
+        let config = """
+            [[defaults.notifications]]
+            event = "pr.merged"
+
+            [[projects]]
+            name = "shop"
+            repositories = ["\(shopRepository)"]
+            pull-requests = { closed-window = "30m" }
+
+            """
+        let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
+        var merged = pr(1)
+        merged.state = "MERGED"
+        merged.closedAt = "2026-09-25T12:01:00Z"
+        await harness.refresh(answering: shopAnswer(merged))
+        #expect(harness.numbers("shop") == [1])
+        #expect(harness.headlines == ["shop · Merged PR #1"])
+
+        // Each timer refresh lists again from its own time: at 12:30 the
+        // merge (12:01) is inside the window, at 12:32 it isn't.
+        #expect(harness.timer.armed == 120)
+        harness.clock.set(date("2026-09-25T12:30:00Z"))
+        await harness.timer.fire()
+        #expect(harness.numbers("shop") == [1])
+        harness.clock.advance(by: try #require(harness.timer.armed))
+        await harness.timer.fire()
+        #expect(harness.numbers("shop") == [])
+        #expect(harness.headlines == ["shop · Merged PR #1"])
+    }
+
+    @Test("while the rate limit pauses refreshing, a closed item still leaves within an interval of its window, without a request")
+    func windowWhilePaused() async throws {
+        let config = """
+            [[projects]]
+            name = "shop"
+            repositories = ["\(shopRepository)"]
+            pull-requests = { closed-window = "30m" }
+
+            """
+        var merged = pr(1)
+        merged.state = "MERGED"
+        merged.closedAt = "2026-09-25T11:59:00Z"
+        // The first refresh spends the last point: paused until 12:42.
+        let harness = try await Harness.started(
+            config: config,
+            graphQL: PullRequestsResponse.answer([PullRequestsResponse(shopRepository, [merged])], remaining: 0)
+        )
+        #expect(harness.numbers("shop") == [1])
+        #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
+
+        // The timer comes back every interval to list again, sending nothing.
+        #expect(harness.timer.armed == 120)
+        harness.clock.set(date("2026-09-25T12:28:00Z"))
+        await harness.timer.fire()
+        #expect(harness.numbers("shop") == [1])
+        harness.clock.advance(by: try #require(harness.timer.armed))
+        await harness.timer.fire()
+        #expect(harness.numbers("shop") == [])
+        #expect(harness.graphQLRequests.count == 1)
+        #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
+        #expect(harness.timer.armed == 120)
+
+        // The last stretch waits only for the pause's end.
+        harness.clock.set(date("2026-09-25T12:41:00Z"))
+        await harness.timer.fire()
+        #expect(harness.timer.armed == 60)
     }
 
     // MARK: - Which states
@@ -366,7 +438,7 @@ struct ListingRuleTests {
         var settings = project()
         settings.issues.show = true
         settings.pullRequests.drafts = false
-        settings.pullRequests.closedWindowDays = 1
+        settings.pullRequests.closedWindow = 1 * 86_400
         settings.issues.authors = AuthorFilter(hide: [.me])
         let items = [
             item(1),
@@ -413,7 +485,7 @@ struct ListingRuleTests {
     func statesAndWindow() {
         var settings = project()
         settings.pullRequests.states = [.closed]
-        settings.pullRequests.closedWindowDays = 1
+        settings.pullRequests.closedWindow = 1 * 86_400
         let items = [
             item(1),
             item(2, state: .closed, closedHoursAgo: 23),

@@ -207,7 +207,11 @@ struct ConfigSchemaTests {
         // keys are the ones shipyard reads, besides the deprecated ones it
         // still reads with a warning.
         let deprecated = deprecatedPaths(schema, root: schema)
-        #expect(deprecated == ["hide-authors"])
+        #expect(deprecated == [
+            "hide-authors",
+            "defaults.pull-requests.closed-window-days", "defaults.issues.closed-window-days", "defaults.workflow-runs.finished-window-hours",
+            "projects[].pull-requests.closed-window-days", "projects[].issues.closed-window-days", "projects[].workflow-runs.finished-window-hours",
+        ])
         #expect(declaredPaths(schema, root: schema) == setPaths(everyKeyValue).union(deprecated))
     }
 
@@ -215,6 +219,12 @@ struct ConfigSchemaTests {
     func oldFormsValidate() throws {
         let old = """
             hide-authors = ["dependabot[bot]"]
+            [defaults.pull-requests]
+            closed-window-days = 3
+            [defaults.issues]
+            closed-window-days = 0
+            [defaults.workflow-runs]
+            finished-window-hours = 4
             [[defaults.notifications]]
             event = "pr.opened"
             authors = "others"
@@ -302,7 +312,7 @@ struct ConfigSchemaTests {
             [[projects]]
             name = "a"
             repositories = ["not-a-slug", "o/r", "o/r"]
-            issues = { closed-window-days = -1, authors = { hide = ["bots2"] } }
+            issues = { closed-window = "-1d", authors = { hide = ["bots2"] } }
             """
         let found = Set(try violations(bad, schema: schema))
         #expect(found == [
@@ -313,7 +323,7 @@ struct ConfigSchemaTests {
             ".defaults.notifications[0].authors: matches none of anyOf",
             ".projects[0].repositories[0]: not-a-slug doesn't match ^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator|anywhere)$",
             ".projects[0].repositories: items not unique",
-            ".projects[0].issues.closed-window-days: below 0",
+            ".projects[0].issues.closed-window: -1d doesn't match ^(0|[0-9]+[smhd])$",
             ".projects[0].issues.authors.hide[0]: bots2 doesn't match ^(me|others|bots|@[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?)$",
         ])
     }

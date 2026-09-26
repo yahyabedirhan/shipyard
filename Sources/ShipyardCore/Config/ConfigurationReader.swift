@@ -235,11 +235,11 @@ final class ConfigurationReader {
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "drafts", "authors", "review-requested"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "closed-window-days", "drafts", "authors", "review-requested"])
         return PullRequestOverrides(
             show: bool(node, "show"),
             states: states(node, of: .pullRequest),
-            closedWindowDays: window(node, "closed-window-days"),
+            closedWindow: duration(node, "closed-window", old: "closed-window-days", unit: "d"),
             drafts: bool(node, "drafts"),
             authors: authorFilter(node),
             reviewRequested: bool(node, "review-requested")
@@ -248,22 +248,22 @@ final class ConfigurationReader {
 
     private func issues(_ parent: Node) -> IssueOverrides {
         guard let node = table(parent, "issues") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "closed-window-days", "authors"])
         return IssueOverrides(
             show: bool(node, "show"),
             states: states(node, of: .issue),
-            closedWindowDays: window(node, "closed-window-days"),
+            closedWindow: duration(node, "closed-window", old: "closed-window-days", unit: "d"),
             authors: authorFilter(node)
         )
     }
 
     private func workflowRuns(_ parent: Node) -> WorkflowRunOverrides {
         guard let node = table(parent, "workflow-runs") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "finished-window-hours", "branches", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "finished-window", "finished-window-hours", "branches", "authors"])
         return WorkflowRunOverrides(
             show: bool(node, "show"),
             states: states(node, of: .workflowRun),
-            finishedWindowHours: window(node, "finished-window-hours"),
+            finishedWindow: duration(node, "finished-window", old: "finished-window-hours", unit: "h"),
             branches: choice(node, "branches", WorkflowRunBranches.self),
             authors: authorFilter(node)
         )
@@ -367,7 +367,56 @@ final class ConfigurationReader {
         return valid ? selectors : nil
     }
 
-    /// A window in days or hours, or a count of rows: a whole number, 0 or more.
+    /// A closed or finished window (`closed-window = "30m"`), in seconds.
+    /// The old key, a whole number of `unit`s (`closed-window-days = 7`),
+    /// still reads, with a warning naming the new one; both in one table is
+    /// an error on the old key's line.
+    private func duration(_ node: Node, _ key: String, old: String, unit: Character) -> TimeInterval? {
+        let window = duration(node, key)
+        guard node.table.contains(key: old) else { return window }
+        let oldPath = node.path + [.key(old)]
+        if node.table.contains(key: key) {
+            error("`\(old)` is the old form of `\(key)`, which this table sets too; delete `\(old)`", at: oldPath)
+            return nil
+        }
+        guard let count = self.window(node, old),
+              let seconds = WindowDuration.units.first(where: { $0.unit == unit })?.seconds
+        else { return nil }
+        let written = count == 0 ? "0" : "\(count)\(unit)"
+        warnings.append(ConfigIssue(
+            line: map.line(for: oldPath),
+            message: "`\(old)` is the old form: it's read as `\(key) = \(Configuration.tomlString(written))`; write that instead"
+        ))
+        return TimeInterval(count) * TimeInterval(seconds)
+    }
+
+    /// A window written as a whole number and one unit, in seconds; one that
+    /// doesn't read is rejected with what's allowed and the nearest spelling.
+    private func duration(_ node: Node, _ key: String) -> TimeInterval? {
+        guard node.table.contains(key: key) else { return nil }
+        let path = node.path + [.key(key)]
+        guard let text = try? node.table.string(forKey: key) else {
+            error("`\(path.dotted)` must be a string: \(Self.windowForm)", at: path)
+            return nil
+        }
+        do throws(WindowDuration.Rejection) {
+            return try WindowDuration.parse(text)
+        } catch {
+            switch error {
+            case .negative:
+                self.error("`\(key)` can't be negative (got \(Configuration.tomlString(text)))", at: path)
+            case .malformed(let suggestion):
+                let hint = suggestion.map { "; did you mean \(Configuration.tomlString($0))?" } ?? ""
+                self.error("`\(key)` must be \(Self.windowForm) (got \(Configuration.tomlString(text))\(hint))", at: path)
+            }
+        }
+        return nil
+    }
+
+    /// What a window takes, as its rejections say it.
+    static let windowForm = "a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\""
+
+    /// A whole number, 0 or more: a count of rows, or an old window in days or hours.
     private func window(_ node: Node, _ key: String) -> Int? {
         guard let value = int(node, key) else { return nil }
         guard value >= 0 else {

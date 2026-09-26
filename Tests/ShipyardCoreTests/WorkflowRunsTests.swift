@@ -198,10 +198,10 @@ struct WorkflowRunsTests {
         #expect(harness.section("shop")?.rows.map(\.number) == [11])
     }
 
-    @Test("finished runs stay for finished-window-hours; running ones stay however long they run")
+    @Test("finished runs stay for finished-window; running ones stay however long they run")
     func finishedWindow() async throws {
         let harness = try await Harness.started(
-            config: runsConfig("workflow-runs = { show = true, finished-window-hours = 4 }"),
+            config: runsConfig("workflow-runs = { show = true, finished-window = \"4h\" }"),
             graphQL: shopGraphQL(),
             runs: [shopRepository: [runsFixture()]]
         )
@@ -218,7 +218,7 @@ struct WorkflowRunsTests {
         #expect(harness.runsRequests.last?.url?.absoluteString.contains("created=%3E%3D2026-09-25T10:00:00Z") == true)
 
         // A window of 0 lists only running runs.
-        try harness.writeConfig(runsConfig("workflow-runs = { show = true, finished-window-hours = 0 }"))
+        try harness.writeConfig(runsConfig("workflow-runs = { show = true, finished-window = \"0\" }"))
         harness.stub.on("GET", WorkflowRunsResponse.url(shopRepository), shopRuns([run(42, "running"), run(41, "failure")]))
         await harness.shipyard.reloadConfiguration()
         #expect(harness.runRows.map(\.number) == [42])

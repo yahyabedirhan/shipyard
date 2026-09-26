@@ -50,12 +50,12 @@ enum WorkflowRuns {
     }
 
     /// The oldest creation time a refresh at `now` asks for, to show runs
-    /// finished within `windowHours`: an hour before the window starts (so a
-    /// run of up to an hour that finished inside it is still in the answer),
+    /// finished within `window` seconds: an hour before the window starts (so
+    /// a run of up to an hour that finished inside it is still in the answer),
     /// rounded down to the hour, so the URL, and with it the `ETag`, stays
     /// the same for an hour and unchanged runs come back `304`.
-    static func since(windowHours: Int, at now: Date) -> Date {
-        let start = now.timeIntervalSince1970 - TimeInterval(max(0, windowHours) + 1) * 3600
+    static func since(window: TimeInterval, at now: Date) -> Date {
+        let start = now.timeIntervalSince1970 - max(0, window) - 3600
         return Date(timeIntervalSince1970: (start / 3600).rounded(.down) * 3600)
     }
 

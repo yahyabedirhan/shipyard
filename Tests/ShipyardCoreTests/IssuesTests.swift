@@ -13,7 +13,7 @@ private let blogRepository = "yahyabedirhan/blog"
 private let issuesEverywhere = """
     [defaults.issues]
     show = true
-    closed-window-days = 3
+    closed-window = "3d"
 
     [[projects]]
     name = "shop"
@@ -114,7 +114,7 @@ struct IssuesTests {
         let config = """
             [defaults.issues]
             show = true
-            closed-window-days = 0
+            closed-window = "0"
             authors = { hide = ["@renovate[bot]"] }
 
             [[projects]]
@@ -150,7 +150,7 @@ struct IssuesTests {
             [[projects]]
             name = "shop"
             repositories = ["yahyabedirhan/shop"]
-            issues = { show = true, closed-window-days = 3 }
+            issues = { show = true, closed-window = "3d" }
 
             [[projects]]
             name = "blog"

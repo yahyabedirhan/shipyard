@@ -211,13 +211,20 @@
           "default": true
         },
         "states": {
-          "description": "Which pull requests to list: open (drafts too), merged, closed (without merging). Merged and closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "description": "Which pull requests to list: open (drafts too), merged, closed (without merging). Merged and closed ones stay for closed-window. Those left out are never shown, counted or notified.",
           "type": "array",
           "items": { "type": "string", "enum": ["open", "merged", "closed"] },
           "default": ["open", "merged", "closed"]
         },
+        "closed-window": {
+          "description": "How long closed and merged pull requests stay listed: a whole number and one unit, s, m, h or d, such as \"30m\" or \"7d\"; \"0\" hides them.",
+          "type": "string",
+          "pattern": "^(0|[0-9]+[smhd])$",
+          "default": "7d"
+        },
         "closed-window-days": {
-          "description": "How many days closed and merged pull requests stay listed; 0 hides them.",
+          "description": "Deprecated: write closed-window = \"<n>d\" instead. How many days closed and merged pull requests stay listed; still read, with a warning.",
+          "deprecated": true,
           "type": "integer",
           "minimum": 0,
           "default": 7
@@ -246,13 +253,20 @@
           "default": false
         },
         "states": {
-          "description": "Which issues to list: open, closed. Closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "description": "Which issues to list: open, closed. Closed ones stay for closed-window. Those left out are never shown, counted or notified.",
           "type": "array",
           "items": { "type": "string", "enum": ["open", "closed"] },
           "default": ["open", "closed"]
         },
+        "closed-window": {
+          "description": "How long closed issues stay listed: a whole number and one unit, s, m, h or d, such as \"30m\" or \"7d\"; \"0\" hides them.",
+          "type": "string",
+          "pattern": "^(0|[0-9]+[smhd])$",
+          "default": "7d"
+        },
         "closed-window-days": {
-          "description": "How many days closed issues stay listed; 0 hides them.",
+          "description": "Deprecated: write closed-window = \"<n>d\" instead. How many days closed issues stay listed; still read, with a warning.",
+          "deprecated": true,
           "type": "integer",
           "minimum": 0,
           "default": 7
@@ -271,13 +285,20 @@
           "default": false
         },
         "states": {
-          "description": "Which workflow runs to list: in-progress (queued or running), failed (timed out and failed to start too), succeeded. Finished ones stay for finished-window-hours. Those left out are never shown, counted or notified.",
+          "description": "Which workflow runs to list: in-progress (queued or running), failed (timed out and failed to start too), succeeded. Finished ones stay for finished-window. Those left out are never shown, counted or notified.",
           "type": "array",
           "items": { "type": "string", "enum": ["in-progress", "failed", "succeeded"] },
           "default": ["in-progress", "failed", "succeeded"]
         },
+        "finished-window": {
+          "description": "How long finished runs stay listed: a whole number and one unit, s, m, h or d, such as \"30m\" or \"3h\"; \"0\" hides them. Running ones always are.",
+          "type": "string",
+          "pattern": "^(0|[0-9]+[smhd])$",
+          "default": "3h"
+        },
         "finished-window-hours": {
-          "description": "How many hours finished runs stay listed; 0 hides them.",
+          "description": "Deprecated: write finished-window = \"<n>h\" instead. How many hours finished runs stay listed; still read, with a warning.",
+          "deprecated": true,
           "type": "integer",
           "minimum": 0,
           "default": 3

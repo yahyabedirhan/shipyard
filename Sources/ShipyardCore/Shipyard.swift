@@ -482,11 +482,16 @@ public final class Shipyard {
     /// (several calls meanwhile make one more run). Afterwards the timer is
     /// armed for the next one, as the rate budget says. While the budget
     /// pauses refreshing (a limit ran out, or a secondary limit), nothing is
-    /// sent: the timer stays armed for the end of the pause.
+    /// sent: the menu is listed again from the last snapshot, so a closed
+    /// item whose window has passed leaves, and the timer comes back after
+    /// the configured interval, or at the end of the pause when that's sooner.
     public func refresh() async {
         guard phase.canRefresh else { return }
         guard canRefreshNow else {
-            if !gate.isRunning { armTimer() }
+            if !gate.isRunning {
+                rebuildMenu(configStore.lastValid)
+                armTimer()
+            }
             return
         }
         guard gate.begin() else { return }
@@ -644,14 +649,18 @@ public final class Shipyard {
     }
 
     /// Arms the timer with the rate budget's delay while refreshes may run,
-    /// and stops it otherwise.
+    /// and stops it otherwise. While paused it comes back after the
+    /// configured interval (or the pause's end, when sooner), so the
+    /// listings still drop what has passed its window.
     private func armTimer() {
         guard phase.canRefresh else {
             timer.disarm()
             return
         }
         let delay = publishRateStatus()
-        timer.arm(after: delay.seconds(from: clock.now)) { [weak self] in
+        var seconds = delay.seconds(from: clock.now)
+        if delay.isPaused { seconds = min(seconds, TimeInterval(configStore.lastValid.refreshIntervalSeconds)) }
+        timer.arm(after: seconds) { [weak self] in
             await self?.refresh()
         }
     }

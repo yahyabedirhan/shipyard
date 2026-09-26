@@ -124,7 +124,7 @@ struct SkillDocumentTests {
         // "show issues for this project": issues on, the window left at its default
         let issues = try #require(blocks.compactMap { $0?.projects.first }.first { $0.issues == IssueOverrides(show: true) })
         let config = Configuration()
-        #expect(config.settings(for: issues).issues == IssueSettings(show: true, closedWindowDays: config.defaults.issues.closedWindowDays))
+        #expect(config.settings(for: issues).issues == IssueSettings(show: true, closedWindow: config.defaults.issues.closedWindow))
         // "group these repos"
         #expect(blocks.contains { ($0?.projects.first?.repositories.count ?? 0) > 1 })
         // "hide dependabot": its pull requests, in every project
@@ -140,7 +140,7 @@ struct SkillDocumentTests {
         // "show CI runs for this project and tell me when they fail": runs on for that
         // project alone, with the default pr.opened rule kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
-        #expect(config.settings(for: runs).workflowRuns.finishedWindowHours == config.defaults.workflowRuns.finishedWindowHours)
+        #expect(config.settings(for: runs).workflowRuns.finishedWindow == config.defaults.workflowRuns.finishedWindow)
         #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .runFailed)])
     }
 
@@ -198,6 +198,7 @@ struct SkillDocumentTests {
         let text = try skill()
         let c = Configuration()
         func literal<T: RawRepresentable>(_ choice: T) -> String where T.RawValue == String { "\"\(choice.rawValue)\"" }
+        func window(_ seconds: TimeInterval) -> String { "\"\(WindowDuration.text(seconds))\"" }
         // A kind's states, in the order the file writes them, when the default is all of them.
         func states(_ kind: ItemKind, _ value: Set<StateGroup>) -> String {
             value == Set(StateGroup.all(for: kind)) ? "[" + StateGroup.all(for: kind).map(literal).joined(separator: ", ") + "]" : "?"
@@ -218,15 +219,15 @@ struct SkillDocumentTests {
             ("pull-requests.states", states(.pullRequest, c.defaults.pullRequests.states)),
             ("issues.states", states(.issue, c.defaults.issues.states)),
             ("workflow-runs.states", states(.workflowRun, c.defaults.workflowRuns.states)),
-            ("pull-requests.closed-window-days", "\(c.defaults.pullRequests.closedWindowDays)"),
+            ("pull-requests.closed-window", window(c.defaults.pullRequests.closedWindow)),
             ("pull-requests.drafts", "\(c.defaults.pullRequests.drafts)"),
             ("pull-requests.authors", c.defaults.pullRequests.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
             ("issues.authors", c.defaults.issues.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
             ("workflow-runs.authors", c.defaults.workflowRuns.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
             ("issues.show", "\(c.defaults.issues.show)"),
-            ("issues.closed-window-days", "\(c.defaults.issues.closedWindowDays)"),
+            ("issues.closed-window", window(c.defaults.issues.closedWindow)),
             ("workflow-runs.show", "\(c.defaults.workflowRuns.show)"),
-            ("workflow-runs.finished-window-hours", "\(c.defaults.workflowRuns.finishedWindowHours)"),
+            ("workflow-runs.finished-window", window(c.defaults.workflowRuns.finishedWindow)),
             ("workflow-runs.branches", literal(c.defaults.workflowRuns.branches)),
             ("[defaults] group-by", literal(c.defaults.arrangement.groupBy)),
             ("[defaults] sort-by", literal(c.defaults.arrangement.sortBy)),

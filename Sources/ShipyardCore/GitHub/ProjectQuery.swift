@@ -9,10 +9,10 @@ struct RepositoryRequest: Equatable, Sendable {
     /// Whether any project with this repository shows issues. Only then does
     /// the query ask for its issues, so repositories without them cost nothing more.
     var issues: Bool = false
-    /// The widest `finished-window-hours` of the projects with this
+    /// The widest `finished-window` of the projects with this
     /// repository that show workflow runs; `nil` when none does. Runs come
     /// from REST, not this query.
-    var runsWindowHours: Int? = nil
+    var runsWindow: TimeInterval? = nil
     /// Whether a project keeps this repository's runs only on the default
     /// branch and open pull requests' heads: then the query asks for both.
     var runBranches: Bool = false
@@ -73,7 +73,7 @@ enum ProjectQuery {
                 requests[at].issues = requests[at].issues || project.issues.show
                 let runs = project.workflowRuns
                 if runs.show {
-                    requests[at].runsWindowHours = max(requests[at].runsWindowHours ?? 0, runs.finishedWindowHours)
+                    requests[at].runsWindow = max(requests[at].runsWindow ?? 0, runs.finishedWindow)
                     requests[at].runBranches = requests[at].runBranches || runs.branches == .defaultAndPullRequests
                 }
             }

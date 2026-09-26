@@ -60,7 +60,9 @@ struct RateLimitTests {
         let pausedFor = Harness.rateLimitReset.timeIntervalSince(harness.clock.now)
         #expect(shipyard.fetchError == .rateLimited(resetAt: Harness.rateLimitReset, api: .graphql))
         #expect(shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
-        #expect(harness.timer.armed == pausedFor)
+        // The timer still comes back every interval, to list again (windows pass).
+        #expect(pausedFor > 120)
+        #expect(harness.timer.armed == 120)
         #expect(shipyard.menu.rateIndicator?.level == .exhausted)
         #expect(shipyard.menu.rateIndicator?.apis.first?.remaining == 0)
         // The pause banner says why; the fetch error's banner doesn't repeat it.
@@ -75,13 +77,19 @@ struct RateLimitTests {
         await shipyard.refresh()
         await shipyard.refresh()
         #expect(harness.graphQLRequests.count == 3)
-        #expect(harness.timer.armed == pausedFor)
+        #expect(harness.timer.armed == 120)
 
-        // A timer that fires before the reset sends nothing and waits out the rest.
+        // A timer that fires before the reset sends nothing and comes back
+        // after the interval, or at the reset when that's sooner.
         harness.clock.advance(by: 1000)
         await harness.timer.fire()
         #expect(harness.graphQLRequests.count == 3)
-        #expect(harness.timer.armed == pausedFor - 1000)
+        #expect(harness.timer.armed == 120)
+        #expect(shipyard.menu.sections == rows)
+        harness.clock.advance(by: pausedFor - 1000 - 60)
+        await harness.timer.fire()
+        #expect(harness.graphQLRequests.count == 3)
+        #expect(harness.timer.armed == 60)
 
         // At the reset time: refreshes resume at the configured interval.
         harness.clock.set(Harness.rateLimitReset)
@@ -176,7 +184,7 @@ struct RateLimitTests {
         #expect(harness.section("job-search")?.rows.map(\.number) == [3])
         #expect(harness.shipyard.fetchError == nil)
         #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
-        #expect(harness.timer.armed == 2520)
+        #expect(harness.timer.armed == 120)
     }
 
     @Test("a secondary limit waits retry-after, then resumes")

@@ -248,7 +248,8 @@ public struct PullRequestSettings: Equatable, Sendable {
     public var show = true
     /// Which pull requests are listed by where they stand; all three by default.
     public var states = Set(StateGroup.all(for: .pullRequest))
-    public var closedWindowDays = 7
+    /// `closed-window`: how long a closed one stays listed, in seconds; 0 hides it.
+    public var closedWindow: TimeInterval = 7 * 86_400
     public var drafts = true
     public var authors = AuthorFilter()
     /// `review-requested`: list only open pull requests waiting on the
@@ -257,14 +258,14 @@ public struct PullRequestSettings: Equatable, Sendable {
     public init(
         show: Bool = true,
         states: Set<StateGroup> = Set(StateGroup.all(for: .pullRequest)),
-        closedWindowDays: Int = 7,
+        closedWindow: TimeInterval = 7 * 86_400,
         drafts: Bool = true,
         authors: AuthorFilter = AuthorFilter(),
         reviewRequested: Bool = false
     ) {
         self.show = show
         self.states = states
-        self.closedWindowDays = closedWindowDays
+        self.closedWindow = closedWindow
         self.drafts = drafts
         self.authors = authors
         self.reviewRequested = reviewRequested
@@ -276,17 +277,18 @@ public struct IssueSettings: Equatable, Sendable {
     public var show = false
     /// Which issues are listed by where they stand; open and closed by default.
     public var states = Set(StateGroup.all(for: .issue))
-    public var closedWindowDays = 7
+    /// `closed-window`: how long a closed one stays listed, in seconds; 0 hides it.
+    public var closedWindow: TimeInterval = 7 * 86_400
     public var authors = AuthorFilter()
     public init(
         show: Bool = false,
         states: Set<StateGroup> = Set(StateGroup.all(for: .issue)),
-        closedWindowDays: Int = 7,
+        closedWindow: TimeInterval = 7 * 86_400,
         authors: AuthorFilter = AuthorFilter()
     ) {
         self.show = show
         self.states = states
-        self.closedWindowDays = closedWindowDays
+        self.closedWindow = closedWindow
         self.authors = authors
     }
 }
@@ -296,19 +298,20 @@ public struct WorkflowRunSettings: Equatable, Sendable {
     public var show = false
     /// Which runs are listed by where they stand; all three by default.
     public var states = Set(StateGroup.all(for: .workflowRun))
-    public var finishedWindowHours = 3
+    /// `finished-window`: how long a finished run stays listed, in seconds; 0 hides it.
+    public var finishedWindow: TimeInterval = 3 * 3600
     public var branches: WorkflowRunBranches = .defaultAndPullRequests
     public var authors = AuthorFilter()
     public init(
         show: Bool = false,
         states: Set<StateGroup> = Set(StateGroup.all(for: .workflowRun)),
-        finishedWindowHours: Int = 3,
+        finishedWindow: TimeInterval = 3 * 3600,
         branches: WorkflowRunBranches = .defaultAndPullRequests,
         authors: AuthorFilter = AuthorFilter()
     ) {
         self.show = show
         self.states = states
-        self.finishedWindowHours = finishedWindowHours
+        self.finishedWindow = finishedWindow
         self.branches = branches
         self.authors = authors
     }
@@ -318,21 +321,21 @@ public struct WorkflowRunSettings: Equatable, Sendable {
 public struct PullRequestOverrides: Equatable, Sendable {
     public var show: Bool?
     public var states: Set<StateGroup>?
-    public var closedWindowDays: Int?
+    public var closedWindow: TimeInterval?
     public var drafts: Bool?
     public var authors: AuthorFilterOverrides
     public var reviewRequested: Bool?
     public init(
         show: Bool? = nil,
         states: Set<StateGroup>? = nil,
-        closedWindowDays: Int? = nil,
+        closedWindow: TimeInterval? = nil,
         drafts: Bool? = nil,
         authors: AuthorFilterOverrides = .init(),
         reviewRequested: Bool? = nil
     ) {
         self.show = show
         self.states = states
-        self.closedWindowDays = closedWindowDays
+        self.closedWindow = closedWindow
         self.drafts = drafts
         self.authors = authors
         self.reviewRequested = reviewRequested
@@ -342,7 +345,7 @@ public struct PullRequestOverrides: Equatable, Sendable {
         PullRequestSettings(
             show: show ?? base.show,
             states: states ?? base.states,
-            closedWindowDays: closedWindowDays ?? base.closedWindowDays,
+            closedWindow: closedWindow ?? base.closedWindow,
             drafts: drafts ?? base.drafts,
             authors: authors.applied(to: base.authors),
             reviewRequested: reviewRequested ?? base.reviewRequested
@@ -354,12 +357,12 @@ public struct PullRequestOverrides: Equatable, Sendable {
 public struct IssueOverrides: Equatable, Sendable {
     public var show: Bool?
     public var states: Set<StateGroup>?
-    public var closedWindowDays: Int?
+    public var closedWindow: TimeInterval?
     public var authors: AuthorFilterOverrides
-    public init(show: Bool? = nil, states: Set<StateGroup>? = nil, closedWindowDays: Int? = nil, authors: AuthorFilterOverrides = .init()) {
+    public init(show: Bool? = nil, states: Set<StateGroup>? = nil, closedWindow: TimeInterval? = nil, authors: AuthorFilterOverrides = .init()) {
         self.show = show
         self.states = states
-        self.closedWindowDays = closedWindowDays
+        self.closedWindow = closedWindow
         self.authors = authors
     }
 
@@ -367,7 +370,7 @@ public struct IssueOverrides: Equatable, Sendable {
         IssueSettings(
             show: show ?? base.show,
             states: states ?? base.states,
-            closedWindowDays: closedWindowDays ?? base.closedWindowDays,
+            closedWindow: closedWindow ?? base.closedWindow,
             authors: authors.applied(to: base.authors)
         )
     }
@@ -377,19 +380,19 @@ public struct IssueOverrides: Equatable, Sendable {
 public struct WorkflowRunOverrides: Equatable, Sendable {
     public var show: Bool?
     public var states: Set<StateGroup>?
-    public var finishedWindowHours: Int?
+    public var finishedWindow: TimeInterval?
     public var branches: WorkflowRunBranches?
     public var authors: AuthorFilterOverrides
     public init(
         show: Bool? = nil,
         states: Set<StateGroup>? = nil,
-        finishedWindowHours: Int? = nil,
+        finishedWindow: TimeInterval? = nil,
         branches: WorkflowRunBranches? = nil,
         authors: AuthorFilterOverrides = .init()
     ) {
         self.show = show
         self.states = states
-        self.finishedWindowHours = finishedWindowHours
+        self.finishedWindow = finishedWindow
         self.branches = branches
         self.authors = authors
     }
@@ -398,7 +401,7 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
         WorkflowRunSettings(
             show: show ?? base.show,
             states: states ?? base.states,
-            finishedWindowHours: finishedWindowHours ?? base.finishedWindowHours,
+            finishedWindow: finishedWindow ?? base.finishedWindow,
             branches: branches ?? base.branches,
             authors: authors.applied(to: base.authors)
         )

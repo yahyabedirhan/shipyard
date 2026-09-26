@@ -74,7 +74,7 @@ let everyKey = """
     [defaults.pull-requests]
     show = false
     states = ["open"]
-    closed-window-days = 14
+    closed-window = "14d"
     drafts = false
     authors = { show = ["others", "@dependabot[bot]"], hide = ["@octocat"] }
     review-requested = true
@@ -82,13 +82,13 @@ let everyKey = """
     [defaults.issues]
     show = true
     states = ["open"]
-    closed-window-days = 0
+    closed-window = "0"
     authors = { show = ["others"], hide = ["bots"] }
 
     [defaults.workflow-runs]
     show = true
     states = ["in-progress", "failed"]
-    finished-window-hours = 12
+    finished-window = "12h"
     branches = "all"
     authors = { show = ["me"], hide = ["@yabepa"] }
 
@@ -104,9 +104,9 @@ let everyKey = """
     repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api", "my-org/*", "owned", "organizations", "collaborator"]
     archived = false
     forks = true
-    pull-requests = { show = true, states = ["merged", "closed"], closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] }, review-requested = false }
-    issues = { show = false, states = ["closed"], closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
-    workflow-runs = { show = false, states = ["succeeded"], finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
+    pull-requests = { show = true, states = ["merged", "closed"], closed-window = "1d", drafts = true, authors = { show = [], hide = ["me", "bots"] }, review-requested = false }
+    issues = { show = false, states = ["closed"], closed-window = "30m", authors = { show = ["@renovate[bot]"], hide = [] } }
+    workflow-runs = { show = false, states = ["succeeded"], finished-window = "45s", branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
     notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
     group-by = "date"
     subsections = false
@@ -140,11 +140,11 @@ struct ConfigurationDecodingTests {
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
         // Every author, in every kind: an existing file lists what it did.
         #expect(config.defaults.pullRequests == .init(
-            show: true, states: [.open, .merged, .closed], closedWindowDays: 7, drafts: true, authors: AuthorFilter(show: [], hide: []), reviewRequested: false
+            show: true, states: [.open, .merged, .closed], closedWindow: 7 * 86_400, drafts: true, authors: AuthorFilter(show: [], hide: []), reviewRequested: false
         ))
-        #expect(config.defaults.issues == .init(show: false, states: [.open, .closed], closedWindowDays: 7, authors: AuthorFilter()))
+        #expect(config.defaults.issues == .init(show: false, states: [.open, .closed], closedWindow: 7 * 86_400, authors: AuthorFilter()))
         #expect(config.defaults.workflowRuns == .init(
-            show: false, states: [.inProgress, .failed, .succeeded], finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()
+            show: false, states: [.inProgress, .failed, .succeeded], finishedWindow: 3 * 3600, branches: .defaultAndPullRequests, authors: AuthorFilter()
         ))
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
         #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))
@@ -199,13 +199,13 @@ struct ConfigurationDecodingTests {
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.defaults.pullRequests == .init(
-            show: false, states: [.open], closedWindowDays: 14, drafts: false,
+            show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),
             reviewRequested: true
         ))
-        #expect(config.defaults.issues == .init(show: true, states: [.open], closedWindowDays: 0, authors: AuthorFilter(show: [.others], hide: [.bots])))
+        #expect(config.defaults.issues == .init(show: true, states: [.open], closedWindow: 0, authors: AuthorFilter(show: [.others], hide: [.bots])))
         #expect(config.defaults.workflowRuns == .init(
-            show: true, states: [.inProgress, .failed], finishedWindowHours: 12, branches: .all, authors: AuthorFilter(show: [.me], hide: [.login("yabepa")])
+            show: true, states: [.inProgress, .failed], finishedWindow: 12 * 3600, branches: .all, authors: AuthorFilter(show: [.me], hide: [.login("yabepa")])
         ))
         #expect(config.defaults.notifications == [
             NotificationRule(event: .prMerged, authors: [.me]),
@@ -222,11 +222,11 @@ struct ConfigurationDecodingTests {
         #expect(project.archived == false)
         #expect(project.forks == true)
         #expect(project.pullRequests == .init(
-            show: true, states: [.merged, .closed], closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots]), reviewRequested: false
+            show: true, states: [.merged, .closed], closedWindow: 86_400, drafts: true, authors: .init(show: [], hide: [.me, .bots]), reviewRequested: false
         ))
-        #expect(project.issues == .init(show: false, states: [.closed], closedWindowDays: 30, authors: .init(show: [.login("renovate[bot]")], hide: [])))
+        #expect(project.issues == .init(show: false, states: [.closed], closedWindow: 1800, authors: .init(show: [.login("renovate[bot]")], hide: [])))
         #expect(project.workflowRuns == .init(
-            show: false, states: [.succeeded], finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
+            show: false, states: [.succeeded], finishedWindow: 45, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
         ))
         #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
         #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created, showFirst: 5))
@@ -472,15 +472,15 @@ struct ConfigurationValidationTests {
 
     @Test("negative windows are rejected")
     func negativeWindows() {
-        #expect(rejection("[defaults.pull-requests]\nclosed-window-days = -1\n")
-            == [ConfigIssue(line: 2, message: "`closed-window-days` can't be negative (got -1)")])
-        #expect(rejection("[defaults.issues]\nclosed-window-days = -2\n")
-            == [ConfigIssue(line: 2, message: "`closed-window-days` can't be negative (got -2)")])
-        #expect(rejection("[defaults.workflow-runs]\nfinished-window-hours = -3\n")
-            == [ConfigIssue(line: 2, message: "`finished-window-hours` can't be negative (got -3)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window-days = -4 }\n")
-            == [ConfigIssue(line: 4, message: "`closed-window-days` can't be negative (got -4)")])
-        #expect(decoded("[defaults.pull-requests]\nclosed-window-days = 0\n")?.configuration.defaults.pullRequests.closedWindowDays == 0)
+        #expect(rejection("[defaults.pull-requests]\nclosed-window = \"-1d\"\n")
+            == [ConfigIssue(line: 2, message: "`closed-window` can't be negative (got \"-1d\")")])
+        #expect(rejection("[defaults.issues]\nclosed-window = \"-2h\"\n")
+            == [ConfigIssue(line: 2, message: "`closed-window` can't be negative (got \"-2h\")")])
+        #expect(rejection("[defaults.workflow-runs]\nfinished-window = \"-3m\"\n")
+            == [ConfigIssue(line: 2, message: "`finished-window` can't be negative (got \"-3m\")")])
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"-4s\" }\n")
+            == [ConfigIssue(line: 4, message: "`closed-window` can't be negative (got \"-4s\")")])
+        #expect(decoded("[defaults.pull-requests]\nclosed-window = \"0s\"\n")?.configuration.defaults.pullRequests.closedWindow == 0)
     }
 
     @Test("an interval under 30 seconds is rejected")
@@ -568,7 +568,7 @@ struct ConfigurationMergeTests {
     init() throws {
         config = try Configuration.decode("""
             [defaults.pull-requests]
-            closed-window-days = 3
+            closed-window = "3d"
             drafts = false
 
             [defaults.workflow-runs]
@@ -611,10 +611,10 @@ struct ConfigurationMergeTests {
         #expect(settings.repositories == ["o/a", "o/b"])
         // `authors` merges key by key too: the project's `hide`, the default `show`.
         #expect(settings.pullRequests == .init(
-            show: true, closedWindowDays: 3, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
+            show: true, closedWindow: 3 * 86_400, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
         ))
-        #expect(settings.issues == .init(show: true, closedWindowDays: 7))
-        #expect(settings.workflowRuns == .init(show: true, finishedWindowHours: 3, branches: .all))
+        #expect(settings.issues == .init(show: true, closedWindow: 7 * 86_400))
+        #expect(settings.workflowRuns == .init(show: true, finishedWindow: 3 * 3600, branches: .all))
     }
 
     @Test("a project's notifications replace the default list")

@@ -113,10 +113,10 @@ struct RefreshTests {
         #expect(rows[56]?.authorKind == .other)
     }
 
-    @Test("closed-window-days sets how far back closed pull requests show")
+    @Test("closed-window sets how far back closed pull requests show")
     func closedWindow() async throws {
         let harness = try await Harness.started(
-            config: "[defaults.pull-requests]\nclosed-window-days = 1\n\n" + projects,
+            config: "[defaults.pull-requests]\nclosed-window = \"1d\"\n\n" + projects,
             graphQL: pullRequests()
         )
 
@@ -130,7 +130,7 @@ struct RefreshTests {
             [[projects]]
             name = "e-commerce"
             repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
-            pull-requests = { closed-window-days = 0 }
+            pull-requests = { closed-window = "0" }
 
             [[projects]]
             name = "job-search"
