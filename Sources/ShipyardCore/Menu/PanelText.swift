@@ -8,8 +8,29 @@ import Foundation
 /// banners, rate limit); each onboarding screen and the skill install card
 /// have their own `PanelText+…` file next to it.
 public enum PanelText {
-    /// The panel's heading.
+    /// The panel's heading until the account is known.
     public static let title = "Shipyard"
+
+    /// The panel's heading: the signed-in account's handle, "@yabepa"
+    /// (beside its avatar), or `title` while the account isn't known
+    /// (connecting, signed out, GitHub out of reach at sign-in).
+    public static func title(for viewer: Viewer?) -> String {
+        viewer.map { "@\($0.login)" } ?? title
+    }
+
+    /// The account's hover text: its full name when it has one, and what a
+    /// click does. "Mona Lisa (@octocat) · Open profile on GitHub".
+    public static func profileHelp(_ viewer: Viewer) -> String {
+        let handle = "@\(viewer.login)"
+        let name = viewer.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let who = name.isEmpty ? handle : "\(name) (\(handle))"
+        return "\(who) · Open profile on GitHub"
+    }
+
+    /// VoiceOver's label for the account button: "Open @octocat's profile on GitHub".
+    public static func profileAccessibilityLabel(_ viewer: Viewer) -> String {
+        "Open @\(viewer.login)'s profile on GitHub"
+    }
 
     /// Next to the heading: "3 need attention"; `nil` when nothing does.
     public static func attentionSummary(_ count: Int) -> String? {

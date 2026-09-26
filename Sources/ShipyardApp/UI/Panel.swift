@@ -38,7 +38,12 @@ struct Panel: View {
     private var header: some View {
         let attention = shipyard.phase == .ready ? shipyard.menu.attention.total : 0
         return HStack(spacing: 8) {
-            Text(PanelText.title).font(TypeScale.title)
+            // The account once it's known (#49); "Shipyard" until then and after signing out.
+            if let viewer = shipyard.viewer {
+                AccountButton(viewer: viewer, avatars: actions.avatars, action: actions.openProfile)
+            } else {
+                Text(PanelText.title(for: nil)).font(TypeScale.title)
+            }
             if let summary = PanelText.attentionSummary(attention) {
                 Text(summary)
                     .font(TypeScale.caption)
@@ -234,6 +239,93 @@ struct Panel: View {
         .padding(.vertical, 8)
         .background(Palette.chrome)
         .animation(.spring(duration: 0.5), value: shipyard.menu.rateIndicator)
+    }
+}
+
+/// The header's account (#49): the round avatar and `@handle`, as one
+/// button that opens the profile on GitHub (the caller closes the menu).
+/// The avatar comes from the `AvatarCache`, so opening the panel downloads
+/// nothing once it's stored; until it's there, or when it can't be had, a
+/// plain circle stands in, never a broken image. The full name is in the
+/// hover text.
+private struct AccountButton: View {
+    let viewer: Viewer
+    let avatars: AvatarCache
+    let action: () -> Void
+    @State private var avatar: NSImage?
+    @State private var hover = false
+
+    private static let avatarSize: CGFloat = 20
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                avatarView
+                Text(PanelText.title(for: viewer))
+                    .font(TypeScale.title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .padding(.horizontal, 4)
+            .frame(height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(hover ? Palette.hover : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressButtonStyle())
+        // The hover fill reaches past the text, not the text past the gutter.
+        .padding(.leading, -4)
+        .onHover { inside in
+            guard inside != hover else { return }
+            hover = inside
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        .onDisappear {
+            // Clicking closes the menu under the pointer: give the cursor back.
+            if hover { NSCursor.pop() }
+            hover = false
+        }
+        .animation(Motion.hover, value: hover)
+        .help(PanelText.profileHelp(viewer))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(PanelText.profileAccessibilityLabel(viewer))
+        .accessibilityAddTraits(.isLink)
+        .task(id: viewer.avatarURL) { await loadAvatar() }
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        Group {
+            if let avatar {
+                Image(nsImage: avatar)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Circle()
+                    .fill(Color.primary.opacity(0.08))
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    )
+            }
+        }
+        .frame(width: Self.avatarSize, height: Self.avatarSize)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .accessibilityHidden(true)
+    }
+
+    private func loadAvatar() async {
+        guard let url = viewer.avatarURL else {
+            avatar = nil
+            return
+        }
+        // Bytes that aren't an image leave the placeholder.
+        avatar = await avatars.image(for: url).flatMap(NSImage.init(data:))
     }
 }
 

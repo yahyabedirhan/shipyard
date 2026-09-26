@@ -62,6 +62,11 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
+    /// The account's avatar for the header, kept on disk (#49).
+    let avatars = AvatarCache(
+        directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
+        transport: URLSessionTransport()
+    )
     private let notifier = Notifier()
     private let opener = WorkspaceURLOpener()
     private var configWatcher: ConfigWatcher?
@@ -129,6 +134,13 @@ final class AppServices {
 
     // MARK: - Panel actions
 
+    /// The header's avatar or handle: opens the account's profile on
+    /// GitHub, then closes the menu, as opening a row does.
+    func openProfile() {
+        shipyard.openProfile()
+        closeMenu()
+    }
+
     func refresh() {
         Task { await shipyard.refresh() }
     }
@@ -165,8 +177,8 @@ final class AppServices {
     // MARK: - Closing the menu
 
     /// Closes the menu's window after an action that opened something in
-    /// another app (an item, a notification's item, the configuration
-    /// file), as a menu bar menu does; otherwise it stays on screen
+    /// another app (an item, a notification's item, the account's profile,
+    /// the configuration file), as a menu bar menu does; otherwise it stays on screen
     /// without being the key window, and keys go to the other app (#39).
     /// Actions that only change the menu (⌥-click, collapse, Mark all
     /// seen) don't call it.

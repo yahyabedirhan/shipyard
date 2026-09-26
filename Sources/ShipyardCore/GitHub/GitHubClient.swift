@@ -3,14 +3,46 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// The signed-in GitHub account.
+/// The signed-in GitHub account, from `GET /user`: the panel's header shows
+/// its avatar and `@login`, and opens its profile.
 public struct Viewer: Equatable, Sendable, Decodable {
     public var login: String
     public var id: Int
+    /// The account's display name (`name`); `nil` when it has none.
+    public var name: String?
+    /// The avatar's image (`avatar_url`); `nil` when GitHub gave none.
+    public var avatarURL: URL?
+    /// The account's page on GitHub (`html_url`), else `https://github.com/<login>`.
+    public var profileURL: URL
 
-    public init(login: String, id: Int) {
+    public init(login: String, id: Int, name: String? = nil, avatarURL: URL? = nil, profileURL: URL? = nil) {
         self.login = login
         self.id = id
+        self.name = name
+        self.avatarURL = avatarURL
+        self.profileURL = profileURL ?? Self.profileURL(of: login)
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            login: container.decode(String.self, forKey: .login),
+            id: container.decode(Int.self, forKey: .id),
+            name: try? container.decodeIfPresent(String.self, forKey: .name),
+            // An odd link is left out rather than failing the sign-in.
+            avatarURL: try? container.decodeIfPresent(URL.self, forKey: .avatarURL),
+            profileURL: try? container.decodeIfPresent(URL.self, forKey: .profileURL)
+        )
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case login, id, name
+        case avatarURL = "avatar_url"
+        case profileURL = "html_url"
+    }
+
+    private static func profileURL(of login: String) -> URL {
+        URL(string: "https://github.com")!.appendingPathComponent(login)
     }
 }
 

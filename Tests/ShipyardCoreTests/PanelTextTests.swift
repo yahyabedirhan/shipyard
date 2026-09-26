@@ -28,6 +28,26 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(10) == "10 need attention")
     }
 
+    @Test("signed in, the header names the account by its handle; until it's known, the app")
+    func headerAccount() {
+        let viewer = Viewer(login: "yabepa", id: 42, name: "Yahya Bedirhan Pak")
+        #expect(PanelText.title(for: viewer) == "@yabepa")
+        #expect(PanelText.title(for: nil) == "Shipyard")
+    }
+
+    @Test("the account's hover text gives the full name when there is one, and says a click opens the profile")
+    func headerAccountHelp() {
+        let named = Viewer(login: "yabepa", id: 42, name: "Yahya Bedirhan Pak")
+        #expect(PanelText.profileHelp(named) == "Yahya Bedirhan Pak (@yabepa) · Open profile on GitHub")
+        #expect(PanelText.profileHelp(Viewer(login: "yabepa", id: 42)) == "@yabepa · Open profile on GitHub")
+        #expect(PanelText.profileHelp(Viewer(login: "yabepa", id: 42, name: "  ")) == "@yabepa · Open profile on GitHub")
+    }
+
+    @Test("VoiceOver names the account button's action")
+    func headerAccountAccessibility() {
+        #expect(PanelText.profileAccessibilityLabel(Viewer(login: "yabepa", id: 42)) == "Open @yabepa's profile on GitHub")
+    }
+
     @Test("the footer's and a section's button to mark everything seen says so")
     func markAllSeen() {
         #expect(PanelText.markAllSeen == "Mark all seen")

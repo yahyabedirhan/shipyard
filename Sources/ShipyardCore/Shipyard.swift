@@ -530,6 +530,14 @@ public final class Shipyard {
         urlOpener.open(url)
     }
 
+    /// Opens the signed-in account's profile on GitHub in the browser (a
+    /// click on the header's avatar or handle, #49). Opens nothing until
+    /// the account is known.
+    public func openProfile() {
+        guard let viewer else { return }
+        urlOpener.open(viewer.profileURL)
+    }
+
     /// A notification was clicked: opens its item on GitHub and marks it
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls
