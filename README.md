@@ -1,4 +1,6 @@
-# shipyard
+<p align="center"><img src="docs/assets/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on an olive khaki tile"></p>
+
+<h1 align="center">shipyard</h1>
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
@@ -119,13 +121,13 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 <img src="docs/assets/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
 
-A file with no projects (or no file at all): the panel offers the three presets and the agent skill:
+A file with no projects (or no file at all): the panel asks how you'll use shipyard, offers the three presets, and offers the agent skill:
 
 ```toml
 version = 1
 ```
 
-<img src="docs/assets/shipyard-0.0.2/presets.png" width="400" alt="Onboarding: the three presets to choose from, and a card offering to install the agent skill">
+<img src="docs/assets/shipyard-0.0.2/presets.png" width="400" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 
 ## Development
 
