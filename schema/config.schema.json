@@ -177,7 +177,12 @@
           "type": "boolean",
           "default": true
         },
-        "authors": { "$ref": "#/definitions/authors" }
+        "authors": { "$ref": "#/definitions/authors" },
+        "review-requested": {
+          "description": "List only open pull requests waiting on your review, requested from you or from one of your teams.",
+          "type": "boolean",
+          "default": false
+        }
       }
     },
     "issues": {

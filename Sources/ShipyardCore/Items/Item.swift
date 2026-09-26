@@ -69,7 +69,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     /// the same terms (running pending, succeeded passed, failed failed), so
     /// `[attention] checks-failed` covers failed runs too.
     public var checks: ChecksState
-    /// Whether the viewer is asked to review it.
+    /// Whether an open pull request waits on the viewer's review, asked of
+    /// them or of one of their teams: the review search found it.
     public var reviewRequestedFromViewer: Bool
     public var createdAt: Date
     public var updatedAt: Date
@@ -149,6 +150,12 @@ public struct RepositoryError: Equatable, Sendable {
         self.kind = kind
         self.message = message
     }
+
+    /// The review search failed: shown where review requests were needed,
+    /// in place of a repository, as "review requests: <GitHub's message>".
+    public static func reviewSearch(_ message: String) -> RepositoryError {
+        RepositoryError(repository: "review requests", kind: .other, message: message)
+    }
 }
 
 /// One of GitHub's hourly limits, as the latest response reported it.
@@ -196,18 +203,33 @@ public struct Snapshot: Equatable, Sendable {
     public var rateLimits: RateLimits
     /// The login the query ran as, when GitHub said.
     public var viewerLogin: String?
+    /// The open pull requests waiting on the user's review, directly or
+    /// through one of their teams (their IDs), from the review search. Every
+    /// pull request's `reviewRequestedFromViewer` says the same.
+    public var reviewRequested: Set<String>
+    /// The pull requests the review search found, in any repository.
+    public var searchPullRequests: [Item]
+    /// Why the review search failed, when it did; `reviewRequested` is then
+    /// the last set it found.
+    public var reviewSearchError: RepositoryError?
 
     public init(
         fetchedAt: Date,
         items: [String: [Item]] = [:],
         errors: [ItemSource: RepositoryError] = [:],
         rateLimits: RateLimits = RateLimits(),
-        viewerLogin: String? = nil
+        viewerLogin: String? = nil,
+        reviewRequested: Set<String> = [],
+        searchPullRequests: [Item] = [],
+        reviewSearchError: RepositoryError? = nil
     ) {
         self.fetchedAt = fetchedAt
         self.items = items
         self.errors = errors
         self.rateLimits = rateLimits
         self.viewerLogin = viewerLogin
+        self.reviewRequested = reviewRequested
+        self.searchPullRequests = searchPullRequests
+        self.reviewSearchError = reviewSearchError
     }
 }

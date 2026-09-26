@@ -103,6 +103,8 @@ The menu comes in two layouts, chosen with `[menu] layout`: `"list"` (the defaul
 
 Each kind of item (`pull-requests`, `issues`, `workflow-runs`) can list only some authors, for every project or for one: `authors = { hide = ["me", "bots"] }` lists what other people open, and `authors = { show = ["@dependabot[bot]"] }` only that account's. A bare word is a group (`me`, `others`, `bots`) and `@` marks a login. What a project's filters leave out isn't shown, counted or notified.
 
+`pull-requests = { review-requested = true }` lists only the pull requests waiting on your review. A request to one of your teams counts as a request to you, here and in the attention count and notifications.
+
 - The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
 - The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.
 - For maintainers, [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code and lists every place to touch when adding a setting.

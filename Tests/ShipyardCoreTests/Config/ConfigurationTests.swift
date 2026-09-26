@@ -68,6 +68,7 @@ let everyKey = """
     closed-window-days = 14
     drafts = false
     authors = { show = ["others", "@dependabot[bot]"], hide = ["@octocat"] }
+    review-requested = true
 
     [defaults.issues]
     show = true
@@ -90,7 +91,7 @@ let everyKey = """
     [[projects]]
     name = "blog"
     repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"]
-    pull-requests = { show = true, closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] } }
+    pull-requests = { show = true, closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] }, review-requested = false }
     issues = { show = false, closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
     workflow-runs = { show = false, finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
     notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
@@ -121,7 +122,9 @@ struct ConfigurationDecodingTests {
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
         // Every author, in every kind: an existing file lists what it did.
-        #expect(config.defaults.pullRequests == .init(show: true, closedWindowDays: 7, drafts: true, authors: AuthorFilter(show: [], hide: [])))
+        #expect(config.defaults.pullRequests == .init(
+            show: true, closedWindowDays: 7, drafts: true, authors: AuthorFilter(show: [], hide: []), reviewRequested: false
+        ))
         #expect(config.defaults.issues == .init(show: false, closedWindowDays: 7, authors: AuthorFilter()))
         #expect(config.defaults.workflowRuns == .init(show: false, finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()))
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
@@ -168,7 +171,8 @@ struct ConfigurationDecodingTests {
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.defaults.pullRequests == .init(
             show: false, closedWindowDays: 14, drafts: false,
-            authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")])
+            authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),
+            reviewRequested: true
         ))
         #expect(config.defaults.issues == .init(show: true, closedWindowDays: 0, authors: AuthorFilter(show: [.others], hide: [.bots])))
         #expect(config.defaults.workflowRuns == .init(
@@ -181,7 +185,9 @@ struct ConfigurationDecodingTests {
         let project = try #require(config.projects.first)
         #expect(project.name == "blog")
         #expect(project.repositories == ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"])
-        #expect(project.pullRequests == .init(show: true, closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots])))
+        #expect(project.pullRequests == .init(
+            show: true, closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots]), reviewRequested: false
+        ))
         #expect(project.issues == .init(show: false, closedWindowDays: 30, authors: .init(show: [.login("renovate[bot]")], hide: [])))
         #expect(project.workflowRuns == .init(
             show: false, finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
@@ -347,6 +353,28 @@ struct ConfigurationValidationTests {
             repositories = ["o/b"]
             """)
         #expect(issues == [ConfigIssue(line: 6, message: "project name `a` is used twice (first on line 2)")])
+    }
+
+    @Test("review-requested must be true or false, and a project's overrides the default")
+    func reviewRequested() throws {
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
+            == [ConfigIssue(line: 4, message: "`projects[0].pull-requests.review-requested` must be true or false")])
+
+        let config = try #require(decoded("""
+            [defaults.pull-requests]
+            review-requested = true
+
+            [[projects]]
+            name = "queue"
+            repositories = ["o/a"]
+
+            [[projects]]
+            name = "all"
+            repositories = ["o/a"]
+            pull-requests = { review-requested = false }
+            """)).configuration
+        #expect(config.settings(for: config.projects[0]).pullRequests.reviewRequested)
+        #expect(!config.settings(for: config.projects[1]).pullRequests.reviewRequested)
     }
 
     @Test("negative windows are rejected")

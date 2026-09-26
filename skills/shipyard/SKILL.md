@@ -57,7 +57,7 @@ Tables:
 | `[rate-limit] max-share-percent` | `10` | `1`–`50`: the share of each hourly GitHub limit shipyard may spend (it's shared with the user's agents) |
 | `[attention] unseen` | `true` | an item not clicked yet needs attention |
 | `[attention] changed` | `true` | an item that changed since it was clicked needs attention |
-| `[attention] review-requested` | `true` | a PR requesting the user's review needs attention |
+| `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
@@ -68,6 +68,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `pull-requests.closed-window-days` | `7` | `0` or more; days closed and merged PRs stay listed; `0` hides them |
 | `pull-requests.drafts` | `true` | boolean; list draft PRs |
 | `pull-requests.authors` | `{ show = [], hide = [] }` | whose PRs are listed: `authors.show` minus `authors.hide`, each a list of author selectors (see Whose items) |
+| `pull-requests.review-requested` | `false` | boolean; `true` lists only open PRs waiting on the user's review, requested from them or from one of their teams |
 | `issues.show` | `false` | boolean |
 | `issues.closed-window-days` | `7` | `0` or more |
 | `issues.authors` | `{ show = [], hide = [] }` | whose issues are listed, as for pull requests |
@@ -119,7 +120,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `pr.merged` | an open pull request was merged |
 | `pr.closed` | an open pull request was closed without merging |
 | `pr.reopened` | a closed pull request was reopened |
-| `pr.review_requested` | an open pull request newly requests the user's review |
+| `pr.review_requested` | an open pull request newly requests the user's review, or a team's they're in |
 | `pr.checks_failed` | an open pull request's checks newly failed |
 | `pr.commented` | a pull request got comments or reviews |
 | `issue.opened` | a new issue is listed open |
@@ -230,6 +231,15 @@ issues = { show = true, authors = { hide = ["me", "bots"] } }
 ```
 
 For only one account's items (say a project for dependency updates), use `show` instead: `pull-requests = { authors = { show = ["@dependabot[bot]"] } }`.
+
+**"Only show the PRs waiting on my review in this project."** Set `review-requested` in the project's pull requests. A request to one of the user's teams counts too. It leaves the project's issues and runs as they are; turn them off too for a pure review queue:
+
+```toml
+[[projects]]
+name = "shipyard reviews"
+repositories = ["yahyabedirhan/shipyard"]
+pull-requests = { review-requested = true }
+```
 
 **"Switch the menu to tabs."** One key in the `[menu]` table; uncomment the header's `# [menu]` lines where the placement rule allows it. The layout button in the menu's header makes the same edit with one click.
 

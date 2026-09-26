@@ -18,7 +18,7 @@ So shipyard shares both limits with `gh` and with every agent acting as the user
 - Add up the requests needed to fulfil each connection in the query (a nested list counts once per parent node), divide by 100 and round. The minimum is 1 point.
 - Nested per-item lists dominate. Fifty PRs, each asking for `reviewRequests(first: 10)` and `commits(last: 1)`, add about 100 requests on top of the PR list itself.
 - `rateLimit(dryRun: true) { cost limit remaining resetAt }` returns a query's cost without spending it.
-- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**.
+- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**. Since 0.0.2 the query no longer reads `reviewRequests`; one review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
 
 ## Query limits, and why shipyard sends repositories in batches
 

@@ -76,6 +76,9 @@ public struct GitHubClient: Sendable {
     /// Each repository's last runs answer and its `ETag`, for as long as
     /// this client (one sign-in) lives.
     private let runCache = WorkflowRunCache()
+    /// The pull requests the last review search that answered found, for
+    /// as long as this client (one sign-in) lives.
+    private let reviewSearchCache = ReviewSearchCache()
 
     /// Repositories per GraphQL request; tests change it to compare batches
     /// with a single request.
@@ -120,18 +123,36 @@ public struct GitHubClient: Sendable {
     /// the fetch.
     public func fetch(projects: [ProjectSettings], at fetchedAt: Date) async throws -> Snapshot {
         let repositories = ProjectQuery.plan(projects)
+        // The review search is only worth its cost where pull requests show.
+        let searchesReviews = projects.contains { $0.pullRequests.show }
         var parsed = ProjectQuery.Parsed()
         var headers: RateLimit?
         // With no repositories, one request still asks for the viewer and the limit.
         let starts = repositories.isEmpty ? [0] : Array(stride(from: 0, to: repositories.count, by: repositoriesPerRequest))
         for start in starts {
             let batch = Array(repositories[start..<min(start + repositoriesPerRequest, repositories.count)])
-            let answer = try await query(batch, at: fetchedAt)
+            let answer = try await query(batch, reviewSearch: searchesReviews && start == 0, at: fetchedAt)
             parsed.add(answer.parsed)
             headers = answer.headers ?? headers
         }
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
+
+        // A failed search keeps the last pull requests it found, so a request
+        // doesn't seem withdrawn (and then new) over one failure.
+        var searchPullRequests: [Item] = []
+        var reviewSearchError: RepositoryError?
+        switch parsed.reviewSearch {
+        case .found(let found):
+            searchPullRequests = found
+            reviewSearchCache.store(found)
+        case .failed(let message):
+            searchPullRequests = reviewSearchCache.last
+            reviewSearchError = .reviewSearch(message)
+        case nil:
+            break
+        }
+        let reviewRequested = Set(searchPullRequests.map(\.id))
 
         let runs = try await workflowRuns(
             of: repositories.filter { $0.runsWindowHours != nil && parsed.errors[$0.slug] == nil },
@@ -171,6 +192,7 @@ public struct GitHubClient: Sendable {
                 projectItems += found.map { item in
                     var item = item
                     item.repository = repository
+                    if item.kind == .pullRequest { item.reviewRequestedFromViewer = reviewRequested.contains(item.id) }
                     return item
                 }
             }
@@ -181,17 +203,25 @@ public struct GitHubClient: Sendable {
             items: items,
             errors: errors,
             rateLimits: RateLimits(graphql: graphql, rest: runs.rateLimit),
-            viewerLogin: parsed.viewerLogin
+            viewerLogin: parsed.viewerLogin,
+            reviewRequested: reviewRequested,
+            searchPullRequests: searchPullRequests,
+            reviewSearchError: reviewSearchError
         )
     }
 
-    /// Asks GraphQL about one batch of repositories. Throws `.rateLimited`
-    /// when the limit ran out, which GraphQL says with a 200.
-    private func query(_ batch: [RepositoryRequest], at fetchedAt: Date) async throws -> (parsed: ProjectQuery.Parsed, headers: RateLimit?) {
+    /// Asks GraphQL about one batch of repositories, and with `reviewSearch`
+    /// for the review search. Throws `.rateLimited` when the limit ran out,
+    /// which GraphQL says with a 200.
+    private func query(
+        _ batch: [RepositoryRequest],
+        reviewSearch: Bool,
+        at fetchedAt: Date
+    ) async throws -> (parsed: ProjectQuery.Parsed, headers: RateLimit?) {
         var request = URLRequest(url: Self.graphQLURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = ProjectQuery.body(batch)
+        request.httpBody = ProjectQuery.body(batch, reviewSearch: reviewSearch)
         let (data, response) = try await send(request)
 
         let headers = RateLimit(headers: response)
@@ -200,7 +230,7 @@ public struct GitHubClient: Sendable {
         let resetAt = headers?.resetAt ?? fetchedAt.addingTimeInterval(60)
         let parsed: ProjectQuery.Parsed
         do {
-            parsed = try ProjectQuery.parse(data, repositories: batch)
+            parsed = try ProjectQuery.parse(data, repositories: batch, reviewSearch: reviewSearch)
         } catch GitHubError.graphQL(let message) {
             if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
             throw GitHubError.graphQL(message)
@@ -342,5 +372,24 @@ extension RateLimit {
             used: header("x-ratelimit-used"),
             resetAt: Date(timeIntervalSince1970: TimeInterval(reset))
         )
+    }
+}
+
+/// The pull requests the last review search found, kept so a failed search
+/// leaves the requests as they were.
+final class ReviewSearchCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pullRequests: [Item] = []
+
+    var last: [Item] {
+        lock.lock()
+        defer { lock.unlock() }
+        return pullRequests
+    }
+
+    func store(_ found: [Item]) {
+        lock.lock()
+        defer { lock.unlock() }
+        pullRequests = found
     }
 }

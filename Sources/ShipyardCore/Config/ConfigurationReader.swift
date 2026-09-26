@@ -193,12 +193,13 @@ final class ConfigurationReader {
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts", "authors", "review-requested"])
         return PullRequestOverrides(
             show: bool(node, "show"),
             closedWindowDays: window(node, "closed-window-days"),
             drafts: bool(node, "drafts"),
-            authors: authorFilter(node)
+            authors: authorFilter(node),
+            reviewRequested: bool(node, "review-requested")
         )
     }
 

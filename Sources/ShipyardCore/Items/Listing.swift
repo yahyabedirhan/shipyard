@@ -4,8 +4,9 @@ import Foundation
 ///
 /// A project's listing is the snapshot's items for it that pass every one of
 /// its filters, combined with AND: the kind is shown, a closed (or finished)
-/// item is inside its window, a draft is allowed, and the author passes the
-/// kind's `authors`. The menu model, the attention counts and the
+/// item is inside its window, a draft is allowed, the author passes the
+/// kind's `authors`, and with `review-requested` a pull request waits on the
+/// user's review. The menu model, the attention counts and the
 /// notification step all read listings, so an item the filters leave out is
 /// never shown, counted or notified. A new filter is one more check here.
 public enum Listing {
@@ -13,7 +14,9 @@ public enum Listing {
     /// `viewer` is the signed-in login, which `me` matches; `now` is what the
     /// windows count back from.
     public static func items(for project: ProjectSettings, in snapshot: Snapshot, viewer: String?, now: Date) -> [Item] {
-        (snapshot.items[project.name] ?? []).filter { lists($0, project: project, viewer: viewer, now: now) }
+        (snapshot.items[project.name] ?? []).filter {
+            lists($0, project: project, viewer: viewer, reviewRequested: snapshot.reviewRequested, now: now)
+        }
     }
 
     /// Every project's listing, by project name, for the projects the
@@ -27,12 +30,14 @@ public enum Listing {
         return listings
     }
 
-    /// Whether `project` lists `item`.
-    static func lists(_ item: Item, project: ProjectSettings, viewer: String?, now: Date) -> Bool {
+    /// Whether `project` lists `item`. `reviewRequested` holds the open pull
+    /// requests waiting on the viewer's review (the review search's).
+    static func lists(_ item: Item, project: ProjectSettings, viewer: String?, reviewRequested: Set<String>, now: Date) -> Bool {
         project.shows(item.kind)
             && inWindow(item, project: project, now: now)
             && (item.state != .draft || project.pullRequests.drafts)
             && project.authors(of: item.kind).includes(item, viewer: viewer)
+            && (item.kind != .pullRequest || !project.pullRequests.reviewRequested || reviewRequested.contains(item.id))
     }
 
     /// Open and running items always are; closed ones for their kind's

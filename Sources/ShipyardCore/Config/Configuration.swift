@@ -211,11 +211,21 @@ public struct PullRequestSettings: Equatable, Sendable {
     public var closedWindowDays = 7
     public var drafts = true
     public var authors = AuthorFilter()
-    public init(show: Bool = true, closedWindowDays: Int = 7, drafts: Bool = true, authors: AuthorFilter = AuthorFilter()) {
+    /// `review-requested`: list only open pull requests waiting on the
+    /// user's review, directly or through one of their teams.
+    public var reviewRequested = false
+    public init(
+        show: Bool = true,
+        closedWindowDays: Int = 7,
+        drafts: Bool = true,
+        authors: AuthorFilter = AuthorFilter(),
+        reviewRequested: Bool = false
+    ) {
         self.show = show
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
         self.authors = authors
+        self.reviewRequested = reviewRequested
     }
 }
 
@@ -256,11 +266,19 @@ public struct PullRequestOverrides: Equatable, Sendable {
     public var closedWindowDays: Int?
     public var drafts: Bool?
     public var authors: AuthorFilterOverrides
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil, drafts: Bool? = nil, authors: AuthorFilterOverrides = .init()) {
+    public var reviewRequested: Bool?
+    public init(
+        show: Bool? = nil,
+        closedWindowDays: Int? = nil,
+        drafts: Bool? = nil,
+        authors: AuthorFilterOverrides = .init(),
+        reviewRequested: Bool? = nil
+    ) {
         self.show = show
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
         self.authors = authors
+        self.reviewRequested = reviewRequested
     }
 
     public func applied(to base: PullRequestSettings) -> PullRequestSettings {
@@ -268,7 +286,8 @@ public struct PullRequestOverrides: Equatable, Sendable {
             show: show ?? base.show,
             closedWindowDays: closedWindowDays ?? base.closedWindowDays,
             drafts: drafts ?? base.drafts,
-            authors: authors.applied(to: base.authors)
+            authors: authors.applied(to: base.authors),
+            reviewRequested: reviewRequested ?? base.reviewRequested
         )
     }
 }

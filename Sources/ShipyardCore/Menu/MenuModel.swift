@@ -109,7 +109,7 @@ public struct MenuModel: Equatable, Sendable {
                         .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
                         .first
                         .map(MenuErrorRow.init)
-                },
+                } + reviewSearchErrors(snapshot, settings: settings),
                 showsRepository: project.repositories.count > 1,
                 // A project added since the snapshot was fetched has no listing yet.
                 isLoaded: listings[project.name] != nil,
@@ -135,6 +135,13 @@ public struct MenuModel: Equatable, Sendable {
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
+    }
+
+    /// The review search's error row, in a project that needed the search:
+    /// one listing only pull requests waiting on the user.
+    private static func reviewSearchErrors(_ snapshot: Snapshot, settings: ProjectSettings) -> [MenuErrorRow] {
+        guard let error = snapshot.reviewSearchError, settings.pullRequests.show, settings.pullRequests.reviewRequested else { return [] }
+        return [MenuErrorRow(error)]
     }
 
     /// The order kinds appear in within a section.

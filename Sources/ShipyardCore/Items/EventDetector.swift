@@ -218,7 +218,13 @@ public struct KnownItems: Equatable, Sendable {
         for item in snapshot.items.values.joined() {
             let before = items[item.id]?.present
             let present = before.map { now.timeIntervalSince($0) < Attention.presenceResolution ? $0 : now } ?? now
-            next.items[item.id] = KnownItem(item, present: present)
+            var known = KnownItem(item, present: present)
+            // The review search sees only open pull requests: a closed one
+            // keeps the request it had, so reopening it isn't a new request.
+            if item.kind == .pullRequest, !item.state.isOpen, let earlier = items[item.id] {
+                known.reviewRequested = earlier.reviewRequested
+            }
+            next.items[item.id] = known
         }
         return next
     }
