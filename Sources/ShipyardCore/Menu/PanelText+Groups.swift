@@ -55,3 +55,12 @@ extension PanelText {
         group.isFolded ? "Folded" : "Open"
     }
 }
+
+// The note in a project using `anywhere`.
+extension PanelText {
+    /// When the review search matched more pull requests than its one page:
+    /// "Only the first 100 of 134 review requests are listed".
+    public static func reviewSearchLimit(shown: Int, total: Int) -> String {
+        "Only the first \(shown) of \(total) review requests are listed"
+    }
+}

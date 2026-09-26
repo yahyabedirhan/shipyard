@@ -482,12 +482,18 @@ public struct ProjectSettings: Equatable, Sendable {
     /// all of them once the settings are `resolved(by:)`.
     public var repositorySlugs: [String] { repositories.compactMap(\.slug) }
 
+    /// Whether the project lists the review search's pull requests from any
+    /// repository (`anywhere`).
+    public var usesAnywhere: Bool { repositories.contains(.anywhere) }
+
     /// These settings watching exactly the repositories `resolved` found for
     /// them, each as `owner/name`. Without a resolution (none yet), only the
-    /// single repositories the project names.
+    /// single repositories the project names. `anywhere` stays, since it
+    /// resolves to no repositories.
     public func resolved(by resolved: ResolvedRepositories?) -> ProjectSettings {
         var settings = self
         settings.repositories = (resolved?.repositories ?? repositorySlugs).map(RepositorySelector.repository)
+        if usesAnywhere { settings.repositories.append(.anywhere) }
         return settings
     }
 

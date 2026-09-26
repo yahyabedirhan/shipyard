@@ -103,7 +103,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 | Key | Required | Allowed |
 |---|---|---|
 | `name` | yes | non-empty, unique across projects; the section's title |
-| `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations` or `collaborator` (see Which repositories); no URLs |
+| `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere` (see Which repositories); no URLs |
 | `pull-requests`, `issues`, `workflow-runs` | no | inline tables with the keys above |
 | `group-by`, `subsections`, `sort-by` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
@@ -126,6 +126,7 @@ A project's `repositories` lists **repository selectors**, in any mix. The synta
 | `owned` | every repository the signed-in account owns |
 | `organizations` | every repository the account reaches through an organization it's a member of, directly or through a team |
 | `collaborator` | someone else's repositories that added the account as a collaborator |
+| `anywhere` | open pull requests waiting on the user's review in any repository, even one the user has never committed to |
 
 - `owned`, `organizations` and `collaborator` are GitHub's own affiliations: they don't overlap, and together they are every repository the account can reach. There's no `me/*`: write `owned`.
 - Groups and wildcards are looked up when the app starts, after each edit, on ⌘R and otherwise about once an hour, so a repository created later shows up without editing the file. Its existing items are listed quietly; only what happens after notifies.
@@ -133,6 +134,7 @@ A project's `repositories` lists **repository selectors**, in any mix. The synta
 - A repository that two selectors bring in is listed once.
 - An `owner/*` whose owner doesn't exist, or that the account can't see, shows an error row in the project; a group with no repositories shows "Nothing open".
 - An author group (`me`, `others`, `bots`) or an `@login` in `repositories` is rejected with a hint: to watch someone's repositories, write `owner/*`.
+- `anywhere` comes from one GitHub search, not from repositories, so it works only in a project that lists pull requests with `review-requested = true` and shows no issues or runs (in its block or its defaults). Anything else is rejected: "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs". The project's other filters (`authors`, `states`, `drafts`) apply as usual. The search returns at most 100 pull requests; when more are waiting, the project says so.
 
 ## Which items: states
 
@@ -300,6 +302,20 @@ For only one account's items (say a project for dependency updates), use `show` 
 name = "shipyard reviews"
 repositories = ["yahyabedirhan/shipyard"]
 pull-requests = { review-requested = true }
+```
+
+**"Show every PR waiting on my review, wherever it is."** A project with the `anywhere` group; it must list only PRs waiting on the user's review. Grouping by repository keeps many repositories readable, and `pr.review_requested` notifies each new request:
+
+```toml
+[[projects]]
+name = "review queue"
+repositories = ["anywhere"]
+pull-requests = { review-requested = true }
+group-by = "repository"
+subsections = true
+notifications = [
+  { event = "pr.review_requested" },
+]
 ```
 
 **"Group this project by repository, with a header for each."** Set `group-by` and `subsections` in the project's block (in `[defaults]` for every project):

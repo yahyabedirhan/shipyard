@@ -169,13 +169,13 @@
           "minLength": 1
         },
         "repositories": {
-          "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
+          "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you), \"anywhere\" (open pull requests waiting on your review in any repository, from GitHub's search; the project must set pull-requests.review-requested = true and show no issues or runs). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator)$"
+            "pattern": "^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator|anywhere)$"
           }
         },
         "group-by": { "$ref": "#/definitions/group-by" },

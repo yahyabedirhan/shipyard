@@ -21,6 +21,14 @@ struct RepositoryRequest: Equatable, Sendable {
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
 }
 
+/// What the review search found: one page of pull requests, and how many
+/// matched in all (more than the page holds when there were more than
+/// `ProjectQuery.reviewSearchFirst`).
+struct ReviewSearchResult: Equatable, Sendable {
+    var pullRequests: [Item] = []
+    var total = 0
+}
+
 /// The GraphQL request a refresh makes for one batch of repositories: each
 /// repository as an alias (its pull requests and, where shown, its issues),
 /// plus the viewer and the rate limit, and in the first batch the review
@@ -218,10 +226,11 @@ enum ProjectQuery {
     }
 
     /// The review search's answer: the pull requests it found (their
-    /// `reviewRequestedFromViewer` set), or GitHub's message when it came
-    /// back `null` with an error.
+    /// `reviewRequestedFromViewer` set) and how many matched in all, which is
+    /// more than it returned when there were more than one page; or GitHub's
+    /// message when it came back `null` with an error.
     enum ReviewSearchAnswer: Equatable, Sendable {
-        case found([Item])
+        case found(ReviewSearchResult)
         case failed(String)
     }
 
@@ -256,12 +265,13 @@ enum ProjectQuery {
         }
         if reviewSearch {
             if let search = payload.reviewSearch {
-                parsed.reviewSearch = .found(search.present.compactMap { node in
+                let found = search.nodes.present.compactMap { node -> Item? in
                     guard let repository = node.repository?.nameWithOwner, let pullRequest = node.pullRequest else { return nil }
                     var item = pullRequest.item(in: repository, viewer: viewer)
                     item.reviewRequestedFromViewer = true
                     return item
-                })
+                }
+                parsed.reviewSearch = .found(ReviewSearchResult(pullRequests: found, total: search.issueCount ?? found.count))
             } else {
                 let error = errors.first { $0.path?.first == .key(reviewSearchAlias) }
                 parsed.reviewSearch = .failed(error?.message ?? "GitHub didn't answer the search")
@@ -315,7 +325,7 @@ enum ProjectQuery {
         var viewer: ViewerNode?
         var rateLimit: RateLimitNode?
         /// The review search; `nil` when it came back `null` (or wasn't asked).
-        var reviewSearch: Nodes<SearchNode>?
+        var reviewSearch: SearchAnswer?
         /// `repo<i>` aliases; `nil` where GitHub answered `null`.
         var repositories: [String: RepositoryNode?] = [:]
 
@@ -330,7 +340,7 @@ enum ProjectQuery {
             let container = try decoder.container(keyedBy: Key.self)
             viewer = try container.decodeIfPresent(ViewerNode.self, forKey: Key(stringValue: "viewer"))
             rateLimit = try container.decodeIfPresent(RateLimitNode.self, forKey: Key(stringValue: "rateLimit"))
-            reviewSearch = try container.decodeIfPresent(Nodes<SearchNode>.self, forKey: Key(stringValue: ProjectQuery.reviewSearchAlias))
+            reviewSearch = try container.decodeIfPresent(SearchAnswer.self, forKey: Key(stringValue: ProjectQuery.reviewSearchAlias))
             for key in container.allKeys where key.stringValue.hasPrefix("repo") && Int(key.stringValue.dropFirst(4)) != nil {
                 repositories[key.stringValue] = .some(try container.decodeIfPresent(RepositoryNode.self, forKey: key))
             }
@@ -353,6 +363,19 @@ enum ProjectQuery {
         /// GitHub may answer `null` for a node it couldn't resolve.
         var nodes: [Node?]?
         var present: [Node] { (nodes ?? []).compactMap { $0 } }
+    }
+
+    /// The review search: one page of results, and how many matched in all.
+    private struct SearchAnswer: Decodable {
+        var nodes: Nodes<SearchNode>
+        var issueCount: Int?
+
+        init(from decoder: any Decoder) throws {
+            nodes = try Nodes<SearchNode>(from: decoder)
+            issueCount = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .issueCount)
+        }
+
+        private enum CodingKeys: String, CodingKey { case issueCount }
     }
 
     private struct Count: Decodable {

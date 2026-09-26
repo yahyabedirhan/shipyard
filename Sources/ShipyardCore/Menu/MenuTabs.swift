@@ -15,6 +15,8 @@ public struct MenuTabContent: Equatable, Sendable {
     public var groups: [RowGroup]
     /// One per repository of the tab's projects that couldn't be fetched.
     public var errors: [MenuErrorRow]
+    /// Its projects' notes, such as the review search's limit.
+    public var notes: [String]
     /// Rows in the tab needing attention.
     public var attentionCount: Int
     /// How many projects the tab holds: all of them, or one.
@@ -96,6 +98,7 @@ extension MenuModel {
         return MenuTabContent(
             groups: groups,
             errors: errors,
+            notes: visible.flatMap(\.notes),
             attentionCount: attentionCount(for: tab),
             projectCount: visible.count,
             showsRepository: tab == .all ? visible.count > 1 || visible.contains(where: \.showsRepository)

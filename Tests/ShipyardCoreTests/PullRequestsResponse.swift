@@ -126,8 +126,9 @@ struct PullRequestsResponse {
         /// The open pull requests of the answer's repositories waiting on
         /// the viewer, directly or through a team.
         case waiting
-        /// These pull requests, each in its repository.
-        case pullRequests([(repository: String, pullRequest: PullRequest)])
+        /// These pull requests, each in its repository; `total` is how many
+        /// matched in all (`issueCount`), when more than these.
+        case pullRequests([(repository: String, pullRequest: PullRequest)], total: Int? = nil)
         /// A `null` search with an error on its path; the rest of the answer as usual.
         case failed(String)
     }
@@ -191,15 +192,17 @@ struct PullRequestsResponse {
             errors.append(["path": ["reviewSearch"], "message": message])
         case .waiting, .pullRequests:
             let waiting: [(repository: String, pullRequest: PullRequest)]
-            if case .pullRequests(let pullRequests) = reviewSearch {
+            var total: Int?
+            if case .pullRequests(let pullRequests, let matched) = reviewSearch {
                 waiting = pullRequests
+                total = matched
             } else {
                 waiting = responses.filter { !$0.missing && !$0.headsOnly }.flatMap { response in
                     response.pullRequests.filter { $0.waitsOn(viewer) }.map { (response.repository, $0) }
                 }
             }
             data["reviewSearch"] = [
-                "issueCount": waiting.count,
+                "issueCount": total ?? waiting.count,
                 "nodes": waiting.map { repository, pullRequest in
                     var node = pullRequest.json(in: repository)
                     node["repository"] = ["nameWithOwner": repository]

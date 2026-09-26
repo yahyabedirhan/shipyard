@@ -315,7 +315,7 @@ struct ConfigSchemaTests {
             ".rate-limit.max-share-percent: above 50",
             ".defaults.notifications[0].event: pr.openned not in enum",
             ".defaults.notifications[0].authors: matches none of anyOf",
-            ".projects[0].repositories[0]: not-a-slug doesn't match ^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator)$",
+            ".projects[0].repositories[0]: not-a-slug doesn't match ^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator|anywhere)$",
             ".projects[0].repositories: items not unique",
             ".projects[0].issues.closed-window-days: below 0",
             ".projects[0].issues.authors.hide[0]: bots2 doesn't match ^(me|others|bots|@[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?)$",

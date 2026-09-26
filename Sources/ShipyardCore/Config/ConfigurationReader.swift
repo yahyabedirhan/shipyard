@@ -147,13 +147,13 @@ final class ConfigurationReader {
         if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
         if let projects = tables(node, "projects") {
-            config.projects = projects.compactMap(project)
+            config.projects = projects.compactMap { project($0, defaults: config.defaults) }
             rejectDuplicateNames(projects)
         }
         return config
     }
 
-    private func project(_ node: Node) -> Configuration.Project? {
+    private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
         warnUnknownKeys(in: node, known: [
             "name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks",
         ] + Self.arrangementKeys)
@@ -189,7 +189,7 @@ final class ConfigurationReader {
             }
         }
         guard let name, repositories != nil else { return nil }
-        return Configuration.Project(
+        let project = Configuration.Project(
             name: name,
             repositories: selectors,
             pullRequests: pullRequests(node),
@@ -200,7 +200,25 @@ final class ConfigurationReader {
             archived: bool(node, "archived"),
             forks: bool(node, "forks")
         )
+        if selectors.contains(.anywhere), !Self.allowsAnywhere(project, defaults: defaults) {
+            let line = map.line(for: node.path + [.key("repositories")], value: RepositorySelector.anywhereName, occurrence: 0)
+            errors.append(ConfigIssue(line: line, message: Self.anywhereMessage))
+        }
+        return project
     }
+
+    /// `anywhere` finds only pull requests waiting on the user, so a project
+    /// using it must list exactly those: pull requests shown with
+    /// `review-requested = true` (in the project or its defaults), and no
+    /// issues or runs.
+    private static func allowsAnywhere(_ project: Configuration.Project, defaults: Configuration.Defaults) -> Bool {
+        let pullRequests = project.pullRequests.applied(to: defaults.pullRequests)
+        return pullRequests.show && pullRequests.reviewRequested
+            && !project.issues.applied(to: defaults.issues).show
+            && !project.workflowRuns.applied(to: defaults.workflowRuns).show
+    }
+
+    static let anywhereMessage = "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs"
 
     /// The keys that arrange a project, written straight under `[defaults]`
     /// or in a `[[projects]]` block.

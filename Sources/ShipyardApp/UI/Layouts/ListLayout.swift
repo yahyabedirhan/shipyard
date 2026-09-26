@@ -124,6 +124,9 @@ struct ListLayout: View {
         ForEach(section.errors) {
             ErrorRow(error: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
         }
+        ForEach(section.notes, id: \.self) {
+            NoteRow(note: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
+        }
         ForEach(Array(section.groups.enumerated()), id: \.element.id) { index, group in
             if group.showsHeader {
                 let place = MenuRowPlace.groupHeader(group.id, in: section.name)

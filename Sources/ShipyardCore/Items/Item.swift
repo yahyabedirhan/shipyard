@@ -243,8 +243,12 @@ public struct Snapshot: Equatable, Sendable {
     /// through one of their teams (their IDs), from the review search. Every
     /// pull request's `reviewRequestedFromViewer` says the same.
     public var reviewRequested: Set<String>
-    /// The pull requests the review search found, in any repository.
+    /// The pull requests the review search found, in any repository: at
+    /// most one page (100). A project using `anywhere` has them among its items.
     public var searchPullRequests: [Item]
+    /// How many pull requests the review search matched in all: more than
+    /// `searchPullRequests` holds when there were more than one page.
+    public var reviewSearchTotal: Int
     /// Why the review search failed, when it did; `reviewRequested` is then
     /// the last set it found.
     public var reviewSearchError: RepositoryError?
@@ -264,6 +268,7 @@ public struct Snapshot: Equatable, Sendable {
         viewerLogin: String? = nil,
         reviewRequested: Set<String> = [],
         searchPullRequests: [Item] = [],
+        reviewSearchTotal: Int? = nil,
         reviewSearchError: RepositoryError? = nil,
         repositories: [String: [String]] = [:],
         selectorErrors: [String: [RepositoryError]] = [:]
@@ -275,6 +280,7 @@ public struct Snapshot: Equatable, Sendable {
         self.viewerLogin = viewerLogin
         self.reviewRequested = reviewRequested
         self.searchPullRequests = searchPullRequests
+        self.reviewSearchTotal = reviewSearchTotal ?? searchPullRequests.count
         self.reviewSearchError = reviewSearchError
         self.repositories = repositories
         self.selectorErrors = selectorErrors

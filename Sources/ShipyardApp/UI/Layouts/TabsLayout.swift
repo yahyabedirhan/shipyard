@@ -293,6 +293,7 @@ private struct TabList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
+            ForEach(content.notes, id: \.self) { NoteRow(note: $0).clearsRowHighlight($highlight) }
             ForEach(Array(content.groups.enumerated()), id: \.element.id) { index, group in
                 if group.showsHeader {
                     let place = MenuRowPlace.groupHeader(group.id, in: nil)

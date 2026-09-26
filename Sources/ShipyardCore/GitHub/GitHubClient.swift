@@ -125,7 +125,8 @@ public struct GitHubClient: Sendable {
     /// A project watches the repositories `resolved` has for it (its groups
     /// and wildcards looked up, see `RepositoryResolver`), else only the
     /// single repositories it names; the snapshot records which, and the
-    /// selectors that couldn't be resolved.
+    /// selectors that couldn't be resolved. A project using `anywhere` also
+    /// has the review search's pull requests, from any repository.
     public func fetch(
         projects configured: [ProjectSettings],
         resolved: [String: ResolvedRepositories] = [:],
@@ -150,18 +151,19 @@ public struct GitHubClient: Sendable {
 
         // A failed search keeps the last pull requests it found, so a request
         // doesn't seem withdrawn (and then new) over one failure.
-        var searchPullRequests: [Item] = []
+        var search = ReviewSearchResult()
         var reviewSearchError: RepositoryError?
         switch parsed.reviewSearch {
         case .found(let found):
-            searchPullRequests = found
+            search = found
             reviewSearchCache.store(found)
         case .failed(let message):
-            searchPullRequests = reviewSearchCache.last
+            search = reviewSearchCache.last
             reviewSearchError = .reviewSearch(message)
         case nil:
             break
         }
+        let searchPullRequests = search.pullRequests
         let reviewRequested = Set(searchPullRequests.map(\.id))
 
         let runs = try await workflowRuns(
@@ -206,6 +208,12 @@ public struct GitHubClient: Sendable {
                     return item
                 }
             }
+            if project.usesAnywhere {
+                // `anywhere`: the search's pull requests, from any repository,
+                // after the project's own repositories' (each item once).
+                let listed = Set(projectItems.map(\.id))
+                projectItems += searchPullRequests.filter { !listed.contains($0.id) }
+            }
             items[project.name] = projectItems
         }
         return Snapshot(
@@ -216,6 +224,7 @@ public struct GitHubClient: Sendable {
             viewerLogin: parsed.viewerLogin,
             reviewRequested: reviewRequested,
             searchPullRequests: searchPullRequests,
+            reviewSearchTotal: search.total,
             reviewSearchError: reviewSearchError,
             repositories: Dictionary(projects.map { ($0.name, $0.repositorySlugs) }, uniquingKeysWith: { first, _ in first }),
             selectorErrors: resolved.filter { !$0.value.errors.isEmpty }.mapValues(\.errors)
@@ -387,21 +396,21 @@ extension RateLimit {
     }
 }
 
-/// The pull requests the last review search found, kept so a failed search
-/// leaves the requests as they were.
+/// What the last review search found, kept so a failed search leaves the
+/// requests as they were.
 final class ReviewSearchCache: @unchecked Sendable {
     private let lock = NSLock()
-    private var pullRequests: [Item] = []
+    private var result = ReviewSearchResult()
 
-    var last: [Item] {
+    var last: ReviewSearchResult {
         lock.lock()
         defer { lock.unlock() }
-        return pullRequests
+        return result
     }
 
-    func store(_ found: [Item]) {
+    func store(_ found: ReviewSearchResult) {
         lock.lock()
         defer { lock.unlock() }
-        pullRequests = found
+        result = found
     }
 }

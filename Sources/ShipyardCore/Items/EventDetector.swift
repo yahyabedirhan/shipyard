@@ -114,6 +114,11 @@ public struct ItemSource: Codable, Equatable, Hashable, Sendable, Comparable {
         self.kind = kind
     }
 
+    /// The review search, for a project using `anywhere`: where its pull
+    /// requests from repositories it doesn't watch come from. It isn't
+    /// `owner/name`, so no repository shares it.
+    public static let anywhere = ItemSource(repository: RepositorySelector.anywhereName, kind: .pullRequest)
+
     public static func < (lhs: ItemSource, rhs: ItemSource) -> Bool {
         (lhs.kind.rawValue, lhs.repository) < (rhs.kind.rawValue, rhs.repository)
     }
@@ -193,7 +198,13 @@ public struct KnownItems: Equatable, Sendable {
     /// no longer fetched is forgotten, so adding it again is a first sight.
     public func updated(with snapshot: Snapshot, projects: [ProjectSettings]) -> KnownItems {
         var next = KnownItems()
-        let failed = Set(snapshot.errors.keys)
+        var failed = Set(snapshot.errors.keys)
+        // A failed search answered with the last one's pull requests (none
+        // after a launch): its first answer is still a first sight.
+        if snapshot.reviewSearchError != nil { failed.insert(.anywhere) }
+        // The search's pull requests can be in any repository, so while a
+        // project uses it, items of repositories no project watches are kept too.
+        let keepsAnyRepository = projects.contains(where: \.usesAnywhere)
         var fetched = Set<String>()
         for project in projects {
             var sources = Set<ItemSource>()
@@ -210,7 +221,7 @@ public struct KnownItems: Equatable, Sendable {
         let failedRepositories = Set(failed.map { $0.repository.lowercased() })
         for (id, item) in items {
             let repository = item.repository.lowercased()
-            guard fetched.contains(repository) else { continue }
+            guard fetched.contains(repository) || keepsAnyRepository else { continue }
             if item.present >= cutoff || failedRepositories.contains(repository) {
                 next.items[id] = item
             }
@@ -235,6 +246,16 @@ extension ProjectSettings {
     /// each kind the project shows.
     var fetchedSources: [ItemSource] {
         repositorySlugs.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
+            + (usesAnywhere ? [.anywhere] : [])
+    }
+
+    /// Where the project's `item` came from: its repository, or the review
+    /// search for a pull request `anywhere` found in a repository the
+    /// project doesn't watch.
+    func source(of item: Item) -> ItemSource {
+        let watched = !usesAnywhere || item.kind != .pullRequest
+            || repositorySlugs.contains { $0.caseInsensitiveCompare(item.repository) == .orderedSame }
+        return watched ? ItemSource(repository: item.repository, kind: item.kind) : .anywhere
     }
 
     /// The kinds this project shows, in the menu's order.
@@ -255,9 +276,16 @@ public enum EventDetector {
     public static func events(known: KnownItems, snapshot: Snapshot, projects: [ProjectSettings]) -> [Event] {
         projects.flatMap { project in
             (snapshot.items[project.name] ?? []).flatMap { item -> [Event] in
-                let source = ItemSource(repository: item.repository, kind: item.kind)
+                let source = project.source(of: item)
                 guard known.knows(source, in: project.name) else { return [] }
-                return changes(from: known.items[item.id], to: item).compactMap { change in
+                let before = known.items[item.id]
+                var found = changes(from: before, to: item)
+                // A pull request the search finds for the first time is a
+                // review request that just arrived, as well as a new item.
+                if source == .anywhere, before == nil, item.state.isOpen, item.reviewRequestedFromViewer {
+                    found.append(.reviewRequested)
+                }
+                return found.compactMap { change in
                     EventKind.of(change, for: item.kind).map {
                         Event(kind: $0, project: project.name, item: item, occurrence: change.happensOnce ? "" : item.fingerprint)
                     }

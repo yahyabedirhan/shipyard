@@ -118,7 +118,9 @@ public struct MenuModel: Equatable, Sendable {
                             .first
                             .map(MenuErrorRow.init)
                     } + reviewSearchErrors(snapshot, settings: settings),
-                showsRepository: repositories.count > 1,
+                notes: reviewSearchNotes(snapshot, settings: settings),
+                // `anywhere` brings in pull requests from any repository.
+                showsRepository: repositories.count > 1 || settings.usesAnywhere,
                 // A project added since the snapshot was fetched has no listing yet.
                 isLoaded: listings[project.name] != nil,
                 repositories: repositories
@@ -185,6 +187,14 @@ public struct MenuModel: Equatable, Sendable {
         return [MenuErrorRow(error)]
     }
 
+    /// The note in a project using `anywhere` when the review search
+    /// matched more pull requests than its one page holds.
+    private static func reviewSearchNotes(_ snapshot: Snapshot, settings: ProjectSettings) -> [String] {
+        let shown = snapshot.searchPullRequests.count
+        guard settings.usesAnywhere, snapshot.reviewSearchTotal > shown else { return [] }
+        return [PanelText.reviewSearchLimit(shown: shown, total: snapshot.reviewSearchTotal)]
+    }
+
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun]
 }
@@ -202,8 +212,11 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// an `owner/*` whose owner can't be seen), then one per repository that
     /// couldn't be fetched.
     public var errors: [MenuErrorRow]
+    /// Notes drawn after the error rows, such as the review search's limit
+    /// in a project using `anywhere`.
+    public var notes: [String]
     /// Whether a row's second line names its repository: only when the
-    /// project has more than one.
+    /// project has more than one, or uses `anywhere`.
     public var showsRepository: Bool
     /// Rows in this section needing attention, for its header.
     public var attentionCount: Int
@@ -227,6 +240,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         name: String,
         rows: [MenuRow],
         errors: [MenuErrorRow] = [],
+        notes: [String] = [],
         showsRepository: Bool = false,
         attentionCount: Int = 0,
         isCollapsed: Bool = false,
@@ -242,6 +256,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
                 attentionCount: rows.filter(\.needsAttention).count
             )],
             errors: errors,
+            notes: notes,
             showsRepository: showsRepository,
             attentionCount: attentionCount,
             isCollapsed: isCollapsed,
@@ -254,6 +269,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         name: String,
         groups: [RowGroup],
         errors: [MenuErrorRow] = [],
+        notes: [String] = [],
         showsRepository: Bool = false,
         attentionCount: Int = 0,
         isCollapsed: Bool = false,
@@ -263,6 +279,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         self.name = name
         self.groups = groups
         self.errors = errors
+        self.notes = notes
         self.showsRepository = showsRepository
         self.attentionCount = attentionCount
         self.isCollapsed = isCollapsed

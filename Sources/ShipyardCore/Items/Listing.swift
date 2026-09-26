@@ -12,6 +12,8 @@ import Foundation
 /// never shown, counted or notified. A new filter is one more check here.
 public enum Listing {
     /// The items `project` lists from `snapshot`, in the snapshot's order.
+    /// For a project using `anywhere`, the fetch put the review search's
+    /// pull requests among its items, so they pass the same checks.
     /// `viewer` is the signed-in login, which `me` matches; `now` is what the
     /// windows count back from.
     public static func items(for project: ProjectSettings, in snapshot: Snapshot, viewer: String?, now: Date) -> [Item] {

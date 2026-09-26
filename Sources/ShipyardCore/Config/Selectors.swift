@@ -22,7 +22,7 @@ public enum AuthorSelector: Hashable, Sendable, CustomStringConvertible {
 
     /// The repository groups: bare words that belong under `repositories`,
     /// named here so an author filter can say where they go.
-    static let repositoryGroups = ["owned", "organizations", "collaborator", "anywhere"]
+    static var repositoryGroups: [String] { RepositorySelector.groupNames }
 
     /// Why a string isn't an author selector, in the words the banner shows.
     public struct Rejection: Error, Equatable, Sendable {
@@ -138,9 +138,11 @@ public struct AuthorFilterOverrides: Equatable, Sendable {
 
 // MARK: - Repositories
 
-/// A repository group: every repository the signed-in account reaches one
-/// way, named after GitHub's own affiliations. The three don't overlap, and
-/// together they are every repository the account can reach.
+/// A repository group that's looked up: every repository the signed-in
+/// account reaches one way, named after GitHub's own affiliations. The three
+/// don't overlap, and together they are every repository the account can
+/// reach. (`anywhere`, the fourth group, isn't looked up: see
+/// `RepositorySelector.anywhere`.)
 public enum RepositoryGroup: String, CaseIterable, Hashable, Sendable {
     /// Repositories the account itself owns.
     case owned
@@ -162,6 +164,15 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
     case owner(String)
     /// `owned`, `organizations` or `collaborator`.
     case group(RepositoryGroup)
+    /// `anywhere`: the open pull requests waiting on the user's review in
+    /// any repository, which the review search finds. It resolves to no
+    /// repositories, and is valid only in a project listing pull requests
+    /// with `review-requested = true` and no issues or runs.
+    case anywhere
+
+    /// The bare words `repositories` takes, in the documentation's order.
+    public static let groupNames = RepositoryGroup.allCases.map(\.rawValue) + [anywhereName]
+    static let anywhereName = "anywhere"
 
     /// The selector as it's written in the file.
     public var description: String {
@@ -169,6 +180,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
         case .repository(let slug): slug
         case .owner(let login): "\(login)/*"
         case .group(let group): group.rawValue
+        case .anywhere: Self.anywhereName
         }
     }
 
@@ -183,7 +195,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
     /// repository, which needs none.
     public var lookup: RepositoryLookup? {
         switch self {
-        case .repository: nil
+        case .repository, .anywhere: nil
         case .owner(let login): .owner(login.lowercased())
         case .group(let group): .group(group)
         }
@@ -193,6 +205,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
     /// hint towards what was likely meant.
     public static func parse(_ text: String) throws(RepositorySelectorRejection) -> RepositorySelector {
         if let group = RepositoryGroup(rawValue: text) { return .group(group) }
+        if text == anywhereName { return .anywhere }
         if text.hasPrefix("@") {
             let login = String(text.dropFirst())
             let hint = isLogin(login) ? "; for their repositories write `\(login)/*`" : ""
@@ -210,8 +223,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
             }
             throw RepositorySelectorRejection("repository `\(text)` isn't `owner/name` or `owner/*`")
         }
-        let groups = RepositoryGroup.allCases.map(\.rawValue)
-        if let near = Suggestion.nearest(to: text, in: groups) {
+        if let near = Suggestion.nearest(to: text, in: groupNames) {
             throw RepositorySelectorRejection("unknown repository group `\(text)` (did you mean `\(near)`?)")
         }
         if isLogin(text) {
@@ -222,7 +234,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
 
     /// What `repositories` takes, for the messages.
     static var accepted: String {
-        let groups = RepositoryGroup.allCases.map { "`\($0.rawValue)`" }
+        let groups = groupNames.map { "`\($0)`" }
         return "`owner/name`, `owner/*`, " + groups.dropLast().joined(separator: ", ") + " or " + groups.last!
     }
 
