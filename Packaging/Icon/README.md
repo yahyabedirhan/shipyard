@@ -35,7 +35,7 @@ To review every variant at 16, 32, 128 and 512 on light and dark:
 swift Packaging/Icon/make-icon.swift --sheet /tmp/icons.png
 ```
 
-The minimal sailboat options (#80), a flat mark of our own drawing in two families (`solid-*`, a white mark on colour, and `white-*`, a coloured mark on white), aren't app variants yet. To redraw their previews and comparison sheet:
+The minimal sailboat options (#80), shipyard's right-facing sailboat redrawn as a flat mark of our own paths, in two families (`solid-*`, a white mark on colour, and `white-*`, a coloured mark on white), aren't app variants yet. To redraw their previews and comparison sheet:
 
 ```sh
 swift Packaging/Icon/make-icon.swift --exploration docs/assets/app-icon/exploration

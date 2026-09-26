@@ -502,68 +502,81 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
     }
 }
 
-// MARK: - Minimal: a flat sailboat over two wave lines, like the connect screen's badge
+// MARK: - Minimal: shipyard's sailboat, flat, like the connect screen's badge
 
-/// An original, flat sailboat mark: a tall mainsail and a smaller jib either
-/// side of a gap where the mast would be, a hull below them, and wave lines
-/// under the hull. Sails and hull get softly rounded corners. Small sizes drop
-/// the second wave and thicken the first.
+/// shipyard's sailboat as a flat mark of our own paths, facing right like the
+/// menu bar item: a straight-edged jib on the left, a taller mainsail with a
+/// rounded head and a bellied leech on the right, a thin gap between them, a
+/// stub of mast down to the hull, a hull whose bottom edge is a wave, and one
+/// wave line below. Small sizes open the gaps and thicken the wave, so the
+/// parts stay apart at 16 and 32.
 struct MinimalMark {
     var sails: CGPath
+    var mast: CGPath
     var hull: CGPath
-    var waves: [CGPath]
+    var wave: CGPath
     var waveWidth: CGFloat
+    var corner: CGFloat
 }
 
 func minimalMark(small: Bool) -> MinimalMark {
-    // Small sizes open the gaps (mast, and sails to hull) so they survive at 16 and 32.
-    let foot: CGFloat = small ? 478 : 452
-    let luffMain: CGFloat = small ? 474 : 490, luffJib: CGFloat = small ? 554 : 538
+    let foot: CGFloat = small ? 418 : 404
+    let gap: CGFloat = small ? 44 : 30
 
     let sails = CGMutablePath()
-    // Mainsail, behind the mast: a straight luff and foot, the leech bellied out.
-    sails.move(to: CGPoint(x: luffMain, y: 796))
-    sails.addLine(to: CGPoint(x: luffMain, y: foot))
-    sails.addLine(to: CGPoint(x: 280, y: foot))
-    sails.addQuadCurve(to: CGPoint(x: luffMain, y: 796), control: CGPoint(x: 330, y: 650))
+    // Mainsail: the luff bows gently forward from the tack to the head; the
+    // head rounds over into a leech that bellies out aft, down to the clew.
+    let head = CGPoint(x: 536, y: 784), tack = CGPoint(x: 506, y: foot), clew = CGPoint(x: 706, y: foot)
+    sails.move(to: tack)
+    sails.addQuadCurve(to: head, control: CGPoint(x: 494, y: 610))
+    sails.addCurve(to: clew, control1: CGPoint(x: 648, y: 770), control2: CGPoint(x: 766, y: 580))
     sails.closeSubpath()
-    // Jib, ahead of the mast: shorter, with a gentler belly.
-    sails.move(to: CGPoint(x: luffJib, y: 706))
-    sails.addLine(to: CGPoint(x: luffJib, y: foot))
-    sails.addLine(to: CGPoint(x: 722, y: foot))
-    sails.addQuadCurve(to: CGPoint(x: luffJib, y: 706), control: CGPoint(x: 668, y: 606))
+    // Jib: a straight luff from its head down to the tack, a flat foot, and a
+    // back edge that follows the mainsail's luff a gap ahead of it.
+    let jibHead = CGPoint(x: 520 - gap, y: 730), jibTack = CGPoint(x: 318, y: foot)
+    sails.move(to: jibHead)
+    sails.addLine(to: jibTack)
+    sails.addLine(to: CGPoint(x: tack.x - gap, y: foot))
+    sails.addQuadCurve(to: jibHead, control: CGPoint(x: 494 - gap, y: 600))
     sails.closeSubpath()
 
+    let mastX = tack.x - gap / 2
+    let mastW: CGFloat = small ? 24 : 18
+    let mast = CGPath(rect: CGRect(x: mastX - mastW / 2, y: 340, width: mastW, height: foot - 330), transform: nil)
+
+    // The sea's swell, shared by the hull's bottom edge and the wave line so they run in step.
+    let left: CGFloat = 286, right: CGFloat = 738, period = (right - left) / 2
+    let amplitude: CGFloat = small ? 20 : 19
+    func swell(_ x: CGFloat) -> CGFloat { amplitude * sin((x - left) / period * 2 * .pi) }
+
+    let deck: CGFloat = small ? 370 : 362
+    let keel: CGFloat = small ? 304 : 302
     let hull = CGMutablePath()
-    hull.move(to: CGPoint(x: 244, y: 408))
-    hull.addLine(to: CGPoint(x: 780, y: 408))
-    hull.addQuadCurve(to: CGPoint(x: 676, y: 318), control: CGPoint(x: 742, y: 326))
-    hull.addLine(to: CGPoint(x: 356, y: 318))
-    hull.addQuadCurve(to: CGPoint(x: 244, y: 408), control: CGPoint(x: 284, y: 326))
+    hull.move(to: CGPoint(x: 316, y: deck))
+    hull.addLine(to: CGPoint(x: 712, y: deck))
+    for i in 0...120 {
+        let x = 698 - (698 - 330) * CGFloat(i) / 120
+        hull.addLine(to: CGPoint(x: x, y: keel + swell(x)))
+    }
     hull.closeSubpath()
 
-    /// A wave line: `count` whole swells between x0 and x1 about y.
-    func waveLine(y: CGFloat, x0: CGFloat, x1: CGFloat, amplitude: CGFloat, count: CGFloat) -> CGPath {
-        let p = CGMutablePath()
-        for i in 0...160 {
-            let t = CGFloat(i) / 160
-            let pt = CGPoint(x: x0 + (x1 - x0) * t, y: y + amplitude * sin(t * count * 2 * .pi))
-            i == 0 ? p.move(to: pt) : p.addLine(to: pt)
-        }
-        return p
+    let waveY: CGFloat = small ? 212 : 248
+    let wave = CGMutablePath()
+    for i in 0...160 {
+        let x = left + (right - left) * CGFloat(i) / 160
+        let p = CGPoint(x: x, y: waveY + swell(x))
+        i == 0 ? wave.move(to: p) : wave.addLine(to: p)
     }
-    let waves = small
-        ? [waveLine(y: 222, x0: 262, x1: 762, amplitude: 22, count: 2)]
-        : [waveLine(y: 250, x0: 262, x1: 762, amplitude: 18, count: 2),
-           waveLine(y: 178, x0: 352, x1: 672, amplitude: 14, count: 1.5)]
-    return MinimalMark(sails: sails, hull: hull, waves: waves, waveWidth: small ? 50 : 30)
+    return MinimalMark(sails: sails, mast: mast, hull: hull, wave: wave, waveWidth: small ? 38 : 26, corner: small ? 10 : 8)
 }
 
-/// The two exploration families: a coloured body with a white mark, and a
-/// white body with the mark in colour.
+/// The exploration's two families: a coloured body with a white mark, and a
+/// white body with the mark in colour. Navy, the favourite, has a lighter and a
+/// deeper shade too.
 enum Minimal: String, CaseIterable {
-    case solidBlue = "solid-blue", solidTeal = "solid-teal", solidNavy = "solid-navy", solidCoral = "solid-coral"
-    case whiteBlue = "white-blue", whiteTeal = "white-teal", whiteNavy = "white-navy", whiteCoral = "white-coral"
+    case solidBlue = "solid-blue", solidTeal = "solid-teal", solidCoral = "solid-coral"
+    case solidNavyLight = "solid-navy-light", solidNavy = "solid-navy", solidNavyDeep = "solid-navy-deep"
+    case whiteBlue = "white-blue", whiteTeal = "white-teal", whiteCoral = "white-coral", whiteNavy = "white-navy"
 
     var onWhite: Bool { rawValue.hasPrefix("white-") }
 
@@ -572,8 +585,10 @@ enum Minimal: String, CaseIterable {
         switch self {
         case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)   // the connect screen's accent, 0x006BED
         case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
-        case .solidNavy, .whiteNavy: return (0x30498C, 0x152049)
         case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
+        case .solidNavyLight: return (0x5476C4, 0x2C4A94)
+        case .solidNavy, .whiteNavy: return (0x30498C, 0x152049)
+        case .solidNavyDeep: return (0x1E2B55, 0x080E26)
         }
     }
 
@@ -584,24 +599,22 @@ enum Minimal: String, CaseIterable {
         frame(ctx, pixels: pixels, base: base, background: background,
               sheen: onWhite ? 0 : 0.14, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
             let mark = minimalMark(small: small)
-            let scale: CGFloat = small ? 1.0 : 0.86
-            scaled(ctx, scale, about: CGPoint(x: 512, y: 512)) {
-                ctx.translateBy(x: 0, y: small ? 22 : 30)
+            scaled(ctx, small ? 1.02 : 0.92, about: CGPoint(x: 512, y: 512)) {
                 ctx.saveGState()
                 shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
                 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
                 let ink = rgb(0xFFFFFF)
                 ctx.setFillColor(ink); ctx.setStrokeColor(ink)
                 ctx.setLineJoin(.round); ctx.setLineCap(.round)
-                // Fill and stroke together round the corners of sails and hull.
-                ctx.setLineWidth(small ? 16 : 22)
-                for path in [mark.sails, mark.hull] { ctx.addPath(path); ctx.drawPath(using: .fillStroke) }
+                // Fill and stroke together to round the corners a little.
+                ctx.setLineWidth(mark.corner)
+                for path in [mark.sails, mark.mast, mark.hull] { ctx.addPath(path); ctx.drawPath(using: .fillStroke) }
                 ctx.setLineWidth(mark.waveWidth)
-                for path in mark.waves { ctx.addPath(path); ctx.strokePath() }
+                ctx.addPath(mark.wave); ctx.strokePath()
                 if onWhite {
                     // Colour the mark with the hue's gradient.
                     ctx.setBlendMode(.sourceIn)
-                    ctx.drawLinearGradient(grad([rgb(top), rgb(bottom)]), start: CGPoint(x: 0, y: 820), end: CGPoint(x: 0, y: 150),
+                    ctx.drawLinearGradient(grad([rgb(top), rgb(bottom)]), start: CGPoint(x: 0, y: 800), end: CGPoint(x: 0, y: 220),
                                            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
                 }
                 ctx.endTransparencyLayer()
@@ -697,8 +710,9 @@ func sheet(to url: URL) throws {
 // MARK: - Exploration
 
 /// Writes a 512-pixel PNG of each minimal variant into `dir`, and
-/// `comparison.png`: every variant at 512 and 32, a row per family, on a light
-/// panel and then on a dark one.
+/// `comparison.png`: a row with the maintainer's reference shots (when `dir`
+/// has them) beside the mark, then every variant at 512 and 32, a row per
+/// family, on a light panel and then on a dark one.
 func exploration(to dir: URL) throws {
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for m in Minimal.allCases {
@@ -710,17 +724,50 @@ func exploration(to dir: URL) throws {
     let gap = 40, small = 32, label = 44
     let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
     let width = gap + (cellW + gap) * columns
-    let panels = [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)]
-    let height = rowH * families.count * panels.count + gap
+    let panelH = rowH * families.count + gap
+    let references = ["reference-connect-badge", "reference-menu-bar"].compactMap { name in
+        NSImage(contentsOf: dir.appendingPathComponent("\(name).png")).map { (name, $0) }
+    }
+    let refH = references.isEmpty ? 0 : gap + 400 + 12 + label + gap
+    let height = refH + panelH * 2
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
         colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
     NSGraphicsContext.saveGraphicsState()
     NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    NSGraphicsContext.current!.imageInterpolation = .high
+
+    func caption(_ s: String, centredIn x: Int, width w: Int, y: Int, color: NSColor) {
+        let t = NSAttributedString(string: s, attributes: [.font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: color])
+        t.draw(at: NSPoint(x: x + (w - Int(t.size().width)) / 2, y: y))
+    }
+
+    if !references.isEmpty {
+        // The references (enlarged screenshots) beside the mark in blue and in navy, all 400 tall.
+        NSColor(white: 0.16, alpha: 1).setFill()
+        NSRect(x: 0, y: height - refH, width: width, height: refH).fill()
+        var x = gap
+        let imageY = height - gap - 400
+        let light = NSColor(white: 0.88, alpha: 1)
+        for (name, image) in references {
+            let w = Int(400 * image.size.width / image.size.height)
+            image.draw(in: NSRect(x: x, y: imageY, width: w, height: 400))
+            caption(name, centredIn: x, width: w, y: imageY - 12 - 32, color: light)
+            x += w + gap
+        }
+        for m in [Minimal.solidBlue, .solidNavy] {
+            let icon = NSImage(size: NSSize(width: 400, height: 400))
+            icon.addRepresentation(render(pixels: 400) { m.draw($0, pixels: 400) })
+            icon.draw(in: NSRect(x: x, y: imageY, width: 400, height: 400))
+            caption("\(m.rawValue) (ours)", centredIn: x, width: 400, y: imageY - 12 - 32, color: light)
+            x += 400 + gap
+        }
+    }
+
+    let panels = [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)]
     for (p, panel) in panels.enumerated() {
-        let panelTop = height - (height - gap) / 2 * p
-        let panelH = (height - gap) / 2 + (p == 1 ? gap : 0)
+        let panelTop = height - refH - panelH * p
         panel.setFill()
         NSRect(x: 0, y: panelTop - panelH, width: width, height: panelH).fill()
         let text = p == 0 ? NSColor(white: 0.15, alpha: 1) : NSColor(white: 0.88, alpha: 1)
@@ -735,10 +782,7 @@ func exploration(to dir: URL) throws {
                 tiny.addRepresentation(render(pixels: small) { m.draw($0, pixels: small) })
                 let smallY = rowTop - gap - 512 - 20 - small
                 tiny.draw(in: NSRect(x: x + (cellW - small) / 2, y: smallY, width: small, height: small))
-                let name = NSAttributedString(string: m.rawValue, attributes: [
-                    .font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: text,
-                ])
-                name.draw(at: NSPoint(x: x + (cellW - Int(name.size().width)) / 2, y: smallY - 12 - 32))
+                caption(m.rawValue, centredIn: x, width: cellW, y: smallY - 12 - 32, color: text)
             }
         }
     }
