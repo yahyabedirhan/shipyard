@@ -433,7 +433,7 @@ struct PanelTextTests {
     func connectSignedOutGhStillSignedIn() {
         let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: true)
         #expect(text.title == "Welcome back")
-        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:")
+        #expect(text.message == "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:")
         #expect(text.alternative == "Alternatively, sign in with GitHub, if you'd rather:")
         #expect(!text.message.contains("logout"))
         #expect(text.lead == .connectWithGh)
@@ -443,7 +443,7 @@ struct PanelTextTests {
     @Test("without a client ID, signed out while gh is still signed in has no second block")
     func connectSignedOutGhStillSignedInWithoutClientID() {
         let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: false)
-        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:")
+        #expect(text.message == "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:")
         #expect(text.alternative == nil)
     }
 
@@ -474,7 +474,7 @@ struct PanelTextTests {
 
     @Test("the gh way's words: gh in code font, as a command", arguments: [
         (PanelText.connectWithGh, "Connect with `gh`"),
-        (PanelText.useGhInstead, "Use the GitHub CLI (`gh`) instead"),
+        (PanelText.useGhInstead, "Use the GitHub CLI `gh` instead"),
         (PanelText.useGhInsteadHelp, "Shipyard reuses the `gh` command's sign-in if you already use it."),
         (PanelText.installGhHelp, "How to install `gh`"),
         (PanelText.installGh, "Download it from [cli.github.com](https://cli.github.com), or run:"),
@@ -504,7 +504,7 @@ struct PanelTextTests {
     func connectNoTokenWithoutClientID() {
         let text = PanelText.connect(.noToken, canSignIn: false)
         #expect(text.title == "Welcome to Shipyard")
-        #expect(text.message == "Connect your GitHub account through the GitHub CLI (`gh`).")
+        #expect(text.message == "Connect your GitHub account through the GitHub CLI `gh`.")
         #expect(text.showsInstallHint)
     }
 

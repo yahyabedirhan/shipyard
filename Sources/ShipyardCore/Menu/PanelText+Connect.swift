@@ -67,7 +67,7 @@ extension PanelText {
     public static let connectWithGh = "Connect with `gh`"
 
     /// The disclosure that holds the `gh` way when Sign in with GitHub leads.
-    public static let useGhInstead = "Use the GitHub CLI (`gh`) instead"
+    public static let useGhInstead = "Use the GitHub CLI `gh` instead"
 
     /// `useGhInstead`'s hover help.
     public static let useGhInsteadHelp = "Shipyard reuses the `gh` command's sign-in if you already use it."
@@ -121,7 +121,7 @@ extension PanelText {
                 title: "Welcome to Shipyard",
                 message: canSignIn
                     ? "Connect your GitHub account to see the pull requests your agents open."
-                    : "Connect your GitHub account through the GitHub CLI (`gh`).",
+                    : "Connect your GitHub account through the GitHub CLI `gh`.",
                 lead: signInOrGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: true
@@ -129,7 +129,7 @@ extension PanelText {
         case .userSignedOut(.ghStillSignedIn):
             return Connect(
                 title: "Welcome back",
-                message: "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:",
+                message: "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:",
                 lead: .connectWithGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: false,
