@@ -60,20 +60,42 @@ private func proseBlocks(_ prose: String) -> [String] {
 struct SkillDocumentTests {
     @Test("it has the frontmatter `npx skills add` needs, named after its folder")
     func frontmatter() throws {
-        let lines = try skill().components(separatedBy: "\n")
-        #expect(lines.first == "---")
-        let end = try #require(lines.dropFirst().firstIndex(of: "---"))
-        let fields = lines[1..<end]
-        #expect(fields.contains("name: shipyard"))
+        let frontmatter = try SkillFrontmatter(document: skill())
+        #expect(frontmatter["name"] == "shipyard")
         #expect(skillURL.deletingLastPathComponent().lastPathComponent == "shipyard")
-        let description = try #require(fields.first { $0.hasPrefix("description: ") })
-        #expect(description.count > "description: ".count + 20)
+        let description = try #require(frontmatter["description"])
+        #expect(description.count > 20)
         // "Change my shipyard" means its configuration. The skill is for any
         // shipyard user: shipyard's own repository and code are AGENTS.md's.
         #expect(description.contains("my shipyard"))
         #expect(description.contains("the shipyard app"))
         let described = words(description.lowercased())
         #expect(described.isDisjoint(with: ["repository", "repo", "code", "source"]), "the description speaks to shipyard's maintainers")
+    }
+
+    @Test("its frontmatter is read as strict YAML, so an unquoted colon in a value is refused")
+    func frontmatterIsStrictYAML() throws {
+        let unquoted = "---\nname: shipyard\ndescription: Edit it (its layout): watch repositories.\n---\n"
+        #expect(throws: SkillFrontmatter.Invalid.self) { try SkillFrontmatter(document: unquoted) }
+
+        let quoted = "---\nname: shipyard\ndescription: \"Edit it (its layout): watch \\\"repositories\\\".\"\n---\n"
+        #expect(try SkillFrontmatter(document: quoted)["description"] == "Edit it (its layout): watch \"repositories\".")
+
+        let singleQuoted = "---\nname: shipyard\ndescription: 'Edit shipyard''s file: all of it.'\n---\n"
+        #expect(try SkillFrontmatter(document: singleQuoted)["description"] == "Edit shipyard's file: all of it.")
+
+        for broken in [
+            "description: ends with a colon:",
+            "description: a # comment eats the rest",
+            "description: \"never closed",
+            "description: 'never closed",
+            "description: \"closed\" then more",
+            "description: >-",
+        ] {
+            #expect(throws: SkillFrontmatter.Invalid.self, "\(broken)") {
+                try SkillFrontmatter(document: "---\nname: shipyard\n\(broken)\n---\n")
+            }
+        }
     }
 
     @Test("every TOML example decodes cleanly and validates against the schema")
