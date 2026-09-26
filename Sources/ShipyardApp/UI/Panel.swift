@@ -48,14 +48,16 @@ struct Panel: View {
             }
             Spacer()
             Button(action: actions.refresh) {
+                // A square frame puts the rotation's anchor on the glyph's
+                // centre; the scoped animation spins only the rotation, so
+                // the header's layout changes don't ride the endless spin.
                 Image(systemName: "arrow.clockwise")
-                    .rotationEffect(.degrees(shipyard.isRefreshing ? 360 : 0))
+                    .frame(width: 16, height: 16)
                     .animation(
                         shipyard.isRefreshing
                             ? .linear(duration: 0.9).repeatForever(autoreverses: false)
-                            : .spring(duration: 0.3),
-                        value: shipyard.isRefreshing
-                    )
+                            : nil
+                    ) { $0.rotationEffect(.degrees(shipyard.isRefreshing ? 360 : 0)) }
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut("r")
