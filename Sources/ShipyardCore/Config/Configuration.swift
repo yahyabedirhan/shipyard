@@ -15,8 +15,6 @@ public struct Configuration: Equatable, Sendable {
     /// A floor in seconds (at least 30); the rate budget may stretch it.
     public var refreshIntervalSeconds: Int = 120
     public var launchAtLogin: Bool = true
-    /// Logins whose items are hidden, e.g. `dependabot[bot]`.
-    public var hideAuthors: [String] = []
     public var menuBar = MenuBar()
     public var menu = Menu()
     public var rateLimit = RateLimitSettings()
@@ -40,7 +38,10 @@ public struct Configuration: Equatable, Sendable {
             pullRequests: project.pullRequests.applied(to: defaults.pullRequests),
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
-            notifications: project.notifications ?? defaults.notifications
+            notifications: project.notifications ?? defaults.notifications,
+            arrangement: project.arrangement.applied(to: defaults.arrangement),
+            archived: project.archived ?? defaults.archived,
+            forks: project.forks ?? defaults.forks
         )
     }
 }
@@ -92,6 +93,12 @@ extension Configuration {
         public var workflowRuns = WorkflowRunSettings()
         /// `[[defaults.notifications]]`; a new pull request in any project by default.
         public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
+        /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
+        public var arrangement = ArrangementSettings()
+        /// Whether repository groups and `owner/*` bring in archived repositories.
+        public var archived = false
+        /// Whether repository groups and `owner/*` bring in forks.
+        public var forks = true
         public init() {}
     }
 
@@ -99,21 +106,29 @@ extension Configuration {
     /// it overrides.
     public struct Project: Equatable, Sendable {
         public var name: String
-        /// `owner/name` slugs.
-        public var repositories: [String]
+        /// Repository selectors: `owner/name`, `owner/*` and repository groups.
+        public var repositories: [RepositorySelector]
         public var pullRequests = PullRequestOverrides()
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
+        /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
+        public var arrangement = ArrangementOverrides()
+        /// `archived` and `forks`, when the project sets them.
+        public var archived: Bool?
+        public var forks: Bool?
 
         public init(
             name: String,
-            repositories: [String],
+            repositories: [RepositorySelector],
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
-            notifications: [NotificationRule]? = nil
+            notifications: [NotificationRule]? = nil,
+            arrangement: ArrangementOverrides = .init(),
+            archived: Bool? = nil,
+            forks: Bool? = nil
         ) {
             self.name = name
             self.repositories = repositories
@@ -121,6 +136,9 @@ extension Configuration {
             self.issues = issues
             self.workflowRuns = workflowRuns
             self.notifications = notifications
+            self.arrangement = arrangement
+            self.archived = archived
+            self.forks = forks
         }
     }
 }
@@ -159,6 +177,24 @@ public enum RateLimitDisplay: String, CaseIterable, Sendable {
     case never
 }
 
+/// `group-by`: what a project's items are grouped by. One level only;
+/// `none` lists them as one group.
+public enum GroupBy: String, CaseIterable, Sendable {
+    case kind
+    case repository
+    case date
+    case author
+    case none
+}
+
+/// `sort-by`: the order within a group, newest first or A to Z. Open (or
+/// running) items always come before closed (or finished) ones.
+public enum SortBy: String, CaseIterable, Sendable {
+    case updated
+    case created
+    case title
+}
+
 /// `workflow-runs.branches`
 public enum WorkflowRunBranches: String, CaseIterable, Sendable {
     case defaultAndPullRequests = "default-and-pull-requests"
@@ -181,23 +217,27 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
 }
 
-/// Whose items a notification rule covers: `me` is the viewer, `bots` a Bot
-/// account or a `[bot]` login, `others` neither.
-public enum AuthorFilter: String, CaseIterable, Sendable {
-    case any
-    case me
-    case others
-    case bots
-}
-
-/// An event and an author filter. Its scope is where it's written:
+/// An event and the authors it covers. Its scope is where it's written:
 /// `[[defaults.notifications]]` for every project, or a project's own list.
+/// It only narrows what the project lists: an item the listing leaves out
+/// is never notified (ADR 0003).
 public struct NotificationRule: Equatable, Sendable {
+    /// The strings `authors` took before selectors, still read with a
+    /// warning: `any` is everyone, the others one author group each.
+    public static let legacyAuthors = ["any", "me", "others", "bots"]
+
     public var event: EventKind
-    public var authors: AuthorFilter
-    public init(event: EventKind, authors: AuthorFilter = .any) {
+    /// Author selectors; empty is everyone.
+    public var authors: [AuthorSelector]
+    public init(event: EventKind, authors: [AuthorSelector] = []) {
         self.event = event
         self.authors = authors
+    }
+
+    /// Whether the rule covers an item's author: any of its selectors
+    /// matches, or it has none.
+    public func covers(_ item: Item, viewer: String?) -> Bool {
+        authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
     }
 }
 
@@ -206,53 +246,106 @@ public struct NotificationRule: Equatable, Sendable {
 /// `pull-requests`
 public struct PullRequestSettings: Equatable, Sendable {
     public var show = true
+    /// Which pull requests are listed by where they stand; all three by default.
+    public var states = Set(StateGroup.all(for: .pullRequest))
     public var closedWindowDays = 7
     public var drafts = true
-    public init(show: Bool = true, closedWindowDays: Int = 7, drafts: Bool = true) {
+    public var authors = AuthorFilter()
+    /// `review-requested`: list only open pull requests waiting on the
+    /// user's review, directly or through one of their teams.
+    public var reviewRequested = false
+    public init(
+        show: Bool = true,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .pullRequest)),
+        closedWindowDays: Int = 7,
+        drafts: Bool = true,
+        authors: AuthorFilter = AuthorFilter(),
+        reviewRequested: Bool = false
+    ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
+        self.authors = authors
+        self.reviewRequested = reviewRequested
     }
 }
 
 /// `issues`
 public struct IssueSettings: Equatable, Sendable {
     public var show = false
+    /// Which issues are listed by where they stand; open and closed by default.
+    public var states = Set(StateGroup.all(for: .issue))
     public var closedWindowDays = 7
-    public init(show: Bool = false, closedWindowDays: Int = 7) {
+    public var authors = AuthorFilter()
+    public init(
+        show: Bool = false,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .issue)),
+        closedWindowDays: Int = 7,
+        authors: AuthorFilter = AuthorFilter()
+    ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
+        self.authors = authors
     }
 }
 
 /// `workflow-runs`
 public struct WorkflowRunSettings: Equatable, Sendable {
     public var show = false
+    /// Which runs are listed by where they stand; all three by default.
+    public var states = Set(StateGroup.all(for: .workflowRun))
     public var finishedWindowHours = 3
     public var branches: WorkflowRunBranches = .defaultAndPullRequests
-    public init(show: Bool = false, finishedWindowHours: Int = 3, branches: WorkflowRunBranches = .defaultAndPullRequests) {
+    public var authors = AuthorFilter()
+    public init(
+        show: Bool = false,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .workflowRun)),
+        finishedWindowHours: Int = 3,
+        branches: WorkflowRunBranches = .defaultAndPullRequests,
+        authors: AuthorFilter = AuthorFilter()
+    ) {
         self.show = show
+        self.states = states
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
+        self.authors = authors
     }
 }
 
 /// The `pull-requests` keys a table sets; unset keys keep the value below.
 public struct PullRequestOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var closedWindowDays: Int?
     public var drafts: Bool?
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil, drafts: Bool? = nil) {
+    public var authors: AuthorFilterOverrides
+    public var reviewRequested: Bool?
+    public init(
+        show: Bool? = nil,
+        states: Set<StateGroup>? = nil,
+        closedWindowDays: Int? = nil,
+        drafts: Bool? = nil,
+        authors: AuthorFilterOverrides = .init(),
+        reviewRequested: Bool? = nil
+    ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
+        self.authors = authors
+        self.reviewRequested = reviewRequested
     }
 
     public func applied(to base: PullRequestSettings) -> PullRequestSettings {
         PullRequestSettings(
             show: show ?? base.show,
+            states: states ?? base.states,
             closedWindowDays: closedWindowDays ?? base.closedWindowDays,
-            drafts: drafts ?? base.drafts
+            drafts: drafts ?? base.drafts,
+            authors: authors.applied(to: base.authors),
+            reviewRequested: reviewRequested ?? base.reviewRequested
         )
     }
 }
@@ -260,33 +353,95 @@ public struct PullRequestOverrides: Equatable, Sendable {
 /// The `issues` keys a table sets; unset keys keep the value below.
 public struct IssueOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var closedWindowDays: Int?
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil) {
+    public var authors: AuthorFilterOverrides
+    public init(show: Bool? = nil, states: Set<StateGroup>? = nil, closedWindowDays: Int? = nil, authors: AuthorFilterOverrides = .init()) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
+        self.authors = authors
     }
 
     public func applied(to base: IssueSettings) -> IssueSettings {
-        IssueSettings(show: show ?? base.show, closedWindowDays: closedWindowDays ?? base.closedWindowDays)
+        IssueSettings(
+            show: show ?? base.show,
+            states: states ?? base.states,
+            closedWindowDays: closedWindowDays ?? base.closedWindowDays,
+            authors: authors.applied(to: base.authors)
+        )
     }
 }
 
 /// The `workflow-runs` keys a table sets; unset keys keep the value below.
 public struct WorkflowRunOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var finishedWindowHours: Int?
     public var branches: WorkflowRunBranches?
-    public init(show: Bool? = nil, finishedWindowHours: Int? = nil, branches: WorkflowRunBranches? = nil) {
+    public var authors: AuthorFilterOverrides
+    public init(
+        show: Bool? = nil,
+        states: Set<StateGroup>? = nil,
+        finishedWindowHours: Int? = nil,
+        branches: WorkflowRunBranches? = nil,
+        authors: AuthorFilterOverrides = .init()
+    ) {
         self.show = show
+        self.states = states
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
+        self.authors = authors
     }
 
     public func applied(to base: WorkflowRunSettings) -> WorkflowRunSettings {
         WorkflowRunSettings(
             show: show ?? base.show,
+            states: states ?? base.states,
             finishedWindowHours: finishedWindowHours ?? base.finishedWindowHours,
-            branches: branches ?? base.branches
+            branches: branches ?? base.branches,
+            authors: authors.applied(to: base.authors)
+        )
+    }
+}
+
+/// How a project's listed items are grouped, sorted and drawn.
+public struct ArrangementSettings: Equatable, Sendable {
+    public var groupBy: GroupBy = .kind
+    /// Groups drawn as subheaders (`true`) or dividers (`false`); `nil`
+    /// keeps each layout's own: dividers in the list, subheaders in a tab.
+    public var subsections: Bool?
+    public var sortBy: SortBy = .updated
+    /// How many rows each group shows before a Show more row; `0` shows
+    /// them all. With `group-by = "none"` it caps the whole project.
+    public var showFirst: Int = 0
+    public init(groupBy: GroupBy = .kind, subsections: Bool? = nil, sortBy: SortBy = .updated, showFirst: Int = 0) {
+        self.groupBy = groupBy
+        self.subsections = subsections
+        self.sortBy = sortBy
+        self.showFirst = showFirst
+    }
+}
+
+/// The arrangement keys a table sets; unset keys keep the value below.
+public struct ArrangementOverrides: Equatable, Sendable {
+    public var groupBy: GroupBy?
+    public var subsections: Bool?
+    public var sortBy: SortBy?
+    public var showFirst: Int?
+    public init(groupBy: GroupBy? = nil, subsections: Bool? = nil, sortBy: SortBy? = nil, showFirst: Int? = nil) {
+        self.groupBy = groupBy
+        self.subsections = subsections
+        self.sortBy = sortBy
+        self.showFirst = showFirst
+    }
+
+    public func applied(to base: ArrangementSettings) -> ArrangementSettings {
+        ArrangementSettings(
+            groupBy: groupBy ?? base.groupBy,
+            subsections: subsections ?? base.subsections,
+            sortBy: sortBy ?? base.sortBy,
+            showFirst: showFirst ?? base.showFirst
         )
     }
 }
@@ -295,19 +450,29 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
 /// menu model and the notification rules read.
 public struct ProjectSettings: Equatable, Sendable {
     public var name: String
-    public var repositories: [String]
+    /// As configured; `resolved(by:)` turns the groups and wildcards into
+    /// the repositories they stand for.
+    public var repositories: [RepositorySelector]
     public var pullRequests: PullRequestSettings
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
     public var notifications: [NotificationRule]
+    public var arrangement: ArrangementSettings
+    /// Whether groups and `owner/*` bring in archived repositories.
+    public var archived: Bool
+    /// Whether groups and `owner/*` bring in forks.
+    public var forks: Bool
 
     public init(
         name: String,
-        repositories: [String],
+        repositories: [RepositorySelector],
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
-        notifications: [NotificationRule]
+        notifications: [NotificationRule],
+        arrangement: ArrangementSettings = ArrangementSettings(),
+        archived: Bool = false,
+        forks: Bool = true
     ) {
         self.name = name
         self.repositories = repositories
@@ -315,6 +480,28 @@ public struct ProjectSettings: Equatable, Sendable {
         self.issues = issues
         self.workflowRuns = workflowRuns
         self.notifications = notifications
+        self.arrangement = arrangement
+        self.archived = archived
+        self.forks = forks
+    }
+
+    /// The single repositories among its selectors (`owner/name`), in order:
+    /// all of them once the settings are `resolved(by:)`.
+    public var repositorySlugs: [String] { repositories.compactMap(\.slug) }
+
+    /// Whether the project lists the review search's pull requests from any
+    /// repository (`anywhere`).
+    public var usesAnywhere: Bool { repositories.contains(.anywhere) }
+
+    /// These settings watching exactly the repositories `resolved` found for
+    /// them, each as `owner/name`. Without a resolution (none yet), only the
+    /// single repositories the project names. `anywhere` stays, since it
+    /// resolves to no repositories.
+    public func resolved(by resolved: ResolvedRepositories?) -> ProjectSettings {
+        var settings = self
+        settings.repositories = (resolved?.repositories ?? repositorySlugs).map(RepositorySelector.repository)
+        if usesAnywhere { settings.repositories.append(.anywhere) }
+        return settings
     }
 
     /// Whether the project lists items of `kind` (its `show` for that kind).
@@ -323,6 +510,24 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.show
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
+        }
+    }
+
+    /// Which of `kind`'s states the project lists.
+    public func states(of kind: ItemKind) -> Set<StateGroup> {
+        switch kind {
+        case .pullRequest: pullRequests.states
+        case .issue: issues.states
+        case .workflowRun: workflowRuns.states
+        }
+    }
+
+    /// Whose items of `kind` the project lists.
+    public func authors(of kind: ItemKind) -> AuthorFilter {
+        switch kind {
+        case .pullRequest: pullRequests.authors
+        case .issue: issues.authors
+        case .workflowRun: workflowRuns.authors
         }
     }
 }
@@ -391,15 +596,14 @@ extension Configuration {
     public static let header = """
         #:schema \(schemaURL)
         # shipyard configuration. You and your agents edit this file; shipyard
-        # applies changes live. It writes to it only to add projects and, from
-        # the menu's layout button, to set layout under [menu]; the rest stays.
+        # applies changes live. It writes to it only to add projects, to set
+        # layout under [menu] from the menu's layout button, and, during
+        # onboarding, to write a preset over a file holding nothing but
+        # version; the rest stays.
         # Every key is optional. Keys, defaults and events are in the schema above.
         # The settings below are commented out at their defaults: uncomment one
         # and change its value to use it.
         version = \(supportedVersion)
-
-        # Logins whose items are never listed or notified, e.g. "dependabot[bot]".
-        # hide-authors = []
 
         # How the menu draws your projects: "list" (every project in one
         # scrolling list) or "tabs" (one project at a time).
@@ -411,10 +615,29 @@ extension Configuration {
         # [menu-bar]
         # count = "total"
 
+        # Whose pull requests every project lists: show (empty: everyone)
+        # minus hide. Authors are the groups me, others and bots, or one
+        # login written with @, e.g. "@dependabot[bot]". Issues and runs
+        # take authors the same way; a project can override it in its block.
+        # [defaults.pull-requests]
+        # authors = { show = [], hide = [] }
+
+        # How each project's items are grouped: "kind" (pull requests, issues,
+        # runs), "repository", "date", "author" or "none"; sorted within a
+        # group: "updated", "created" or "title"; and how many rows a group
+        # shows before a Show more row (0: all). A project can set its own.
+        # [defaults]
+        # group-by = "kind"
+        # sort-by = "updated"
+        # show-first = 0
+
         # List issues too, not only pull requests, in every project: set show
-        # to true. A project can override it in its own block.
+        # to true. states picks which: "open", "closed" or both. Pull requests
+        # take states too ("open", "merged", "closed"), and runs ("in-progress",
+        # "failed", "succeeded"). A project can override both in its own block.
         # [defaults.issues]
         # show = false
+        # states = ["open", "closed"]
 
         # List GitHub Actions workflow runs in every project: set show to true.
         # [defaults.workflow-runs]
@@ -423,10 +646,10 @@ extension Configuration {
         # When to notify, for every project: one block per rule. The list
         # replaces the default rule below, so keep it to hear of new pull
         # requests. Other events include "run.failed" and "pr.review_requested";
-        # authors can be "any", "me", "others" or "bots".
+        # authors narrows a rule to some authors, as above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
-        # authors = "any"
+        # authors = []
 
         # The largest share of each hourly GitHub rate limit shipyard may spend,
         # in percent (1 to 50). The limit is shared with your other tools.
@@ -434,23 +657,29 @@ extension Configuration {
         # max-share-percent = 10
 
         # Projects: one [[projects]] block each, below. The project picker
-        # appends them here.
+        # appends them here. A project's repositories can be owner/name,
+        # owner/* (everything an owner has) or a group: owned, organizations
+        # or collaborator.
 
         """
 
     /// The `[[projects]]` blocks the picker appends to the end of the file.
     /// Each block is self-contained, so appending never disturbs what's above.
     public static func appendText(projects: [NewProject]) -> String {
-        projects.map { project in
-            let repositories = project.repositories.map(tomlString).joined(separator: ", ")
-            return """
+        projects.map { "\n" + projectBlock($0) }.joined()
+    }
 
-                [[projects]]
-                name = \(tomlString(project.name))
-                repositories = [\(repositories)]
+    /// One project's `[[projects]]` block: its header, name and
+    /// repositories, ending in a newline. The picker's appends and the
+    /// presets both build on it, each adding the blank lines around it.
+    static func projectBlock(_ project: NewProject) -> String {
+        let repositories = project.repositories.map(tomlString).joined(separator: ", ")
+        return """
+            [[projects]]
+            name = \(tomlString(project.name))
+            repositories = [\(repositories)]
 
-                """
-        }.joined()
+            """
     }
 
     /// A TOML basic string with `"`, `\` and control characters escaped.

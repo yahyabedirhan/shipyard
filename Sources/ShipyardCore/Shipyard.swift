@@ -53,6 +53,9 @@ public final class Shipyard {
     /// What the panel draws. A failed refresh keeps the rows and sets
     /// `fetchError` and the time they were last updated.
     public private(set) var menu = MenuModel.empty
+    /// The groups Show more revealed past their `show-first` cap, until
+    /// Show less or the menu closes (`panelClosed()`); never saved.
+    public private(set) var expandedGroups: Set<GroupID> = []
     /// The last refresh that succeeded; `nil` before one did.
     public private(set) var snapshot: Snapshot?
     /// Why the latest refresh failed; `nil` once one succeeds.
@@ -63,9 +66,15 @@ public final class Shipyard {
     /// `nil` while it reads cleanly. Shipyard keeps running on the last
     /// valid configuration meanwhile.
     public private(set) var configError: ConfigError?
-    /// Unknown settings the last clean read ignored, for the panel's quiet
-    /// banner; empty when there are none or the latest read failed.
+    /// Unknown settings the last clean read ignored, and old forms it read,
+    /// for the panel's quiet banner; empty when there are none or the latest
+    /// read failed.
     public private(set) var configWarnings: [ConfigIssue] = []
+    /// The presets onboarding offers as its first step: all of them while
+    /// the file holds nothing but `version` (missing, or the app's header);
+    /// none once it has other settings, when onboarding shows the plain
+    /// project picker instead. Follows every reload.
+    public private(set) var presets: [Preset] = Preset.all
     /// What the rate budget knows: limits, recent costs, a pause.
     public private(set) var budget = RateBudget()
     /// Whether ⌘R may refresh now: false only while the rate budget pauses
@@ -87,6 +96,8 @@ public final class Shipyard {
     private var gate = RefreshGate()
     private let tokenProvider: TokenProvider
     private let deviceFlow: DeviceFlow
+    /// Whether the build has an OAuth App client ID, so the device flow can start.
+    public let canSignInWithGitHub: Bool
     private let transport: any HTTPTransport
 
     /// The client for the current token; `nil` when signed out.
@@ -98,6 +109,13 @@ public final class Shipyard {
     /// Bumped whenever a token is taken up or dropped, so an answer to a
     /// request made with an earlier token can't sign in or out.
     @ObservationIgnored private var session = 0
+    /// What the projects' repository groups and `owner/*` stand for,
+    /// looked up at most hourly.
+    @ObservationIgnored private let resolver = RepositoryResolver()
+    /// Whether the next refresh looks every group and `owner/*` up again,
+    /// whatever their age: at launch, after a configuration change, on ⌘R
+    /// and after signing in again.
+    @ObservationIgnored private var forceResolve = true
 
     public init(
         configStore: ConfigStore,
@@ -125,6 +143,7 @@ public final class Shipyard {
         self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
         self.deviceFlow = DeviceFlow(clientID: oauthClientID, transport: transport, clock: clock, sleep: sleep)
+        self.canSignInWithGitHub = OAuthApp.isSet(oauthClientID)
         self.transport = transport
     }
 
@@ -182,6 +201,13 @@ public final class Shipyard {
         deviceFlowTask = nil
         task.cancel()
         apply(.deviceFlowCancelled)
+    }
+
+    /// Opens the page the device flow's code is entered on (github.com/login/device),
+    /// while the code shows; otherwise does nothing.
+    public func openVerificationPage() {
+        guard case .connecting(let code) = phase else { return }
+        urlOpener.open(code.verificationURL)
     }
 
     private func runDeviceFlow(_ generation: Int) async {
@@ -280,6 +306,9 @@ public final class Shipyard {
         fetchError = nil
         menu = .empty
         budget = RateBudget()
+        // Another account reaches other repositories.
+        resolver.reset()
+        forceResolve = true
         timer.disarm()
         apply(.signedOut)
     }
@@ -304,6 +333,8 @@ public final class Shipyard {
     private func follow(_ result: ConfigStore.ReloadResult) async {
         publishConfigStatus()
         if case .changed(let configuration) = result {
+            // New selectors, or `archived` and `forks` changed: look them up now.
+            forceResolve = true
             followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // Projects, filters, `[attention]` and `[menu-bar]` apply at
@@ -328,6 +359,7 @@ public final class Shipyard {
     private func publishConfigStatus() {
         configError = configStore.error
         configWarnings = configStore.warnings
+        presets = configStore.acceptsPreset ? Preset.all : []
         configStatusStore.record(ConfigStatus(
             checked: clock.now,
             config: configStore.url,
@@ -393,6 +425,29 @@ public final class Shipyard {
         return result
     }
 
+    /// Onboarding's first step: writes `preset`'s whole file, with
+    /// `projects` as the repositories picked for it (none for
+    /// `review-queue`, or for `incoming-contributions` watching `owned`), and
+    /// follows the reload like `addProjects`: the phase moves to `ready` and
+    /// the first refresh runs, without a restart. Throws a `ConfigError`
+    /// (and writes nothing) when the file already holds settings besides
+    /// `version`, which also stops offering presets, or when a project is
+    /// invalid; throws the file system's error when it can't write.
+    @discardableResult
+    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigStore.ReloadResult {
+        let result: ConfigStore.ReloadResult
+        do {
+            result = try configStore.writePreset(preset, projects: projects)
+        } catch let error as ConfigError where error == Configuration.presetRefused {
+            // The file changed since the last reload: read it, so the panel
+            // shows the plain picker.
+            await reloadConfiguration()
+            throw error
+        }
+        await follow(result)
+        return result
+    }
+
     // MARK: - Layout button
 
     /// The header's layout button: writes the layout after the current one
@@ -448,6 +503,7 @@ public final class Shipyard {
     /// A file that exists is never touched.
     public func refreshNow() async {
         createConfigurationIfMissing()
+        forceResolve = true
         await refresh()
     }
 
@@ -456,26 +512,50 @@ public final class Shipyard {
     /// file that can't be written changes nothing: a missing file still
     /// reads as the defaults with no projects.
     private func createConfigurationIfMissing() {
-        try? configStore.createIfMissing()
+        _ = try? configStore.createIfMissing()
     }
 
     private func performRefresh() async {
         let configuration = configStore.lastValid
-        let projects = configuration.projects.map(configuration.settings(for:))
+        let configured = configuration.projects.map(configuration.settings(for:))
         let current = session
         let now = clock.now
         do {
-            let snapshot = try await request { try await $0.fetch(projects: projects, at: now) }
+            // Groups and wildcards first: looked up at most hourly, or at once
+            // after a configuration change, ⌘R or signing in.
+            let force = forceResolve
+            forceResolve = false
+            let resolved = try await resolver.resolve(configured, force: force, at: now) { lookup in
+                try await self.request { try await $0.repositories(of: lookup, at: now) }
+            }
+            guard current == session else { return }
+            let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
+            let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
             self.snapshot = snapshot
             fetchError = nil
             budget.record(snapshot.rateLimits, at: clock.now)
+            // What each project has: the menu, the counts and the
+            // notifications below all read these, and nothing else.
+            let listings = Listing.listings(for: projects, in: snapshot, now: clock.now)
             var notifications: [PostedNotification] = []
             appStateStore.update { state in
-                notifications = Self.notify(snapshot: snapshot, projects: projects, configuration: configuration, state: &state, at: now)
+                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
-            menu = MenuModel.build(snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+            var built = MenuModel.build(
+                listings: listings,
+                snapshot: snapshot,
+                configuration: configuration,
+                state: appStateStore.state,
+                expanded: expandedGroups,
+                now: clock.now
+            )
+            // A fold whose group is gone, or whose project is, goes too.
+            let folds = built.foldsToKeep(appStateStore.state.collapsedGroups)
+            appStateStore.update { $0.collapsedGroups = folds }
+            built.foldedGroups = folds
+            menu = built
             publishRateStatus()
             // Recorded (and saved) before posting: a crash in between loses a
             // notification rather than repeating one.
@@ -501,19 +581,21 @@ public final class Shipyard {
 
     /// Finds the events in `snapshot` and records them in `state`, returning
     /// what to post: each event not handled before, once, in the first
-    /// project (in configuration order) whose rules select it. Every event
-    /// is recorded as handled, notified or not. Then `snapshot` becomes the
-    /// known items, and its sources known, so the next refresh compares with it.
+    /// project (in configuration order) that lists the item and whose rules
+    /// select it. Every event is recorded as handled, notified or not, and
+    /// every fetched item becomes known, listed or not: `snapshot` becomes
+    /// the known items, and its sources known, so the next refresh compares
+    /// with it, and an item a filter change brings into view later isn't new.
     private static func notify(
         snapshot: Snapshot,
+        listings: [String: [Item]],
         projects: [ProjectSettings],
-        configuration: Configuration,
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
         let events = EventDetector.events(known: state.known, snapshot: snapshot, projects: projects)
         let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
-        let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
+        let listed = listings.mapValues { Set($0.map(\.id)) }
         var byID: [String: [Event]] = [:]
         var order: [String] = []
         for event in events {
@@ -524,7 +606,8 @@ public final class Shipyard {
         for id in order {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
             let selected = occurrences.first { event in
-                settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, hiddenAuthors: hidden) } ?? false
+                guard listed[event.project]?.contains(event.item.id) == true, let project = settings[event.project] else { return false }
+                return NotificationRules.shouldNotify(event, settings: project, viewer: snapshot.viewerLogin)
             }
             if let selected { notifications.append(NotificationRules.notification(for: selected)) }
             state.notified.insert(first, at: now)
@@ -639,6 +722,40 @@ public final class Shipyard {
         }
     }
 
+    /// Folds the subsection `group` names, or unfolds it if it's folded,
+    /// without a refresh; its subheader keeps its count. Remembered across
+    /// restarts. A group drawn after a divider, or one no longer listed,
+    /// has no subheader to fold, and nothing changes.
+    public func toggleGroup(_ group: GroupID) {
+        guard menu.subsection(group) != nil else { return }
+        updateAppState { state in
+            if state.collapsedGroups.remove(group) == nil { state.collapsedGroups.insert(group) }
+        }
+    }
+
+    /// Shows every row of the group `group` names, past its `show-first`
+    /// cap, until Show less or the menu closes. Kept in memory only: a group
+    /// that isn't capped changes nothing.
+    public func showMore(_ group: GroupID) {
+        guard let listed = menu.group(group), listed.hiddenCount > 0 else { return }
+        expandedGroups.insert(group)
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
+    /// Caps the group `group` names at its `show-first` again.
+    public func showLess(_ group: GroupID) {
+        guard expandedGroups.remove(group) != nil else { return }
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
+    /// The menu closed: every group Show more revealed is capped again, so
+    /// the menu opens with every cap back.
+    public func panelClosed() {
+        guard !expandedGroups.isEmpty else { return }
+        expandedGroups = []
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
     /// Changes the app state, saves it, and brings the menu model's
     /// attention flags, counts and collapsed sections up to date.
     private func updateAppState(_ body: (inout AppState) -> Void) {
@@ -651,7 +768,17 @@ public final class Shipyard {
     /// rate-limit indicator: a project added since shows as not loaded yet,
     /// a removed one disappears. Follows the menu bar rule of `applyAttention`.
     private func rebuildMenu(_ configuration: Configuration) {
-        var rebuilt = MenuModel.build(snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+        let listings = snapshot.map { snapshot in
+            Listing.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, now: clock.now)
+        } ?? [:]
+        var rebuilt = MenuModel.build(
+            listings: listings,
+            snapshot: snapshot,
+            configuration: configuration,
+            state: appStateStore.state,
+            expanded: expandedGroups,
+            now: clock.now
+        )
         rebuilt.fetchError = menu.fetchError
         rebuilt.refreshDelay = menu.refreshDelay
         rebuilt.rateIndicator = menu.rateIndicator

@@ -8,8 +8,17 @@ import SwiftUI
 /// same name are grouped into one project. Add writes them to the
 /// configuration (`addProjects(_:)`), which moves shipyard to `ready`: the
 /// panel shows the list without a restart. The rules live in `ProjectChoices`.
+///
+/// After a preset that needs repositories (`PresetPicker`), Add writes the
+/// preset with them instead (`add`), and a back button returns to the presets.
 struct ProjectPicker: View {
     let shipyard: Shipyard
+    /// The preset the repositories are for; `nil` for the plain picker.
+    var preset: Preset?
+    /// What Add does with the projects; `nil` appends them (`addProjects`).
+    var add: (([NewProject]) async throws -> ConfigStore.ReloadResult)?
+    /// Back to the presets; `nil` for the plain picker.
+    var back: (() -> Void)?
 
     private enum Suggestions {
         case loading
@@ -31,6 +40,18 @@ struct ProjectPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
+                if let back, let preset {
+                    HStack(spacing: 6) {
+                        Button(action: back) {
+                            Label(PanelText.backToPresets, systemImage: "chevron.left")
+                        }
+                        .buttonStyle(TextButtonStyle())
+                        .disabled(isAdding)
+                        Text(preset.title)
+                            .font(TypeScale.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Text(PanelText.pickerTitle).font(TypeScale.display)
                 Text(PanelText.pickerIntro)
                     .font(TypeScale.body)
@@ -233,7 +254,7 @@ struct ProjectPicker: View {
                 if isAdding {
                     ProgressView().controlSize(.small)
                 }
-                Button(PanelText.addProjects(projects.count), action: add)
+                Button(PanelText.addProjects(projects.count), action: confirm)
                     .buttonStyle(PillButtonStyle(prominent: true))
                     .keyboardShortcut(.defaultAction)
                     .disabled(!choices.canConfirm || isAdding)
@@ -248,7 +269,7 @@ struct ProjectPicker: View {
         }
     }
 
-    private func add() {
+    private func confirm() {
         guard choices.canConfirm, !isAdding else { return }
         isAdding = true
         addError = nil
@@ -257,7 +278,12 @@ struct ProjectPicker: View {
             do {
                 // With projects, the phase moves to `ready` and the panel
                 // swaps this view for the list.
-                if case .invalid = try await shipyard.addProjects(choices.projects) {
+                let result = if let add {
+                    try await add(choices.projects)
+                } else {
+                    try await shipyard.addProjects(choices.projects)
+                }
+                if case .invalid = result {
                     // Written, but the file around them doesn't load: the
                     // banner above says why. Don't write them twice.
                     choices = ProjectChoices(suggestions: choices.offered)

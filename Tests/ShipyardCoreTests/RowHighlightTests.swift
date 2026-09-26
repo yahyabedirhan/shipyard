@@ -173,7 +173,7 @@ struct RowHighlightTests {
         #expect(MenuRowPlace.header("shipyard") != MenuRowPlace.header("mirror"))
     }
 
-    @Test("a tab's rows run through its kind groups in order, each row once")
+    @Test("a tab's rows run through its kind groups in order, each under its subheader, each row once")
     func tabPlaces() {
         let pull = row(.pullRequest, 1)
         let issue = row(.issue, 2)
@@ -183,7 +183,11 @@ struct RowHighlightTests {
             MenuSection(name: "mirror", rows: [pull]),
         ])
 
-        #expect(menu.tabContent(for: .all).rowPlaces == [place(nil, pull), place(nil, issue), place(nil, run)])
+        #expect(menu.tabContent(for: .all).rowPlaces == [
+            .groupHeader(.allTab(.kind(.pullRequest)), in: nil), place(nil, pull),
+            .groupHeader(.allTab(.kind(.issue)), in: nil), place(nil, issue),
+            .groupHeader(.allTab(.kind(.workflowRun)), in: nil), place(nil, run),
+        ])
     }
 
     // MARK: - ↑ and ↓
@@ -241,7 +245,7 @@ struct RowHighlightTests {
         highlight.pointerEntered(place(nil, issue))
 
         highlight.moveDown(in: tab.rowPlaces)
-        #expect(highlight.place == place(nil, pull))
+        #expect(highlight.place == .groupHeader(.allTab(.kind(.pullRequest)), in: nil))
 
         highlight.moveUp(in: tab.rowPlaces)
         #expect(highlight.place == place(nil, issue))
@@ -288,7 +292,7 @@ struct RowHighlightTests {
         ])
     }
 
-    @Test("in a tab, the keys cross from one kind's group to the next")
+    @Test("in a tab, the keys cross from one kind's group to the next, through its subheader")
     func keysAcrossKindGroups() {
         let pull = row(.pullRequest, 1)
         let issue = row(.issue, 2)
@@ -297,7 +301,9 @@ struct RowHighlightTests {
         highlight.pointerEntered(place(nil, pull))
 
         highlight.moveDown(in: tab.rowPlaces)
+        #expect(highlight.place == .groupHeader(.allTab(.kind(.issue)), in: nil))
 
+        highlight.moveDown(in: tab.rowPlaces)
         #expect(highlight.place == place(nil, issue))
     }
 
@@ -434,6 +440,126 @@ struct RowHighlightTests {
         #expect(gone.moveLeft(in: fold.menu) == nil)
         #expect(gone.moveRight(in: fold.menu) == nil)
         #expect(gone.place == .header("gone"))
+    }
+
+    // MARK: - Subsections
+
+    private struct Subsections {
+        let pulls: RowGroup
+        let issues: RowGroup
+        let pull: MenuRow
+        let issue: MenuRow
+        let menu: MenuModel
+    }
+
+    /// "shipyard" under two subheaders, pull requests open and issues
+    /// folded, then "plain", whose groups are drawn after a divider.
+    private var subsections: Subsections {
+        let pull = row(.pullRequest, 1)
+        let issue = row(.issue, 2)
+        let pulls = RowGroup(id: GroupID(project: "shipyard", key: .kind(.pullRequest)), title: "Pull requests", rows: [pull], showsHeader: true)
+        let issues = RowGroup(id: GroupID(project: "shipyard", key: .kind(.issue)), title: "Issues", rows: [issue], showsHeader: true, isFolded: true)
+        let plain = RowGroup(id: GroupID(project: "plain", key: .kind(.pullRequest)), title: "Pull requests", rows: [row(.pullRequest, 3)])
+        return Subsections(pulls: pulls, issues: issues, pull: pull, issue: issue, menu: MenuModel(sections: [
+            MenuSection(name: "shipyard", groups: [pulls, issues]),
+            MenuSection(name: "plain", groups: [plain]),
+        ]))
+    }
+
+    @Test("↑ and ↓ stop on subheaders; a folded subsection gives only its subheader; a divider isn't a stop")
+    func subheaderPlaces() {
+        let s = subsections
+
+        #expect(s.menu.listRowPlaces == [
+            .header("shipyard"),
+            .groupHeader(s.pulls.id, in: "shipyard"),
+            place("shipyard", s.pull),
+            .groupHeader(s.issues.id, in: "shipyard"),
+            .header("plain"),
+            place("plain", row(.pullRequest, 3)),
+        ])
+        #expect(s.menu.tabContent(for: .project("shipyard")).rowPlaces == [
+            .groupHeader(s.pulls.id, in: nil),
+            place(nil, s.pull),
+            .groupHeader(s.issues.id, in: nil),
+        ])
+
+        var highlight = RowHighlight(place: place("shipyard", s.pull))
+        highlight.moveDown(in: s.menu.listRowPlaces)
+        #expect(highlight.place == .groupHeader(s.issues.id, in: "shipyard"))
+        #expect(highlight.place?.isHeader == false)
+    }
+
+    @Test("← on an item goes to its subheader; on an open subheader folds it; from a folded one to the project's header")
+    func leftOnSubsection() {
+        let s = subsections
+        var highlight = RowHighlight()
+        highlight.pointerEntered(place("shipyard", s.pull))
+
+        #expect(highlight.moveLeft(in: s.menu) == nil)
+        #expect(highlight.place == .groupHeader(s.pulls.id, in: "shipyard"))
+        #expect(!highlight.followsPointer)
+
+        #expect(highlight.moveLeft(in: s.menu) == .fold(s.pulls.id))
+        #expect(highlight.place == .groupHeader(s.pulls.id, in: "shipyard"))
+
+        var folded = RowHighlight(place: .groupHeader(s.issues.id, in: "shipyard"))
+        #expect(folded.moveLeft(in: s.menu) == nil)
+        #expect(folded.place == .header("shipyard"))
+
+        // Without a subheader, an item goes straight to its project's header.
+        var plain = RowHighlight(place: place("plain", row(.pullRequest, 3)))
+        #expect(plain.moveLeft(in: s.menu) == nil)
+        #expect(plain.place == .header("plain"))
+    }
+
+    @Test("→ on a folded subheader unfolds it; on an open one goes to its first item; on a header to its first subheader")
+    func rightOnSubsection() {
+        let s = subsections
+        var folded = RowHighlight(place: .groupHeader(s.issues.id, in: "shipyard"))
+        #expect(folded.moveRight(in: s.menu) == .unfold(s.issues.id))
+        #expect(folded.place == .groupHeader(s.issues.id, in: "shipyard"))
+
+        var open = RowHighlight(place: .groupHeader(s.pulls.id, in: "shipyard"))
+        #expect(open.moveRight(in: s.menu) == nil)
+        #expect(open.place == place("shipyard", s.pull))
+
+        var header = RowHighlight(place: .header("shipyard"))
+        #expect(header.moveRight(in: s.menu) == nil)
+        #expect(header.place == .groupHeader(s.pulls.id, in: "shipyard"))
+    }
+
+    @Test("in a tab, ← and → fold and unfold a subheader, and do nothing on an item")
+    func tabSubheader() {
+        let s = subsections
+        let content = s.menu.tabContent(for: .project("shipyard"))
+
+        var open = RowHighlight(place: .groupHeader(s.pulls.id, in: nil))
+        #expect(open.moveLeft(in: content) == .fold(s.pulls.id))
+        #expect(open.moveRight(in: content) == nil)
+        #expect(open.place == place(nil, s.pull))
+
+        var folded = RowHighlight(place: .groupHeader(s.issues.id, in: nil))
+        #expect(folded.moveLeft(in: content) == nil)
+        #expect(folded.moveRight(in: content) == .unfold(s.issues.id))
+
+        var item = RowHighlight(place: place(nil, s.pull))
+        #expect(item.moveLeft(in: content) == nil)
+        #expect(item.moveRight(in: content) == nil)
+        #expect(item.place == place(nil, s.pull))
+    }
+
+    @Test("Return on a subheader folds or unfolds it; a folded subsection's items aren't targets")
+    func subheaderTarget() {
+        let s = subsections
+        let content = s.menu.tabContent(for: .project("shipyard"))
+
+        #expect(s.menu.listTarget(at: .groupHeader(s.pulls.id, in: "shipyard")) == .group(s.pulls))
+        #expect(s.menu.listTarget(at: place("shipyard", s.issue)) == nil)
+        #expect(content.subsection(at: .groupHeader(s.issues.id, in: nil)) == s.issues)
+        #expect(content.subsection(at: place(nil, s.pull)) == nil)
+        #expect(content.row(at: place(nil, s.issue)) == nil)
+        #expect(content.row(at: .groupHeader(s.pulls.id, in: nil)) == nil)
     }
 
     // MARK: - ← and → in the tabs layout

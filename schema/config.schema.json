@@ -24,7 +24,8 @@
       "default": true
     },
     "hide-authors": {
-      "description": "Logins whose items are hidden, e.g. \"dependabot[bot]\".",
+      "description": "Deprecated: write authors = { hide = [...] } in [defaults.pull-requests], [defaults.issues] and [defaults.workflow-runs] instead. Logins (without @) whose items are hidden, e.g. \"dependabot[bot]\"; still read, as a hide in each kind's defaults, with a warning.",
+      "deprecated": true,
       "type": "array",
       "items": { "type": "string" },
       "default": []
@@ -107,14 +108,20 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "group-by": { "$ref": "#/definitions/group-by" },
+        "subsections": { "$ref": "#/definitions/subsections" },
+        "sort-by": { "$ref": "#/definitions/sort-by" },
+        "show-first": { "$ref": "#/definitions/show-first" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
         "notifications": {
           "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
           "$ref": "#/definitions/notifications",
-          "default": [{ "event": "pr.opened", "authors": "any" }]
-        }
+          "default": [{ "event": "pr.opened", "authors": [] }]
+        },
+        "archived": { "$ref": "#/definitions/archived" },
+        "forks": { "$ref": "#/definitions/forks" }
       }
     },
     "projects": {
@@ -125,6 +132,38 @@
     }
   },
   "definitions": {
+    "group-by": {
+      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z), or none (one list).",
+      "type": "string",
+      "enum": ["kind", "repository", "date", "author", "none"],
+      "default": "kind"
+    },
+    "subsections": {
+      "description": "Draw each group under a subheader (its name and count) instead of after a divider line. Unset, each layout keeps its own look: dividers in the list, subheaders in tabs. A value set applies to both layouts.",
+      "type": "boolean"
+    },
+    "sort-by": {
+      "description": "The order within a group: last updated (newest first), created (newest first) or title (A to Z). Open or running items always come before closed or finished ones.",
+      "type": "string",
+      "enum": ["updated", "created", "title"],
+      "default": "updated"
+    },
+    "show-first": {
+      "description": "How many rows each group shows before a \"Show N more\" row, which reveals the rest and then reads \"Show less\". 0 shows every row. With group-by = \"none\" it caps the whole project. A group's count includes the rows it hides; the menu shows every cap again each time it opens.",
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "archived": {
+      "description": "Whether repository groups and owner/* bring in archived repositories. A repository named as owner/name is always listed.",
+      "type": "boolean",
+      "default": false
+    },
+    "forks": {
+      "description": "Whether repository groups and owner/* bring in forks. A repository named as owner/name is always listed.",
+      "type": "boolean",
+      "default": true
+    },
     "project": {
       "description": "A named group of one or more GitHub repositories, shown as one section. Tables here merge key by key onto [defaults]; notifications replaces the default list.",
       "type": "object",
@@ -137,15 +176,21 @@
           "minLength": 1
         },
         "repositories": {
-          "description": "The project's repositories as owner/name slugs, each listed once. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
+          "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you), \"anywhere\" (open pull requests waiting on your review in any repository, from GitHub's search; the project must set pull-requests.review-requested = true and show no issues or runs). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+            "pattern": "^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator|anywhere)$"
           }
         },
+        "group-by": { "$ref": "#/definitions/group-by" },
+        "subsections": { "$ref": "#/definitions/subsections" },
+        "sort-by": { "$ref": "#/definitions/sort-by" },
+        "show-first": { "$ref": "#/definitions/show-first" },
+        "archived": { "$ref": "#/definitions/archived" },
+        "forks": { "$ref": "#/definitions/forks" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
@@ -156,7 +201,7 @@
       }
     },
     "pull-requests": {
-      "description": "Pull requests from anyone: open ones, then those closed within the closed window, newest first.",
+      "description": "Pull requests: open ones, then those closed within the closed window, newest first, from the authors authors allows.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -164,6 +209,12 @@
           "description": "List pull requests.",
           "type": "boolean",
           "default": true
+        },
+        "states": {
+          "description": "Which pull requests to list: open (drafts too), merged, closed (without merging). Merged and closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["open", "merged", "closed"] },
+          "default": ["open", "merged", "closed"]
         },
         "closed-window-days": {
           "description": "How many days closed and merged pull requests stay listed; 0 hides them.",
@@ -175,11 +226,17 @@
           "description": "List draft pull requests (in gray).",
           "type": "boolean",
           "default": true
+        },
+        "authors": { "$ref": "#/definitions/authors" },
+        "review-requested": {
+          "description": "List only open pull requests waiting on your review, requested from you or from one of your teams.",
+          "type": "boolean",
+          "default": false
         }
       }
     },
     "issues": {
-      "description": "Issues from anyone: open ones, then those closed within the closed window.",
+      "description": "Issues: open ones, then those closed within the closed window, from the authors authors allows.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -188,12 +245,19 @@
           "type": "boolean",
           "default": false
         },
+        "states": {
+          "description": "Which issues to list: open, closed. Closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["open", "closed"] },
+          "default": ["open", "closed"]
+        },
         "closed-window-days": {
           "description": "How many days closed issues stay listed; 0 hides them.",
           "type": "integer",
           "minimum": 0,
           "default": 7
-        }
+        },
+        "authors": { "$ref": "#/definitions/authors" }
       }
     },
     "workflow-runs": {
@@ -206,6 +270,12 @@
           "type": "boolean",
           "default": false
         },
+        "states": {
+          "description": "Which workflow runs to list: in-progress (queued or running), failed (timed out and failed to start too), succeeded. Finished ones stay for finished-window-hours. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["in-progress", "failed", "succeeded"] },
+          "default": ["in-progress", "failed", "succeeded"]
+        },
         "finished-window-hours": {
           "description": "How many hours finished runs stay listed; 0 hides them.",
           "type": "integer",
@@ -217,11 +287,37 @@
           "type": "string",
           "enum": ["default-and-pull-requests", "all"],
           "default": "default-and-pull-requests"
+        },
+        "authors": { "$ref": "#/definitions/authors" }
+      }
+    },
+    "authors": {
+      "description": "Whose items this kind lists: those show matches (empty: everyone) minus those hide matches; hide wins. Items left out are never shown, counted or notified. A project's authors merges key by key onto the defaults'.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List only these authors' items; empty lists everyone.",
+          "$ref": "#/definitions/author-selectors",
+          "default": []
+        },
+        "hide": {
+          "description": "Never list these authors' items, even when show matches them.",
+          "$ref": "#/definitions/author-selectors",
+          "default": []
         }
       }
     },
+    "author-selectors": {
+      "description": "Author selectors: the groups me (you, and your agents working as you), others (anyone but you and bots) and bots (a Bot account or a [bot] login), or one login written with @, e.g. \"@dependabot[bot]\". A bare word is always a group.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(me|others|bots|@[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?)$"
+      }
+    },
     "notifications": {
-      "description": "Notification rules: a macOS notification is sent for an event when a rule names it and its author filter matches.",
+      "description": "Notification rules: a macOS notification is sent for an event on an item the project lists when a rule names it and its authors match.",
       "type": "array",
       "items": { "$ref": "#/definitions/notification-rule" }
     },
@@ -249,10 +345,17 @@
           ]
         },
         "authors": {
-          "description": "Whose items: anyone, you (me), anyone but you and bots (others), or bots (a Bot account or a [bot] login).",
-          "type": "string",
-          "enum": ["any", "me", "others", "bots"],
-          "default": "any"
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "anyOf": [
+            { "$ref": "#/definitions/author-selectors" },
+            {
+              "description": "Deprecated: write a list instead, e.g. [\"others\"]; \"any\" is [].",
+              "deprecated": true,
+              "type": "string",
+              "enum": ["any", "me", "others", "bots"]
+            }
+          ],
+          "default": []
         }
       }
     }

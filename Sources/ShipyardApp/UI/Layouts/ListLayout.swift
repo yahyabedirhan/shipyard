@@ -7,11 +7,12 @@ import SwiftUI
 /// collapses its project, shows its attention count and, on hover, Mark
 /// all seen.
 ///
-/// The keys: ↑ and ↓ step through headers and items, wrapping at
-/// the ends; ← goes from an item to its header and collapses an expanded
-/// header; → expands a collapsed header and goes from an expanded one to
-/// its first item; Return opens the highlighted item (⌥Return marks it
-/// seen) or the header's repository. Every row is a direct child of the
+/// The keys: ↑ and ↓ step through headers, subheaders and items, wrapping
+/// at the ends; ← goes from an item to its subheader (or header) and folds
+/// an open subheader or collapses an expanded header; → expands or unfolds
+/// and goes from an open one to what's first under it; Return opens the
+/// highlighted item (⌥Return marks it seen) or the header's repository, and
+/// folds or unfolds a subheader. Every row is a direct child of the
 /// lazy stack, with its place as its id, so the keys can scroll to a row
 /// that isn't laid out yet.
 struct ListLayout: View {
@@ -66,20 +67,37 @@ struct ListLayout: View {
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
 
-    /// After ← or →: collapses or expands the project it asks for, not
-    /// animated (see `lineTransition`).
-    private func fold(_ change: ProjectFold?) -> RowKeyMove {
-        guard let change else { return .moved }
-        if let section = model.sections.first(where: { $0.name == change.project }) {
-            actions.toggleCollapsed(section)
+    /// After ← or →: collapses or expands the project, or folds or unfolds
+    /// the subsection, it asks for, not animated (see `lineTransition`).
+    private func fold(_ change: MenuFold?) -> RowKeyMove {
+        switch change {
+        case nil:
+            break
+        case .collapse(let project), .expand(let project):
+            if let section = model.sections.first(where: { $0.name == project }) {
+                actions.toggleCollapsed(section)
+            }
+        case .fold(let id), .unfold(let id):
+            if let group = model.subsection(id) {
+                actions.toggleGroup(group)
+            }
         }
         return .moved
     }
 
     /// Return: opens the item (⌥Return: marks it seen) or the header's
-    /// repository. ⌥Return on a header does nothing.
+    /// repository, folds or unfolds a subsection, or toggles Show more.
+    /// ⌥Return on a header, a subheader or a Show more row does nothing.
     private func activate(_ place: MenuRowPlace, markSeenOnly: Bool) -> Bool {
         switch model.listTarget(at: place) {
+        case .group(let group):
+            guard !markSeenOnly else { return false }
+            actions.toggleGroup(group)
+            return true
+        case .showMore(let group):
+            guard !markSeenOnly else { return false }
+            actions.toggleShowMore(group)
+            return true
         case .item(let row):
             withAnimation(Motion.seen) {
                 if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
@@ -95,8 +113,9 @@ struct ListLayout: View {
     }
 
     /// An expanded project's lines, each its own child of the lazy stack:
-    /// placeholders while it loads, its error rows, then its rows, with a
-    /// line where the kind changes.
+    /// placeholders while it loads, its error rows, then its groups' rows,
+    /// each group under its subheader or after a line, and a capped group's
+    /// Show more row after its rows.
     @ViewBuilder
     private func lines(_ section: MenuSection) -> some View {
         let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
@@ -110,20 +129,37 @@ struct ListLayout: View {
         ForEach(section.errors) {
             ErrorRow(error: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
         }
-        ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-            let place = MenuRowPlace(section: section.name, row: row.id)
-            VStack(spacing: 0) {
-                if index > 0, row.kind != section.rows[index - 1].kind {
-                    // A line only where the kind changes: pull requests | issues | runs.
-                    Hairline()
-                        .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
-                        .padding(.trailing, Grid.gutter)
-                }
-                ListRow(row: row, showsRepository: section.showsRepository)
-                    .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
+        ForEach(section.notes, id: \.self) {
+            NoteRow(note: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
+        }
+        ForEach(Array(section.groups.enumerated()), id: \.element.id) { index, group in
+            if group.showsHeader {
+                let place = MenuRowPlace.groupHeader(group.id, in: section.name)
+                GroupHeader(group: group, place: place, highlight: $highlight, actions: actions)
+                    .id(place)
+                    .transition(Self.lineTransition)
             }
-            .id(place)
-            .transition(Self.lineTransition)
+            // A folded subsection shows its subheader alone.
+            ForEach(Array((group.isFolded ? [] : group.rows).enumerated()), id: \.element.id) { position, row in
+                let place = MenuRowPlace(section: section.name, row: row.id)
+                VStack(spacing: 0) {
+                    if index > 0, position == 0, !group.showsHeader {
+                        // A line where one group ends and the next begins:
+                        // by default pull requests | issues | runs.
+                        GroupDivider()
+                    }
+                    ListRow(row: row, showsRepository: section.showsRepository)
+                        .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
+                }
+                .id(place)
+                .transition(Self.lineTransition)
+            }
+            if group.hasShowMore, !group.isFolded {
+                let place = MenuRowPlace.showMore(group.id, in: section.name)
+                ShowMoreRow(group: group, place: place, highlight: $highlight, actions: actions)
+                    .id(place)
+                    .transition(Self.lineTransition)
+            }
         }
         if hasContent {
             Color.clear.frame(height: 3).transition(Self.lineTransition)

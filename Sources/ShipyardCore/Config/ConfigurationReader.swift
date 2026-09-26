@@ -102,7 +102,7 @@ final class ConfigurationReader {
             }
         }
         if let value = bool(node, "launch-at-login") { config.launchAtLogin = value }
-        if let authors = strings(node, "hide-authors") { config.hideAuthors = authors }
+        let hiddenAuthors = strings(node, "hide-authors")
 
         if let menuBar = table(node, "menu-bar") {
             warnUnknownKeys(in: menuBar, known: ["count"])
@@ -135,22 +135,28 @@ final class ConfigurationReader {
         }
 
         if let defaults = table(node, "defaults") {
-            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications"])
+            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks"] + Self.arrangementKeys)
+            if let value = bool(defaults, "archived") { config.defaults.archived = value }
+            if let value = bool(defaults, "forks") { config.defaults.forks = value }
             config.defaults.pullRequests = pullRequests(defaults).applied(to: config.defaults.pullRequests)
             config.defaults.issues = issues(defaults).applied(to: config.defaults.issues)
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
+            config.defaults.arrangement = arrangement(defaults).applied(to: config.defaults.arrangement)
         }
+        if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
         if let projects = tables(node, "projects") {
-            config.projects = projects.compactMap(project)
+            config.projects = projects.compactMap { project($0, defaults: config.defaults) }
             rejectDuplicateNames(projects)
         }
         return config
     }
 
-    private func project(_ node: Node) -> Configuration.Project? {
-        warnUnknownKeys(in: node, known: ["name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications"])
+    private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
+        warnUnknownKeys(in: node, known: [
+            "name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks",
+        ] + Self.arrangementKeys)
         let name = string(node, "name")
         let repositories = strings(node, "repositories")
         if name == nil && !node.table.contains(key: "name") {
@@ -159,78 +165,209 @@ final class ConfigurationReader {
             error("a project's `name` can't be empty", at: node.path + [.key("name")])
         }
         if repositories == nil && !node.table.contains(key: "repositories") {
-            error("project `\(name ?? "")` needs `repositories`, a list of `owner/name` slugs", at: node.path)
+            error("project `\(name ?? "")` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)", at: node.path)
         } else if let repositories, repositories.isEmpty {
             error("project `\(name ?? "")` needs at least one repository", at: node.path + [.key("repositories")])
         }
         var listed = Set<String>()
         var spelled: [String: Int] = [:]
+        var selectors: [RepositorySelector] = []
         for repository in repositories ?? [] {
             // Which appearance of this exact spelling it is, to find its line.
             let occurrence = spelled[repository, default: 0]
             spelled[repository] = occurrence + 1
-            if !Self.isRepositorySlug(repository) {
-                error("repository `\(repository)` isn't `owner/name`", at: node.path + [.key("repositories")], value: repository)
-            } else if !listed.insert(repository.lowercased()).inserted {
+            let line = map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence)
+            do {
+                let selector = try RepositorySelector.parse(repository)
+                selectors.append(selector)
                 // GitHub's names aren't case-sensitive: `o/r` and `O/R` are one repository.
-                errors.append(ConfigIssue(
-                    line: map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence),
-                    message: Self.duplicateRepositoryMessage(repository, project: name ?? "")
-                ))
+                if !listed.insert(repository.lowercased()).inserted {
+                    errors.append(ConfigIssue(line: line, message: Self.duplicateRepositoryMessage(repository, project: name ?? "")))
+                }
+            } catch {
+                errors.append(ConfigIssue(line: line, message: error.message))
             }
         }
-        guard let name, let repositories else { return nil }
-        return Configuration.Project(
+        guard let name, repositories != nil else { return nil }
+        let project = Configuration.Project(
             name: name,
-            repositories: repositories,
+            repositories: selectors,
             pullRequests: pullRequests(node),
             issues: issues(node),
             workflowRuns: workflowRuns(node),
-            notifications: notifications(node)
+            notifications: notifications(node),
+            arrangement: arrangement(node),
+            archived: bool(node, "archived"),
+            forks: bool(node, "forks")
+        )
+        if selectors.contains(.anywhere), !Self.allowsAnywhere(project, defaults: defaults) {
+            let line = map.line(for: node.path + [.key("repositories")], value: RepositorySelector.anywhereName, occurrence: 0)
+            errors.append(ConfigIssue(line: line, message: Self.anywhereMessage))
+        }
+        return project
+    }
+
+    /// `anywhere` finds only pull requests waiting on the user, so a project
+    /// using it must list exactly those: pull requests shown with
+    /// `review-requested = true` (in the project or its defaults), and no
+    /// issues or runs.
+    private static func allowsAnywhere(_ project: Configuration.Project, defaults: Configuration.Defaults) -> Bool {
+        let pullRequests = project.pullRequests.applied(to: defaults.pullRequests)
+        return pullRequests.show && pullRequests.reviewRequested
+            && !project.issues.applied(to: defaults.issues).show
+            && !project.workflowRuns.applied(to: defaults.workflowRuns).show
+    }
+
+    static let anywhereMessage = "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs"
+
+    /// The keys that arrange a project, written straight under `[defaults]`
+    /// or in a `[[projects]]` block.
+    static let arrangementKeys = ["group-by", "subsections", "sort-by", "show-first"]
+
+    private func arrangement(_ node: Node) -> ArrangementOverrides {
+        ArrangementOverrides(
+            groupBy: choice(node, "group-by", GroupBy.self),
+            subsections: bool(node, "subsections"),
+            sortBy: choice(node, "sort-by", SortBy.self),
+            showFirst: window(node, "show-first")
         )
     }
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "drafts", "authors", "review-requested"])
         return PullRequestOverrides(
             show: bool(node, "show"),
+            states: states(node, of: .pullRequest),
             closedWindowDays: window(node, "closed-window-days"),
-            drafts: bool(node, "drafts")
+            drafts: bool(node, "drafts"),
+            authors: authorFilter(node),
+            reviewRequested: bool(node, "review-requested")
         )
     }
 
     private func issues(_ parent: Node) -> IssueOverrides {
         guard let node = table(parent, "issues") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days"])
-        return IssueOverrides(show: bool(node, "show"), closedWindowDays: window(node, "closed-window-days"))
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "authors"])
+        return IssueOverrides(
+            show: bool(node, "show"),
+            states: states(node, of: .issue),
+            closedWindowDays: window(node, "closed-window-days"),
+            authors: authorFilter(node)
+        )
     }
 
     private func workflowRuns(_ parent: Node) -> WorkflowRunOverrides {
         guard let node = table(parent, "workflow-runs") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "finished-window-hours", "branches"])
+        warnUnknownKeys(in: node, known: ["show", "states", "finished-window-hours", "branches", "authors"])
         return WorkflowRunOverrides(
             show: bool(node, "show"),
+            states: states(node, of: .workflowRun),
             finishedWindowHours: window(node, "finished-window-hours"),
-            branches: choice(node, "branches", WorkflowRunBranches.self)
+            branches: choice(node, "branches", WorkflowRunBranches.self),
+            authors: authorFilter(node)
         )
+    }
+
+    /// A kind's `states`: a list of the states that kind takes. Each one it
+    /// doesn't take is an error on its own line, with the nearest one it
+    /// does take suggested.
+    private func states(_ node: Node, of kind: ItemKind) -> Set<StateGroup>? {
+        guard let texts = strings(node, "states") else { return nil }
+        let valid = StateGroup.all(for: kind).map(\.rawValue)
+        var states: Set<StateGroup> = []
+        var readable = true
+        for text in texts {
+            if valid.contains(text), let state = StateGroup(rawValue: text) {
+                states.insert(state)
+                continue
+            }
+            let hint = Suggestion.nearest(to: text, in: valid).map { "did you mean `\($0)`?" }
+                ?? "expected " + valid.map { "`\($0)`" }.joined(separator: ", ")
+            error("unknown \(kind.noun) state `\(text)` (\(hint))", at: node.path + [.key("states")], value: text)
+            readable = false
+        }
+        return readable ? states : nil
+    }
+
+    /// A kind's `authors = { show = [...], hide = [...] }`.
+    private func authorFilter(_ parent: Node) -> AuthorFilterOverrides {
+        guard let node = table(parent, "authors") else { return .init() }
+        warnUnknownKeys(in: node, known: ["show", "hide"])
+        return AuthorFilterOverrides(show: authorSelectors(node, "show"), hide: authorSelectors(node, "hide"))
+    }
+
+    /// The old top-level `hide-authors`, a list of bare logins, read as a
+    /// `hide` of those logins in each kind's defaults, with a warning.
+    private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigPath) {
+        let selectors = logins.map { AuthorSelector.login($0.hasPrefix("@") ? String($0.dropFirst()) : $0) }
+        defaults.pullRequests.authors.hide += selectors
+        defaults.issues.authors.hide += selectors
+        defaults.workflowRuns.authors.hide += selectors
+        let written = selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ")
+        warnings.append(ConfigIssue(
+            line: map.line(for: path),
+            message: "`hide-authors` is the old form: it's read as `authors = { hide = [\(written)] }` "
+                + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
+        ))
     }
 
     private func notifications(_ parent: Node) -> [NotificationRule]? {
         guard let rules = tables(parent, "notifications") else { return nil }
         return rules.compactMap { node in
             warnUnknownKeys(in: node, known: ["event", "authors"])
-            let authors = choice(node, "authors", AuthorFilter.self)
+            let authors = ruleAuthors(node)
             guard node.table.contains(key: "event") else {
                 error("a notification rule needs an `event`", at: node.path)
                 return nil
             }
             guard let event = choice(node, "event", EventKind.self, noun: "event") else { return nil }
-            return NotificationRule(event: event, authors: authors ?? .any)
+            return NotificationRule(event: event, authors: authors ?? [])
         }
     }
 
-    /// A window in days or hours: a whole number, 0 or more.
+    /// A rule's `authors`: a list of author selectors, or one of the old
+    /// strings (`"any"`, `"me"`, `"others"`, `"bots"`), read with a warning.
+    private func ruleAuthors(_ node: Node) -> [AuthorSelector]? {
+        guard let old = try? node.table.string(forKey: "authors") else { return authorSelectors(node, "authors") }
+        let path = node.path + [.key("authors")]
+        guard NotificationRule.legacyAuthors.contains(old) else {
+            do throws(AuthorSelector.Rejection) {
+                let selector = try AuthorSelector(parsing: old)
+                error("`authors` is a list: write `authors = [\(Configuration.tomlString(selector.description))]`", at: path, value: old)
+            } catch {
+                self.error(error.message, at: path, value: old)
+            }
+            return nil
+        }
+        let selectors = old == "any" ? [] : [try! AuthorSelector(parsing: old)]
+        let written = "[" + selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ") + "]"
+        let advice = old == "any" ? "write `authors = []`, or leave it out, for everyone" : "write `authors = \(written)`"
+        warnings.append(ConfigIssue(
+            line: map.line(for: path, value: old),
+            message: "`authors = \"\(old)\"` is the old form of a notification rule's authors; \(advice)"
+        ))
+        return selectors
+    }
+
+    /// A list of author selectors; each one that doesn't read is an error
+    /// on its own line.
+    private func authorSelectors(_ node: Node, _ key: String) -> [AuthorSelector]? {
+        guard let texts = strings(node, key) else { return nil }
+        var selectors: [AuthorSelector] = []
+        var valid = true
+        for text in texts {
+            do throws(AuthorSelector.Rejection) {
+                selectors.append(try AuthorSelector(parsing: text))
+            } catch {
+                self.error(error.message, at: node.path + [.key(key)], value: text)
+                valid = false
+            }
+        }
+        return valid ? selectors : nil
+    }
+
+    /// A window in days or hours, or a count of rows: a whole number, 0 or more.
     private func window(_ node: Node, _ key: String) -> Int? {
         guard let value = int(node, key) else { return nil }
         guard value >= 0 else {
@@ -430,6 +567,17 @@ enum Suggestion {
             swap(&previous, &current)
         }
         return previous[b.count]
+    }
+}
+
+private extension ItemKind {
+    /// The kind as a state's message names it: "unknown issue state …".
+    var noun: String {
+        switch self {
+        case .pullRequest: "pull request"
+        case .issue: "issue"
+        case .workflowRun: "workflow run"
+        }
     }
 }
 

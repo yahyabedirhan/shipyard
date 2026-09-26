@@ -32,9 +32,10 @@ struct MenuTabsTests {
     }
 
     private func section(_ name: String, _ rows: [MenuRow], showsRepository: Bool = false, isLoaded: Bool = true) -> MenuSection {
+        // Arranged as a project with the default settings is in the tabs layout.
         MenuSection(
             name: name,
-            rows: rows,
+            groups: Arrangement.groups(rows: rows, project: name, settings: ArrangementSettings(), layout: .tabs, now: now),
             showsRepository: showsRepository,
             attentionCount: rows.filter(\.needsAttention).count,
             isLoaded: isLoaded
@@ -98,7 +99,7 @@ struct MenuTabsTests {
 
         let content = menu.tabContent(for: .project("shipyard"))
 
-        #expect(content.groups.map(\.kind) == [.pullRequest, .workflowRun])
+        #expect(content.groups.map(\.id.key) == [.kind(.pullRequest), .kind(.workflowRun)])
         #expect(content.groups[0].rows.map(\.number) == [1, 2])
         #expect(content.groups[0].attentionCount == 1)
         #expect(content.groups[1].rows.map(\.number) == [9])
@@ -116,7 +117,8 @@ struct MenuTabsTests {
 
         let content = menu.tabContent(for: .all)
 
-        #expect(content.groups.map(\.kind) == [.pullRequest, .issue])
+        #expect(content.groups.map(\.id.key) == [.kind(.pullRequest), .kind(.issue)])
+        #expect(content.groups.map(\.showsHeader) == [true, true])
         #expect(content.groups[0].rows.map(\.number) == [1, 7])
         #expect(content.projectCount == 2)
     }

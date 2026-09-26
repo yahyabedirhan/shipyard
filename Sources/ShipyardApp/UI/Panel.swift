@@ -31,6 +31,7 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
         .onAppear { actions.panelOpened() }
+        .onDisappear { actions.panelClosed() }
     }
 
     // MARK: - Header
@@ -173,18 +174,17 @@ struct Panel: View {
     @ViewBuilder
     private var content: some View {
         switch shipyard.phase {
-        case .connecting:
-            // Only the device flow connects this way, and 0.0.x doesn't
-            // offer it.
-            ProgressView()
-                .controlSize(.small)
-                .padding(Grid.gutter)
-                .frame(maxWidth: .infinity)
-        case .signedOut:
+        case .signedOut, .connecting:
+            // Signed out, or the device flow's code waiting for approval.
             ConnectView(shipyard: shipyard)
         case .needsProjects:
-            // Onboarding's second step, and its offer to install the skill.
-            ProjectPicker(shipyard: shipyard)
+            // Onboarding's preset step while the file holds nothing but
+            // `version`, else the plain picker; and its offer to install the skill.
+            if shipyard.presets.isEmpty {
+                ProjectPicker(shipyard: shipyard)
+            } else {
+                PresetPicker(shipyard: shipyard)
+            }
             SkillInstallCard(installation: actions.skillInstallation)
                 .padding(.horizontal, Grid.gutter)
                 .padding(.bottom, Grid.gutter)

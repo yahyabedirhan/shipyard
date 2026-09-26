@@ -352,7 +352,7 @@ struct ConfigStoreLayoutTests {
             """)
         #expect(store.lastValid.menu.layout == .tabs)
         #expect(store.lastValid.menuBar.count == .none)
-        #expect(store.lastValid.hideAuthors == ["dependabot[bot]"])
+        #expect(store.lastValid.defaults.pullRequests.authors.hide == [.login("dependabot[bot]")])
     }
 
     @Test("a file with no tables gets [menu] at the end")
@@ -381,7 +381,7 @@ struct ConfigStoreLayoutTests {
         let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"nope\"]\n"
         try write(broken, to: url)
         let store = ConfigStore(url: url)
-        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "repository `nope` isn't `owner/name`")])) {
+        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {
             try store.setLayout(.tabs)
         }
         #expect(try contents(of: url) == broken)

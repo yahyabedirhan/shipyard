@@ -192,6 +192,31 @@ private struct ItemRow: ViewModifier {
     }
 }
 
+/// A note about a project's list, in a row's place, such as the review
+/// search's limit: information, not a failure.
+struct NoteRow: View {
+    let note: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 10.5))
+                .frame(width: Grid.iconColumn)
+            Text(note)
+                .font(TypeScale.meta)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .help(note)
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
+        .padding(.trailing, Grid.gutter)
+        .frame(height: Grid.rowHeight)
+    }
+}
+
 /// A repository of a project that couldn't be fetched, in a row's place.
 struct ErrorRow: View {
     let error: MenuErrorRow

@@ -291,18 +291,46 @@ struct PanelTextTests {
 
     // MARK: - The connect screen
 
-    @Test("with no gh token the connect screen says to install gh and run gh auth login")
+    @Test("with no token the connect screen offers Sign in with GitHub, and gh for those who use it")
     func connectNoToken() {
-        let text = PanelText.connect(.noToken)
+        let text = PanelText.connect(.noToken, canSignIn: true)
         #expect(text.title == "Connect to GitHub")
-        #expect(text.message.contains("GitHub CLI"))
+        #expect(text.message.contains("Sign in with GitHub"))
+        #expect(text.signInUnavailable == nil)
+        #expect(text.commandLead.contains("gh"))
         #expect(text.command == "gh auth login")
         #expect(text.suggestsInstallingGh)
         #expect(PanelText.installGh.contains("https://cli.github.com"))
         #expect(PanelText.installGh.contains("brew install gh"))
+        #expect(PanelText.signInWithGitHub == "Sign in with GitHub")
     }
 
-    @Test("while shipyard looks for gh's token the panel says it's connecting")
+    @Test("without a client ID Sign in with GitHub says why it's unavailable, and gh stays the way in", arguments: [
+        Shipyard.SignedOutReason.noToken, .rejected(.gh), .rejected(.tokenStore),
+        .userSignedOut(.signedOut), .userSignedOut(.ghStillSignedIn),
+    ])
+    func connectWithoutClientID(reason: Shipyard.SignedOutReason) {
+        let text = PanelText.connect(reason, canSignIn: false)
+        #expect(text.signInUnavailable == PanelText.signInUnavailable)
+        #expect(!text.message.contains("Sign in with GitHub"))
+        #expect(text.command.hasPrefix("gh auth"))
+    }
+
+    @Test("the unavailable reason is short and names the missing client ID")
+    func signInUnavailableReason() {
+        #expect(PanelText.signInUnavailable == "Not available in this build: it has no OAuth App client ID.")
+    }
+
+    @Test("with no token and no client ID the screen says to install gh and run gh auth login")
+    func connectNoTokenWithoutClientID() {
+        let text = PanelText.connect(.noToken, canSignIn: false)
+        #expect(text.title == "Connect to GitHub")
+        #expect(text.message.contains("GitHub CLI"))
+        #expect(text.command == "gh auth login")
+        #expect(text.suggestsInstallingGh)
+    }
+
+    @Test("while shipyard looks for a token the panel says it's connecting")
     func connecting() {
         #expect(PanelText.connecting == "Connecting to GitHub…")
     }
@@ -320,34 +348,70 @@ struct PanelTextTests {
 
     @Test("a rejected gh token says it was revoked or expired and to sign gh in again")
     func connectRejectedGh() {
-        let text = PanelText.connect(.rejected(.gh))
+        let text = PanelText.connect(.rejected(.gh), canSignIn: true)
         #expect(text.title == "GitHub rejected gh's token")
         #expect(text.message.contains("revoked or has expired"))
         #expect(text.command == "gh auth login")
         #expect(!text.suggestsInstallingGh)
     }
 
-    @Test("a rejected stored token also points at gh auth login")
+    @Test("a rejected device-flow token says to sign in with GitHub again")
     func connectRejectedStored() {
-        let text = PanelText.connect(.rejected(.tokenStore))
+        let text = PanelText.connect(.rejected(.tokenStore), canSignIn: true)
         #expect(text.title == "GitHub rejected shipyard's token")
+        #expect(text.message.contains("revoked or has expired"))
+        #expect(text.message.contains("Sign in with GitHub again"))
+        #expect(text.signInUnavailable == nil)
         #expect(text.command == "gh auth login")
     }
 
     @Test("signing out while gh is still signed in says to run gh auth logout")
     func connectSignedOutGhStillSignedIn() {
-        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn))
+        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: true)
         #expect(text.title == "Signed out")
         #expect(text.message.contains("still signed in"))
         #expect(text.command == "gh auth logout")
         #expect(!text.suggestsInstallingGh)
     }
 
-    @Test("signing out with nothing left signed in points back at gh auth login")
+    @Test("signing out with nothing left signed in offers Sign in with GitHub, or gh auth login")
     func connectSignedOut() {
-        let text = PanelText.connect(.userSignedOut(.signedOut))
+        let text = PanelText.connect(.userSignedOut(.signedOut), canSignIn: true)
         #expect(text.title == "Signed out")
+        #expect(text.message.contains("Sign in with GitHub"))
         #expect(text.command == "gh auth login")
+    }
+
+    // MARK: - Sign in with GitHub
+
+    @Test("the code screen shows the code, says where it goes, and how to open GitHub")
+    func deviceCodeScreen() {
+        let code = DeviceCode(
+            userCode: "WDJB-MJHT",
+            verificationURL: URL(string: "https://github.com/login/device")!,
+            expiresAt: Date(timeIntervalSince1970: 1_790_338_500)
+        )
+        let text = PanelText.deviceCode(code, locale: british, timeZone: london)
+        #expect(text.title == "Enter this code on GitHub")
+        #expect(text.code == "WDJB-MJHT")
+        #expect(text.message == "Copy the code, open github.com/login/device and paste it there. Shipyard connects once you approve.")
+        #expect(text.openButton == "Copy code and open GitHub")
+        #expect(text.waiting == "Waiting for approval · the code expires at 13:15")
+        #expect(PanelText.cancelSignIn == "Cancel")
+    }
+
+    @Test("a sign-in that ended without a token says why", arguments: [
+        (DeviceFlowError.expired, "The code expired before it was approved. Sign in again for a new one."),
+        (.denied, "The sign-in was declined on GitHub."),
+        (.clientIDMissing, "Not available in this build: it has no OAuth App client ID."),
+        (.unauthorized, "GitHub refused the sign-in. Try again, or use gh."),
+        (.rejected("device_flow_disabled"), "GitHub refused the sign-in (device_flow_disabled). Try again, or use gh."),
+        (.http(503), "GitHub answered with an error (HTTP 503). Try again."),
+        (.network("offline"), "GitHub couldn't be reached. Check the connection and try again."),
+        (.malformed, "GitHub's answer couldn't be read. Try again."),
+    ])
+    func signInFailed(error: DeviceFlowError, text: String) {
+        #expect(PanelText.signInFailed(error) == text)
     }
 
     // MARK: - The agent skill
@@ -414,6 +478,17 @@ struct PanelTextTests {
     }
 
     // MARK: - The project picker
+
+    @Test("the preset step's button goes on to the picker when repositories are still needed, otherwise starts with the preset")
+    func presetContinue() {
+        #expect(PanelText.presetContinue(PresetChoice()) == "Continue")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .myAgents)) == "Choose repositories")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .reviewQueue)) == "Start with Review queue")
+        var incoming = PresetChoice(preset: .incomingContributions)
+        #expect(PanelText.presetContinue(incoming) == "Start with Incoming contributions")
+        incoming.watchesOwned = false
+        #expect(PanelText.presetContinue(incoming) == "Choose repositories")
+    }
 
     @Test("the picker's Add button counts the projects it writes")
     func addProjects() {

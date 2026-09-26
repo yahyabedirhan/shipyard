@@ -169,22 +169,26 @@ struct NotificationTests {
     // MARK: - Author filters
 
     struct AuthorCase: Sendable, CustomTestStringConvertible {
-        var filter: String
+        var authors: String
         var expected: [Int]
-        var testDescription: String { filter }
+        var testDescription: String { authors }
     }
 
-    @Test("each author filter selects its authors", arguments: [
-        AuthorCase(filter: "any", expected: [2, 3, 4, 5]),
-        AuthorCase(filter: "me", expected: [2]),
-        AuthorCase(filter: "others", expected: [3]),
-        AuthorCase(filter: "bots", expected: [4, 5]),
+    @Test("a rule's author selectors select their authors", arguments: [
+        AuthorCase(authors: "[]", expected: [2, 3, 4, 5]),
+        AuthorCase(authors: #"["me"]"#, expected: [2]),
+        AuthorCase(authors: #"["others"]"#, expected: [3]),
+        AuthorCase(authors: #"["bots"]"#, expected: [4, 5]),
+        AuthorCase(authors: #"["@octocat", "@renovate[bot]"]"#, expected: [3, 5]),
+        // The old spellings still read (with a warning).
+        AuthorCase(authors: #""any""#, expected: [2, 3, 4, 5]),
+        AuthorCase(authors: #""others""#, expected: [3]),
     ])
     func authorFilter(_ author: AuthorCase) async throws {
         let config = """
             [[defaults.notifications]]
             event = "pr.opened"
-            authors = "\(author.filter)"
+            authors = \(author.authors)
 
             """ + shop
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
@@ -200,9 +204,9 @@ struct NotificationTests {
         #expect(harness.notifier.posted.map(\.headline) == author.expected.map { "New PR #\($0)" })
     }
 
-    @Test("a hidden author is never notified")
+    @Test("an author the project's filters hide is never notified")
     func hiddenAuthor() async throws {
-        let config = "hide-authors = [\"dependabot[bot]\"]\n\n" + shop
+        let config = "[defaults.pull-requests]\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + shop
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
         await harness.refresh(answering: shopAnswer(pr(1), pr(2, author: "dependabot", type: "Bot"), pr(3)))
         #expect(harness.titles == ["shop · New PR #3"])

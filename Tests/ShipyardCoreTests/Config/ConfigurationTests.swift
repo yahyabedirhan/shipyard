@@ -46,7 +46,6 @@ let everyKey = """
     version = 1
     refresh-interval-seconds = 300
     launch-at-login = false
-    hide-authors = ["dependabot[bot]", "renovate[bot]"]
 
     [menu-bar]
     count = "per-kind"
@@ -64,34 +63,55 @@ let everyKey = """
     review-requested = false
     checks-failed = false
 
+    [defaults]
+    group-by = "repository"
+    subsections = true
+    sort-by = "created"
+    show-first = 5
+    archived = true
+    forks = false
+
     [defaults.pull-requests]
     show = false
+    states = ["open"]
     closed-window-days = 14
     drafts = false
+    authors = { show = ["others", "@dependabot[bot]"], hide = ["@octocat"] }
+    review-requested = true
 
     [defaults.issues]
     show = true
+    states = ["open"]
     closed-window-days = 0
+    authors = { show = ["others"], hide = ["bots"] }
 
     [defaults.workflow-runs]
     show = true
+    states = ["in-progress", "failed"]
     finished-window-hours = 12
     branches = "all"
+    authors = { show = ["me"], hide = ["@yabepa"] }
 
     [[defaults.notifications]]
     event = "pr.merged"
-    authors = "me"
+    authors = ["me"]
 
     [[defaults.notifications]]
     event = "run.failed"
 
     [[projects]]
     name = "blog"
-    repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"]
-    pull-requests = { show = true, closed-window-days = 1, drafts = true }
-    issues = { show = false, closed-window-days = 30 }
-    workflow-runs = { show = false, finished-window-hours = 1, branches = "default-and-pull-requests" }
-    notifications = [{ event = "issue.opened", authors = "bots" }]
+    repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api", "my-org/*", "owned", "organizations", "collaborator"]
+    archived = false
+    forks = true
+    pull-requests = { show = true, states = ["merged", "closed"], closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] }, review-requested = false }
+    issues = { show = false, states = ["closed"], closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
+    workflow-runs = { show = false, states = ["succeeded"], finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
+    notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
+    group-by = "date"
+    subsections = false
+    sort-by = "title"
+    show-first = 0
 
     """
 
@@ -114,15 +134,22 @@ struct ConfigurationDecodingTests {
         #expect(config.version == 1)
         #expect(config.refreshIntervalSeconds == 120)
         #expect(config.launchAtLogin)
-        #expect(config.hideAuthors.isEmpty)
         #expect(config.menuBar.count == .total)
         #expect(config.menu.layout == .list)
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
-        #expect(config.defaults.pullRequests == .init(show: true, closedWindowDays: 7, drafts: true))
-        #expect(config.defaults.issues == .init(show: false, closedWindowDays: 7))
-        #expect(config.defaults.workflowRuns == .init(show: false, finishedWindowHours: 3, branches: .defaultAndPullRequests))
-        #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: .any)])
+        // Every author, in every kind: an existing file lists what it did.
+        #expect(config.defaults.pullRequests == .init(
+            show: true, states: [.open, .merged, .closed], closedWindowDays: 7, drafts: true, authors: AuthorFilter(show: [], hide: []), reviewRequested: false
+        ))
+        #expect(config.defaults.issues == .init(show: false, states: [.open, .closed], closedWindowDays: 7, authors: AuthorFilter()))
+        #expect(config.defaults.workflowRuns == .init(
+            show: false, states: [.inProgress, .failed, .succeeded], finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()
+        ))
+        #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
+        #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))
+        #expect(!config.defaults.archived)
+        #expect(config.defaults.forks)
         #expect(config.projects.isEmpty)
         #expect(!config.hasProjects)
     }
@@ -140,11 +167,22 @@ struct ConfigurationDecodingTests {
                 repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"],
                 issues: IssueOverrides(show: true),
                 notifications: [
-                    NotificationRule(event: .prOpened, authors: .others),
-                    NotificationRule(event: .runFailed, authors: .any),
+                    NotificationRule(event: .prOpened, authors: [.others]),
+                    NotificationRule(event: .runFailed),
                 ]
             ),
             Configuration.Project(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            Configuration.Project(
+                name: "contributions",
+                repositories: ["owned", "my-org/*", "cobanov/ghbar"],
+                pullRequests: PullRequestOverrides(authors: AuthorFilterOverrides(hide: [.me, .bots])),
+                arrangement: ArrangementOverrides(groupBy: .repository, subsections: true)
+            ),
+            Configuration.Project(
+                name: "review queue",
+                repositories: ["anywhere"],
+                pullRequests: PullRequestOverrides(reviewRequested: true)
+            ),
         ]
         #expect(config == expected)
     }
@@ -156,34 +194,66 @@ struct ConfigurationDecodingTests {
         let config = result.configuration
         #expect(config.refreshIntervalSeconds == 300)
         #expect(!config.launchAtLogin)
-        #expect(config.hideAuthors == ["dependabot[bot]", "renovate[bot]"])
         #expect(config.menuBar.count == .perKind)
         #expect(config.menu.layout == .tabs)
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
-        #expect(config.defaults.pullRequests == .init(show: false, closedWindowDays: 14, drafts: false))
-        #expect(config.defaults.issues == .init(show: true, closedWindowDays: 0))
-        #expect(config.defaults.workflowRuns == .init(show: true, finishedWindowHours: 12, branches: .all))
+        #expect(config.defaults.pullRequests == .init(
+            show: false, states: [.open], closedWindowDays: 14, drafts: false,
+            authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),
+            reviewRequested: true
+        ))
+        #expect(config.defaults.issues == .init(show: true, states: [.open], closedWindowDays: 0, authors: AuthorFilter(show: [.others], hide: [.bots])))
+        #expect(config.defaults.workflowRuns == .init(
+            show: true, states: [.inProgress, .failed], finishedWindowHours: 12, branches: .all, authors: AuthorFilter(show: [.me], hide: [.login("yabepa")])
+        ))
         #expect(config.defaults.notifications == [
-            NotificationRule(event: .prMerged, authors: .me),
-            NotificationRule(event: .runFailed, authors: .any),
+            NotificationRule(event: .prMerged, authors: [.me]),
+            NotificationRule(event: .runFailed),
         ])
+        #expect(config.defaults.archived)
+        #expect(!config.defaults.forks)
         let project = try #require(config.projects.first)
         #expect(project.name == "blog")
-        #expect(project.repositories == ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"])
-        #expect(project.pullRequests == .init(show: true, closedWindowDays: 1, drafts: true))
-        #expect(project.issues == .init(show: false, closedWindowDays: 30))
-        #expect(project.workflowRuns == .init(show: false, finishedWindowHours: 1, branches: .defaultAndPullRequests))
-        #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: .bots)])
+        #expect(project.repositories == [
+            .repository("yahyabedirhan/blog-frontend"), .repository("yahyabedirhan/blog.api"),
+            .owner("my-org"), .group(.owned), .group(.organizations), .group(.collaborator),
+        ])
+        #expect(project.archived == false)
+        #expect(project.forks == true)
+        #expect(project.pullRequests == .init(
+            show: true, states: [.merged, .closed], closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots]), reviewRequested: false
+        ))
+        #expect(project.issues == .init(show: false, states: [.closed], closedWindowDays: 30, authors: .init(show: [.login("renovate[bot]")], hide: [])))
+        #expect(project.workflowRuns == .init(
+            show: false, states: [.succeeded], finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
+        ))
+        #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
+        #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created, showFirst: 5))
+        #expect(project.arrangement == .init(groupBy: .date, subsections: false, sortBy: .title, showFirst: 0))
     }
 
-    @Test("every event and author filter decodes")
-    func everyEvent() throws {
-        for event in EventKind.allCases {
-            for authors in AuthorFilter.allCases {
-                let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = \"\(authors.rawValue)\"\n"
+    @Test("every group-by and sort-by choice decodes")
+    func everyArrangement() throws {
+        for groupBy in GroupBy.allCases {
+            for sortBy in SortBy.allCases {
+                let text = "[defaults]\ngroup-by = \"\(groupBy.rawValue)\"\nsort-by = \"\(sortBy.rawValue)\"\n"
                 let config = try #require(decoded(text)).configuration
-                #expect(config.defaults.notifications == [NotificationRule(event: event, authors: authors)])
+                #expect(config.defaults.arrangement == .init(groupBy: groupBy, sortBy: sortBy))
+            }
+        }
+    }
+
+    @Test("every event and author selector decodes")
+    func everyEvent() throws {
+        let selectors: [AuthorSelector] = AuthorSelector.groups + [.login("octocat"), .login("dependabot[bot]")]
+        for event in EventKind.allCases {
+            for authors in [[], selectors] {
+                let list = authors.map { "\"\($0)\"" }.joined(separator: ", ")
+                let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
+                let result = try #require(decoded(text))
+                #expect(result.warnings.isEmpty)
+                #expect(result.configuration.defaults.notifications == [NotificationRule(event: event, authors: authors)])
             }
         }
     }
@@ -249,7 +319,7 @@ struct ConfigurationValidationTests {
         #expect(rejection("[[defaults.notifications]]\nauthors = \"me\"\n")
             == [ConfigIssue(line: 1, message: "a notification rule needs an `event`")])
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"bot\"\n")
-            == [ConfigIssue(line: 3, message: "unknown value `bot` for `authors` (did you mean `bots`?)")])
+            == [ConfigIssue(line: 3, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
         #expect(rejection("[menu-bar]\ncount = \"per_kind\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `per_kind` for `count` (did you mean `per-kind`?)")])
         #expect(rejection("[menu]\nlayout = \"tab\"\n")
@@ -264,7 +334,51 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
     }
 
-    @Test("a repository that isn't owner/name is rejected")
+    @Test("an unknown group-by or sort-by is rejected with the nearest valid one")
+    func arrangementChoices() {
+        #expect(rejection("[defaults]\ngroup-by = \"repo\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `repo` for `group-by` (expected one of `kind`, `repository`, `date`, `author`, `none`)")])
+        #expect(rejection("[defaults]\ngroup-by = \"repositories\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `repositories` for `group-by` (did you mean `repository`?)")])
+        #expect(rejection("[defaults]\nsort-by = \"update\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `update` for `sort-by` (did you mean `updated`?)")])
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\ngroup-by = \"authors\"\n")
+            == [ConfigIssue(line: 4, message: "unknown value `authors` for `group-by` (did you mean `author`?)")])
+        #expect(rejection("[defaults]\nsort-by = \"oldest\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
+        #expect(rejection("[defaults]\nsubsections = \"yes\"\n")
+            == [ConfigIssue(line: 2, message: "`defaults.subsections` must be true or false")])
+        #expect(rejection("[defaults]\nshow-first = -1\n")
+            == [ConfigIssue(line: 2, message: "`show-first` can't be negative (got -1)")])
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nshow-first = \"5\"\n")
+            == [ConfigIssue(line: 4, message: "`projects[0].show-first` must be a whole number")])
+    }
+
+    @Test("a project's arrangement merges key by key onto the defaults")
+    func arrangementMerges() throws {
+        let config = try #require(decoded("""
+            [defaults]
+            group-by = "repository"
+            subsections = true
+            show-first = 5
+
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+            sort-by = "title"
+
+            [[projects]]
+            name = "b"
+            repositories = ["o/b"]
+            group-by = "none"
+            subsections = false
+            show-first = 0
+            """)).configuration
+        #expect(config.settings(for: config.projects[0]).arrangement == .init(groupBy: .repository, subsections: true, sortBy: .title, showFirst: 5))
+        #expect(config.settings(for: config.projects[1]).arrangement == .init(groupBy: .none, subsections: false, sortBy: .updated, showFirst: 0))
+    }
+
+        @Test("a repository that isn't owner/name, owner/* or a group is rejected")
     func repositorySlugs() {
         let issues = rejection("""
             [[projects]]
@@ -278,10 +392,10 @@ struct ConfigurationValidationTests {
             ]
             """)
         #expect(issues == [
-            ConfigIssue(line: 5, message: "repository `just-a-name` isn't `owner/name`"),
-            ConfigIssue(line: 6, message: "repository `o/b/c` isn't `owner/name`"),
-            ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name`"),
-            ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name`"),
+            ConfigIssue(line: 5, message: "unknown repository group `just-a-name` (did you mean `just-a-name/*`, or a repository as `just-a-name/name`?)"),
+            ConfigIssue(line: 6, message: "repository `o/b/c` isn't `owner/name` or `owner/*`"),
+            ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name` or `owner/*`"),
+            ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name` or `owner/*`"),
         ])
         #expect(ConfigurationReader.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
     }
@@ -313,7 +427,7 @@ struct ConfigurationValidationTests {
         #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n")
             == [ConfigIssue(line: 1, message: "a project needs a `name`")])
         #expect(rejection("[[projects]]\nname = \"a\"\n")
-            == [ConfigIssue(line: 1, message: "project `a` needs `repositories`, a list of `owner/name` slugs")])
+            == [ConfigIssue(line: 1, message: "project `a` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = []\n")
             == [ConfigIssue(line: 3, message: "project `a` needs at least one repository")])
         #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")
@@ -332,6 +446,28 @@ struct ConfigurationValidationTests {
             repositories = ["o/b"]
             """)
         #expect(issues == [ConfigIssue(line: 6, message: "project name `a` is used twice (first on line 2)")])
+    }
+
+    @Test("review-requested must be true or false, and a project's overrides the default")
+    func reviewRequested() throws {
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
+            == [ConfigIssue(line: 4, message: "`projects[0].pull-requests.review-requested` must be true or false")])
+
+        let config = try #require(decoded("""
+            [defaults.pull-requests]
+            review-requested = true
+
+            [[projects]]
+            name = "queue"
+            repositories = ["o/a"]
+
+            [[projects]]
+            name = "all"
+            repositories = ["o/a"]
+            pull-requests = { review-requested = false }
+            """)).configuration
+        #expect(config.settings(for: config.projects[0]).pullRequests.reviewRequested)
+        #expect(!config.settings(for: config.projects[1]).pullRequests.reviewRequested)
     }
 
     @Test("negative windows are rejected")
@@ -441,17 +577,21 @@ struct ConfigurationMergeTests {
             [[defaults.notifications]]
             event = "pr.opened"
 
+            [defaults.pull-requests.authors]
+            show = ["others"]
+            hide = ["bots"]
+
             [[defaults.notifications]]
             event = "run.failed"
-            authors = "me"
+            authors = ["me"]
 
             [[projects]]
             name = "overrides"
             repositories = ["o/a", "o/b"]
-            pull-requests = { drafts = true }
+            pull-requests = { drafts = true, authors = { hide = ["@octocat"] } }
             issues = { show = true }
             workflow-runs = { branches = "all" }
-            notifications = [{ event = "pr.merged", authors = "others" }]
+            notifications = [{ event = "pr.merged", authors = ["others"] }]
 
             [[projects]]
             name = "plain"
@@ -469,14 +609,17 @@ struct ConfigurationMergeTests {
         let settings = config.settings(for: config.projects[0])
         #expect(settings.name == "overrides")
         #expect(settings.repositories == ["o/a", "o/b"])
-        #expect(settings.pullRequests == .init(show: true, closedWindowDays: 3, drafts: true))
+        // `authors` merges key by key too: the project's `hide`, the default `show`.
+        #expect(settings.pullRequests == .init(
+            show: true, closedWindowDays: 3, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
+        ))
         #expect(settings.issues == .init(show: true, closedWindowDays: 7))
         #expect(settings.workflowRuns == .init(show: true, finishedWindowHours: 3, branches: .all))
     }
 
     @Test("a project's notifications replace the default list")
     func notificationsReplace() {
-        #expect(config.settings(for: config.projects[0]).notifications == [NotificationRule(event: .prMerged, authors: .others)])
+        #expect(config.settings(for: config.projects[0]).notifications == [NotificationRule(event: .prMerged, authors: [.others])])
         #expect(config.settings(for: config.projects[2]).notifications.isEmpty)
     }
 
@@ -487,8 +630,8 @@ struct ConfigurationMergeTests {
         #expect(settings.issues == config.defaults.issues)
         #expect(settings.workflowRuns == config.defaults.workflowRuns)
         #expect(settings.notifications == [
-            NotificationRule(event: .prOpened, authors: .any),
-            NotificationRule(event: .runFailed, authors: .me),
+            NotificationRule(event: .prOpened),
+            NotificationRule(event: .runFailed, authors: [.me]),
         ])
     }
 }

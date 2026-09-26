@@ -229,7 +229,7 @@ struct AttentionTests {
         var bot = PR(1)
         bot.author = "dependabot"
         bot.authorType = "Bot"
-        let harness = try await Harness.started(config: "hide-authors = [\"dependabot[bot]\"]\n\n" + shop, graphQL: answer(bot, PR(2)))
+        let harness = try await Harness.started(config: "[defaults.pull-requests]\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + shop, graphQL: answer(bot, PR(2)))
 
         #expect(harness.count == 1)
     }

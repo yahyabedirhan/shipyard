@@ -1,18 +1,26 @@
 # Shipyard: low-level design
 
-Agreed 2026-09-25. Terms are the ones in `CONTEXT.md`; the configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`; facts about GitHub's API are in `docs/references/`. When the code and this document disagree, fix one of them in the same change.
+Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003). Terms are the ones in `CONTEXT.md`; the configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`; facts about GitHub's API are in `docs/references/`. When the code and this document disagree, fix one of them in the same change.
 
 **For a newcomer, in one screen.** Shipyard is one Swift executable. `Shipyard` (the orchestrator) owns the app's lifecycle and runs a **refresh**. A refresh reads the **configuration**, fetches every project's items from GitHub, compares the result with what it saw last time to find **events**, sends the notifications the **rules** allow, and publishes a **menu model** the SwiftUI panel draws. Everything the app remembers about the user (seen items, collapsed sections, the last items it knew) is **app state**, kept apart from the configuration.
+
+Since 0.0.2 a refresh also **resolves** each project's repository selectors (groups such as `owned`, and wildcards such as `owner/*`) into repositories, fetches them in batches with one **review search** (the open PRs waiting on the user, teams included), and then works from each project's **listing**: the items its filters keep. The menu, the counts and the notifications all read the listing, and an **arrangement** groups, sorts and caps it for the panel.
 
 ```text
 config.toml ──▶ ConfigStore ─┐
                              ▼
+             RepositoryResolver ──▶ GitHub (repository lists, hourly)
+                             │ concrete repositories
+                             ▼
 GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier ──▶ macOS notifications
-                             │   ▲
-                             ▼   │ click / collapse
-                        MenuModel ──▶ Panel (SwiftUI)
+  (batches + review search)  │   ▲
+                             ▼   │ click / fold / Show more
+                          Listing (what each project has) ──▶ EventDetector / NotificationRules
+                             │
+                             ▼
+                   MenuModel + Arrangement ──▶ Panel (SwiftUI)
                              ▲
-                       AppStateStore (seen, known, collapsed)
+                       AppStateStore (seen, known, collapsed projects and groups)
 ```
 
 ---
@@ -25,27 +33,52 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 |---|---|
 | R1 | Live in the macOS menu bar as an icon plus one **attention count**; clicking it opens a panel. |
 | R2 | Show one collapsible section per **project**, in configuration order. A project is one or more GitHub repositories. |
-| R3 | In each project, list pull requests from anyone: open ones, then ones closed within the **closed window** (default 7 days), newest first. |
+| R3 | In each project, list pull requests: open ones, then ones closed within the **closed window** (default 7 days), newest first; which ones is the project's **listing**, decided by its filters (F1–F5). |
 | R4 | Colour pull requests by GitHub's convention: open green, draft gray, merged purple, closed red. Open PRs show a check-status dot. |
 | R5 | List issues the same way when the configuration turns them on (off by default). |
 | R6 | List **workflow runs** when turned on (off by default): running now, plus finished within the last N hours (default 3), on the default branch and open PR branches. |
 | R7 | Clicking an item opens it on GitHub and marks it **seen**. ⌥-click marks it seen without opening. "Mark all seen" exists per project and globally. Opening the panel marks nothing. |
 | R8 | An open item **needs attention** when it is unseen, changed since seen (commits, comments, reviews, checks, review request), requests the user's review, or has failed checks. Closed items never do. |
-| R9 | Send macOS notifications for **events** matched by **notification rules** (event + scope + author filter). Default: `pr.opened`, any author, all projects. |
+| R9 | Send macOS notifications for **events** matched by **notification rules** (event + scope + author selectors, F2). Default: `pr.opened`, any author, all projects. |
 | R10 | Refresh on an interval (default 120 s), when the Mac wakes, when the configuration changes, and on ⌘R. Opening the panel doesn't refresh: it shows the last fetched data and spends no GitHub request. |
 | R11 | Read everything the user controls from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
 | R12 | Keep app state (seen, known items, collapsed sections, notified) in `~/Library/Application Support/Shipyard/state.json`, never in the configuration. |
 | R11a | After every reload, record the verdict on the configuration file (accepted, or each problem with its line and the banner's text) in `~/Library/Application Support/Shipyard/config-status.json`, with when it was checked and the file's modification time, so an agent can confirm the app took its edit without seeing the banner (#48). |
-| R13 | Onboarding: connect GitHub by reusing `gh`'s token silently; in 0.0.x `gh` is the only way in, and without a usable `gh` token the panel shows a connect screen explaining `gh auth login` (sign-in without `gh`, the device flow with the token in the Keychain, is deferred to #22); then, whenever there are no projects, show the project picker, which writes projects to the configuration. |
+| R13 | Onboarding: connect GitHub by reusing `gh`'s token silently, or with **Sign in with GitHub** (the device flow, the token in the login Keychain, S1); then, whenever there are no projects, choose a **preset** and pick repositories (P2), which writes the configuration. |
 | R14 | Offer to install the shipyard skill during onboarding and from the panel's menu, by running `npx -y skills add yahyabedirhan/shipyard -g -y` for the user. |
 | R15 | Launch at login (on by default, configurable). |
 | R10a | Spend at most `max-share-percent` (default 10%) of each GitHub hourly limit (GraphQL points, REST requests). If a refresh at the configured interval would spend more, stretch the interval and say so in the panel. |
 | R10b | The limit is shared with everything else using your token (your agents' `gh` calls included). Below 20% remaining, refresh every 10 min; at 0, pause until the reset time. ⌘R still works while any limit remains. |
 | R16 | Show the rate limit in the panel footer: remaining / limit per API and when it resets (ghbar's indicator). Configurable: `always` (default), `when-low`, `never`. When paused, the menu bar icon changes and a banner says why. |
+**Added in 0.0.2** (effort `shipyard-0-0-2`):
+
+| # | Requirement |
+|---|---|
+| F1 | Each kind (`pull-requests`, `issues`, `workflow-runs`) takes `authors = { show = […], hide = […] }`, in `[defaults.*]` and per project. An item is listed when its author matches `show` (empty: everyone) and doesn't match `hide`; `hide` wins. It replaces the top-level `hide-authors`. |
+| F2 | An **author selector** is an author group (`me`, `others`, `bots`) or a login written `@login` (`@dependabot[bot]`), matched ignoring case (ADR 0002). `me` is the signed-in account, so agents working as the user count as `me`; `bots` is a GitHub `Bot` account or a login ending in `[bot]`; `others` is everyone else. Notification rules take the same selectors. |
+| F3 | Each kind takes `states`: pull requests `open`, `merged`, `closed` (default all three); issues `open`, `closed`; runs `in-progress`, `failed`, `succeeded`. `drafts`, `closed-window-days` and `finished-window-hours` stay: `states` picks which, the window says for how long. |
+| F4 | `pull-requests.review-requested = true` lists only open PRs waiting on the user's review. A request to the user or to one of their teams counts, and the same meaning drives attention's `review-requested` and the `pr.review_requested` event. |
+| F5 | An item a project's filters leave out is not listed, not counted (header, tab, menu bar) and not notified; a notification rule's `authors` only narrows what's listed (ADR 0003). Filters apply the same in both layouts, the All tab included. |
+| G1 | `repositories` takes **repository selectors**: `owner/name`, `owner/*` (everything under a user or organization), and the **repository groups** `owned` (the user's own account), `organizations` (through membership of an organization, teams included) and `collaborator` (someone else's repository that added the user). There's no top-level scope switch. |
+| G2 | `anywhere` is a repository group for open PRs anywhere on GitHub waiting on the user's review. A project using it must show pull requests with `review-requested = true`, and shows no issues or runs. |
+| G3 | `archived` (default `false`) and `forks` (default `true`), in `[defaults]` and per project, decide whether groups and wildcards bring in archived repositories and forks. A repository named as `owner/name` is always included. |
+| G4 | The repositories behind groups and wildcards are looked up at launch, after a configuration change, on ⌘R and otherwise at most hourly, so a new repository shows up without editing the file. A repository appears once per project, however many selectors bring it in. |
+| G5 | Any number of repositories refreshes: the fetch goes out in batches, and the rate budget stretches the interval as it does today. |
+| A1 | `group-by = "kind" \| "repository" \| "date" \| "author" \| "none"` (default `"kind"`, today's grouping), in `[defaults]` and per project; one level of groups. |
+| A2 | `subsections = true \| false`: groups drawn as subheaders (a name and a count) or as dividers. Unset, each layout keeps what it does today: dividers in the list, subheaders in a tab. A value set applies to both layouts. |
+| A3 | `sort-by = "updated" \| "created" \| "title"` (default `"updated"`) sorts within a group, newest first or A to Z; open (or running) items always come before closed (or finished) ones. `group-by = "date"` buckets by the `sort-by` date (`updated` for `title`): Today, Yesterday, This week, This month, Older. |
+| A4 | A subsection folds like a project (click its subheader, ← and →); the fold is app state and survives restarts. |
+| A5 | `show-first = N` (default `0`, all) shows a group's first N rows and a **Show N more** row, which becomes **Show less**; the keys reach it and Return toggles it. Expansions reset when the panel closes. With `group-by = "none"` the cap applies to the whole project. |
+| A6 | The list layout and a project's tab arrange a project the same way; the All tab keeps a fixed look: grouped by kind, newest first. |
+| P1 | Three **presets** are part of the app: `my-agents`, `incoming-contributions`, `review-queue`, each a complete configuration to start from. The skill lists them, and a test keeps its copies equal to the app's. |
+| P2 | Onboarding starts by choosing a preset: `my-agents` then shows the repository picker; `incoming-contributions` offers "all my repositories (`owned`)", on by default, or picking; `review-queue` needs no repositories. |
+| S1 | Sign in without `gh` (formerly #22): the connect screen offers **Sign in with GitHub** (the device flow) beside the `gh` instructions; the token goes to the login Keychain and survives restarts; Sign out deletes it; a revoked token returns to the connect screen; the README says how a fork sets its own OAuth App client ID. |
 
 ### Rules and completion
 
-- The configuration is **only** written by the project picker (R13); every other change comes from the user or their agents editing the file.
+- The app writes the configuration in three targeted ways only (ADR 0001): the project picker appends projects (R13), the layout button sets `[menu] layout`, and onboarding writes a preset (P2), only to a file whose only live key is `version` (the app's own commented header). Every other change comes from the user or their agents editing the file.
+- Resolved repository lists are app memory, not app state: they're resolved again at launch.
+- Every fetched item is recorded as known, listed or not, so an item a later filter change brings into view doesn't notify as though it were new (ADR 0003).
 - The first time shipyard sees a project, it records its items as known **without** notifying (no flood on first launch or on adding a project). This is ghbar's "bootstrap" lesson.
 - An item is notified at most once per event (ghbar's other lesson: "seen" and "notified" are separate sets).
 
@@ -61,6 +94,15 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Rate limit exhausted: GraphQL answers **200** with a rate-limit error and `x-ratelimit-remaining: 0`; REST answers 403/429 | Keep the last items; banner "GraphQL rate limit reached · updates resume at 16:42" (`PanelText.refreshDelay`); the reset time comes from the response (`resetAt` / `x-ratelimit-reset`), not ghbar's one-hour guess. |
 | Secondary rate limit (403/429 with `retry-after`) | Wait `retry-after` seconds, then resume; banner says so. |
 | `npx` not found | Show the command with a Copy button instead of running it. |
+| A bare word in `authors` that isn't an author group | Rejected with its line: "unknown author `bots2` (did you mean `bots` or `@bots2`?)" |
+| A repository group in `authors`, or an author group in `repositories` | Rejected: "`owned` is a repository group; `authors` takes `me`, `others`, `bots` or an `@login`" |
+| `anywhere` without `review-requested = true`, or with issues or runs shown | Rejected: "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
+| An unknown `group-by`, `sort-by` or `states` value | Rejected with the nearest valid one suggested |
+| `owner/*` for an owner that doesn't exist or can't be seen | An error row in that project for the selector; its other selectors still list |
+| A group resolves to no repositories | The project shows "Nothing open", not an error |
+| Resolving fails (network, rate limit) | Keep the last resolved lists and fetch with them; the fetch error shows as today |
+| The review search fails | Watched repositories still list; `review-requested` projects and `anywhere` show the search's error row |
+| An old `hide-authors`, or an old notification `authors = "others"` | Read as the new form with a warning (the quiet banner and `config-status.json`), so the file keeps working |
 
 ### Out of scope
 
@@ -73,6 +115,12 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
 | Developer ID signing, notarization | Agreed: ad-hoc signed zips and the `xattr` line until 0.1.0 at the earliest. |
 | Push updates (webhooks) | Needs a server; polling is enough at this scale. |
+| Deployments waiting for the user's approval | Deferred from 0.0.2: a later `workflow-runs` filter |
+| `assigned` and `mentioned` filters | Nobody needs them yet; each is a field and one check in `Listing` later |
+| Oldest first, a sort direction, nested grouping | Not asked for; each is one more choice later |
+| Folding busy projects automatically (ghbar folds repositories with more than three items) | Deferred: the maintainer doesn't need it yet |
+| The picker offering repository groups other than a preset's `owned` | Groups come through the skill in 0.0.2 |
+| More than 100 review requests at once | The search returns the first 100; the section says so when there are more |
 
 ---
 
@@ -95,26 +143,40 @@ Nouns from the requirements, sorted:
 | Account / token | **Entity**: `Auth` owns where the token comes from. |
 | Menu model | **Entity** (value): what the panel draws. |
 | Attention count, closed window, colour | Fields/derived values, not entities. |
+| Author selector, author filter (`show`, `hide`) | **Values** with a rule: parse `me` / `others` / `bots` / `@login`, match an item's author |
+| Repository selector | **Value**: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator`, `anywhere` |
+| Repository resolver | **Entity**: owns the resolved lists and when they're stale |
+| Review search | Part of the fetch: one search per refresh answering "which open PRs wait on me" |
+| Listing | **Entity** (pure): owns "what a project has", the one filtering rule |
+| Arrangement, group | **Entity** (pure) and its **value**: grouping, sorting and the cap; a group's key, title, rows, count, fold |
+| Preset | **Value**: a name, a summary, its configuration text and what onboarding asks for |
+| Group fold, Show more | Fields: `collapsedGroups` in app state; `expandedGroups` in `Shipyard`'s memory, cleared when the panel closes |
 
 Relationships:
 
 ```text
 Shipyard -> ConfigStore            reads current Configuration, is told when it changes
 Shipyard -> Auth                   asks for a token; drives device flow
-Shipyard -> GitHubClient           fetch(projects) -> Snapshot (with rate limits)
+Shipyard -> RepositoryResolver     resolve(projects, force:) -> [ProjectName: ResolvedRepositories]
+RepositoryResolver -> GitHubClient  repositories(of: group or owner), pages of 100
+Shipyard -> GitHubClient           fetch(projects, resolved) -> Snapshot: repository batches + the review search (with rate limits)
+Shipyard -> Listing                items(project, snapshot, viewer, now) -> the project's listed items
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
 Shipyard -> ConfigStatusStore      record(verdict) after every reload, for agents
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]
-Shipyard -> NotificationRules      shouldNotify(event, project settings, hidden authors) -> Bool
+Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification)
 Notifier -> Shipyard               openNotification(itemURL) on a click
-Shipyard -> MenuModel              build(snapshot, config, appState) -> what Panel draws
+Shipyard -> MenuModel              build(listings, snapshot (errors, when fetched), config, appState, expandedGroups) -> what Panel draws
+MenuModel -> Arrangement           groups(items, settings, folds, expanded, now) -> [RowGroup]
 Panel    -> Shipyard               click(item), collapse(project), markAllSeen(), refresh()
 Onboarding -> Shipyard            suggestedRepositories(), checkRepository(text), addProjects(projects)
 Panel    -> Shipyard               switchToNextLayout() (the header's layout button)
-Shipyard -> ConfigStore            append(projects:) and setLayout(layout) (the two writers), then follows the reload
-Snapshot  has  [Project -> [Item]]
+Panel    -> Shipyard               toggleGroup(group), showMore(group), showLess(group), panelClosed()
+Onboarding -> Shipyard            presets, choosePreset(preset, projects), beginDeviceFlow()
+Shipyard -> ConfigStore            append(projects:), setLayout(layout) and writePreset(preset, projects) (the three writers), then follows the reload
+Snapshot  has  [Project -> [Item]], reviewRequested: Set<ItemID>, the search's PRs, errors per source and per selector
 Configuration has [Project], Defaults, [NotificationRule]
 ```
 
@@ -130,6 +192,13 @@ Where each rule lives:
 | First sight of a project is silent; one notification per event | `EventDetector` + `AppState.notified` |
 | Which events notify | `NotificationRules` |
 | What's in the closed window, what order, what colour | `MenuModel` |
+| Which repositories a selector means; when to look again | `RepositoryResolver` |
+| Whether a PR waits on the user (teams included) | the review search, read into `Item.reviewRequestedFromViewer` |
+| Whether a project lists an item (kind shown, states, window, drafts, authors, review requested) | `Listing` |
+| Which author a selector matches | `AuthorSelector` |
+| How listed items are grouped, sorted and capped | `Arrangement` |
+| Whether a group is folded / expanded past its cap | `AppState.collapsedGroups` / `Shipyard.expandedGroups` |
+| Which preset text is written, and when writing it is safe | `Preset` + `ConfigStore.writePreset` |
 
 ---
 
@@ -174,7 +243,7 @@ Operations:
 |---|---|---|
 | `start()` | create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); load config; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Try again calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
 | `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()` | as `refresh()`; an existing file is never touched |
-| `refresh()` | the refresh pipeline (§4); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
+| `refresh()` | the refresh pipeline (§4), which resolves repository selectors first (forced after a configuration change and on ⌘R, else at most hourly); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing and re-arms the timer for the pause's end |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`, in `publishConfigStatus()`, which also writes the verdict to `configStatusStore`, accepted, rejected or unchanged); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
 | `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
@@ -183,12 +252,17 @@ Operations:
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
-| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core, but 0.0.x's app never calls it (#22) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again |
+| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core since 0.0.1; since 0.0.2 the connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
+| `openVerificationPage()` | the code screen's Copy code and open GitHub (the app copies the code first): opens the code's `verificationURL` (github.com/login/device) through `URLOpening` | only while `connecting(code)`; otherwise does nothing |
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
 | `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigError` (empty or used name, no repositories, bad slug) before writing anything |
 | `switchToNextLayout()` | the header's layout button: `configStore.setLayout(lastValid.menu.layout.next)` then follows the reload like `reloadConfiguration()`, so the menu switches as for a hand edit (rows kept, then a refresh) | a file that doesn't read, a `[menu]` the writer doesn't edit or a failed write changes nothing: `configError` says why (the banner) until the next reload |
-| `signOut()` | clears the token store → `signedOut` with `userSignedOut(result)`; app state (seen, collapsed) is kept. The header's gear menu has Sign out | if the token came from `gh` (always, in 0.0.x), `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
+| `toggleGroup(group)` | flips the group's fold in `collapsedGroups` (app state, saved) and re-applies the folds to the menu (`applyAttention`) without a refresh; the subheader keeps its count | only a subsection folds (`MenuModel.subsection(_:)`, in a project or the All tab); a group without a subheader, or one no longer listed, changes nothing |
+| `showMore(group)` / `showLess(group)` | adds the group to, or removes it from, `expandedGroups` (memory) and re-caps the menu's groups in place (`MenuModel.applyExpansions`), without a refresh or a save; a refresh while the menu is open keeps the expansion | Show more on a group that isn't capped (or isn't listed) changes nothing |
+| `panelClosed()` | empties `expandedGroups` and re-caps; the panel calls it from `onDisappear` when the menu window closes, so a reopened menu shows every cap again | — |
+| `presets` / `choosePreset(preset, [NewProject])` | onboarding's first step: `configStore.writePreset(preset, projects)`, then follows the reload like `addProjects` | refused (a `ConfigError`, nothing written) when the file has live settings besides `version`; onboarding then shows the plain picker |
+| `signOut()` | clears the token store (deletes the Keychain item) → `signedOut` with `userSignedOut(result)`; app state (seen, collapsed) is kept. The header's gear menu has Sign out | if the token came from `gh`, `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut` with `rejected(source)`, dropping the stored token when it came from the token store |
 
 ### Configuration — `ShipyardCore/Config/Configuration.swift`
@@ -201,7 +275,7 @@ version = 1
 
 refresh-interval-seconds = 120   # min 30; a floor, stretched by the rate budget if needed
 launch-at-login = true
-hide-authors = []                # logins, e.g. "dependabot[bot]"
+# hide-authors: removed in 0.0.2; read as a hide in each kind's authors, with a warning
 
 [menu-bar]
 count = "total"                  # "total" | "per-kind" | "none"
@@ -222,21 +296,36 @@ checks-failed = true
 # What every project shows, unless the project overrides it.
 [defaults.pull-requests]
 show = true
+states = ["open", "merged", "closed"]
 closed-window-days = 7
 drafts = true
+review-requested = false
+authors = { show = [], hide = [] }       # [] in show: everyone; hide wins (F1)
 
 [defaults.issues]
 show = false
+states = ["open", "closed"]
 closed-window-days = 7
+authors = { show = [], hide = [] }
 
 [defaults.workflow-runs]
 show = false
 finished-window-hours = 3
 branches = "default-and-pull-requests"   # | "all"
+states = ["in-progress", "failed", "succeeded"]
+authors = { show = [], hide = [] }
+
+[defaults]                                # how a project is arranged, and what groups bring in (per project too)
+group-by = "kind"                         # "kind" | "repository" | "date" | "author" | "none"
+# subsections: unset keeps each layout's own (dividers in the list, subheaders in tabs)
+sort-by = "updated"                       # "updated" | "created" | "title"
+show-first = 0                            # 0: show all
+archived = false
+forks = true
 
 [[defaults.notifications]]
 event = "pr.opened"
-authors = "any"
+authors = []                              # author selectors; [] (or the old "any") is everyone
 
 # One [[projects]] block per project, shown in this order.
 [[projects]]
@@ -244,18 +333,32 @@ name = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 issues = { show = true }          # overrides merge key by key onto defaults
 notifications = [                 # replaces the default list for this project
-  { event = "pr.opened", authors = "others" },
+  { event = "pr.opened", authors = ["others"] },
   { event = "run.failed" },
 ]
 
 [[projects]]
 name = "job-search"
 repositories = ["yahyabedirhan/job-search"]
+
+[[projects]]
+name = "contributions"
+repositories = ["owned", "my-org/*", "cobanov/ghbar"]   # groups, wildcards and single repositories
+group-by = "repository"
+subsections = true
+pull-requests = { authors = { hide = ["me", "bots"] } }
+
+[[projects]]
+name = "review queue"
+repositories = ["anywhere"]
+pull-requests = { review-requested = true }
 ```
 
 Keys are kebab-case (TOML's usual style, as in Cargo and Starship). Per-project overrides are written as inline tables so each `[[projects]]` block stays self-contained and can be appended on its own.
 
-Events: `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded`. Authors: `any | me | others | bots`.
+Events: `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded`. Author selectors: `me`, `others`, `bots` or `@login` (ADR 0002); the old notification strings `any | me | others | bots` still read, with a warning.
+
+**Selectors** (`Config/Selectors.swift`): `AuthorSelector` and `RepositorySelector` parse a string or reject it with the hints in §1's error table; the key a selector sits under says which set it's from, so a bare word is a group, `@` marks a login and `/` a repository. `AuthorSelector.matches(author, authorKind, viewer)` is the only author match in the codebase; `AuthorFilter.includes` is `(show.isEmpty || show.contains(where: matches)) && !hide.contains(where: matches)`. `ProjectSettings.repositories` is `[RepositorySelector]`, and each kind's settings carry `states` (a set of `StateGroup`, the values that kind takes; `ItemState.group` maps a draft to `open` and a running run to `in-progress`) and `authors` (and pull requests `reviewRequested`); `ArrangementSettings` holds `groupBy`, `subsections` (optional: unset keeps the layout's own), `sortBy` and `showFirst`, and `archived` and `forks` sit beside them. All merge key by key in `settings(for:)`. The cross-key rule for `anywhere` (G2) is checked in the reader. The schema keeps `hide-authors` and the old notification strings, marked deprecated, so `taplo check` still passes on files the app accepts.
 
 Operations:
 
@@ -272,21 +375,32 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
-Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2), `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails), `writePreset(preset, projects)` (the third writer, below) and `acceptsPreset` (whether the latest reload found a file a preset may be written over). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
 ### ConfigStatusStore — `ShipyardCore/Config/ConfigStatus.swift`
 
 Writes the latest `ConfigStatus` (`checked`, `config`, `configModified`, `error`, `warnings`) to `config-status.json` in a directory the app provides, the same one as `state.json` (tests pass a temporary one). Not beside `config.toml`: `ConfigWatcher` watches that directory, so a write there would reload again. Write-only and replaced atomically; the app never reads it back. Each problem is written with its `line`, `message` and `banner`, the banner's line from `PanelText.configIssue`. The format is in `docs/configuration.md`.
 
+### Presets — `ShipyardCore/Config/Presets.swift` (+ `PresetSetting.swift`)
+
+`Preset`: `name`, `title`, `summary`, `asks: .repositories | .ownedOrRepositories | .nothing`, and `text(projects: [NewProject]) -> String`, a whole commented configuration file (the `#:schema` line, a comment naming the preset, `version`, then its tables and projects) that decodes with no warnings and passes the schema. `Preset.all` lists the three in onboarding's order and `Preset.named(_:)` finds one by name. The skill's `skills/shipyard/presets.md` shows the same three files, with example repositories where onboarding's picks go; a test keeps them equal.
+
+| Preset | Contents |
+|---|---|
+| `my-agents` | issues shown (`[defaults.issues] show = true`); `[defaults] group-by = "kind"`; each of `projects` as its own block (onboarding passes one per chosen repository); the default notification. The maintainer's setup. |
+| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`. Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested]`, since a request, not a new PR, is its news. ghbar's view. |
+| `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notification `pr.review_requested`. Ignores `projects`. |
+
+`ConfigStore.writePreset(preset, projects)` is the third writer (ADR 0001's amendment): it writes `preset.text(projects:)` in place when the file is missing or its only live key is `version`, and otherwise refuses with a `ConfigError` so onboarding falls back to the picker. "Only live key" is `Configuration.acceptsPreset(text)`: the file reads, and `TOMLSourceMap` finds no entry but `version` (comments don't count; any table does). Each reload records it as `acceptsPreset`, which `Shipyard.presets` follows; `writePreset` checks the file again before writing, and also refuses invalid picked projects and a preset that wouldn't read with them.
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
 
-**0.0.x connects through `gh` only.** The app reads `gh auth token` silently and never starts the device flow; without a usable `gh` token the panel's connect screen says to install `gh` and run `gh auth login`. The device flow and the Keychain below stay in the core, tested, and come to the app with sign-in without `gh` (#22); until then the app's token store is `SessionTokenStore` (`SessionTokenStore.swift`), which nothing writes to.
+**0.0.1 connected through `gh` only; 0.0.2 adds the device flow (S1).** In 0.0.1 the app read `gh auth token` silently, never started the device flow, and kept tokens in a session-only store. 0.0.2 compiles in shipyard's OAuth App client ID (`OAuthApp.clientID`, one line; a placeholder until the maintainer registers the app), makes `Keychain` the app's token store, and puts **Sign in with GitHub** on the connect screen; the `gh` token stays the silent path for anyone who has it. A build whose client ID is still the placeholder shows Sign in with GitHub disabled, with why, and connects through `gh` only.
 
 Kept from ghbar almost as is, because it worked well:
 - `TokenProvider.current()`: Keychain first (the user signed in explicitly), then `gh auth token` found at known paths (`/opt/homebrew/bin/gh`, `/usr/local/bin/gh`, then `PATH`), since an `.app` starts with an almost empty `PATH`. Spawning `gh` sits behind the `GhTokenLookup` protocol (`GhCLI` runs it with `Process`), so tests use a fake lookup.
 - `DeviceFlow`: request code → show code and open github.com/login/device → poll every `interval` s (+5 s per `slow_down`) → store in Keychain. Stops with `.expired` after the code's 15 minutes. Needs a GitHub OAuth App client ID (scopes `repo`, `read:org`): the one build-time constant `OAuthApp.clientID`, a placeholder until the maintainer registers the app (the flow refuses to start while it's the placeholder). Waiting and the clock are injected, so tests poll without real time passing.
-- `Keychain` (app target): the `TokenStore` port, get/set/delete one token. Tests use an in-memory store.
+- `Keychain` (app target): the `TokenStore` port, get/set/delete one generic password in the login Keychain (service `com.yahyabedirhan.shipyard`, account `github-token`). Tests use an in-memory store; the app target has no tests, and agents never touch the real Keychain.
 
 ### GitHubClient — `ShipyardCore/GitHub/GitHubClient.swift`
 
@@ -295,14 +409,28 @@ State: token, `HTTPTransport` (`URLSessionTransport` in the app; tests stub resp
 | Operation | Returns / rejects |
 |---|---|
 | `viewer() -> Viewer` (login, id, name, `avatarURL` from `avatar_url`, `profileURL` from `html_url`, else `https://github.com/<login>`), from `GET /user` at sign-in only | 401 → `.unauthorized`; a missing or unreadable name, avatar or profile link is left out (`nil`, or the constructed profile), never failing the sign-in |
-| `fetch(projects: [ProjectSettings], at:) -> Snapshot` | one GraphQL call for PRs and issues (all repositories as aliases), plus one REST call per repository for runs when runs are on; partial errors land per source (repository + kind) in the snapshot: a repository GraphQL can't resolve fails every kind each project shows from it. The GraphQL query also asks for `rateLimit { limit remaining resetAt cost }`; REST reads the `x-ratelimit-*` headers and sends `If-None-Match` so unchanged runs come back as 304, which GitHub doesn't count against the limit. The snapshot's `rateLimits.rest` is the last runs response's headers with the counted (non-304) requests as `cost`. A runs request that fails with another HTTP status (or an unreadable body) becomes an error for that repository's runs source only (an error row in the projects that show runs) while its pull requests and issues still list; a spent limit, a 401 or a network failure fails the whole fetch, as for GraphQL |
+| `fetch(projects: [ProjectSettings], resolved: [ProjectName: ResolvedRepositories], at:) -> Snapshot` | each project watches what `resolved` has for it (else only the `owner/name` it names); GraphQL for PRs and issues (every repository as an alias, in batches of 25 per request, one request after another; a failed batch fails the fetch), plus one REST call per repository for runs when runs are on; partial errors land per source (repository + kind) in the snapshot: a repository GraphQL can't resolve fails every kind each project shows from it. The GraphQL query also asks for `rateLimit { limit remaining resetAt cost }`; REST reads the `x-ratelimit-*` headers and sends `If-None-Match` so unchanged runs come back as 304, which GitHub doesn't count against the limit. The snapshot's `rateLimits.rest` is the last runs response's headers with the counted (non-304) requests as `cost`. A runs request that fails with another HTTP status (or an unreadable body) becomes an error for that repository's runs source only (an error row in the projects that show runs) while its pull requests and issues still list; a spent limit, a 401 or a network failure fails the whole fetch, as for GraphQL |
 | rate-limit errors | `.rateLimited(resetAt, api)` from `x-ratelimit-reset` (403/429 with `x-ratelimit-remaining: 0`, or GraphQL's 200 with a `RATE_LIMITED` error or with `x-ratelimit-remaining: 0` and an error); `api` comes from `x-ratelimit-resource` (`graphql`, else REST), or the URL without it. `.secondaryLimit(retryAfter)` from `retry-after` (it wins over the reset time), else 60 s for a bare 429 or a 403 whose message says "secondary rate limit"; any other 403 is `.http(403)`. Every response's `x-ratelimit-*` headers are read into a `RateLimit`; the snapshot carries GraphQL's (headers first, `cost` from the body). GraphQL's exhausted case is a 200 with an error, so the check reads headers, not only the status code. REST calls for runs go one after another, never in parallel (GitHub's guidance against secondary limits) |
 | `recentRepositories(at:) -> [RepoSummary]` | for the picker, one GraphQL request (`GitHub/Repositories.swift`): `viewer.repositories` (owner and collaborator, `isArchived: false`) and `viewer.repositoriesContributedTo`, each `first: 25` ordered by `PUSHED_AT`; merged, each repository once (case-insensitive), archived ones dropped (the contributed list has no `isArchived` argument), newest push first, never-pushed last. Rate-limit errors as for `fetch` |
 | `repository(slug) -> RepoSummary` | REST `GET /repos/{owner}/{repo}`, for the picker's check of a typed name; `full_name` is GitHub's spelling; 404 → `.http(404)` |
 
-The query text lives next to its parser in `GitHub/ProjectQuery.swift` (build + parse, one owner). Each repository is asked for once (aliases `repo0`, `repo1`… with `$owner<i>`/`$name<i>` variables), even when several projects list it, and the query also asks for `viewer { login }` (to tell `me` and the viewer's review requests apart) and `rateLimit`. An alias that comes back `null` with a `NOT_FOUND` (missing, or no access) or `FORBIDDEN` error becomes that repository's error in the snapshot; the others still parse. Per repository alias it asks for: open PRs (first 50), PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally), and per PR `isDraft`, `author { login, __typename }`, `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, `reviewRequests` (to find the viewer), and the head commit's `statusCheckRollup.state`. Issues are asked for the same way (`openIssues`: open, first 50; `closedIssues`: closed, first 20, both by `UPDATED_AT`; per issue `state`, `author { login, __typename }`, `createdAt`, `updatedAt`, `closedAt` and the comment count, with no nested lists), and only in the aliases of repositories that some project's effective settings show issues for, so turning issues off keeps them out of the query's cost; the `IssueFields` fragment is sent only when one does. A repository shared by two projects is asked for once with the union of what they show, and each project keeps only the kinds it shows.
+The query text lives next to its parser in `GitHub/ProjectQuery.swift` (build + parse, one owner). Each repository is asked for once (aliases `repo0`, `repo1`… with `$owner<i>`/`$name<i>` variables, numbered within each batch of `ProjectQuery.repositoriesPerRequest` = 25), even when several projects list it, and every batch's query also asks for `viewer { login }` (to tell `me` and the viewer's review requests apart) and `rateLimit`. An alias that comes back `null` with a `NOT_FOUND` (missing, or no access) or `FORBIDDEN` error becomes that repository's error in the snapshot; the others still parse. Per repository alias it asks for: open PRs (first 50), PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally), and per PR `isDraft`, `author { login, __typename }`, `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, and the head commit's `statusCheckRollup.state` (since 0.0.2 not `reviewRequests`: the review search, below, says which PRs wait on the viewer). Issues are asked for the same way (`openIssues`: open, first 50; `closedIssues`: closed, first 20, both by `UPDATED_AT`; per issue `state`, `author { login, __typename }`, `createdAt`, `updatedAt`, `closedAt` and the comment count, with no nested lists), and only in the aliases of repositories that some project's effective settings show issues for, so turning issues off keeps them out of the query's cost; the `IssueFields` fragment is sent only when one does. A repository shared by two projects is asked for once with the union of what they show, and each project keeps only the kinds it shows.
 Runs come from REST, because GraphQL doesn't list workflow runs (`GitHub/WorkflowRuns.swift` builds the request, parses it and holds the branch filter). Each repository that some project shows runs for (and that GraphQL didn't report missing) gets one `GET /repos/{o}/{r}/actions/runs?created=>=<since>&exclude_pull_requests=true&per_page=100` per refresh, one after another. `since` is an hour before the widest `finished-window-hours` of those projects, rounded down to the hour, so the URL stays the same for an hour (and its `ETag` can match) and a run of up to an hour that finished inside the window is still in the answer; a run that started earlier than that isn't listed, even while it runs. The client keeps each repository's last URL, `ETag` and parsed runs in memory (`WorkflowRunCache`, for as long as the `GitHubClient` of one sign-in lives; a relaunch asks afresh once): the next request to the same URL sends `If-None-Match`, and a `304` reuses those runs. A run's state: anything not `completed` (and `action_required`) is `running`; `success` and `neutral` are `succeeded`; `failure`, `timed_out` and `startup_failure` are `failed`; `cancelled`, `skipped` and `stale` runs aren't listed. The runs are parsed once per repository and filtered per project: `branches = "all"` keeps them all; `"default-and-pull-requests"` keeps those whose `head_branch` is the repository's default branch or an open pull request's head. The GraphQL query supplies both for those repositories (`defaultBranchRef { name }`, `headRefName` in `PullRequestFields`, and, where no project shows the repository's pull requests, `openPullRequestHeads: pullRequests(states: OPEN, first: 50) { nodes { headRefName } }`), so no extra REST calls. The window itself is the menu model's.
 
+**Since 0.0.2**, `fetch(projects, resolved:)` sends the repository aliases in **batches of 25** per GraphQL request, one after another, so one request stays well inside GitHub's node limit (500,000) and its 10-second timeout however many repositories a group brings in (see `docs/references/github-rate-limits.md`); the cost is their sum, which `RateBudget` measures as today, and the limit is the last batch's headers. A failed batch (a spent limit, a 401, a network failure) fails the whole refresh as a single request's failure did, and a repository missing from one batch is still that repository's error. The first batch also asks for the **review search**, `search(type: ISSUE, query: "is:pr is:open archived:false review-requested:@me", first: 100)`, with the same pull request fields the repositories use. It yields `Snapshot.reviewRequested: Set<ItemID>` and the PRs themselves, which `anywhere` projects list. `review-requested:@me` includes requests to the user's teams, which is why the search replaces reading each PR's `reviewRequests`, and that part of the per-repository query goes; `Item.reviewRequestedFromViewer` is filled from the set, so attention and `pr.review_requested` gain team requests with no change of their own. The search is asked for only when some project shows pull requests. It can fail on its own (`reviewSearch: null` with an error on that path) while the repositories answer: the refresh still succeeds, the client (which keeps the last search's PRs for as long as it lives, like the runs' ETags) fills the set and the flags from the last search that answered, so a blip neither withdraws requests nor makes them new again, and `Snapshot.reviewSearchError` gives `MenuModel` an error row ("review requests: <GitHub's message>") in each project with `review-requested = true`, which every `anywhere` project is. A project using `anywhere` (G2, #61) gets the search's PRs among its items in the snapshot, after its own repositories' and each once, so the listing, the counts and the event detector treat them like any fetched PR; `issueCount` (every match, not just the page) becomes `Snapshot.reviewSearchTotal`, and when it's more than the page holds the section carries a note, "Only the first 100 of 134 review requests are listed" (`MenuSection.notes`, drawn after the error rows, in the list and in the tabs). Because the search sees only open PRs, `KnownItems.updated` keeps the review request a closed PR had, so reopening it is `pr.reopened` without a second `pr.review_requested`. The search's facts are in `docs/references/github-search.md`.
+
+### RepositoryResolver — `ShipyardCore/GitHub/RepositoryResolver.swift` (0.0.2)
+
+A `@MainActor` class `Shipyard` owns. State: one entry per `RepositoryLookup` (a group, or an owner's login lowercased, so `o/*` in two projects is one lookup): the last list GitHub gave (`[RepoSummary]`, archived ones and forks included and marked), when it arrived, and why the latest lookup failed (or that the owner can't be seen), in memory only. `ResolvedRepositories` is a project's result: `repositories: [String]` (`owner/name`, each once) and `errors: [RepositoryError]` (one per selector, named after it).
+
+| Operation | Does | Rejects / edge |
+|---|---|---|
+| `resolve(projects, force: Bool, at: now, lookup:) async throws -> [ProjectName: ResolvedRepositories]` | looks up each group or `owner/*` the projects use, once however many use it, when it wasn't answered within `interval` (an hour), when its last lookup failed, or always when `force`; then per project, in selector order: an `owner/name` as written, a looked-up list without archived repositories unless `archived` and without forks unless `forks`; each repository once, ignoring case (the first spelling wins). `lookup` is `GitHubClient.repositories(of:at:)` through `Shipyard.request`, so a 401 signs out | a failed lookup (network, rate limit, an unreadable answer) keeps the last list silently, and is tried again at the next refresh; with no list to keep, the selector gets an error row ("owned: couldn't list its repositories (…)"). An owner GitHub answers `null` for is an answer, kept for the hour: an error row ("ghost-org/*: not found, or no access") and no repositories. Only `.unauthorized` and cancellation are thrown. Lookups no project uses any more are dropped |
+| `reset()` | forgets every list, on sign-out (another account reaches other repositories) | — |
+
+`Shipyard` forces the next resolve at launch, after a valid configuration change, on ⌘R (`refreshNow()`) and after signing in again; the refresh timer's runs look up only what's stale. It passes the configured projects and the resolution to `fetch(projects:resolved:at:)`, which watches `ProjectSettings.resolved(by:)` (each project's selectors replaced by what they resolved to, as `owner/name`), records it in `Snapshot.repositories` and the error rows in `Snapshot.selectorErrors`; the notification step's known sources come from the same resolved settings, so a repository a group brings in later is a first sight: its items are recorded, not notified.
+
+The calls sit in `GitHub/Repositories.swift` (`RepositoryListQuery`, `GitHubClient.repositories(of:at:) -> [RepoSummary]?`): `owned`, `organizations` and `collaborator` are `viewer.repositories(affiliations: [OWNER | ORGANIZATION_MEMBER | COLLABORATOR], ownerAffiliations: the same)`; `owner/*` is `repositoryOwner(login).repositories(ownerAffiliations: [OWNER])`, `nil` when the owner is `null`; both in pages of 100 by name, with `isArchived` and `isFork` on each node. The GitHub facts behind them are in `docs/references/github-repositories.md`. `anywhere` (G2) resolves to nothing: its PRs come from the review search.
 ### Item and Snapshot — `ShipyardCore/Items/`
 
 ```text
@@ -325,8 +453,24 @@ Snapshot
   errors: [ItemSource: RepositoryError]      (per repository + kind; notFound | forbidden | other, GitHub's message)
   rateLimits: { graphql: RateLimit?, rest: RateLimit? }   (limit, remaining, used, resetAt, cost of this refresh: GraphQL's `rateLimit.cost`; REST's counted (non-304) requests)
   viewerLogin
+  reviewRequested: Set<ItemID>               (0.0.2: open PRs waiting on the user, teams included, from the review search)
+  searchPullRequests: [Item]                 (0.0.2: the search's PRs, in any repository, for `anywhere`; at most one page of 100)
+  reviewSearchTotal: Int                     (0.0.2: how many PRs the search matched in all, its `issueCount`)
+  reviewSearchError: RepositoryError?        (0.0.2: the search failed; the two above are then the last search's)
+  repositories: [ProjectName: [String]]      (0.0.2: what each project watched, its groups and wildcards resolved; the menu's error rows and repository names read it)
+  selectorErrors: [ProjectName: [RepositoryError]]   (0.0.2: the selectors that couldn't be resolved, each an error row named after the selector)
 ```
 
+### Listing — `ShipyardCore/Items/Listing.swift` (0.0.2)
+
+Pure, and the only place that decides what a project has (ADR 0003):
+
+| Operation | Returns |
+|---|---|
+| `items(for: ProjectSettings, in: Snapshot, viewer, now) -> [Item]` | the snapshot's items for the project (from its resolved repositories, and for `anywhere` the search's PRs, which the fetch puts among them) that pass every check, combined with AND: kind shown, `states`, the window, `drafts`, `authors`, `review-requested` |
+| `listings(for: [ProjectSettings], in: Snapshot, now) -> [ProjectName: [Item]]` | every project's listing, the viewer being the snapshot's `viewerLogin`; a project the snapshot has no entry for (added since) has none, so the menu shows it not loaded yet |
+
+`MenuModel`, `Attention.counts` and the notification filter all take a listing, so they can't disagree; the two `hide-authors` checks (in `MenuModel` and in `Shipyard`'s notification step) go.
 ### Attention — `ShipyardCore/Items/Attention.swift`
 
 Owns the rule, so the rule sits with the data it reads (seen records). It's keyed on the generic `Item`, so issues and runs reuse it.
@@ -343,11 +487,11 @@ State: `seen: [ItemID: SeenRecord]`, where `SeenRecord` = the fingerprint seen a
 
 Pure: `events(known: KnownItems, snapshot, projects: [ProjectSettings]) -> [Event]`, per project in configuration order.
 `KnownItems` = `items: [ItemID: KnownItem]` (the last state, checks, review request, activity, repository and fingerprint of each item, and `present`: when a refresh last listed it, bumped at most once a day) and `sources: [ProjectName: Set<ItemSource>]`, where an `ItemSource` is one repository and one item kind. Items from a source the project hasn't been fetched from before produce no events: the first refresh ever, a project or repository just added, a kind just shown. `known.updated(with: snapshot, projects:)` is what the next refresh compares with: the snapshot's items and fetched sources; a source that failed keeps its known-ness (so its return isn't a burst), and only that source: a runs 403 doesn't hold back the repository's pull requests; an item missing from the snapshot (out of the most recent 50, or its repository failed) is kept for 30 days after it was last listed, and while its repository fails, so when it comes back it's compared with its last version (no `opened`; `merged` if it merged meanwhile) rather than announced as new; a project, repository or kind no longer fetched is forgotten (adding it back is a first sight again).
-The detector finds generic `ItemChange`s and `EventKind.of(change, for: item.kind)` names them, so issues and runs only add names (and runs their own changes): absent → open (drafts too) = opened (absent → closed is nothing: it may be an old item coming back into the closed list); open → merged = merged; open → closed = closed; closed → open = reopened; review requested newly true (open) = review_requested; checks newly failed (open) = checks_failed; activity went up = commented. For issues only opened, closed and commented have names (`issue.*`); an issue reopened is no event, and its next close is a new occurrence of `issue.closed`. Runs have their own changes: failed (found failed, unknown or not failed before) = `run.failed`, succeeded likewise = `run.succeeded`; a run found already finished counts, since only recent runs are asked for, so it finished between two refreshes. Both recur (a re-run that fails again is a new occurrence). Runs of one repository are a source of their own, so turning runs on is a silent first sight. Pull requests and issues of one repository are separate sources, so showing issues in a project that already has its pull requests known is a silent first sight. An `Event` has the kind, project, item and an occurrence: empty for events that happen once in an item's life (opened, merged), the item's fingerprint for ones that recur; `id` = kind + item URL (+ occurrence), the same in every project.
+The detector finds generic `ItemChange`s and `EventKind.of(change, for: item.kind)` names them, so issues and runs only add names (and runs their own changes): absent → open (drafts too) = opened (absent → closed is nothing: it may be an old item coming back into the closed list); open → merged = merged; open → closed = closed; closed → open = reopened; review requested newly true (open) = review_requested; checks newly failed (open) = checks_failed; activity went up = commented. For issues only opened, closed and commented have names (`issue.*`); an issue reopened is no event, and its next close is a new occurrence of `issue.closed`. Runs have their own changes: failed (found failed, unknown or not failed before) = `run.failed`, succeeded likewise = `run.succeeded`; a run found already finished counts, since only recent runs are asked for, so it finished between two refreshes. Both recur (a re-run that fails again is a new occurrence). Runs of one repository are a source of their own, so turning runs on is a silent first sight. Pull requests and issues of one repository are separate sources, so showing issues in a project that already has its pull requests known is a silent first sight. **Since 0.0.2**, a project using `anywhere` has one more source, `ItemSource.anywhere` (the review search), for its PRs from repositories it doesn't watch: its first answer is a silent first sight (and a failed search's stand-in isn't one); after that a PR the search finds for the first time is `pr.opened` and `pr.review_requested` both, since it's a new item and a request that just arrived, whatever rules pick. While a project uses `anywhere`, `KnownItems.updated` keeps known items of any repository for their retention, so a PR that leaves the search and comes back isn't new again. An `Event` has the kind, project, item and an occurrence: empty for events that happen once in an item's life (opened, merged), the item's fingerprint for ones that recur; `id` = kind + item URL (+ occurrence), the same in every project.
 
 ### NotificationRules — `ShipyardCore/Items/NotificationRules.swift`
 
-Pure: `shouldNotify(event, settings: ProjectSettings, hiddenAuthors) -> Bool` — the project's rule list contains the event, and the author filter matches the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither). Authors in `hide-authors`, and drafts in a project whose `pull-requests.drafts` is false, are never notified, as they're never listed. `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57", "Run #41 failed"), the item's title (for a run, "CI · main": workflow and branch) and URL.
+Pure: `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, asked only for items the project lists (since 0.0.2; before, it took `hiddenAuthors`) — the project's rule list contains the event, and the rule's author selectors match the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither, or an `@login`). `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57", "Run #41 failed"), the item's title (for a run, "CI · main": workflow and branch) and URL.
 `NotifiedEvents` (app state, apart from the seen records) holds every event handled, notified or passed over, per item: `contains(event)`, `insert(event, at:)`, and `prune(present:at:)`, which keeps an item's record while it's known and 30 days after, so an item that leaves the list and comes back isn't announced again.
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
@@ -359,6 +503,7 @@ One JSON file, `state.json`, in a directory the app provides (`~/Library/Applica
   "version": 1,
   "seen": { "https://github.com/o/r/pull/57": { "fingerprint": "open|…", "present": "2026-09-25T12:00:00Z" } },
   "collapsed": ["job-search"],
+  "collapsedGroups": [{ "project": "shop", "group": "kind:issue" }],
   "known": { "https://github.com/o/r/pull/57": { "repository": "o/r", "state": "open", "checks": "pending", "reviewRequested": false, "activity": 0, "fingerprint": "open|…", "present": "2026-09-25T12:00:00Z" } },
   "knownProjects": { "e-commerce": [{ "repository": "o/r", "kind": "pullRequest" }] },
   "notified": { "https://github.com/o/r/pull/57": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
@@ -366,6 +511,7 @@ One JSON file, `state.json`, in a directory the app provides (`~/Library/Applica
 ```
 
 Every field is optional when read and unknown fields are ignored, so adding a field doesn't bump `version`: an older file loads with the new field empty (a file without `knownProjects` makes the first refresh after the upgrade silent), and a file a newer build wrote at the same `version` still loads in an older build. `known`, `knownProjects` and `notified` that can't be read are dropped rather than failing the file (the next refresh is then silent, the safe way to fail), and an entry inside them this build can't read is skipped. A known item without `present` (written before it was kept) loads as present long ago: kept while listed, dropped the first time it isn't. `version` changes only for a change an older reader would misunderstand, with a migration in `AppState.init(from:)`; a file whose `version` is newer than this build's `currentVersion` isn't read (it would be misread) but set aside like an unreadable one, and shipyard starts as on a first run.
+Since 0.0.2, `AppState` also holds `collapsedGroups: Set<GroupID>` (a project and a group key), optional when read, so no version bump. A fold is written as its project (empty for the All tab) and its key as text (`kind:issue`, `repository:owner/name`, `date:thisWeek`, `author:login`, `ungrouped`); a fold this build can't read is skipped, and a `collapsedGroups` that can't be read is dropped. After each successful refresh `MenuModel.foldsToKeep` prunes it: a fold is kept while its group is listed (under a subheader or a divider, so turning `subsections` off and on again keeps it), or while its project isn't loaded or has an error row (its groups may come back); a removed project's folds, and a group gone from its project or from the All tab, are dropped.
 Operations: `load(at:) -> missing | loaded | setAside(URL)` at `Shipyard.start()`; `update { state in … }` changes the state and saves it (atomically, no debounce: the file is small and changes on clicks, on refreshes that found a change, and about once a day from pruning) when it changed. A file that isn't readable app state (or has a newer `version`) is renamed to `state-corrupt-<yyyyMMdd-HHmmss>.json` and shipyard starts as on a first run, with no notifications on the first refresh (bootstrap).
 
 ### Notifier — `ShipyardApp/Notifier.swift` (the `Notifying` port; tests use a recording one)
@@ -378,8 +524,11 @@ Wraps `SMAppService.mainApp`: `setEnabled(true)` registers the running `.app` (n
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(snapshot?, config, appState, now) -> MenuModel`: sections per project in configuration order (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), items filtered (kind shown, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), `hide-authors`, drafts), grouped by kind (pull requests, then issues, then runs) and within each kind sorted (open or running by `updatedAt` desc, then closed or finished by `closedAt` desc), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `layout` (`list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel), the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). `applyAttention(appState, config)` recomputes just those, so a click or a collapse updates the model without a refresh. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+Pure: `build(listings:snapshot:configuration:state:expanded:now:) -> MenuModel`: sections per project in configuration order, built from the projects' listings, the snapshot giving only the error rows and when it was fetched (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), the items `Listing` lists (kind shown, states, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), drafts, `authors`), each section's `groups: [RowGroup]` as `Arrangement` groups, sorts and caps them (the defaults, `group-by = "kind"` and `sort-by = "updated"`, give the old order: pull requests, then issues, then runs, open or running first; `expanded` holds the groups Show more revealed past their cap), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `Palette` colours it by kind: an issue's closed is purple, a pull request's red), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `layout` (`list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel), the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). The menu bar count, each header's count and the tabs' counts are of listed items only. `applyAttention(_:configuration:)` recomputes just those, and each subsection's fold from `collapsedGroups`, so a click, a collapse or a fold updates the model without a refresh; `applyExpansions(_:configuration:)` re-caps the groups for Show more and Show less, and `foldsToKeep(_:)` drops the folds of groups or projects that are gone. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
 
+### Arrangement — `ShipyardCore/Menu/Arrangement.swift` (0.0.2)
+
+Pure: `groups(items, project, settings: ArrangementSettings, layout, folded: Set<GroupID>, expanded: Set<GroupID>, now, calendar) -> [RowGroup]` groups by `group-by` (one untitled group for `none`, with no header), sorts each group (open first, then `sort-by`, then the order given), marks folds, and caps unexpanded groups at `show-first` (`RowGroup.capped(at:expanded:)`, which `MenuModel.applyExpansions` also calls to re-cap in place). `RowGroup`: `id` (project + key), `title` ("Pull requests", "owner/name", "Today", "@login"), `rows` (the ones drawn), `hiddenRows` (the ones past the cap, still the group's: `allRows` is both, and `MenuSection.rows`, which the counts, Mark all seen and the All tab read, is every group's `allRows`), `attentionCount` (of every row, capped or not), `showsHeader` (`subsections`, or the layout's own when unset: dividers in the list, subheaders in a tab), `isFolded`, `hiddenCount`, `isExpanded` (past a cap it has), `hasShowMore` (a cap to toggle: drawn as a `ShowMoreRow` after the rows unless folded). Group order: kinds in today's order; repositories and authors A to Z (ignoring case); dates newest first. A group's key is a `GroupKey` (`kind`, `repository`, `date(DateBucket)`, `author`, `ungrouped`); `GroupID` is the project's name and that key. The date buckets count calendar days back from `now` (Today, Yesterday, the week so far, the month so far, Older) by `sort-by`'s date: `createdAt` for `created`, else `updatedAt` (a closed item's `closedAt`). The rows come without attention flags, which `applyAttention` sets on each group's rows along with its `attentionCount`; an internal variant arranges rows that already carry them. `applyAttention` also sets each subsection's `isFolded` from `collapsedGroups`, so a fold needs no refresh, and keeps them as the model's `foldedGroups`, which the All tab (its groups' project is empty) is arranged with. `MenuTabs` uses the section's groups for a project's tab; the All tab arranges its rows with fixed settings (kind, updated, subheaders, no cap). The layouts draw a group with `showsHeader` under a `GroupHeader` (a chevron, its title, a kind or a date in capitals, and its row count, folded or not; a click folds or unfolds it, and a folded group draws its subheader alone), and any other group but the first after a `GroupDivider` line (`Components+Groups.swift`). `RowHighlight`'s places gain `groupHeader(GroupID)` and `showMore(GroupID)`, so ↑ and ↓ stop there, ← and → fold a subsection, Return on a subheader folds or unfolds it, and Return toggles Show more (`MenuListTarget.showMore`, `MenuTabContent.showMoreGroup(at:)`); ← on a Show more row goes to its subheader, or its project's header after a divider. Group titles, date bucket names and "Show 3 more" / "Show less" are in `PanelText+Groups.swift`.
 ### UI — `ShipyardApp/UI/`
 
 SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
@@ -399,8 +548,12 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               native mini spinner in place of the arrow) ·
                               gear menu: Open configuration file · Install agent skill… · Sign out (once signed in)
       signedOut              → <ConnectView>  (Onboarding/)
-      connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
-      needsProjects          → <ProjectPicker>(Onboarding/): a field for owner/name or a link · the suggestions and typed
+      connecting             → <ConnectView>  (the device flow's code, Copy code and open GitHub, Cancel)
+      needsProjects, presets → <PresetPicker>(Onboarding/): the presets as a radio group, each titled with its summary ·
+                              for incoming-contributions "All my repositories (owned)" (on) or "Pick repositories" ·
+                              "Choose repositories" (then <ProjectPicker> with a back button, whose Add writes the
+                              preset) or "Start with <preset>" (writes it at once)
+      needsProjects, none    → <ProjectPicker>(Onboarding/): a field for owner/name or a link · the suggestions and typed
                               repositories as checkboxes, each chosen one with its project name and "Group with" ·
                               "Adds …" summary · Add N projects
                               <SkillInstallCard> (the offer to install the agent skill, always shown here)
@@ -424,7 +577,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               click or Return opens and marks seen, ⌥-click or ⌥Return marks seen only; ↑/↓ move the
                               highlight through headers and rows, wrapping; ← goes to the row's header
         <TabsLayout>          (Layouts/) "tabs": a pill strip (All, one tab per project, attention counts), the
-                              line under it with Mark all seen or Mark seen, the tab's rows grouped by kind (#36);
+                              line under it with Mark all seen or Mark seen, the tab's rows as its arrangement groups them, All by kind (#36);
                               ↑/↓ move through the tab's rows, wrapping; ←/→ switch tabs (provisional); a row
                               clicks, tooltips and highlights as the list's does (itemRow)
       <SkillInstallCard>      above the footer, after the gear menu's "Install agent skill…" (disabled in needsProjects, which shows the card), with a close button
@@ -435,15 +588,15 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
 The frame and the layouts share `Design.swift`'s tokens (the spacing `Grid`, the `TypeScale`, the `Palette` of state and surface colours for light and dark, and `Motion`) and `Components.swift`'s pieces (`MeasuredScrollView`, `Banner`, `CountBadge`, `CommandBox`; a row's `StateSymbol`, `CheckDot`, `AttentionDot` and `ErrorRow`; `itemRow(…)`, which makes a layout's item row a button that opens it on click and marks it seen on ⌥-click (or the VoiceOver action), with the tooltip from `PanelText.rowHelp` and the row highlight; `MarkSeenButton`, a project's or tab's Mark all seen; the row, press, icon, pill and text button styles; the row highlight's shape, `rowHighlight(_:in:)`), so the two layouts look like one app. The plumbing behind the highlight and the keys (`highlightable`, `clearsRowHighlight`, `rowKeys`, `RowFrames`, the focus on each open) is in `RowKeys.swift`. A layout is a view `(model: MenuModel, actions: LayoutActions)`; `LayoutActions` (`open`, `markSeen`, `markAllSeen`, `toggleCollapsed`, `openRepository`) comes from `AppServices`, and a layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
 
-Each layout highlights at most one row, and keeps which one in a `RowHighlight` (`ShipyardCore/Menu/RowHighlight.swift`, pure, #44, #45). A row is known by its `MenuRowPlace`: its project in the list layout (where one item can be listed under two projects) and its row id, or, for a project's header in the list layout, `.header(project)` (no row id): headers are rows the pointer and the keys highlight like items. Rows and headers feed the pointer's enter and exit to it (`highlightable(_:_:drawsOwnHighlight:)`): an exit from a row the highlight already left changes nothing, leaving the rows clears it even if the last exit never arrived, and `keep(in:)` clears it once its row stops being listed (collapsed, refreshed away, another tab). The rows a highlight can rest on, top to bottom, are `MenuModel.listRowPlaces` (each project's header, then its rows while it's expanded) and `MenuTabContent.rowPlaces`; error and placeholder rows aren't among them. The layout draws the highlight once, behind its rows (`rowHighlight(_:in:)`): one shape placed at the highlighted row's bounds (read from anchor preferences) that glides to the next row, rather than a shape matched between rows, which a lazy stack's recycled rows made jump. Tabs list a row at the same place, and while the list slides from one tab to the next both tabs are on screen, so a tab's rows are marked with `rowList(tab)` and what they report (bounds and spans) is keyed by `RowSlot` (the tab and the place); the tabs layout draws the highlight outside the sliding lists, for the selected tab's slots only, so the outgoing tab isn't lit and the shape fades in on the new tab. A project header pins over the rows, so it draws its own highlight on its background instead. Error rows, placeholders and a tab's kind headers call `pointerLeftRows()` when the pointer enters them (`clearsRowHighlight(_:)`), so a row whose exit was lost doesn't stay lit.
+Each layout highlights at most one row, and keeps which one in a `RowHighlight` (`ShipyardCore/Menu/RowHighlight.swift`, pure, #44, #45). A row is known by its `MenuRowPlace`: its project in the list layout (where one item can be listed under two projects) and its row id, or, for a project's header in the list layout, `.header(project)` (no row id): headers are rows the pointer and the keys highlight like items. Rows and headers feed the pointer's enter and exit to it (`highlightable(_:_:drawsOwnHighlight:)`): an exit from a row the highlight already left changes nothing, leaving the rows clears it even if the last exit never arrived, and `keep(in:)` clears it once its row stops being listed (collapsed, refreshed away, another tab). The rows a highlight can rest on, top to bottom, are `MenuModel.listRowPlaces` (each project's header, then, while it's expanded, its groups' places) and `MenuTabContent.rowPlaces` (its groups' places); error and placeholder rows aren't among them. Since 0.0.2 a place is a `MenuRowPlace.Kind`: an item, a project's header (`.header(project)`), or a subsection's subheader (`.groupHeader(GroupID, in: section)`, the section `nil` in a tab), which the highlight rests on like a row; `RowGroup.places(in:)` gives a group's places (its subheader, then, unless folded, its rows and its Show more row, `.showMore(GroupID, in: section)`), the one seam a new stop extends. The layout draws the highlight once, behind its rows (`rowHighlight(_:in:)`): one shape placed at the highlighted row's bounds (read from anchor preferences) that glides to the next row, rather than a shape matched between rows, which a lazy stack's recycled rows made jump. Tabs list a row at the same place, and while the list slides from one tab to the next both tabs are on screen, so a tab's rows are marked with `rowList(tab)` and what they report (bounds and spans) is keyed by `RowSlot` (the tab and the place); the tabs layout draws the highlight outside the sliding lists, for the selected tab's slots only, so the outgoing tab isn't lit and the shape fades in on the new tab. A project header pins over the rows, so it draws its own highlight on its background instead. Error rows and placeholders call `pointerLeftRows()` when the pointer enters them (`clearsRowHighlight(_:)`), so a row whose exit was lost doesn't stay lit.
 
-The keys drive the same highlight (#45), so the pointer and the keys can't disagree; every rule is in `RowHighlight` and `RowScroll` and tested there. `rowKeys(_:places:in:pinnedHeader:scroll:left:right:activate:)` (`RowKeys.swift`) goes on each layout's scrolling list. ↑ and ↓ call `moveUp(in:)` / `moveDown(in:)` with the layout's row places (the list's, or the selected tab's), which step to the previous or next place (from none: the first or the last) and wrap at the ends, like `NSMenu`. In the list layout, ← and → are `moveLeft(in:)` / `moveRight(in:)`: ← goes from an item to its project's header and collapses an expanded header; → expands a collapsed header and goes from an expanded one to its first item; they return the `ProjectFold` (collapse or expand) the layout passes to `toggleCollapsed`. In the tabs layout, ← and → switch to the previous or next tab (`MenuModel.tab(beside:by:)`, wrapping; provisional) and `moveToFirst(in:)` puts the highlight on the new tab's first row. Return acts on `MenuModel.listTarget(at:)` (an item, or a header's project) or `MenuTabContent.row(at:)`: an item opens and is marked seen, ⌥Return only marks it seen, like a click and an ⌥-click; a header opens its project's `repositoryURL` (the first configured repository) through `openRepository`, and ⌥Return on it does nothing. After a key the highlight stops following the pointer (`followsPointer`), so rows scrolling under a resting pointer don't take it back; it still records which row is under the pointer, and when the pointer really moves (a new location from `onContinuousHover`) `pointerMoved()` hands the highlight to that row, or to none.
+The keys drive the same highlight (#45), so the pointer and the keys can't disagree; every rule is in `RowHighlight` and `RowScroll` and tested there. `rowKeys(_:places:in:pinnedHeader:scroll:left:right:activate:)` (`RowKeys.swift`) goes on each layout's scrolling list. ↑ and ↓ call `moveUp(in:)` / `moveDown(in:)` with the layout's row places (the list's, or the selected tab's), which step to the previous or next place (from none: the first or the last) and wrap at the ends, like `NSMenu`. In the list layout, ← and → are `moveLeft(in:)` / `moveRight(in:)`, as in an outline: ← goes from an item to its subheader (or, in a group without one, its project's header), folds an open subheader, goes from a folded one to its project's header, and collapses an expanded header; → expands a collapsed header and goes from an expanded one to what's first under it, unfolds a folded subheader and goes from an open one to its first item; they return the `MenuFold` (collapse or expand a project, fold or unfold a group) the layout passes to `toggleCollapsed` or `toggleGroup`. In the tabs layout, ← and → on a subheader fold and unfold it (`moveLeft(in:)` / `moveRight(in:)` with the tab's content; → on an open one goes to its first item); anywhere else they switch to the previous or next tab (`MenuModel.tab(beside:by:)`, wrapping; provisional) and `moveToFirst(in:)` puts the highlight on the new tab's first place. Return acts on `MenuModel.listTarget(at:)` (an item, a header's project, a subheader's group, or a Show more row's group) or `MenuTabContent.row(at:)` / `subsection(at:)` / `showMoreGroup(at:)`: an item opens and is marked seen, ⌥Return only marks it seen, like a click and an ⌥-click; a header opens its project's `repositoryURL` (the first configured repository) through `openRepository`; a subheader folds or unfolds, as a click on it does; a Show more row shows the rest of its group, or as Show less caps it again; ⌥Return on a header, a subheader or a Show more row does nothing. An item in a folded subsection is no target. After a key the highlight stops following the pointer (`followsPointer`), so rows scrolling under a resting pointer don't take it back; it still records which row is under the pointer, and when the pointer really moves (a new location from `onContinuousHover`) `pointerMoved()` hands the highlight to that row, or to none.
 
 Scrolling with the keys: the list layout is one lazy stack whose every line (a project's placeholders, error rows and item rows, each with the hairline where the kind changes) is its own child, under `Section`s whose headers pin, and each row and header carries its place as its `.id`, so `ScrollViewReader` can reach a row the lazy stack hasn't laid out. Each laid-out row reports its span in the list's visible area to a `RowFrames` (a reference in the environment, kept out of view state), under its `RowSlot` and a token for the row view, so a row view that disappears (dropped by the lazy stack, or the outgoing tab's) forgets only the span it reported itself; and `RowScroll.reveal` decides: a row in full view doesn't scroll; one past the bottom scrolls to sit on it; one above the top, or under the pinned header, scrolls to sit just below the header (a unit anchor worked out from the list's and the row's heights); one not laid out scrolls towards the way the highlight moved (up: to the top), except a header's first item after the header, which is under the header pinned at the top: just below the header. A wrap (↓ from the last row to the first, ↑ from the first to the last) scrolls straight to the list's far end in the same key press, laid out or not: to `RowListTop` or `RowListBottom`, zero-height views the layout puts above and below its rows, outside the lazy stack. The lazy stack guesses the height of rows it hasn't laid out, so the first scroll to the bottom can stop short of the last row; a `RowWrapLanding` (pure, in `RowScroll.swift`) follows the wrap: each time rows report new spans (`RowFrames.rowsMoved`), once the update is laid out, it checks the wrapped-to row and scrolls to the same end again until the row is in full view, at most four times; any key or pointer move ends it. A row the lazy stack kept but hid reports its last span again when it reappears (a wrap back to the end it came from leaves it where it was, so its geometry doesn't change and it wouldn't report otherwise). The scroll isn't animated, so a held key repeats at the system's rate and the list keeps up; only the highlight shape glides. `onKeyPress` calls the handler it had at the key-down for every repeat of that key, with that handler's copy of the modifier (its rows, and a highlight from before the first step), so the key handlers act through a reference to the modifier as last drawn (`LatestRowKeys`), along with the highlight a key set that the view hasn't been updated with yet; ↑/↓ take `.down` and `.repeat`, and ←, → and Return act once per press. A highlighted item row gets the rounded, inset shape; a highlighted project header fills its whole band, square and full width. A tab switch scrolls to the list's top (`RowListTop`, a zero-height view above the sliding lists), where the new tab's first row is: not to the row itself, which isn't laid out yet and whose id the outgoing tab's row shares.
 
 Focus: the list takes the keyboard focus when it appears and again each time its window becomes key (`NSWindow.didBecomeKeyNotification` for the window it's in, through a zero-size `NSViewRepresentable`), because the `MenuBarExtra`'s view outlives a closed menu and focus set before the window is key is lost; so the arrows work as soon as the menu opens. The panel's window is key while the menu is open, which is what lets the list receive keys (as ⌘R and the picker's text field already do); closed, it's off screen and takes no keys, and nothing here changes when the window becomes key or the app's activation.
 
-`ConnectView` draws `PanelText.connect(signedOutReason)`: the app's icon and a title, what happened, the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out. While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The header's gear menu has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
+`ConnectView` draws `PanelText.connect(signedOutReason, canSignIn: canSignInWithGitHub)`: the app's icon and a title, what happened, **Sign in with GitHub** (`beginDeviceFlow()`; under it `PanelText.signInFailed(signInError)` after a flow that ended without a token, or, with the placeholder client ID, the button disabled and `PanelText.signInUnavailable`), then the `gh` way in: a lead-in and the `gh` command with a Copy button (`gh auth login`, or `gh auth logout` after signing out of `gh`'s token), a pointer to installing `gh` when there's no token at all, and Try again (`start()`), which says why (`PanelText.stillSignedOut`) when it leaves shipyard signed out. Try again isn't the default action, so Return can't undo a sign-out; it's the prominent button only when Sign in with GitHub is unavailable. In `connecting(code)` it draws `PanelText.deviceCode(code)`: the user code, large and selectable, when it expires, Cancel (`cancelDeviceFlow()`) and Copy code and open GitHub, which puts the code on the clipboard before `openVerificationPage()` (the browser taking focus may close the menu; the flow goes on in `Shipyard`). While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Try again. The header's gear menu has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. While `shipyard.presets` isn't empty (the file holds nothing but `version`), the panel shows `PresetPicker` first: a native radio group of `presets`, each with its title and summary, and for `incoming-contributions` a second one, "All my repositories (`owned`)" (the default) or "Pick repositories". Its state is a `PresetChoice` (`ShipyardCore/Onboarding/`, pure): the chosen preset, `watchesOwned`, and whether the picker comes next (`needsRepositories`). The button says so (`PanelText.presetContinue`): "Choose repositories" shows the `ProjectPicker` with a back button, whose Add calls `choosePreset(preset, projects:)` with the picked projects; "Start with …" calls it at once with none. A refusal empties `presets`, so the panel shows the plain picker. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
 
 The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one, named without its owner by `repositoryName`), a row's tooltip in either layout (its state and that line, and the ⌥-click hint while it needs attention), a state's word and the state icon's VoiceOver label, the header (the account's "@handle", its hover text and VoiceOver label, "Shipyard" until the account is known, "3 need attention"), the Mark all seen buttons, "Last updated 5 min ago", the configuration error and warnings, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card) come from `PanelText` in `ShipyardCore/Menu/` (one file for the menu, one per onboarding screen and the skill card), so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel only rereads the notification permission (it doesn't refresh), ⌘R is the header's Refresh button (`refreshNow()`, which also creates a missing configuration file), and `layoutActions` hands the layouts their `LayoutActions`. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation`. `AppServices` also holds the `AvatarCache` (in `Application Support/Shipyard/Avatar/`) the header's account draws from. Opening something elsewhere (a row's `open`, a notification's item, the header's account through `openProfile()`, "Open configuration file") then calls `closeMenu()`, which closes the menu the way a click on its icon does, through the status item (SwiftUI has no dismiss for a `.window` `MenuBarExtra`); ⌥-click, collapse, tab switches and Mark all seen leave it open (#39).
 
@@ -473,7 +626,7 @@ Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skil
 |---|---|
 | `install() async -> SkillInstallResult` | `installed(output)` on status 0; `npxNotFound(command)` on status 127 (the shell couldn't find `npx`), with `SkillInstaller.command` for the Copy button; `failed(output)` otherwise: what it printed, colour codes stripped, or "exited with status N" when it printed nothing, or "couldn't start <shell>" |
 
-The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` looks for a repository's skills (`skills/<name>/SKILL.md`, with `name` and `description` frontmatter). It documents the configuration file for agents; `SkillDocumentTests` decode each of its TOML examples with `Configuration.decode`, check them against the schema, and check that it names every key (each nested one beside its table), default, event and author filter the code has, and that its worked requests configure what they say. How configuration works in the code, and the checklist for adding a setting, is `docs/configuration.md`; `ConfigurationDocumentTests` keep that checklist naming every place a setting lives.
+The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` looks for a repository's skills (`skills/<name>/SKILL.md`, with `name` and `description` frontmatter). It documents the configuration file for agents; `SkillDocumentTests` read its frontmatter as strict YAML (the CLI skips a skill whose frontmatter isn't valid YAML, such as a value with an unquoted `: `), decode each of its TOML examples with `Configuration.decode`, check them against the schema, and check that it names every key (each nested one beside its table), default, event and author filter the code has, and that its worked requests configure what they say. How configuration works in the code, and the checklist for adding a setting, is `docs/configuration.md`; `ConfigurationDocumentTests` keep that checklist naming every place a setting lives.
 
 ### Folder tree
 
@@ -485,8 +638,10 @@ shipyard/
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (origami, the menu bar's sailboat folded from paper, is the app's; sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
-├── skills/shipyard/SKILL.md          # teaches agents the config file; installed by `npx skills add`
+├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
+├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
+├── docs/assets/<topic>/             # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md)
 ├── Sources/ShipyardCore/             # Foundation, FoundationNetworking, Observation and TOMLDecoder only, so agents can build and test it on a Linux VPS
 │   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
 │   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
@@ -497,8 +652,11 @@ shipyard/
 │   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
 │   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
 │   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
+│   │   ├── Selectors.swift           # AuthorSelector, AuthorFilter, RepositorySelector: parse, match, the hints (ADR 0002)
+│   │   ├── Presets.swift             # the three presets: names, what they ask for, their file text
+│   │   ├── PresetSetting.swift       # the third writer: a preset into a file whose only live key is version
 │   │   ├── LayoutSetting.swift       # the layout button's edit: set [menu] layout in the text, every other line kept
-│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects, set the layout
+│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects, set the layout, write a preset
 │   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
@@ -506,29 +664,35 @@ shipyard/
 │   │   ├── AvatarCache.swift         # the account's avatar on disk: downloaded once (no token, s=60), again only when its URL changes
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
-│   │   ├── Repositories.swift        # the picker's calls: recent repositories (GraphQL), checking a typed one (REST); RepoSummary, RepositoryCheck
+│   │   ├── Repositories.swift        # the picker's calls: recent repositories (GraphQL), checking a typed one (REST); RepoSummary, RepositoryCheck; a group's or owner's repositories, paged
+│   │   ├── RepositoryResolver.swift  # repository selectors → repositories, hourly; archived and forks; an error per selector
 │   │   ├── WorkflowRuns.swift        # REST runs request + parse + branch filter
 │   │   └── Auth/
 │   │       ├── TokenProvider.swift   # TokenStore → gh → none; GhCLI finds and runs gh
 │   │       └── DeviceFlow.swift      # OAuth device flow
 │   ├── Items/
-│   │   ├── Item.swift                # Item, Snapshot, RepositoryError, RateLimit, fingerprint
+│   │   ├── Item.swift                # Item, StateGroup, Snapshot, RepositoryError, RateLimit, fingerprint
+│   │   ├── Listing.swift             # the one filter: what a project lists (ADR 0003)
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
 │   │   └── NotificationRules.swift   # event + project settings → notify?; what to post; NotifiedEvents
 │   ├── State/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
-│   │   ├── MenuModel.swift           # pure: sections, rows, semantic state colours, label
-│   │   ├── MenuTabs.swift            # pure: the tabs layout's tabs, their counts, the selection's fallback to All, the tab beside one (←/→), a tab's rows grouped by kind
-│   │   ├── RowHighlight.swift        # pure: which row or project header a layout highlights, from the pointer and the arrow keys (wrap, ←/→ fold), the rows it can rest on, what Return acts on
+│   │   ├── MenuModel.swift           # pure: sections of groups, from listings; semantic state colours, label
+│   │   ├── Arrangement.swift         # pure: group, sort, cap: RowGroup
+│   │   ├── PanelText+Groups.swift    # pure: group titles, date buckets, "Show 3 more", "Show less"
+│   │   ├── MenuTabs.swift            # pure: the tabs layout's tabs, their counts, the selection's fallback to All, the tab beside one (←/→), a tab's rows as its arrangement groups them, All by kind
+│   │   ├── RowHighlight.swift        # pure: which row, project header or subheader a layout highlights, from the pointer and the arrow keys (wrap, ←/→ fold), the rows it can rest on, what Return acts on
 │   │   ├── RowScroll.swift           # pure: how far the list scrolls to keep the keys' highlight in view, clear of the pinned header; a wrap to the far end, followed until its row lands (RowWrapLanding)
 │   │   ├── PanelText.swift           # pure: the header's account or "Shipyard", row age and second line, a state's word and the state icon's VoiceOver label, tab titles and summary, "Last updated N min ago", config error and warnings, fetch error, refresh-delay and notifications-off banners, rate-limit lines
 │   │   ├── PanelText+Connect.swift   # pure: the connect screen's words
 │   │   ├── PanelText+ProjectPicker.swift  # pure: the picker's words, its Add button and summary
+│   │   ├── PanelText+PresetPicker.swift   # pure: the preset step's words and its button
 │   │   └── PanelText+SkillInstall.swift   # pure: the skill install card
 │   ├── Onboarding/
-│   │   └── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
+│   │   ├── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
+│   │   └── PresetChoice.swift        # pure: the chosen preset and what it still needs before Add
 │   └── Skill/
 │       ├── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port, cancellable), SkillInstallResult
 │       └── SkillInstallation.swift   # one install as the panel shows it: running, result, timeout, cancel
@@ -537,8 +701,7 @@ shipyard/
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # URLOpening on NSWorkspace; opens config.toml in its editor (TextEdit when none)
-│   ├── SessionTokenStore.swift       # session-only token store (never written in 0.0.x: gh only) until Keychain.swift (#22)
-│   ├── Keychain.swift                # TokenStore on the login keychain (#22, with sign-in without gh)
+│   ├── Keychain.swift                # TokenStore on the login keychain: the app's token store since 0.0.2 (S1)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   └── UI/
@@ -547,18 +710,20 @@ shipyard/
 │       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, an item row's click, tooltip and highlight (itemRow), Mark seen button, button styles, the row highlight's shape (rowHighlight)
 │       ├── RowKeys.swift             # the highlight's and keys' plumbing: rows reporting their bounds and spans by tab (highlightable, rowList, RowFrames), the row keys (focus on each open, held-key repeats, scrolling the highlight into view, the list's top and bottom for a wrap or a tab switch)
 │       ├── SkillInstallCard.swift    # the skill install: offer, Cancel, result, command to copy
+│       ├── Components+Groups.swift   # GroupHeader (a subsection's subheader) and ShowMoreRow, shared by both layouts
 │       ├── Layouts/
-│       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, mark all seen, collapse
+│       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, mark all seen, collapse, fold a subsection, Show more or less
 │       │   ├── ListLayout.swift      # [menu] layout = "list": pinned project headers, one line per item
-│       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows grouped by kind
+│       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows as its arrangement groups them, All by kind
 │       └── Onboarding/
-│           ├── ConnectView.swift     # why signed out, the gh command to copy, Try again
+│           ├── ConnectView.swift     # why signed out, Sign in with GitHub (the code, Cancel), the gh command to copy, Try again
+│           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
 └── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module
     ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
     ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
     ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
-    ├── Onboarding/                   # ProjectChoices: choosing, typing, naming, grouping
+    ├── Onboarding/                   # ProjectChoices: choosing, typing, naming, grouping; PresetChoice: each preset's next step
     ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
     ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
     └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake shell, hanging shell, instant sleeper
@@ -578,8 +743,12 @@ refresh()
   guard budget.canRefresh(now) else { timer.arm(until pause ends); return }   // ⌘R, wake: nothing sent while paused
   guard gate.begin() else return                      // queued; runs again after this one
   config = configStore.lastValid
+  configured = config.projects.map(config.settings)   // each project's settings, before its groups and wildcards resolve
   do
-    snapshot = await request { github.fetch(projects: config.projects.map(config.settings), at: clock.now) }   // every call goes through request (401 → signedOut)
+    resolved = await resolver.resolve(configured, force: forceResolve, now) { request { github.repositories(of: $0) } }   // 0.0.2: hourly unless forced (launch, config change, ⌘R, sign-in)
+    forceResolve = false
+    projects = configured.map { $0.resolved(by: resolved[$0.name]) }   // the repositories the known sources and events are about
+    snapshot = await request { github.fetch(projects: configured, resolved: resolved, at: clock.now) }   // batches of 25 + the review search; every call goes through request (401 → signedOut)
   catch unauthorized
     phase = signedOut; gate.finish(); return
   catch rateLimited(resetAt, api) / secondaryLimit(retryAfter)
@@ -588,10 +757,11 @@ refresh()
   catch other
     rebuildMenu(config)
     fetchError = other; menu.fetchError = other; gate.finish(); return   // keep old snapshot, rows and lastUpdated
+  listings = projects.map { Listing.items(for: $0, in: snapshot, viewer, now) }   // 0.0.2: what each project has
   appStateStore.update { state in                     // saves only if it changed
     events = EventDetector.events(state.known, snapshot, projects)   // first sight of a project's source: none
     for id, occurrences in events grouped by id where id ∉ state.notified   // an item in two projects: one event
-      if first occurrence whose project's rules select it (NotificationRules.shouldNotify, hide-authors)
+      if first occurrence listed by its project (listings) and selected by its rules (NotificationRules.shouldNotify)
         toPost.append(NotificationRules.notification(for: it))
       state.notified.insert(id)                         // notified or not, never again
     state.known = state.known.updated(with: snapshot, projects); state.notified.prune(present: known items, now)
@@ -599,7 +769,9 @@ refresh()
   }
   self.snapshot = snapshot; fetchError = nil
   budget.record(snapshot.rateLimits, now)
-  menu = MenuModel.build(snapshot, config, appState, now)   // Panel re-renders from it
+  menu = MenuModel.build(listings, snapshot (errors, fetchedAt), config, appState, expandedGroups, now)   // Panel re-renders from it
+  appStateStore.update { $0.collapsedGroups = menu.foldsToKeep($0.collapsedGroups) }   // 0.0.2: a fold whose group or project is gone goes too
+  menu.foldedGroups = appState.collapsedGroups
   delay = budget.nextDelay(config.refreshIntervalSeconds, config.rateLimit.maxSharePercent, now)
   menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, in: [graphql] + [rest if any project shows runs], now)
   for n in toPost: await notifier.post(n)              // after saving: a crash loses one rather than repeating it
@@ -607,6 +779,39 @@ refresh()
   if gate.finish() then refresh()                     // a queued trigger arrived meanwhile
 ```
 
+Every fetched item stays known even when its project doesn't list it, so an item a filter change brings into view later doesn't notify as though it were new.
+
+### Listing.items (0.0.2)
+
+```text
+items(for project, in snapshot, viewer, now)
+  candidates = snapshot items of the project: its resolved repositories', plus the search's PRs when it uses anywhere (the fetch adds them)
+  return candidates where
+    project.shows(item.kind)
+    and kindSettings.states contains item.state.group           // StateGroup: open | merged | closed | in-progress | failed | succeeded
+    and inWindow(item, kindSettings, now)                       // closed-window-days / finished-window-hours
+    and (kind != pullRequest or drafts or not item.isDraft)
+    and kindSettings.authors.includes(item.author, viewer)
+    and (not reviewRequested or snapshot.reviewRequested contains item.id)
+```
+
+### Arrangement.groups (0.0.2)
+
+```text
+groups(items, project, settings, layout, folded, expanded, now, calendar)
+  buckets = partition items by key(settings.groupBy, item)        // none: one bucket
+  for bucket in ordered(buckets)
+    rows = bucket sorted (open first, then settings.sortBy)
+    id = GroupID(project, key)
+    overCap = settings.showFirst > 0 and rows.count > settings.showFirst
+    capped = overCap and id not in expanded
+    emit RowGroup(id, title(key), rows: capped ? first showFirst : rows,
+                  hiddenRows: capped ? the rest : [],             // hiddenCount = hiddenRows.count
+                  isExpanded: overCap and id in expanded,          // its row reads Show less
+                  showsHeader: settings.subsections ?? layout.subheadersByDefault,
+                  isFolded: showsHeader and id in folded,
+                  attentionCount: every row's needsAttention, hidden ones too)
+```
 ### Attention.needsAttention(item)
 
 ```text
@@ -644,7 +849,7 @@ Two separate hourly limits, both 5,000 for a signed-in user, and **both shared w
 | REST runs, 10 repositories, nothing changed (304) | 10 requests, 0 counted | 0 | 0% |
 | REST runs, 10 repositories, all changed | 10 requests | 300 | 6% |
 
-GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists (`reviewRequests`, last commit's checks) dominate it. To keep it low, `reviewRequests` asks for `first: 10` and the head commit for `last: 1`, and closed items for `first: 20`. The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it. The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table. So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your GraphQL rate limit (a refresh costs 56 points)".
+GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists dominate it. To keep it low, the head commit is asked for `last: 1` and closed items for `first: 20`; 0.0.1 also read each PR's `reviewRequests` (`first: 10`), which 0.0.2's single review search (one page of 100 PRs, in the first batch) replaces. The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it. The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table. So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your GraphQL rate limit (a refresh costs 56 points)".
 
 ### Trace 1: an agent opens a PR (happy path)
 
@@ -673,6 +878,24 @@ Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backe
 | 4 | refreshes keep running with `lastValid` | list unchanged |
 | 5 | agent reads `config-status.json`, fixes the file, reads it again | `error = nil`, banner gone, record says `"accepted": true` for the new modification time, refresh triggered |
 
+### Trace 4: `incoming-contributions` with `owned` (0.0.2, happy path)
+
+| Step | State after |
+|---|---|
+| Onboarding: choose `incoming-contributions` with "all my repositories" | `writePreset` writes the file; the reload has "Incoming" (`owned`) and "Review requests" (`anywhere`); phase `ready` |
+| `refresh()`: the resolver pages `viewer.repositories(affiliations: OWNER, isArchived: false)` | "Incoming" resolves to 14 repositories; `anywhere` to none |
+| `fetch`: one batch of 14 aliases plus the review search | the snapshot has 40 items; `reviewRequested` has 3 PRs, 2 in other people's repositories |
+| `Listing`: "Incoming" drops the 31 items by `me` and 2 by `dependabot[bot]`; "Review requests" takes the 3 search PRs | listings of 7 and 3 |
+| `EventDetector`: first sight of every source | no events, nothing notified (bootstrap) |
+| `MenuModel` + `Arrangement`: group by repository, subsections | "Incoming" shows 4 repository subheaders; the menu bar counts 10 listed items, not 40 |
+| Next refresh: someone opens a PR on one of the user's repositories | `pr.opened` from `others`, listed, so it notifies |
+
+### Trace 5: `anywhere` misused (0.0.2, rejection)
+
+| Step | State after |
+|---|---|
+| An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
+| `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
 ### Trace 3: agents drain the limit (rejection by budget)
 
 Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agents are running `gh` heavily.
@@ -704,12 +927,21 @@ What the traces turned up and the design now handles: the first refresh after ad
 | Notarized releases | `Makefile` only |
 | Fetch less when nothing moved (e.g. only query repositories whose `pushedAt` changed) | `ProjectQuery` + `GitHubClient`; `RateBudget` needs nothing, it measures the cost |
 | Breaking config change | `version` field + a migration in `Configuration.decode` |
+| A new author group (e.g. `agents`) | `AuthorSelector` (a case and its match), the schema, the skill |
+| `assigned` or `mentioned` | a field on the kind's settings, one check in `Listing`, the query field |
+| Deployments waiting on approval | a `workflow-runs` field, a REST call in `WorkflowRuns`, one check in `Listing` |
+| A new `group-by` (e.g. `label`) | a case in `Arrangement`'s key and title, the schema, the skill |
+| Oldest first | a `sort-by` choice in `Arrangement`, the schema |
+| A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
+| The picker offering more groups | `PresetChoice` and `PresetPicker` only |
 
-Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI (ADR 0001), multi-account support.
+Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI (ADR 0001), multi-account support. Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), persisting resolved repositories (resolving costs a few points once an hour), and a plugin seam for filters (each is a field and one line in `Listing`).
 
 ---
 
 ## Decisions taken in review
+- **0.0.2, review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh. Cost accepted: GitHub's search index can lag a PR by a short while, and it returns at most 100.
+- **0.0.2, `subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
 
 - **Panel technology: SwiftUI `MenuBarExtra` in `.window` style**, not AppKit `NSMenu`. The panel stays open while sections collapse and ⌥-clicks happen, colours and rows are fully controlled, and onboarding lives in the same panel. Cost accepted: it doesn't behave exactly like a native menu (no type-to-select).
 - **A click clears everything about an item until it changes again**, including a review request or failed checks. The attention count means "things to look at", not "work outstanding".

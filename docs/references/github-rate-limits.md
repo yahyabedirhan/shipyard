@@ -18,7 +18,17 @@ So shipyard shares both limits with `gh` and with every agent acting as the user
 - Add up the requests needed to fulfil each connection in the query (a nested list counts once per parent node), divide by 100 and round. The minimum is 1 point.
 - Nested per-item lists dominate. Fifty PRs, each asking for `reviewRequests(first: 10)` and `commits(last: 1)`, add about 100 requests on top of the PR list itself.
 - `rateLimit(dryRun: true) { cost limit remaining resetAt }` returns a query's cost without spending it.
-- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**.
+- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**. Since 0.0.2 the query no longer reads `reviewRequests`; one review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
+
+## Query limits, and why shipyard sends repositories in batches
+
+Checked 2026-09-26 against the GraphQL rate-limits page above.
+
+- **Nodes:** "Individual calls cannot request more than 500,000 total nodes." Nodes multiply down nested connections (50 repositories × 10 issues each = 500 nodes).
+- **Time:** "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate the request and you will receive a timeout response."
+- GitHub's advice for both: "Break up complex queries into multiple simpler queries."
+- **Shipyard's batch:** 25 repositories per GraphQL request, sent one after another (never in parallel, per the secondary limits below). One repository asks for at most about 910 nodes (70 pull requests, each with 10 review requests and 1 commit, plus 70 issues), so a batch stays near 23,000 nodes, far inside the node limit, and small enough to answer well within the 10 seconds even when a group brings in hundreds of repositories. A user with 25 repositories or fewer still sends one request.
+- **Cost of batches:** each request's cost is rounded on its own and has the minimum of 1 point, so several batches can cost a point or two more than one request would. Shipyard's rate budget records the batches' sum as the refresh's cost, and the last batch's headers as where the limit stands.
 
 ## Knowing where you stand
 

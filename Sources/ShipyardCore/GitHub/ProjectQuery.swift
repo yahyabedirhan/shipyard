@@ -21,19 +21,40 @@ struct RepositoryRequest: Equatable, Sendable {
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
 }
 
-/// The one GraphQL request a refresh makes: every repository as an alias
-/// (its pull requests and, where shown, its issues), plus the viewer and the
-/// rate limit. Builds the query and parses the
-/// answer into items, so the query text and its parser have one owner.
+/// What the review search found: one page of pull requests, and how many
+/// matched in all (more than the page holds when there were more than
+/// `ProjectQuery.reviewSearchFirst`).
+struct ReviewSearchResult: Equatable, Sendable {
+    var pullRequests: [Item] = []
+    var total = 0
+}
+
+/// The GraphQL request a refresh makes for one batch of repositories: each
+/// repository as an alias (its pull requests and, where shown, its issues),
+/// plus the viewer and the rate limit, and in the first batch the review
+/// search. Builds the query and parses the answer into items, so the query
+/// text and its parser have one owner.
 enum ProjectQuery {
+    /// Repositories asked about per request. A refresh with more sends
+    /// several requests, one after another, so one query stays well inside
+    /// GitHub's node limit however many repositories the projects watch.
+    static let repositoriesPerRequest = 25
+
     /// Open pull requests (and open issues) fetched per repository.
     static let openFirst = 50
     /// Closed or merged pull requests (and closed issues) fetched per
     /// repository, most recently updated first; the menu keeps those inside
     /// the closed window.
     static let closedFirst = 20
-    /// Review requests read per pull request, to find the viewer's.
-    static let reviewRequestsFirst = 10
+
+    /// The open pull requests waiting on the viewer's review, anywhere on
+    /// GitHub. `review-requested:@me` counts requests to the viewer's teams
+    /// too (`user-review-requested:@me` wouldn't).
+    static let reviewSearchQuery = "is:pr is:open archived:false review-requested:@me"
+    /// Pull requests the review search returns: one page, GitHub's largest.
+    static let reviewSearchFirst = 100
+    /// The review search's alias in the query and the answer.
+    static let reviewSearchAlias = "reviewSearch"
 
     /// The repositories to ask about, each once, in the order the projects
     /// first name them.
@@ -41,7 +62,7 @@ enum ProjectQuery {
         var requests: [RepositoryRequest] = []
         var index: [String: Int] = [:]
         for project in projects {
-            for slug in project.repositories {
+            for slug in project.repositorySlugs {
                 let key = slug.lowercased()
                 let at = index[key] ?? requests.count
                 if at == requests.count {
@@ -65,8 +86,9 @@ enum ProjectQuery {
 
     // MARK: - Building
 
-    /// The query text for `repositories`, with `$owner<i>`/`$name<i>` variables.
-    static func document(_ repositories: [RepositoryRequest]) -> String {
+    /// The query text for `repositories`, with `$owner<i>`/`$name<i>`
+    /// variables, and with `reviewSearch` the review search.
+    static func document(_ repositories: [RepositoryRequest], reviewSearch: Bool = false) -> String {
         let parameters = repositories.indices
             .map { "$owner\($0): String!, $name\($0): String!" }
             .joined(separator: ", ")
@@ -110,10 +132,19 @@ enum ProjectQuery {
 
         var text = "query Shipyard\(parameters.isEmpty ? "" : "(\(parameters))") {\n"
         text += "  viewer { login }\n"
+        if reviewSearch {
+            text += """
+                  \(reviewSearchAlias): search(type: ISSUE, query: "\(reviewSearchQuery)", first: \(reviewSearchFirst)) {
+                    issueCount
+                    nodes { ... on PullRequest { repository { nameWithOwner } ...PullRequestFields } }
+                  }
+
+                """
+        }
         text += fields
         text += "  rateLimit { limit remaining used resetAt cost }\n}\n"
         // GraphQL rejects a fragment no field uses.
-        if repositories.contains(where: \.pullRequests) {
+        if reviewSearch || repositories.contains(where: \.pullRequests) {
             text += """
 
                 fragment PullRequestFields on PullRequest {
@@ -121,7 +152,6 @@ enum ProjectQuery {
                   author { login __typename }
                   comments { totalCount }
                   reviews { totalCount }
-                  reviewRequests(first: \(reviewRequestsFirst)) { nodes { requestedReviewer { __typename ... on User { login } } } }
                   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
                 }
 
@@ -142,13 +172,13 @@ enum ProjectQuery {
     }
 
     /// The JSON body to POST to `/graphql`.
-    static func body(_ repositories: [RepositoryRequest]) -> Data {
+    static func body(_ repositories: [RepositoryRequest], reviewSearch: Bool = false) -> Data {
         var variables: [String: String] = [:]
         for (index, repository) in repositories.enumerated() {
             variables["owner\(index)"] = repository.owner
             variables["name\(index)"] = repository.name
         }
-        let request = Request(query: document(repositories), variables: variables)
+        let request = Request(query: document(repositories, reviewSearch: reviewSearch), variables: variables)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         // Encoding strings and a string dictionary can't fail.
@@ -175,12 +205,40 @@ enum ProjectQuery {
         /// Per repository slug that asked (`runBranches`): its default branch
         /// and open pull requests' heads, for the runs' branch filter.
         var branches: [String: RunBranches] = [:]
+        /// What the review search found, when this answer's query asked for it.
+        var reviewSearch: ReviewSearchAnswer?
+
+        /// Adds the answer to the next batch: its repositories' items,
+        /// errors and branches. The rate limit is the later one's, costing
+        /// the sum of both.
+        mutating func add(_ next: Parsed) {
+            viewerLogin = viewerLogin ?? next.viewerLogin
+            reviewSearch = reviewSearch ?? next.reviewSearch
+            items.merge(next.items) { _, later in later }
+            errors.merge(next.errors) { _, later in later }
+            branches.merge(next.branches) { _, later in later }
+            if var limit = next.rateLimit ?? rateLimit {
+                let costs = [rateLimit?.cost, next.rateLimit?.cost].compactMap { $0 }
+                limit.cost = costs.isEmpty ? nil : costs.reduce(0, +)
+                rateLimit = limit
+            }
+        }
+    }
+
+    /// The review search's answer: the pull requests it found (their
+    /// `reviewRequestedFromViewer` set) and how many matched in all, which is
+    /// more than it returned when there were more than one page; or GitHub's
+    /// message when it came back `null` with an error.
+    enum ReviewSearchAnswer: Equatable, Sendable {
+        case found(ReviewSearchResult)
+        case failed(String)
     }
 
     /// Reads GitHub's answer. A body that isn't GraphQL's shape throws
     /// `.malformed`; errors with no data throw `.graphQL`. A repository whose
-    /// alias came back `null` becomes a `RepositoryError`, and the rest still parse.
-    static func parse(_ data: Data, repositories: [RepositoryRequest]) throws -> Parsed {
+    /// alias came back `null` becomes a `RepositoryError`, and the rest still
+    /// parse; so does a review search that came back `null`.
+    static func parse(_ data: Data, repositories: [RepositoryRequest], reviewSearch: Bool = false) throws -> Parsed {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let response: Response
@@ -204,6 +262,20 @@ enum ProjectQuery {
         parsed.viewerLogin = viewer
         parsed.rateLimit = payload.rateLimit.map {
             RateLimit(limit: $0.limit, remaining: $0.remaining, used: $0.used, resetAt: $0.resetAt, cost: $0.cost)
+        }
+        if reviewSearch {
+            if let search = payload.reviewSearch {
+                let found = search.nodes.present.compactMap { node -> Item? in
+                    guard let repository = node.repository?.nameWithOwner, let pullRequest = node.pullRequest else { return nil }
+                    var item = pullRequest.item(in: repository, viewer: viewer)
+                    item.reviewRequestedFromViewer = true
+                    return item
+                }
+                parsed.reviewSearch = .found(ReviewSearchResult(pullRequests: found, total: search.issueCount ?? found.count))
+            } else {
+                let error = errors.first { $0.path?.first == .key(reviewSearchAlias) }
+                parsed.reviewSearch = .failed(error?.message ?? "GitHub didn't answer the search")
+            }
         }
         for (index, repository) in repositories.enumerated() {
             let alias = alias(index)
@@ -252,6 +324,8 @@ enum ProjectQuery {
     private struct Payload: Decodable {
         var viewer: ViewerNode?
         var rateLimit: RateLimitNode?
+        /// The review search; `nil` when it came back `null` (or wasn't asked).
+        var reviewSearch: SearchAnswer?
         /// `repo<i>` aliases; `nil` where GitHub answered `null`.
         var repositories: [String: RepositoryNode?] = [:]
 
@@ -266,6 +340,7 @@ enum ProjectQuery {
             let container = try decoder.container(keyedBy: Key.self)
             viewer = try container.decodeIfPresent(ViewerNode.self, forKey: Key(stringValue: "viewer"))
             rateLimit = try container.decodeIfPresent(RateLimitNode.self, forKey: Key(stringValue: "rateLimit"))
+            reviewSearch = try container.decodeIfPresent(SearchAnswer.self, forKey: Key(stringValue: ProjectQuery.reviewSearchAlias))
             for key in container.allKeys where key.stringValue.hasPrefix("repo") && Int(key.stringValue.dropFirst(4)) != nil {
                 repositories[key.stringValue] = .some(try container.decodeIfPresent(RepositoryNode.self, forKey: key))
             }
@@ -288,6 +363,19 @@ enum ProjectQuery {
         /// GitHub may answer `null` for a node it couldn't resolve.
         var nodes: [Node?]?
         var present: [Node] { (nodes ?? []).compactMap { $0 } }
+    }
+
+    /// The review search: one page of results, and how many matched in all.
+    private struct SearchAnswer: Decodable {
+        var nodes: Nodes<SearchNode>
+        var issueCount: Int?
+
+        init(from decoder: any Decoder) throws {
+            nodes = try Nodes<SearchNode>(from: decoder)
+            issueCount = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Int.self, forKey: .issueCount)
+        }
+
+        private enum CodingKeys: String, CodingKey { case issueCount }
     }
 
     private struct Count: Decodable {
@@ -324,12 +412,20 @@ enum ProjectQuery {
         var __typename: String?
     }
 
-    private struct ReviewRequestNode: Decodable {
-        struct Reviewer: Decodable {
-            var __typename: String?
-            var login: String?
+    /// One result of the review search: a pull request and its repository.
+    /// A result that isn't a pull request (the query asks only for them)
+    /// decodes with neither and is skipped.
+    private struct SearchNode: Decodable {
+        struct Repository: Decodable { var nameWithOwner: String }
+        var repository: Repository?
+        var pullRequest: PullRequestNode?
+
+        private enum CodingKeys: String, CodingKey { case repository }
+
+        init(from decoder: any Decoder) throws {
+            repository = try? decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(Repository.self, forKey: .repository)
+            pullRequest = try? PullRequestNode(from: decoder)
         }
-        var requestedReviewer: Reviewer?
     }
 
     private struct CommitNode: Decodable {
@@ -354,7 +450,6 @@ enum ProjectQuery {
         var author: AuthorNode?
         var comments: Count?
         var reviews: Count?
-        var reviewRequests: Nodes<ReviewRequestNode>?
         var commits: Nodes<CommitNode>?
 
         func item(in repository: String, viewer: String?) -> Item {
@@ -364,12 +459,7 @@ enum ProjectQuery {
             case "CLOSED": .closed
             default: isDraft ? .draft : .open
             }
-            let reviewRequested = viewer.map { viewer in
-                (reviewRequests?.present ?? []).contains {
-                    $0.requestedReviewer?.__typename == "User"
-                        && $0.requestedReviewer?.login?.lowercased() == viewer.lowercased()
-                }
-            } ?? false
+            // Whether it waits on the viewer comes from the review search.
             return Item(
                 kind: .pullRequest,
                 repository: repository,
@@ -380,7 +470,6 @@ enum ProjectQuery {
                 authorKind: authorKind,
                 state: state,
                 checks: Self.checks(commits?.present.last?.commit.statusCheckRollup?.state),
-                reviewRequestedFromViewer: reviewRequested,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 closedAt: state.isOpen ? nil : (closedAt ?? mergedAt ?? updatedAt),
@@ -390,7 +479,7 @@ enum ProjectQuery {
 
         /// A deleted account is GitHub's `ghost`. GraphQL names a Bot
         /// `dependabot`, where REST and the web say `dependabot[bot]`; the
-        /// `[bot]` spelling is kept so `hide-authors` matches either way.
+        /// `[bot]` spelling is kept so an `@login` author selector matches either way.
         static func author(_ node: AuthorNode?, viewer: String?) -> (String, AuthorKind) {
             guard let node else { return ("ghost", .other) }
             if node.__typename == "Bot" || node.login.hasSuffix("[bot]") {

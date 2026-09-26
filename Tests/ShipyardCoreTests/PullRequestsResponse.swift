@@ -19,8 +19,12 @@ struct PullRequestsResponse {
         var closedAt: String?
         var comments = 0
         var reviews = 0
-        /// Logins whose review is requested.
+        /// Logins whose review is requested. The review search finds the
+        /// pull request when the viewer's is.
         var reviewRequests: [String] = []
+        /// Teams whose review is requested, each one the viewer is in: the
+        /// review search finds the pull request for them too.
+        var teamReviewRequests: [String] = []
         /// `statusCheckRollup.state`: `SUCCESS`, `FAILURE`, `PENDING`…; `nil` for none.
         var checks: String? = "PENDING"
         /// The branch it would merge; `change-<number>` unless set.
@@ -30,6 +34,12 @@ struct PullRequestsResponse {
 
         func url(in repository: String) -> URL {
             URL(string: "https://github.com/\(repository)/pull/\(number)")!
+        }
+
+        /// Whether `review-requested:@me` finds it for `viewer`: open, and
+        /// asking for the viewer's review or one of their teams'.
+        func waitsOn(_ viewer: String) -> Bool {
+            state == "OPEN" && (reviewRequests.contains { $0.lowercased() == viewer.lowercased() } || !teamReviewRequests.isEmpty)
         }
 
         func json(in repository: String) -> [String: Any] {
@@ -47,7 +57,6 @@ struct PullRequestsResponse {
                 "author": ["login": author, "__typename": authorType],
                 "comments": ["totalCount": comments],
                 "reviews": ["totalCount": reviews],
-                "reviewRequests": ["nodes": reviewRequests.map { ["requestedReviewer": ["__typename": "User", "login": $0]] }],
                 "commits": ["nodes": [["commit": ["statusCheckRollup": checks.map { ["state": $0] as Any } ?? NSNull()]]]],
             ]
         }
@@ -112,12 +121,37 @@ struct PullRequestsResponse {
     /// The answer, with GitHub's rate-limit headers.
     var answer: StubHTTP.Answer { Self.answer([self]) }
 
+    /// What the review search (`reviewSearch`) answers.
+    enum ReviewSearch {
+        /// The open pull requests of the answer's repositories waiting on
+        /// the viewer, directly or through a team.
+        case waiting
+        /// These pull requests, each in its repository; `total` is how many
+        /// matched in all (`issueCount`), when more than these.
+        case pullRequests([(repository: String, pullRequest: PullRequest)], total: Int? = nil)
+        /// A `null` search with an error on its path; the rest of the answer as usual.
+        case failed(String)
+    }
+
     /// One answer for several repositories, as `repo0`, `repo1`… in the
-    /// order the query asks for them: the configuration's, each repository once.
-    static func answer(_ responses: [PullRequestsResponse]) -> StubHTTP.Answer {
+    /// order the query asks for them: the configuration's, each repository
+    /// once. A request carries one batch of repositories, so a refresh with
+    /// more than a batch needs one answer per batch. The body reports `cost`,
+    /// and the body and headers `remaining`.
+    /// It answers the review search (`reviewSearch`) too, which only the
+    /// first batch asks for; later batches' copies go unread.
+    static func answer(
+        _ responses: [PullRequestsResponse],
+        cost: Int = 1,
+        remaining: Int = 4990,
+        reviewSearch: ReviewSearch = .waiting
+    ) -> StubHTTP.Answer {
         var data: [String: Any] = [
             "viewer": ["login": responses.first?.viewer ?? "yabepa"],
-            "rateLimit": ["limit": 5000, "remaining": 4990, "used": 10, "resetAt": "2026-09-25T12:42:00Z", "cost": 1],
+            "rateLimit": [
+                "limit": 5000, "remaining": remaining, "used": 5000 - remaining,
+                "resetAt": "2026-09-25T12:42:00Z", "cost": cost,
+            ],
         ]
         var errors: [[String: Any]] = []
         for (index, response) in responses.enumerated() {
@@ -151,9 +185,34 @@ struct PullRequestsResponse {
             }
             data[alias] = node
         }
+        let viewer = responses.first?.viewer ?? "yabepa"
+        switch reviewSearch {
+        case .failed(let message):
+            data["reviewSearch"] = NSNull()
+            errors.append(["path": ["reviewSearch"], "message": message])
+        case .waiting, .pullRequests:
+            let waiting: [(repository: String, pullRequest: PullRequest)]
+            var total: Int?
+            if case .pullRequests(let pullRequests, let matched) = reviewSearch {
+                waiting = pullRequests
+                total = matched
+            } else {
+                waiting = responses.filter { !$0.missing && !$0.headsOnly }.flatMap { response in
+                    response.pullRequests.filter { $0.waitsOn(viewer) }.map { (response.repository, $0) }
+                }
+            }
+            data["reviewSearch"] = [
+                "issueCount": total ?? waiting.count,
+                "nodes": waiting.map { repository, pullRequest in
+                    var node = pullRequest.json(in: repository)
+                    node["repository"] = ["nameWithOwner": repository]
+                    return node
+                },
+            ] as [String: Any]
+        }
         var body: [String: Any] = ["data": data]
         if !errors.isEmpty { body["errors"] = errors }
-        var answer = StubHTTP.Answer.json("", headers: Harness.rateLimitHeaders(remaining: 4990))
+        var answer = StubHTTP.Answer.json("", headers: Harness.rateLimitHeaders(remaining: remaining))
         answer.body = try! JSONSerialization.data(withJSONObject: body)
         return answer
     }

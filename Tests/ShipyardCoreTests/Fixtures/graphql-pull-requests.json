@@ -1,6 +1,20 @@
 {
   "data": {
     "viewer": { "login": "yabepa" },
+    "reviewSearch": {
+      "issueCount": 1,
+      "nodes": [
+        {
+          "repository": { "nameWithOwner": "yahyabedirhan/e-commerce-backend" },
+          "number": 56, "title": "Tidy logging", "url": "https://github.com/yahyabedirhan/e-commerce-backend/pull/56",
+          "isDraft": false, "state": "OPEN",
+          "createdAt": "2026-09-23T12:00:00Z", "updatedAt": "2026-09-24T12:00:00Z", "closedAt": null, "mergedAt": null,
+          "author": { "login": "octocat", "__typename": "User" },
+          "comments": { "totalCount": 3 }, "reviews": { "totalCount": 0 },
+          "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
+        }
+      ]
+    },
     "repo0": {
       "nameWithOwner": "yahyabedirhan/e-commerce-frontend",
       "openPullRequests": {
@@ -11,7 +25,6 @@
             "createdAt": "2026-09-25T10:00:00Z", "updatedAt": "2026-09-25T11:00:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "PENDING" } } } ] }
           },
           {
@@ -20,7 +33,6 @@
             "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-25T09:00:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 2 }, "reviews": { "totalCount": 1 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
           }
         ]
@@ -33,7 +45,6 @@
             "createdAt": "2026-09-22T09:00:00Z", "updatedAt": "2026-09-23T15:00:05Z", "closedAt": "2026-09-23T15:00:00Z", "mergedAt": "2026-09-23T15:00:00Z",
             "author": { "login": "octocat", "__typename": "User" },
             "comments": { "totalCount": 1 }, "reviews": { "totalCount": 1 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
           },
           {
@@ -42,7 +53,6 @@
             "createdAt": "2026-09-01T09:00:00Z", "updatedAt": "2026-09-10T10:00:00Z", "closedAt": "2026-09-10T10:00:00Z", "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
           }
         ]
@@ -58,7 +68,6 @@
             "createdAt": "2026-09-25T07:00:00Z", "updatedAt": "2026-09-25T10:30:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
           },
           {
@@ -67,10 +76,6 @@
             "createdAt": "2026-09-23T12:00:00Z", "updatedAt": "2026-09-24T12:00:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "octocat", "__typename": "User" },
             "comments": { "totalCount": 3 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [
-              { "requestedReviewer": { "__typename": "User", "login": "yabepa" } },
-              { "requestedReviewer": { "__typename": "Team" } }
-            ] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": null } } ] }
           },
           {
@@ -79,7 +84,6 @@
             "createdAt": "2026-09-22T06:00:00Z", "updatedAt": "2026-09-22T06:10:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "dependabot", "__typename": "Bot" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
           }
         ]
@@ -92,7 +96,6 @@
             "createdAt": "2026-09-20T12:00:00Z", "updatedAt": "2026-09-24T18:00:00Z", "closedAt": "2026-09-24T18:00:00Z", "mergedAt": null,
             "author": null,
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "FAILURE" } } } ] }
           }
         ]
@@ -108,7 +111,6 @@
             "createdAt": "2026-09-25T08:00:00Z", "updatedAt": "2026-09-25T08:30:00Z", "closedAt": null, "mergedAt": null,
             "author": { "login": "yabepa", "__typename": "User" },
             "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
-            "reviewRequests": { "nodes": [] },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "ERROR" } } } ] }
           }
         ]

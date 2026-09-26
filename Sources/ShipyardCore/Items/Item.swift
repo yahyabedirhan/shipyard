@@ -30,6 +30,42 @@ public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     /// running workflow run. The menu lists these first and ages them from
     /// when they started; finished ones count back from `closedAt`.
     public var isActive: Bool { isOpen || self == .running }
+
+    /// The state a kind's `states` names this one by: a draft is `open`, a
+    /// running run (queued, waiting or in progress) `in-progress`.
+    public var group: StateGroup {
+        switch self {
+        case .open, .draft: .open
+        case .merged: .merged
+        case .closed: .closed
+        case .running: .inProgress
+        case .succeeded: .succeeded
+        case .failed: .failed
+        }
+    }
+}
+
+/// The values of a kind's `states`: where its items stand, as the file
+/// names them. Pull requests take `open`, `merged` and `closed`; issues
+/// `open` and `closed`; workflow runs `in-progress`, `failed` and
+/// `succeeded` (a timed-out run, or one that never started, is `failed`).
+public enum StateGroup: String, CaseIterable, Hashable, Sendable {
+    case open
+    case merged
+    case closed
+    case inProgress = "in-progress"
+    case failed
+    case succeeded
+
+    /// The states `kind` takes, in the order the file writes them: all of
+    /// them is that kind's default.
+    public static func all(for kind: ItemKind) -> [StateGroup] {
+        switch kind {
+        case .pullRequest: [.open, .merged, .closed]
+        case .issue: [.open, .closed]
+        case .workflowRun: [.inProgress, .failed, .succeeded]
+        }
+    }
 }
 
 /// The head commit's combined check status on a pull request.
@@ -69,7 +105,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     /// the same terms (running pending, succeeded passed, failed failed), so
     /// `[attention] checks-failed` covers failed runs too.
     public var checks: ChecksState
-    /// Whether the viewer is asked to review it.
+    /// Whether an open pull request waits on the viewer's review, asked of
+    /// them or of one of their teams: the review search found it.
     public var reviewRequestedFromViewer: Bool
     public var createdAt: Date
     public var updatedAt: Date
@@ -149,6 +186,12 @@ public struct RepositoryError: Equatable, Sendable {
         self.kind = kind
         self.message = message
     }
+
+    /// The review search failed: shown where review requests were needed,
+    /// in place of a repository, as "review requests: <GitHub's message>".
+    public static func reviewSearch(_ message: String) -> RepositoryError {
+        RepositoryError(repository: "review requests", kind: .other, message: message)
+    }
 }
 
 /// One of GitHub's hourly limits, as the latest response reported it.
@@ -196,18 +239,50 @@ public struct Snapshot: Equatable, Sendable {
     public var rateLimits: RateLimits
     /// The login the query ran as, when GitHub said.
     public var viewerLogin: String?
+    /// The open pull requests waiting on the user's review, directly or
+    /// through one of their teams (their IDs), from the review search. Every
+    /// pull request's `reviewRequestedFromViewer` says the same.
+    public var reviewRequested: Set<String>
+    /// The pull requests the review search found, in any repository: at
+    /// most one page (100). A project using `anywhere` has them among its items.
+    public var searchPullRequests: [Item]
+    /// How many pull requests the review search matched in all: more than
+    /// `searchPullRequests` holds when there were more than one page.
+    public var reviewSearchTotal: Int
+    /// Why the review search failed, when it did; `reviewRequested` is then
+    /// the last set it found.
+    public var reviewSearchError: RepositoryError?
+    /// Per project name, the repositories fetched for it (`owner/name`, each
+    /// once): the ones it names and the ones its groups and wildcards resolved to.
+    public var repositories: [String: [String]]
+    /// Per project name, its selectors that couldn't be resolved (an owner
+    /// that doesn't exist or can't be seen, or a failed lookup with no
+    /// earlier list), each an error row named after the selector.
+    public var selectorErrors: [String: [RepositoryError]]
 
     public init(
         fetchedAt: Date,
         items: [String: [Item]] = [:],
         errors: [ItemSource: RepositoryError] = [:],
         rateLimits: RateLimits = RateLimits(),
-        viewerLogin: String? = nil
+        viewerLogin: String? = nil,
+        reviewRequested: Set<String> = [],
+        searchPullRequests: [Item] = [],
+        reviewSearchTotal: Int? = nil,
+        reviewSearchError: RepositoryError? = nil,
+        repositories: [String: [String]] = [:],
+        selectorErrors: [String: [RepositoryError]] = [:]
     ) {
         self.fetchedAt = fetchedAt
         self.items = items
         self.errors = errors
         self.rateLimits = rateLimits
         self.viewerLogin = viewerLogin
+        self.reviewRequested = reviewRequested
+        self.searchPullRequests = searchPullRequests
+        self.reviewSearchTotal = reviewSearchTotal ?? searchPullRequests.count
+        self.reviewSearchError = reviewSearchError
+        self.repositories = repositories
+        self.selectorErrors = selectorErrors
     }
 }

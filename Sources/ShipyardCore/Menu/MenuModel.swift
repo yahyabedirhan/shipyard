@@ -2,10 +2,10 @@ import Foundation
 
 /// What the panel draws: one section per project, in configuration order,
 /// the attention count and menu bar label, and when the list was last
-/// brought up to date. Every display rule (what the closed window keeps,
-/// drafts, hidden authors, order, state and check dot, which rows need
-/// attention, what the menu bar says) lives here, so tests reach them
-/// without SwiftUI.
+/// brought up to date. It's built from the projects' listings (`Listing`
+/// decides which items a project has); every display rule (order, state and
+/// check dot, which rows need attention, what the menu bar says) lives here,
+/// so tests reach them without SwiftUI.
 public struct MenuModel: Equatable, Sendable {
     public var sections: [MenuSection]
     /// Rows needing attention across all projects, per kind; a row listed
@@ -28,6 +28,10 @@ public struct MenuModel: Equatable, Sendable {
     /// The footer's rate-limit indicator; `nil` when `[rate-limit] show`
     /// hides it or no limit is known yet.
     public var rateIndicator: RateIndicator?
+    /// The subsections the user folded, as app state has them: the
+    /// sections' groups carry theirs, and the All tab, arranged when it's
+    /// drawn, reads its own from here.
+    public var foldedGroups: Set<GroupID>
 
     public init(
         sections: [MenuSection] = [],
@@ -37,8 +41,10 @@ public struct MenuModel: Equatable, Sendable {
         lastUpdated: Date? = nil,
         fetchError: GitHubError? = nil,
         refreshDelay: RefreshDelay? = nil,
-        rateIndicator: RateIndicator? = nil
+        rateIndicator: RateIndicator? = nil,
+        foldedGroups: Set<GroupID> = []
     ) {
+        self.foldedGroups = foldedGroups
         self.sections = sections
         self.attention = attention
         self.menuBarLabel = menuBarLabel
@@ -66,56 +72,67 @@ public struct MenuModel: Equatable, Sendable {
     /// Before anything was fetched.
     public static let empty = MenuModel()
 
-    /// The model for `snapshot` under `configuration` and what the user has
-    /// seen and collapsed, as of `now` (which the closed window counts back from).
+    /// The model for the projects' `listings` (from `Listing.listings`, by
+    /// project name) under `configuration` and what the user has seen and
+    /// collapsed; `snapshot` gives the error rows and when it was fetched.
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a
-    /// project the snapshot has no entry for (added since it was fetched).
-    public static func build(snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
+    /// project without a listing (added since the snapshot was fetched).
+    /// `expanded` holds the groups Show more revealed past their cap.
+    public static func build(
+        listings: [String: [Item]],
+        snapshot: Snapshot?,
+        configuration: Configuration,
+        state: AppState,
+        expanded: Set<GroupID> = [],
+        now: Date
+    ) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
                 MenuSection(
                     name: project.name,
-                    rows: [],
+                    groups: [],
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
-                    repositories: project.repositories
+                    repositories: project.repositories.compactMap(\.slug)
                 )
             }
             var model = MenuModel(sections: sections, layout: configuration.menu.layout)
             model.applyAttention(state, configuration: configuration)
             return model
         }
-        let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
-            let items = (snapshot.items[project.name] ?? []).filter {
-                shows($0, settings: settings, hiddenAuthors: hidden, now: now)
-            }
-            // Pull requests, then issues, then runs; each kind open (or
-            // running) first, then closed (or finished).
-            let rows = kindOrder.flatMap { kind -> [Item] in
-                let ofKind = items.filter { $0.kind == kind }
-                let open = ofKind.filter(\.state.isActive).sorted { $0.updatedAt > $1.updatedAt }
-                let closed = ofKind.filter { !$0.state.isActive }
-                    .sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
-                return open + closed
-            }
+            let items = listings[project.name] ?? []
+            // What the refresh watched for it: its groups and wildcards resolved.
+            let repositories = snapshot.repositories[project.name] ?? settings.repositorySlugs
             return MenuSection(
                 name: project.name,
-                rows: rows.map { MenuRow($0) },
-                // One row per repository, for a kind this project shows: a
-                // runs failure isn't an error where runs are off.
-                errors: project.repositories.compactMap { repository in
-                    settings.fetchedKinds.lazy
-                        .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
-                        .first
-                        .map(MenuErrorRow.init)
-                },
-                showsRepository: project.repositories.count > 1,
-                // A project added since the snapshot was fetched has no data yet.
-                isLoaded: snapshot.items[project.name] != nil,
-                repositories: project.repositories
+                groups: Arrangement.groups(
+                    items,
+                    project: project.name,
+                    settings: settings.arrangement,
+                    layout: configuration.menu.layout,
+                    folded: state.collapsedGroups,
+                    expanded: expanded,
+                    now: now
+                ),
+                // One row per selector that couldn't be resolved, then one
+                // per repository, for a kind this project shows: a runs
+                // failure isn't an error where runs are off.
+                errors: (snapshot.selectorErrors[project.name] ?? []).map(MenuErrorRow.init)
+                    + repositories.compactMap { repository in
+                        settings.fetchedKinds.lazy
+                            .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
+                            .first
+                            .map(MenuErrorRow.init)
+                    } + reviewSearchErrors(snapshot, settings: settings),
+                notes: reviewSearchNotes(snapshot, settings: settings),
+                // `anywhere` brings in pull requests from any repository.
+                showsRepository: repositories.count > 1 || settings.usesAnywhere,
+                // A project added since the snapshot was fetched has no listing yet.
+                isLoaded: listings[project.name] != nil,
+                repositories: repositories
             )
         }
         var model = MenuModel(sections: sections, layout: configuration.menu.layout, lastUpdated: snapshot.fetchedAt)
@@ -124,13 +141,19 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// Sets each row's attention flag, each section's count and collapsed
-    /// flag, the totals and the menu bar label from `state`, keeping the
-    /// rows. Clicks, "mark all seen" and collapsing come here without a refresh.
+    /// flag, each subsection's fold, the totals and the menu bar label from
+    /// `state`, keeping the rows. Clicks, "mark all seen", collapsing and
+    /// folding come here without a refresh.
     public mutating func applyAttention(_ state: AppState, configuration: Configuration) {
         let toggles = configuration.attention
+        foldedGroups = state.collapsedGroups
         for index in sections.indices {
-            for row in sections[index].rows.indices {
-                sections[index].rows[row].needsAttention = state.attention.needsAttention(sections[index].rows[row].item, toggles: toggles)
+            for group in sections[index].groups.indices {
+                let id = sections[index].groups[group].id
+                sections[index].groups[group].isFolded = sections[index].groups[group].showsHeader && state.collapsedGroups.contains(id)
+                Self.flagAttention(&sections[index].groups[group].rows, attention: state.attention, toggles: toggles)
+                Self.flagAttention(&sections[index].groups[group].hiddenRows, attention: state.attention, toggles: toggles)
+                sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
@@ -139,41 +162,93 @@ public struct MenuModel: Equatable, Sendable {
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
     }
 
+    /// Sets each of `rows`' attention flag from `attention`, shown rows and
+    /// the rows behind a Show more alike.
+    private static func flagAttention(_ rows: inout [MenuRow], attention: Attention, toggles: Configuration.AttentionToggles) {
+        for row in rows.indices {
+            rows[row].needsAttention = attention.needsAttention(rows[row].item, toggles: toggles)
+        }
+    }
+
+    /// Caps each project's groups at its `show-first` again, showing every
+    /// row of the groups in `expanded`, without a refresh: Show more and
+    /// Show less come here, and closing the menu, which caps every group.
+    public mutating func applyExpansions(_ expanded: Set<GroupID>, configuration: Configuration) {
+        for index in sections.indices {
+            guard let project = configuration.projects.first(where: { $0.name == sections[index].name }) else { continue }
+            let showFirst = configuration.settings(for: project).arrangement.showFirst
+            sections[index].groups = sections[index].groups.map { $0.capped(at: showFirst, expanded: expanded.contains($0.id)) }
+        }
+    }
+
+    /// The group `id` names in a project's section, capped or expanded:
+    /// what Show more and Show less act on; `nil` when it's not listed.
+    public func group(_ id: GroupID) -> RowGroup? {
+        sections.first { $0.name == id.project }?.groups.first { $0.id == id }
+    }
+
+    /// The subsection `id` names, as drawn: in a project's section, or in
+    /// the All tab; `nil` when no such group is listed, or it's drawn after
+    /// a divider, which has no subheader to fold.
+    public func subsection(_ id: GroupID) -> RowGroup? {
+        let groups = id.project.isEmpty
+            ? tabContent(for: .all).groups
+            : sections.first { $0.name == id.project }?.groups ?? []
+        return groups.first { $0.id == id && $0.showsHeader }
+    }
+
+    /// Of `folds`, the ones to keep after a refresh: a group still listed
+    /// (folded or not, under a subheader or a divider, so switching
+    /// `subsections` back finds it), or any fold of a project whose rows
+    /// aren't all here (not loaded, or a repository failed), whose groups
+    /// may come back. A removed project's folds, and a group gone from its
+    /// project (or from the All tab), are pruned.
+    public func foldsToKeep(_ folds: Set<GroupID>) -> Set<GroupID> {
+        let allTab = Set(tabContent(for: .all).groups.map(\.id))
+        return folds.filter { id in
+            if id.project.isEmpty { return allTab.contains(id) }
+            guard let section = sections.first(where: { $0.name == id.project }) else { return false }
+            return !section.isLoaded || !section.errors.isEmpty || section.groups.contains { $0.id == id }
+        }
+    }
+
+    /// The review search's error row, in a project that needed the search:
+    /// one listing only pull requests waiting on the user.
+    private static func reviewSearchErrors(_ snapshot: Snapshot, settings: ProjectSettings) -> [MenuErrorRow] {
+        guard let error = snapshot.reviewSearchError, settings.pullRequests.show, settings.pullRequests.reviewRequested else { return [] }
+        return [MenuErrorRow(error)]
+    }
+
+    /// The note in a project using `anywhere` when the review search
+    /// matched more pull requests than its one page holds.
+    private static func reviewSearchNotes(_ snapshot: Snapshot, settings: ProjectSettings) -> [String] {
+        let shown = snapshot.searchPullRequests.count
+        guard settings.usesAnywhere, snapshot.reviewSearchTotal > shown else { return [] }
+        return [PanelText.reviewSearchLimit(shown: shown, total: snapshot.reviewSearchTotal)]
+    }
+
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun]
-
-    private static func shows(_ item: Item, settings: ProjectSettings, hiddenAuthors: Set<String>, now: Date) -> Bool {
-        guard settings.shows(item.kind) else { return false }
-        if hiddenAuthors.contains(item.author.lowercased()) { return false }
-        if item.state == .draft, !settings.pullRequests.drafts { return false }
-        if !item.state.isActive {
-            // Closed items stay for their kind's closed window in days;
-            // finished runs for `finished-window-hours`.
-            let window: TimeInterval = switch item.kind {
-            case .pullRequest: TimeInterval(settings.pullRequests.closedWindowDays) * 86_400
-            case .issue: TimeInterval(settings.issues.closedWindowDays) * 86_400
-            case .workflowRun: TimeInterval(settings.workflowRuns.finishedWindowHours) * 3600
-            }
-            guard window > 0, let closedAt = item.closedAt else { return false }
-            return closedAt >= now.addingTimeInterval(-window)
-        }
-        return true
-    }
 }
 
 /// One project in the panel.
 public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
-    /// Pull requests, then issues, then workflow runs; within each kind, open
+    /// Its listed items as `Arrangement` groups and sorts them: by default
+    /// pull requests, then issues, then workflow runs; within each kind, open
     /// (or running) items first (most recently updated first), then closed
-    /// (or finished) ones (most recently closed first), each kind within its
-    /// own window.
-    public var rows: [MenuRow]
-    /// One per repository of this project that couldn't be fetched.
+    /// (or finished) ones (most recently closed first).
+    public var groups: [RowGroup]
+    /// One per selector of this project that couldn't be resolved (such as
+    /// an `owner/*` whose owner can't be seen), then one per repository that
+    /// couldn't be fetched.
     public var errors: [MenuErrorRow]
+    /// Notes drawn after the error rows, such as the review search's limit
+    /// in a project using `anywhere`.
+    public var notes: [String]
     /// Whether a row's second line names its repository: only when the
-    /// project has more than one.
+    /// project has more than one, or uses `anywhere`.
     public var showsRepository: Bool
     /// Rows in this section needing attention, for its header.
     public var attentionCount: Int
@@ -183,15 +258,51 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether its rows were fetched: `false` before the first refresh
     /// succeeded, when the section is listed without rows.
     public var isLoaded: Bool
-    /// The project's repositories (`owner/name`), in configuration order.
+    /// The project's repositories (`owner/name`): the ones it names and,
+    /// once fetched, the ones its groups and wildcards resolved to.
     public var repositories: [String]
 
     public var id: String { name }
 
+    /// Every row of every group, in order, the ones a cap hides too: what
+    /// the counts, "Mark all seen" and the All tab read.
+    public var rows: [MenuRow] { groups.flatMap(\.allRows) }
+
+    /// A section whose rows are one group, as `group-by = "none"` makes.
     public init(
         name: String,
         rows: [MenuRow],
         errors: [MenuErrorRow] = [],
+        notes: [String] = [],
+        showsRepository: Bool = false,
+        attentionCount: Int = 0,
+        isCollapsed: Bool = false,
+        isLoaded: Bool = true,
+        repositories: [String] = []
+    ) {
+        self.init(
+            name: name,
+            groups: rows.isEmpty ? [] : [RowGroup(
+                id: GroupID(project: name, key: .ungrouped),
+                title: "",
+                rows: rows,
+                attentionCount: rows.filter(\.needsAttention).count
+            )],
+            errors: errors,
+            notes: notes,
+            showsRepository: showsRepository,
+            attentionCount: attentionCount,
+            isCollapsed: isCollapsed,
+            isLoaded: isLoaded,
+            repositories: repositories
+        )
+    }
+
+    public init(
+        name: String,
+        groups: [RowGroup],
+        errors: [MenuErrorRow] = [],
+        notes: [String] = [],
         showsRepository: Bool = false,
         attentionCount: Int = 0,
         isCollapsed: Bool = false,
@@ -199,8 +310,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         repositories: [String] = []
     ) {
         self.name = name
-        self.rows = rows
+        self.groups = groups
         self.errors = errors
+        self.notes = notes
         self.showsRepository = showsRepository
         self.attentionCount = attentionCount
         self.isCollapsed = isCollapsed
