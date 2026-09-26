@@ -281,6 +281,9 @@ struct ConfigSchemaTests {
         let oldAuthors = (ruleAuthors?["anyOf"] as? [[String: Any]])?.compactMap { $0["enum"] as? [String] }
         #expect(oldAuthors == [NotificationRule.legacyAuthors])
         #expect(enumValues(["workflow-runs", "properties", "branches"], in: definitions) == WorkflowRunBranches.allCases.map(\.rawValue))
+        for (kind, table) in [(ItemKind.pullRequest, "pull-requests"), (.issue, "issues"), (.workflowRun, "workflow-runs")] {
+            #expect(enumValues([table, "properties", "states", "items"], in: definitions) == StateGroup.all(for: kind).map(\.rawValue))
+        }
         let properties = try #require(schema["properties"] as? [String: Any])
         #expect(enumValues(["menu-bar", "properties", "count"], in: properties) == MenuBarCount.allCases.map(\.rawValue))
         #expect(enumValues(["menu", "properties", "layout"], in: properties) == MenuLayout.allCases.map(\.rawValue))

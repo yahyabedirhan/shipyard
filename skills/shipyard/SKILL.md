@@ -25,7 +25,7 @@ A request to change the user's shipyard is a change to this file. When no key be
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
@@ -65,14 +65,17 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | Key | Default | Allowed |
 |---|---|---|
 | `pull-requests.show` | `true` | boolean |
+| `pull-requests.states` | `["open", "merged", "closed"]` | which PRs are listed: any of `"open"` (drafts too), `"merged"`, `"closed"` (closed without merging) |
 | `pull-requests.closed-window-days` | `7` | `0` or more; days closed and merged PRs stay listed; `0` hides them |
 | `pull-requests.drafts` | `true` | boolean; list draft PRs |
 | `pull-requests.authors` | `{ show = [], hide = [] }` | whose PRs are listed: `authors.show` minus `authors.hide`, each a list of author selectors (see Whose items) |
 | `pull-requests.review-requested` | `false` | boolean; `true` lists only open PRs waiting on the user's review, requested from them or from one of their teams |
 | `issues.show` | `false` | boolean |
+| `issues.states` | `["open", "closed"]` | which issues are listed: any of `"open"`, `"closed"` |
 | `issues.closed-window-days` | `7` | `0` or more |
 | `issues.authors` | `{ show = [], hide = [] }` | whose issues are listed, as for pull requests |
 | `workflow-runs.show` | `false` | boolean |
+| `workflow-runs.states` | `["in-progress", "failed", "succeeded"]` | which runs are listed: any of `"in-progress"` (queued or running), `"failed"` (timed out and failed to start too), `"succeeded"` |
 | `workflow-runs.finished-window-hours` | `3` | `0` or more; hours finished runs stay listed (running ones always are) |
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
@@ -100,9 +103,13 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 ## Overrides
 
-- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
+- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
 - `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
+
+## Which items: states
+
+Each kind's `states` picks its items by where they stand; what it leaves out isn't shown, counted or notified. The closed windows still apply: `states` says which items, `closed-window-days` (or `finished-window-hours`) how long a closed, merged or finished one stays. So `pull-requests = { states = ["open"] }` lists no merged or closed PRs at all, and `states = ["merged"]` lists PRs merged in the last `closed-window-days`. A state the kind doesn't take is rejected with the nearest one it does: "unknown pull request state `merge` (did you mean `merged`?)". `states = []` lists none of the kind's items; to hide a kind, `show = false` says so more plainly.
 
 ## Whose items: author selectors
 
@@ -123,7 +130,7 @@ The entries of `show` and `hide`, and of a notification rule's `authors`, are **
 
 ## Notification rules
 
-A rule, one element of a `notifications` list, is `{ event = "…", authors = [...] }`; `authors` is a list of author selectors and defaults to `[]`, everyone. An event is notified when a rule in the project's list names it and one of its `authors` matches the item's author. A rule only narrows what the project lists: an item the project's filters leave out (its `authors`, `drafts`, or a closed window of `0`) is never notified, whatever the rule says; so `pr.merged` needs `closed-window-days` above `0`, and `run.failed` needs `finished-window-hours` above `0`. Each event is notified once, and a project's existing items never notify when it's added.
+A rule, one element of a `notifications` list, is `{ event = "…", authors = [...] }`; `authors` is a list of author selectors and defaults to `[]`, everyone. An event is notified when a rule in the project's list names it and one of its `authors` matches the item's author. A rule only narrows what the project lists: an item the project's filters leave out (its `states`, `authors`, `drafts`, or a closed window of `0`) is never notified, whatever the rule says; so `pr.merged` needs `merged` in `states` and `closed-window-days` above `0`, and `run.failed` needs `failed` in `states` and `finished-window-hours` above `0`. Each event is notified once, and a project's existing items never notify when it's added.
 
 | Event | When |
 |---|---|
@@ -263,6 +270,18 @@ subsections = true
 ```
 
 For the most recently opened first, add `sort-by = "created"`; for what changed today at the top, `group-by = "date"`.
+
+**"Only show open PRs and issues here."** `states` in each kind, inside the project's block:
+
+```toml
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard"]
+pull-requests = { states = ["open"] }
+issues = { show = true, states = ["open"] }
+```
+
+Runs work the same way: `workflow-runs = { show = true, states = ["failed", "in-progress"] }` leaves out the ones that succeeded. For every project, set `states` in `[defaults.pull-requests]` (or `[defaults.issues]`, `[defaults.workflow-runs]`) instead.
 
 **"Switch the menu to tabs."** One key in the `[menu]` table; uncomment the header's `# [menu]` lines where the placement rule allows it. The layout button in the menu's header makes the same edit with one click.
 

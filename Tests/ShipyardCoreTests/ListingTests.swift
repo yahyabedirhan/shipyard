@@ -229,6 +229,50 @@ struct ListingTests {
         #expect(harness.headlines == ["with history · Merged PR #1"])
     }
 
+    // MARK: - Which states
+
+    @Test("states = [\"open\"] lists no merged or closed pull requests, and doesn't notify pr.merged there; the default lists all three")
+    func onlyOpenPullRequests() async throws {
+        let config = """
+            [[defaults.notifications]]
+            event = "pr.merged"
+
+            [[defaults.notifications]]
+            event = "pr.closed"
+
+            [[projects]]
+            name = "open only"
+            repositories = ["\(shopRepository)"]
+            pull-requests = { states = ["open"] }
+
+            [[projects]]
+            name = "everything"
+            repositories = ["\(shopRepository)"]
+
+            """
+        var merged = pr(2)
+        merged.state = "MERGED"
+        merged.closedAt = "2026-09-25T11:00:00Z"
+        var closed = pr(3)
+        closed.state = "CLOSED"
+        closed.closedAt = "2026-09-25T11:00:00Z"
+        let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1), merged, closed, pr(4), pr(5)))
+        #expect(harness.numbers("open only")?.sorted() == [1, 4, 5])
+        #expect(harness.numbers("everything")?.sorted() == [1, 2, 3, 4, 5])
+        #expect(harness.section("open only")?.attentionCount == 3)
+
+        // #4 is merged and #5 closed: notified only where merged and closed pull requests are listed.
+        var mergedNow = pr(4)
+        mergedNow.state = "MERGED"
+        mergedNow.closedAt = "2026-09-25T12:01:00Z"
+        var closedNow = pr(5)
+        closedNow.state = "CLOSED"
+        closedNow.closedAt = "2026-09-25T12:01:00Z"
+        await harness.refresh(answering: shopAnswer(pr(1), merged, closed, mergedNow, closedNow))
+        #expect(harness.headlines.sorted() == ["everything · Closed PR #5", "everything · Merged PR #4"])
+        #expect(harness.numbers("open only") == [1])
+    }
+
     // MARK: - Old files
 
     @Test("an old hide-authors still hides, with a warning in the banner and the status record")
@@ -334,6 +378,49 @@ struct ListingRuleTests {
             item(7, kind: .workflowRun, state: .running),
         ]
         #expect(listed(items, settings) == [1, 3, 6])
+    }
+
+    @Test("each kind lists only its states: a draft is open, a running run in progress")
+    func states() {
+        var settings = project()
+        settings.issues.show = true
+        settings.workflowRuns.show = true
+        let items = [
+            item(1),
+            item(2, state: .draft),
+            item(3, state: .merged, closedHoursAgo: 1),
+            item(4, state: .closed, closedHoursAgo: 1),
+            item(5, kind: .issue),
+            item(6, kind: .issue, state: .closed, closedHoursAgo: 1),
+            item(7, kind: .workflowRun, state: .running),
+            item(8, kind: .workflowRun, state: .failed, closedHoursAgo: 1),
+            item(9, kind: .workflowRun, state: .succeeded, closedHoursAgo: 1),
+        ]
+        #expect(listed(items, settings) == [1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+        settings.pullRequests.states = [.open]
+        settings.issues.states = [.closed]
+        settings.workflowRuns.states = [.inProgress, .failed]
+        #expect(listed(items, settings) == [1, 2, 6, 7, 8])
+
+        settings.pullRequests.states = [.merged]
+        settings.issues.states = []
+        settings.workflowRuns.states = [.succeeded]
+        #expect(listed(items, settings) == [3, 9])
+    }
+
+    @Test("states picks which closed items; the window still says for how long")
+    func statesAndWindow() {
+        var settings = project()
+        settings.pullRequests.states = [.closed]
+        settings.pullRequests.closedWindowDays = 1
+        let items = [
+            item(1),
+            item(2, state: .closed, closedHoursAgo: 23),
+            item(3, state: .closed, closedHoursAgo: 25),
+            item(4, state: .merged, closedHoursAgo: 1),
+        ]
+        #expect(listed(items, settings) == [2])
     }
 
     @Test("me is the viewer's login even where the fetch didn't mark it")

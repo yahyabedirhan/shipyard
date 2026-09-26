@@ -207,9 +207,10 @@ final class ConfigurationReader {
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts", "authors", "review-requested"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "drafts", "authors", "review-requested"])
         return PullRequestOverrides(
             show: bool(node, "show"),
+            states: states(node, of: .pullRequest),
             closedWindowDays: window(node, "closed-window-days"),
             drafts: bool(node, "drafts"),
             authors: authorFilter(node),
@@ -219,9 +220,10 @@ final class ConfigurationReader {
 
     private func issues(_ parent: Node) -> IssueOverrides {
         guard let node = table(parent, "issues") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window-days", "authors"])
         return IssueOverrides(
             show: bool(node, "show"),
+            states: states(node, of: .issue),
             closedWindowDays: window(node, "closed-window-days"),
             authors: authorFilter(node)
         )
@@ -229,13 +231,35 @@ final class ConfigurationReader {
 
     private func workflowRuns(_ parent: Node) -> WorkflowRunOverrides {
         guard let node = table(parent, "workflow-runs") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "finished-window-hours", "branches", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "finished-window-hours", "branches", "authors"])
         return WorkflowRunOverrides(
             show: bool(node, "show"),
+            states: states(node, of: .workflowRun),
             finishedWindowHours: window(node, "finished-window-hours"),
             branches: choice(node, "branches", WorkflowRunBranches.self),
             authors: authorFilter(node)
         )
+    }
+
+    /// A kind's `states`: a list of the states that kind takes. Each one it
+    /// doesn't take is an error on its own line, with the nearest one it
+    /// does take suggested.
+    private func states(_ node: Node, of kind: ItemKind) -> Set<StateGroup>? {
+        guard let texts = strings(node, "states") else { return nil }
+        let valid = StateGroup.all(for: kind).map(\.rawValue)
+        var states: Set<StateGroup> = []
+        var readable = true
+        for text in texts {
+            if valid.contains(text), let state = StateGroup(rawValue: text) {
+                states.insert(state)
+                continue
+            }
+            let hint = Suggestion.nearest(to: text, in: valid).map { "did you mean `\($0)`?" }
+                ?? "expected " + valid.map { "`\($0)`" }.joined(separator: ", ")
+            error("unknown \(kind.noun) state `\(text)` (\(hint))", at: node.path + [.key("states")], value: text)
+            readable = false
+        }
+        return readable ? states : nil
     }
 
     /// A kind's `authors = { show = [...], hide = [...] }`.
@@ -515,6 +539,17 @@ enum Suggestion {
             swap(&previous, &current)
         }
         return previous[b.count]
+    }
+}
+
+private extension ItemKind {
+    /// The kind as a state's message names it: "unknown issue state …".
+    var noun: String {
+        switch self {
+        case .pullRequest: "pull request"
+        case .issue: "issue"
+        case .workflowRun: "workflow run"
+        }
     }
 }
 

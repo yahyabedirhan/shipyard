@@ -131,6 +131,9 @@ struct SkillDocumentTests {
         // "only show what other people open in this project": me and bots hidden, per kind
         let incoming = blocks.compactMap { $0?.projects.first }.first { $0.pullRequests.authors.hide == [.me, .bots] }
         #expect(incoming?.issues.authors.hide == [.me, .bots])
+        // "only show open PRs and issues here"
+        let states = blocks.compactMap { $0?.projects.first }.first { $0.pullRequests.states == [.open] }
+        #expect(states?.issues == IssueOverrides(show: true, states: [.open]))
         // "switch the menu to tabs"
         #expect(blocks.contains { $0?.menu.layout == .tabs })
         // "show CI runs for this project and tell me when they fail": runs on for that
@@ -194,6 +197,10 @@ struct SkillDocumentTests {
         let text = try skill()
         let c = Configuration()
         func literal<T: RawRepresentable>(_ choice: T) -> String where T.RawValue == String { "\"\(choice.rawValue)\"" }
+        // A kind's states, in the order the file writes them, when the default is all of them.
+        func states(_ kind: ItemKind, _ value: Set<StateGroup>) -> String {
+            value == Set(StateGroup.all(for: kind)) ? "[" + StateGroup.all(for: kind).map(literal).joined(separator: ", ") + "]" : "?"
+        }
         let rows: [(String, String)] = [
             ("version", "\(c.version)"),
             ("refresh-interval-seconds", "\(c.refreshIntervalSeconds)"),
@@ -207,6 +214,9 @@ struct SkillDocumentTests {
             ("[attention] review-requested", "\(c.attention.reviewRequested)"),
             ("[attention] checks-failed", "\(c.attention.checksFailed)"),
             ("pull-requests.show", "\(c.defaults.pullRequests.show)"),
+            ("pull-requests.states", states(.pullRequest, c.defaults.pullRequests.states)),
+            ("issues.states", states(.issue, c.defaults.issues.states)),
+            ("workflow-runs.states", states(.workflowRun, c.defaults.workflowRuns.states)),
             ("pull-requests.closed-window-days", "\(c.defaults.pullRequests.closedWindowDays)"),
             ("pull-requests.drafts", "\(c.defaults.pullRequests.drafts)"),
             ("pull-requests.authors", c.defaults.pullRequests.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
@@ -235,6 +245,7 @@ struct SkillDocumentTests {
         let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description) + NotificationRule.legacyAuthors
             + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
             + WorkflowRunBranches.allCases.map(\.rawValue) + GroupBy.allCases.map(\.rawValue) + SortBy.allCases.map(\.rawValue)
+            + StateGroup.allCases.map(\.rawValue)
         for value in values {
             #expect(text.contains("`\(value)`") || text.contains("`\"\(value)\"`"), "`\(value)` isn't listed")
         }

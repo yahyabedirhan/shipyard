@@ -233,6 +233,8 @@ public struct NotificationRule: Equatable, Sendable {
 /// `pull-requests`
 public struct PullRequestSettings: Equatable, Sendable {
     public var show = true
+    /// Which pull requests are listed by where they stand; all three by default.
+    public var states = Set(StateGroup.all(for: .pullRequest))
     public var closedWindowDays = 7
     public var drafts = true
     public var authors = AuthorFilter()
@@ -241,12 +243,14 @@ public struct PullRequestSettings: Equatable, Sendable {
     public var reviewRequested = false
     public init(
         show: Bool = true,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .pullRequest)),
         closedWindowDays: Int = 7,
         drafts: Bool = true,
         authors: AuthorFilter = AuthorFilter(),
         reviewRequested: Bool = false
     ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
         self.authors = authors
@@ -257,10 +261,18 @@ public struct PullRequestSettings: Equatable, Sendable {
 /// `issues`
 public struct IssueSettings: Equatable, Sendable {
     public var show = false
+    /// Which issues are listed by where they stand; open and closed by default.
+    public var states = Set(StateGroup.all(for: .issue))
     public var closedWindowDays = 7
     public var authors = AuthorFilter()
-    public init(show: Bool = false, closedWindowDays: Int = 7, authors: AuthorFilter = AuthorFilter()) {
+    public init(
+        show: Bool = false,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .issue)),
+        closedWindowDays: Int = 7,
+        authors: AuthorFilter = AuthorFilter()
+    ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.authors = authors
     }
@@ -269,16 +281,20 @@ public struct IssueSettings: Equatable, Sendable {
 /// `workflow-runs`
 public struct WorkflowRunSettings: Equatable, Sendable {
     public var show = false
+    /// Which runs are listed by where they stand; all three by default.
+    public var states = Set(StateGroup.all(for: .workflowRun))
     public var finishedWindowHours = 3
     public var branches: WorkflowRunBranches = .defaultAndPullRequests
     public var authors = AuthorFilter()
     public init(
         show: Bool = false,
+        states: Set<StateGroup> = Set(StateGroup.all(for: .workflowRun)),
         finishedWindowHours: Int = 3,
         branches: WorkflowRunBranches = .defaultAndPullRequests,
         authors: AuthorFilter = AuthorFilter()
     ) {
         self.show = show
+        self.states = states
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
         self.authors = authors
@@ -288,18 +304,21 @@ public struct WorkflowRunSettings: Equatable, Sendable {
 /// The `pull-requests` keys a table sets; unset keys keep the value below.
 public struct PullRequestOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var closedWindowDays: Int?
     public var drafts: Bool?
     public var authors: AuthorFilterOverrides
     public var reviewRequested: Bool?
     public init(
         show: Bool? = nil,
+        states: Set<StateGroup>? = nil,
         closedWindowDays: Int? = nil,
         drafts: Bool? = nil,
         authors: AuthorFilterOverrides = .init(),
         reviewRequested: Bool? = nil
     ) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
         self.authors = authors
@@ -309,6 +328,7 @@ public struct PullRequestOverrides: Equatable, Sendable {
     public func applied(to base: PullRequestSettings) -> PullRequestSettings {
         PullRequestSettings(
             show: show ?? base.show,
+            states: states ?? base.states,
             closedWindowDays: closedWindowDays ?? base.closedWindowDays,
             drafts: drafts ?? base.drafts,
             authors: authors.applied(to: base.authors),
@@ -320,10 +340,12 @@ public struct PullRequestOverrides: Equatable, Sendable {
 /// The `issues` keys a table sets; unset keys keep the value below.
 public struct IssueOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var closedWindowDays: Int?
     public var authors: AuthorFilterOverrides
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil, authors: AuthorFilterOverrides = .init()) {
+    public init(show: Bool? = nil, states: Set<StateGroup>? = nil, closedWindowDays: Int? = nil, authors: AuthorFilterOverrides = .init()) {
         self.show = show
+        self.states = states
         self.closedWindowDays = closedWindowDays
         self.authors = authors
     }
@@ -331,6 +353,7 @@ public struct IssueOverrides: Equatable, Sendable {
     public func applied(to base: IssueSettings) -> IssueSettings {
         IssueSettings(
             show: show ?? base.show,
+            states: states ?? base.states,
             closedWindowDays: closedWindowDays ?? base.closedWindowDays,
             authors: authors.applied(to: base.authors)
         )
@@ -340,16 +363,19 @@ public struct IssueOverrides: Equatable, Sendable {
 /// The `workflow-runs` keys a table sets; unset keys keep the value below.
 public struct WorkflowRunOverrides: Equatable, Sendable {
     public var show: Bool?
+    public var states: Set<StateGroup>?
     public var finishedWindowHours: Int?
     public var branches: WorkflowRunBranches?
     public var authors: AuthorFilterOverrides
     public init(
         show: Bool? = nil,
+        states: Set<StateGroup>? = nil,
         finishedWindowHours: Int? = nil,
         branches: WorkflowRunBranches? = nil,
         authors: AuthorFilterOverrides = .init()
     ) {
         self.show = show
+        self.states = states
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
         self.authors = authors
@@ -358,6 +384,7 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
     public func applied(to base: WorkflowRunSettings) -> WorkflowRunSettings {
         WorkflowRunSettings(
             show: show ?? base.show,
+            states: states ?? base.states,
             finishedWindowHours: finishedWindowHours ?? base.finishedWindowHours,
             branches: branches ?? base.branches,
             authors: authors.applied(to: base.authors)
@@ -434,6 +461,15 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.show
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
+        }
+    }
+
+    /// Which of `kind`'s states the project lists.
+    public func states(of kind: ItemKind) -> Set<StateGroup> {
+        switch kind {
+        case .pullRequest: pullRequests.states
+        case .issue: issues.states
+        case .workflowRun: workflowRuns.states
         }
     }
 
@@ -543,9 +579,12 @@ extension Configuration {
         # sort-by = "updated"
 
         # List issues too, not only pull requests, in every project: set show
-        # to true. A project can override it in its own block.
+        # to true. states picks which: "open", "closed" or both. Pull requests
+        # take states too ("open", "merged", "closed"), and runs ("in-progress",
+        # "failed", "succeeded"). A project can override both in its own block.
         # [defaults.issues]
         # show = false
+        # states = ["open", "closed"]
 
         # List GitHub Actions workflow runs in every project: set show to true.
         # [defaults.workflow-runs]

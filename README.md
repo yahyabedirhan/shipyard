@@ -102,7 +102,7 @@ Everything shipyard shows and when it notifies lives in `~/.config/shipyard/conf
 
 The menu comes in two layouts, chosen with `[menu] layout`: `"list"` (the default) puts every project in one scrolling list, one line per item under pinned project headers; `"tabs"` shows one project at a time.
 
-Each kind of item (`pull-requests`, `issues`, `workflow-runs`) can list only some authors, for every project or for one: `authors = { hide = ["me", "bots"] }` lists what other people open, and `authors = { show = ["@dependabot[bot]"] }` only that account's. A bare word is a group (`me`, `others`, `bots`) and `@` marks a login. What a project's filters leave out isn't shown, counted or notified.
+Each kind of item (`pull-requests`, `issues`, `workflow-runs`) can list only some authors, for every project or for one: `authors = { hide = ["me", "bots"] }` lists what other people open, and `authors = { show = ["@dependabot[bot]"] }` only that account's. A bare word is a group (`me`, `others`, `bots`) and `@` marks a login. Each kind can also list only some states: `pull-requests = { states = ["open"] }` leaves out merged and closed pull requests, and `workflow-runs = { states = ["failed"] }` only failed runs. What a project's filters leave out isn't shown, counted or notified.
 
 `pull-requests = { review-requested = true }` lists only the pull requests waiting on your review. A request to one of your teams counts as a request to you, here and in the attention count and notifications.
 

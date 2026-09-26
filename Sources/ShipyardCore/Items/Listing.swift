@@ -3,10 +3,11 @@ import Foundation
 /// The one place that decides what a project has (ADR 0003). Pure.
 ///
 /// A project's listing is the snapshot's items for it that pass every one of
-/// its filters, combined with AND: the kind is shown, a closed (or finished)
-/// item is inside its window, a draft is allowed, the author passes the
-/// kind's `authors`, and with `review-requested` a pull request waits on the
-/// user's review. The menu model, the attention counts and the
+/// its filters, combined with AND: the kind is shown, the item's state is
+/// one of the kind's `states`, a closed (or finished) item is inside its
+/// window, a draft is allowed, the author passes the kind's `authors`, and
+/// with `review-requested` a pull request waits on the user's review. The
+/// menu model, the attention counts and the
 /// notification step all read listings, so an item the filters leave out is
 /// never shown, counted or notified. A new filter is one more check here.
 public enum Listing {
@@ -34,6 +35,7 @@ public enum Listing {
     /// requests waiting on the viewer's review (the review search's).
     static func lists(_ item: Item, project: ProjectSettings, viewer: String?, reviewRequested: Set<String>, now: Date) -> Bool {
         project.shows(item.kind)
+            && project.states(of: item.kind).contains(item.state.group)
             && inWindow(item, project: project, now: now)
             && (item.state != .draft || project.pullRequests.drafts)
             && project.authors(of: item.kind).includes(item, viewer: viewer)

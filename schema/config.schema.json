@@ -188,6 +188,12 @@
           "type": "boolean",
           "default": true
         },
+        "states": {
+          "description": "Which pull requests to list: open (drafts too), merged, closed (without merging). Merged and closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["open", "merged", "closed"] },
+          "default": ["open", "merged", "closed"]
+        },
         "closed-window-days": {
           "description": "How many days closed and merged pull requests stay listed; 0 hides them.",
           "type": "integer",
@@ -217,6 +223,12 @@
           "type": "boolean",
           "default": false
         },
+        "states": {
+          "description": "Which issues to list: open, closed. Closed ones stay for closed-window-days. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["open", "closed"] },
+          "default": ["open", "closed"]
+        },
         "closed-window-days": {
           "description": "How many days closed issues stay listed; 0 hides them.",
           "type": "integer",
@@ -235,6 +247,12 @@
           "description": "List workflow runs.",
           "type": "boolean",
           "default": false
+        },
+        "states": {
+          "description": "Which workflow runs to list: in-progress (queued or running), failed (timed out and failed to start too), succeeded. Finished ones stay for finished-window-hours. Those left out are never shown, counted or notified.",
+          "type": "array",
+          "items": { "type": "string", "enum": ["in-progress", "failed", "succeeded"] },
+          "default": ["in-progress", "failed", "succeeded"]
         },
         "finished-window-hours": {
           "description": "How many hours finished runs stay listed; 0 hides them.",

@@ -30,6 +30,42 @@ public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     /// running workflow run. The menu lists these first and ages them from
     /// when they started; finished ones count back from `closedAt`.
     public var isActive: Bool { isOpen || self == .running }
+
+    /// The state a kind's `states` names this one by: a draft is `open`, a
+    /// running run (queued, waiting or in progress) `in-progress`.
+    public var group: StateGroup {
+        switch self {
+        case .open, .draft: .open
+        case .merged: .merged
+        case .closed: .closed
+        case .running: .inProgress
+        case .succeeded: .succeeded
+        case .failed: .failed
+        }
+    }
+}
+
+/// The values of a kind's `states`: where its items stand, as the file
+/// names them. Pull requests take `open`, `merged` and `closed`; issues
+/// `open` and `closed`; workflow runs `in-progress`, `failed` and
+/// `succeeded` (a timed-out run, or one that never started, is `failed`).
+public enum StateGroup: String, CaseIterable, Hashable, Sendable {
+    case open
+    case merged
+    case closed
+    case inProgress = "in-progress"
+    case failed
+    case succeeded
+
+    /// The states `kind` takes, in the order the file writes them: all of
+    /// them is that kind's default.
+    public static func all(for kind: ItemKind) -> [StateGroup] {
+        switch kind {
+        case .pullRequest: [.open, .merged, .closed]
+        case .issue: [.open, .closed]
+        case .workflowRun: [.inProgress, .failed, .succeeded]
+        }
+    }
 }
 
 /// The head commit's combined check status on a pull request.
