@@ -15,8 +15,6 @@ public struct Configuration: Equatable, Sendable {
     /// A floor in seconds (at least 30); the rate budget may stretch it.
     public var refreshIntervalSeconds: Int = 120
     public var launchAtLogin: Bool = true
-    /// Logins whose items are hidden, e.g. `dependabot[bot]`.
-    public var hideAuthors: [String] = []
     public var menuBar = MenuBar()
     public var menu = Menu()
     public var rateLimit = RateLimitSettings()
@@ -181,23 +179,27 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
 }
 
-/// Whose items a notification rule covers: `me` is the viewer, `bots` a Bot
-/// account or a `[bot]` login, `others` neither.
-public enum AuthorFilter: String, CaseIterable, Sendable {
-    case any
-    case me
-    case others
-    case bots
-}
-
-/// An event and an author filter. Its scope is where it's written:
+/// An event and the authors it covers. Its scope is where it's written:
 /// `[[defaults.notifications]]` for every project, or a project's own list.
+/// It only narrows what the project lists: an item the listing leaves out
+/// is never notified (ADR 0003).
 public struct NotificationRule: Equatable, Sendable {
+    /// The strings `authors` took before selectors, still read with a
+    /// warning: `any` is everyone, the others one author group each.
+    public static let legacyAuthors = ["any", "me", "others", "bots"]
+
     public var event: EventKind
-    public var authors: AuthorFilter
-    public init(event: EventKind, authors: AuthorFilter = .any) {
+    /// Author selectors; empty is everyone.
+    public var authors: [AuthorSelector]
+    public init(event: EventKind, authors: [AuthorSelector] = []) {
         self.event = event
         self.authors = authors
+    }
+
+    /// Whether the rule covers an item's author: any of its selectors
+    /// matches, or it has none.
+    public func covers(_ item: Item, viewer: String?) -> Bool {
+        authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
     }
 }
 
@@ -208,10 +210,12 @@ public struct PullRequestSettings: Equatable, Sendable {
     public var show = true
     public var closedWindowDays = 7
     public var drafts = true
-    public init(show: Bool = true, closedWindowDays: Int = 7, drafts: Bool = true) {
+    public var authors = AuthorFilter()
+    public init(show: Bool = true, closedWindowDays: Int = 7, drafts: Bool = true, authors: AuthorFilter = AuthorFilter()) {
         self.show = show
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
+        self.authors = authors
     }
 }
 
@@ -219,9 +223,11 @@ public struct PullRequestSettings: Equatable, Sendable {
 public struct IssueSettings: Equatable, Sendable {
     public var show = false
     public var closedWindowDays = 7
-    public init(show: Bool = false, closedWindowDays: Int = 7) {
+    public var authors = AuthorFilter()
+    public init(show: Bool = false, closedWindowDays: Int = 7, authors: AuthorFilter = AuthorFilter()) {
         self.show = show
         self.closedWindowDays = closedWindowDays
+        self.authors = authors
     }
 }
 
@@ -230,10 +236,17 @@ public struct WorkflowRunSettings: Equatable, Sendable {
     public var show = false
     public var finishedWindowHours = 3
     public var branches: WorkflowRunBranches = .defaultAndPullRequests
-    public init(show: Bool = false, finishedWindowHours: Int = 3, branches: WorkflowRunBranches = .defaultAndPullRequests) {
+    public var authors = AuthorFilter()
+    public init(
+        show: Bool = false,
+        finishedWindowHours: Int = 3,
+        branches: WorkflowRunBranches = .defaultAndPullRequests,
+        authors: AuthorFilter = AuthorFilter()
+    ) {
         self.show = show
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
+        self.authors = authors
     }
 }
 
@@ -242,17 +255,20 @@ public struct PullRequestOverrides: Equatable, Sendable {
     public var show: Bool?
     public var closedWindowDays: Int?
     public var drafts: Bool?
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil, drafts: Bool? = nil) {
+    public var authors: AuthorFilterOverrides
+    public init(show: Bool? = nil, closedWindowDays: Int? = nil, drafts: Bool? = nil, authors: AuthorFilterOverrides = .init()) {
         self.show = show
         self.closedWindowDays = closedWindowDays
         self.drafts = drafts
+        self.authors = authors
     }
 
     public func applied(to base: PullRequestSettings) -> PullRequestSettings {
         PullRequestSettings(
             show: show ?? base.show,
             closedWindowDays: closedWindowDays ?? base.closedWindowDays,
-            drafts: drafts ?? base.drafts
+            drafts: drafts ?? base.drafts,
+            authors: authors.applied(to: base.authors)
         )
     }
 }
@@ -261,13 +277,19 @@ public struct PullRequestOverrides: Equatable, Sendable {
 public struct IssueOverrides: Equatable, Sendable {
     public var show: Bool?
     public var closedWindowDays: Int?
-    public init(show: Bool? = nil, closedWindowDays: Int? = nil) {
+    public var authors: AuthorFilterOverrides
+    public init(show: Bool? = nil, closedWindowDays: Int? = nil, authors: AuthorFilterOverrides = .init()) {
         self.show = show
         self.closedWindowDays = closedWindowDays
+        self.authors = authors
     }
 
     public func applied(to base: IssueSettings) -> IssueSettings {
-        IssueSettings(show: show ?? base.show, closedWindowDays: closedWindowDays ?? base.closedWindowDays)
+        IssueSettings(
+            show: show ?? base.show,
+            closedWindowDays: closedWindowDays ?? base.closedWindowDays,
+            authors: authors.applied(to: base.authors)
+        )
     }
 }
 
@@ -276,17 +298,25 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
     public var show: Bool?
     public var finishedWindowHours: Int?
     public var branches: WorkflowRunBranches?
-    public init(show: Bool? = nil, finishedWindowHours: Int? = nil, branches: WorkflowRunBranches? = nil) {
+    public var authors: AuthorFilterOverrides
+    public init(
+        show: Bool? = nil,
+        finishedWindowHours: Int? = nil,
+        branches: WorkflowRunBranches? = nil,
+        authors: AuthorFilterOverrides = .init()
+    ) {
         self.show = show
         self.finishedWindowHours = finishedWindowHours
         self.branches = branches
+        self.authors = authors
     }
 
     public func applied(to base: WorkflowRunSettings) -> WorkflowRunSettings {
         WorkflowRunSettings(
             show: show ?? base.show,
             finishedWindowHours: finishedWindowHours ?? base.finishedWindowHours,
-            branches: branches ?? base.branches
+            branches: branches ?? base.branches,
+            authors: authors.applied(to: base.authors)
         )
     }
 }
@@ -323,6 +353,15 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.show
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
+        }
+    }
+
+    /// Whose items of `kind` the project lists.
+    public func authors(of kind: ItemKind) -> AuthorFilter {
+        switch kind {
+        case .pullRequest: pullRequests.authors
+        case .issue: issues.authors
+        case .workflowRun: workflowRuns.authors
         }
     }
 }
@@ -398,9 +437,6 @@ extension Configuration {
         # and change its value to use it.
         version = \(supportedVersion)
 
-        # Logins whose items are never listed or notified, e.g. "dependabot[bot]".
-        # hide-authors = []
-
         # How the menu draws your projects: "list" (every project in one
         # scrolling list) or "tabs" (one project at a time).
         # [menu]
@@ -410,6 +446,13 @@ extension Configuration {
         # attention), "per-kind" (pull requests, issues and runs apart) or "none".
         # [menu-bar]
         # count = "total"
+
+        # Whose pull requests every project lists: show (empty: everyone)
+        # minus hide. Authors are the groups me, others and bots, or one
+        # login written with @, e.g. "@dependabot[bot]". Issues and runs
+        # take authors the same way; a project can override it in its block.
+        # [defaults.pull-requests]
+        # authors = { show = [], hide = [] }
 
         # List issues too, not only pull requests, in every project: set show
         # to true. A project can override it in its own block.
@@ -423,10 +466,10 @@ extension Configuration {
         # When to notify, for every project: one block per rule. The list
         # replaces the default rule below, so keep it to hear of new pull
         # requests. Other events include "run.failed" and "pr.review_requested";
-        # authors can be "any", "me", "others" or "bots".
+        # authors narrows a rule to some authors, as above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
-        # authors = "any"
+        # authors = []
 
         # The largest share of each hourly GitHub rate limit shipyard may spend,
         # in percent (1 to 50). The limit is shared with your other tools.

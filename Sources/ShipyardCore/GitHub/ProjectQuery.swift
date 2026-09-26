@@ -410,7 +410,7 @@ enum ProjectQuery {
 
         /// A deleted account is GitHub's `ghost`. GraphQL names a Bot
         /// `dependabot`, where REST and the web say `dependabot[bot]`; the
-        /// `[bot]` spelling is kept so `hide-authors` matches either way.
+        /// `[bot]` spelling is kept so an `@login` author selector matches either way.
         static func author(_ node: AuthorNode?, viewer: String?) -> (String, AuthorKind) {
             guard let node else { return ("ghost", .other) }
             if node.__typename == "Bot" || node.login.hasSuffix("[bot]") {

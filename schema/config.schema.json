@@ -24,7 +24,8 @@
       "default": true
     },
     "hide-authors": {
-      "description": "Logins whose items are hidden, e.g. \"dependabot[bot]\".",
+      "description": "Deprecated: write authors = { hide = [...] } in [defaults.pull-requests], [defaults.issues] and [defaults.workflow-runs] instead. Logins (without @) whose items are hidden, e.g. \"dependabot[bot]\"; still read, as a hide in each kind's defaults, with a warning.",
+      "deprecated": true,
       "type": "array",
       "items": { "type": "string" },
       "default": []
@@ -113,7 +114,7 @@
         "notifications": {
           "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
           "$ref": "#/definitions/notifications",
-          "default": [{ "event": "pr.opened", "authors": "any" }]
+          "default": [{ "event": "pr.opened", "authors": [] }]
         }
       }
     },
@@ -156,7 +157,7 @@
       }
     },
     "pull-requests": {
-      "description": "Pull requests from anyone: open ones, then those closed within the closed window, newest first.",
+      "description": "Pull requests: open ones, then those closed within the closed window, newest first, from the authors authors allows.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -175,11 +176,12 @@
           "description": "List draft pull requests (in gray).",
           "type": "boolean",
           "default": true
-        }
+        },
+        "authors": { "$ref": "#/definitions/authors" }
       }
     },
     "issues": {
-      "description": "Issues from anyone: open ones, then those closed within the closed window.",
+      "description": "Issues: open ones, then those closed within the closed window, from the authors authors allows.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -193,7 +195,8 @@
           "type": "integer",
           "minimum": 0,
           "default": 7
-        }
+        },
+        "authors": { "$ref": "#/definitions/authors" }
       }
     },
     "workflow-runs": {
@@ -217,11 +220,37 @@
           "type": "string",
           "enum": ["default-and-pull-requests", "all"],
           "default": "default-and-pull-requests"
+        },
+        "authors": { "$ref": "#/definitions/authors" }
+      }
+    },
+    "authors": {
+      "description": "Whose items this kind lists: those show matches (empty: everyone) minus those hide matches; hide wins. Items left out are never shown, counted or notified. A project's authors merges key by key onto the defaults'.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List only these authors' items; empty lists everyone.",
+          "$ref": "#/definitions/author-selectors",
+          "default": []
+        },
+        "hide": {
+          "description": "Never list these authors' items, even when show matches them.",
+          "$ref": "#/definitions/author-selectors",
+          "default": []
         }
       }
     },
+    "author-selectors": {
+      "description": "Author selectors: the groups me (you, and your agents working as you), others (anyone but you and bots) and bots (a Bot account or a [bot] login), or one login written with @, e.g. \"@dependabot[bot]\". A bare word is always a group.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(me|others|bots|@[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?)$"
+      }
+    },
     "notifications": {
-      "description": "Notification rules: a macOS notification is sent for an event when a rule names it and its author filter matches.",
+      "description": "Notification rules: a macOS notification is sent for an event on an item the project lists when a rule names it and its authors match.",
       "type": "array",
       "items": { "$ref": "#/definitions/notification-rule" }
     },
@@ -249,10 +278,17 @@
           ]
         },
         "authors": {
-          "description": "Whose items: anyone, you (me), anyone but you and bots (others), or bots (a Bot account or a [bot] login).",
-          "type": "string",
-          "enum": ["any", "me", "others", "bots"],
-          "default": "any"
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "anyOf": [
+            { "$ref": "#/definitions/author-selectors" },
+            {
+              "description": "Deprecated: write a list instead, e.g. [\"others\"]; \"any\" is [].",
+              "deprecated": true,
+              "type": "string",
+              "enum": ["any", "me", "others", "bots"]
+            }
+          ],
+          "default": []
         }
       }
     }

@@ -64,6 +64,15 @@ private func resolve(_ schema: [String: Any], root: [String: Any]) -> [String: A
 
 private func check(_ value: Value, against raw: [String: Any], root: [String: Any], at path: String, into found: inout [String]) {
     let schema = resolve(raw, root: root)
+    if let branches = schema["anyOf"] as? [[String: Any]] {
+        let passes = branches.contains { branch in
+            var inBranch: [String] = []
+            check(value, against: branch, root: root, at: path, into: &inBranch)
+            return inBranch.isEmpty
+        }
+        if !passes { found.append("\(path): matches none of anyOf") }
+        return
+    }
     let type = schema["type"] as? String
     switch value {
     case .object(let object):
@@ -139,6 +148,25 @@ func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = 
     return paths
 }
 
+/// The property paths the schema marks `deprecated`: old keys shipyard
+/// still reads, with a warning, which a file without warnings doesn't set.
+func deprecatedPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
+    let schema = resolve(raw, root: root)
+    var paths: Set<String> = []
+    if let properties = schema["properties"] as? [String: Any] {
+        for (key, child) in properties {
+            let childPath = path.isEmpty ? key : path + "." + key
+            let childSchema = child as! [String: Any]
+            if childSchema["deprecated"] as? Bool == true { paths.insert(childPath) }
+            paths.formUnion(deprecatedPaths(childSchema, root: root, at: childPath))
+        }
+    }
+    if let items = schema["items"] as? [String: Any] {
+        paths.formUnion(deprecatedPaths(items, root: root, at: path + "[]"))
+    }
+    return paths
+}
+
 /// Every key path set in a TOML value, in the same notation.
 private func setPaths(_ value: Value, at path: String = "") -> Set<String> {
     switch value {
@@ -180,8 +208,43 @@ struct ConfigSchemaTests {
         let schema = try loadSchema()
         let everyKeyValue = value(of: try TOMLTable(source: everyKey))
         // `everyKey` decodes without warnings (see the decoding tests), so its
-        // keys are the ones shipyard reads.
-        #expect(declaredPaths(schema, root: schema) == setPaths(everyKeyValue))
+        // keys are the ones shipyard reads, besides the deprecated ones it
+        // still reads with a warning.
+        let deprecated = deprecatedPaths(schema, root: schema)
+        #expect(deprecated == ["hide-authors"])
+        #expect(declaredPaths(schema, root: schema) == setPaths(everyKeyValue).union(deprecated))
+    }
+
+    @Test("the old forms still validate, so taplo passes every file shipyard reads")
+    func oldFormsValidate() throws {
+        let old = """
+            hide-authors = ["dependabot[bot]"]
+            [[defaults.notifications]]
+            event = "pr.opened"
+            authors = "others"
+            [[defaults.notifications]]
+            event = "pr.merged"
+            authors = "any"
+            """
+        #expect(try violations(old, schema: try loadSchema()) == [])
+    }
+
+    @Test("the schema's author selectors are the ones the reader takes")
+    func authorSelectorPattern() throws {
+        let schema = try loadSchema()
+        let definitions = try #require(schema["definitions"] as? [String: Any])
+        let selectors = try #require(definitions["author-selectors"] as? [String: Any])
+        let items = try #require(selectors["items"] as? [String: Any])
+        let pattern = try #require(items["pattern"] as? String)
+        let samples = [
+            "me", "others", "bots", "@octocat", "@dependabot[bot]", "@some-login-2",
+            "any", "bots2", "Me", "owned", "o/r", "@", "@-x", "@two words", "@o/r", "@x[bot", "dependabot[bot]",
+        ]
+        for sample in samples {
+            let reads = (try? AuthorSelector(parsing: sample)) != nil
+            let validates = sample.range(of: pattern, options: .regularExpression) != nil
+            #expect(reads == validates, "`\(sample)`: the reader says \(reads), the schema \(validates)")
+        }
     }
 
     @Test("every key in the schema has a description")
@@ -214,7 +277,9 @@ struct ConfigSchemaTests {
             return node?["enum"] as? [String]
         }
         #expect(enumValues(["notification-rule", "properties", "event"], in: definitions) == EventKind.allCases.map(\.rawValue))
-        #expect(enumValues(["notification-rule", "properties", "authors"], in: definitions) == AuthorFilter.allCases.map(\.rawValue))
+        let ruleAuthors = try #require((definitions["notification-rule"] as? [String: Any])?["properties"] as? [String: Any])["authors"] as? [String: Any]
+        let oldAuthors = (ruleAuthors?["anyOf"] as? [[String: Any]])?.compactMap { $0["enum"] as? [String] }
+        #expect(oldAuthors == [NotificationRule.legacyAuthors])
         #expect(enumValues(["workflow-runs", "properties", "branches"], in: definitions) == WorkflowRunBranches.allCases.map(\.rawValue))
         let properties = try #require(schema["properties"] as? [String: Any])
         #expect(enumValues(["menu-bar", "properties", "count"], in: properties) == MenuBarCount.allCases.map(\.rawValue))
@@ -232,10 +297,11 @@ struct ConfigSchemaTests {
             max-share-percent = 60
             [[defaults.notifications]]
             event = "pr.openned"
+            authors = "everyone"
             [[projects]]
             name = "a"
             repositories = ["not-a-slug", "o/r", "o/r"]
-            issues = { closed-window-days = -1 }
+            issues = { closed-window-days = -1, authors = { hide = ["bots2"] } }
             """
         let found = Set(try violations(bad, schema: schema))
         #expect(found == [
@@ -243,9 +309,11 @@ struct ConfigSchemaTests {
             ": unknown key colour",
             ".rate-limit.max-share-percent: above 50",
             ".defaults.notifications[0].event: pr.openned not in enum",
+            ".defaults.notifications[0].authors: matches none of anyOf",
             ".projects[0].repositories[0]: not-a-slug doesn't match ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$",
             ".projects[0].repositories: items not unique",
             ".projects[0].issues.closed-window-days: below 0",
+            ".projects[0].issues.authors.hide[0]: bots2 doesn't match ^(me|others|bots|@[A-Za-z0-9][A-Za-z0-9-]*(\\[bot\\])?)$",
         ])
     }
 
@@ -274,11 +342,13 @@ struct ConfigSchemaTests {
     @Test("a new file's header shows the settings people reach for first")
     func headerShowsCommonSettings() throws {
         let table = try TOMLTable(source: uncommenting(Set(headerExamples().joined())))
-        #expect(try table.array(forKey: "hide-authors").count == 0)
         #expect(try table.table(forKey: "menu").string(forKey: "layout") == "list")
         #expect(try table.table(forKey: "menu-bar").string(forKey: "count") == "total")
         #expect(try table.table(forKey: "rate-limit").integer(forKey: "max-share-percent") == 10)
         let defaults = try table.table(forKey: "defaults")
+        let authors = try defaults.table(forKey: "pull-requests").table(forKey: "authors")
+        #expect(try authors.array(forKey: "show").count == 0)
+        #expect(try authors.array(forKey: "hide").count == 0)
         #expect(try defaults.table(forKey: "issues").bool(forKey: "show") == false)
         #expect(try defaults.table(forKey: "workflow-runs").bool(forKey: "show") == false)
         let rules = try defaults.array(forKey: "notifications")

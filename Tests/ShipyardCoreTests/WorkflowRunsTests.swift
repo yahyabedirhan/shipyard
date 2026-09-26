@@ -399,7 +399,7 @@ struct WorkflowRunsTests {
     func notifications() async throws {
         let config = runsConfig("""
             workflow-runs = { show = true }
-            notifications = [{ event = "run.failed" }, { event = "run.succeeded", authors = "me" }]
+            notifications = [{ event = "run.failed" }, { event = "run.succeeded", authors = ["me"] }]
             """)
         let harness = try await Harness.started(
             config: config,

@@ -129,10 +129,10 @@ struct RefreshTests {
         #expect(harness.section("e-commerce")?.rows.map(\.number) == [14, 57, 12, 56, 55])
     }
 
-    @Test("drafts = false hides drafts, and hide-authors hides those authors")
+    @Test("drafts = false hides drafts, and authors hides those authors")
     func draftsAndHiddenAuthors() async throws {
         let harness = try await Harness.started(
-            config: "hide-authors = [\"dependabot[bot]\"]\n\n[defaults.pull-requests]\ndrafts = false\n\n" + projects,
+            config: "[defaults.pull-requests]\ndrafts = false\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + projects,
             graphQL: pullRequests()
         )
 
@@ -382,7 +382,7 @@ struct RefreshTests {
                 return count
             }
             guard count == 1 else { return }
-            try? Data(("hide-authors = [\"dependabot[bot]\"]\n\n" + projects).utf8).write(to: configURL)
+            try? Data(("[defaults.pull-requests]\nauthors = { hide = [\"@dependabot[bot]\"] }\n\n" + projects).utf8).write(to: configURL)
             await shipyard.reloadConfiguration()
         }
 

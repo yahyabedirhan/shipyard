@@ -102,7 +102,7 @@ final class ConfigurationReader {
             }
         }
         if let value = bool(node, "launch-at-login") { config.launchAtLogin = value }
-        if let authors = strings(node, "hide-authors") { config.hideAuthors = authors }
+        let hiddenAuthors = strings(node, "hide-authors")
 
         if let menuBar = table(node, "menu-bar") {
             warnUnknownKeys(in: menuBar, known: ["count"])
@@ -141,6 +141,7 @@ final class ConfigurationReader {
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
         }
+        if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
         if let projects = tables(node, "projects") {
             config.projects = projects.compactMap(project)
@@ -192,42 +193,111 @@ final class ConfigurationReader {
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts"])
+        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "drafts", "authors"])
         return PullRequestOverrides(
             show: bool(node, "show"),
             closedWindowDays: window(node, "closed-window-days"),
-            drafts: bool(node, "drafts")
+            drafts: bool(node, "drafts"),
+            authors: authorFilter(node)
         )
     }
 
     private func issues(_ parent: Node) -> IssueOverrides {
         guard let node = table(parent, "issues") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "closed-window-days"])
-        return IssueOverrides(show: bool(node, "show"), closedWindowDays: window(node, "closed-window-days"))
+        warnUnknownKeys(in: node, known: ["show", "closed-window-days", "authors"])
+        return IssueOverrides(
+            show: bool(node, "show"),
+            closedWindowDays: window(node, "closed-window-days"),
+            authors: authorFilter(node)
+        )
     }
 
     private func workflowRuns(_ parent: Node) -> WorkflowRunOverrides {
         guard let node = table(parent, "workflow-runs") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "finished-window-hours", "branches"])
+        warnUnknownKeys(in: node, known: ["show", "finished-window-hours", "branches", "authors"])
         return WorkflowRunOverrides(
             show: bool(node, "show"),
             finishedWindowHours: window(node, "finished-window-hours"),
-            branches: choice(node, "branches", WorkflowRunBranches.self)
+            branches: choice(node, "branches", WorkflowRunBranches.self),
+            authors: authorFilter(node)
         )
+    }
+
+    /// A kind's `authors = { show = [...], hide = [...] }`.
+    private func authorFilter(_ parent: Node) -> AuthorFilterOverrides {
+        guard let node = table(parent, "authors") else { return .init() }
+        warnUnknownKeys(in: node, known: ["show", "hide"])
+        return AuthorFilterOverrides(show: authorSelectors(node, "show"), hide: authorSelectors(node, "hide"))
+    }
+
+    /// The old top-level `hide-authors`, a list of bare logins, read as a
+    /// `hide` of those logins in each kind's defaults, with a warning.
+    private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigPath) {
+        let selectors = logins.map { AuthorSelector.login($0.hasPrefix("@") ? String($0.dropFirst()) : $0) }
+        defaults.pullRequests.authors.hide += selectors
+        defaults.issues.authors.hide += selectors
+        defaults.workflowRuns.authors.hide += selectors
+        let written = selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ")
+        warnings.append(ConfigIssue(
+            line: map.line(for: path),
+            message: "`hide-authors` is the old form: it's read as `authors = { hide = [\(written)] }` "
+                + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
+        ))
     }
 
     private func notifications(_ parent: Node) -> [NotificationRule]? {
         guard let rules = tables(parent, "notifications") else { return nil }
         return rules.compactMap { node in
             warnUnknownKeys(in: node, known: ["event", "authors"])
-            let authors = choice(node, "authors", AuthorFilter.self)
+            let authors = ruleAuthors(node)
             guard node.table.contains(key: "event") else {
                 error("a notification rule needs an `event`", at: node.path)
                 return nil
             }
             guard let event = choice(node, "event", EventKind.self, noun: "event") else { return nil }
-            return NotificationRule(event: event, authors: authors ?? .any)
+            return NotificationRule(event: event, authors: authors ?? [])
         }
+    }
+
+    /// A rule's `authors`: a list of author selectors, or one of the old
+    /// strings (`"any"`, `"me"`, `"others"`, `"bots"`), read with a warning.
+    private func ruleAuthors(_ node: Node) -> [AuthorSelector]? {
+        guard let old = try? node.table.string(forKey: "authors") else { return authorSelectors(node, "authors") }
+        let path = node.path + [.key("authors")]
+        guard NotificationRule.legacyAuthors.contains(old) else {
+            do throws(AuthorSelector.Rejection) {
+                let selector = try AuthorSelector(parsing: old)
+                error("`authors` is a list: write `authors = [\(Configuration.tomlString(selector.description))]`", at: path, value: old)
+            } catch {
+                self.error(error.message, at: path, value: old)
+            }
+            return nil
+        }
+        let selectors = old == "any" ? [] : [try! AuthorSelector(parsing: old)]
+        let written = "[" + selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ") + "]"
+        let advice = old == "any" ? "write `authors = []`, or leave it out, for everyone" : "write `authors = \(written)`"
+        warnings.append(ConfigIssue(
+            line: map.line(for: path, value: old),
+            message: "`authors = \"\(old)\"` is the old form of a notification rule's authors; \(advice)"
+        ))
+        return selectors
+    }
+
+    /// A list of author selectors; each one that doesn't read is an error
+    /// on its own line.
+    private func authorSelectors(_ node: Node, _ key: String) -> [AuthorSelector]? {
+        guard let texts = strings(node, key) else { return nil }
+        var selectors: [AuthorSelector] = []
+        var valid = true
+        for text in texts {
+            do throws(AuthorSelector.Rejection) {
+                selectors.append(try AuthorSelector(parsing: text))
+            } catch {
+                self.error(error.message, at: node.path + [.key(key)], value: text)
+                valid = false
+            }
+        }
+        return valid ? selectors : nil
     }
 
     /// A window in days or hours: a whole number, 0 or more.

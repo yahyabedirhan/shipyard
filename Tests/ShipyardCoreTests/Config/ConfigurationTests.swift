@@ -46,7 +46,6 @@ let everyKey = """
     version = 1
     refresh-interval-seconds = 300
     launch-at-login = false
-    hide-authors = ["dependabot[bot]", "renovate[bot]"]
 
     [menu-bar]
     count = "per-kind"
@@ -68,19 +67,22 @@ let everyKey = """
     show = false
     closed-window-days = 14
     drafts = false
+    authors = { show = ["others", "@dependabot[bot]"], hide = ["@octocat"] }
 
     [defaults.issues]
     show = true
     closed-window-days = 0
+    authors = { show = ["others"], hide = ["bots"] }
 
     [defaults.workflow-runs]
     show = true
     finished-window-hours = 12
     branches = "all"
+    authors = { show = ["me"], hide = ["@yabepa"] }
 
     [[defaults.notifications]]
     event = "pr.merged"
-    authors = "me"
+    authors = ["me"]
 
     [[defaults.notifications]]
     event = "run.failed"
@@ -88,10 +90,10 @@ let everyKey = """
     [[projects]]
     name = "blog"
     repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"]
-    pull-requests = { show = true, closed-window-days = 1, drafts = true }
-    issues = { show = false, closed-window-days = 30 }
-    workflow-runs = { show = false, finished-window-hours = 1, branches = "default-and-pull-requests" }
-    notifications = [{ event = "issue.opened", authors = "bots" }]
+    pull-requests = { show = true, closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] } }
+    issues = { show = false, closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
+    workflow-runs = { show = false, finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
+    notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
 
     """
 
@@ -114,15 +116,15 @@ struct ConfigurationDecodingTests {
         #expect(config.version == 1)
         #expect(config.refreshIntervalSeconds == 120)
         #expect(config.launchAtLogin)
-        #expect(config.hideAuthors.isEmpty)
         #expect(config.menuBar.count == .total)
         #expect(config.menu.layout == .list)
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
-        #expect(config.defaults.pullRequests == .init(show: true, closedWindowDays: 7, drafts: true))
-        #expect(config.defaults.issues == .init(show: false, closedWindowDays: 7))
-        #expect(config.defaults.workflowRuns == .init(show: false, finishedWindowHours: 3, branches: .defaultAndPullRequests))
-        #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: .any)])
+        // Every author, in every kind: an existing file lists what it did.
+        #expect(config.defaults.pullRequests == .init(show: true, closedWindowDays: 7, drafts: true, authors: AuthorFilter(show: [], hide: [])))
+        #expect(config.defaults.issues == .init(show: false, closedWindowDays: 7, authors: AuthorFilter()))
+        #expect(config.defaults.workflowRuns == .init(show: false, finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()))
+        #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
         #expect(config.projects.isEmpty)
         #expect(!config.hasProjects)
     }
@@ -143,8 +145,8 @@ struct ConfigurationDecodingTests {
                     repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"],
                     issues: IssueOverrides(show: true),
                     notifications: [
-                        NotificationRule(event: .prOpened, authors: .others),
-                        NotificationRule(event: .runFailed, authors: .any),
+                        NotificationRule(event: .prOpened, authors: [.others]),
+                        NotificationRule(event: .runFailed),
                     ]
                 ),
                 Configuration.Project(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
@@ -160,34 +162,43 @@ struct ConfigurationDecodingTests {
         let config = result.configuration
         #expect(config.refreshIntervalSeconds == 300)
         #expect(!config.launchAtLogin)
-        #expect(config.hideAuthors == ["dependabot[bot]", "renovate[bot]"])
         #expect(config.menuBar.count == .perKind)
         #expect(config.menu.layout == .tabs)
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
-        #expect(config.defaults.pullRequests == .init(show: false, closedWindowDays: 14, drafts: false))
-        #expect(config.defaults.issues == .init(show: true, closedWindowDays: 0))
-        #expect(config.defaults.workflowRuns == .init(show: true, finishedWindowHours: 12, branches: .all))
+        #expect(config.defaults.pullRequests == .init(
+            show: false, closedWindowDays: 14, drafts: false,
+            authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")])
+        ))
+        #expect(config.defaults.issues == .init(show: true, closedWindowDays: 0, authors: AuthorFilter(show: [.others], hide: [.bots])))
+        #expect(config.defaults.workflowRuns == .init(
+            show: true, finishedWindowHours: 12, branches: .all, authors: AuthorFilter(show: [.me], hide: [.login("yabepa")])
+        ))
         #expect(config.defaults.notifications == [
-            NotificationRule(event: .prMerged, authors: .me),
-            NotificationRule(event: .runFailed, authors: .any),
+            NotificationRule(event: .prMerged, authors: [.me]),
+            NotificationRule(event: .runFailed),
         ])
         let project = try #require(config.projects.first)
         #expect(project.name == "blog")
         #expect(project.repositories == ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"])
-        #expect(project.pullRequests == .init(show: true, closedWindowDays: 1, drafts: true))
-        #expect(project.issues == .init(show: false, closedWindowDays: 30))
-        #expect(project.workflowRuns == .init(show: false, finishedWindowHours: 1, branches: .defaultAndPullRequests))
-        #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: .bots)])
+        #expect(project.pullRequests == .init(show: true, closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots])))
+        #expect(project.issues == .init(show: false, closedWindowDays: 30, authors: .init(show: [.login("renovate[bot]")], hide: [])))
+        #expect(project.workflowRuns == .init(
+            show: false, finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
+        ))
+        #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
     }
 
-    @Test("every event and author filter decodes")
+    @Test("every event and author selector decodes")
     func everyEvent() throws {
+        let selectors: [AuthorSelector] = AuthorSelector.groups + [.login("octocat"), .login("dependabot[bot]")]
         for event in EventKind.allCases {
-            for authors in AuthorFilter.allCases {
-                let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = \"\(authors.rawValue)\"\n"
-                let config = try #require(decoded(text)).configuration
-                #expect(config.defaults.notifications == [NotificationRule(event: event, authors: authors)])
+            for authors in [[], selectors] {
+                let list = authors.map { "\"\($0)\"" }.joined(separator: ", ")
+                let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
+                let result = try #require(decoded(text))
+                #expect(result.warnings.isEmpty)
+                #expect(result.configuration.defaults.notifications == [NotificationRule(event: event, authors: authors)])
             }
         }
     }
@@ -253,7 +264,7 @@ struct ConfigurationValidationTests {
         #expect(rejection("[[defaults.notifications]]\nauthors = \"me\"\n")
             == [ConfigIssue(line: 1, message: "a notification rule needs an `event`")])
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"bot\"\n")
-            == [ConfigIssue(line: 3, message: "unknown value `bot` for `authors` (did you mean `bots`?)")])
+            == [ConfigIssue(line: 3, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
         #expect(rejection("[menu-bar]\ncount = \"per_kind\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `per_kind` for `count` (did you mean `per-kind`?)")])
         #expect(rejection("[menu]\nlayout = \"tab\"\n")
@@ -445,17 +456,21 @@ struct ConfigurationMergeTests {
             [[defaults.notifications]]
             event = "pr.opened"
 
+            [defaults.pull-requests.authors]
+            show = ["others"]
+            hide = ["bots"]
+
             [[defaults.notifications]]
             event = "run.failed"
-            authors = "me"
+            authors = ["me"]
 
             [[projects]]
             name = "overrides"
             repositories = ["o/a", "o/b"]
-            pull-requests = { drafts = true }
+            pull-requests = { drafts = true, authors = { hide = ["@octocat"] } }
             issues = { show = true }
             workflow-runs = { branches = "all" }
-            notifications = [{ event = "pr.merged", authors = "others" }]
+            notifications = [{ event = "pr.merged", authors = ["others"] }]
 
             [[projects]]
             name = "plain"
@@ -473,14 +488,17 @@ struct ConfigurationMergeTests {
         let settings = config.settings(for: config.projects[0])
         #expect(settings.name == "overrides")
         #expect(settings.repositories == ["o/a", "o/b"])
-        #expect(settings.pullRequests == .init(show: true, closedWindowDays: 3, drafts: true))
+        // `authors` merges key by key too: the project's `hide`, the default `show`.
+        #expect(settings.pullRequests == .init(
+            show: true, closedWindowDays: 3, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
+        ))
         #expect(settings.issues == .init(show: true, closedWindowDays: 7))
         #expect(settings.workflowRuns == .init(show: true, finishedWindowHours: 3, branches: .all))
     }
 
     @Test("a project's notifications replace the default list")
     func notificationsReplace() {
-        #expect(config.settings(for: config.projects[0]).notifications == [NotificationRule(event: .prMerged, authors: .others)])
+        #expect(config.settings(for: config.projects[0]).notifications == [NotificationRule(event: .prMerged, authors: [.others])])
         #expect(config.settings(for: config.projects[2]).notifications.isEmpty)
     }
 
@@ -491,8 +509,8 @@ struct ConfigurationMergeTests {
         #expect(settings.issues == config.defaults.issues)
         #expect(settings.workflowRuns == config.defaults.workflowRuns)
         #expect(settings.notifications == [
-            NotificationRule(event: .prOpened, authors: .any),
-            NotificationRule(event: .runFailed, authors: .me),
+            NotificationRule(event: .prOpened),
+            NotificationRule(event: .runFailed, authors: [.me]),
         ])
     }
 }

@@ -2,10 +2,10 @@ import Foundation
 
 /// What the panel draws: one section per project, in configuration order,
 /// the attention count and menu bar label, and when the list was last
-/// brought up to date. Every display rule (what the closed window keeps,
-/// drafts, hidden authors, order, state and check dot, which rows need
-/// attention, what the menu bar says) lives here, so tests reach them
-/// without SwiftUI.
+/// brought up to date. It's built from the projects' listings (`Listing`
+/// decides which items a project has); every display rule (order, state and
+/// check dot, which rows need attention, what the menu bar says) lives here,
+/// so tests reach them without SwiftUI.
 public struct MenuModel: Equatable, Sendable {
     public var sections: [MenuSection]
     /// Rows needing attention across all projects, per kind; a row listed
@@ -66,12 +66,13 @@ public struct MenuModel: Equatable, Sendable {
     /// Before anything was fetched.
     public static let empty = MenuModel()
 
-    /// The model for `snapshot` under `configuration` and what the user has
-    /// seen and collapsed, as of `now` (which the closed window counts back from).
+    /// The model for the projects' `listings` (from `Listing.listings`, by
+    /// project name) under `configuration` and what the user has seen and
+    /// collapsed; `snapshot` gives the error rows and when it was fetched.
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a
-    /// project the snapshot has no entry for (added since it was fetched).
-    public static func build(snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
+    /// project without a listing (added since the snapshot was fetched).
+    public static func build(listings: [String: [Item]], snapshot: Snapshot?, configuration: Configuration, state: AppState) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
                 MenuSection(
@@ -86,12 +87,9 @@ public struct MenuModel: Equatable, Sendable {
             model.applyAttention(state, configuration: configuration)
             return model
         }
-        let hidden = Set(configuration.hideAuthors.map { $0.lowercased() })
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
-            let items = (snapshot.items[project.name] ?? []).filter {
-                shows($0, settings: settings, hiddenAuthors: hidden, now: now)
-            }
+            let items = listings[project.name] ?? []
             // Pull requests, then issues, then runs; each kind open (or
             // running) first, then closed (or finished).
             let rows = kindOrder.flatMap { kind -> [Item] in
@@ -113,8 +111,8 @@ public struct MenuModel: Equatable, Sendable {
                         .map(MenuErrorRow.init)
                 },
                 showsRepository: project.repositories.count > 1,
-                // A project added since the snapshot was fetched has no data yet.
-                isLoaded: snapshot.items[project.name] != nil,
+                // A project added since the snapshot was fetched has no listing yet.
+                isLoaded: listings[project.name] != nil,
                 repositories: project.repositories
             )
         }
@@ -141,24 +139,6 @@ public struct MenuModel: Equatable, Sendable {
 
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun]
-
-    private static func shows(_ item: Item, settings: ProjectSettings, hiddenAuthors: Set<String>, now: Date) -> Bool {
-        guard settings.shows(item.kind) else { return false }
-        if hiddenAuthors.contains(item.author.lowercased()) { return false }
-        if item.state == .draft, !settings.pullRequests.drafts { return false }
-        if !item.state.isActive {
-            // Closed items stay for their kind's closed window in days;
-            // finished runs for `finished-window-hours`.
-            let window: TimeInterval = switch item.kind {
-            case .pullRequest: TimeInterval(settings.pullRequests.closedWindowDays) * 86_400
-            case .issue: TimeInterval(settings.issues.closedWindowDays) * 86_400
-            case .workflowRun: TimeInterval(settings.workflowRuns.finishedWindowHours) * 3600
-            }
-            guard window > 0, let closedAt = item.closedAt else { return false }
-            return closedAt >= now.addingTimeInterval(-window)
-        }
-        return true
-    }
 }
 
 /// One project in the panel.

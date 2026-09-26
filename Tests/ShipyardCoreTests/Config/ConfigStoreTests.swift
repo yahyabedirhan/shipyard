@@ -352,7 +352,7 @@ struct ConfigStoreLayoutTests {
             """)
         #expect(store.lastValid.menu.layout == .tabs)
         #expect(store.lastValid.menuBar.count == .none)
-        #expect(store.lastValid.hideAuthors == ["dependabot[bot]"])
+        #expect(store.lastValid.defaults.pullRequests.authors.hide == [.login("dependabot[bot]")])
     }
 
     @Test("a file with no tables gets [menu] at the end")

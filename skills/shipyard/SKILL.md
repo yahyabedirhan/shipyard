@@ -20,12 +20,12 @@ A request to change the user's shipyard is a change to this file. When no key be
 
 1. Read the whole file: the user writes comments in it and edits it by hand. Change or add only the lines the request needs, keeping every comment, blank line and the existing order.
 2. Put what you add where TOML reads it:
-   - A top-level key (`refresh-interval-seconds`, `hide-authors`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
+   - A top-level key (`refresh-interval-seconds`, `launch-at-login`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
    - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
@@ -44,7 +44,8 @@ Top level:
 | `version` | `1` | only `1` |
 | `refresh-interval-seconds` | `120` | whole number, at least `30`; a floor the app stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
-| `hide-authors` | `[]` | logins, e.g. `"dependabot[bot]"`; matched ignoring case; their items are never listed or notified |
+
+`hide-authors` (a top-level list of logins) is the old way to hide authors. The app still reads it, as a `hide` in each kind's defaults, with a warning; replace it with `authors` (see Whose items).
 
 Tables:
 
@@ -66,12 +67,15 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `pull-requests.show` | `true` | boolean |
 | `pull-requests.closed-window-days` | `7` | `0` or more; days closed and merged PRs stay listed; `0` hides them |
 | `pull-requests.drafts` | `true` | boolean; list draft PRs |
+| `pull-requests.authors` | `{ show = [], hide = [] }` | whose PRs are listed: `authors.show` minus `authors.hide`, each a list of author selectors (see Whose items) |
 | `issues.show` | `false` | boolean |
 | `issues.closed-window-days` | `7` | `0` or more |
+| `issues.authors` | `{ show = [], hide = [] }` | whose issues are listed, as for pull requests |
 | `workflow-runs.show` | `false` | boolean |
 | `workflow-runs.finished-window-hours` | `3` | `0` or more; hours finished runs stay listed (running ones always are) |
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
-| `notifications` | one rule: `pr.opened`, `any` | a list of rules (below) |
+| `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
+| `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
 
 A project, one `[[projects]]` block each, shown as sections in file order:
 
@@ -84,13 +88,30 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 ## Overrides
 
-- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`.
+- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
-- `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, `any`): once the file has one, write the `pr.opened` rule too if it should stay.
+- `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
+
+## Whose items: author selectors
+
+Each kind's `authors = { show = [...], hide = [...] }` decides whose items a project lists. An item is listed when its author matches `show` (an empty `show` is everyone) and doesn't match `hide`; `hide` wins when both match. Set it for every project in `[defaults.pull-requests]`, `[defaults.issues]` or `[defaults.workflow-runs]`, or for one project inside its block. Pull requests, issues and runs each have their own; hiding someone everywhere means hiding them in each kind the projects show.
+
+What a project's filters leave out is gone from shipyard: it isn't shown, counted in the menu bar, the project's header or a tab, nor notified. Every fetched item is still remembered, so when a later edit brings an item into view it isn't notified as new.
+
+The entries of `show` and `hide`, and of a notification rule's `authors`, are **author selectors**. The syntax is small: **a bare word is a group, `@` marks a person, `/` marks a repository.**
+
+| Selector | Covers |
+|---|---|
+| `me` | the signed-in user, which includes agents working as them |
+| `others` | anyone but the user and bots |
+| `bots` | a GitHub Bot account or a login ending in `[bot]` |
+| `@login` | one account, e.g. `@octocat` or `@dependabot[bot]` (keep the `[bot]` suffix); matched ignoring case |
+
+`me`, `others` and `bots` together cover every author once. Always write a login with `@`: a bare word that isn't a group is rejected with a hint: "unknown author `bots2` (did you mean `bots` or `@bots2`?)". A repository (`owner/name`) or a repository group is rejected in `authors` too: repositories belong in a project's `repositories`.
 
 ## Notification rules
 
-A rule, one element of a `notifications` list, is `{ event = "…", authors = "…" }`; `authors` defaults to `"any"`. An event is notified when a rule in the project's list names it and its author filter matches the item's author. Each event is notified once, and a project's existing items never notify when it's added.
+A rule, one element of a `notifications` list, is `{ event = "…", authors = [...] }`; `authors` is a list of author selectors and defaults to `[]`, everyone. An event is notified when a rule in the project's list names it and one of its `authors` matches the item's author. A rule only narrows what the project lists: an item the project's filters leave out (its `authors`, `drafts`, or a closed window of `0`) is never notified, whatever the rule says; so `pr.merged` needs `closed-window-days` above `0`, and `run.failed` needs `finished-window-hours` above `0`. Each event is notified once, and a project's existing items never notify when it's added.
 
 | Event | When |
 |---|---|
@@ -109,12 +130,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = "�
 
 Issue events need the project to show issues, and run events to show workflow runs.
 
-| Authors | Covers |
-|---|---|
-| `any` | everyone |
-| `me` | the signed-in user, which includes agents working as them |
-| `others` | anyone but the user and bots |
-| `bots` | a GitHub Bot account or a login ending in `[bot]` |
+Older files write a rule's `authors` as one string: `"any"`, `"me"`, `"others"` or `"bots"`. The app still reads them, with a warning; when you touch such a rule, write the list instead (`authors = ["others"]`; `"any"` is `[]`, or leave `authors` out).
 
 ## Checking an edit
 
@@ -188,17 +204,32 @@ repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-b
 name = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 notifications = [
-  { event = "pr.opened", authors = "others" },
+  { event = "pr.opened", authors = ["others"] },
 ]
 ```
 
 For every project instead, write `[[defaults.notifications]]` blocks.
 
-**"Hide dependabot."** A top-level key; add to the list when it exists. Use the login as GitHub shows it, `[bot]` suffix included:
+**"Hide dependabot."** A `hide` in the pull requests' defaults (add to the list when it exists; add the same to `[defaults.issues]` when projects show issues). Write the login with `@`, as GitHub shows it, `[bot]` suffix included. To hide every bot, write `bots` instead.
 
 ```toml
-hide-authors = ["dependabot[bot]"]
+[defaults.pull-requests]
+authors = { hide = ["@dependabot[bot]"] }
 ```
+
+When the file still has an old `hide-authors` list, move its logins into these `hide` lists (each with `@`) and delete the `hide-authors` line.
+
+**"Only show what other people open in this project."** Hide `me` and `bots` in each kind the project shows, inside its block:
+
+```toml
+[[projects]]
+name = "shipyard"
+repositories = ["yahyabedirhan/shipyard"]
+pull-requests = { authors = { hide = ["me", "bots"] } }
+issues = { show = true, authors = { hide = ["me", "bots"] } }
+```
+
+For only one account's items (say a project for dependency updates), use `show` instead: `pull-requests = { authors = { show = ["@dependabot[bot]"] } }`.
 
 **"Switch the menu to tabs."** One key in the `[menu]` table; uncomment the header's `# [menu]` lines where the placement rule allows it. The layout button in the menu's header makes the same edit with one click.
 

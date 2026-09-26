@@ -119,22 +119,25 @@ struct SkillDocumentTests {
         let blocks = tomlBlocks(in: try skill()).map { try? Configuration.decode($0).configuration }
         // "notify me when others open PRs here"
         let others = blocks.compactMap { $0?.projects.first?.notifications }
-        #expect(others.contains([NotificationRule(event: .prOpened, authors: .others)]))
+        #expect(others.contains([NotificationRule(event: .prOpened, authors: [.others])]))
         // "show issues for this project": issues on, the window left at its default
-        let issues = try #require(blocks.compactMap { $0?.projects.first }.first { $0.issues.show == true })
+        let issues = try #require(blocks.compactMap { $0?.projects.first }.first { $0.issues == IssueOverrides(show: true) })
         let config = Configuration()
         #expect(config.settings(for: issues).issues == IssueSettings(show: true, closedWindowDays: config.defaults.issues.closedWindowDays))
         // "group these repos"
         #expect(blocks.contains { ($0?.projects.first?.repositories.count ?? 0) > 1 })
-        // "hide dependabot"
-        #expect(blocks.contains { $0?.hideAuthors == ["dependabot[bot]"] })
+        // "hide dependabot": its pull requests, in every project
+        #expect(blocks.contains { $0?.defaults.pullRequests.authors == AuthorFilter(hide: [.login("dependabot[bot]")]) })
+        // "only show what other people open in this project": me and bots hidden, per kind
+        let incoming = blocks.compactMap { $0?.projects.first }.first { $0.pullRequests.authors.hide == [.me, .bots] }
+        #expect(incoming?.issues.authors.hide == [.me, .bots])
         // "switch the menu to tabs"
         #expect(blocks.contains { $0?.menu.layout == .tabs })
         // "show CI runs for this project and tell me when they fail": runs on for that
         // project alone, with the default pr.opened rule kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
         #expect(config.settings(for: runs).workflowRuns.finishedWindowHours == config.defaults.workflowRuns.finishedWindowHours)
-        #expect(runs.notifications == [NotificationRule(event: .prOpened, authors: .any), NotificationRule(event: .runFailed, authors: .any)])
+        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .runFailed)])
     }
 
     @Test("every key the schema declares is named")
@@ -195,7 +198,6 @@ struct SkillDocumentTests {
             ("version", "\(c.version)"),
             ("refresh-interval-seconds", "\(c.refreshIntervalSeconds)"),
             ("launch-at-login", "\(c.launchAtLogin)"),
-            ("hide-authors", c.hideAuthors.isEmpty ? "[]" : "?"),
             ("[menu-bar] count", literal(c.menuBar.count)),
             ("[menu] layout", literal(c.menu.layout)),
             ("[rate-limit] show", literal(c.rateLimit.show)),
@@ -207,6 +209,9 @@ struct SkillDocumentTests {
             ("pull-requests.show", "\(c.defaults.pullRequests.show)"),
             ("pull-requests.closed-window-days", "\(c.defaults.pullRequests.closedWindowDays)"),
             ("pull-requests.drafts", "\(c.defaults.pullRequests.drafts)"),
+            ("pull-requests.authors", c.defaults.pullRequests.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
+            ("issues.authors", c.defaults.issues.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
+            ("workflow-runs.authors", c.defaults.workflowRuns.authors == AuthorFilter() ? "{ show = [], hide = [] }" : "?"),
             ("issues.show", "\(c.defaults.issues.show)"),
             ("issues.closed-window-days", "\(c.defaults.issues.closedWindowDays)"),
             ("workflow-runs.show", "\(c.defaults.workflowRuns.show)"),
@@ -216,14 +221,14 @@ struct SkillDocumentTests {
         for (key, value) in rows {
             #expect(text.contains("| `\(key)` | `\(value)` |"), "no row `\(key)` = `\(value)`")
         }
-        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: .any)])
-        #expect(text.contains("| `notifications` | one rule: `pr.opened`, `any` |"))
+        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
+        #expect(text.contains("| `notifications` | one rule: `pr.opened`, `authors = []` |"))
     }
 
     @Test("every choice, event and author filter is listed")
     func choices() throws {
         let text = try skill()
-        let values = EventKind.allCases.map(\.rawValue) + AuthorFilter.allCases.map(\.rawValue)
+        let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description) + NotificationRule.legacyAuthors
             + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
             + WorkflowRunBranches.allCases.map(\.rawValue)
         for value in values {
