@@ -77,9 +77,18 @@ public struct GitHubClient: Sendable {
     /// this client (one sign-in) lives.
     private let runCache = WorkflowRunCache()
 
+    /// Repositories per GraphQL request; tests change it to compare batches
+    /// with a single request.
+    private let repositoriesPerRequest: Int
+
     public init(token: String, transport: any HTTPTransport) {
+        self.init(token: token, transport: transport, repositoriesPerRequest: ProjectQuery.repositoriesPerRequest)
+    }
+
+    init(token: String, transport: any HTTPTransport, repositoriesPerRequest: Int) {
         self.token = token
         self.transport = transport
+        self.repositoriesPerRequest = max(1, repositoriesPerRequest)
     }
 
     /// The account the token belongs to.
@@ -90,13 +99,16 @@ public struct GitHubClient: Sendable {
         return viewer
     }
 
-    /// Every project's pull requests, and its issues where it shows them, in
-    /// one GraphQL request (each repository once, as an alias), with the
-    /// viewer and the rate limit. A project gets only the kinds it shows,
-    /// even when another project asked for more of a shared repository. A repository
-    /// GitHub can't resolve becomes an error in the snapshot while the rest
-    /// load. The GraphQL limit comes from the response headers, with the
-    /// body's `cost`.
+    /// Every project's pull requests, and its issues where it shows them,
+    /// from GraphQL: each repository once, as an alias, in batches of
+    /// `ProjectQuery.repositoriesPerRequest` per request, sent one after
+    /// another, each with the viewer and the rate limit. A project gets only
+    /// the kinds it shows, even when another project asked for more of a
+    /// shared repository. A repository GitHub can't resolve becomes an error
+    /// in the snapshot while the rest load; a batch that fails (a spent
+    /// limit, a 401, a network failure) fails the fetch. The GraphQL limit
+    /// comes from the last batch's response headers, with the batches' total
+    /// `cost`.
     ///
     /// Where a project shows workflow runs, each of its repositories' runs
     /// then come from REST, one conditional request per repository, one after
@@ -108,24 +120,16 @@ public struct GitHubClient: Sendable {
     /// the fetch.
     public func fetch(projects: [ProjectSettings], at fetchedAt: Date) async throws -> Snapshot {
         let repositories = ProjectQuery.plan(projects)
-        var request = URLRequest(url: Self.graphQLURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = ProjectQuery.body(repositories)
-        let (data, response) = try await send(request)
-
-        let headers = RateLimit(headers: response)
-        // GraphQL's exhausted limit is a 200: an error typed RATE_LIMITED,
-        // or at least `x-ratelimit-remaining: 0` with no data.
-        let resetAt = headers?.resetAt ?? fetchedAt.addingTimeInterval(60)
-        let parsed: ProjectQuery.Parsed
-        do {
-            parsed = try ProjectQuery.parse(data, repositories: repositories)
-        } catch GitHubError.graphQL(let message) {
-            if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
-            throw GitHubError.graphQL(message)
+        var parsed = ProjectQuery.Parsed()
+        var headers: RateLimit?
+        // With no repositories, one request still asks for the viewer and the limit.
+        let starts = repositories.isEmpty ? [0] : Array(stride(from: 0, to: repositories.count, by: repositoriesPerRequest))
+        for start in starts {
+            let batch = Array(repositories[start..<min(start + repositoriesPerRequest, repositories.count)])
+            let answer = try await query(batch, at: fetchedAt)
+            parsed.add(answer.parsed)
+            headers = answer.headers ?? headers
         }
-        if parsed.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
 
@@ -179,6 +183,30 @@ public struct GitHubClient: Sendable {
             rateLimits: RateLimits(graphql: graphql, rest: runs.rateLimit),
             viewerLogin: parsed.viewerLogin
         )
+    }
+
+    /// Asks GraphQL about one batch of repositories. Throws `.rateLimited`
+    /// when the limit ran out, which GraphQL says with a 200.
+    private func query(_ batch: [RepositoryRequest], at fetchedAt: Date) async throws -> (parsed: ProjectQuery.Parsed, headers: RateLimit?) {
+        var request = URLRequest(url: Self.graphQLURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = ProjectQuery.body(batch)
+        let (data, response) = try await send(request)
+
+        let headers = RateLimit(headers: response)
+        // GraphQL's exhausted limit is a 200: an error typed RATE_LIMITED,
+        // or at least `x-ratelimit-remaining: 0` with no data.
+        let resetAt = headers?.resetAt ?? fetchedAt.addingTimeInterval(60)
+        let parsed: ProjectQuery.Parsed
+        do {
+            parsed = try ProjectQuery.parse(data, repositories: batch)
+        } catch GitHubError.graphQL(let message) {
+            if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
+            throw GitHubError.graphQL(message)
+        }
+        if parsed.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
+        return (parsed, headers)
     }
 
     /// What the runs requests of one refresh found.

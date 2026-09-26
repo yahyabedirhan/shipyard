@@ -21,11 +21,16 @@ struct RepositoryRequest: Equatable, Sendable {
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
 }
 
-/// The one GraphQL request a refresh makes: every repository as an alias
-/// (its pull requests and, where shown, its issues), plus the viewer and the
-/// rate limit. Builds the query and parses the
+/// The GraphQL request a refresh makes for one batch of repositories: each
+/// repository as an alias (its pull requests and, where shown, its issues),
+/// plus the viewer and the rate limit. Builds the query and parses the
 /// answer into items, so the query text and its parser have one owner.
 enum ProjectQuery {
+    /// Repositories asked about per request. A refresh with more sends
+    /// several requests, one after another, so one query stays well inside
+    /// GitHub's node limit however many repositories the projects watch.
+    static let repositoriesPerRequest = 25
+
     /// Open pull requests (and open issues) fetched per repository.
     static let openFirst = 50
     /// Closed or merged pull requests (and closed issues) fetched per
@@ -175,6 +180,21 @@ enum ProjectQuery {
         /// Per repository slug that asked (`runBranches`): its default branch
         /// and open pull requests' heads, for the runs' branch filter.
         var branches: [String: RunBranches] = [:]
+
+        /// Adds the answer to the next batch: its repositories' items,
+        /// errors and branches. The rate limit is the later one's, costing
+        /// the sum of both.
+        mutating func add(_ next: Parsed) {
+            viewerLogin = viewerLogin ?? next.viewerLogin
+            items.merge(next.items) { _, later in later }
+            errors.merge(next.errors) { _, later in later }
+            branches.merge(next.branches) { _, later in later }
+            if var limit = next.rateLimit ?? rateLimit {
+                let costs = [rateLimit?.cost, next.rateLimit?.cost].compactMap { $0 }
+                limit.cost = costs.isEmpty ? nil : costs.reduce(0, +)
+                rateLimit = limit
+            }
+        }
     }
 
     /// Reads GitHub's answer. A body that isn't GraphQL's shape throws

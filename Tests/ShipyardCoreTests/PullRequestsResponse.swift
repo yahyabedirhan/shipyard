@@ -113,11 +113,17 @@ struct PullRequestsResponse {
     var answer: StubHTTP.Answer { Self.answer([self]) }
 
     /// One answer for several repositories, as `repo0`, `repo1`… in the
-    /// order the query asks for them: the configuration's, each repository once.
-    static func answer(_ responses: [PullRequestsResponse]) -> StubHTTP.Answer {
+    /// order the query asks for them: the configuration's, each repository
+    /// once. A request carries one batch of repositories, so a refresh with
+    /// more than a batch needs one answer per batch. The body reports `cost`,
+    /// and the body and headers `remaining`.
+    static func answer(_ responses: [PullRequestsResponse], cost: Int = 1, remaining: Int = 4990) -> StubHTTP.Answer {
         var data: [String: Any] = [
             "viewer": ["login": responses.first?.viewer ?? "yabepa"],
-            "rateLimit": ["limit": 5000, "remaining": 4990, "used": 10, "resetAt": "2026-09-25T12:42:00Z", "cost": 1],
+            "rateLimit": [
+                "limit": 5000, "remaining": remaining, "used": 5000 - remaining,
+                "resetAt": "2026-09-25T12:42:00Z", "cost": cost,
+            ],
         ]
         var errors: [[String: Any]] = []
         for (index, response) in responses.enumerated() {
@@ -153,7 +159,7 @@ struct PullRequestsResponse {
         }
         var body: [String: Any] = ["data": data]
         if !errors.isEmpty { body["errors"] = errors }
-        var answer = StubHTTP.Answer.json("", headers: Harness.rateLimitHeaders(remaining: 4990))
+        var answer = StubHTTP.Answer.json("", headers: Harness.rateLimitHeaders(remaining: remaining))
         answer.body = try! JSONSerialization.data(withJSONObject: body)
         return answer
     }

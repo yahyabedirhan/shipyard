@@ -20,6 +20,16 @@ So shipyard shares both limits with `gh` and with every agent acting as the user
 - `rateLimit(dryRun: true) { cost limit remaining resetAt }` returns a query's cost without spending it.
 - **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**.
 
+## Query limits, and why shipyard sends repositories in batches
+
+Checked 2026-09-26 against the GraphQL rate-limits page above.
+
+- **Nodes:** "Individual calls cannot request more than 500,000 total nodes." Nodes multiply down nested connections (50 repositories × 10 issues each = 500 nodes).
+- **Time:** "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate the request and you will receive a timeout response."
+- GitHub's advice for both: "Break up complex queries into multiple simpler queries."
+- **Shipyard's batch:** 25 repositories per GraphQL request, sent one after another (never in parallel, per the secondary limits below). One repository asks for at most about 910 nodes (70 pull requests, each with 10 review requests and 1 commit, plus 70 issues), so a batch stays near 23,000 nodes, far inside the node limit, and small enough to answer well within the 10 seconds even when a group brings in hundreds of repositories. A user with 25 repositories or fewer still sends one request.
+- **Cost of batches:** each request's cost is rounded on its own and has the minimum of 1 point, so several batches can cost a point or two more than one request would. Shipyard's rate budget records the batches' sum as the refresh's cost, and the last batch's headers as where the limit stands.
+
 ## Knowing where you stand
 
 - REST responses carry `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-used`, `x-ratelimit-reset` (UTC epoch seconds) and `x-ratelimit-resource`.
