@@ -2,23 +2,35 @@ import Foundation
 
 // The connect screen's words (`ConnectView`).
 extension PanelText {
-    /// What the connect screen says: a title, what happened, Sign in with
-    /// GitHub (or why it's unavailable), then the `gh` way in: a lead-in, the
-    /// command to copy, and whether to point at installing `gh`.
+    /// What the connect screen says, and which way in leads: a title, one
+    /// line on what happened, then Sign in with GitHub and the `gh` way in
+    /// the order `lead` gives. Strings mentioning `gh` are Markdown, so the
+    /// command reads in code font.
     public struct Connect: Equatable, Sendable {
+        /// Which way in the screen puts first.
+        public enum Lead: Equatable, Sendable {
+            /// Sign in with GitHub, prominent; under it the `gh` way,
+            /// folded in a disclosure.
+            case signIn
+            /// The `gh auth login` box with Connect with gh beside it,
+            /// prominent; Sign in with GitHub under it.
+            case ghCommand
+            /// Connect with gh, prominent, beside the message (`gh` is
+            /// signed in already); Sign in with GitHub under it.
+            case connectWithGh
+        }
+
         /// The screen's heading, e.g. "Connect to GitHub".
         public var title: String
-        /// What happened and what to do.
+        /// What happened, in one short line (Markdown).
         public var message: String
+        public var lead: Lead
         /// Why Sign in with GitHub can't be used in this build, shown under
         /// its disabled button; `nil` when it can.
         public var signInUnavailable: String?
-        /// The words before the `gh` command, ending where the command follows.
-        public var commandLead: String
-        /// The `gh` command to run in a terminal, with a Copy button.
-        public var command: String
-        /// Whether `gh` may not be installed at all, so the screen shows `installGh`.
-        public var suggestsInstallingGh: Bool
+        /// Whether `gh` may not be installed at all, so the `gh` way has the
+        /// install hint (`installGh`) beside it.
+        public var showsInstallHint: Bool
     }
 
     /// What the code screen says while the device flow waits for approval.
@@ -40,11 +52,27 @@ extension PanelText {
         public var waiting: String
     }
 
-    private static let ghLoginCommand = "gh auth login"
-    private static let ghLogoutCommand = "gh auth logout"
+    /// The command that signs `gh` in, in the `gh` way's copyable box.
+    public static let ghLogin = "gh auth login"
 
-    /// Where to get `gh`, as Markdown (the link is clickable in the panel).
-    public static let installGh = "Get gh at [cli.github.com](https://cli.github.com) or with `brew install gh`."
+    /// The button that looks for `gh`'s token again (`start()`).
+    public static let connectWithGh = "Connect with `gh`"
+
+    /// The disclosure that holds the `gh` way when Sign in with GitHub leads.
+    public static let useGhInstead = "Use the GitHub CLI (`gh`) instead"
+
+    /// `useGhInstead`'s hover help.
+    public static let useGhInsteadHelp = "Shipyard reuses the `gh` command's sign-in if you already use it."
+
+    /// The install hint's hover help (the ⓘ beside the `gh` way).
+    public static let installGhHelp = "How to install `gh`"
+
+    /// The install hint's popover: where to get `gh`, before `brewInstallGh`
+    /// in a copyable box. Markdown, so the link is clickable.
+    public static let installGh = "Download it from [cli.github.com](https://cli.github.com), or run:"
+
+    /// The Homebrew command that installs `gh`.
+    public static let brewInstallGh = "brew install gh"
 
     /// Shown while `start()` looks for a token, before there's a reason to show.
     public static let connecting = "Connecting to GitHub…"
@@ -59,76 +87,61 @@ extension PanelText {
     /// The code screen's button that stops the device flow.
     public static let cancelSignIn = "Cancel"
 
-    /// Said under Try again when it left shipyard signed out, for `reason`
-    /// as it stands after the try, so the click doesn't look like it did nothing.
+    /// Said beside Connect with gh when it left shipyard signed out, for
+    /// `reason` as it stands after the try, so the click doesn't look like
+    /// it did nothing.
     public static func stillSignedOut(_ reason: Shipyard.SignedOutReason) -> String {
         switch reason {
-        case .noToken: "gh still isn't signed in."
-        case .rejected(.gh): "GitHub still rejects gh's token."
-        case .rejected(.tokenStore): "GitHub still rejects the token."
+        case .noToken: "The `gh` command still isn't signed in."
+        case .rejected(.gh): "GitHub still rejects the `gh` command's sign-in."
+        case .rejected(.tokenStore): "GitHub still rejects the sign-in."
         case .userSignedOut: "Still not connected."
         }
     }
 
     /// The connect screen for why shipyard is signed out. With `canSignIn`
-    /// (the build has an OAuth App client ID) it leads with Sign in with
-    /// GitHub and offers `gh` beside it; without, `gh` is the way in and the
-    /// button says why it's unavailable.
+    /// (the build has an OAuth App client ID) Sign in with GitHub leads,
+    /// except where `gh` is the quicker fix: `gh` still signed in, or `gh`'s
+    /// token rejected. Without, `gh` always leads and the button says why
+    /// it's unavailable.
     public static func connect(_ reason: Shipyard.SignedOutReason, canSignIn: Bool) -> Connect {
         let unavailable = canSignIn ? nil : signInUnavailable
+        let signInOrGh: Connect.Lead = canSignIn ? .signIn : .ghCommand
         switch reason {
-        case .noToken:
+        case .noToken, .userSignedOut(.signedOut):
             return Connect(
                 title: "Connect to GitHub",
                 message: canSignIn
-                    ? "Sign in with GitHub in your browser, or connect through the GitHub CLI, gh, if you use it."
-                    : "Shipyard connects to GitHub through the GitHub CLI, gh.",
+                    ? "Sign in to see the pull requests your agents open."
+                    : "Connect through the GitHub CLI (`gh`).",
+                lead: signInOrGh,
                 signInUnavailable: unavailable,
-                commandLead: canSignIn
-                    ? "With gh installed, sign in with it in a terminal:"
-                    : "Install it, then sign in with it in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: true
-            )
-        case .rejected(.gh):
-            return Connect(
-                title: "GitHub rejected gh's token",
-                message: canSignIn
-                    ? "It was revoked or has expired. Sign in with GitHub instead, or sign in to gh again."
-                    : "It was revoked or has expired.",
-                signInUnavailable: unavailable,
-                commandLead: "Sign in to gh again in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: false
-            )
-        case .rejected(.tokenStore):
-            return Connect(
-                title: "GitHub rejected shipyard's token",
-                message: canSignIn
-                    ? "It was revoked or has expired. Sign in with GitHub again."
-                    : "It was revoked or has expired.",
-                signInUnavailable: unavailable,
-                commandLead: canSignIn ? "Or sign in to gh in a terminal:" : "Sign in to gh in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: false
+                showsInstallHint: true
             )
         case .userSignedOut(.ghStillSignedIn):
             return Connect(
                 title: "Signed out",
-                message: "gh is still signed in, so Try again, or the next launch, connects again.",
+                message: "The `gh` command is still signed in.",
+                lead: .connectWithGh,
                 signInUnavailable: unavailable,
-                commandLead: "To disconnect for good, sign gh out in a terminal:",
-                command: ghLogoutCommand,
-                suggestsInstallingGh: false
+                showsInstallHint: false
             )
-        case .userSignedOut(.signedOut):
+        case .rejected(.tokenStore):
             return Connect(
-                title: "Signed out",
-                message: canSignIn ? "To connect again, Sign in with GitHub." : "To connect again, use gh.",
+                title: "Sign in again",
+                message: "Your GitHub sign-in expired or was revoked.",
+                lead: signInOrGh,
                 signInUnavailable: unavailable,
-                commandLead: canSignIn ? "Or sign in to gh in a terminal:" : "Sign in to gh in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: false
+                // The `gh` way folds into the same disclosure as on first launch.
+                showsInstallHint: canSignIn
+            )
+        case .rejected(.gh):
+            return Connect(
+                title: "Sign in again",
+                message: "GitHub rejected the `gh` command's sign-in.",
+                lead: .ghCommand,
+                signInUnavailable: unavailable,
+                showsInstallHint: false
             )
         }
     }
@@ -159,8 +172,8 @@ extension PanelText {
         case .expired: "The code expired before it was approved. Sign in again for a new one."
         case .denied: "The sign-in was declined on GitHub."
         case .clientIDMissing: signInUnavailable
-        case .unauthorized: "GitHub refused the sign-in. Try again, or use gh."
-        case .rejected(let code): "GitHub refused the sign-in (\(code)). Try again, or use gh."
+        case .unauthorized: "GitHub refused the sign-in. Try again, or use `gh`."
+        case .rejected(let code): "GitHub refused the sign-in (\(code)). Try again, or use `gh`."
         case .http(let status): "GitHub answered with an error (HTTP \(status)). Try again."
         case .network: "GitHub couldn't be reached. Check the connection and try again."
         case .malformed: "GitHub's answer couldn't be read. Try again."

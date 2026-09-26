@@ -1,18 +1,21 @@
 import ShipyardCore
 import SwiftUI
 
-/// Onboarding's connect step. Signed out, it says what happened, offers
-/// Sign in with GitHub (the device flow), and beside it the `gh` command to
-/// run, with a Copy button; Try again looks for a token once more. A build
-/// without an OAuth App client ID shows Sign in with GitHub disabled, with
-/// why, and `gh` stays the way in. While the device flow waits (`connecting`)
-/// it shows the code (a click on it, or on its copy icon, copies it), a
-/// button that copies it and opens github.com/login/device, and Cancel.
-/// The words come from `PanelText.connect` and `PanelText.deviceCode`.
+/// Onboarding's connect step. Signed out, it says what happened in a line
+/// and puts the fix right there, in the order `PanelText.Connect.lead`
+/// gives: Sign in with GitHub (the device flow) first, with the `gh` way
+/// folded in a disclosure under it; or the `gh auth login` box with Connect
+/// with gh beside it; or Connect with gh alone beside the message, when `gh`
+/// is signed in already. Connect with gh looks for a token once more
+/// (`start()`). A build without an OAuth App client ID shows Sign in with
+/// GitHub disabled, with why, and `gh` leads. While the device flow waits
+/// (`connecting`) it shows the code (a click on it, or on its copy icon,
+/// copies it), a button that copies it and opens github.com/login/device,
+/// and Cancel. The words come from `PanelText.connect` and `PanelText.deviceCode`.
 ///
 /// `start()` clears the reason while it looks for a token, so the last one
-/// stays on screen during Try again; before any is known (at launch) a
-/// spinner shows instead.
+/// stays on screen during Connect with gh; before any is known (at launch)
+/// a spinner shows instead.
 struct ConnectView: View {
     let shipyard: Shipyard
 
@@ -20,8 +23,12 @@ struct ConnectView: View {
     @State private var isTrying = false
     /// Sign in with GitHub was clicked and GitHub hasn't sent a code yet.
     @State private var isRequestingCode = false
-    /// Try again left shipyard signed out: say so, or the click seems to do nothing.
+    /// Connect with gh left shipyard signed out: say so, or the click seems to do nothing.
     @State private var stillSignedOut = false
+    /// The `gh` disclosure under Sign in with GitHub is open.
+    @State private var showsGh = false
+    /// The install hint's popover is open.
+    @State private var showsInstallHint = false
     /// The code is on the clipboard: the copy icon shows a checkmark.
     @State private var codeCopied = false
 
@@ -51,76 +58,132 @@ struct ConnectView: View {
     private func screen(_ text: PanelText.Connect) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
-            Text(text.message)
-                .font(TypeScale.body)
-                .foregroundStyle(.secondary)
-                .lineSpacing(1.5)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 12)
-            signIn(unavailable: text.signInUnavailable)
-                .padding(.bottom, 12)
-            Hairline()
-                .padding(.bottom, 10)
-            Text(text.commandLead)
-                .font(TypeScale.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.bottom, 8)
-            CommandBox(command: text.command)
-                .padding(.bottom, 10)
-            if text.suggestsInstallingGh {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.tertiary)
-                    Text(LocalizedStringKey(PanelText.installGh))
-                        .font(.system(size: 11))
+            switch text.lead {
+            case .signIn:
+                message(text.message)
+                    .padding(.bottom, 12)
+                signIn(prominent: true, unavailable: text.signInUnavailable)
+                    .padding(.bottom, 12)
+                DisclosureGroup(isExpanded: $showsGh) {
+                    ghCommand(prominent: false, installHint: true)
+                        .padding(.top, 8)
+                } label: {
+                    markdown(PanelText.useGhInstead)
+                        .font(TypeScale.body)
                         .foregroundStyle(.secondary)
-                        .tint(Palette.accent)
+                        .hoverHelp(markdown: PanelText.useGhInsteadHelp)
                 }
-                .padding(.bottom, 4)
-            }
-            HStack(spacing: 8) {
-                if isTrying {
-                    ProgressView().controlSize(.small)
-                } else if stillSignedOut, let reason = shipyard.signedOutReason {
-                    Text(PanelText.stillSignedOut(reason))
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
+            case .ghCommand:
+                message(text.message)
+                    .padding(.bottom, 12)
+                ghCommand(prominent: true, installHint: text.showsInstallHint)
+                    .padding(.bottom, 12)
+                signIn(prominent: false, unavailable: text.signInUnavailable)
+            case .connectWithGh:
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    message(text.message)
+                    Spacer(minLength: 0)
+                    connectWithGh(prominent: true)
                 }
-                Spacer()
-                // Not the default action: after signing out of gh's token,
-                // Return would connect straight back. Quiet when Sign in
-                // with GitHub is the screen's main action.
-                Button("Try again", action: tryAgain)
-                    .buttonStyle(PillButtonStyle(prominent: text.signInUnavailable != nil))
-                    .disabled(isTrying || isRequestingCode)
+                stillSignedOutNote
+                    .padding(.top, 6)
+                signIn(prominent: false, unavailable: text.signInUnavailable)
+                    .padding(.top, 12)
             }
-            .padding(.top, 10)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func message(_ text: String) -> some View {
+        markdown(text)
+            .font(TypeScale.body)
+            .foregroundStyle(.secondary)
+            .lineSpacing(1.5)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The `gh auth login` box with Connect with gh beside it, the install
+    /// hint after it, and under it why the last Connect with gh found nothing.
+    private func ghCommand(prominent: Bool, installHint: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                CommandBox(command: PanelText.ghLogin)
+                connectWithGh(prominent: prominent)
+                if installHint { installHintButton }
+            }
+            stillSignedOutNote
+        }
+    }
+
+    /// Looks for a token once more (`start()`). Never the default action:
+    /// after signing out of `gh`'s token, Return would connect straight back.
+    private func connectWithGh(prominent: Bool) -> some View {
+        HStack(spacing: 6) {
+            if isTrying { ProgressView().controlSize(.small) }
+            Button(action: connectAgain) { markdown(PanelText.connectWithGh) }
+                .buttonStyle(PillButtonStyle(prominent: prominent))
+                .disabled(isTrying || isRequestingCode)
+        }
+        .fixedSize()
+    }
+
+    @ViewBuilder
+    private var stillSignedOutNote: some View {
+        if stillSignedOut, !isTrying, let reason = shipyard.signedOutReason {
+            markdown(PanelText.stillSignedOut(reason))
+                .font(TypeScale.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The ⓘ beside the `gh` way: a popover with where to get `gh`, and
+    /// the Homebrew command to copy.
+    private var installHintButton: some View {
+        Button { showsInstallHint.toggle() } label: {
+            Image(systemName: "info.circle")
+        }
+        .buttonStyle(IconButtonStyle())
+        .hoverHelp(markdown: PanelText.installGhHelp)
+        .accessibilityLabel(PanelText.installGhHelp.replacingOccurrences(of: "`", with: ""))
+        .popover(isPresented: $showsInstallHint, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                markdown(PanelText.installGh)
+                    .font(TypeScale.body)
+                    .tint(Palette.accent)
+                    .fixedSize(horizontal: false, vertical: true)
+                CommandBox(command: PanelText.brewInstallGh)
+            }
+            .padding(12)
+            .frame(width: 260)
+        }
+    }
+
     /// Sign in with GitHub, and under it why the last one failed, or why
     /// the build can't offer it.
-    private func signIn(unavailable: String?) -> some View {
+    private func signIn(prominent: Bool, unavailable: String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Button(PanelText.signInWithGitHub, action: beginSignIn)
-                    .buttonStyle(PillButtonStyle(prominent: unavailable == nil))
+                    .buttonStyle(PillButtonStyle(prominent: prominent && unavailable == nil))
                     .disabled(unavailable != nil || isRequestingCode || isTrying)
                 if isRequestingCode {
                     ProgressView().controlSize(.small)
                 }
             }
             if let note = unavailable ?? shipyard.signInError.map(PanelText.signInFailed) {
-                Text(note)
+                markdown(note)
                     .font(TypeScale.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// Text from `PanelText` that may hold Markdown: `gh` in backticks, a link.
+    private func markdown(_ text: String) -> Text {
+        Text(LocalizedStringKey(text))
     }
 
     // MARK: - The code (connecting)
@@ -221,7 +284,7 @@ struct ConnectView: View {
         withAnimation(.spring(duration: 0.3)) { codeCopied = true }
     }
 
-    private func tryAgain() {
+    private func connectAgain() {
         isTrying = true
         stillSignedOut = false
         Task {

@@ -284,7 +284,7 @@ public final class Shipyard {
     }
 
     /// Clears the token store and returns to `signedOut`. When the token came
-    /// from `gh`, says so, so the app can tell the user to run `gh auth logout`.
+    /// from `gh`, says so, so the connect screen can offer Connect with gh.
     @discardableResult
     public func signOut() -> SignOutResult {
         cancelDeviceFlow()

@@ -83,6 +83,12 @@ extension View {
         modifier(HoverHelpSource(content: text.map(HoverHelpContent.text), context: context, leadingInset: leadingInset))
     }
 
+    /// `hoverHelp(_:context:leadingInset:)` for a line of Markdown, so a
+    /// command in backticks reads in code font; VoiceOver hears it without them.
+    func hoverHelp(markdown text: String, context: HoverHelp.Context = .toolbar) -> some View {
+        modifier(HoverHelpSource(content: .markdown(text), context: context, leadingInset: Grid.gutter))
+    }
+
     /// Shows a row's card when the pointer rests on it, lined up
     /// `leadingInset` in from the row's leading edge, with the row's timing.
     func hoverHelp(_ card: RowCard, leadingInset: CGFloat) -> some View {
@@ -113,12 +119,15 @@ extension View {
 /// What a hover card shows: a line or two of help, or a row's card.
 enum HoverHelpContent: Hashable {
     case text(String)
+    /// One line of Markdown (inline code, links).
+    case markdown(String)
     case row(RowCard)
 
     /// What VoiceOver reads as the view's hint.
     var spoken: String {
         switch self {
         case .text(let text): text
+        case .markdown(let text): text.replacingOccurrences(of: "`", with: "")
         case .row(let card): card.spoken
         }
     }
@@ -327,6 +336,10 @@ private struct HoverHelpBody: View {
     var body: some View {
         switch content {
         case .text(let text): HoverHelpText(text: text)
+        case .markdown(let text):
+            Text(LocalizedStringKey(text))
+                .font(TypeScale.meta)
+                .fixedSize(horizontal: false, vertical: true)
         case .row(let card): RowCardView(card: card)
         }
     }
