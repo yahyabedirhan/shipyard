@@ -1,4 +1,4 @@
-[Spec #54](https://github.com/yahyabedirhan/shipyard/issues/54) | Tickets: #55–#66, #14 | QA: #67–#70 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/low-level-design.md) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/configuration.md) | [Decisions](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/.handoff/2026-09-26-shipyard-0.0.2-decisions.md)
+[Spec #54](https://github.com/yahyabedirhan/shipyard/issues/54) | Tickets: #55–#66, #14, #23, #73, #74 | QA: #67–#70, #76 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/low-level-design.md) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/docs/configuration.md) | [Decisions](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-0.0.2/.handoff/2026-09-26-shipyard-0.0.2-decisions.md)
 
 ## Why the change
 
@@ -6,17 +6,17 @@ Shipyard 0.0.2 makes it a superset of ghbar through configuration, while the mai
 
 ## Special things to note
 
-- **Sign-in without `gh` is built but switched off:** it waits on #23. `OAuthApp.clientID` (`DeviceFlow.swift`) is still the placeholder, so the connect screen shows Sign in with GitHub as unavailable with its reason, and `gh` stays the way in. Setting the ID is a one-line change. This PR is only **part of #14**, which stays open, and the README already describes the sign-in.
+- **Sign in with GitHub works without `gh`:** shipyard's OAuth App from #23 (`Ov23li68GZnClULrjIFj`) is compiled into `OAuthApp.clientID`. The connect screen shows a code, the token goes in the login Keychain, and `gh` stays the silent path when it's signed in. After each `make install`, macOS may ask once whether the new copy may use the Keychain item: choose Always Allow.
 - **Behaviour changes worth a look:**
   - The closed and finished windows are part of a project's listing (ADR 0003), so `closed-window-days = 0` no longer notifies `pr.merged`/`pr.closed`, and `finished-window-hours = 0` no longer notifies finished runs.
   - The first time the review search finds a PR, it raises both `pr.opened` and `pr.review_requested`, so a project with both rules gets two notifications.
   - With several projects, the All tab sorts rows across projects within each kind.
   - `incoming-contributions` hides bots in its Review requests project too.
   - A failed review search keeps the last results.
-- **QA is non-blocking:** #67 (group and sort), #68 (fold), #69 (Show more) and #70 (preset onboarding) carry the real-menu checks and don't hold this PR. Agents took the screenshots below in the real app with a test config that watches public repositories only. Clicking inside the panel wasn't possible, so folding and the keys weren't shot.
+- **QA is non-blocking:** #67 (group and sort), #68 (fold), #69 (Show more) and #70 (preset onboarding) and #76 (sign-in) carry the real-menu checks and don't hold this PR. Agents took the screenshots below in the real app with a test config that watches public repositories only. Clicking inside the panel wasn't possible, so folding and the keys weren't shot.
   - Your `config.toml` and `state.json` were restored from backups afterwards.
   - `.scratch/shipyard-0-0-2/mac.lock` is kept with the backups; remove it when you're happy.
-  - `/Applications/Shipyard.app` is this branch's build (05e285e).
+  - `/Applications/Shipyard.app` is currently the #72 hover-help prototype (branch `feat/hover-help`); run `make install` from this branch to try the PR.
 
 ## Change outline
 
@@ -95,6 +95,6 @@ Where the new responsibilities live:
 +   presets.md                the three presets, tested equal to the app's
 ```
 
-Commits, one per ticket: #55 `887d33c`, #57 `fbb70ca`, #56 `aae03e7`, #14 `71431da` (part), #59 `7c1c559`, #62 `dbfc390`, #58 `f87ea62`, #60 `6421bb8`, #63 `f3d1687`, #61 `b52835b`, #65 `f23a938`, #64 `6a7f547`, #66 `8b546fd`, and the final review's tidy-up in `05e285e`. `make test`: 608 tests pass. The release build has no warnings.
+Commits, one per ticket: #55 `887d33c`, #57 `fbb70ca`, #56 `aae03e7`, #14 `71431da` and `f2d6408`, #59 `7c1c559`, #62 `dbfc390`, #58 `f87ea62`, #60 `6421bb8`, #63 `f3d1687`, #61 `b52835b`, #65 `f23a938`, #64 `6a7f547`, #66 `8b546fd`, the final review's tidy-up in `05e285e`, screenshots moved into `docs/assets/` for #73 (`23901d4`, `e164484`, `45b4518`), and the README rewrite for #74 (`12ba5be`). `make test`: 612 tests pass. The release build has no warnings.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
