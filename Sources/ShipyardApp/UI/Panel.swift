@@ -59,7 +59,7 @@ struct Panel: View {
                 Button(action: actions.switchToNextLayout) {
                     Image(systemName: layout.symbol)
                         .frame(width: 16, height: 16)
-                        .contentTransition(.symbolEffect(.replace))
+                        .contentTransition(.symbolEffect(.replace, options: .speed(1.5)))
                 }
                 .buttonStyle(IconButtonStyle())
                 .help(PanelText.layoutButton(layout))
