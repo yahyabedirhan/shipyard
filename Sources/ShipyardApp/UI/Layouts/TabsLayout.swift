@@ -130,6 +130,11 @@ struct TabsLayout: View {
                     actions.toggleGroup(group)
                     return true
                 }
+                if let group = content.showMoreGroup(at: place) {
+                    guard !markSeenOnly else { return false }
+                    actions.toggleShowMore(group)
+                    return true
+                }
                 guard let row = content.row(at: place) else { return false }
                 withAnimation(Motion.seen) {
                     if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
@@ -307,6 +312,11 @@ private struct TabList: View {
                     let place = MenuRowPlace(section: nil, row: row.id)
                     TabRow(row: row, showsRepository: content.showsRepository)
                         .itemRow(row, at: place, highlight: $highlight, showsRepository: content.showsRepository, actions: actions)
+                        .id(place)
+                }
+                if group.hasShowMore, !group.isFolded {
+                    let place = MenuRowPlace.showMore(group.id, in: nil)
+                    ShowMoreRow(group: group, place: place, highlight: $highlight, actions: actions)
                         .id(place)
                 }
             }

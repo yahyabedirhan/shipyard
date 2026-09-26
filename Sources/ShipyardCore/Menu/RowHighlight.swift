@@ -1,7 +1,8 @@
 import Foundation
 
 /// Where a row sits in a layout: the project it's listed under and what's
-/// there, an item, the project's header or a subsection's subheader. The
+/// there, an item, the project's header, a subsection's subheader or a
+/// group's Show more (or Show less) row. The
 /// list layout can list one item under two projects, so its two rows have
 /// two places and only the one under the pointer is highlighted.
 public struct MenuRowPlace: Hashable, Sendable {
@@ -13,6 +14,9 @@ public struct MenuRowPlace: Hashable, Sendable {
         case projectHeader
         /// A subsection's subheader.
         case groupHeader(GroupID)
+        /// A capped group's Show more row, which reads Show less while the
+        /// group is expanded.
+        case showMore(GroupID)
     }
 
     /// The project (section) the row is listed under in the list layout;
@@ -41,6 +45,13 @@ public struct MenuRowPlace: Hashable, Sendable {
     /// → fold it.
     public static func groupHeader(_ group: GroupID, in section: String?) -> MenuRowPlace {
         MenuRowPlace(section: section, kind: .groupHeader(group))
+    }
+
+    /// The Show more (or Show less) row of `group`, under the project
+    /// `section` in the list layout (`nil` in a tab): ↑ and ↓ stop on it,
+    /// and Return toggles it.
+    public static func showMore(_ group: GroupID, in section: String?) -> MenuRowPlace {
+        MenuRowPlace(section: section, kind: .showMore(group))
     }
 
     /// The item's `MenuRow.id`; `nil` for a header or a subheader.
@@ -176,6 +187,10 @@ public struct RowHighlight: Equatable, Sendable {
             let group = section.groups.first { $0.rows.contains { $0.id == id } }
             moveTo(group.flatMap { $0.showsHeader ? .groupHeader($0.id, in: project) : nil } ?? .header(project))
             return nil
+        case .showMore(let id):
+            let group = section.groups.first { $0.id == id }
+            moveTo(group.flatMap { $0.showsHeader ? .groupHeader($0.id, in: project) : nil } ?? .header(project))
+            return nil
         case .groupHeader(let id):
             guard let group = section.groups.first(where: { $0.id == id }) else { return nil }
             if let fold = foldLeft(group) { return fold }
@@ -198,7 +213,7 @@ public struct RowHighlight: Equatable, Sendable {
         guard let place, let project = place.section,
               let section = model.sections.first(where: { $0.name == project }) else { return nil }
         switch place.kind {
-        case .item:
+        case .item, .showMore:
             return nil
         case .groupHeader(let id):
             guard let group = section.groups.first(where: { $0.id == id }) else { return nil }
@@ -272,21 +287,25 @@ public struct RowHighlight: Equatable, Sendable {
 
 /// What Return acts on in the list layout: an item, which it opens (⌥Return
 /// marks it seen), a project's header, which opens the project's
-/// repository on GitHub, or a subsection's subheader, which it folds or
-/// unfolds, as a click does.
+/// repository on GitHub, a subsection's subheader, which it folds or
+/// unfolds, as a click does, or a group's Show more row, which shows the
+/// rest of the group or, as Show less, caps it again.
 public enum MenuListTarget: Equatable, Sendable {
     case item(MenuRow)
     case project(MenuSection)
     case group(RowGroup)
+    case showMore(RowGroup)
 }
 
 extension RowGroup {
     /// The group's places a highlight can rest on, top to bottom, listed
     /// under `section` (`nil` in a tab): its subheader if it has one, then,
-    /// unless it's folded, its rows.
+    /// unless it's folded, its rows and its Show more (or Show less) row.
     public func places(in section: String?) -> [MenuRowPlace] {
-        (showsHeader ? [.groupHeader(id, in: section)] : [])
-            + (isFolded ? [] : rows.map { MenuRowPlace(section: section, row: $0.id) })
+        guard !isFolded else { return showsHeader ? [.groupHeader(id, in: section)] : [] }
+        return (showsHeader ? [.groupHeader(id, in: section)] : [])
+            + rows.map { MenuRowPlace(section: section, row: $0.id) }
+            + (hasShowMore ? [.showMore(id, in: section)] : [])
     }
 
     /// Its row with the id `id`, unless it's folded away.
@@ -309,8 +328,8 @@ extension MenuModel {
     }
 
     /// What Return acts on at `place`: the project of a header, a
-    /// subheader's group, or an item if its project is expanded and its
-    /// group open, and it's still listed.
+    /// subheader's group, a Show more row's group, or an item, if its
+    /// project is expanded and its group open, and it's still listed.
     public func listTarget(at place: MenuRowPlace) -> MenuListTarget? {
         guard let section = sections.first(where: { $0.name == place.section }) else { return nil }
         switch place.kind {
@@ -319,6 +338,9 @@ extension MenuModel {
         case .groupHeader(let id):
             guard !section.isCollapsed, let group = section.groups.first(where: { $0.id == id && $0.showsHeader }) else { return nil }
             return .group(group)
+        case .showMore(let id):
+            guard !section.isCollapsed, let group = section.groups.first(where: { $0.id == id && !$0.isFolded && $0.hasShowMore }) else { return nil }
+            return .showMore(group)
         case .item(let id):
             guard !section.isCollapsed, let row = section.groups.lazy.compactMap({ $0.visibleRow(id) }).first else { return nil }
             return .item(row)
@@ -328,8 +350,8 @@ extension MenuModel {
 
 extension MenuTabContent {
     /// The tab's rows a highlight can rest on, top to bottom through its
-    /// groups: each subheader, then the rows of an open group; error rows
-    /// aren't items.
+    /// groups: each subheader, then the rows of an open group and its Show
+    /// more row; error rows aren't items.
     public var rowPlaces: [MenuRowPlace] {
         groups.flatMap { $0.places(in: nil) }
     }
@@ -345,5 +367,12 @@ extension MenuTabContent {
     /// unfolds), if the tab still lists it.
     public func subsection(at place: MenuRowPlace) -> RowGroup? {
         groups.first { $0.id == place.group && $0.showsHeader }
+    }
+
+    /// The group whose Show more (or Show less) row is at `place` (what
+    /// Return toggles), if the tab still draws it.
+    public func showMoreGroup(at place: MenuRowPlace) -> RowGroup? {
+        guard case .showMore(let id) = place.kind else { return nil }
+        return groups.first { $0.id == id && !$0.isFolded && $0.hasShowMore }
     }
 }

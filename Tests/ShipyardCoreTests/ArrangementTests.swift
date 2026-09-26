@@ -48,13 +48,16 @@ struct ArrangementTests {
         groupBy: GroupBy = .kind,
         subsections: Bool? = nil,
         sortBy: SortBy = .updated,
-        layout: MenuLayout = .list
+        showFirst: Int = 0,
+        layout: MenuLayout = .list,
+        expanded: Set<GroupID> = []
     ) -> [RowGroup] {
         Arrangement.groups(
             items,
             project: "shipyard",
-            settings: ArrangementSettings(groupBy: groupBy, subsections: subsections, sortBy: sortBy),
+            settings: ArrangementSettings(groupBy: groupBy, subsections: subsections, sortBy: sortBy, showFirst: showFirst),
             layout: layout,
+            expanded: expanded,
             now: now,
             calendar: calendar
         )
@@ -228,6 +231,86 @@ struct ArrangementTests {
         let groups = Arrangement.groups(rows: rows, project: "shipyard", settings: ArrangementSettings(), layout: .list, now: now)
 
         #expect(groups.map(\.attentionCount) == [1, 1])
+    }
+
+    // MARK: - Show more
+
+    /// Seven open pull requests, #1 the newest, and two issues.
+    private var sevenAndTwo: [Item] {
+        (1...7).map { item($0, updated: Double($0) * hour) } + [item(8, .issue), item(9, .issue)]
+    }
+
+    private let pullRequests = GroupID(project: "shipyard", key: .kind(.pullRequest))
+
+    @Test("show-first 5 shows a group of seven's first five rows and hides two, in order; a shorter group isn't capped")
+    func showFirstCaps() {
+        let groups = arrange(sevenAndTwo, showFirst: 5)
+
+        #expect(numbers(groups) == [[1, 2, 3, 4, 5], [8, 9]])
+        #expect(groups[0].hiddenRows.map(\.number) == [6, 7])
+        #expect(groups[0].hiddenCount == 2)
+        #expect(groups[0].allRows.map(\.number) == [1, 2, 3, 4, 5, 6, 7])
+        #expect(groups[0].hasShowMore)
+        #expect(!groups[0].isExpanded)
+        #expect(!groups[1].hasShowMore)
+        #expect(PanelText.showMore(groups[0]) == "Show 2 more")
+    }
+
+    @Test("an expanded group shows every row and a Show less row")
+    func expandedShowsAll() {
+        let groups = arrange(sevenAndTwo, showFirst: 5, expanded: [pullRequests])
+
+        #expect(numbers(groups) == [[1, 2, 3, 4, 5, 6, 7], [8, 9]])
+        #expect(groups[0].hiddenCount == 0)
+        #expect(groups[0].isExpanded)
+        #expect(groups[0].hasShowMore)
+        #expect(PanelText.showMore(groups[0]) == "Show less")
+    }
+
+    @Test("show-first 0, or a group no longer than the cap, has no Show more row, expanded or not")
+    func noCap() {
+        for groups in [
+            arrange(sevenAndTwo),
+            arrange(sevenAndTwo, showFirst: 7, expanded: [pullRequests]),
+            arrange(sevenAndTwo, showFirst: 0, expanded: [pullRequests]),
+        ] {
+            #expect(groups.map(\.hasShowMore) == [false, false])
+            #expect(groups.map(\.isExpanded) == [false, false])
+            #expect(groups.map(\.hiddenCount) == [0, 0])
+        }
+    }
+
+    @Test("with group-by none the cap applies to the whole project")
+    func capsWholeProject() {
+        let groups = arrange(sevenAndTwo, groupBy: .none, showFirst: 5)
+
+        #expect(groups.count == 1)
+        #expect(groups[0].rows.count == 5)
+        #expect(groups[0].hiddenCount == 4)
+        #expect(PanelText.showMore(groups[0]) == "Show 4 more")
+    }
+
+    @Test("the cap applies under subheaders and after dividers alike, in both layouts")
+    func capsEitherLook() {
+        for subsections in [true, false] {
+            for layout in MenuLayout.allCases {
+                let groups = arrange(sevenAndTwo, subsections: subsections, showFirst: 5, layout: layout)
+                #expect(groups[0].showsHeader == subsections)
+                #expect(groups[0].hiddenCount == 2)
+            }
+        }
+    }
+
+    @Test("a group's attention count includes the rows its cap hides")
+    func attentionCountsHidden() {
+        let rows = (1...4).map { MenuRow(item($0, updated: Double($0) * hour), needsAttention: $0 > 2) }
+
+        let groups = Arrangement.groups(
+            rows: rows, project: "shipyard", settings: ArrangementSettings(showFirst: 2), layout: .list, now: now
+        )
+
+        #expect(groups[0].rows.map(\.number) == [1, 2])
+        #expect(groups[0].attentionCount == 2)
     }
 
     // MARK: - Words

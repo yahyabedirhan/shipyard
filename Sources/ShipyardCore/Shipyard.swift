@@ -53,6 +53,9 @@ public final class Shipyard {
     /// What the panel draws. A failed refresh keeps the rows and sets
     /// `fetchError` and the time they were last updated.
     public private(set) var menu = MenuModel.empty
+    /// The groups Show more revealed past their `show-first` cap, until
+    /// Show less or the menu closes (`panelClosed()`); never saved.
+    public private(set) var expandedGroups: Set<GroupID> = []
     /// The last refresh that succeeded; `nil` before one did.
     public private(set) var snapshot: Snapshot?
     /// Why the latest refresh failed; `nil` once one succeeds.
@@ -511,7 +514,14 @@ public final class Shipyard {
                 notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
-            var built = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+            var built = MenuModel.build(
+                listings: listings,
+                snapshot: snapshot,
+                configuration: configuration,
+                state: appStateStore.state,
+                expanded: expandedGroups,
+                now: clock.now
+            )
             // A fold whose group is gone, or whose project is, goes too.
             let folds = built.foldsToKeep(appStateStore.state.collapsedGroups)
             appStateStore.update { $0.collapsedGroups = folds }
@@ -694,6 +704,29 @@ public final class Shipyard {
         }
     }
 
+    /// Shows every row of the group `group` names, past its `show-first`
+    /// cap, until Show less or the menu closes. Kept in memory only: a group
+    /// that isn't capped changes nothing.
+    public func showMore(_ group: GroupID) {
+        guard let listed = menu.group(group), listed.hiddenCount > 0 else { return }
+        expandedGroups.insert(group)
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
+    /// Caps the group `group` names at its `show-first` again.
+    public func showLess(_ group: GroupID) {
+        guard expandedGroups.remove(group) != nil else { return }
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
+    /// The menu closed: every group Show more revealed is capped again, so
+    /// the menu opens with every cap back.
+    public func panelClosed() {
+        guard !expandedGroups.isEmpty else { return }
+        expandedGroups = []
+        menu.applyExpansions(expandedGroups, configuration: configStore.lastValid)
+    }
+
     /// Changes the app state, saves it, and brings the menu model's
     /// attention flags, counts and collapsed sections up to date.
     private func updateAppState(_ body: (inout AppState) -> Void) {
@@ -709,7 +742,14 @@ public final class Shipyard {
         let listings = snapshot.map { snapshot in
             Listing.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, now: clock.now)
         } ?? [:]
-        var rebuilt = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+        var rebuilt = MenuModel.build(
+            listings: listings,
+            snapshot: snapshot,
+            configuration: configuration,
+            state: appStateStore.state,
+            expanded: expandedGroups,
+            now: clock.now
+        )
         rebuilt.fetchError = menu.fetchError
         rebuilt.refreshDelay = menu.refreshDelay
         rebuilt.rateIndicator = menu.rateIndicator

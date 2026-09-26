@@ -50,6 +50,12 @@ extension PanelText {
         "\(group.isFolded ? "Unfold" : "Fold") \(group.title)"
     }
 
+    /// A capped group's last row: "Show 2 more" while it's capped, "Show
+    /// less" once Show more revealed the rest.
+    public static func showMore(_ group: RowGroup) -> String {
+        group.isExpanded ? "Show less" : "Show \(group.hiddenCount) more"
+    }
+
     /// A subheader's state for VoiceOver.
     public static func groupFoldState(_ group: RowGroup) -> String {
         group.isFolded ? "Folded" : "Open"

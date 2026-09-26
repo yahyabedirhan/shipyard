@@ -230,6 +230,7 @@ struct SkillDocumentTests {
             ("workflow-runs.branches", literal(c.defaults.workflowRuns.branches)),
             ("[defaults] group-by", literal(c.defaults.arrangement.groupBy)),
             ("[defaults] sort-by", literal(c.defaults.arrangement.sortBy)),
+            ("[defaults] show-first", "\(c.defaults.arrangement.showFirst)"),
             ("[defaults] archived", "\(c.defaults.archived)"),
             ("[defaults] forks", "\(c.defaults.forks)"),
         ]

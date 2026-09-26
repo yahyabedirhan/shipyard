@@ -52,6 +52,40 @@ struct GroupHeader: View {
     }
 }
 
+/// A capped group's last row: "Show 2 more", which shows the rest of the
+/// group, then "Show less", which caps it again. A click toggles it, as
+/// Return does when the keys highlight it; it's a place the highlight
+/// rests on, like a row. Shared by both layouts, under subheaders or
+/// dividers alike.
+struct ShowMoreRow: View {
+    let group: RowGroup
+    /// Where it sits, for the highlight and the keys.
+    let place: MenuRowPlace
+    @Binding var highlight: RowHighlight
+    let actions: LayoutActions
+
+    var body: some View {
+        Button {
+            actions.toggleShowMore(group)
+        } label: {
+            HStack(spacing: 0) {
+                Text(PanelText.showMore(group))
+                    .font(TypeScale.meta)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            // Under the rows' titles.
+            .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
+            .padding(.trailing, Grid.gutter)
+            .frame(height: Grid.rowHeight)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(PanelText.showMore(group))
+        .highlightable(place, $highlight)
+    }
+}
+
 /// The line between two groups drawn without subheaders, indented to the
 /// rows' titles.
 struct GroupDivider: View {

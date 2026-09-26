@@ -31,6 +31,7 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
         .onAppear { actions.panelOpened() }
+        .onDisappear { actions.panelClosed() }
     }
 
     // MARK: - Header

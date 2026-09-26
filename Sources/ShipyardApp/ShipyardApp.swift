@@ -128,6 +128,9 @@ final class AppServices {
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
             toggleGroup: { shipyard.toggleGroup($0.id) },
+            toggleShowMore: { group in
+                if group.isExpanded { shipyard.showLess(group.id) } else { shipyard.showMore(group.id) }
+            },
             openRepository: { [weak self] project in
                 shipyard.openRepository(of: project)
                 self?.closeMenu()
@@ -161,6 +164,12 @@ final class AppServices {
     /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
         Task { await notifier.checkPermission() }
+    }
+
+    /// Closing the panel caps every group Show more revealed, so the menu
+    /// opens with every cap back.
+    func panelClosed() {
+        shipyard.panelClosed()
     }
 
     /// Whether the panel says notifications are off (observed: it's the

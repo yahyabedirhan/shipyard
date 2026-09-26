@@ -78,7 +78,15 @@ public struct MenuModel: Equatable, Sendable {
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a
     /// project without a listing (added since the snapshot was fetched).
-    public static func build(listings: [String: [Item]], snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
+    /// `expanded` holds the groups Show more revealed past their cap.
+    public static func build(
+        listings: [String: [Item]],
+        snapshot: Snapshot?,
+        configuration: Configuration,
+        state: AppState,
+        expanded: Set<GroupID> = [],
+        now: Date
+    ) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
                 MenuSection(
@@ -106,6 +114,7 @@ public struct MenuModel: Equatable, Sendable {
                     settings: settings.arrangement,
                     layout: configuration.menu.layout,
                     folded: state.collapsedGroups,
+                    expanded: expanded,
                     now: now
                 ),
                 // One row per selector that couldn't be resolved, then one
@@ -146,13 +155,34 @@ public struct MenuModel: Equatable, Sendable {
                     let item = sections[index].groups[group].rows[row].item
                     sections[index].groups[group].rows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
                 }
-                sections[index].groups[group].attentionCount = sections[index].groups[group].rows.filter(\.needsAttention).count
+                for row in sections[index].groups[group].hiddenRows.indices {
+                    let item = sections[index].groups[group].hiddenRows[row].item
+                    sections[index].groups[group].hiddenRows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
+                }
+                sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
+    }
+
+    /// Caps each project's groups at its `show-first` again, showing every
+    /// row of the groups in `expanded`, without a refresh: Show more and
+    /// Show less come here, and closing the menu, which caps every group.
+    public mutating func applyExpansions(_ expanded: Set<GroupID>, configuration: Configuration) {
+        for index in sections.indices {
+            guard let project = configuration.projects.first(where: { $0.name == sections[index].name }) else { continue }
+            let showFirst = configuration.settings(for: project).arrangement.showFirst
+            sections[index].groups = sections[index].groups.map { $0.capped(at: showFirst, expanded: expanded.contains($0.id)) }
+        }
+    }
+
+    /// The group `id` names in a project's section, capped or expanded:
+    /// what Show more and Show less act on; `nil` when it's not listed.
+    public func group(_ id: GroupID) -> RowGroup? {
+        sections.first { $0.name == id.project }?.groups.first { $0.id == id }
     }
 
     /// The subsection `id` names, as drawn: in a project's section, or in
@@ -232,8 +262,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
 
     public var id: String { name }
 
-    /// Every row of every group, in order.
-    public var rows: [MenuRow] { groups.flatMap(\.rows) }
+    /// Every row of every group, in order, the ones a cap hides too: what
+    /// the counts, "Mark all seen" and the All tab read.
+    public var rows: [MenuRow] { groups.flatMap(\.allRows) }
 
     /// A section whose rows are one group, as `group-by = "none"` makes.
     public init(

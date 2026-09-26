@@ -111,6 +111,7 @@
         "group-by": { "$ref": "#/definitions/group-by" },
         "subsections": { "$ref": "#/definitions/subsections" },
         "sort-by": { "$ref": "#/definitions/sort-by" },
+        "show-first": { "$ref": "#/definitions/show-first" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
@@ -147,6 +148,12 @@
       "enum": ["updated", "created", "title"],
       "default": "updated"
     },
+    "show-first": {
+      "description": "How many rows each group shows before a \"Show N more\" row, which reveals the rest and then reads \"Show less\". 0 shows every row. With group-by = \"none\" it caps the whole project. A group's count includes the rows it hides; the menu shows every cap again each time it opens.",
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
     "archived": {
       "description": "Whether repository groups and owner/* bring in archived repositories. A repository named as owner/name is always listed.",
       "type": "boolean",
@@ -181,6 +188,7 @@
         "group-by": { "$ref": "#/definitions/group-by" },
         "subsections": { "$ref": "#/definitions/subsections" },
         "sort-by": { "$ref": "#/definitions/sort-by" },
+        "show-first": { "$ref": "#/definitions/show-first" },
         "archived": { "$ref": "#/definitions/archived" },
         "forks": { "$ref": "#/definitions/forks" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },

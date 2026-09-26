@@ -98,6 +98,7 @@ How every project's items are grouped and sorted in the menu, set straight under
 | `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z), `"none"` (one list); one level only |
 | `[defaults] subsections` | unset | boolean: `true` draws each group under a subheader (its name and count), `false` after a divider line; unset keeps each layout's own look (dividers in the list, subheaders in tabs) |
 | `[defaults] sort-by` | `"updated"` | `"updated"` (newest first), `"created"` (newest first), `"title"` (A to Z); open or running items always come first. `"date"` groups by this date (`"updated"` when sorting by title) |
+| `[defaults] show-first` | `0` | a whole number, 0 or more: each group shows its first N rows and a "Show N more" row, which reveals the rest and then reads "Show less"; `0` shows every row. With `group-by = "none"` it caps the whole project. A group's count includes the rows it hides, and every cap comes back when the menu closes |
 
 The All tab of the tabs layout always groups by kind, newest first.
 
@@ -115,7 +116,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 | `name` | yes | non-empty, unique across projects; the section's title |
 | `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere` (see Which repositories); no URLs |
 | `pull-requests`, `issues`, `workflow-runs` | no | inline tables with the keys above |
-| `group-by`, `subsections`, `sort-by` | no | as under `[defaults]` above |
+| `group-by`, `subsections`, `sort-by`, `show-first` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
 
@@ -339,6 +340,15 @@ subsections = true
 ```
 
 For the most recently opened first, add `sort-by = "created"`; for what changed today at the top, `group-by = "date"`.
+
+**"Keep this project short: show a few of each and let me expand."** Set `show-first` in the project's block (in `[defaults]` for every project). Each group shows that many rows and a "Show N more" row that reveals the rest until the menu closes:
+
+```toml
+[[projects]]
+name = "contributions"
+repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
+show-first = 5
+```
 
 **"Only show open PRs and issues here."** `states` in each kind, inside the project's block:
 

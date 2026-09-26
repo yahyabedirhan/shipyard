@@ -86,13 +86,17 @@ struct ListLayout: View {
     }
 
     /// Return: opens the item (⌥Return: marks it seen) or the header's
-    /// repository, or folds or unfolds a subsection. ⌥Return on a header
-    /// or a subheader does nothing.
+    /// repository, folds or unfolds a subsection, or toggles Show more.
+    /// ⌥Return on a header, a subheader or a Show more row does nothing.
     private func activate(_ place: MenuRowPlace, markSeenOnly: Bool) -> Bool {
         switch model.listTarget(at: place) {
         case .group(let group):
             guard !markSeenOnly else { return false }
             actions.toggleGroup(group)
+            return true
+        case .showMore(let group):
+            guard !markSeenOnly else { return false }
+            actions.toggleShowMore(group)
             return true
         case .item(let row):
             withAnimation(Motion.seen) {
@@ -110,7 +114,8 @@ struct ListLayout: View {
 
     /// An expanded project's lines, each its own child of the lazy stack:
     /// placeholders while it loads, its error rows, then its groups' rows,
-    /// each group under its subheader or after a line.
+    /// each group under its subheader or after a line, and a capped group's
+    /// Show more row after its rows.
     @ViewBuilder
     private func lines(_ section: MenuSection) -> some View {
         let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
@@ -148,6 +153,12 @@ struct ListLayout: View {
                 }
                 .id(place)
                 .transition(Self.lineTransition)
+            }
+            if group.hasShowMore, !group.isFolded {
+                let place = MenuRowPlace.showMore(group.id, in: section.name)
+                ShowMoreRow(group: group, place: place, highlight: $highlight, actions: actions)
+                    .id(place)
+                    .transition(Self.lineTransition)
             }
         }
         if hasContent {

@@ -93,7 +93,7 @@ extension Configuration {
         public var workflowRuns = WorkflowRunSettings()
         /// `[[defaults.notifications]]`; a new pull request in any project by default.
         public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
-        /// `group-by`, `subsections` and `sort-by`, written straight under `[defaults]`.
+        /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
         public var arrangement = ArrangementSettings()
         /// Whether repository groups and `owner/*` bring in archived repositories.
         public var archived = false
@@ -113,7 +113,7 @@ extension Configuration {
         public var workflowRuns = WorkflowRunOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
-        /// The project's own `group-by`, `subsections` and `sort-by`.
+        /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
         public var arrangement = ArrangementOverrides()
         /// `archived` and `forks`, when the project sets them.
         public var archived: Bool?
@@ -412,10 +412,14 @@ public struct ArrangementSettings: Equatable, Sendable {
     /// keeps each layout's own: dividers in the list, subheaders in a tab.
     public var subsections: Bool?
     public var sortBy: SortBy = .updated
-    public init(groupBy: GroupBy = .kind, subsections: Bool? = nil, sortBy: SortBy = .updated) {
+    /// How many rows each group shows before a Show more row; `0` shows
+    /// them all. With `group-by = "none"` it caps the whole project.
+    public var showFirst: Int = 0
+    public init(groupBy: GroupBy = .kind, subsections: Bool? = nil, sortBy: SortBy = .updated, showFirst: Int = 0) {
         self.groupBy = groupBy
         self.subsections = subsections
         self.sortBy = sortBy
+        self.showFirst = showFirst
     }
 }
 
@@ -424,17 +428,20 @@ public struct ArrangementOverrides: Equatable, Sendable {
     public var groupBy: GroupBy?
     public var subsections: Bool?
     public var sortBy: SortBy?
-    public init(groupBy: GroupBy? = nil, subsections: Bool? = nil, sortBy: SortBy? = nil) {
+    public var showFirst: Int?
+    public init(groupBy: GroupBy? = nil, subsections: Bool? = nil, sortBy: SortBy? = nil, showFirst: Int? = nil) {
         self.groupBy = groupBy
         self.subsections = subsections
         self.sortBy = sortBy
+        self.showFirst = showFirst
     }
 
     public func applied(to base: ArrangementSettings) -> ArrangementSettings {
         ArrangementSettings(
             groupBy: groupBy ?? base.groupBy,
             subsections: subsections ?? base.subsections,
-            sortBy: sortBy ?? base.sortBy
+            sortBy: sortBy ?? base.sortBy,
+            showFirst: showFirst ?? base.showFirst
         )
     }
 }
@@ -614,11 +621,13 @@ extension Configuration {
         # authors = { show = [], hide = [] }
 
         # How each project's items are grouped: "kind" (pull requests, issues,
-        # runs), "repository", "date", "author" or "none"; and sorted within a
-        # group: "updated", "created" or "title". A project can set its own.
+        # runs), "repository", "date", "author" or "none"; sorted within a
+        # group: "updated", "created" or "title"; and how many rows a group
+        # shows before a Show more row (0: all). A project can set its own.
         # [defaults]
         # group-by = "kind"
         # sort-by = "updated"
+        # show-first = 0
 
         # List issues too, not only pull requests, in every project: set show
         # to true. states picks which: "open", "closed" or both. Pull requests

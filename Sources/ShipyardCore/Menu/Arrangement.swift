@@ -12,7 +12,9 @@ public enum Arrangement {
     /// `MenuModel.applyAttention` sets.
     ///
     /// `folded` marks the subsections the user folded (a group drawn after
-    /// a divider never is); `expanded` is for the groups shown past their cap.
+    /// a divider never is); `expanded` is for the groups shown past their
+    /// cap. A group longer than `show-first` shows its first rows and keeps
+    /// the rest as `hiddenRows`, unless it's expanded.
     public static func groups(
         _ items: [Item],
         project: String,
@@ -59,9 +61,8 @@ public enum Arrangement {
                 rows: sorted,
                 attentionCount: sorted.filter(\.needsAttention).count,
                 showsHeader: showsHeader,
-                isFolded: showsHeader && folded.contains(id),
-                isExpanded: expanded.contains(id)
-            )
+                isFolded: showsHeader && folded.contains(id)
+            ).capped(at: settings.showFirst, expanded: expanded.contains(id))
         }
     }
 
@@ -263,9 +264,14 @@ public struct RowGroup: Equatable, Sendable, Identifiable {
     public var id: GroupID
     /// "Pull requests", "owner/name", "Today", "@login"; empty for `none`.
     public var title: String
-    /// Sorted: open (or running) first, then by `sort-by`.
+    /// The rows drawn, sorted: open (or running) first, then by `sort-by`.
+    /// A capped group holds its first `show-first` here and the rest in
+    /// `hiddenRows`.
     public var rows: [MenuRow]
-    /// Rows in the group needing attention.
+    /// The rows past the cap, which Show more reveals: still the group's,
+    /// so they count, in the order they'd be drawn.
+    public var hiddenRows: [MenuRow]
+    /// Rows in the group needing attention, hidden ones too.
     public var attentionCount: Int
     /// Drawn under a subheader (its title and row count) rather than after
     /// a divider: `subsections`, or the layout's own when that's unset. The
@@ -275,9 +281,8 @@ public struct RowGroup: Equatable, Sendable, Identifiable {
     /// drawn, still with its count, and its rows stay here and still count.
     /// A group without a subheader never is.
     public var isFolded: Bool
-    /// Rows left out of `rows` by a cap.
-    public var hiddenCount: Int
-    /// Whether the user asked to see the group past its cap.
+    /// Whether the user asked to see the group past its cap (Show more)
+    /// and it has rows past it: its Show less row caps it again.
     public var isExpanded: Bool
 
     public init(
@@ -287,7 +292,7 @@ public struct RowGroup: Equatable, Sendable, Identifiable {
         attentionCount: Int = 0,
         showsHeader: Bool = false,
         isFolded: Bool = false,
-        hiddenCount: Int = 0,
+        hiddenRows: [MenuRow] = [],
         isExpanded: Bool = false
     ) {
         self.id = id
@@ -296,8 +301,32 @@ public struct RowGroup: Equatable, Sendable, Identifiable {
         self.attentionCount = attentionCount
         self.showsHeader = showsHeader
         self.isFolded = isFolded
-        self.hiddenCount = hiddenCount
+        self.hiddenRows = hiddenRows
         self.isExpanded = isExpanded
+    }
+
+    /// Rows left out of `rows` by a cap: the N of "Show N more".
+    public var hiddenCount: Int { hiddenRows.count }
+
+    /// Every row of the group, shown or hidden, in order.
+    public var allRows: [MenuRow] { rows + hiddenRows }
+
+    /// Whether the group has a cap to toggle: a Show more row while it's
+    /// capped, a Show less row while it's expanded. Drawn, and a place the
+    /// keys reach, only while the group isn't folded.
+    public var hasShowMore: Bool { hiddenCount > 0 || isExpanded }
+
+    /// The group with its rows capped at `showFirst` (`0`: no cap): its
+    /// first rows shown and the rest hidden, or, when `expanded` and it has
+    /// more rows than the cap, every row shown and `isExpanded` set.
+    public func capped(at showFirst: Int, expanded: Bool) -> RowGroup {
+        var group = self
+        let rows = allRows
+        let hides = showFirst > 0 && rows.count > showFirst && !expanded
+        group.rows = hides ? Array(rows.prefix(showFirst)) : rows
+        group.hiddenRows = hides ? Array(rows.dropFirst(showFirst)) : []
+        group.isExpanded = showFirst > 0 && rows.count > showFirst && expanded
+        return group
     }
 }
 

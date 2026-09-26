@@ -222,13 +222,14 @@ final class ConfigurationReader {
 
     /// The keys that arrange a project, written straight under `[defaults]`
     /// or in a `[[projects]]` block.
-    static let arrangementKeys = ["group-by", "subsections", "sort-by"]
+    static let arrangementKeys = ["group-by", "subsections", "sort-by", "show-first"]
 
     private func arrangement(_ node: Node) -> ArrangementOverrides {
         ArrangementOverrides(
             groupBy: choice(node, "group-by", GroupBy.self),
             subsections: bool(node, "subsections"),
-            sortBy: choice(node, "sort-by", SortBy.self)
+            sortBy: choice(node, "sort-by", SortBy.self),
+            showFirst: window(node, "show-first")
         )
     }
 
@@ -366,7 +367,7 @@ final class ConfigurationReader {
         return valid ? selectors : nil
     }
 
-    /// A window in days or hours: a whole number, 0 or more.
+    /// A window in days or hours, or a count of rows: a whole number, 0 or more.
     private func window(_ node: Node, _ key: String) -> Int? {
         guard let value = int(node, key) else { return nil }
         guard value >= 0 else {

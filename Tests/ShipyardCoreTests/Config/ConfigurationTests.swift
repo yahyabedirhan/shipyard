@@ -67,6 +67,7 @@ let everyKey = """
     group-by = "repository"
     subsections = true
     sort-by = "created"
+    show-first = 5
     archived = true
     forks = false
 
@@ -110,6 +111,7 @@ let everyKey = """
     group-by = "date"
     subsections = false
     sort-by = "title"
+    show-first = 0
 
     """
 
@@ -145,7 +147,7 @@ struct ConfigurationDecodingTests {
             show: false, states: [.inProgress, .failed, .succeeded], finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()
         ))
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
-        #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated))
+        #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))
         #expect(!config.defaults.archived)
         #expect(config.defaults.forks)
         #expect(config.projects.isEmpty)
@@ -154,28 +156,35 @@ struct ConfigurationDecodingTests {
 
     @Test("the design's example file decodes with the documented defaults")
     func designExampleDecodes() throws {
-        // The design's example file already uses settings that aren't built yet;
-        // this wrapper comes off once the example decodes.
-        withKnownIssue {
-            let result = try #require(decoded(try designExample()))
-            #expect(result.warnings.isEmpty)
-            let config = result.configuration
+        let result = try #require(decoded(try designExample()))
+        #expect(result.warnings.isEmpty)
+        let config = result.configuration
 
-            var expected = Configuration()
-            expected.projects = [
-                Configuration.Project(
-                    name: "e-commerce",
-                    repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"],
-                    issues: IssueOverrides(show: true),
-                    notifications: [
-                        NotificationRule(event: .prOpened, authors: [.others]),
-                        NotificationRule(event: .runFailed),
-                    ]
-                ),
-                Configuration.Project(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
-            ]
-            #expect(config == expected)
-        }
+        var expected = Configuration()
+        expected.projects = [
+            Configuration.Project(
+                name: "e-commerce",
+                repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"],
+                issues: IssueOverrides(show: true),
+                notifications: [
+                    NotificationRule(event: .prOpened, authors: [.others]),
+                    NotificationRule(event: .runFailed),
+                ]
+            ),
+            Configuration.Project(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            Configuration.Project(
+                name: "contributions",
+                repositories: ["owned", "my-org/*", "cobanov/ghbar"],
+                pullRequests: PullRequestOverrides(authors: AuthorFilterOverrides(hide: [.me, .bots])),
+                arrangement: ArrangementOverrides(groupBy: .repository, subsections: true)
+            ),
+            Configuration.Project(
+                name: "review queue",
+                repositories: ["anywhere"],
+                pullRequests: PullRequestOverrides(reviewRequested: true)
+            ),
+        ]
+        #expect(config == expected)
     }
 
     @Test("every key decodes, spelt in kebab-case")
@@ -220,8 +229,8 @@ struct ConfigurationDecodingTests {
             show: false, states: [.succeeded], finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
         ))
         #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
-        #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created))
-        #expect(project.arrangement == .init(groupBy: .date, subsections: false, sortBy: .title))
+        #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created, showFirst: 5))
+        #expect(project.arrangement == .init(groupBy: .date, subsections: false, sortBy: .title, showFirst: 0))
     }
 
     @Test("every group-by and sort-by choice decodes")
@@ -339,6 +348,10 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
         #expect(rejection("[defaults]\nsubsections = \"yes\"\n")
             == [ConfigIssue(line: 2, message: "`defaults.subsections` must be true or false")])
+        #expect(rejection("[defaults]\nshow-first = -1\n")
+            == [ConfigIssue(line: 2, message: "`show-first` can't be negative (got -1)")])
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nshow-first = \"5\"\n")
+            == [ConfigIssue(line: 4, message: "`projects[0].show-first` must be a whole number")])
     }
 
     @Test("a project's arrangement merges key by key onto the defaults")
@@ -347,6 +360,7 @@ struct ConfigurationValidationTests {
             [defaults]
             group-by = "repository"
             subsections = true
+            show-first = 5
 
             [[projects]]
             name = "a"
@@ -358,9 +372,10 @@ struct ConfigurationValidationTests {
             repositories = ["o/b"]
             group-by = "none"
             subsections = false
+            show-first = 0
             """)).configuration
-        #expect(config.settings(for: config.projects[0]).arrangement == .init(groupBy: .repository, subsections: true, sortBy: .title))
-        #expect(config.settings(for: config.projects[1]).arrangement == .init(groupBy: .none, subsections: false, sortBy: .updated))
+        #expect(config.settings(for: config.projects[0]).arrangement == .init(groupBy: .repository, subsections: true, sortBy: .title, showFirst: 5))
+        #expect(config.settings(for: config.projects[1]).arrangement == .init(groupBy: .none, subsections: false, sortBy: .updated, showFirst: 0))
     }
 
         @Test("a repository that isn't owner/name, owner/* or a group is rejected")
