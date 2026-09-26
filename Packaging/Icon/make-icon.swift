@@ -7,6 +7,7 @@
 //
 //   swift Packaging/Icon/make-icon.swift <out.iconset> [--variant <name>]   every size an .iconset needs (origami by default)
 //   swift Packaging/Icon/make-icon.swift --sheet <out.png>                  a contact sheet of every variant, for review
+//   swift Packaging/Icon/make-icon.swift --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
 //
 // Command Line Tools only (AppKit and CoreGraphics). `make icon` runs it and
 // packs the iconset with `iconutil -c icns` into Packaging/Icon/AppIcon.icns;
@@ -501,6 +502,115 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
     }
 }
 
+// MARK: - Minimal: a flat sailboat over two wave lines, like the connect screen's badge
+
+/// An original, flat sailboat mark: a tall mainsail and a smaller jib either
+/// side of a gap where the mast would be, a hull below them, and wave lines
+/// under the hull. Sails and hull get softly rounded corners. Small sizes drop
+/// the second wave and thicken the first.
+struct MinimalMark {
+    var sails: CGPath
+    var hull: CGPath
+    var waves: [CGPath]
+    var waveWidth: CGFloat
+}
+
+func minimalMark(small: Bool) -> MinimalMark {
+    // Small sizes open the gaps (mast, and sails to hull) so they survive at 16 and 32.
+    let foot: CGFloat = small ? 478 : 452
+    let luffMain: CGFloat = small ? 474 : 490, luffJib: CGFloat = small ? 554 : 538
+
+    let sails = CGMutablePath()
+    // Mainsail, behind the mast: a straight luff and foot, the leech bellied out.
+    sails.move(to: CGPoint(x: luffMain, y: 796))
+    sails.addLine(to: CGPoint(x: luffMain, y: foot))
+    sails.addLine(to: CGPoint(x: 280, y: foot))
+    sails.addQuadCurve(to: CGPoint(x: luffMain, y: 796), control: CGPoint(x: 330, y: 650))
+    sails.closeSubpath()
+    // Jib, ahead of the mast: shorter, with a gentler belly.
+    sails.move(to: CGPoint(x: luffJib, y: 706))
+    sails.addLine(to: CGPoint(x: luffJib, y: foot))
+    sails.addLine(to: CGPoint(x: 722, y: foot))
+    sails.addQuadCurve(to: CGPoint(x: luffJib, y: 706), control: CGPoint(x: 668, y: 606))
+    sails.closeSubpath()
+
+    let hull = CGMutablePath()
+    hull.move(to: CGPoint(x: 244, y: 408))
+    hull.addLine(to: CGPoint(x: 780, y: 408))
+    hull.addQuadCurve(to: CGPoint(x: 676, y: 318), control: CGPoint(x: 742, y: 326))
+    hull.addLine(to: CGPoint(x: 356, y: 318))
+    hull.addQuadCurve(to: CGPoint(x: 244, y: 408), control: CGPoint(x: 284, y: 326))
+    hull.closeSubpath()
+
+    /// A wave line: `count` whole swells between x0 and x1 about y.
+    func waveLine(y: CGFloat, x0: CGFloat, x1: CGFloat, amplitude: CGFloat, count: CGFloat) -> CGPath {
+        let p = CGMutablePath()
+        for i in 0...160 {
+            let t = CGFloat(i) / 160
+            let pt = CGPoint(x: x0 + (x1 - x0) * t, y: y + amplitude * sin(t * count * 2 * .pi))
+            i == 0 ? p.move(to: pt) : p.addLine(to: pt)
+        }
+        return p
+    }
+    let waves = small
+        ? [waveLine(y: 222, x0: 262, x1: 762, amplitude: 22, count: 2)]
+        : [waveLine(y: 250, x0: 262, x1: 762, amplitude: 18, count: 2),
+           waveLine(y: 178, x0: 352, x1: 672, amplitude: 14, count: 1.5)]
+    return MinimalMark(sails: sails, hull: hull, waves: waves, waveWidth: small ? 50 : 30)
+}
+
+/// The two exploration families: a coloured body with a white mark, and a
+/// white body with the mark in colour.
+enum Minimal: String, CaseIterable {
+    case solidBlue = "solid-blue", solidTeal = "solid-teal", solidNavy = "solid-navy", solidCoral = "solid-coral"
+    case whiteBlue = "white-blue", whiteTeal = "white-teal", whiteNavy = "white-navy", whiteCoral = "white-coral"
+
+    var onWhite: Bool { rawValue.hasPrefix("white-") }
+
+    /// The hue as a top-to-bottom pair: the body's gradient, or the mark's on white.
+    var hue: (top: UInt32, bottom: UInt32) {
+        switch self {
+        case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)   // the connect screen's accent, 0x006BED
+        case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
+        case .solidNavy, .whiteNavy: return (0x30498C, 0x152049)
+        case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
+        }
+    }
+
+    func draw(_ ctx: CGContext, pixels: Int) {
+        let (top, bottom) = hue
+        let background = onWhite ? grad([rgb(0xFFFFFF), rgb(0xECEFF3)]) : grad([rgb(top), rgb(bottom)])
+        let base = onWhite ? rgb(0xC9CFD8) : rgb(bottom)
+        frame(ctx, pixels: pixels, base: base, background: background,
+              sheen: onWhite ? 0 : 0.14, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
+            let mark = minimalMark(small: small)
+            let scale: CGFloat = small ? 1.0 : 0.86
+            scaled(ctx, scale, about: CGPoint(x: 512, y: 512)) {
+                ctx.translateBy(x: 0, y: small ? 22 : 30)
+                ctx.saveGState()
+                shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
+                ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+                let ink = rgb(0xFFFFFF)
+                ctx.setFillColor(ink); ctx.setStrokeColor(ink)
+                ctx.setLineJoin(.round); ctx.setLineCap(.round)
+                // Fill and stroke together round the corners of sails and hull.
+                ctx.setLineWidth(small ? 16 : 22)
+                for path in [mark.sails, mark.hull] { ctx.addPath(path); ctx.drawPath(using: .fillStroke) }
+                ctx.setLineWidth(mark.waveWidth)
+                for path in mark.waves { ctx.addPath(path); ctx.strokePath() }
+                if onWhite {
+                    // Colour the mark with the hue's gradient.
+                    ctx.setBlendMode(.sourceIn)
+                    ctx.drawLinearGradient(grad([rgb(top), rgb(bottom)]), start: CGPoint(x: 0, y: 820), end: CGPoint(x: 0, y: 150),
+                                           options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+                }
+                ctx.endTransparencyLayer()
+                ctx.restoreGState()
+            }
+        }
+    }
+}
+
 // MARK: - Variants
 
 enum Variant: String, CaseIterable {
@@ -519,6 +629,10 @@ enum Variant: String, CaseIterable {
 // MARK: - Rendering
 
 func render(_ variant: Variant, pixels: Int) -> NSBitmapImageRep {
+    render(pixels: pixels) { variant.draw($0, pixels: pixels) }
+}
+
+func render(pixels: Int, _ draw: (CGContext) -> Void) -> NSBitmapImageRep {
     let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels,
         bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -528,7 +642,7 @@ func render(_ variant: Variant, pixels: Int) -> NSBitmapImageRep {
     ctx.setShouldAntialias(true)
     ctx.interpolationQuality = .high
     ctx.scaleBy(x: CGFloat(pixels) / 1024, y: CGFloat(pixels) / 1024)
-    variant.draw(ctx, pixels: pixels)
+    draw(ctx)
     graphics.flushGraphics()
     return rep.retagging(with: .sRGB)!
 }
@@ -580,6 +694,58 @@ func sheet(to url: URL) throws {
     try writePNG(rep, to: url)
 }
 
+// MARK: - Exploration
+
+/// Writes a 512-pixel PNG of each minimal variant into `dir`, and
+/// `comparison.png`: every variant at 512 and 32, a row per family, on a light
+/// panel and then on a dark one.
+func exploration(to dir: URL) throws {
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    for m in Minimal.allCases {
+        try writePNG(render(pixels: 512) { m.draw($0, pixels: 512) }, to: dir.appendingPathComponent("\(m.rawValue).png"))
+    }
+
+    let families = [Minimal.allCases.filter { !$0.onWhite }, Minimal.allCases.filter(\.onWhite)]
+    let columns = families.map(\.count).max()!
+    let gap = 40, small = 32, label = 44
+    let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
+    let width = gap + (cellW + gap) * columns
+    let panels = [NSColor(white: 0.94, alpha: 1), NSColor(white: 0.11, alpha: 1)]
+    let height = rowH * families.count * panels.count + gap
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    for (p, panel) in panels.enumerated() {
+        let panelTop = height - (height - gap) / 2 * p
+        let panelH = (height - gap) / 2 + (p == 1 ? gap : 0)
+        panel.setFill()
+        NSRect(x: 0, y: panelTop - panelH, width: width, height: panelH).fill()
+        let text = p == 0 ? NSColor(white: 0.15, alpha: 1) : NSColor(white: 0.88, alpha: 1)
+        for (f, family) in families.enumerated() {
+            let rowTop = panelTop - rowH * f
+            for (c, m) in family.enumerated() {
+                let x = gap + (cellW + gap) * c
+                let big = NSImage(size: NSSize(width: 512, height: 512))
+                big.addRepresentation(render(pixels: 512) { m.draw($0, pixels: 512) })
+                big.draw(in: NSRect(x: x, y: rowTop - gap - 512, width: 512, height: 512))
+                let tiny = NSImage(size: NSSize(width: small, height: small))
+                tiny.addRepresentation(render(pixels: small) { m.draw($0, pixels: small) })
+                let smallY = rowTop - gap - 512 - 20 - small
+                tiny.draw(in: NSRect(x: x + (cellW - small) / 2, y: smallY, width: small, height: small))
+                let name = NSAttributedString(string: m.rawValue, attributes: [
+                    .font: NSFont.systemFont(ofSize: 26, weight: .semibold), .foregroundColor: text,
+                ])
+                name.draw(at: NSPoint(x: x + (cellW - Int(name.size().width)) / 2, y: smallY - 12 - 32))
+            }
+        }
+    }
+    NSGraphicsContext.restoreGraphicsState()
+    try writePNG(rep, to: dir.appendingPathComponent("comparison.png"))
+}
+
 // MARK: - Main
 
 func fail(_ message: String) -> Never {
@@ -596,7 +762,9 @@ if let flag = arguments.firstIndex(of: "--variant") {
     arguments.removeSubrange(flag...flag + 1)
 }
 
-if arguments.count == 2, arguments[0] == "--sheet" {
+if arguments.count == 2, arguments[0] == "--exploration" {
+    try exploration(to: URL(fileURLWithPath: arguments[1], isDirectory: true))
+} else if arguments.count == 2, arguments[0] == "--sheet" {
     try sheet(to: URL(fileURLWithPath: arguments[1]))
 } else if arguments.count == 1 {
     let iconset = URL(fileURLWithPath: arguments[0], isDirectory: true)

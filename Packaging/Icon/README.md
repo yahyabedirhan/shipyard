@@ -35,4 +35,10 @@ To review every variant at 16, 32, 128 and 512 on light and dark:
 swift Packaging/Icon/make-icon.swift --sheet /tmp/icons.png
 ```
 
+The minimal sailboat options (#80), a flat mark of our own drawing in two families (`solid-*`, a white mark on colour, and `white-*`, a coloured mark on white), aren't app variants yet. To redraw their previews and comparison sheet:
+
+```sh
+swift Packaging/Icon/make-icon.swift --exploration docs/assets/app-icon/exploration
+```
+
 The script needs the Command Line Tools only (AppKit and CoreGraphics), and its output is the same on every run.
