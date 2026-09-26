@@ -1,30 +1,54 @@
 import ShipyardCore
 import SwiftUI
 
-/// A subsection's subheader: the group's title in small capitals (a
-/// repository or a login as written) and how many rows it holds. Shared by
+/// A subsection's subheader: a chevron, the group's title in small capitals
+/// (a repository or a login as written) and how many rows it holds, folded
+/// or not. A click folds or unfolds it, as ← and → do when the keys
+/// highlight it; it's a place the highlight rests on, like a row. Shared by
 /// both layouts; in a tab it's the kind header the tabs always had.
 struct GroupHeader: View {
     let group: RowGroup
+    /// Where it sits, for the highlight and the keys.
+    let place: MenuRowPlace
+    @Binding var highlight: RowHighlight
+    let actions: LayoutActions
 
     var body: some View {
-        HStack(spacing: 5) {
-            Text(PanelText.groupHeader(group))
-                .font(TypeScale.eyebrow)
-                .tracking(0.5)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Text(String(group.rows.count + group.hiddenCount))
-                .font(TypeScale.eyebrow.monospacedDigit())
-                .foregroundStyle(.tertiary)
-            Spacer()
+        Button {
+            // Not animated, like a project's fold (see `ListLayout.lineTransition`).
+            actions.toggleGroup(group)
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 7.5, weight: .bold))
+                    .foregroundStyle(.tertiary)
+                    .animation(Motion.collapse) { $0.rotationEffect(.degrees(group.isFolded ? 0 : 90)) }
+                    .frame(width: Grid.dotColumn)
+                    .padding(.trailing, -1)
+                Text(PanelText.groupHeader(group))
+                    .font(TypeScale.eyebrow)
+                    .tracking(0.5)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(String(group.rows.count + group.hiddenCount))
+                    .font(TypeScale.eyebrow.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+                Spacer()
+            }
+            .foregroundStyle(.secondary)
+            // The chevron in the rows' dot column, the title where it was.
+            .padding(.leading, Grid.gutter - 4)
+            .padding(.trailing, Grid.gutter)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
-        .foregroundStyle(.secondary)
-        .padding(.leading, Grid.gutter + Grid.dotColumn)
-        .padding(.trailing, Grid.gutter)
-        .padding(.top, Grid.gutter)
-        .padding(.bottom, 4)
+        .buttonStyle(.plain)
+        .help(PanelText.groupFoldHelp(group))
+        .accessibilityLabel(group.title)
+        .accessibilityValue(PanelText.groupFoldState(group))
         .accessibilityAddTraits(.isHeader)
+        .highlightable(place, $highlight)
+        .padding(.top, Grid.gutter - 4)
     }
 }
 

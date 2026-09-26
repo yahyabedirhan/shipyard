@@ -137,6 +137,49 @@ struct AppStateStoreTests {
         #expect(store.state.known.items["https://github.com/o/r/pull/1"]?.present == .distantPast)
     }
 
+    @Test("folded subsections read back, a fold this build can't read is skipped, and a file without them loads")
+    func collapsedGroups() throws {
+        let directory = temporaryDirectory()
+        let store = AppStateStore(directory: directory)
+        store.load(at: now)
+        let folds: Set<GroupID> = [
+            GroupID(project: "shop", key: .kind(.issue)),
+            GroupID(project: "shop", key: .repository("o/r")),
+            GroupID(project: "shop", key: .date(.thisWeek)),
+            GroupID(project: "shop", key: .author("octocat")),
+            GroupID(project: "shop", key: .ungrouped),
+            .allTab(.kind(.workflowRun)),
+        ]
+        store.update { $0.collapsedGroups = folds }
+
+        let reloaded = AppStateStore(directory: directory)
+        #expect(reloaded.load(at: now) == .loaded)
+        #expect(reloaded.state.collapsedGroups == folds)
+
+        let later = """
+            {
+              "version": 1,
+              "collapsedGroups": [
+                { "project": "shop", "group": "kind:issue" },
+                { "project": "shop", "group": "label:bug" },
+                { "project": "shop", "group": "kind:discussion" },
+                { "project": "shop" }
+              ]
+            }
+            """
+        try Data(later.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsedGroups == [GroupID(project: "shop", key: .kind(.issue))])
+
+        try Data(#"{"collapsedGroups": "shop"}"#.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsedGroups.isEmpty)
+
+        try Data(#"{"collapsed": ["shop"]}"#.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsedGroups.isEmpty)
+    }
+
     @Test("a file a newer build wrote with a higher version is set aside, as a first run")
     func newerVersion() throws {
         let directory = temporaryDirectory()

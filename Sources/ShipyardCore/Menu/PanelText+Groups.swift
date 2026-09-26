@@ -44,4 +44,14 @@ extension PanelText {
         case .repository, .author: group.title
         }
     }
+
+    /// A subheader's tooltip: what a click does to it.
+    public static func groupFoldHelp(_ group: RowGroup) -> String {
+        "\(group.isFolded ? "Unfold" : "Fold") \(group.title)"
+    }
+
+    /// A subheader's state for VoiceOver.
+    public static func groupFoldState(_ group: RowGroup) -> String {
+        group.isFolded ? "Folded" : "Open"
+    }
 }

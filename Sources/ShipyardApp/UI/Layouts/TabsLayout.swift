@@ -122,9 +122,14 @@ struct TabsLayout: View {
                 places: content.rowPlaces,
                 in: tab,
                 scroll: proxy,
-                left: { switchTab(&$0, by: -1) },
-                right: { switchTab(&$0, by: 1) }
+                left: { side(&$0, content, by: -1) },
+                right: { side(&$0, content, by: 1) }
             ) { place, markSeenOnly in
+                if let group = content.subsection(at: place) {
+                    guard !markSeenOnly else { return false }
+                    actions.toggleGroup(group)
+                    return true
+                }
                 guard let row = content.row(at: place) else { return false }
                 withAnimation(Motion.seen) {
                     if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
@@ -134,8 +139,22 @@ struct TabsLayout: View {
         }
     }
 
-    /// ← and → (provisional): the previous or next tab, wrapping, with
-    /// `highlight` on its first row.
+    /// ← (`step` -1) or →: on a subheader, folds or unfolds it (→ on an
+    /// open one goes to its first row); anywhere else, switches tabs.
+    private func side(_ highlight: inout RowHighlight, _ content: MenuTabContent, by step: Int) -> RowKeyMove {
+        guard highlight.place?.group != nil else { return switchTab(&highlight, by: step) }
+        let change = step < 0 ? highlight.moveLeft(in: content) : highlight.moveRight(in: content)
+        switch change {
+        case .fold(let id), .unfold(let id):
+            if let group = content.groups.first(where: { $0.id == id }) { actions.toggleGroup(group) }
+        case .collapse, .expand, nil:
+            break
+        }
+        return .moved
+    }
+
+    /// ← and → (provisional) off a subheader: the previous or next tab,
+    /// wrapping, with `highlight` on its first row.
     private func switchTab(_ highlight: inout RowHighlight, by step: Int) -> RowKeyMove {
         let next = model.tab(beside: tab, by: step)
         guard next != tab else { return .ignored }
@@ -276,11 +295,14 @@ private struct TabList: View {
             ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
             ForEach(Array(content.groups.enumerated()), id: \.element.id) { index, group in
                 if group.showsHeader {
-                    GroupHeader(group: group).clearsRowHighlight($highlight)
+                    let place = MenuRowPlace.groupHeader(group.id, in: nil)
+                    GroupHeader(group: group, place: place, highlight: $highlight, actions: actions)
+                        .id(place)
                 } else if index > 0 {
                     GroupDivider().padding(.vertical, 2)
                 }
-                ForEach(group.rows) { row in
+                // A folded subsection shows its subheader alone.
+                ForEach(group.isFolded ? [] : group.rows) { row in
                     let place = MenuRowPlace(section: nil, row: row.id)
                     TabRow(row: row, showsRepository: content.showsRepository)
                         .itemRow(row, at: place, highlight: $highlight, showsRepository: content.showsRepository, actions: actions)

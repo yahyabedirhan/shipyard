@@ -127,6 +127,7 @@ final class AppServices {
             markSeen: { shipyard.markSeen($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
+            toggleGroup: { shipyard.toggleGroup($0.id) },
             openRepository: { [weak self] project in
                 shipyard.openRepository(of: project)
                 self?.closeMenu()

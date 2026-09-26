@@ -511,7 +511,12 @@ public final class Shipyard {
                 notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
-            menu = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+            var built = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
+            // A fold whose group is gone, or whose project is, goes too.
+            let folds = built.foldsToKeep(appStateStore.state.collapsedGroups)
+            appStateStore.update { $0.collapsedGroups = folds }
+            built.foldedGroups = folds
+            menu = built
             publishRateStatus()
             // Recorded (and saved) before posting: a crash in between loses a
             // notification rather than repeating one.
@@ -675,6 +680,17 @@ public final class Shipyard {
     public func toggleCollapsed(_ project: String) {
         updateAppState { state in
             if state.collapsed.remove(project) == nil { state.collapsed.insert(project) }
+        }
+    }
+
+    /// Folds the subsection `group` names, or unfolds it if it's folded,
+    /// without a refresh; its subheader keeps its count. Remembered across
+    /// restarts. A group drawn after a divider, or one no longer listed,
+    /// has no subheader to fold, and nothing changes.
+    public func toggleGroup(_ group: GroupID) {
+        guard menu.subsection(group) != nil else { return }
+        updateAppState { state in
+            if state.collapsedGroups.remove(group) == nil { state.collapsedGroups.insert(group) }
         }
     }
 

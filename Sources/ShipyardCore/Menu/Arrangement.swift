@@ -11,8 +11,8 @@ public enum Arrangement {
     /// items make no groups. Rows come without attention flags, which
     /// `MenuModel.applyAttention` sets.
     ///
-    /// `folded` marks the subsections the user folded; `expanded` is for
-    /// the groups shown past their cap.
+    /// `folded` marks the subsections the user folded (a group drawn after
+    /// a divider never is); `expanded` is for the groups shown past their cap.
     public static func groups(
         _ items: [Item],
         project: String,
@@ -132,6 +132,44 @@ public enum GroupKey: Hashable, Sendable {
     case ungrouped
 }
 
+extension GroupKey {
+    /// The key as written in `state.json`: "kind:pullRequest",
+    /// "repository:owner/name", "date:today", "author:login", "ungrouped".
+    public var text: String {
+        switch self {
+        case .kind(let kind): "kind:\(kind.rawValue)"
+        case .repository(let repository): "repository:\(repository)"
+        case .date(let bucket): "date:\(bucket.name)"
+        case .author(let login): "author:\(login)"
+        case .ungrouped: "ungrouped"
+        }
+    }
+
+    /// The key `text` writes, or `nil` for one this build doesn't know.
+    public init?(text: String) {
+        guard text != "ungrouped" else {
+            self = .ungrouped
+            return
+        }
+        guard let colon = text.firstIndex(of: ":") else { return nil }
+        let value = String(text[text.index(after: colon)...])
+        switch text[..<colon] {
+        case "kind":
+            guard let kind = ItemKind(rawValue: value) else { return nil }
+            self = .kind(kind)
+        case "repository" where !value.isEmpty:
+            self = .repository(value)
+        case "date":
+            guard let bucket = DateBucket.allCases.first(where: { $0.name == value }) else { return nil }
+            self = .date(bucket)
+        case "author" where !value.isEmpty:
+            self = .author(value)
+        default:
+            return nil
+        }
+    }
+}
+
 /// A group of one project (or of the All tab, whose project is empty): the
 /// key a fold or an expansion is remembered by.
 public struct GroupID: Hashable, Sendable {
@@ -141,6 +179,45 @@ public struct GroupID: Hashable, Sendable {
     public init(project: String, key: GroupKey) {
         self.project = project
         self.key = key
+    }
+
+    /// The All tab's group of `key`: the All tab has no project.
+    public static func allTab(_ key: GroupKey) -> GroupID {
+        GroupID(project: "", key: key)
+    }
+}
+
+// In `state.json`: `{ "project": "shop", "group": "kind:pullRequest" }`. A
+// group key this build doesn't know fails the decode, and the app state
+// skips that entry.
+extension GroupID: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case project
+        case group
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        project = try container.decode(String.self, forKey: .project)
+        let text = try container.decode(String.self, forKey: .group)
+        guard let key = GroupKey(text: text) else {
+            throw DecodingError.dataCorruptedError(forKey: .group, in: container, debugDescription: "unknown group \(text)")
+        }
+        self.key = key
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(project, forKey: .project)
+        try container.encode(key.text, forKey: .group)
+    }
+}
+
+extension GroupID: Comparable {
+    /// By project, then by the key as written: the order `state.json`
+    /// lists folds in.
+    public static func < (a: GroupID, b: GroupID) -> Bool {
+        (a.project, a.key.text) < (b.project, b.key.text)
     }
 }
 
@@ -167,6 +244,17 @@ public enum DateBucket: Int, CaseIterable, Hashable, Sendable {
             else if date >= month { .thisMonth }
             else { .older }
     }
+
+    /// The bucket's name in `state.json`.
+    public var name: String {
+        switch self {
+        case .today: "today"
+        case .yesterday: "yesterday"
+        case .thisWeek: "thisWeek"
+        case .thisMonth: "thisMonth"
+        case .older: "older"
+        }
+    }
 }
 
 /// One group of a project's rows, drawn under a subheader (a subsection)
@@ -183,7 +271,9 @@ public struct RowGroup: Equatable, Sendable, Identifiable {
     /// a divider: `subsections`, or the layout's own when that's unset. The
     /// one group of `none` has no header.
     public var showsHeader: Bool
-    /// Whether the user folded this subsection.
+    /// Whether the user folded this subsection: only its subheader is
+    /// drawn, still with its count, and its rows stay here and still count.
+    /// A group without a subheader never is.
     public var isFolded: Bool
     /// Rows left out of `rows` by a cap.
     public var hiddenCount: Int

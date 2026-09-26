@@ -28,6 +28,10 @@ public struct MenuModel: Equatable, Sendable {
     /// The footer's rate-limit indicator; `nil` when `[rate-limit] show`
     /// hides it or no limit is known yet.
     public var rateIndicator: RateIndicator?
+    /// The subsections the user folded, as app state has them: the
+    /// sections' groups carry theirs, and the All tab, arranged when it's
+    /// drawn, reads its own from here.
+    public var foldedGroups: Set<GroupID>
 
     public init(
         sections: [MenuSection] = [],
@@ -37,8 +41,10 @@ public struct MenuModel: Equatable, Sendable {
         lastUpdated: Date? = nil,
         fetchError: GitHubError? = nil,
         refreshDelay: RefreshDelay? = nil,
-        rateIndicator: RateIndicator? = nil
+        rateIndicator: RateIndicator? = nil,
+        foldedGroups: Set<GroupID> = []
     ) {
+        self.foldedGroups = foldedGroups
         self.sections = sections
         self.attention = attention
         self.menuBarLabel = menuBarLabel
@@ -99,6 +105,7 @@ public struct MenuModel: Equatable, Sendable {
                     project: project.name,
                     settings: settings.arrangement,
                     layout: configuration.menu.layout,
+                    folded: state.collapsedGroups,
                     now: now
                 ),
                 // One row per selector that couldn't be resolved, then one
@@ -123,12 +130,16 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// Sets each row's attention flag, each section's count and collapsed
-    /// flag, the totals and the menu bar label from `state`, keeping the
-    /// rows. Clicks, "mark all seen" and collapsing come here without a refresh.
+    /// flag, each subsection's fold, the totals and the menu bar label from
+    /// `state`, keeping the rows. Clicks, "mark all seen", collapsing and
+    /// folding come here without a refresh.
     public mutating func applyAttention(_ state: AppState, configuration: Configuration) {
         let toggles = configuration.attention
+        foldedGroups = state.collapsedGroups
         for index in sections.indices {
             for group in sections[index].groups.indices {
+                let id = sections[index].groups[group].id
+                sections[index].groups[group].isFolded = sections[index].groups[group].showsHeader && state.collapsedGroups.contains(id)
                 for row in sections[index].groups[group].rows.indices {
                     let item = sections[index].groups[group].rows[row].item
                     sections[index].groups[group].rows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
@@ -140,6 +151,31 @@ public struct MenuModel: Equatable, Sendable {
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
+    }
+
+    /// The subsection `id` names, as drawn: in a project's section, or in
+    /// the All tab; `nil` when no such group is listed, or it's drawn after
+    /// a divider, which has no subheader to fold.
+    public func subsection(_ id: GroupID) -> RowGroup? {
+        let groups = id.project.isEmpty
+            ? tabContent(for: .all).groups
+            : sections.first { $0.name == id.project }?.groups ?? []
+        return groups.first { $0.id == id && $0.showsHeader }
+    }
+
+    /// Of `folds`, the ones to keep after a refresh: a group still listed
+    /// (folded or not, under a subheader or a divider, so switching
+    /// `subsections` back finds it), or any fold of a project whose rows
+    /// aren't all here (not loaded, or a repository failed), whose groups
+    /// may come back. A removed project's folds, and a group gone from its
+    /// project (or from the All tab), are pruned.
+    public func foldsToKeep(_ folds: Set<GroupID>) -> Set<GroupID> {
+        let allTab = Set(tabContent(for: .all).groups.map(\.id))
+        return folds.filter { id in
+            if id.project.isEmpty { return allTab.contains(id) }
+            guard let section = sections.first(where: { $0.name == id.project }) else { return false }
+            return !section.isLoaded || !section.errors.isEmpty || section.groups.contains { $0.id == id }
+        }
     }
 
     /// The review search's error row, in a project that needed the search:

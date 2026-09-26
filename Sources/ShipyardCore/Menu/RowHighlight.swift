@@ -1,48 +1,70 @@
 import Foundation
 
-/// Where a row sits in a layout: the project it's listed under and the
-/// row, or the project's header. The list layout can list one item under
-/// two projects, so its two rows have two places and only the one under
-/// the pointer is highlighted.
+/// Where a row sits in a layout: the project it's listed under and what's
+/// there, an item, the project's header or a subsection's subheader. The
+/// list layout can list one item under two projects, so its two rows have
+/// two places and only the one under the pointer is highlighted.
 public struct MenuRowPlace: Hashable, Sendable {
+    /// What a place holds. A new stop for the keys is one more case.
+    public enum Kind: Hashable, Sendable {
+        /// An item: its `MenuRow.id`.
+        case item(String)
+        /// The list layout's header of the project in `section`.
+        case projectHeader
+        /// A subsection's subheader.
+        case groupHeader(GroupID)
+    }
+
     /// The project (section) the row is listed under in the list layout;
     /// `nil` in a tab, which lists each row once.
     public var section: String?
-    /// The row's `MenuRow.id`; `nil` for the project's header.
-    public var row: String?
+    public var kind: Kind
 
     public init(section: String?, row: String) {
         self.section = section
-        self.row = row
+        kind = .item(row)
     }
 
-    private init(header project: String) {
-        section = project
-        row = nil
+    private init(section: String?, kind: Kind) {
+        self.section = section
+        self.kind = kind
     }
 
     /// The list layout's header of the project named `project`: a row the
     /// pointer and the keys highlight like an item.
     public static func header(_ project: String) -> MenuRowPlace {
-        MenuRowPlace(header: project)
+        MenuRowPlace(section: project, kind: .projectHeader)
     }
 
-    /// Whether it's a project's header rather than an item.
-    public var isHeader: Bool { row == nil }
+    /// The subheader of the subsection `group`, under the project `section`
+    /// in the list layout (`nil` in a tab): ↑ and ↓ stop on it, and ← and
+    /// → fold it.
+    public static func groupHeader(_ group: GroupID, in section: String?) -> MenuRowPlace {
+        MenuRowPlace(section: section, kind: .groupHeader(group))
+    }
+
+    /// The item's `MenuRow.id`; `nil` for a header or a subheader.
+    public var row: String? {
+        if case .item(let id) = kind { id } else { nil }
+    }
+
+    /// The subsection whose subheader it is; `nil` for anything else.
+    public var group: GroupID? {
+        if case .groupHeader(let id) = kind { id } else { nil }
+    }
+
+    /// Whether it's a project's header (pinned in the list layout) rather
+    /// than an item or a subheader.
+    public var isHeader: Bool { kind == .projectHeader }
 }
 
-/// What ← or → asks of the list layout besides moving the highlight: a
-/// project to collapse or expand.
-public enum ProjectFold: Equatable, Sendable {
+/// What ← or → asks of a layout besides moving the highlight: a project to
+/// collapse or expand, or a subsection to fold or unfold.
+public enum MenuFold: Equatable, Sendable {
     case collapse(String)
     case expand(String)
-
-    /// The project it folds.
-    public var project: String {
-        switch self {
-        case .collapse(let name), .expand(let name): name
-        }
-    }
+    case fold(GroupID)
+    case unfold(GroupID)
 }
 
 /// Which row a layout highlights: at most one, moved by the pointer and by
@@ -140,38 +162,102 @@ public struct RowHighlight: Equatable, Sendable {
 
     // MARK: - ← and → in the list layout
 
-    /// ←: from an item to its project's header; on an expanded header,
-    /// collapses its project (the header stays highlighted). Returns the
-    /// project to collapse, if any. On a collapsed header, with nothing
-    /// highlighted, or on a project that's gone, nothing happens.
-    public mutating func moveLeft(in model: MenuModel) -> ProjectFold? {
+    /// ←, as in an outline: from an item to its subsection's subheader, or
+    /// to its project's header when its group has none; on an open
+    /// subheader, folds it; from a folded one to its project's header; on
+    /// an expanded header, collapses its project. What folds keeps the
+    /// highlight. Returns what to fold, if anything. On a collapsed header,
+    /// with nothing highlighted, or on a project that's gone, nothing happens.
+    public mutating func moveLeft(in model: MenuModel) -> MenuFold? {
         guard let place, let project = place.section,
               let section = model.sections.first(where: { $0.name == project }) else { return nil }
-        if !place.isHeader {
-            followsPointer = false
-            self.place = .header(project)
+        switch place.kind {
+        case .item(let id):
+            let group = section.groups.first { $0.rows.contains { $0.id == id } }
+            moveTo(group.flatMap { $0.showsHeader ? .groupHeader($0.id, in: project) : nil } ?? .header(project))
             return nil
+        case .groupHeader(let id):
+            guard let group = section.groups.first(where: { $0.id == id }) else { return nil }
+            if let fold = foldLeft(group) { return fold }
+            moveTo(.header(project))
+            return nil
+        case .projectHeader:
+            guard !section.isCollapsed else { return nil }
+            followsPointer = false
+            return .collapse(project)
         }
-        guard !section.isCollapsed else { return nil }
-        followsPointer = false
-        return .collapse(project)
     }
 
-    /// →: on a collapsed header, expands its project (the header stays
-    /// highlighted); on an expanded header, goes to its first item. Returns
-    /// the project to expand, if any. On an item, a header without items,
-    /// or with nothing highlighted, nothing happens.
-    public mutating func moveRight(in model: MenuModel) -> ProjectFold? {
-        guard let place, place.isHeader, let project = place.section,
+    /// →: on a collapsed header, expands its project; on an expanded one,
+    /// goes to what's first under it (a subheader or an item); on a folded
+    /// subheader, unfolds it; on an open one, goes to its first item. What
+    /// unfolds keeps the highlight. Returns what to unfold, if anything. On
+    /// an item, a header or subheader with nothing under it, or with nothing
+    /// highlighted, nothing happens.
+    public mutating func moveRight(in model: MenuModel) -> MenuFold? {
+        guard let place, let project = place.section,
               let section = model.sections.first(where: { $0.name == project }) else { return nil }
-        if section.isCollapsed {
-            followsPointer = false
-            return .expand(project)
+        switch place.kind {
+        case .item:
+            return nil
+        case .groupHeader(let id):
+            guard let group = section.groups.first(where: { $0.id == id }) else { return nil }
+            return foldRight(group, in: project)
+        case .projectHeader:
+            if section.isCollapsed {
+                followsPointer = false
+                return .expand(project)
+            }
+            let places = model.listRowPlaces
+            guard let index = places.firstIndex(of: place), index + 1 < places.count,
+                  places[index + 1].section == project else { return nil }
+            moveTo(places[index + 1])
+            return nil
         }
-        guard let first = section.rows.first else { return nil }
+    }
+
+    // MARK: - ← and → on a tab's subheader
+
+    /// ← on a tab's subheader: folds it if it's open. Returns the group
+    /// to fold, if any; anywhere else in the tab, nothing happens (← there
+    /// switches tabs).
+    public mutating func moveLeft(in content: MenuTabContent) -> MenuFold? {
+        guard let id = place?.group, let group = content.groups.first(where: { $0.id == id }) else { return nil }
+        return foldLeft(group)
+    }
+
+    /// → on a tab's subheader: unfolds a folded one, or goes to an open
+    /// one's first item. Returns the group to unfold, if any; anywhere else
+    /// in the tab, nothing happens (→ there switches tabs).
+    public mutating func moveRight(in content: MenuTabContent) -> MenuFold? {
+        guard let id = place?.group, let group = content.groups.first(where: { $0.id == id }) else { return nil }
+        return foldRight(group, in: nil)
+    }
+
+    // MARK: - Folding a subsection
+
+    /// ← on `group`'s subheader: folds it unless it's folded already.
+    private mutating func foldLeft(_ group: RowGroup) -> MenuFold? {
+        guard !group.isFolded else { return nil }
         followsPointer = false
-        self.place = MenuRowPlace(section: project, row: first.id)
+        return .fold(group.id)
+    }
+
+    /// → on `group`'s subheader, listed under `section`: unfolds it, or goes
+    /// to its first item.
+    private mutating func foldRight(_ group: RowGroup, in section: String?) -> MenuFold? {
+        if group.isFolded {
+            followsPointer = false
+            return .unfold(group.id)
+        }
+        if let first = group.rows.first { moveTo(MenuRowPlace(section: section, row: first.id)) }
         return nil
+    }
+
+    /// The keys move the highlight to `place`.
+    private mutating func moveTo(_ place: MenuRowPlace) {
+        followsPointer = false
+        self.place = place
     }
 
     // MARK: - The rows
@@ -185,44 +271,79 @@ public struct RowHighlight: Equatable, Sendable {
 }
 
 /// What Return acts on in the list layout: an item, which it opens (⌥Return
-/// marks it seen), or a project's header, which opens the project's
-/// repository on GitHub.
+/// marks it seen), a project's header, which opens the project's
+/// repository on GitHub, or a subsection's subheader, which it folds or
+/// unfolds, as a click does.
 public enum MenuListTarget: Equatable, Sendable {
     case item(MenuRow)
     case project(MenuSection)
+    case group(RowGroup)
+}
+
+extension RowGroup {
+    /// The group's places a highlight can rest on, top to bottom, listed
+    /// under `section` (`nil` in a tab): its subheader if it has one, then,
+    /// unless it's folded, its rows.
+    public func places(in section: String?) -> [MenuRowPlace] {
+        (showsHeader ? [.groupHeader(id, in: section)] : [])
+            + (isFolded ? [] : rows.map { MenuRowPlace(section: section, row: $0.id) })
+    }
+
+    /// Its row with the id `id`, unless it's folded away.
+    func visibleRow(_ id: String) -> MenuRow? {
+        isFolded ? nil : rows.first { $0.id == id }
+    }
 }
 
 extension MenuModel {
     /// The list layout's rows a highlight can rest on, top to bottom: each
-    /// project's header, then, while it's expanded, its rows in order. A
-    /// collapsed project gives only its header; error and not-loaded
-    /// placeholder rows aren't rows.
+    /// project's header, then, while it's expanded, its groups' subheaders
+    /// and the rows of the ones that aren't folded. A collapsed project
+    /// gives only its header; error and not-loaded placeholder rows aren't
+    /// rows.
     public var listRowPlaces: [MenuRowPlace] {
         sections.flatMap { section in
             [MenuRowPlace.header(section.name)]
-                + (section.isCollapsed ? [] : section.rows.map { MenuRowPlace(section: section.name, row: $0.id) })
+                + (section.isCollapsed ? [] : section.groups.flatMap { $0.places(in: section.name) })
         }
     }
 
-    /// What Return acts on at `place`: the project of a header, or an item
-    /// if its project is expanded and still lists it.
+    /// What Return acts on at `place`: the project of a header, a
+    /// subheader's group, or an item if its project is expanded and its
+    /// group open, and it's still listed.
     public func listTarget(at place: MenuRowPlace) -> MenuListTarget? {
         guard let section = sections.first(where: { $0.name == place.section }) else { return nil }
-        guard let id = place.row else { return .project(section) }
-        guard !section.isCollapsed, let row = section.rows.first(where: { $0.id == id }) else { return nil }
-        return .item(row)
+        switch place.kind {
+        case .projectHeader:
+            return .project(section)
+        case .groupHeader(let id):
+            guard !section.isCollapsed, let group = section.groups.first(where: { $0.id == id && $0.showsHeader }) else { return nil }
+            return .group(group)
+        case .item(let id):
+            guard !section.isCollapsed, let row = section.groups.lazy.compactMap({ $0.visibleRow(id) }).first else { return nil }
+            return .item(row)
+        }
     }
 }
 
 extension MenuTabContent {
     /// The tab's rows a highlight can rest on, top to bottom through its
-    /// kind groups; error rows aren't items.
+    /// groups: each subheader, then the rows of an open group; error rows
+    /// aren't items.
     public var rowPlaces: [MenuRowPlace] {
-        groups.flatMap { group in group.rows.map { MenuRowPlace(section: nil, row: $0.id) } }
+        groups.flatMap { $0.places(in: nil) }
     }
 
-    /// The tab's row at `place` (what Return opens), if it still lists it.
+    /// The tab's row at `place` (what Return opens), if it still lists it
+    /// and its group isn't folded.
     public func row(at place: MenuRowPlace) -> MenuRow? {
-        groups.lazy.flatMap(\.rows).first { $0.id == place.row }
+        guard let id = place.row else { return nil }
+        return groups.lazy.compactMap { $0.visibleRow(id) }.first
+    }
+
+    /// The subsection whose subheader is at `place` (what Return folds or
+    /// unfolds), if the tab still lists it.
+    public func subsection(at place: MenuRowPlace) -> RowGroup? {
+        groups.first { $0.id == place.group && $0.showsHeader }
     }
 }
