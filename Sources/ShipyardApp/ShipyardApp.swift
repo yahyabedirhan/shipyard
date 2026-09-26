@@ -78,7 +78,7 @@ final class AppServices {
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
-            tokenStore: SessionTokenStore(),
+            tokenStore: Keychain(),
             urlOpener: opener,
             notifier: notifier,
             loginItem: LaunchAtLogin()

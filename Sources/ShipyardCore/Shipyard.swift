@@ -88,6 +88,8 @@ public final class Shipyard {
     private var gate = RefreshGate()
     private let tokenProvider: TokenProvider
     private let deviceFlow: DeviceFlow
+    /// Whether the build has an OAuth App client ID, so the device flow can start.
+    public let canSignInWithGitHub: Bool
     private let transport: any HTTPTransport
 
     /// The client for the current token; `nil` when signed out.
@@ -126,6 +128,7 @@ public final class Shipyard {
         self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
         self.deviceFlow = DeviceFlow(clientID: oauthClientID, transport: transport, clock: clock, sleep: sleep)
+        self.canSignInWithGitHub = OAuthApp.isSet(oauthClientID)
         self.transport = transport
     }
 
@@ -183,6 +186,13 @@ public final class Shipyard {
         deviceFlowTask = nil
         task.cancel()
         apply(.deviceFlowCancelled)
+    }
+
+    /// Opens the page the device flow's code is entered on (github.com/login/device),
+    /// while the code shows; otherwise does nothing.
+    public func openVerificationPage() {
+        guard case .connecting(let code) = phase else { return }
+        urlOpener.open(code.verificationURL)
     }
 
     private func runDeviceFlow(_ generation: Int) async {

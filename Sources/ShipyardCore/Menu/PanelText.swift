@@ -304,7 +304,7 @@ public enum PanelText {
     }
 
     /// A time of day the way the user's clock shows it, e.g. "16:42".
-    private static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
+    static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
         formatter.timeZone = timeZone

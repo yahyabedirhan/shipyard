@@ -12,7 +12,7 @@ Shipyard shows the pull requests (and, if you turn them on, issues and workflow 
 
 - **macOS 14** or later. Shipyard ships for macOS only.
 - **To build from source: the Command Line Tools with Swift 6 or later** (`swift --version` says which you have). The package uses Swift tools version 6.0; Xcode isn't needed.
-- **The [GitHub CLI](https://cli.github.com), installed and signed in.** Shipyard 0.0.x connects to GitHub only through `gh`, picking up its token silently; signing in without `gh` is planned for a later version.
+- **A GitHub account.** Either **Sign in with GitHub** from the panel (GitHub's device flow: you enter a code on github.com, and the token is kept in your login Keychain), or have the [GitHub CLI](https://cli.github.com) signed in, and shipyard picks up its token silently:
 
   ```sh
   brew install gh
@@ -46,7 +46,7 @@ Or, on macOS 15 and later, open it once, dismiss the warning, then choose **Open
 
 Shipyard has no Dock icon: it lives in the menu bar. Click its icon to open the panel.
 
-1. Until `gh` is signed in, the panel shows the command to run and a **Try again** button.
+1. Until it's connected, the panel offers **Sign in with GitHub**: it shows a code, **Copy code and open GitHub** puts it on the clipboard and opens github.com/login/device, and shipyard connects once you approve. Beside it are the `gh` command to run instead and a **Try again** button.
 2. Then it offers your repositories to pick from (or type `owner/name`). Name each project, or give several repositories the same name to group them, and **Add** them. The panel also offers to install the agent skill (see [Configuration](#configuration)).
 3. The first time something is worth notifying, macOS asks whether shipyard may send notifications. If you decline, the panel says notifications are off, with a button to System Settings.
 
@@ -72,6 +72,8 @@ make install
 
 From a zip, quit shipyard, delete the old copy (`rm -rf /Applications/Shipyard.app`), then install the newer zip as [above](#from-a-release-zip).
 
+If you signed in with GitHub, macOS may ask once whether the new copy may use shipyard's Keychain item (each build is signed afresh); choose **Always Allow**.
+
 ### Uninstall
 
 1. Quit shipyard (**Quit** in its panel, or ⌘Q while it's open).
@@ -91,7 +93,7 @@ From a zip, quit shipyard, delete the old copy (`rm -rf /Applications/Shipyard.a
 
 6. macOS may keep a Shipyard entry under System Settings > Notifications after the app is gone. It's harmless, and System Settings has no button to remove it; leave it, or turn its notifications off there.
 
-`gh` stays signed in; run `gh auth logout` if you want that too.
+If you signed in with GitHub, **Sign out** in the gear menu deletes the token from the Keychain; to do it after the app is gone, run `security delete-generic-password -s com.yahyabedirhan.shipyard -a github-token`. `gh` stays signed in; run `gh auth logout` if you want that too.
 
 ## Configuration
 
@@ -120,5 +122,14 @@ swift build --target ShipyardCore    # the core alone, on macOS or Linux
 ```
 
 CI runs the core's tests on Ubuntu for every push and pull request.
+
+### Forks: your own OAuth App
+
+Sign in with GitHub uses the OAuth App client ID compiled into the build. A fork sets its own rather than borrowing the maintainer's:
+
+1. On GitHub, **Settings > Developer settings > OAuth Apps > New OAuth App**. Any homepage and callback URL will do (the device flow doesn't use the callback). Tick **Enable Device Flow** in its settings.
+2. Copy its **Client ID** (not a secret; there's no client secret to add) into `OAuthApp.clientID` in `Sources/ShipyardCore/GitHub/Auth/DeviceFlow.swift`.
+
+A build without a client ID shows Sign in with GitHub as unavailable and connects through `gh`. GitHub limits each OAuth App to 50 device-code submissions an hour, and keeps at most 10 tokens per user and scope, revoking older ones; see [`docs/references/github-device-flow.md`](docs/references/github-device-flow.md).
 
 The design is in `docs/low-level-design.md`, and the glossary in `CONTEXT.md`.

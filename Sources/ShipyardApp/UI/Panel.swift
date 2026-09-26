@@ -173,14 +173,8 @@ struct Panel: View {
     @ViewBuilder
     private var content: some View {
         switch shipyard.phase {
-        case .connecting:
-            // Only the device flow connects this way, and 0.0.x doesn't
-            // offer it.
-            ProgressView()
-                .controlSize(.small)
-                .padding(Grid.gutter)
-                .frame(maxWidth: .infinity)
-        case .signedOut:
+        case .signedOut, .connecting:
+            // Signed out, or the device flow's code waiting for approval.
             ConnectView(shipyard: shipyard)
         case .needsProjects:
             // Onboarding's second step, and its offer to install the skill.

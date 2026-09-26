@@ -10,12 +10,19 @@ public enum OAuthApp {
     ///
     /// The maintainer supplies it: register an OAuth App under the maintainer's
     /// GitHub account with device flow enabled, and put its client ID here.
-    /// Forks put their own.
+    /// Forks put their own (the README says how). While it's the placeholder,
+    /// the connect screen shows Sign in with GitHub as unavailable and `gh`
+    /// stays the way in.
     public static let clientID = "REPLACE_WITH_OAUTH_APP_CLIENT_ID"
 
     /// Stands in for the client ID until the maintainer supplies it; the
     /// device flow refuses to start while it's still set.
     public static let placeholderClientID = "REPLACE_WITH_OAUTH_APP_CLIENT_ID"
+
+    /// Whether `clientID` is a real client ID rather than the placeholder.
+    public static func isSet(_ clientID: String) -> Bool {
+        !clientID.isEmpty && clientID != placeholderClientID
+    }
 
     /// Private repositories' pull requests and issues, and organisation repositories.
     public static let scopes = "repo read:org"
@@ -103,7 +110,7 @@ public struct DeviceFlow: Sendable {
 
     /// Asks GitHub for a device code and the user code to show.
     public func requestCode() async throws -> DeviceAuthorization {
-        guard clientID != OAuthApp.placeholderClientID else { throw DeviceFlowError.clientIDMissing }
+        guard OAuthApp.isSet(clientID) else { throw DeviceFlowError.clientIDMissing }
         let requestedAt = clock.now
         let answer: CodeAnswer = try await post(Self.codeURL, form: ["client_id": clientID, "scope": OAuthApp.scopes])
         if let error = answer.error { throw DeviceFlowError.rejected(error) }

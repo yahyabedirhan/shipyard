@@ -235,6 +235,84 @@ struct SignInTests {
         #expect(harness.stub.requests("POST", DeviceFlow.codeURL).isEmpty)
     }
 
+    @Test("Sign in with GitHub is offered when the build has an OAuth App client ID")
+    func signInAvailable() throws {
+        let harness = try Harness()
+
+        #expect(harness.shipyard.canSignInWithGitHub)
+    }
+
+    @Test("Sign in with GitHub isn't offered while the client ID is still the placeholder")
+    func signInUnavailableWithoutClientID() async throws {
+        let harness = try Harness(clientID: OAuthApp.placeholderClientID)
+        #expect(!harness.shipyard.canSignInWithGitHub)
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signInError == .clientIDMissing)
+        #expect(harness.stub.requests.isEmpty)
+    }
+
+    @Test("while the code shows, opening GitHub opens the page to enter it on")
+    func opensVerificationPage() async throws {
+        let harness = try Harness()
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.pending, DeviceFlowAnswers.token())
+        harness.stub.on(userURL, viewerAnswer)
+        let shipyard = harness.shipyard
+        harness.sleeper.onSleep { index, _ in
+            if index == 0 { await shipyard.openVerificationPage() }
+        }
+
+        await harness.shipyard.beginDeviceFlow().value
+
+        #expect(harness.opener.opened == [URL(string: "https://github.com/login/device")!])
+    }
+
+    @Test("opening GitHub does nothing when no code is showing")
+    func noVerificationPageWhenSignedOut() async throws {
+        let harness = try Harness()
+        await harness.shipyard.start()
+
+        harness.shipyard.openVerificationPage()
+
+        #expect(harness.opener.opened.isEmpty)
+    }
+
+    @Test("a device-flow token survives a restart: the next start signs in with the stored token")
+    func deviceTokenSurvivesRestart() async throws {
+        let harness = try Harness()
+        harness.stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
+        harness.stub.on("POST", DeviceFlow.tokenURL, DeviceFlowAnswers.token("gho_device"))
+        harness.stub.on(userURL, viewerAnswer)
+        await harness.shipyard.beginDeviceFlow().value
+
+        let relaunched = harness.relaunched()
+        relaunched.stub.on(userURL, viewerAnswer)
+        await relaunched.shipyard.start()
+
+        #expect(relaunched.shipyard.phase == .needsProjects)
+        #expect(relaunched.shipyard.tokenSource == .tokenStore)
+        #expect(relaunched.authorizations == ["Bearer gho_device"])
+    }
+
+    @Test("a revoked device-flow token brings back the connect screen, saying GitHub rejected it")
+    func revokedDeviceToken() async throws {
+        let harness = try Harness(stored: "gho_device", gh: "gho_fromgh", config: withProjects)
+        harness.stub.on(userURL, viewerAnswer, unauthorized)
+        await harness.shipyard.start()
+        #expect(harness.shipyard.tokenSource == .tokenStore)
+
+        await #expect(throws: GitHubError.unauthorized) {
+            _ = try await harness.shipyard.request { try await $0.viewer() }
+        }
+
+        #expect(harness.shipyard.phase == .signedOut)
+        #expect(harness.shipyard.signedOutReason == .rejected(.tokenStore))
+        #expect(try harness.store.token() == nil)
+    }
+
     // MARK: - Signing out
 
     @Test("signing out clears the token store")
