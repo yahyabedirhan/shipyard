@@ -337,7 +337,7 @@ private struct HoverHelpBody: View {
         switch content {
         case .text(let text): HoverHelpText(text: text)
         case .markdown(let text):
-            Text(LocalizedStringKey(text))
+            Text(markdown: text, code: .system(size: 11, design: .monospaced))
                 .font(TypeScale.meta)
                 .fixedSize(horizontal: false, vertical: true)
         case .row(let card): RowCardView(card: card)

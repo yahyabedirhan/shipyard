@@ -400,15 +400,18 @@ private struct IconButtonBody: View {
 /// or quiet.
 struct PillButtonStyle: ButtonStyle {
     var prominent = false
+    /// 24 in a row of buttons; taller for a screen's stacked, full-width actions.
+    var height: CGFloat = 24
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        PillButtonBody(configuration: configuration, prominent: prominent)
+        PillButtonBody(configuration: configuration, prominent: prominent, height: height)
     }
 }
 
 private struct PillButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let prominent: Bool
+    let height: CGFloat
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
 
@@ -417,7 +420,7 @@ private struct PillButtonBody: View {
             .font(TypeScale.button)
             .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 12)
-            .frame(height: 24)
+            .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(prominent ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.07)))
@@ -546,5 +549,20 @@ private struct TextButtonBody: View {
             .contentShape(Rectangle())
             .onHover { hover = $0 }
             .animation(Motion.hover, value: hover)
+    }
+}
+
+extension Text {
+    /// Inline Markdown from `PanelText` (a command in backticks, a link),
+    /// with each code span set in `code` explicitly: `Text` given a
+    /// `LocalizedStringKey` drops the backticks but, under a `.font(_:)` of a
+    /// fixed size, keeps the span in the surrounding font.
+    init(markdown: String, code: Font) {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        var text = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
+        for run in text.runs where run.inlinePresentationIntent?.contains(.code) == true {
+            text[run.range].font = code
+        }
+        self.init(text)
     }
 }

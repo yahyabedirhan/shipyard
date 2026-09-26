@@ -20,9 +20,9 @@ extension PanelText {
             case connectWithGh
         }
 
-        /// The screen's heading, e.g. "Connect to GitHub".
+        /// The screen's greeting, e.g. "Welcome to Shipyard".
         public var title: String
-        /// What happened, in one short line (Markdown).
+        /// What happened and the quickest way in, in a line or two (Markdown).
         public var message: String
         public var lead: Lead
         /// Why Sign in with GitHub can't be used in this build, shown under
@@ -113,26 +113,27 @@ extension PanelText {
         switch reason {
         case .noToken, .userSignedOut(.signedOut):
             return Connect(
-                title: "Connect to GitHub",
+                title: "Welcome to Shipyard",
                 message: canSignIn
-                    ? "Sign in to see the pull requests your agents open."
-                    : "Connect through the GitHub CLI (`gh`).",
+                    ? "Connect your GitHub account to see the pull requests your agents open."
+                    : "Connect your GitHub account through the GitHub CLI (`gh`).",
                 lead: signInOrGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: true
             )
         case .userSignedOut(.ghStillSignedIn):
             return Connect(
-                title: "Signed out",
-                message: "The `gh` command is still signed in.",
+                title: "Welcome back",
+                message: "The GitHub CLI (`gh`) is already signed in on this Mac, so connecting takes one click."
+                    + (canSignIn ? " Or sign in with GitHub, if you'd rather." : ""),
                 lead: .connectWithGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: false
             )
         case .rejected(.tokenStore):
             return Connect(
-                title: "Sign in again",
-                message: "Your GitHub sign-in expired or was revoked.",
+                title: "Welcome back",
+                message: "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.",
                 lead: signInOrGh,
                 signInUnavailable: unavailable,
                 // The `gh` way folds into the same disclosure as on first launch.
@@ -140,8 +141,8 @@ extension PanelText {
             )
         case .rejected(.gh):
             return Connect(
-                title: "Sign in again",
-                message: "GitHub rejected the `gh` command's sign-in.",
+                title: "Welcome back",
+                message: "GitHub rejected the `gh` command's sign-in. Sign `gh` in again in a terminal, then connect.",
                 lead: .ghCommand,
                 signInUnavailable: unavailable,
                 showsInstallHint: false

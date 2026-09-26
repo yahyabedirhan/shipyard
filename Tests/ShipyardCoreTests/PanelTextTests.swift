@@ -417,23 +417,24 @@ struct PanelTextTests {
 
     // MARK: - The connect screen
 
-    @Test("on first launch, or signed out with nothing signed in, Sign in with GitHub leads and gh folds away", arguments: [
+    @Test("on first launch, or signed out with nothing signed in, a welcome, Sign in with GitHub leads and gh folds away", arguments: [
         Shipyard.SignedOutReason.noToken, .userSignedOut(.signedOut),
     ])
     func connectFirstLaunch(reason: Shipyard.SignedOutReason) {
         let text = PanelText.connect(reason, canSignIn: true)
-        #expect(text.title == "Connect to GitHub")
-        #expect(text.message == "Sign in to see the pull requests your agents open.")
+        #expect(text.title == "Welcome to Shipyard")
+        #expect(text.message == "Connect your GitHub account to see the pull requests your agents open.")
         #expect(text.lead == .signIn)
         #expect(text.signInUnavailable == nil)
         #expect(text.showsInstallHint)
     }
 
-    @Test("signed out while gh is still signed in, Connect with gh leads, and there's no gh auth logout")
+    @Test("signed out while gh is still signed in, a welcome back says gh is one click away, and there's no gh auth logout")
     func connectSignedOutGhStillSignedIn() {
         let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: true)
-        #expect(text.title == "Signed out")
-        #expect(text.message == "The `gh` command is still signed in.")
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this Mac, so connecting takes one click. Or sign in with GitHub, if you'd rather.")
+        #expect(!text.message.contains("logout"))
         #expect(text.lead == .connectWithGh)
         #expect(!text.showsInstallHint)
     }
@@ -441,8 +442,8 @@ struct PanelTextTests {
     @Test("a rejected Keychain token says so in a line, then Sign in with GitHub leads")
     func connectRejectedStored() {
         let text = PanelText.connect(.rejected(.tokenStore), canSignIn: true)
-        #expect(text.title == "Sign in again")
-        #expect(text.message == "Your GitHub sign-in expired or was revoked.")
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.")
         #expect(text.lead == .signIn)
         #expect(text.showsInstallHint)
     }
@@ -450,8 +451,8 @@ struct PanelTextTests {
     @Test("a rejected gh token leads with gh auth login and Connect with gh, then Sign in with GitHub")
     func connectRejectedGh() {
         let text = PanelText.connect(.rejected(.gh), canSignIn: true)
-        #expect(text.title == "Sign in again")
-        #expect(text.message == "GitHub rejected the `gh` command's sign-in.")
+        #expect(text.title == "Welcome back")
+        #expect(text.message == "GitHub rejected the `gh` command's sign-in. Sign `gh` in again in a terminal, then connect.")
         #expect(text.lead == .ghCommand)
         #expect(!text.showsInstallHint)
     }
@@ -481,15 +482,36 @@ struct PanelTextTests {
         let text = PanelText.connect(reason, canSignIn: false)
         #expect(text.signInUnavailable == PanelText.signInUnavailable)
         #expect(text.lead == lead)
-        #expect(!text.message.contains("Sign in"))
+        #expect(!text.message.lowercased().contains("sign in with github"))
     }
 
     @Test("with no token and no client ID the screen says to connect through gh, with the install hint")
     func connectNoTokenWithoutClientID() {
         let text = PanelText.connect(.noToken, canSignIn: false)
-        #expect(text.title == "Connect to GitHub")
-        #expect(text.message == "Connect through the GitHub CLI (`gh`).")
+        #expect(text.title == "Welcome to Shipyard")
+        #expect(text.message == "Connect your GitHub account through the GitHub CLI (`gh`).")
         #expect(text.showsInstallHint)
+    }
+
+    @Test("gh is always in backticks, so it reads in code font, in every state's words")
+    func connectGhInCodeFont() throws {
+        let reasons: [Shipyard.SignedOutReason] = [
+            .noToken, .rejected(.gh), .rejected(.tokenStore), .userSignedOut(.signedOut), .userSignedOut(.ghStillSignedIn),
+        ]
+        var words = reasons.flatMap { reason in
+            [true, false].flatMap { canSignIn in
+                let text = PanelText.connect(reason, canSignIn: canSignIn)
+                return [text.title, text.message]
+            } + [PanelText.stillSignedOut(reason)]
+        }
+        words += [PanelText.connectWithGh, PanelText.useGhInstead, PanelText.useGhInsteadHelp, PanelText.installGhHelp]
+        words += [DeviceFlowError.unauthorized, .rejected("x")].map(PanelText.signInFailed)
+        let code = try Regex("`[^`]*`")
+        let gh = try Regex("\\bgh\\b")
+        for text in words {
+            // Outside the code spans, no gh is left.
+            #expect(text.replacing(code, with: "").firstMatch(of: gh) == nil, "bare gh in: \(text)")
+        }
     }
 
     @Test("the unavailable reason is short and names the missing client ID")
