@@ -112,7 +112,8 @@ Notifier -> Shipyard               openNotification(itemURL) on a click
 Shipyard -> MenuModel              build(snapshot, config, appState) -> what Panel draws
 Panel    -> Shipyard               click(item), collapse(project), markAllSeen(), refresh()
 Onboarding -> Shipyard            suggestedRepositories(), checkRepository(text), addProjects(projects)
-Shipyard -> ConfigStore            append(projects:) (the one writer), then follows the reload
+Panel    -> Shipyard               switchToNextLayout() (the header's layout button)
+Shipyard -> ConfigStore            append(projects:) and setLayout(layout) (the two writers), then follows the reload
 Snapshot  has  [Project -> [Item]]
 Configuration has [Project], Defaults, [NotificationRule]
 ```
@@ -186,6 +187,7 @@ Operations:
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
 | `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigError` (empty or used name, no repositories, bad slug) before writing anything |
+| `switchToNextLayout()` | the header's layout button: `configStore.setLayout(lastValid.menu.layout.next)` then follows the reload like `reloadConfiguration()`, so the menu switches as for a hand edit (rows kept, then a refresh) | a file that doesn't read, a `[menu]` the writer doesn't edit or a failed write changes nothing: `configError` says why (the banner) until the next reload |
 | `signOut()` | clears the token store → `signedOut` with `userSignedOut(result)`; app state (seen, collapsed) is kept. The header's gear menu has Sign out | if the token came from `gh` (always, in 0.0.x), `ghStillSignedIn`: the connect screen says to run `gh auth logout`, since Try again or the next launch picks `gh`'s token up again |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut` with `rejected(source)`, dropping the stored token when it came from the token store |
 
@@ -261,14 +263,16 @@ Operations:
 |---|---|
 | `static decode(Data) throws(ConfigError) -> Decoded` | the configuration plus warnings; rejects, each with a line and a message (every problem is listed, not only the first): invalid TOML, a value of the wrong type, an unknown choice (event, author filter, count style…) with the nearest valid one suggested, bad repo slug (`owner/name`), a project without a name or repositories, a repository listed twice in one project (ignoring case), duplicate project names, negative windows, interval < 30, share outside 1–50, a `version` other than 1 |
 | `settings(for: Project) -> ProjectSettings` | defaults merged with the project's overrides (objects merge by field; `notifications` replaces) |
-| `appendText(projects:) -> String` | the `[[projects]]` blocks the picker appends; the app never rewrites the file |
+| `appendText(projects:) -> String` | the `[[projects]]` blocks the picker appends; the app never rewrites the file as a whole |
+| `settingLayout(layout, in: text) throws(ConfigError) -> String` (`LayoutSetting.swift`) | the file's text with `[menu] layout` set and every other line kept: replaces an existing value (keeping its comment), adds the key under an existing `[menu]`, uncomments the header's `# [menu]` example when no live key follows it before the next table, else adds `[menu]` before the first table (or at the end); rejects a file that doesn't read (its own error), a `[menu]` in another form (inline table, dotted keys, `[menu.x]`) and any result that wouldn't read back as the same configuration with only the layout changed |
+| `MenuLayout.next` | the layout after this one; the enum's case order is the cycle (list → tabs → list), so a new layout joins it by being added |
 
 Unknown keys are ignored with a warning, so a newer file doesn't break an older app. TOMLDecoder parses the file but doesn't say where a value came from, so `ConfigurationReader` walks the parsed `TOMLTable` key by key and `TOMLSourceMap` (a light second pass over the text) finds the line of each key path for the messages. The published schema is `schema/config.schema.json`; tests check the example above and a file setting every key against it.
 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
-Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `hide-authors`, `[menu] layout`, `[menu-bar] count`, `[defaults.issues]` and `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
 ### ConfigStatusStore — `ShipyardCore/Config/ConfigStatus.swift`
@@ -389,7 +393,9 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               text (profileHelp), VoiceOver "Open @handle's profile on GitHub"; "Shipyard" while
                               viewer is nil (connecting, signed out, GitHub out of reach at sign-in); the avatar from
                               AvatarCache, a plain circle until it's there or when it can't be had ·
-                              "3 need attention" · Refresh (⌘R, spins while refreshing) ·
+                              "3 need attention" · Layout (ready only: the current layout's icon, list.bullet or
+                              rectangle.split.3x1; tooltip and VoiceOver PanelText.layoutButton, "Layout: list. Click
+                              for tabs."; a click is switchToNextLayout) · Refresh (⌘R, spins while refreshing) ·
                               gear menu: Open configuration file · Install agent skill… · Sign out (once signed in)
       signedOut              → <ConnectView>  (Onboarding/)
       connecting             → spinner        (only the device flow reaches it; its screen comes with #22)
@@ -489,7 +495,8 @@ shipyard/
 │   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
 │   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
 │   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
-│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects
+│   │   ├── LayoutSetting.swift       # the layout button's edit: set [menu] layout in the text, every other line kept
+│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects, set the layout
 │   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests

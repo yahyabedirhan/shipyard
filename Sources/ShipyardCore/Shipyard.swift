@@ -393,6 +393,25 @@ public final class Shipyard {
         return result
     }
 
+    // MARK: - Layout button
+
+    /// The header's layout button: writes the layout after the current one
+    /// (`MenuLayout.next`, wrapping) to `[menu] layout` in the configuration
+    /// file and follows the reload, so the menu switches as it does for a
+    /// hand edit. When the file can't be written (it doesn't read, `[menu]`
+    /// is in a form the writer doesn't edit, or the file system refuses),
+    /// nothing changes and `configError` says why until the next reload.
+    public func switchToNextLayout() async {
+        let next = configStore.lastValid.menu.layout.next
+        do {
+            await follow(try configStore.setLayout(next))
+        } catch let error as ConfigError {
+            configError = error
+        } catch {
+            configError = ConfigError([ConfigIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
+        }
+    }
+
     /// A limit the picker ran into holds refreshes back too: it's the same limit.
     private func recordLimit(_ error: any Error) {
         guard let error = error as? GitHubError else { return }

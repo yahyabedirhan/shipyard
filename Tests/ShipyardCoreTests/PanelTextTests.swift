@@ -28,6 +28,12 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(10) == "10 need attention")
     }
 
+    @Test("the layout button's tooltip and VoiceOver label name the current layout and the next one")
+    func layoutButton() {
+        #expect(PanelText.layoutButton(.list) == "Layout: list. Click for tabs.")
+        #expect(PanelText.layoutButton(.tabs) == "Layout: tabs. Click for list.")
+    }
+
     @Test("signed in, the header names the account by its handle; until it's known, the app")
     func headerAccount() {
         let viewer = Viewer(login: "yabepa", id: 42, name: "Yahya Bedirhan Pak")

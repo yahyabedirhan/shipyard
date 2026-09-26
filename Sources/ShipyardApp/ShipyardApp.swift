@@ -149,6 +149,12 @@ final class AppServices {
         Task { await shipyard.refreshNow() }
     }
 
+    /// The header's layout button: writes the next layout to the
+    /// configuration file; the menu switches with the reload.
+    func switchToNextLayout() {
+        Task { await shipyard.switchToNextLayout() }
+    }
+
     /// Opening the panel rereads the notification permission (the user may
     /// have changed it in System Settings). It doesn't refresh: looking
     /// costs no GitHub request, the timer keeps the data fresh.

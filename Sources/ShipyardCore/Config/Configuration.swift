@@ -137,9 +137,19 @@ public enum MenuBarCount: String, CaseIterable, Sendable {
 /// `[menu] layout`: how the panel draws the projects once shipyard is
 /// ready. `list` puts every project's rows in one scrolling list, under
 /// pinned project headers; `tabs` shows one project at a time.
+///
+/// The cases' order is the cycle the header's layout button steps
+/// through: a new layout only has to be added here to join it.
 public enum MenuLayout: String, CaseIterable, Sendable {
     case list
     case tabs
+
+    /// The layout after this one in the cycle; after the last, the first.
+    public var next: MenuLayout {
+        let all = Self.allCases
+        let index = all.firstIndex(of: self)!
+        return all[(index + 1) % all.count]
+    }
 }
 
 /// `[rate-limit] show`
@@ -381,7 +391,8 @@ extension Configuration {
     public static let header = """
         #:schema \(schemaURL)
         # shipyard configuration. You and your agents edit this file; shipyard
-        # applies changes live and never rewrites it (it only appends projects).
+        # applies changes live. It writes to it only to add projects and, from
+        # the menu's layout button, to set layout under [menu]; the rest stays.
         # Every key is optional. Keys, defaults and events are in the schema above.
         # The settings below are commented out at their defaults: uncomment one
         # and change its value to use it.

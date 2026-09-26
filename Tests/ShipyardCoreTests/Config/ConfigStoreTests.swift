@@ -228,6 +228,183 @@ struct ConfigStoreAppendTests {
     }
 }
 
+@Suite("Configuration store: setting the layout")
+struct ConfigStoreLayoutTests {
+    /// Writes `text`, reloads, sets the layout and returns the file after.
+    private func setLayout(_ layout: MenuLayout, in text: String) throws -> (text: String, store: ConfigStore) {
+        let url = temporaryConfigURL()
+        try write(text, to: url)
+        let store = ConfigStore(url: url)
+        store.reload()
+        try store.setLayout(layout)
+        return (try contents(of: url), store)
+    }
+
+    @Test("an existing layout's value is replaced, keeping its comment and every other line")
+    func replacesValue() throws {
+        let before = """
+            # mine
+            refresh-interval-seconds = 60
+
+            [menu]   # how it looks
+            layout = "list"   # or tabs
+
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+
+            """
+        let (after, store) = try setLayout(.tabs, in: before)
+        #expect(after == before.replacingOccurrences(of: "layout = \"list\"", with: "layout = \"tabs\""))
+        #expect(store.lastValid.menu.layout == .tabs)
+        #expect(store.lastValid.refreshIntervalSeconds == 60)
+        #expect(store.lastValid.projects.map(\.name) == ["a"])
+    }
+
+    @Test("a [menu] table without the key gets it under its header")
+    func addsKeyToTable() throws {
+        let before = "[menu]\n\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n"
+        let (after, store) = try setLayout(.tabs, in: before)
+        #expect(after == "[menu]\nlayout = \"tabs\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n")
+        #expect(store.lastValid.menu.layout == .tabs)
+    }
+
+    @Test("the new-file header's commented [menu] example is uncommented in place, its projects kept")
+    func uncommentsHeaderExample() throws {
+        let projects = "\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n"
+        let before = Configuration.header + projects
+        let (after, store) = try setLayout(.tabs, in: before)
+        let expected = Configuration.header
+            .replacingOccurrences(of: "# [menu]\n# layout = \"list\"\n", with: "[menu]\nlayout = \"tabs\"\n") + projects
+        #expect(after == expected)
+        #expect(after != before)
+        #expect(store.lastValid.menu.layout == .tabs)
+        #expect(store.lastValid.projects.map(\.name) == ["a"])
+        #expect(store.warnings.isEmpty)
+
+        // Back to list: the now-live key is replaced, nothing else moves.
+        try store.setLayout(.list)
+        #expect(try contents(of: store.url) == expected.replacingOccurrences(of: "layout = \"tabs\"", with: "layout = \"list\""))
+        #expect(store.lastValid.menu.layout == .list)
+    }
+
+    @Test("a commented [menu] followed by live settings isn't uncommented: a new table goes before the first table")
+    func commentedMenuOverLiveKeys() throws {
+        let before = """
+            # [menu]
+            # layout = "list"
+            refresh-interval-seconds = 60
+
+            # my projects
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+
+            """
+        let (after, store) = try setLayout(.tabs, in: before)
+        #expect(after == """
+            # [menu]
+            # layout = "list"
+            refresh-interval-seconds = 60
+
+            [menu]
+            layout = "tabs"
+
+            # my projects
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+
+            """)
+        #expect(store.lastValid.menu.layout == .tabs)
+        #expect(store.lastValid.refreshIntervalSeconds == 60)
+    }
+
+    @Test("a file without [menu] gets one before its first table")
+    func addsTable() throws {
+        let before = """
+            #:schema \(Configuration.schemaURL)
+            version = 1
+            hide-authors = ["dependabot[bot]"]
+
+            [menu-bar]
+            count = "none"
+
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+            """ // no trailing newline
+        let (after, store) = try setLayout(.tabs, in: before)
+        #expect(after == """
+            #:schema \(Configuration.schemaURL)
+            version = 1
+            hide-authors = ["dependabot[bot]"]
+
+            [menu]
+            layout = "tabs"
+
+            [menu-bar]
+            count = "none"
+
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+            """)
+        #expect(store.lastValid.menu.layout == .tabs)
+        #expect(store.lastValid.menuBar.count == .none)
+        #expect(store.lastValid.hideAuthors == ["dependabot[bot]"])
+    }
+
+    @Test("a file with no tables gets [menu] at the end")
+    func addsTableAtEnd() throws {
+        let (after, store) = try setLayout(.tabs, in: "version = 1")
+        #expect(after == "version = 1\n\n[menu]\nlayout = \"tabs\"\n")
+        #expect(store.lastValid.menu.layout == .tabs)
+
+        let (fromEmpty, _) = try setLayout(.tabs, in: "")
+        #expect(fromEmpty == "[menu]\nlayout = \"tabs\"\n")
+    }
+
+    @Test("a missing file is created with its header, whose example is uncommented")
+    func missingFile() throws {
+        let url = temporaryConfigURL()
+        let store = ConfigStore(url: url)
+        try store.setLayout(.tabs)
+        #expect(try contents(of: url) == Configuration.header
+            .replacingOccurrences(of: "# [menu]\n# layout = \"list\"\n", with: "[menu]\nlayout = \"tabs\"\n"))
+        #expect(store.lastValid.menu.layout == .tabs)
+    }
+
+    @Test("a broken file isn't written: its own error says why")
+    func brokenFile() throws {
+        let url = temporaryConfigURL()
+        let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"nope\"]\n"
+        try write(broken, to: url)
+        let store = ConfigStore(url: url)
+        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "repository `nope` isn't `owner/name`")])) {
+            try store.setLayout(.tabs)
+        }
+        #expect(try contents(of: url) == broken)
+    }
+
+    @Test("a [menu] written as an inline table isn't edited, and says how to set it by hand")
+    func inlineTable() throws {
+        let url = temporaryConfigURL()
+        let inline = "menu = { layout = \"list\" }\n"
+        try write(inline, to: url)
+        let store = ConfigStore(url: url)
+        store.reload()
+        #expect(throws: ConfigError([ConfigIssue(
+            line: 1,
+            message: "can't switch the layout: `[menu]` is written in a form shipyard doesn't edit; set `layout = \"tabs\"` under `[menu]` by hand"
+        )])) {
+            try store.setLayout(.tabs)
+        }
+        #expect(try contents(of: url) == inline)
+        #expect(store.lastValid.menu.layout == .list)
+    }
+}
+
 @Suite("Configuration store: location")
 struct ConfigStoreLocationTests {
     let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)

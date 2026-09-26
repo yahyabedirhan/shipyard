@@ -32,6 +32,12 @@ public enum PanelText {
         "Open @\(viewer.login)'s profile on GitHub"
     }
 
+    /// The header's layout button, as its tooltip and VoiceOver label: the
+    /// layout shown and the one a click switches to. "Layout: list. Click for tabs."
+    public static func layoutButton(_ current: MenuLayout) -> String {
+        "Layout: \(current.rawValue). Click for \(current.next.rawValue)."
+    }
+
     /// Next to the heading: "3 need attention"; `nil` when nothing does.
     public static func attentionSummary(_ count: Int) -> String? {
         switch count {

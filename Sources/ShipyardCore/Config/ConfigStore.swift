@@ -6,7 +6,8 @@ import Foundation
 /// The core doesn't watch the file. The app's `ConfigWatcher` watches the
 /// directory and calls `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
-/// file: `append(projects:)` only adds `[[projects]]` blocks at the end.
+/// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
+/// the end, and `setLayout(_:)` changes or adds only `[menu] layout`.
 public final class ConfigStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
@@ -127,6 +128,30 @@ public final class ConfigStore: @unchecked Sendable {
         defer { try? handle.close() }
         _ = try handle.seekToEnd()
         try handle.write(contentsOf: Data(addition.utf8))
+        return reload()
+    }
+
+    /// Sets `[menu] layout` in the file, for the header's layout button:
+    /// replaces the key's value, or uncomments the new-file header's
+    /// `# [menu]` example, or adds a `[menu]` table before the first table,
+    /// leaving every other line and comment as it was. Creates the file
+    /// with its header when it's missing. Throws the file's `ConfigError`
+    /// when it doesn't read, one saying why when the edit can't be made,
+    /// or the file system's error, and then writes nothing. Returns the
+    /// reload that follows.
+    @discardableResult
+    public func setLayout(_ layout: MenuLayout) throws -> ReloadResult {
+        try createIfMissing()
+        guard let text = String(data: try read(), encoding: .utf8) else {
+            throw ConfigError([ConfigIssue(line: nil, message: "the file isn't UTF-8 text")])
+        }
+        let edited = try Configuration.settingLayout(layout, in: text)
+        // In place, not by renaming a new file over it: a symlinked file
+        // (dotfiles) stays a symlink and keeps its permissions.
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(edited.utf8))
         return reload()
     }
 

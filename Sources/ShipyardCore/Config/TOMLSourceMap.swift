@@ -32,7 +32,8 @@ extension Array where Element == ConfigPathComponent {
 /// comments and multi-line arrays. It only runs on text TOMLDecoder already
 /// accepted.
 struct TOMLSourceMap {
-    private struct Entry {
+    /// A table header or a `key = value` the pass recorded.
+    struct Entry {
         var path: ConfigPath
         var line: Int
         /// The last line of the entry: the value's last line for a key, the
@@ -41,7 +42,8 @@ struct TOMLSourceMap {
         var isHeader: Bool
     }
 
-    private var entries: [Entry] = []
+    /// Every header and key, in file order.
+    private(set) var entries: [Entry] = []
     private let lines: [Substring]
 
     init(_ text: String) {

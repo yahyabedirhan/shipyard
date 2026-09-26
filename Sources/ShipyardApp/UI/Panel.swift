@@ -52,6 +52,19 @@ struct Panel: View {
                     .transition(.opacity)
             }
             Spacer()
+            if shipyard.phase == .ready {
+                // Shows the current layout; a click writes the next one to
+                // `[menu] layout`, and the menu follows the reload.
+                let layout = shipyard.menu.layout
+                Button(action: actions.switchToNextLayout) {
+                    Image(systemName: layout.symbol)
+                        .frame(width: 16, height: 16)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(IconButtonStyle())
+                .help(PanelText.layoutButton(layout))
+                .accessibilityLabel(PanelText.layoutButton(layout))
+            }
             Button(action: actions.refresh) {
                 // A square frame puts the rotation's anchor on the glyph's
                 // centre; the scoped animation spins only the rotation, so
@@ -326,6 +339,16 @@ private struct AccountButton: View {
         }
         // Bytes that aren't an image leave the placeholder.
         avatar = await avatars.image(for: url).flatMap(NSImage.init(data:))
+    }
+}
+
+extension MenuLayout {
+    /// The layout button's icon while this layout is shown.
+    fileprivate var symbol: String {
+        switch self {
+        case .list: "list.bullet"
+        case .tabs: "rectangle.split.3x1"
+        }
     }
 }
 
