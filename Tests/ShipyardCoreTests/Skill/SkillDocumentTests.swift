@@ -7,6 +7,7 @@ import Testing
 // drift from what the code reads and validates.
 
 private let skillURL = repositoryRoot.appendingPathComponent("skills/shipyard/SKILL.md")
+private let presetsURL = repositoryRoot.appendingPathComponent("skills/shipyard/presets.md")
 
 private func skill() throws -> String {
     try String(contentsOf: skillURL, encoding: .utf8)
@@ -253,6 +254,31 @@ struct SkillDocumentTests {
         }
         for event in EventKind.allCases {
             #expect(text.contains("| `\(event.rawValue)` |"), "event `\(event.rawValue)` has no row")
+        }
+    }
+
+    @Test("its presets page shows the app's presets, file for file, and the skill says when to start from one")
+    func presets() throws {
+        let page = try String(contentsOf: presetsURL, encoding: .utf8)
+        // The examples the page puts where onboarding's picks go.
+        let examples: [String: [NewProject]] = [
+            Preset.myAgents.name: [
+                NewProject(name: "hello-world", repositories: ["octocat/hello-world"]),
+                NewProject(name: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
+            ],
+        ]
+        // One `## `name`` section per preset, in the app's order, each with its file.
+        let sections = page.components(separatedBy: "\n## ").dropFirst()
+        let named = sections.filter { $0.hasPrefix("`") }
+        #expect(named.map { String($0.prefix { $0 != "\n" }) } == Preset.all.map { "`\($0.name)`" })
+        for (preset, section) in zip(Preset.all, named) {
+            let blocks = tomlBlocks(in: section)
+            #expect(blocks == [preset.text(projects: examples[preset.name] ?? [])], "`\(preset.name)` differs from the app's")
+        }
+        let text = try skill()
+        #expect(text.contains("[presets.md](presets.md)"))
+        for preset in Preset.all {
+            #expect(text.contains("`\(preset.name)`"), "the skill doesn't name `\(preset.name)`")
         }
     }
 

@@ -16,6 +16,16 @@ A request to change the user's shipyard is a change to this file. When no key be
 - The app writes to the file itself in two ways only: its project picker appends `[[projects]]` blocks, and the layout button in the menu's header sets `layout` under `[menu]` to the next layout in turn (list, then tabs, then list again), keeping every other line. So read the file afresh before each edit.
 - Keys are kebab-case. The schema is `https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`, named by the file's first line, `#:schema <url>`.
 
+## Starting from a preset
+
+Shipyard has three **presets**, ready-made files for its main uses; the app offers them when it's set up, and [presets.md](presets.md) has each one's whole file:
+
+- `my-agents`: the pull requests and issues the user and their agents open, one project per repository.
+- `incoming-contributions`: what other people open on the user's repositories, bots hidden, plus the pull requests waiting on their review anywhere.
+- `review-queue`: only the pull requests waiting on the user's review, in any repository.
+
+Start from a preset when the user names one, or asks to set shipyard up (or start over) for one of these uses, and the file is missing or holds nothing live but `version`: write the preset's file with the user's repositories, as presets.md says. When the file already has settings or projects, don't replace it: make the change the request needs with the keys below.
+
 ## Editing it
 
 1. Read the whole file: the user writes comments in it and edits it by hand. Change or add only the lines the request needs, keeping every comment, blank line and the existing order.

@@ -384,13 +384,13 @@ Writes the latest `ConfigStatus` (`checked`, `config`, `configModified`, `error`
 
 ### Presets — `ShipyardCore/Config/Presets.swift` (+ `PresetSetting.swift`)
 
-`Preset`: `name`, `title`, `summary`, `asks: .repositories | .ownedOrRepositories | .nothing`, and `text(projects:) -> String`, a whole commented configuration file that decodes with no warnings. The skill's `skills/shipyard/presets.md` shows the same three files; a test keeps them equal.
+`Preset`: `name`, `title`, `summary`, `asks: .repositories | .ownedOrRepositories | .nothing`, and `text(projects: [NewProject]) -> String`, a whole commented configuration file (the `#:schema` line, a comment naming the preset, `version`, then its tables and projects) that decodes with no warnings and passes the schema. `Preset.all` lists the three in onboarding's order and `Preset.named(_:)` finds one by name. The skill's `skills/shipyard/presets.md` shows the same three files, with example repositories where onboarding's picks go; a test keeps them equal.
 
 | Preset | Contents |
 |---|---|
-| `my-agents` | issues shown (`[defaults.issues] show = true`); `group-by = "kind"`; the chosen repositories, one project each. The maintainer's setup. |
-| `incoming-contributions` | pull requests and issues shown with `authors = { hide = ["me", "bots"] }`; `group-by = "repository"`, `subsections = true`; a project "Incoming" with `owned` (or the chosen repositories) and a project "Review requests" with `anywhere` and `review-requested = true`; notifications `pr.opened` and `issue.opened` from `others`. ghbar's view. |
-| `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notification `pr.review_requested`. |
+| `my-agents` | issues shown (`[defaults.issues] show = true`); `[defaults] group-by = "kind"`; each of `projects` as its own block (onboarding passes one per chosen repository); the default notification. The maintainer's setup. |
+| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`. Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested]`, since a request, not a new PR, is its news. ghbar's view. |
+| `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notification `pr.review_requested`. Ignores `projects`. |
 
 `ConfigStore.writePreset(preset, projects)` is the third writer (ADR 0001's amendment): it writes `preset.text(projects:)` in place when the file is missing or its only live key is `version`, and otherwise refuses with a `ConfigError` so onboarding falls back to the picker.
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
