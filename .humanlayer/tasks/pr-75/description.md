@@ -7,7 +7,7 @@ macOS's native tooltips came late, looked dated, got cut off at the panel's edge
 ## Special things to note
 
 - The row card reads some extra plain GraphQL fields (`avatarUrl`, `baseRefName`, `additions`, `deletions`, `changedFiles`, `reviewDecision`), which add no cost. Labels were tried and dropped: a dry run put 5 repositories at 11 points instead of 4 (recorded in `docs/references/github-rate-limits.md`).
-- The card has only been checked by the maintainer in the real menu. The placement, the words and the attention reasons are tested in the core; the drawing and the timing are not.
+- The maintainer tried every round in the real menu. The placement, the words and the attention reasons are tested in the core, but the drawing and the timing aren't. How each decision was reached, and what was tried and dropped, is in the decision log on #72 and on this PR.
 - The popover runner-up stays one line away (`HoverHelp.style = .popover`). It isn't the default because a popover is a window and may take the arrow keys.
 
 ## Change outline
@@ -27,6 +27,16 @@ toolbar  delay 500 ms · warm 600 ms · grace 90 ms   → glides from button to 
 row      delay 1000 ms · no warmth · no grace       → closes as the pointer leaves; every row waits again
 ```
 
+What it looks like in the real panel (dark mode, the public shipyard project):
+
+| Pull request | Checks running |
+|---|---|
+| ![A pull request's card: avatar and two-line title, branches, +9,372 −815 in 133 files, checks passed, comments and last update](https://raw.githubusercontent.com/yahyabedirhan/shipyard/86f625d44bcfc7f97b6f64a7b0ae910c120d48c5/docs/assets/hover-help/pull-request-card.png) | ![A pull request's card with checks running in amber](https://raw.githubusercontent.com/yahyabedirhan/shipyard/86f625d44bcfc7f97b6f64a7b0ae910c120d48c5/docs/assets/hover-help/pull-request-checks-running.png) |
+
+| Issue, one-line title | Issue, two-line title | Header button |
+|---|---|---|
+| ![An issue's card: the avatar centred beside a one-line title](https://raw.githubusercontent.com/yahyabedirhan/shipyard/86f625d44bcfc7f97b6f64a7b0ae910c120d48c5/docs/assets/hover-help/issue-one-line-title.png) | ![An issue's card: the avatar centred beside a two-line title](https://raw.githubusercontent.com/yahyabedirhan/shipyard/86f625d44bcfc7f97b6f64a7b0ae910c120d48c5/docs/assets/hover-help/issue-two-line-title.png) | ![Refresh (⌘R) under the refresh button](https://raw.githubusercontent.com/yahyabedirhan/shipyard/86f625d44bcfc7f97b6f64a7b0ae910c120d48c5/docs/assets/hover-help/toolbar-refresh.png) |
+
 The row card is built in the core, so tests reach it without SwiftUI:
 
 ```swift
@@ -40,7 +50,7 @@ enum Fact { branches, size, files, review, checks, comments, reviews, updated, t
 ```
 
 ```text
-(👤) Fix checkout totals
+(👤) Fix checkout totals              ← avatar centred on the title, one line or three
      ( 👁 Your review is requested )
      ⎇ fix-totals → main
      ± +120 −43   ⧉ 6 files
