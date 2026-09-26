@@ -359,102 +359,25 @@ struct RowButtonStyle: ButtonStyle {
 
 // MARK: - The row highlight
 
-/// Each row's bounds, by its place, for the one highlight shape.
-private struct RowBoundsKey: PreferenceKey {
-    static let defaultValue: [MenuRowPlace: Anchor<CGRect>] = [:]
-
-    static func reduce(value: inout [MenuRowPlace: Anchor<CGRect>], nextValue: () -> [MenuRowPlace: Anchor<CGRect>]) {
-        value.merge(nextValue()) { $1 }
-    }
-}
-
-/// Where the laid-out rows sit in a layout's scrolling list, in its
-/// visible area, and how tall that area is: what `RowScroll` needs to
-/// keep the keys' highlight in view (#45). A reference kept out of view
-/// state: it changes on every scroll and draws nothing.
-@MainActor
-final class RowFrames {
-    /// The coordinate space of the list's visible area.
-    nonisolated static let space = "row-frames"
-    var spans: [MenuRowPlace: RowSpan] = [:]
-    var visibleHeight: Double = 0
-}
-
-private struct RowFramesKey: EnvironmentKey {
-    static var defaultValue: RowFrames? { nil }
-}
-
-extension EnvironmentValues {
-    /// The list's `RowFrames`, set by `rowKeys(…)` for the rows inside it.
-    fileprivate var rowFrames: RowFrames? {
-        get { self[RowFramesKey.self] }
-        set { self[RowFramesKey.self] = newValue }
-    }
-}
-
 extension View {
-    /// A row at `place`: reports its bounds to the layout's highlight
-    /// (unless it draws its own, like a pinned project header), reports
-    /// where it sits in the list for scrolling it into view, and feeds the
-    /// pointer's enter and exit to `highlight` (#44, #45). The layout puts
-    /// `.id(place)` on the list's own child for the row, so the keys can
-    /// scroll to a row the lazy list hasn't laid out.
-    func highlightable(_ place: MenuRowPlace, _ highlight: Binding<RowHighlight>, drawsOwnHighlight: Bool = false) -> some View {
-        modifier(Highlightable(place: place, highlight: highlight, drawsOwnHighlight: drawsOwnHighlight))
-    }
-
-    /// Something among the rows that isn't one (an error row, a
-    /// placeholder, a tab's kind header): the pointer on it highlights
-    /// nothing, even if the row it came from never reported its exit.
-    func clearsRowHighlight(_ highlight: Binding<RowHighlight>) -> some View {
-        onHover { inside in
-            if inside { highlight.wrappedValue.pointerLeftRows() }
-        }
-    }
-
-    /// The keys for a layout's rows (#45), on its scrolling list. ↑ and ↓
-    /// move `highlight` through `places`, wrapping at the ends; `left` and
-    /// `right` are the layout's ← and →. The highlighted row is kept in
-    /// view, clear of a `pinnedHeader` that tall, without animating the
-    /// scroll. Return calls `activate(place, false)` and ⌥Return
-    /// `activate(place, true)`; `activate` says whether it acted. The list
-    /// takes the keyboard focus each time its window becomes key (each
-    /// time the menu opens), and moving the pointer hands the highlight
-    /// back to it.
-    func rowKeys(
-        _ highlight: Binding<RowHighlight>,
-        places: [MenuRowPlace],
-        pinnedHeader: CGFloat = 0,
-        scroll: ScrollViewProxy,
-        left: @escaping () -> RowKeyMove,
-        right: @escaping () -> RowKeyMove,
-        activate: @escaping (MenuRowPlace, _ markSeenOnly: Bool) -> Bool
-    ) -> some View {
-        modifier(RowKeys(
-            highlight: highlight,
-            places: places,
-            pinnedHeader: pinnedHeader,
-            scroll: scroll,
-            left: left,
-            right: right,
-            activate: activate
-        ))
-    }
-
     /// Draws `highlight` behind the rows in this view: one shape, at the
     /// highlighted row's bounds, gliding from row to row. It's one view
     /// moving rather than a shape matched between rows, so rows that a lazy
     /// stack creates and drops can't make it jump, and a row scrolled out of
-    /// the stack takes the highlight with it.
-    func rowHighlight(_ highlight: RowHighlight) -> some View {
+    /// the stack takes the highlight with it. With tabs, `list` is the
+    /// selected tab: only its rows are lit, not the outgoing tab's while
+    /// the list slides, and the shape fades in on a new tab rather than
+    /// gliding from the old one.
+    func rowHighlight(_ highlight: RowHighlight, in list: AnyHashable? = nil) -> some View {
         backgroundPreferenceValue(RowBoundsKey.self) { bounds in
             GeometryReader { proxy in
-                if let place = highlight.place, let anchor = bounds[place] {
+                if let place = highlight.place, let anchor = bounds[RowSlot(list: list, place: place)] {
                     let rect = proxy[anchor]
                     RowHighlightShape()
                         .frame(width: max(rect.width - 2 * Grid.inset, 0), height: rect.height)
                         .offset(x: rect.minX + Grid.inset, y: rect.minY)
                         .transition(.opacity)
+                        .id(list)
                 }
             }
             .animation(Motion.highlight, value: highlight.place)
@@ -466,176 +389,6 @@ extension View {
 struct RowHighlightShape: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover)
-    }
-}
-
-/// What ← or → did in a layout, for `rowKeys(…)`: nothing, moved the
-/// highlight within the list (which then scrolls it into view as ↑ and ↓
-/// do), or moved it to a new list (another tab), which scrolls to its top.
-enum RowKeyMove {
-    case ignored
-    case moved
-    case newList
-}
-
-/// `highlightable(_:_:drawsOwnHighlight:)`.
-private struct Highlightable: ViewModifier {
-    let place: MenuRowPlace
-    @Binding var highlight: RowHighlight
-    let drawsOwnHighlight: Bool
-    @Environment(\.rowFrames) private var frames
-
-    func body(content: Content) -> some View {
-        content
-            .anchorPreference(key: RowBoundsKey.self, value: .bounds) { drawsOwnHighlight ? [:] : [place: $0] }
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowFrames.space)) } action: { frame in
-                frames?.spans[place] = RowSpan(top: frame.minY, bottom: frame.maxY)
-            }
-            // A row the lazy list dropped isn't where it last was.
-            .onDisappear { frames?.spans[place] = nil }
-            .onHover { inside in
-                if inside {
-                    highlight.pointerEntered(place)
-                } else {
-                    highlight.pointerExited(place)
-                }
-            }
-    }
-}
-
-/// `rowKeys(_:places:pinnedHeader:scroll:left:right:activate:)`.
-private struct RowKeys: ViewModifier {
-    @Binding var highlight: RowHighlight
-    let places: [MenuRowPlace]
-    let pinnedHeader: CGFloat
-    let scroll: ScrollViewProxy
-    let left: () -> RowKeyMove
-    let right: () -> RowKeyMove
-    let activate: (MenuRowPlace, Bool) -> Bool
-    @FocusState private var focused: Bool
-    @State private var frames = RowFrames()
-    /// Where the pointer last was, in the window. Kept out of the view's
-    /// state: it changes on every move and draws nothing.
-    @State private var pointer = PointerLocation()
-
-    func body(content: Content) -> some View {
-        content
-            .coordinateSpace(.named(RowFrames.space))
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { frames.visibleHeight = $0 }
-            .environment(\.rowFrames, frames)
-            // The panel's window is key while the menu is open, so the
-            // focused list gets the keys; closed, the panel isn't on
-            // screen and takes none. `.onAppear` alone isn't enough: the
-            // view outlives a closed menu, and focus set before its window
-            // is key is lost, so it's set again each time it becomes key.
-            .focusable()
-            .focusEffectDisabled()
-            .focused($focused)
-            .onAppear { focused = true }
-            .background(WindowBecameKey { focused = true })
-            // Held down, a key repeats at the system's rate (`onKeyPress`
-            // gets the repeats), and each step scrolls without animating.
-            .onKeyPress(.downArrow) { step { $0.moveDown(in: places) } }
-            .onKeyPress(.upArrow) { step { $0.moveUp(in: places) } }
-            .onKeyPress(.leftArrow) { side(left) }
-            .onKeyPress(.rightArrow) { side(right) }
-            .onKeyPress(keys: [.return]) { press in
-                guard let place = highlight.place,
-                      activate(place, press.modifiers.contains(.option)) else { return .ignored }
-                return .handled
-            }
-            .onContinuousHover(coordinateSpace: .global) { phase in
-                // Scrolling moves the rows under a resting pointer, not the
-                // pointer: only a new location hands the highlight back.
-                guard case .active(let location) = phase, location != pointer.location else { return }
-                pointer.location = location
-                if !highlight.followsPointer { highlight.pointerMoved() }
-            }
-    }
-
-    private func step(_ move: (inout RowHighlight) -> Void) -> KeyPress.Result {
-        let previous = highlight.place
-        move(&highlight)
-        guard let place = highlight.place else { return .ignored }
-        reveal(place, from: previous)
-        return .handled
-    }
-
-    private func side(_ move: () -> RowKeyMove) -> KeyPress.Result {
-        let previous = highlight.place
-        switch move() {
-        case .ignored:
-            return .ignored
-        case .moved:
-            if let place = highlight.place { reveal(place, from: previous) }
-        case .newList:
-            if let place = highlight.place { scroll.scrollTo(place, anchor: .top) }
-        }
-        return .handled
-    }
-
-    /// Scrolls `place` into view, as far as it takes and no further.
-    private func reveal(_ place: MenuRowPlace, from previous: MenuRowPlace?) {
-        let move = RowScroll.reveal(
-            place,
-            from: previous,
-            in: places,
-            frame: frames.spans[place],
-            visibleHeight: frames.visibleHeight,
-            pinnedHeader: pinnedHeader
-        )
-        switch move {
-        case .stay: break
-        case .alignTop(let anchor): scroll.scrollTo(place, anchor: UnitPoint(x: 0.5, y: anchor))
-        case .alignBottom: scroll.scrollTo(place, anchor: .bottom)
-        }
-    }
-}
-
-private final class PointerLocation {
-    var location: CGPoint?
-}
-
-/// Calls `action` each time the window this view is in becomes key, and
-/// once when it's placed in a window that already is: the moment the menu
-/// opens. It changes nothing about when the window becomes key.
-private struct WindowBecameKey: NSViewRepresentable {
-    let action: () -> Void
-
-    func makeNSView(context: Context) -> Observer {
-        Observer()
-    }
-
-    func updateNSView(_ view: Observer, context: Context) {
-        view.action = action
-    }
-
-    final class Observer: NSView {
-        var action: (() -> Void)?
-        private var observation: NSObjectProtocol?
-
-        override func viewWillMove(toWindow newWindow: NSWindow?) {
-            super.viewWillMove(toWindow: newWindow)
-            if let observation { NotificationCenter.default.removeObserver(observation) }
-            observation = nil
-        }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            guard let window else { return }
-            observation = NotificationCenter.default.addObserver(
-                forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main
-            ) { [weak self] _ in
-                // After SwiftUI has made the window's content key-ready.
-                DispatchQueue.main.async { self?.action?() }
-            }
-            if window.isKeyWindow {
-                DispatchQueue.main.async { [weak self] in self?.action?() }
-            }
-        }
-
-        // Not in the way of the pointer.
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 

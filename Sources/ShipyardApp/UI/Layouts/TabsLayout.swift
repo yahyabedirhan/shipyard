@@ -94,15 +94,22 @@ struct TabsLayout: View {
     private func list(_ content: MenuTabContent) -> some View {
         ScrollViewReader { proxy in
             MeasuredScrollView {
-                ZStack(alignment: .top) {
-                    TabList(content: content, actions: actions, highlight: $highlight)
-                        .id(tab)
-                        .transition(.asymmetric(
-                            insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
-                            removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
-                        ))
+                VStack(spacing: 0) {
+                    RowListTop()
+                    ZStack(alignment: .top) {
+                        TabList(content: content, actions: actions, highlight: $highlight)
+                            .rowList(tab)
+                            .id(tab)
+                            .transition(.asymmetric(
+                                insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
+                                removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
+                            ))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    // Drawn here, not in each tab's list, so only the
+                    // selected tab's row is lit while the lists slide.
+                    .rowHighlight(highlight, in: tab)
                 }
-                .frame(maxWidth: .infinity, alignment: .top)
                 .clipped()
             }
             .onHover { inside in
@@ -112,6 +119,7 @@ struct TabsLayout: View {
             .rowKeys(
                 $highlight,
                 places: content.rowPlaces,
+                in: tab,
                 scroll: proxy,
                 left: { switchTab(by: -1) },
                 right: { switchTab(by: 1) }
@@ -280,7 +288,6 @@ private struct TabList: View {
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
-        .rowHighlight(highlight)
     }
 }
 

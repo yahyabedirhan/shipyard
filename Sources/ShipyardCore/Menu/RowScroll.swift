@@ -33,7 +33,8 @@ public enum RowScroll: Equatable, Sendable {
     /// (the layout's rows, top to bottom). `frame` is the row's span in the
     /// visible area, or `nil` when the lazy list hasn't laid it out (it's
     /// off screen: the list scrolls towards it the way the highlight moved,
-    /// up when it went up or wrapped to the top). `pinnedHeader` is the
+    /// up when it went up or wrapped to the top, or from a header to its
+    /// first item, which is under the pinned header). `pinnedHeader` is the
     /// height of a project header pinned over the top (0 in a tab); a
     /// header itself pins at the very top.
     public static func reveal(
@@ -47,7 +48,11 @@ public enum RowScroll: Equatable, Sendable {
         let clear = target.isHeader ? 0 : pinnedHeader
         guard let frame else {
             let index = places.firstIndex(of: target) ?? 0
-            let upward = previous.flatMap { places.firstIndex(of: $0) }.map { index < $0 } ?? (index == 0)
+            let from = previous.flatMap { places.firstIndex(of: $0) }
+            // A header's first item sits just under it; with the header
+            // pinned at the top, that item is scrolled away above.
+            let underHeader = previous?.isHeader == true && previous?.section == target.section && from == index - 1
+            let upward = underHeader || from.map { index < $0 } ?? (index == 0)
             // Without the row's height, near enough: off by the row's share of the header.
             return upward ? .alignTop(anchor: anchor(clear, visibleHeight, rowHeight: 0)) : .alignBottom
         }

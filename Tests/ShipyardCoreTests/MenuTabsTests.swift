@@ -189,17 +189,6 @@ struct MenuTabsTests {
         #expect(PanelText.rowDetail(run, showingRepository: false) == "#41 · running")
     }
 
-    @Test("a tab's row says what ⌥-click does and what its check dot means")
-    func rowHelp() {
-        #expect(PanelText.markRowSeen == "Mark seen")
-        #expect(PanelText.optionClickHint == "⌥-click to mark seen")
-        #expect(PanelText.needsAttention == "Needs attention")
-        #expect(PanelText.checks(.none) == nil)
-        #expect(PanelText.checks(.pending) == "Checks running")
-        #expect(PanelText.checks(.passed) == "Checks passed")
-        #expect(PanelText.checks(.failed) == "Checks failed")
-    }
-
     @Test("each kind's group has a small header")
     func kindHeaders() {
         #expect(PanelText.kindGroup(.pullRequest) == "Pull requests")

@@ -65,6 +65,15 @@ struct RowScrollTests {
         #expect(reveal(item, from: next, top: nil) == .alignTop(anchor: 26.0 / 560))
     }
 
+    @Test("from a pinned header to its first item not laid out: just below the header, not to the bottom")
+    func fromPinnedHeaderToFirstItem() {
+        // Scrolled into the middle of the project, its first item is above
+        // the visible area, under the header pinned at the top.
+        #expect(reveal(item, from: .header("shipyard"), top: nil) == .alignTop(anchor: 26.0 / 560))
+        // A row further down still goes the way the highlight moved.
+        #expect(reveal(next, from: .header("shipyard"), top: nil) == .alignBottom)
+    }
+
     @Test("with nothing highlighted before, a row not laid out goes to the top if it's the first, else to the bottom")
     func notLaidOutFromNothing() {
         #expect(reveal(.header("shipyard"), from: nil, top: nil) == .alignTop(anchor: 0))

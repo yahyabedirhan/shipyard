@@ -140,6 +140,17 @@ struct PanelTextTests {
             open pull request · #21 · yahyabedirhan · 37m
             ⌥-click to mark seen
             """)
+        #expect(PanelText.optionClickHint == "⌥-click to mark seen")
+    }
+
+    @Test("a row's action, attention dot and check dot have words for VoiceOver and the tooltip")
+    func rowWords() {
+        #expect(PanelText.markRowSeen == "Mark seen")
+        #expect(PanelText.needsAttention == "Needs attention")
+        #expect(PanelText.checks(.none) == nil)
+        #expect(PanelText.checks(.pending) == "Checks running")
+        #expect(PanelText.checks(.passed) == "Checks passed")
+        #expect(PanelText.checks(.failed) == "Checks failed")
     }
 
     private func issue(state: ItemState) -> MenuRow {
