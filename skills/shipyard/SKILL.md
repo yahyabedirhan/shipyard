@@ -12,27 +12,25 @@ Shipyard lists the pull requests (and, when turned on, issues and workflow runs)
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.
 - Every key is optional. A missing or empty file means the defaults with no projects (the app then shows its project picker).
 - Keys are kebab-case. The schema is `https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`, named by the file's first line, `#:schema <url>`.
-- A broken save doesn't blank the app: it keeps the last valid configuration and shows the error, with its line, in its panel. Unknown keys are ignored and shown as a quiet gray warning with their line ("unknown setting `x` (ignored; did you mean `y`?)"), so a misspelled key does nothing; the schema catches it before the user sees it.
-- A file the app created starts with a commented header that shows settings as commented-out TOML (`# [menu]`, `# layout = "list"`). To set one of those, uncomment its lines and change the value rather than adding a second copy, as long as no top-level key sits below them (see Editing it).
 
 ## Editing it
 
-1. Read the whole file first. The user writes comments in it and edits it by hand.
-2. Make the **smallest edit** that does the job: change or add only the lines the request needs, and keep every comment, blank line and the order of what's there. Shipyard itself never rewrites the file; its project picker only **appends** `[[projects]]` blocks at the end. Hold edits to the same standard.
-3. Put what you add where TOML reads it:
+1. Read the whole file: the user writes comments in it and edits it by hand. Change or add only the lines the request needs, keeping every comment, blank line and the existing order.
+2. Put what you add where TOML reads it:
    - A top-level key (`refresh-interval-seconds`, `hide-authors`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
    - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-4. When the file doesn't exist, create it (and its directory) starting with:
+   - A file the app created starts with a header showing settings as commented-out TOML (`# [menu]`, `# layout = "list"`). To set one, uncomment its lines and change the value rather than adding a second copy, unless a top-level key sits below them: uncommenting the table header would pull that key into the table.
+3. When the file doesn't exist, create it (and its directory) starting with:
 
    ```toml
    #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
    version = 1
    ```
 
-5. **Check the edit** before you report done (see Checking an edit). The edit is done when `taplo check` passes, the rules it can't check hold, and, when the app is running, its panel shows no configuration error.
+4. Check the edit (see Checking an edit). It is done when `taplo check` passes and the rules it can't check hold.
 
 ## Keys and defaults
 
@@ -142,7 +140,7 @@ The panel is on the user's screen, not yours: when the user reports that banner,
 
 ## Worked requests
 
-**"Watch this repo in shipyard."** Take the slug from the repository's remote (`git remote get-url origin`: `git@github.com:owner/name.git` and `https://github.com/owner/name` are both `owner/name`). If a project already lists it, say so and stop. Otherwise append a block named after the repository, unless the user names it:
+**"Watch this repo in shipyard."** Take the `owner/name` slug from the repository's `origin` remote. If a project already lists it, say so and stop. Otherwise append a block named after the repository, unless the user names it:
 
 ```toml
 [[projects]]
@@ -158,7 +156,7 @@ name = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 ```
 
-**"Notify me when others open PRs here."** Give that project its own list. It replaces the defaults for this project, so any other default rule it should keep goes in the list too:
+**"Notify me when others open PRs here."** Give that project its own list (it replaces the defaults; see Overrides):
 
 ```toml
 [[projects]]
@@ -169,24 +167,22 @@ notifications = [
 ]
 ```
 
-To add a rule for every project instead, write `[[defaults.notifications]]` blocks, and keep the default `pr.opened` rule among them (see Overrides).
+For every project instead, write `[[defaults.notifications]]` blocks.
 
-**"Hide dependabot."** A top-level key, above the first table; add to the list when it exists. Use the login as GitHub shows it, `[bot]` suffix included:
+**"Hide dependabot."** A top-level key; add to the list when it exists. Use the login as GitHub shows it, `[bot]` suffix included:
 
 ```toml
 hide-authors = ["dependabot[bot]"]
 ```
 
-**"Switch the menu to tabs."** One key in the `[menu]` table. If the file has the header's commented `# [menu]` and `# layout = "list"` lines and no top-level key follows them, uncomment both and set the value. Otherwise add the table below the last top-level key and above the first `[[projects]]` block: uncommenting `# [menu]` above a top-level key would make that key part of `[menu]`.
+**"Switch the menu to tabs."** One key in the `[menu]` table; uncomment the header's `# [menu]` lines where the placement rule allows it.
 
 ```toml
 [menu]
 layout = "tabs"
 ```
 
-`"list"`, the default, switches it back.
-
-**"Show issues for this project."** Add an `issues` override inside the project's block; its other keys keep their defaults:
+**"Show issues for this project."** Add an `issues` override inside the project's block:
 
 ```toml
 [[projects]]
@@ -202,7 +198,7 @@ To show issues in every project instead, set it once in the defaults:
 show = true
 ```
 
-**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override turns runs on for this project alone, and its own notification list adds `run.failed` while keeping the default `pr.opened`:
+**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the default `pr.opened` beside `run.failed`:
 
 ```toml
 [[projects]]
