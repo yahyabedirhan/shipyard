@@ -118,7 +118,9 @@
           "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
           "$ref": "#/definitions/notifications",
           "default": [{ "event": "pr.opened", "authors": [] }]
-        }
+        },
+        "archived": { "$ref": "#/definitions/archived" },
+        "forks": { "$ref": "#/definitions/forks" }
       }
     },
     "projects": {
@@ -145,6 +147,16 @@
       "enum": ["updated", "created", "title"],
       "default": "updated"
     },
+    "archived": {
+      "description": "Whether repository groups and owner/* bring in archived repositories. A repository named as owner/name is always listed.",
+      "type": "boolean",
+      "default": false
+    },
+    "forks": {
+      "description": "Whether repository groups and owner/* bring in forks. A repository named as owner/name is always listed.",
+      "type": "boolean",
+      "default": true
+    },
     "project": {
       "description": "A named group of one or more GitHub repositories, shown as one section. Tables here merge key by key onto [defaults]; notifications replaces the default list.",
       "type": "object",
@@ -157,18 +169,20 @@
           "minLength": 1
         },
         "repositories": {
-          "description": "The project's repositories as owner/name slugs, each listed once. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
+          "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+            "pattern": "^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator)$"
           }
         },
         "group-by": { "$ref": "#/definitions/group-by" },
         "subsections": { "$ref": "#/definitions/subsections" },
         "sort-by": { "$ref": "#/definitions/sort-by" },
+        "archived": { "$ref": "#/definitions/archived" },
+        "forks": { "$ref": "#/definitions/forks" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },

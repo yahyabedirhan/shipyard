@@ -106,6 +106,8 @@ Each kind of item (`pull-requests`, `issues`, `workflow-runs`) can list only som
 
 `pull-requests = { review-requested = true }` lists only the pull requests waiting on your review. A request to one of your teams counts as a request to you, here and in the attention count and notifications.
 
+A project's `repositories` takes single repositories (`owner/name`), everything an owner has (`my-org/*`), and the groups `owned`, `organizations` and `collaborator` (your own repositories, your organizations', and other people's you collaborate on). Groups and wildcards leave out archived repositories (`archived = true` brings them in) and keep forks (`forks = false` leaves them out), and pick up new repositories within the hour, or at once on ⌘R.
+
 - The schema, [`schema/config.schema.json`](schema/config.schema.json), documents every key and default; name it on the file's first line (`#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`) for editor completion and `taplo check`.
 - The agent skill, [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md), teaches your agents to edit the file. Install it with `npx skills add yahyabedirhan/shipyard -g -y`.
 - For maintainers, [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code and lists every place to touch when adding a setting.

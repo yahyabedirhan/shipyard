@@ -121,7 +121,17 @@ public struct GitHubClient: Sendable {
     /// its `branches` allows. A repository whose runs can't be read gets an
     /// error in the snapshot; a spent limit, a 401 or a network failure fails
     /// the fetch.
-    public func fetch(projects: [ProjectSettings], at fetchedAt: Date) async throws -> Snapshot {
+    ///
+    /// A project watches the repositories `resolved` has for it (its groups
+    /// and wildcards looked up, see `RepositoryResolver`), else only the
+    /// single repositories it names; the snapshot records which, and the
+    /// selectors that couldn't be resolved.
+    public func fetch(
+        projects configured: [ProjectSettings],
+        resolved: [String: ResolvedRepositories] = [:],
+        at fetchedAt: Date
+    ) async throws -> Snapshot {
+        let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
         let repositories = ProjectQuery.plan(projects)
         // The review search is only worth its cost where pull requests show.
         let searchesReviews = projects.contains { $0.pullRequests.show }
@@ -165,7 +175,7 @@ public struct GitHubClient: Sendable {
         let slugs = Dictionary(repositories.map { ($0.slug.lowercased(), $0.slug) }, uniquingKeysWith: { first, _ in first })
         for project in projects {
             var projectItems: [Item] = []
-            for repository in project.repositories {
+            for repository in project.repositorySlugs {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
                     // Nothing of the repository could be fetched: every kind
@@ -206,7 +216,9 @@ public struct GitHubClient: Sendable {
             viewerLogin: parsed.viewerLogin,
             reviewRequested: reviewRequested,
             searchPullRequests: searchPullRequests,
-            reviewSearchError: reviewSearchError
+            reviewSearchError: reviewSearchError,
+            repositories: Dictionary(projects.map { ($0.name, $0.repositorySlugs) }, uniquingKeysWith: { first, _ in first }),
+            selectorErrors: resolved.filter { !$0.value.errors.isEmpty }.mapValues(\.errors)
         )
     }
 

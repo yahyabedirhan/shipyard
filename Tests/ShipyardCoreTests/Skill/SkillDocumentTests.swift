@@ -229,6 +229,8 @@ struct SkillDocumentTests {
             ("workflow-runs.branches", literal(c.defaults.workflowRuns.branches)),
             ("[defaults] group-by", literal(c.defaults.arrangement.groupBy)),
             ("[defaults] sort-by", literal(c.defaults.arrangement.sortBy)),
+            ("[defaults] archived", "\(c.defaults.archived)"),
+            ("[defaults] forks", "\(c.defaults.forks)"),
         ]
         for (key, value) in rows {
             #expect(text.contains("| `\(key)` | `\(value)` |"), "no row `\(key)` = `\(value)`")
@@ -245,7 +247,7 @@ struct SkillDocumentTests {
         let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description) + NotificationRule.legacyAuthors
             + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
             + WorkflowRunBranches.allCases.map(\.rawValue) + GroupBy.allCases.map(\.rawValue) + SortBy.allCases.map(\.rawValue)
-            + StateGroup.allCases.map(\.rawValue)
+            + StateGroup.allCases.map(\.rawValue) + RepositoryGroup.allCases.map(\.rawValue)
         for value in values {
             #expect(text.contains("`\(value)`") || text.contains("`\"\(value)\"`"), "`\(value)` isn't listed")
         }

@@ -234,7 +234,7 @@ extension ProjectSettings {
     /// The sources a refresh fetches for this project: each repository, for
     /// each kind the project shows.
     var fetchedSources: [ItemSource] {
-        repositories.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
+        repositorySlugs.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
     }
 
     /// The kinds this project shows, in the menu's order.

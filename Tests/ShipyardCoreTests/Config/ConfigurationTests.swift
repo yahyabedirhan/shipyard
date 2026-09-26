@@ -67,6 +67,8 @@ let everyKey = """
     group-by = "repository"
     subsections = true
     sort-by = "created"
+    archived = true
+    forks = false
 
     [defaults.pull-requests]
     show = false
@@ -98,7 +100,9 @@ let everyKey = """
 
     [[projects]]
     name = "blog"
-    repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"]
+    repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api", "my-org/*", "owned", "organizations", "collaborator"]
+    archived = false
+    forks = true
     pull-requests = { show = true, states = ["merged", "closed"], closed-window-days = 1, drafts = true, authors = { show = [], hide = ["me", "bots"] }, review-requested = false }
     issues = { show = false, states = ["closed"], closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
     workflow-runs = { show = false, states = ["succeeded"], finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
@@ -142,6 +146,8 @@ struct ConfigurationDecodingTests {
         ))
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
         #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated))
+        #expect(!config.defaults.archived)
+        #expect(config.defaults.forks)
         #expect(config.projects.isEmpty)
         #expect(!config.hasProjects)
     }
@@ -196,9 +202,16 @@ struct ConfigurationDecodingTests {
             NotificationRule(event: .prMerged, authors: [.me]),
             NotificationRule(event: .runFailed),
         ])
+        #expect(config.defaults.archived)
+        #expect(!config.defaults.forks)
         let project = try #require(config.projects.first)
         #expect(project.name == "blog")
-        #expect(project.repositories == ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api"])
+        #expect(project.repositories == [
+            .repository("yahyabedirhan/blog-frontend"), .repository("yahyabedirhan/blog.api"),
+            .owner("my-org"), .group(.owned), .group(.organizations), .group(.collaborator),
+        ])
+        #expect(project.archived == false)
+        #expect(project.forks == true)
         #expect(project.pullRequests == .init(
             show: true, states: [.merged, .closed], closedWindowDays: 1, drafts: true, authors: .init(show: [], hide: [.me, .bots]), reviewRequested: false
         ))
@@ -350,7 +363,7 @@ struct ConfigurationValidationTests {
         #expect(config.settings(for: config.projects[1]).arrangement == .init(groupBy: .none, subsections: false, sortBy: .updated))
     }
 
-    @Test("a repository that isn't owner/name is rejected")
+        @Test("a repository that isn't owner/name, owner/* or a group is rejected")
     func repositorySlugs() {
         let issues = rejection("""
             [[projects]]
@@ -364,10 +377,10 @@ struct ConfigurationValidationTests {
             ]
             """)
         #expect(issues == [
-            ConfigIssue(line: 5, message: "repository `just-a-name` isn't `owner/name`"),
-            ConfigIssue(line: 6, message: "repository `o/b/c` isn't `owner/name`"),
-            ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name`"),
-            ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name`"),
+            ConfigIssue(line: 5, message: "unknown repository group `just-a-name` (did you mean `just-a-name/*`, or a repository as `just-a-name/name`?)"),
+            ConfigIssue(line: 6, message: "repository `o/b/c` isn't `owner/name` or `owner/*`"),
+            ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name` or `owner/*`"),
+            ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name` or `owner/*`"),
         ])
         #expect(ConfigurationReader.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
     }
@@ -399,7 +412,7 @@ struct ConfigurationValidationTests {
         #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n")
             == [ConfigIssue(line: 1, message: "a project needs a `name`")])
         #expect(rejection("[[projects]]\nname = \"a\"\n")
-            == [ConfigIssue(line: 1, message: "project `a` needs `repositories`, a list of `owner/name` slugs")])
+            == [ConfigIssue(line: 1, message: "project `a` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = []\n")
             == [ConfigIssue(line: 3, message: "project `a` needs at least one repository")])
         #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")

@@ -12,15 +12,25 @@ public struct RepoSummary: Equatable, Sendable, Identifiable {
     public var isArchived: Bool
     /// The last push to any branch; `nil` for a repository nobody pushed to.
     public var pushedAt: Date?
+    /// Whether it's a fork of another repository.
+    public var isFork: Bool
 
     public var id: String { slug }
 
-    public init(slug: String, description: String? = nil, isPrivate: Bool = false, isArchived: Bool = false, pushedAt: Date? = nil) {
+    public init(
+        slug: String,
+        description: String? = nil,
+        isPrivate: Bool = false,
+        isArchived: Bool = false,
+        pushedAt: Date? = nil,
+        isFork: Bool = false
+    ) {
         self.slug = slug
         self.description = description
         self.isPrivate = isPrivate
         self.isArchived = isArchived
         self.pushedAt = pushedAt
+        self.isFork = isFork
     }
 }
 
@@ -247,5 +257,184 @@ extension GitHubClient {
             throw GitHubError.malformed
         }
         return repository.summary
+    }
+}
+
+// MARK: - Listing a group's or an owner's repositories
+
+/// The repository resolver's question to GitHub: every repository of a
+/// repository group, or of one owner, a page of 100 at a time. The query
+/// text and its parser live here, so they have one owner. Archived
+/// repositories and forks come back marked, and the resolver leaves them out
+/// per project, so one lookup serves projects that differ on `archived` or
+/// `forks`.
+enum RepositoryListQuery {
+    /// Repositories per page: GitHub's largest `first` on a connection.
+    static let pageSize = 100
+    /// Pages read at most for one lookup (10,000 repositories), so an answer
+    /// that never stops paging can't hold a refresh forever.
+    static let maxPages = 100
+
+    static func document(_ lookup: RepositoryLookup) -> String {
+        func connection(_ arguments: String) -> String {
+            "repositories(first: \(pageSize), after: $after, \(arguments)orderBy: {field: NAME, direction: ASC}) {"
+                + " pageInfo { hasNextPage endCursor } nodes { nameWithOwner isPrivate isArchived isFork pushedAt } }"
+        }
+        switch lookup {
+        case .group(let group):
+            // `affiliations` is the viewer's relation, `ownerAffiliations` the
+            // owner's; for the viewer's own list both name the same account,
+            // and the second defaults to [OWNER, COLLABORATOR], so both are set.
+            let affiliation = switch group {
+            case .owned: "OWNER"
+            case .organizations: "ORGANIZATION_MEMBER"
+            case .collaborator: "COLLABORATOR"
+            }
+            return """
+                query ShipyardGroupRepositories($after: String) {
+                  viewer { \(connection("affiliations: [\(affiliation)], ownerAffiliations: [\(affiliation)], ")) }
+                  rateLimit { limit remaining used resetAt cost }
+                }
+
+                """
+        case .owner:
+            // Only what the owner owns: the default also lists repositories
+            // the owner collaborates on elsewhere.
+            return """
+                query ShipyardOwnerRepositories($login: String!, $after: String) {
+                  repositoryOwner(login: $login) { \(connection("ownerAffiliations: [OWNER], ")) }
+                  rateLimit { limit remaining used resetAt cost }
+                }
+
+                """
+        }
+    }
+
+    /// The JSON body to POST to `/graphql` for the page after `cursor`.
+    static func body(_ lookup: RepositoryLookup, after cursor: String?) -> Data {
+        struct Request: Encodable {
+            var query: String
+            var variables: [String: String]
+        }
+        var variables: [String: String] = [:]
+        if case .owner(let login) = lookup { variables["login"] = login }
+        if let cursor { variables["after"] = cursor }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return (try? encoder.encode(Request(query: document(lookup), variables: variables))) ?? Data()
+    }
+
+    /// One page of the answer.
+    struct Page: Equatable, Sendable {
+        /// `nil` when the owner doesn't exist or the token can't see it.
+        var repositories: [RepoSummary]?
+        /// The cursor of the next page; `nil` on the last.
+        var nextCursor: String?
+        var rateLimited = false
+    }
+
+    /// Reads one page. An owner GitHub doesn't know (or hides) comes back
+    /// `null` with no error; errors with no data throw `.graphQL`; a body
+    /// that isn't GraphQL's shape throws `.malformed`.
+    static func parse(_ data: Data) throws -> Page {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let response: Response
+        do {
+            response = try decoder.decode(Response.self, from: data)
+        } catch {
+            throw GitHubError.malformed
+        }
+        let errors = response.errors ?? []
+        if errors.contains(where: { $0.type == "RATE_LIMITED" }) { return Page(rateLimited: true) }
+        guard let payload = response.data else {
+            throw GitHubError.graphQL(errors.first?.message ?? "GitHub answered with neither data nor errors")
+        }
+        guard let connection = payload.viewer?.repositories ?? payload.repositoryOwner?.repositories else {
+            if payload.viewer == nil, payload.repositoryOwner == nil, errors.isEmpty { return Page() }
+            throw GitHubError.graphQL(errors.first?.message ?? "GitHub answered without the repositories")
+        }
+        let repositories = (connection.nodes ?? []).compactMap { $0 }.map { node in
+            RepoSummary(
+                slug: node.nameWithOwner,
+                isPrivate: node.isPrivate,
+                isArchived: node.isArchived,
+                pushedAt: node.pushedAt,
+                isFork: node.isFork
+            )
+        }
+        return Page(repositories: repositories, nextCursor: connection.pageInfo.hasNextPage ? connection.pageInfo.endCursor : nil)
+    }
+
+    private struct Response: Decodable {
+        var data: Payload?
+        var errors: [GraphQLError]?
+    }
+
+    private struct GraphQLError: Decodable {
+        var type: String?
+        var message: String
+    }
+
+    private struct Payload: Decodable {
+        var viewer: Owner?
+        var repositoryOwner: Owner?
+    }
+
+    private struct Owner: Decodable {
+        var repositories: Connection?
+    }
+
+    private struct Connection: Decodable {
+        var pageInfo: PageInfo
+        var nodes: [Node?]?
+    }
+
+    private struct PageInfo: Decodable {
+        var hasNextPage: Bool
+        var endCursor: String?
+    }
+
+    private struct Node: Decodable {
+        var nameWithOwner: String
+        var isPrivate: Bool
+        var isArchived: Bool
+        var isFork: Bool
+        var pushedAt: Date?
+    }
+}
+
+extension GitHubClient {
+    /// Every repository `lookup` stands for, archived ones and forks
+    /// included and marked, by name, reading page after page of 100; `nil`
+    /// when the owner of an `owner/*` doesn't exist or the token can't see
+    /// it. Rate-limit errors as for `fetch`; a limit that ran out without a
+    /// reset time waits from `now`.
+    public func repositories(of lookup: RepositoryLookup, at now: Date) async throws -> [RepoSummary]? {
+        var repositories: [RepoSummary] = []
+        var cursor: String?
+        for _ in 0..<RepositoryListQuery.maxPages {
+            var request = URLRequest(url: Self.graphQLURL)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = RepositoryListQuery.body(lookup, after: cursor)
+            let (data, response) = try await send(request)
+
+            let headers = RateLimit(headers: response)
+            let resetAt = headers?.resetAt ?? now.addingTimeInterval(RateBudget.defaultRetryAfter)
+            let page: RepositoryListQuery.Page
+            do {
+                page = try RepositoryListQuery.parse(data)
+            } catch GitHubError.graphQL(let message) {
+                if headers?.remaining == 0 { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
+                throw GitHubError.graphQL(message)
+            }
+            if page.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
+            guard let found = page.repositories else { return nil }
+            repositories += found
+            guard let next = page.nextCursor else { break }
+            cursor = next
+        }
+        return repositories
     }
 }

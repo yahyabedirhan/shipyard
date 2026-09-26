@@ -80,7 +80,7 @@ public struct MenuModel: Equatable, Sendable {
                     groups: [],
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
-                    repositories: project.repositories
+                    repositories: project.repositories.compactMap(\.slug)
                 )
             }
             var model = MenuModel(sections: sections, layout: configuration.menu.layout)
@@ -90,6 +90,8 @@ public struct MenuModel: Equatable, Sendable {
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
             let items = listings[project.name] ?? []
+            // What the refresh watched for it: its groups and wildcards resolved.
+            let repositories = snapshot.repositories[project.name] ?? settings.repositorySlugs
             return MenuSection(
                 name: project.name,
                 groups: Arrangement.groups(
@@ -99,18 +101,20 @@ public struct MenuModel: Equatable, Sendable {
                     layout: configuration.menu.layout,
                     now: now
                 ),
-                // One row per repository, for a kind this project shows: a
-                // runs failure isn't an error where runs are off.
-                errors: project.repositories.compactMap { repository in
-                    settings.fetchedKinds.lazy
-                        .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
-                        .first
-                        .map(MenuErrorRow.init)
-                } + reviewSearchErrors(snapshot, settings: settings),
-                showsRepository: project.repositories.count > 1,
+                // One row per selector that couldn't be resolved, then one
+                // per repository, for a kind this project shows: a runs
+                // failure isn't an error where runs are off.
+                errors: (snapshot.selectorErrors[project.name] ?? []).map(MenuErrorRow.init)
+                    + repositories.compactMap { repository in
+                        settings.fetchedKinds.lazy
+                            .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
+                            .first
+                            .map(MenuErrorRow.init)
+                    } + reviewSearchErrors(snapshot, settings: settings),
+                showsRepository: repositories.count > 1,
                 // A project added since the snapshot was fetched has no listing yet.
                 isLoaded: listings[project.name] != nil,
-                repositories: project.repositories
+                repositories: repositories
             )
         }
         var model = MenuModel(sections: sections, layout: configuration.menu.layout, lastUpdated: snapshot.fetchedAt)
@@ -158,7 +162,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// (or running) items first (most recently updated first), then closed
     /// (or finished) ones (most recently closed first).
     public var groups: [RowGroup]
-    /// One per repository of this project that couldn't be fetched.
+    /// One per selector of this project that couldn't be resolved (such as
+    /// an `owner/*` whose owner can't be seen), then one per repository that
+    /// couldn't be fetched.
     public var errors: [MenuErrorRow]
     /// Whether a row's second line names its repository: only when the
     /// project has more than one.
@@ -171,7 +177,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether its rows were fetched: `false` before the first refresh
     /// succeeded, when the section is listed without rows.
     public var isLoaded: Bool
-    /// The project's repositories (`owner/name`), in configuration order.
+    /// The project's repositories (`owner/name`): the ones it names and,
+    /// once fetched, the ones its groups and wildcards resolved to.
     public var repositories: [String]
 
     public var id: String { name }

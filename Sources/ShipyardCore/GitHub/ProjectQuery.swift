@@ -54,7 +54,7 @@ enum ProjectQuery {
         var requests: [RepositoryRequest] = []
         var index: [String: Int] = [:]
         for project in projects {
-            for slug in project.repositories {
+            for slug in project.repositorySlugs {
                 let key = slug.lowercased()
                 let at = index[key] ?? requests.count
                 if at == requests.count {

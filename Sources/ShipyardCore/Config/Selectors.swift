@@ -135,3 +135,125 @@ public struct AuthorFilterOverrides: Equatable, Sendable {
         AuthorFilter(show: show ?? base.show, hide: hide ?? base.hide)
     }
 }
+
+// MARK: - Repositories
+
+/// A repository group: every repository the signed-in account reaches one
+/// way, named after GitHub's own affiliations. The three don't overlap, and
+/// together they are every repository the account can reach.
+public enum RepositoryGroup: String, CaseIterable, Hashable, Sendable {
+    /// Repositories the account itself owns.
+    case owned
+    /// Repositories the account reaches through membership of an
+    /// organization, directly or through one of its teams.
+    case organizations
+    /// Someone else's repositories that added the account as a collaborator.
+    case collaborator
+}
+
+/// One entry of a project's `repositories` (ADR 0002): a single repository
+/// (`owner/name`), everything under one owner (`owner/*`), or a repository
+/// group (a bare word). The key it sits under says it's a repository, so a
+/// group needs no symbol of its own; a `/` marks a repository.
+public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
+    /// `owner/name`, as the file spells it. Always listed, archived or not.
+    case repository(String)
+    /// `owner/*`: every repository the user or organization `owner` owns.
+    case owner(String)
+    /// `owned`, `organizations` or `collaborator`.
+    case group(RepositoryGroup)
+
+    /// The selector as it's written in the file.
+    public var description: String {
+        switch self {
+        case .repository(let slug): slug
+        case .owner(let login): "\(login)/*"
+        case .group(let group): group.rawValue
+        }
+    }
+
+    /// The single repository it names, for `owner/name`; `nil` for a
+    /// selector that's looked up.
+    public var slug: String? {
+        if case .repository(let slug) = self { return slug }
+        return nil
+    }
+
+    /// The lookup that finds its repositories on GitHub; `nil` for a single
+    /// repository, which needs none.
+    public var lookup: RepositoryLookup? {
+        switch self {
+        case .repository: nil
+        case .owner(let login): .owner(login.lowercased())
+        case .group(let group): .group(group)
+        }
+    }
+
+    /// Reads one entry of `repositories`, or says why it isn't one with a
+    /// hint towards what was likely meant.
+    public static func parse(_ text: String) throws(RepositorySelectorRejection) -> RepositorySelector {
+        if let group = RepositoryGroup(rawValue: text) { return .group(group) }
+        if text.hasPrefix("@") {
+            let login = String(text.dropFirst())
+            let hint = isLogin(login) ? "; for their repositories write `\(login)/*`" : ""
+            throw RepositorySelectorRejection("`\(text)` is a login; `repositories` takes \(accepted)\(hint)")
+        }
+        if AuthorSelector.groups.contains(where: { $0.description == text }) {
+            throw RepositorySelectorRejection("`\(text)` is an author group; `repositories` takes \(accepted)")
+        }
+        if text.contains("/") {
+            if text.hasSuffix("/*") {
+                let owner = String(text.dropLast(2))
+                if isLogin(owner) { return .owner(owner) }
+            } else if ConfigurationReader.isRepositorySlug(text) {
+                return .repository(text)
+            }
+            throw RepositorySelectorRejection("repository `\(text)` isn't `owner/name` or `owner/*`")
+        }
+        let groups = RepositoryGroup.allCases.map(\.rawValue)
+        if let near = Suggestion.nearest(to: text, in: groups) {
+            throw RepositorySelectorRejection("unknown repository group `\(text)` (did you mean `\(near)`?)")
+        }
+        if isLogin(text) {
+            throw RepositorySelectorRejection("unknown repository group `\(text)` (did you mean `\(text)/*`, or a repository as `\(text)/name`?)")
+        }
+        throw RepositorySelectorRejection("repository `\(text)` isn't \(accepted)")
+    }
+
+    /// What `repositories` takes, for the messages.
+    static var accepted: String {
+        let groups = RepositoryGroup.allCases.map { "`\($0.rawValue)`" }
+        return "`owner/name`, `owner/*`, " + groups.dropLast().joined(separator: ", ") + " or " + groups.last!
+    }
+
+    /// An owner's login: a person's or an organization's, never a bot's.
+    static func isLogin(_ text: String) -> Bool {
+        AuthorSelector.isLogin(text) && !text.hasSuffix("[bot]")
+    }
+}
+
+extension RepositorySelector: ExpressibleByStringLiteral {
+    /// A selector written in code, such as a preset's `"owned"`; it must parse.
+    public init(stringLiteral text: String) {
+        do {
+            self = try Self.parse(text)
+        } catch {
+            preconditionFailure("`\(text)` isn't a repository selector: \(error.message)")
+        }
+    }
+}
+
+/// Why an entry of `repositories` isn't a repository selector; `message`
+/// is what the banner says after the line.
+public struct RepositorySelectorRejection: Error, Equatable, Sendable {
+    public var message: String
+    public init(_ message: String) { self.message = message }
+}
+
+/// What the repository resolver asks GitHub to list: a repository group of
+/// the signed-in account, or everything one owner owns (login lowercased,
+/// since logins aren't case-sensitive).
+public enum RepositoryLookup: Hashable, Sendable {
+    case group(RepositoryGroup)
+    case owner(String)
+}

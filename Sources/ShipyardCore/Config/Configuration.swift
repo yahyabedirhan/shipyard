@@ -39,7 +39,9 @@ public struct Configuration: Equatable, Sendable {
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
             notifications: project.notifications ?? defaults.notifications,
-            arrangement: project.arrangement.applied(to: defaults.arrangement)
+            arrangement: project.arrangement.applied(to: defaults.arrangement),
+            archived: project.archived ?? defaults.archived,
+            forks: project.forks ?? defaults.forks
         )
     }
 }
@@ -93,6 +95,10 @@ extension Configuration {
         public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
         /// `group-by`, `subsections` and `sort-by`, written straight under `[defaults]`.
         public var arrangement = ArrangementSettings()
+        /// Whether repository groups and `owner/*` bring in archived repositories.
+        public var archived = false
+        /// Whether repository groups and `owner/*` bring in forks.
+        public var forks = true
         public init() {}
     }
 
@@ -100,8 +106,8 @@ extension Configuration {
     /// it overrides.
     public struct Project: Equatable, Sendable {
         public var name: String
-        /// `owner/name` slugs.
-        public var repositories: [String]
+        /// Repository selectors: `owner/name`, `owner/*` and repository groups.
+        public var repositories: [RepositorySelector]
         public var pullRequests = PullRequestOverrides()
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
@@ -109,15 +115,20 @@ extension Configuration {
         public var notifications: [NotificationRule]?
         /// The project's own `group-by`, `subsections` and `sort-by`.
         public var arrangement = ArrangementOverrides()
+        /// `archived` and `forks`, when the project sets them.
+        public var archived: Bool?
+        public var forks: Bool?
 
         public init(
             name: String,
-            repositories: [String],
+            repositories: [RepositorySelector],
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
             notifications: [NotificationRule]? = nil,
-            arrangement: ArrangementOverrides = .init()
+            arrangement: ArrangementOverrides = .init(),
+            archived: Bool? = nil,
+            forks: Bool? = nil
         ) {
             self.name = name
             self.repositories = repositories
@@ -126,6 +137,8 @@ extension Configuration {
             self.workflowRuns = workflowRuns
             self.notifications = notifications
             self.arrangement = arrangement
+            self.archived = archived
+            self.forks = forks
         }
     }
 }
@@ -430,21 +443,29 @@ public struct ArrangementOverrides: Equatable, Sendable {
 /// menu model and the notification rules read.
 public struct ProjectSettings: Equatable, Sendable {
     public var name: String
-    public var repositories: [String]
+    /// As configured; `resolved(by:)` turns the groups and wildcards into
+    /// the repositories they stand for.
+    public var repositories: [RepositorySelector]
     public var pullRequests: PullRequestSettings
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
     public var notifications: [NotificationRule]
     public var arrangement: ArrangementSettings
+    /// Whether groups and `owner/*` bring in archived repositories.
+    public var archived: Bool
+    /// Whether groups and `owner/*` bring in forks.
+    public var forks: Bool
 
     public init(
         name: String,
-        repositories: [String],
+        repositories: [RepositorySelector],
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
         notifications: [NotificationRule],
-        arrangement: ArrangementSettings = ArrangementSettings()
+        arrangement: ArrangementSettings = ArrangementSettings(),
+        archived: Bool = false,
+        forks: Bool = true
     ) {
         self.name = name
         self.repositories = repositories
@@ -453,6 +474,21 @@ public struct ProjectSettings: Equatable, Sendable {
         self.workflowRuns = workflowRuns
         self.notifications = notifications
         self.arrangement = arrangement
+        self.archived = archived
+        self.forks = forks
+    }
+
+    /// The single repositories among its selectors (`owner/name`), in order:
+    /// all of them once the settings are `resolved(by:)`.
+    public var repositorySlugs: [String] { repositories.compactMap(\.slug) }
+
+    /// These settings watching exactly the repositories `resolved` found for
+    /// them, each as `owner/name`. Without a resolution (none yet), only the
+    /// single repositories the project names.
+    public func resolved(by resolved: ResolvedRepositories?) -> ProjectSettings {
+        var settings = self
+        settings.repositories = (resolved?.repositories ?? repositorySlugs).map(RepositorySelector.repository)
+        return settings
     }
 
     /// Whether the project lists items of `kind` (its `show` for that kind).
@@ -604,7 +640,9 @@ extension Configuration {
         # max-share-percent = 10
 
         # Projects: one [[projects]] block each, below. The project picker
-        # appends them here.
+        # appends them here. A project's repositories can be owner/name,
+        # owner/* (everything an owner has) or a group: owned, organizations
+        # or collaborator.
 
         """
 

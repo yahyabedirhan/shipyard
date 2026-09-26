@@ -248,6 +248,13 @@ public struct Snapshot: Equatable, Sendable {
     /// Why the review search failed, when it did; `reviewRequested` is then
     /// the last set it found.
     public var reviewSearchError: RepositoryError?
+    /// Per project name, the repositories fetched for it (`owner/name`, each
+    /// once): the ones it names and the ones its groups and wildcards resolved to.
+    public var repositories: [String: [String]]
+    /// Per project name, its selectors that couldn't be resolved (an owner
+    /// that doesn't exist or can't be seen, or a failed lookup with no
+    /// earlier list), each an error row named after the selector.
+    public var selectorErrors: [String: [RepositoryError]]
 
     public init(
         fetchedAt: Date,
@@ -257,7 +264,9 @@ public struct Snapshot: Equatable, Sendable {
         viewerLogin: String? = nil,
         reviewRequested: Set<String> = [],
         searchPullRequests: [Item] = [],
-        reviewSearchError: RepositoryError? = nil
+        reviewSearchError: RepositoryError? = nil,
+        repositories: [String: [String]] = [:],
+        selectorErrors: [String: [RepositoryError]] = [:]
     ) {
         self.fetchedAt = fetchedAt
         self.items = items
@@ -267,5 +276,7 @@ public struct Snapshot: Equatable, Sendable {
         self.reviewRequested = reviewRequested
         self.searchPullRequests = searchPullRequests
         self.reviewSearchError = reviewSearchError
+        self.repositories = repositories
+        self.selectorErrors = selectorErrors
     }
 }

@@ -52,7 +52,7 @@ private func issue(_ number: Int = 1, state: ItemState = .open, activity: Int = 
 
 private func settings(
     _ name: String = "shop",
-    repositories: [String] = ["o/r"],
+    repositories: [RepositorySelector] = ["o/r"],
     pullRequests: Bool = true,
     issues: Bool = false,
     rules: [NotificationRule] = [NotificationRule(event: .prOpened)]

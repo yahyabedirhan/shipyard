@@ -135,7 +135,9 @@ final class ConfigurationReader {
         }
 
         if let defaults = table(node, "defaults") {
-            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications"] + Self.arrangementKeys)
+            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks"] + Self.arrangementKeys)
+            if let value = bool(defaults, "archived") { config.defaults.archived = value }
+            if let value = bool(defaults, "forks") { config.defaults.forks = value }
             config.defaults.pullRequests = pullRequests(defaults).applied(to: config.defaults.pullRequests)
             config.defaults.issues = issues(defaults).applied(to: config.defaults.issues)
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
@@ -152,7 +154,9 @@ final class ConfigurationReader {
     }
 
     private func project(_ node: Node) -> Configuration.Project? {
-        warnUnknownKeys(in: node, known: ["name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications"] + Self.arrangementKeys)
+        warnUnknownKeys(in: node, known: [
+            "name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks",
+        ] + Self.arrangementKeys)
         let name = string(node, "name")
         let repositories = strings(node, "repositories")
         if name == nil && !node.table.contains(key: "name") {
@@ -161,35 +165,40 @@ final class ConfigurationReader {
             error("a project's `name` can't be empty", at: node.path + [.key("name")])
         }
         if repositories == nil && !node.table.contains(key: "repositories") {
-            error("project `\(name ?? "")` needs `repositories`, a list of `owner/name` slugs", at: node.path)
+            error("project `\(name ?? "")` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)", at: node.path)
         } else if let repositories, repositories.isEmpty {
             error("project `\(name ?? "")` needs at least one repository", at: node.path + [.key("repositories")])
         }
         var listed = Set<String>()
         var spelled: [String: Int] = [:]
+        var selectors: [RepositorySelector] = []
         for repository in repositories ?? [] {
             // Which appearance of this exact spelling it is, to find its line.
             let occurrence = spelled[repository, default: 0]
             spelled[repository] = occurrence + 1
-            if !Self.isRepositorySlug(repository) {
-                error("repository `\(repository)` isn't `owner/name`", at: node.path + [.key("repositories")], value: repository)
-            } else if !listed.insert(repository.lowercased()).inserted {
+            let line = map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence)
+            do {
+                let selector = try RepositorySelector.parse(repository)
+                selectors.append(selector)
                 // GitHub's names aren't case-sensitive: `o/r` and `O/R` are one repository.
-                errors.append(ConfigIssue(
-                    line: map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence),
-                    message: Self.duplicateRepositoryMessage(repository, project: name ?? "")
-                ))
+                if !listed.insert(repository.lowercased()).inserted {
+                    errors.append(ConfigIssue(line: line, message: Self.duplicateRepositoryMessage(repository, project: name ?? "")))
+                }
+            } catch {
+                errors.append(ConfigIssue(line: line, message: error.message))
             }
         }
-        guard let name, let repositories else { return nil }
+        guard let name, repositories != nil else { return nil }
         return Configuration.Project(
             name: name,
-            repositories: repositories,
+            repositories: selectors,
             pullRequests: pullRequests(node),
             issues: issues(node),
             workflowRuns: workflowRuns(node),
             notifications: notifications(node),
-            arrangement: arrangement(node)
+            arrangement: arrangement(node),
+            archived: bool(node, "archived"),
+            forks: bool(node, "forks")
         )
     }
 

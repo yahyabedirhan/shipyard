@@ -101,6 +101,13 @@ public final class Shipyard {
     /// Bumped whenever a token is taken up or dropped, so an answer to a
     /// request made with an earlier token can't sign in or out.
     @ObservationIgnored private var session = 0
+    /// What the projects' repository groups and `owner/*` stand for,
+    /// looked up at most hourly.
+    @ObservationIgnored private let resolver = RepositoryResolver()
+    /// Whether the next refresh looks every group and `owner/*` up again,
+    /// whatever their age: at launch, after a configuration change, on ⌘R
+    /// and after signing in again.
+    @ObservationIgnored private var forceResolve = true
 
     public init(
         configStore: ConfigStore,
@@ -291,6 +298,9 @@ public final class Shipyard {
         fetchError = nil
         menu = .empty
         budget = RateBudget()
+        // Another account reaches other repositories.
+        resolver.reset()
+        forceResolve = true
         timer.disarm()
         apply(.signedOut)
     }
@@ -315,6 +325,8 @@ public final class Shipyard {
     private func follow(_ result: ConfigStore.ReloadResult) async {
         publishConfigStatus()
         if case .changed(let configuration) = result {
+            // New selectors, or `archived` and `forks` changed: look them up now.
+            forceResolve = true
             followLaunchAtLogin()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // Projects, filters, `[attention]` and `[menu-bar]` apply at
@@ -459,6 +471,7 @@ public final class Shipyard {
     /// A file that exists is never touched.
     public func refreshNow() async {
         createConfigurationIfMissing()
+        forceResolve = true
         await refresh()
     }
 
@@ -472,11 +485,20 @@ public final class Shipyard {
 
     private func performRefresh() async {
         let configuration = configStore.lastValid
-        let projects = configuration.projects.map(configuration.settings(for:))
+        let configured = configuration.projects.map(configuration.settings(for:))
         let current = session
         let now = clock.now
         do {
-            let snapshot = try await request { try await $0.fetch(projects: projects, at: now) }
+            // Groups and wildcards first: looked up at most hourly, or at once
+            // after a configuration change, ⌘R or signing in.
+            let force = forceResolve
+            forceResolve = false
+            let resolved = try await resolver.resolve(configured, force: force, at: now) { lookup in
+                try await self.request { try await $0.repositories(of: lookup, at: now) }
+            }
+            guard current == session else { return }
+            let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
+            let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
             self.snapshot = snapshot
             fetchError = nil

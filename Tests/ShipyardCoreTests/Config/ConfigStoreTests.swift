@@ -381,7 +381,7 @@ struct ConfigStoreLayoutTests {
         let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"nope\"]\n"
         try write(broken, to: url)
         let store = ConfigStore(url: url)
-        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "repository `nope` isn't `owner/name`")])) {
+        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {
             try store.setLayout(.tabs)
         }
         #expect(try contents(of: url) == broken)

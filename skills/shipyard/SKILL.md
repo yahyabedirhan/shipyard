@@ -91,14 +91,22 @@ How every project's items are grouped and sorted in the menu, set straight under
 
 The All tab of the tabs layout always groups by kind, newest first.
 
+What repository groups and `owner/*` bring in (see Which repositories), set in `[defaults]` and in a project's block:
+
+| Key | Default | Allowed |
+|---|---|---|
+| `[defaults] archived` | `false` | boolean; `true` brings in archived repositories too |
+| `[defaults] forks` | `true` | boolean; `false` leaves forks out |
+
 A project, one `[[projects]]` block each, shown as sections in file order:
 
 | Key | Required | Allowed |
 |---|---|---|
 | `name` | yes | non-empty, unique across projects; the section's title |
-| `repositories` | yes | at least one `owner/name` slug: the owner is letters, digits and `-`; the name adds `_` and `.`; no URLs |
+| `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations` or `collaborator` (see Which repositories); no URLs |
 | `pull-requests`, `issues`, `workflow-runs` | no | inline tables with the keys above |
 | `group-by`, `subsections`, `sort-by` | no | as under `[defaults]` above |
+| `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
 
 ## Overrides
@@ -106,6 +114,25 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 - A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window-days`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
 - `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
+
+## Which repositories: repository selectors
+
+A project's `repositories` lists **repository selectors**, in any mix. The syntax is the author selectors' (below): a bare word is a group, and `/` marks a repository.
+
+| Selector | Watches |
+|---|---|
+| `owner/name` | one repository: the owner is letters, digits and `-`; the name adds `_` and `.` |
+| `owner/*` | every repository a user or organization owns, e.g. `my-org/*` |
+| `owned` | every repository the signed-in account owns |
+| `organizations` | every repository the account reaches through an organization it's a member of, directly or through a team |
+| `collaborator` | someone else's repositories that added the account as a collaborator |
+
+- `owned`, `organizations` and `collaborator` are GitHub's own affiliations: they don't overlap, and together they are every repository the account can reach. There's no `me/*`: write `owned`.
+- Groups and wildcards are looked up when the app starts, after each edit, on ⌘R and otherwise about once an hour, so a repository created later shows up without editing the file. Its existing items are listed quietly; only what happens after notifies.
+- They leave out archived repositories and keep forks, unless `archived = true` or `forks = false` says otherwise. A repository named as `owner/name` is always listed, archived or not.
+- A repository that two selectors bring in is listed once.
+- An `owner/*` whose owner doesn't exist, or that the account can't see, shows an error row in the project; a group with no repositories shows "Nothing open".
+- An author group (`me`, `others`, `bots`) or an `@login` in `repositories` is rejected with a hint: to watch someone's repositories, write `owner/*`.
 
 ## Which items: states
 
@@ -164,7 +191,7 @@ Exit status 0 is a pass; anything else is a fail, and the lines above it say why
 The schema can't check three rules; check them by reading the file:
 
 - Every project `name` is used once.
-- A project lists each repository once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
+- A project lists each repository, wildcard and group once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
 - Top-level keys sit above the first `[table]` header.
 
 **The app.** Shipyard rereads the file within a moment of each save and writes its verdict to `~/Library/Application Support/Shipyard/config-status.json`. After saving, wait a second, then read the record and the modification time of the file you edited (under `$XDG_CONFIG_HOME` when it is set):
@@ -214,6 +241,22 @@ repositories = ["yahyabedirhan/shipyard"]
 [[projects]]
 name = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
+```
+
+**"Watch all my repositories."** One project with the `owned` group; add `organizations` when the user means their organizations' repositories too:
+
+```toml
+[[projects]]
+name = "mine"
+repositories = ["owned"]
+```
+
+**"Watch everything in my-org, and my own shipyard."** A wildcard beside a single repository; `archived = true` would bring in the organization's archived repositories as well:
+
+```toml
+[[projects]]
+name = "my-org"
+repositories = ["my-org/*", "yahyabedirhan/shipyard"]
 ```
 
 **"Notify me when others open PRs here."** Give that project its own list (it replaces the defaults; see Overrides):
