@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The app's own drawings of `Sailboat.path`: the menu bar item and the
-/// connect screen's badge. The app icon draws the same path (make-icon.swift
+/// The menu bar item, drawn from `Sailboat.path`. The app icon and the
+/// welcome screens' badge (`LogoBadge`) draw the same path (make-icon.swift
 /// compiles Sailboat.swift), so all three show one figure.
 enum SailboatImage {
     /// The menu bar item's side, in points.
@@ -26,13 +26,5 @@ enum SailboatImage {
         image.isTemplate = true
         image.accessibilityDescription = "shipyard"
         return image
-    }
-}
-
-/// The sailboat as a SwiftUI shape, fitted to the frame it's given: the
-/// connect screen's badge fills it.
-struct SailboatShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        Path(Sailboat.path(in: rect, yDown: true))
     }
 }

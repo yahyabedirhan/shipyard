@@ -7,7 +7,7 @@
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
-#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=origami)
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=olive-khaki)
 #   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
 #   make icon-exploration redraw the minimal sailboat options and their comparison sheet
 #   make clean
@@ -23,14 +23,15 @@ ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
 ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
-# The variant make-icon.swift draws for the app: origami, sailboat, night or sunset.
-ICON        ?= origami
-ALTERNATES  := sailboat night sunset
-# make-icon.swift is compiled with the app's sailboat path, so the icon, the
-# menu bar item and the badge draw one figure. swiftc runs top-level code only
+# The variant make-icon.swift draws for the app: olive-khaki (shipyard's logo),
+# origami, sailboat, night or sunset.
+ICON        ?= olive-khaki
+ALTERNATES  := origami sailboat night sunset
+# make-icon.swift is compiled with the app's sailboat path and logo, so the
+# icon, the menu bar item and the badge draw one figure in the same colours. swiftc runs top-level code only
 # from a main.swift, so the script is copied in under that name.
 ICON_TOOL   := $(BUILD_DIR)/make-icon/make-icon
-SAILBOAT    := Sources/ShipyardApp/Brand/Sailboat.swift
+BRAND       := Sources/ShipyardApp/Brand/Sailboat.swift Sources/ShipyardApp/Brand/Logo.swift
 
 # With the Command Line Tools alone (no Xcode), swift test can't find the
 # Testing framework the tests use: point the compiler and the test runner at
@@ -96,10 +97,10 @@ release: test bundle
 
 # The icon is committed, so bundling doesn't redraw it; run this after
 # changing make-icon.swift, or with ICON=<variant> to switch the app's icon.
-$(ICON_TOOL): Packaging/Icon/make-icon.swift $(SAILBOAT)
+$(ICON_TOOL): Packaging/Icon/make-icon.swift $(BRAND)
 	@mkdir -p $(dir $@)
 	cp Packaging/Icon/make-icon.swift $(dir $@)main.swift
-	swiftc -o $@ $(dir $@)main.swift $(SAILBOAT)
+	swiftc -o $@ $(dir $@)main.swift $(BRAND)
 
 icon: $(ICON_TOOL)
 	$(ICON_TOOL) $(ICONSET) --variant $(ICON)

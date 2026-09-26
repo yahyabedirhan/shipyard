@@ -261,15 +261,7 @@ struct ConnectView: View {
 
     private func heading(_ title: String) -> some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(LinearGradient(colors: [Palette.accent, Palette.accent.opacity(0.75)], startPoint: .top, endPoint: .bottom))
-                .frame(width: 32, height: 32)
-                .overlay(
-                    SailboatShape()
-                        .fill(.white)
-                        .frame(width: 18, height: 18)
-                )
-                .accessibilityHidden(true)
+            LogoBadge(side: 32)
             Text(title).font(TypeScale.display)
         }
         .padding(.bottom, 12)

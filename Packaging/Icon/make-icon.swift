@@ -1,17 +1,20 @@
-// Draws Shipyard's app icon in one of four variants (see README.md here):
+// Draws Shipyard's app icon in one of five variants (see README.md here):
 //
-//   origami    the menu bar's sailboat folded from paper, on amber (the app's icon)
-//   sailboat   the menu bar's sailboat on a sea-blue squircle
-//   night      the sailboat under a crescent moon and stars
-//   sunset     the sailboat in silhouette against a low sun
+//   olive-khaki  shipyard's logo: the sailboat in cream on olive khaki (the app's icon)
+//   origami      the menu bar's sailboat folded from paper, on amber
+//   sailboat     the menu bar's sailboat on a sea-blue squircle
+//   night        the sailboat under a crescent moon and stars
+//   sunset       the sailboat in silhouette against a low sun
 //
-//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (origami by default)
+//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (olive-khaki by default)
 //   make-icon --sheet <out.png>                  a contact sheet of every variant, for review
 //   make-icon --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
 //
-// It's compiled together with the app's Sources/ShipyardApp/Brand/Sailboat.swift,
-// the sailboat the menu bar item and the badge draw, into build/make-icon/make-icon
-// (the Makefile's icon targets do it), so the minimal options draw that same path.
+// It's compiled together with the app's Sources/ShipyardApp/Brand/Sailboat.swift
+// (the sailboat) and Brand/Logo.swift (the logo's squircle, colours and figure
+// size), which the menu bar item and the welcome screens' badge draw too, into
+// build/make-icon/make-icon (the Makefile's icon targets do it), so the icon
+// and the app can't drift apart.
 //
 // Command Line Tools only (AppKit and CoreGraphics). `make icon` runs it and
 // packs the iconset with `iconutil -c icns` into Packaging/Icon/AppIcon.icns;
@@ -45,24 +48,6 @@ func grad(_ colors: [CGColor], _ locations: [CGFloat]? = nil) -> CGGradient {
 // MARK: - Shapes (1024 grid, y up)
 
 typealias P = (CGFloat, CGFloat)
-
-/// The macOS 11+ body: an 824-point squircle (superellipse) centred on the grid.
-func squircle(in rect: CGRect) -> CGPath {
-    let path = CGMutablePath()
-    let n: CGFloat = 5
-    let a = rect.width / 2, b = rect.height / 2
-    let steps = 720
-    for i in 0...steps {
-        let t = CGFloat(i) / CGFloat(steps) * 2 * .pi
-        let c = cos(t), s = sin(t)
-        let x = a * copysign(pow(abs(c), 2 / n), c)
-        let y = b * copysign(pow(abs(s), 2 / n), s)
-        let p = CGPoint(x: rect.midX + x, y: rect.midY + y)
-        i == 0 ? path.move(to: p) : path.addLine(to: p)
-    }
-    path.closeSubpath()
-    return path
-}
 
 func poly(_ pts: [P]) -> CGPath {
     let p = CGMutablePath()
@@ -206,7 +191,7 @@ func frame(_ ctx: CGContext, pixels: Int, base: CGColor = rgb(0x203050), backgro
            sheen: CGFloat = 0.16, rim: CGFloat = 0.22, _ content: (CGContext, Bool, CGRect) -> Void) {
     let small = pixels < 64
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
-    let shape = squircle(in: body)
+    let shape = Logo.squircle(in: body)
     ctx.saveGState()
     shadow(ctx, dy: -10, blur: 22, color: rgb(0x000000, 0.35))
     fillSolid(ctx, shape, base)
@@ -536,7 +521,7 @@ enum Minimal: String, CaseIterable {
         case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
         case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
         case .solidKhaki, .whiteKhaki: return (0xAE9B6C, 0x8E7B4E)
-        case .solidOliveKhaki, .whiteOliveKhaki: return (0x8C8660, 0x6A6541)
+        case .solidOliveKhaki, .whiteOliveKhaki: return (Logo.top, Logo.bottom)   // the logo
         case .solidDeepKhaki, .whiteDeepKhaki: return (0x7D6A4C, 0x574630)
         }
     }
@@ -546,16 +531,16 @@ enum Minimal: String, CaseIterable {
         let background = onWhite ? grad([rgb(0xFFFFFF), rgb(0xECEFF3)]) : grad([rgb(top), rgb(bottom)])
         let base = onWhite ? rgb(0xC9CFD8) : rgb(bottom)
         frame(ctx, pixels: pixels, base: base, background: background,
-              sheen: onWhite ? 0 : 0.14, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
+              sheen: onWhite ? 0 : Logo.sheen, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
             // The same path at every size; small sizes only draw it bigger.
             let b = Sailboat.bounds
-            scaled(ctx, small ? 1.1 : 0.92, about: CGPoint(x: 512, y: 512)) {
+            scaled(ctx, small ? Logo.smallFigureScale : Logo.figureScale, about: CGPoint(x: 512, y: 512)) {
                 ctx.translateBy(x: 512 - b.midX, y: 512 - b.midY)
                 ctx.saveGState()
                 shadow(ctx, dy: -6, blur: 16, color: rgb(onWhite ? bottom : 0x000000, onWhite ? 0.22 : 0.2))
                 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
                 // White on the first colours; cream, warmer, on khaki.
-                fillSolid(ctx, Sailboat.path, rgb(isKhaki ? 0xFBF6EA : 0xFFFFFF))
+                fillSolid(ctx, Sailboat.path, rgb(isKhaki ? Logo.figure : 0xFFFFFF))
                 if onWhite {
                     // Colour the figure with the hue's gradient.
                     ctx.setBlendMode(.sourceIn)
@@ -572,10 +557,11 @@ enum Minimal: String, CaseIterable {
 // MARK: - Variants
 
 enum Variant: String, CaseIterable {
-    case origami, sailboat, night, sunset
+    case oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
 
     func draw(_ ctx: CGContext, pixels: Int) {
         switch self {
+        case .oliveKhaki: Minimal.solidOliveKhaki.draw(ctx, pixels: pixels)
         case .origami: drawOrigami(ctx, pixels: pixels)
         case .sailboat: drawSailboat(ctx, pixels: pixels)
         case .night: drawNight(ctx, pixels: pixels)
@@ -611,7 +597,7 @@ func writePNG(_ rep: NSBitmapImageRep, to url: URL) throws {
 
 // MARK: - Contact sheet
 
-/// One row per variant (origami first), each at 16, 32, 128 and 512 pixels on
+/// One row per variant (the app's first), each at 16, 32, 128 and 512 pixels on
 /// a light panel and on a dark panel.
 func sheet(to url: URL) throws {
     let sizes = [16, 32, 128, 512]
@@ -827,7 +813,7 @@ func fail(_ message: String) -> Never {
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
-var variant = Variant.origami
+var variant = Variant.oliveKhaki
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }
     guard let chosen = Variant(rawValue: arguments[flag + 1]) else { fail("unknown variant \(arguments[flag + 1])") }
