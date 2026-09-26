@@ -30,7 +30,7 @@ struct ConnectView: View {
     /// The install hint's popover is open.
     @State private var showsInstallHint = false
     /// The code is on the clipboard: the copy icon shows a checkmark.
-    @State private var codeCopied = false
+    @State private var codeCopiedAt: Date?
 
     var body: some View {
         Group {
@@ -232,7 +232,7 @@ struct ConnectView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(text.code)
-        .accessibilityHint(codeCopied ? text.copied : text.copyCode)
+        .accessibilityHint(codeCopiedAt != nil ? text.copied : text.copyCode)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .overlay(alignment: .trailing) {
@@ -242,12 +242,12 @@ struct ConnectView: View {
                 copiedLabel: text.copied,
                 title: text.copyTitle,
                 copiedTitle: text.copied,
-                copied: $codeCopied
+                copiedAt: $codeCopiedAt
             )
             .padding(.trailing, 6)
         }
         .card()
-        .onChange(of: text.code) { codeCopied = false }
+        .onChange(of: text.code) { codeCopiedAt = nil }
     }
 
     private func heading(_ title: String) -> some View {
@@ -289,7 +289,7 @@ struct ConnectView: View {
 
     private func copy(_ code: String) {
         Clipboard.copy(code)
-        withAnimation(.spring(duration: 0.3)) { codeCopied = true }
+        CopyButton.copied($codeCopiedAt)
     }
 
     private func connectAgain() {

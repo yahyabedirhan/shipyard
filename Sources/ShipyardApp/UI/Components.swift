@@ -252,7 +252,7 @@ struct CommandBox: View {
     /// Whether it starts with a `$` prompt (a single-line shell command).
     var prompt = true
     var font = TypeScale.code
-    @State private var copied = false
+    @State private var copiedAt: Date?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -264,7 +264,7 @@ struct CommandBox: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            CopyButton(text: command, copied: $copied)
+            CopyButton(text: command, copiedAt: $copiedAt)
                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
         }
         .padding(.leading, 10)
@@ -273,7 +273,7 @@ struct CommandBox: View {
         .frame(minHeight: 30)
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
-        .onChange(of: command) { copied = false }
+        .onChange(of: command) { copiedAt = nil }
     }
 }
 
@@ -281,9 +281,21 @@ struct CommandBox: View {
 /// sign-in code): puts `text` on the clipboard and turns into a checkmark.
 /// No hover help: the checkmark says it was copied. With a `title` it has a
 /// short word beside the icon ("Copy"), which rolls to `copiedTitle`
-/// ("Copied") with the counts' text transition. `copied` is the caller's,
-/// so another way of copying the same text can show it too.
+/// ("Copied") with the counts' text transition. Ten seconds after the last
+/// copy it turns back, with the same animations; another copy before then
+/// starts the ten seconds again. `copiedAt` (when it was last copied; `nil`
+/// shows the copy icon) is the caller's, so another way of copying the same
+/// text can show it too, through `CopyButton.copied(_:)`, and new text can
+/// reset it at once.
 struct CopyButton: View {
+    /// How long the checkmark stays after a copy.
+    static let resetDelay: Duration = .seconds(10)
+
+    /// Marks `copiedAt` as copied now, with the icon's animation.
+    static func copied(_ copiedAt: Binding<Date?>) {
+        withAnimation(.spring(duration: 0.3)) { copiedAt.wrappedValue = Date() }
+    }
+
     let text: String
     /// VoiceOver's label before and after copying.
     var label = "Copy"
@@ -291,12 +303,14 @@ struct CopyButton: View {
     /// The word beside the icon before and after copying; none without it.
     var title: String? = nil
     var copiedTitle: String? = nil
-    @Binding var copied: Bool
+    @Binding var copiedAt: Date?
+
+    private var copied: Bool { copiedAt != nil }
 
     var body: some View {
         Button {
             Clipboard.copy(text)
-            withAnimation(.spring(duration: 0.3)) { copied = true }
+            Self.copied($copiedAt)
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: copied ? "checkmark" : "doc.on.doc")
@@ -316,6 +330,12 @@ struct CopyButton: View {
         }
         .buttonStyle(IconButtonStyle(labeled: title != nil))
         .accessibilityLabel(copied ? copiedLabel : label)
+        // Restarts with each copy and is cancelled when the button goes away.
+        .task(id: copiedAt) {
+            guard copiedAt != nil else { return }
+            do { try await Task.sleep(for: Self.resetDelay) } catch { return }
+            withAnimation(.spring(duration: 0.3)) { copiedAt = nil }
+        }
     }
 }
 
