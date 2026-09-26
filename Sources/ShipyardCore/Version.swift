@@ -2,5 +2,5 @@
 /// and packaging stamps the bundle's Info.plist with the same value.
 /// Versions stay below 0.1.0 until the public launch.
 public enum ShipyardVersion {
-    public static let current = "0.0.2"
+    public static let current = "0.0.3"
 }
