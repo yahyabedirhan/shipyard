@@ -82,6 +82,8 @@ enum Motion {
     static let seen = Animation.easeOut(duration: 0.5)
     /// Hover and press highlights.
     static let hover = Animation.easeOut(duration: 0.12)
+    /// A layout's row highlight gliding to the row under the pointer.
+    static let highlight = Animation.spring(duration: 0.25, bounce: 0.1)
     /// The tabs layout's selected pill sliding, and its list following.
     static let tab = Animation.spring(response: 0.36, dampingFraction: 0.86)
 }

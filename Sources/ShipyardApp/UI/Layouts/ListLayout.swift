@@ -11,8 +11,7 @@ struct ListLayout: View {
     let model: MenuModel
     let actions: LayoutActions
     /// The row under the pointer; one highlight glides between rows.
-    @State private var hovered: String?
-    @Namespace private var hoverSpace
+    @State private var highlight = RowHighlight()
 
     var body: some View {
         MeasuredScrollView {
@@ -31,7 +30,12 @@ struct ListLayout: View {
                     }
                 }
             }
+            .rowHighlight(highlight)
         }
+        .onHover { inside in
+            if !inside { highlight.pointerLeftRows() }
+        }
+        .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
 
     @ViewBuilder
@@ -45,13 +49,8 @@ struct ListLayout: View {
                 }
                 ForEach(section.errors) { ErrorRow(error: $0) }
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    ListRow(
-                        row: row,
-                        showsRepository: section.showsRepository,
-                        actions: actions,
-                        hovered: $hovered,
-                        hoverSpace: hoverSpace
-                    )
+                    ListRow(row: row, showsRepository: section.showsRepository, actions: actions)
+                        .highlightable(MenuRowPlace(section: section.name, row: row.id), $highlight)
                     if index < section.rows.count - 1, row.kind != section.rows[index + 1].kind {
                         // A line only where the kind changes: pull requests | issues | runs.
                         Hairline()
@@ -148,11 +147,7 @@ private struct ListRow: View {
     let row: MenuRow
     let showsRepository: Bool
     let actions: LayoutActions
-    @Binding var hovered: String?
-    let hoverSpace: Namespace.ID
     @Environment(\.panelNow) private var now
-
-    private var isHovered: Bool { hovered == row.id }
 
     var body: some View {
         Button(action: click) {
@@ -202,15 +197,11 @@ private struct ListRow: View {
             .frame(height: Grid.rowHeight)
             .contentShape(Rectangle())
         }
-        .buttonStyle(RowButtonStyle(isHovered: isHovered, hoverSpace: hoverSpace))
-        .onHover { inside in
-            if inside { hovered = row.id } else if hovered == row.id { hovered = nil }
-        }
+        .buttonStyle(RowButtonStyle())
         // ⌥-click's equivalent for the keyboard and VoiceOver.
         .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
         .help(help)
         .animation(Motion.seen, value: row.needsAttention)
-        .animation(.spring(duration: 0.3, bounce: 0.15), value: hovered)
     }
 
     private var stateIcon: some View {

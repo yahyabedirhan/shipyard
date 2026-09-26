@@ -18,6 +18,9 @@ struct TabsLayout: View {
     @State private var selection: MenuTab = .all
     /// Whether the latest tab change moved right, so the list slides that way.
     @State private var forward = true
+    /// The row under the pointer, in the selected tab; one highlight glides
+    /// between rows.
+    @State private var highlight = RowHighlight()
 
     /// `selection`, or All while its project isn't there.
     private var tab: MenuTab { model.resolved(selection) }
@@ -33,6 +36,8 @@ struct TabsLayout: View {
             list(content)
         }
         .frame(maxWidth: .infinity)
+        // A row gone from the tab (refreshed away, or another tab chosen) loses the highlight.
+        .onChange(of: content.rowPlaces) { _, places in highlight.keep(in: places) }
         .onChange(of: model.tabs) {
             if model.resolved(selection) != selection {
                 withAnimation(Motion.tab) { selection = .all }
@@ -96,7 +101,7 @@ struct TabsLayout: View {
     private func list(_ content: MenuTabContent) -> some View {
         MeasuredScrollView {
             ZStack(alignment: .top) {
-                TabList(content: content, actions: actions)
+                TabList(content: content, actions: actions, highlight: $highlight)
                     .id(tab)
                     .transition(.asymmetric(
                         insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
@@ -105,6 +110,9 @@ struct TabsLayout: View {
             }
             .frame(maxWidth: .infinity, alignment: .top)
             .clipped()
+        }
+        .onHover { inside in
+            if !inside { highlight.pointerLeftRows() }
         }
     }
 }
@@ -232,9 +240,7 @@ private struct TabPill: View {
 private struct TabList: View {
     let content: MenuTabContent
     let actions: LayoutActions
-    /// The row under the pointer; one highlight glides between rows.
-    @State private var hovered: String?
-    @Namespace private var hoverSpace
+    @Binding var highlight: RowHighlight
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -242,13 +248,8 @@ private struct TabList: View {
             ForEach(content.groups) { group in
                 KindHeader(kind: group.kind, count: group.rows.count)
                 ForEach(group.rows) { row in
-                    TabRow(
-                        row: row,
-                        showsRepository: content.showsRepository,
-                        actions: actions,
-                        hovered: $hovered,
-                        hoverSpace: hoverSpace
-                    )
+                    TabRow(row: row, showsRepository: content.showsRepository, actions: actions)
+                        .highlightable(MenuRowPlace(section: nil, row: row.id), $highlight)
                 }
             }
             if let empty = PanelText.emptyTab(content) {
@@ -257,6 +258,7 @@ private struct TabList: View {
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
+        .rowHighlight(highlight)
     }
 }
 
@@ -291,8 +293,6 @@ private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool
     let actions: LayoutActions
-    @Binding var hovered: String?
-    let hoverSpace: Namespace.ID
     @Environment(\.panelNow) private var now
 
     var body: some View {
@@ -332,15 +332,11 @@ private struct TabRow: View {
             .padding(.vertical, 5)
             .contentShape(Rectangle())
         }
-        .buttonStyle(RowButtonStyle(isHovered: hovered == row.id, hoverSpace: hoverSpace))
-        .onHover { inside in
-            if inside { hovered = row.id } else if hovered == row.id { hovered = nil }
-        }
+        .buttonStyle(RowButtonStyle())
         // ⌥-click's equivalent for the keyboard and VoiceOver.
         .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
         .help(row.needsAttention ? "\(row.url.absoluteString)\n\(PanelText.optionClickHint)" : row.url.absoluteString)
         .animation(Motion.seen, value: row.needsAttention)
-        .animation(.spring(duration: 0.3, bounce: 0.15), value: hovered)
     }
 
     /// ⌥ held: mark seen without opening; otherwise open (which marks seen).

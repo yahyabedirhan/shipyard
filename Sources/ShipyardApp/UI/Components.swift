@@ -296,22 +296,66 @@ private struct PillButtonBody: View {
     }
 }
 
-/// A row's hover highlight: one shape gliding between the rows that share
-/// `hoverSpace`, darker while pressed.
+/// A row: darker while pressed. Its hover highlight isn't drawn here but
+/// once per layout, behind the rows (`rowHighlight(_:)`), so it can glide.
 struct RowButtonStyle: ButtonStyle {
-    let isHovered: Bool
-    let hoverSpace: Namespace.ID
-
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
             .background {
-                if isHovered {
+                if configuration.isPressed {
+                    // Over the hover highlight, the two add up to `Palette.pressed`.
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(configuration.isPressed ? Palette.pressed : Palette.hover)
-                        .matchedGeometryEffect(id: "hover", in: hoverSpace)
+                        .fill(Palette.hover)
                         .padding(.horizontal, Grid.inset)
                 }
             }
+    }
+}
+
+// MARK: - The row highlight
+
+/// Each row's bounds, by its place, for the one highlight shape.
+private struct RowBoundsKey: PreferenceKey {
+    static let defaultValue: [MenuRowPlace: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [MenuRowPlace: Anchor<CGRect>], nextValue: () -> [MenuRowPlace: Anchor<CGRect>]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+extension View {
+    /// A row at `place`: reports its bounds to the layout's highlight and
+    /// feeds the pointer's enter and exit to `highlight` (#44).
+    func highlightable(_ place: MenuRowPlace, _ highlight: Binding<RowHighlight>) -> some View {
+        anchorPreference(key: RowBoundsKey.self, value: .bounds) { [place: $0] }
+            .onHover { inside in
+                if inside {
+                    highlight.wrappedValue.pointerEntered(place)
+                } else {
+                    highlight.wrappedValue.pointerExited(place)
+                }
+            }
+    }
+
+    /// Draws `highlight` behind the rows in this view: one shape, at the
+    /// highlighted row's bounds, gliding from row to row. It's one view
+    /// moving rather than a shape matched between rows, so rows that a lazy
+    /// stack creates and drops can't make it jump, and a row scrolled out of
+    /// the stack takes the highlight with it.
+    func rowHighlight(_ highlight: RowHighlight) -> some View {
+        backgroundPreferenceValue(RowBoundsKey.self) { bounds in
+            GeometryReader { proxy in
+                if let place = highlight.place, let anchor = bounds[place] {
+                    let rect = proxy[anchor]
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Palette.hover)
+                        .frame(width: max(rect.width - 2 * Grid.inset, 0), height: rect.height)
+                        .offset(x: rect.minX + Grid.inset, y: rect.minY)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.highlight, value: highlight.place)
+        }
     }
 }
 
