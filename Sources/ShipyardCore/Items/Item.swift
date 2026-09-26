@@ -117,6 +117,12 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     public var activity: Int
     /// A workflow run's head branch; `nil` for pull requests and issues.
     public var branch: String?
+    /// The author's avatar (a run: whoever triggered it); `nil` when GitHub
+    /// gave none.
+    public var avatarURL: URL?
+    /// What only the row's hover card shows. Not part of `fingerprint`, so
+    /// it never makes a seen item "changed" on its own.
+    public var details: ItemDetails
 
     public init(
         kind: ItemKind,
@@ -133,7 +139,9 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         updatedAt: Date,
         closedAt: Date? = nil,
         activity: Int = 0,
-        branch: String? = nil
+        branch: String? = nil,
+        avatarURL: URL? = nil,
+        details: ItemDetails = ItemDetails()
     ) {
         self.kind = kind
         self.repository = repository
@@ -150,6 +158,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         self.closedAt = closedAt
         self.activity = activity
         self.branch = branch
+        self.avatarURL = avatarURL
+        self.details = details
     }
 
     /// Everything whose change makes a seen item "changed": state, update
@@ -163,6 +173,64 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
             String(activity),
         ].joined(separator: "|")
     }
+}
+
+/// What an item's row doesn't show and its hover card does. Each is `nil`
+/// (or zero) where it doesn't apply to the kind or GitHub gave none.
+public struct ItemDetails: Equatable, Hashable, Sendable {
+    /// A pull request's head branch, and the branch it merges into.
+    public var headBranch: String?
+    public var baseBranch: String?
+    /// A pull request's lines added and removed, and files changed.
+    public var additions: Int?
+    public var deletions: Int?
+    public var changedFiles: Int?
+    /// Where a pull request's review stands.
+    public var review: ReviewDecision?
+    /// A pull request's or issue's comments, and a pull request's reviews.
+    public var comments: Int
+    public var reviews: Int
+    /// A workflow run's title: its commit's message or its pull request's
+    /// title (the row shows the workflow's name).
+    public var runTitle: String?
+    /// What started a workflow run: `push`, `pull_request`, `schedule`…
+    public var runEvent: String?
+    /// Which attempt a workflow run is; 1 for the first.
+    public var runAttempt: Int?
+
+    public init(
+        headBranch: String? = nil,
+        baseBranch: String? = nil,
+        additions: Int? = nil,
+        deletions: Int? = nil,
+        changedFiles: Int? = nil,
+        review: ReviewDecision? = nil,
+        comments: Int = 0,
+        reviews: Int = 0,
+        runTitle: String? = nil,
+        runEvent: String? = nil,
+        runAttempt: Int? = nil
+    ) {
+        self.headBranch = headBranch
+        self.baseBranch = baseBranch
+        self.additions = additions
+        self.deletions = deletions
+        self.changedFiles = changedFiles
+        self.review = review
+        self.comments = comments
+        self.reviews = reviews
+        self.runTitle = runTitle
+        self.runEvent = runEvent
+        self.runAttempt = runAttempt
+    }
+}
+
+/// A pull request's `reviewDecision`: `nil` when the repository requires
+/// no review.
+public enum ReviewDecision: String, Equatable, Hashable, Sendable {
+    case approved = "APPROVED"
+    case changesRequested = "CHANGES_REQUESTED"
+    case reviewRequired = "REVIEW_REQUIRED"
 }
 
 /// Why one repository couldn't be fetched. The rest of the refresh still counts.

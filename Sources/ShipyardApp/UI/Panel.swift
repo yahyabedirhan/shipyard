@@ -27,6 +27,7 @@ struct Panel: View {
                 footer(now: context.date)
             }
             .environment(\.panelNow, context.date)
+            .hoverHelpHost()
         }
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
@@ -63,7 +64,7 @@ struct Panel: View {
                         .contentTransition(.symbolEffect(.replace, options: .speed(1.5)))
                 }
                 .buttonStyle(IconButtonStyle())
-                .help(PanelText.layoutButton(layout))
+                .hoverHelp(PanelText.layoutButton(layout))
                 .accessibilityLabel(PanelText.layoutButton(layout))
             }
             Button(action: actions.refresh) {
@@ -82,7 +83,7 @@ struct Panel: View {
             .keyboardShortcut("r")
             // The model's pause, as the banner and the menu bar icon show it.
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
-            .help("Refresh (⌘R)")
+            .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
             Menu {
                 Button("Open configuration file", action: actions.openConfigurationFile)
@@ -102,7 +103,8 @@ struct Panel: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .frame(width: 24, height: 22)
-            .help("Settings")
+            .hoverHelp(PanelText.settings)
+            .accessibilityLabel(PanelText.settings)
         }
         .padding(.leading, Grid.gutter)
         .padding(.trailing, 8)
@@ -301,7 +303,7 @@ private struct AccountButton: View {
             hover = false
         }
         .animation(Motion.hover, value: hover)
-        .help(PanelText.profileHelp(viewer))
+        .hoverHelp(PanelText.profileHelp(viewer), leadingInset: 0)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PanelText.profileAccessibilityLabel(viewer))
         .accessibilityAddTraits(.isLink)

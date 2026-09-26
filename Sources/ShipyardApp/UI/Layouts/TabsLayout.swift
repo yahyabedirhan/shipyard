@@ -245,6 +245,9 @@ private struct TabPill: View {
     let namespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
+    /// Whether the title is cut off at `Grid.maxTabTitleWidth`: only then
+    /// does hovering show it whole.
+    @State private var isTruncated = false
 
     var body: some View {
         Button(action: action) {
@@ -254,6 +257,14 @@ private struct TabPill: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: Grid.maxTabTitleWidth)
+                    .background {
+                        // The title at its full width, measured, never drawn.
+                        Text(title)
+                            .font(TypeScale.button)
+                            .fixedSize()
+                            .hidden()
+                            .onGeometryChange(for: Bool.self) { $0.size.width > Grid.maxTabTitleWidth } action: { isTruncated = $0 }
+                    }
                 if count > 0 {
                     // The accent on the selected tab; muted on the others.
                     CountBadge(count: count, muted: !isOn)
@@ -279,7 +290,7 @@ private struct TabPill: View {
             .animation(Motion.tab, value: count)
         }
         .buttonStyle(PressButtonStyle())
-        .help(title)
+        .hoverHelp(isTruncated ? title : nil)
         .accessibilityAddTraits(isOn ? .isSelected : [])
         .onHover { isHovered = $0 }
         .animation(Motion.hover, value: isHovered)
@@ -332,7 +343,7 @@ private struct TabList: View {
 /// One item: the attention dot, its state icon in a tinted square (with a
 /// pull request's check dot on it), its title (bold while it needs
 /// attention) over the second line, and its age on the right. What a
-/// click does, its tooltip and its highlight come from `itemRow(…)`.
+/// click does, its hover help and its highlight come from `itemRow(…)`.
 private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool

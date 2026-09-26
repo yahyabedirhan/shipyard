@@ -24,6 +24,7 @@ So shipyard shares both limits with `gh` and with every agent acting as the user
 
 Checked 2026-09-26 against the GraphQL rate-limits page above.
 
+- **Measured 2026-09-26 (issue #72), `rateLimit(dryRun: true)`:** the query shape above over 5 repositories (without `reviewRequests`) costs **4 points**. Adding `labels(first: 20) { totalCount nodes { name color } }` to every pull request and issue raises it to **11**, and to open ones only to **9**: a nested connection is paid for per parent node, whatever its `first`. Plain fields (`avatarUrl`, `additions`, `reviewDecision`…) cost nothing. So the row's hover card shows no labels.
 - **Nodes:** "Individual calls cannot request more than 500,000 total nodes." Nodes multiply down nested connections (50 repositories × 10 issues each = 500 nodes).
 - **Time:** "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate the request and you will receive a timeout response."
 - GitHub's advice for both: "Break up complex queries into multiple simpler queries."

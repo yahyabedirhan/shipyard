@@ -156,6 +156,9 @@ struct AttentionTests {
         #expect(try harness.row(1).needsAttention)
         #expect(try harness.row(2).needsAttention)
         #expect(try !harness.row(3).needsAttention)
+        #expect(try harness.row(1).attentionReasons == [.reviewRequested])
+        #expect(try harness.row(2).attentionReasons == [.checksFailed])
+        #expect(try harness.row(3).attentionReasons == [])
         #expect(harness.count == 2)
 
         // A click clears them until the item changes.
@@ -167,6 +170,34 @@ struct AttentionTests {
         await harness.refresh(answering: answer(review, failing, quiet))
         #expect(try harness.row(2).needsAttention)
         #expect(harness.count == 1)
+    }
+
+    @Test("a row says why it needs attention: new, or changed since seen, and whatever still stands")
+    func attentionReasons() {
+        let toggles = Configuration.AttentionToggles()
+        let item = Item(
+            kind: .pullRequest,
+            repository: repository,
+            number: 1,
+            title: "Fix checkout totals",
+            url: URL(string: "https://github.com/\(repository)/pull/1")!,
+            author: "octocat",
+            authorKind: .other,
+            state: .open,
+            checks: .failed,
+            reviewRequestedFromViewer: true,
+            createdAt: Harness.now,
+            updatedAt: Harness.now
+        )
+        var attention = Attention()
+        #expect(attention.reasons(item, toggles: toggles) == [.unseen, .reviewRequested, .checksFailed])
+
+        attention.markSeen(item, at: Harness.now)
+        #expect(attention.reasons(item, toggles: toggles) == [])
+
+        var pushed = item
+        pushed.updatedAt = Harness.now.addingTimeInterval(60)
+        #expect(attention.reasons(pushed, toggles: toggles) == [.changed, .reviewRequested, .checksFailed])
     }
 
     @Test("a review request that arrives after the item was seen counts")

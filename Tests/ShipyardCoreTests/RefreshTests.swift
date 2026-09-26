@@ -84,6 +84,19 @@ struct RefreshTests {
         #expect(fix.kind == .pullRequest)
         #expect(fix.since == date("2026-09-24T08:00:00Z"))
         #expect(fix.age(at: Harness.now) == 28 * 3600)
+        // What only the hover card shows.
+        #expect(fix.item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
+        #expect(fix.item.details == ItemDetails(
+            headBranch: "fix-totals",
+            baseBranch: "main",
+            additions: 120,
+            deletions: 43,
+            changedFiles: 6,
+            review: .approved,
+            comments: 2,
+            reviews: 1
+        ))
+        #expect(rows[14]?.item.details.review == nil)
 
         #expect(rows.mapValues(\.state) == [
             14: .draft, 57: .open, 12: .open, 56: .open, 55: .open, 54: .closed, 9: .merged, 3: .open,

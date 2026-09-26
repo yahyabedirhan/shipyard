@@ -31,7 +31,9 @@
             "number": 12, "title": "Fix checkout totals", "url": "https://github.com/yahyabedirhan/e-commerce-frontend/pull/12",
             "isDraft": false, "state": "OPEN",
             "createdAt": "2026-09-24T08:00:00Z", "updatedAt": "2026-09-25T09:00:00Z", "closedAt": null, "mergedAt": null,
-            "author": { "login": "yabepa", "__typename": "User" },
+            "headRefName": "fix-totals", "baseRefName": "main",
+            "additions": 120, "deletions": 43, "changedFiles": 6, "reviewDecision": "APPROVED",
+            "author": { "login": "yabepa", "__typename": "User", "avatarUrl": "https://avatars.githubusercontent.com/u/42?v=4" },
             "comments": { "totalCount": 2 }, "reviews": { "totalCount": 1 },
             "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
           }

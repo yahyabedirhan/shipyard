@@ -43,8 +43,9 @@ struct GroupHeader: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(PanelText.groupFoldHelp(group))
+        // No hover help: the chevron says it folds. VoiceOver hears what a click does.
         .accessibilityLabel(group.title)
+        .accessibilityHint(PanelText.groupFoldHelp(group))
         .accessibilityValue(PanelText.groupFoldState(group))
         .accessibilityAddTraits(.isHeader)
         .highlightable(place, $highlight)
