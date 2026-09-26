@@ -29,6 +29,11 @@ extension PanelText {
         public var code: String
         /// What to do with the code.
         public var message: String
+        /// What clicking the code, or the copy icon beside it, does: its
+        /// hover help and VoiceOver label.
+        public var copyCode: String
+        /// Said in `copyCode`'s place once the code is on the clipboard.
+        public var copied: String
         /// The button that copies the code and opens the page to enter it on.
         public var openButton: String
         /// Under the code while polling, with when the code expires.
@@ -141,6 +146,8 @@ extension PanelText {
             title: "Enter this code on GitHub",
             code: code.userCode,
             message: "Copy the code, open \(page) and paste it there. Shipyard connects once you approve.",
+            copyCode: "Copy code",
+            copied: "Copied",
             openButton: "Copy code and open GitHub",
             waiting: "Waiting for approval · the code expires at \(clockTime(code.expiresAt, locale: locale, timeZone: timeZone))"
         )

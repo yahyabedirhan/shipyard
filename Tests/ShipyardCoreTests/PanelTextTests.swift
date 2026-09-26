@@ -510,7 +510,7 @@ struct PanelTextTests {
 
     // MARK: - Sign in with GitHub
 
-    @Test("the code screen shows the code, says where it goes, and how to open GitHub")
+    @Test("the code screen shows the code, says where it goes, how to copy it, and how to open GitHub")
     func deviceCodeScreen() {
         let code = DeviceCode(
             userCode: "WDJB-MJHT",
@@ -521,6 +521,8 @@ struct PanelTextTests {
         #expect(text.title == "Enter this code on GitHub")
         #expect(text.code == "WDJB-MJHT")
         #expect(text.message == "Copy the code, open github.com/login/device and paste it there. Shipyard connects once you approve.")
+        #expect(text.copyCode == "Copy code")
+        #expect(text.copied == "Copied")
         #expect(text.openButton == "Copy code and open GitHub")
         #expect(text.waiting == "Waiting for approval · the code expires at 13:15")
         #expect(PanelText.cancelSignIn == "Cancel")

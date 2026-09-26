@@ -1,4 +1,3 @@
-import AppKit
 import ShipyardCore
 import SwiftUI
 
@@ -7,8 +6,9 @@ import SwiftUI
 /// run, with a Copy button; Try again looks for a token once more. A build
 /// without an OAuth App client ID shows Sign in with GitHub disabled, with
 /// why, and `gh` stays the way in. While the device flow waits (`connecting`)
-/// it shows the code, a button that copies it and opens github.com/login/device,
-/// and Cancel. The words come from `PanelText.connect` and `PanelText.deviceCode`.
+/// it shows the code (a click on it, or on its copy icon, copies it), a
+/// button that copies it and opens github.com/login/device, and Cancel.
+/// The words come from `PanelText.connect` and `PanelText.deviceCode`.
 ///
 /// `start()` clears the reason while it looks for a token, so the last one
 /// stays on screen during Try again; before any is known (at launch) a
@@ -22,6 +22,8 @@ struct ConnectView: View {
     @State private var isRequestingCode = false
     /// Try again left shipyard signed out: say so, or the click seems to do nothing.
     @State private var stillSignedOut = false
+    /// The code is on the clipboard: the copy icon shows a checkmark.
+    @State private var codeCopied = false
 
     var body: some View {
         Group {
@@ -132,13 +134,7 @@ struct ConnectView: View {
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
-            Text(text.code)
-                .font(.system(size: 22, weight: .semibold, design: .monospaced))
-                .kerning(2)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .card()
+            code(text)
                 .padding(.bottom, 8)
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
@@ -158,6 +154,29 @@ struct ConnectView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The code, large, in a card with the copy icon at its end. Clicking
+    /// the code copies it too; either way the icon turns into a checkmark,
+    /// and the code's hover help says Copied.
+    private func code(_ text: PanelText.DeviceCodeScreen) -> some View {
+        Button(action: { copy(text.code) }) {
+            Text(text.code)
+                .font(.system(size: 22, weight: .semibold, design: .monospaced))
+                .kerning(2)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .hoverHelp(codeCopied ? text.copied : text.copyCode)
+        .accessibilityLabel(text.code)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .overlay(alignment: .trailing) {
+            CopyButton(text: text.code, label: text.copyCode, copiedLabel: text.copied, copied: $codeCopied)
+                .padding(.trailing, 6)
+        }
+        .card()
+        .onChange(of: text.code) { codeCopied = false }
     }
 
     private func heading(_ title: String) -> some View {
@@ -193,9 +212,13 @@ struct ConnectView: View {
     /// The code goes on the clipboard first: opening the browser may close
     /// the menu, and the code is then ready to paste.
     private func copyAndOpen(_ code: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(code, forType: .string)
+        copy(code)
         shipyard.openVerificationPage()
+    }
+
+    private func copy(_ code: String) {
+        Clipboard.copy(code)
+        withAnimation(.spring(duration: 0.3)) { codeCopied = true }
     }
 
     private func tryAgain() {

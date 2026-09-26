@@ -264,18 +264,8 @@ struct CommandBox: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(command, forType: .string)
-                withAnimation(.spring(duration: 0.3)) { copied = true }
-            } label: {
-                Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(IconButtonStyle())
-            // No hover help: the icon turns into a checkmark once copied.
-            .accessibilityLabel(copied ? "Copied" : "Copy")
-            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            CopyButton(text: command, copied: $copied)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
         }
         .padding(.leading, 10)
         .padding(.trailing, 4)
@@ -284,6 +274,39 @@ struct CommandBox: View {
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
         .onChange(of: command) { copied = false }
+    }
+}
+
+/// The copy icon beside text to copy (a `CommandBox`'s command, the
+/// sign-in code): puts `text` on the clipboard and turns into a checkmark.
+/// No hover help: the checkmark says it was copied. `copied` is the
+/// caller's, so another way of copying the same text can show it too.
+struct CopyButton: View {
+    let text: String
+    /// VoiceOver's label before and after copying.
+    var label = "Copy"
+    var copiedLabel = "Copied"
+    @Binding var copied: Bool
+
+    var body: some View {
+        Button {
+            Clipboard.copy(text)
+            withAnimation(.spring(duration: 0.3)) { copied = true }
+        } label: {
+            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(IconButtonStyle())
+        .accessibilityLabel(copied ? copiedLabel : label)
+    }
+}
+
+/// The general pasteboard, for text.
+enum Clipboard {
+    /// Puts exactly `text` on the clipboard, in place of what was there.
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 }
 
