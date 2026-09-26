@@ -596,8 +596,10 @@ extension Configuration {
     public static let header = """
         #:schema \(schemaURL)
         # shipyard configuration. You and your agents edit this file; shipyard
-        # applies changes live. It writes to it only to add projects and, from
-        # the menu's layout button, to set layout under [menu]; the rest stays.
+        # applies changes live. It writes to it only to add projects, to set
+        # layout under [menu] from the menu's layout button, and, during
+        # onboarding, to write a preset over a file holding nothing but
+        # version; the rest stays.
         # Every key is optional. Keys, defaults and events are in the schema above.
         # The settings below are commented out at their defaults: uncomment one
         # and change its value to use it.
@@ -664,16 +666,20 @@ extension Configuration {
     /// The `[[projects]]` blocks the picker appends to the end of the file.
     /// Each block is self-contained, so appending never disturbs what's above.
     public static func appendText(projects: [NewProject]) -> String {
-        projects.map { project in
-            let repositories = project.repositories.map(tomlString).joined(separator: ", ")
-            return """
+        projects.map { "\n" + projectBlock($0) }.joined()
+    }
 
-                [[projects]]
-                name = \(tomlString(project.name))
-                repositories = [\(repositories)]
+    /// One project's `[[projects]]` block: its header, name and
+    /// repositories, ending in a newline. The picker's appends and the
+    /// presets both build on it, each adding the blank lines around it.
+    static func projectBlock(_ project: NewProject) -> String {
+        let repositories = project.repositories.map(tomlString).joined(separator: ", ")
+        return """
+            [[projects]]
+            name = \(tomlString(project.name))
+            repositories = [\(repositories)]
 
-                """
-        }.joined()
+            """
     }
 
     /// A TOML basic string with `"`, `\` and control characters escaped.

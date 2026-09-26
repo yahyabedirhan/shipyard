@@ -512,7 +512,7 @@ public final class Shipyard {
     /// file that can't be written changes nothing: a missing file still
     /// reads as the defaults with no projects.
     private func createConfigurationIfMissing() {
-        try? configStore.createIfMissing()
+        _ = try? configStore.createIfMissing()
     }
 
     private func performRefresh() async {

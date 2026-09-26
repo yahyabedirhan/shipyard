@@ -15,6 +15,14 @@ public struct Preset: Hashable, Sendable, Identifiable {
         case nothing
     }
 
+    /// Which file the preset writes; `text(projects:)` switches on it, so
+    /// every preset has its own file and none falls back to another's.
+    enum Kind: Hashable, Sendable {
+        case myAgents
+        case incomingContributions
+        case reviewQueue
+    }
+
     /// The preset's name, kebab-case, as the skill and the user say it.
     public let name: String
     /// Its title in onboarding.
@@ -22,6 +30,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
     /// One sentence on what it lists.
     public let summary: String
     public let asks: Asks
+    let kind: Kind
 
     public var id: String { name }
 
@@ -31,7 +40,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         name: "my-agents",
         title: "My agents",
         summary: "The pull requests and issues you and your agents open, one project per repository.",
-        asks: .repositories
+        asks: .repositories,
+        kind: .myAgents
     )
 
     /// What other people open on your repositories, bots left out, and the
@@ -40,7 +50,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         name: "incoming-contributions",
         title: "Incoming contributions",
         summary: "The pull requests and issues other people open on your repositories, and the pull requests waiting on your review.",
-        asks: .ownedOrRepositories
+        asks: .ownedOrRepositories,
+        kind: .incomingContributions
     )
 
     /// Only the pull requests waiting on your review, in any repository.
@@ -48,7 +59,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         name: "review-queue",
         title: "Review queue",
         summary: "Only the pull requests waiting on your review, in any repository.",
-        asks: .nothing
+        asks: .nothing,
+        kind: .reviewQueue
     )
 
     /// Every preset, in the order onboarding lists them.
@@ -71,16 +83,16 @@ public struct Preset: Hashable, Sendable, Identifiable {
     ///   then its "Review requests" project.
     /// - `review-queue` ignores `projects`: its one project is `anywhere`.
     public func text(projects: [NewProject] = []) -> String {
-        switch name {
-        case Preset.incomingContributions.name:
+        switch kind {
+        case .myAgents:
+            return Preset.myAgentsText(projects)
+        case .incomingContributions:
             let incoming = projects.isEmpty
                 ? [NewProject(name: Preset.incomingProjectName, repositories: [RepositoryGroup.owned.rawValue])]
                 : projects
             return Preset.incomingContributionsText(incoming)
-        case Preset.reviewQueue.name:
+        case .reviewQueue:
             return Preset.reviewQueueText
-        default:
-            return Preset.myAgentsText(projects)
         }
     }
 
@@ -191,14 +203,6 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
     /// `projects` as plain `[[projects]]` blocks, a blank line between each.
     private static func blocks(_ projects: [NewProject]) -> String {
-        projects.map { project in
-            let repositories = project.repositories.map(Configuration.tomlString).joined(separator: ", ")
-            return """
-                [[projects]]
-                name = \(Configuration.tomlString(project.name))
-                repositories = [\(repositories)]
-
-                """
-        }.joined(separator: "\n")
+        projects.map(Configuration.projectBlock).joined(separator: "\n")
     }
 }

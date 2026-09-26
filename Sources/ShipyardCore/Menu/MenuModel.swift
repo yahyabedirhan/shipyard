@@ -151,14 +151,8 @@ public struct MenuModel: Equatable, Sendable {
             for group in sections[index].groups.indices {
                 let id = sections[index].groups[group].id
                 sections[index].groups[group].isFolded = sections[index].groups[group].showsHeader && state.collapsedGroups.contains(id)
-                for row in sections[index].groups[group].rows.indices {
-                    let item = sections[index].groups[group].rows[row].item
-                    sections[index].groups[group].rows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
-                }
-                for row in sections[index].groups[group].hiddenRows.indices {
-                    let item = sections[index].groups[group].hiddenRows[row].item
-                    sections[index].groups[group].hiddenRows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
-                }
+                Self.flagAttention(&sections[index].groups[group].rows, attention: state.attention, toggles: toggles)
+                Self.flagAttention(&sections[index].groups[group].hiddenRows, attention: state.attention, toggles: toggles)
                 sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
@@ -166,6 +160,14 @@ public struct MenuModel: Equatable, Sendable {
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
+    }
+
+    /// Sets each of `rows`' attention flag from `attention`, shown rows and
+    /// the rows behind a Show more alike.
+    private static func flagAttention(_ rows: inout [MenuRow], attention: Attention, toggles: Configuration.AttentionToggles) {
+        for row in rows.indices {
+            rows[row].needsAttention = attention.needsAttention(rows[row].item, toggles: toggles)
+        }
     }
 
     /// Caps each project's groups at its `show-first` again, showing every
