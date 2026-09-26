@@ -122,7 +122,7 @@ extension View {
     }
 
     /// Something among the rows that isn't one (an error row, a
-    /// placeholder, a tab's kind header): the pointer on it highlights
+    /// placeholder, a group's subheader): the pointer on it highlights
     /// nothing, even if the row it came from never reported its exit.
     func clearsRowHighlight(_ highlight: Binding<RowHighlight>) -> some View {
         onHover { inside in

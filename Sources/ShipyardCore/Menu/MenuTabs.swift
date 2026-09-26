@@ -6,11 +6,13 @@ public enum MenuTab: Hashable, Sendable {
     case project(String)
 }
 
-/// What a tab of the tabs layout lists: its rows grouped by kind, its
-/// projects' error rows, and what the line under the tab strip counts.
+/// What a tab of the tabs layout lists: its rows in groups, its projects'
+/// error rows, and what the line under the tab strip counts.
 public struct MenuTabContent: Equatable, Sendable {
-    /// Pull requests, then issues, then runs; a kind with no rows is left out.
-    public var groups: [MenuKindGroup]
+    /// A project's groups as its arrangement makes them, the same as in
+    /// the list; All's by kind (pull requests, then issues, then runs) under
+    /// subheaders, newest first. A group with no rows is left out.
+    public var groups: [RowGroup]
     /// One per repository of the tab's projects that couldn't be fetched.
     public var errors: [MenuErrorRow]
     /// Rows in the tab needing attention.
@@ -24,17 +26,11 @@ public struct MenuTabContent: Equatable, Sendable {
     public var isLoaded: Bool
 }
 
-/// The rows of one kind in a tab, under a small header.
-public struct MenuKindGroup: Equatable, Sendable, Identifiable {
-    public var kind: ItemKind
-    public var rows: [MenuRow]
-    /// Rows in the group needing attention.
-    public var attentionCount: Int
-
-    public var id: ItemKind { kind }
-}
-
 extension MenuModel {
+    /// The All tab's fixed arrangement, whatever the projects set: by kind,
+    /// newest first, with the tabs' kind subheaders.
+    static let allTabArrangement = ArrangementSettings(groupBy: .kind, subsections: true, sortBy: .updated)
+
     /// All, then one tab per project in configuration order.
     public var tabs: [MenuTab] {
         [.all] + sections.map { .project($0.name) }
@@ -68,22 +64,32 @@ extension MenuModel {
         }
     }
 
-    /// What `tab` lists. All takes every project's rows in project order,
-    /// a row listed in two projects once, and names each row's repository
-    /// once it holds more than one project; a project's tab names it only
-    /// when the project has several repositories.
+    /// What `tab` lists. A project's tab lists its section's groups. All
+    /// takes every project's rows, a row listed in two projects once, in
+    /// its fixed arrangement (by kind, newest first, under subheaders), and
+    /// names each row's repository once it holds more than one project; a
+    /// project's tab names it only when the project has several repositories.
     public func tabContent(for tab: MenuTab) -> MenuTabContent {
         let tab = resolved(tab)
         let visible: [MenuSection] = switch tab {
         case .all: sections
         case .project(let name): sections.filter { $0.name == name }
         }
-        var seen = Set<String>()
-        let rows = visible.flatMap(\.rows).filter { seen.insert($0.id).inserted }
-        let groups = Self.kindOrder.compactMap { kind -> MenuKindGroup? in
-            let ofKind = rows.filter { $0.kind == kind }
-            guard !ofKind.isEmpty else { return nil }
-            return MenuKindGroup(kind: kind, rows: ofKind, attentionCount: ofKind.filter(\.needsAttention).count)
+        let groups: [RowGroup]
+        switch tab {
+        case .all:
+            var seen = Set<String>()
+            let rows = visible.flatMap(\.rows).filter { seen.insert($0.id).inserted }
+            groups = Arrangement.groups(
+                rows: rows,
+                project: "",
+                settings: Self.allTabArrangement,
+                layout: .tabs,
+                // Grouping by kind reads no dates.
+                now: lastUpdated ?? .distantPast
+            )
+        case .project:
+            groups = visible.flatMap(\.groups)
         }
         let errors = visible.flatMap(\.errors)
         return MenuTabContent(

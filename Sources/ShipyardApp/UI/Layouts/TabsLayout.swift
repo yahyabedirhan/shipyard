@@ -264,7 +264,8 @@ private struct TabPill: View {
 
 // MARK: - A tab's rows
 
-/// The tab's error rows, then its rows grouped under small kind headers.
+/// The tab's error rows, then its groups' rows, each under its subheader
+/// (by default a small kind header) or after a line.
 private struct TabList: View {
     let content: MenuTabContent
     let actions: LayoutActions
@@ -273,9 +274,12 @@ private struct TabList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
-            ForEach(content.groups) { group in
-                KindHeader(kind: group.kind, count: group.rows.count)
-                    .clearsRowHighlight($highlight)
+            ForEach(Array(content.groups.enumerated()), id: \.element.id) { index, group in
+                if group.showsHeader {
+                    GroupHeader(group: group).clearsRowHighlight($highlight)
+                } else if index > 0 {
+                    GroupDivider().padding(.vertical, 2)
+                }
                 ForEach(group.rows) { row in
                     let place = MenuRowPlace(section: nil, row: row.id)
                     TabRow(row: row, showsRepository: content.showsRepository)
@@ -289,29 +293,6 @@ private struct TabList: View {
         }
         .padding(.top, 4)
         .padding(.bottom, 8)
-    }
-}
-
-private struct KindHeader: View {
-    let kind: ItemKind
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Text(PanelText.kindGroup(kind).uppercased())
-                .font(TypeScale.eyebrow)
-                .tracking(0.5)
-            Text(String(count))
-                .font(TypeScale.eyebrow.monospacedDigit())
-                .foregroundStyle(.tertiary)
-            Spacer()
-        }
-        .foregroundStyle(.secondary)
-        .padding(.leading, Grid.gutter + Grid.dotColumn)
-        .padding(.trailing, Grid.gutter)
-        .padding(.top, Grid.gutter)
-        .padding(.bottom, 4)
-        .accessibilityAddTraits(.isHeader)
     }
 }
 

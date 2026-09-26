@@ -63,6 +63,11 @@ let everyKey = """
     review-requested = false
     checks-failed = false
 
+    [defaults]
+    group-by = "repository"
+    subsections = true
+    sort-by = "created"
+
     [defaults.pull-requests]
     show = false
     closed-window-days = 14
@@ -95,6 +100,9 @@ let everyKey = """
     issues = { show = false, closed-window-days = 30, authors = { show = ["@renovate[bot]"], hide = [] } }
     workflow-runs = { show = false, finished-window-hours = 1, branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
     notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
+    group-by = "date"
+    subsections = false
+    sort-by = "title"
 
     """
 
@@ -128,6 +136,7 @@ struct ConfigurationDecodingTests {
         #expect(config.defaults.issues == .init(show: false, closedWindowDays: 7, authors: AuthorFilter()))
         #expect(config.defaults.workflowRuns == .init(show: false, finishedWindowHours: 3, branches: .defaultAndPullRequests, authors: AuthorFilter()))
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
+        #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated))
         #expect(config.projects.isEmpty)
         #expect(!config.hasProjects)
     }
@@ -193,6 +202,19 @@ struct ConfigurationDecodingTests {
             show: false, finishedWindowHours: 1, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
         ))
         #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
+        #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created))
+        #expect(project.arrangement == .init(groupBy: .date, subsections: false, sortBy: .title))
+    }
+
+    @Test("every group-by and sort-by choice decodes")
+    func everyArrangement() throws {
+        for groupBy in GroupBy.allCases {
+            for sortBy in SortBy.allCases {
+                let text = "[defaults]\ngroup-by = \"\(groupBy.rawValue)\"\nsort-by = \"\(sortBy.rawValue)\"\n"
+                let config = try #require(decoded(text)).configuration
+                #expect(config.defaults.arrangement == .init(groupBy: groupBy, sortBy: sortBy))
+            }
+        }
     }
 
     @Test("every event and author selector decodes")
@@ -283,6 +305,44 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
         #expect(rejection("[defaults.workflow-runs]\nbranches = \"al\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
+    }
+
+    @Test("an unknown group-by or sort-by is rejected with the nearest valid one")
+    func arrangementChoices() {
+        #expect(rejection("[defaults]\ngroup-by = \"repo\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `repo` for `group-by` (expected one of `kind`, `repository`, `date`, `author`, `none`)")])
+        #expect(rejection("[defaults]\ngroup-by = \"repositories\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `repositories` for `group-by` (did you mean `repository`?)")])
+        #expect(rejection("[defaults]\nsort-by = \"update\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `update` for `sort-by` (did you mean `updated`?)")])
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\ngroup-by = \"authors\"\n")
+            == [ConfigIssue(line: 4, message: "unknown value `authors` for `group-by` (did you mean `author`?)")])
+        #expect(rejection("[defaults]\nsort-by = \"oldest\"\n")
+            == [ConfigIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
+        #expect(rejection("[defaults]\nsubsections = \"yes\"\n")
+            == [ConfigIssue(line: 2, message: "`defaults.subsections` must be true or false")])
+    }
+
+    @Test("a project's arrangement merges key by key onto the defaults")
+    func arrangementMerges() throws {
+        let config = try #require(decoded("""
+            [defaults]
+            group-by = "repository"
+            subsections = true
+
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+            sort-by = "title"
+
+            [[projects]]
+            name = "b"
+            repositories = ["o/b"]
+            group-by = "none"
+            subsections = false
+            """)).configuration
+        #expect(config.settings(for: config.projects[0]).arrangement == .init(groupBy: .repository, subsections: true, sortBy: .title))
+        #expect(config.settings(for: config.projects[1]).arrangement == .init(groupBy: .none, subsections: false, sortBy: .updated))
     }
 
     @Test("a repository that isn't owner/name is rejected")

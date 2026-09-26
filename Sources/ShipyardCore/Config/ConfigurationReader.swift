@@ -135,11 +135,12 @@ final class ConfigurationReader {
         }
 
         if let defaults = table(node, "defaults") {
-            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications"])
+            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications"] + Self.arrangementKeys)
             config.defaults.pullRequests = pullRequests(defaults).applied(to: config.defaults.pullRequests)
             config.defaults.issues = issues(defaults).applied(to: config.defaults.issues)
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
+            config.defaults.arrangement = arrangement(defaults).applied(to: config.defaults.arrangement)
         }
         if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
@@ -151,7 +152,7 @@ final class ConfigurationReader {
     }
 
     private func project(_ node: Node) -> Configuration.Project? {
-        warnUnknownKeys(in: node, known: ["name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications"])
+        warnUnknownKeys(in: node, known: ["name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications"] + Self.arrangementKeys)
         let name = string(node, "name")
         let repositories = strings(node, "repositories")
         if name == nil && !node.table.contains(key: "name") {
@@ -187,7 +188,20 @@ final class ConfigurationReader {
             pullRequests: pullRequests(node),
             issues: issues(node),
             workflowRuns: workflowRuns(node),
-            notifications: notifications(node)
+            notifications: notifications(node),
+            arrangement: arrangement(node)
+        )
+    }
+
+    /// The keys that arrange a project, written straight under `[defaults]`
+    /// or in a `[[projects]]` block.
+    static let arrangementKeys = ["group-by", "subsections", "sort-by"]
+
+    private func arrangement(_ node: Node) -> ArrangementOverrides {
+        ArrangementOverrides(
+            groupBy: choice(node, "group-by", GroupBy.self),
+            subsections: bool(node, "subsections"),
+            sortBy: choice(node, "sort-by", SortBy.self)
         )
     }
 

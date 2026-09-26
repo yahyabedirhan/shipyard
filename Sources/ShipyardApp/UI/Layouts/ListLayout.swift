@@ -95,8 +95,8 @@ struct ListLayout: View {
     }
 
     /// An expanded project's lines, each its own child of the lazy stack:
-    /// placeholders while it loads, its error rows, then its rows, with a
-    /// line where the kind changes.
+    /// placeholders while it loads, its error rows, then its groups' rows,
+    /// each group under its subheader or after a line.
     @ViewBuilder
     private func lines(_ section: MenuSection) -> some View {
         let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
@@ -110,20 +110,24 @@ struct ListLayout: View {
         ForEach(section.errors) {
             ErrorRow(error: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
         }
-        ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-            let place = MenuRowPlace(section: section.name, row: row.id)
-            VStack(spacing: 0) {
-                if index > 0, row.kind != section.rows[index - 1].kind {
-                    // A line only where the kind changes: pull requests | issues | runs.
-                    Hairline()
-                        .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
-                        .padding(.trailing, Grid.gutter)
-                }
-                ListRow(row: row, showsRepository: section.showsRepository)
-                    .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
+        ForEach(Array(section.groups.enumerated()), id: \.element.id) { index, group in
+            if group.showsHeader {
+                GroupHeader(group: group).clearsRowHighlight($highlight).transition(Self.lineTransition)
             }
-            .id(place)
-            .transition(Self.lineTransition)
+            ForEach(Array(group.rows.enumerated()), id: \.element.id) { position, row in
+                let place = MenuRowPlace(section: section.name, row: row.id)
+                VStack(spacing: 0) {
+                    if index > 0, position == 0, !group.showsHeader {
+                        // A line where one group ends and the next begins:
+                        // by default pull requests | issues | runs.
+                        GroupDivider()
+                    }
+                    ListRow(row: row, showsRepository: section.showsRepository)
+                        .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
+                }
+                .id(place)
+                .transition(Self.lineTransition)
+            }
         }
         if hasContent {
             Color.clear.frame(height: 3).transition(Self.lineTransition)

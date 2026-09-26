@@ -181,15 +181,6 @@ public enum PanelText {
         return content.isLoaded ? "Nothing open" : "Not loaded yet"
     }
 
-    /// The small header over a kind's rows in a tab.
-    public static func kindGroup(_ kind: ItemKind) -> String {
-        switch kind {
-        case .pullRequest: "Pull requests"
-        case .issue: "Issues"
-        case .workflowRun: "Runs"
-        }
-    }
-
     /// "Last updated 5 min ago" for rows fetched at `date`; `nil` before
     /// the first refresh succeeded.
     public static func lastUpdated(_ date: Date?, now: Date) -> String? {

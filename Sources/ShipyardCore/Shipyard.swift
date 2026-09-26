@@ -489,7 +489,7 @@ public final class Shipyard {
                 notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
-            menu = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state)
+            menu = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
             publishRateStatus()
             // Recorded (and saved) before posting: a crash in between loses a
             // notification rather than repeating one.
@@ -671,7 +671,7 @@ public final class Shipyard {
         let listings = snapshot.map { snapshot in
             Listing.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, now: clock.now)
         } ?? [:]
-        var rebuilt = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state)
+        var rebuilt = MenuModel.build(listings: listings, snapshot: snapshot, configuration: configuration, state: appStateStore.state, now: clock.now)
         rebuilt.fetchError = menu.fetchError
         rebuilt.refreshDelay = menu.refreshDelay
         rebuilt.rateIndicator = menu.rateIndicator

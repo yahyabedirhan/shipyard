@@ -72,12 +72,12 @@ public struct MenuModel: Equatable, Sendable {
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a
     /// project without a listing (added since the snapshot was fetched).
-    public static func build(listings: [String: [Item]], snapshot: Snapshot?, configuration: Configuration, state: AppState) -> MenuModel {
+    public static func build(listings: [String: [Item]], snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
                 MenuSection(
                     name: project.name,
-                    rows: [],
+                    groups: [],
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
                     repositories: project.repositories
@@ -90,18 +90,15 @@ public struct MenuModel: Equatable, Sendable {
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
             let items = listings[project.name] ?? []
-            // Pull requests, then issues, then runs; each kind open (or
-            // running) first, then closed (or finished).
-            let rows = kindOrder.flatMap { kind -> [Item] in
-                let ofKind = items.filter { $0.kind == kind }
-                let open = ofKind.filter(\.state.isActive).sorted { $0.updatedAt > $1.updatedAt }
-                let closed = ofKind.filter { !$0.state.isActive }
-                    .sorted { ($0.closedAt ?? $0.updatedAt) > ($1.closedAt ?? $1.updatedAt) }
-                return open + closed
-            }
             return MenuSection(
                 name: project.name,
-                rows: rows.map { MenuRow($0) },
+                groups: Arrangement.groups(
+                    items,
+                    project: project.name,
+                    settings: settings.arrangement,
+                    layout: configuration.menu.layout,
+                    now: now
+                ),
                 // One row per repository, for a kind this project shows: a
                 // runs failure isn't an error where runs are off.
                 errors: project.repositories.compactMap { repository in
@@ -127,8 +124,12 @@ public struct MenuModel: Equatable, Sendable {
     public mutating func applyAttention(_ state: AppState, configuration: Configuration) {
         let toggles = configuration.attention
         for index in sections.indices {
-            for row in sections[index].rows.indices {
-                sections[index].rows[row].needsAttention = state.attention.needsAttention(sections[index].rows[row].item, toggles: toggles)
+            for group in sections[index].groups.indices {
+                for row in sections[index].groups[group].rows.indices {
+                    let item = sections[index].groups[group].rows[row].item
+                    sections[index].groups[group].rows[row].needsAttention = state.attention.needsAttention(item, toggles: toggles)
+                }
+                sections[index].groups[group].attentionCount = sections[index].groups[group].rows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
@@ -152,11 +153,11 @@ public struct MenuModel: Equatable, Sendable {
 public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
-    /// Pull requests, then issues, then workflow runs; within each kind, open
+    /// Its listed items as `Arrangement` groups and sorts them: by default
+    /// pull requests, then issues, then workflow runs; within each kind, open
     /// (or running) items first (most recently updated first), then closed
-    /// (or finished) ones (most recently closed first), each kind within its
-    /// own window.
-    public var rows: [MenuRow]
+    /// (or finished) ones (most recently closed first).
+    public var groups: [RowGroup]
     /// One per repository of this project that couldn't be fetched.
     public var errors: [MenuErrorRow]
     /// Whether a row's second line names its repository: only when the
@@ -175,6 +176,10 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
 
     public var id: String { name }
 
+    /// Every row of every group, in order.
+    public var rows: [MenuRow] { groups.flatMap(\.rows) }
+
+    /// A section whose rows are one group, as `group-by = "none"` makes.
     public init(
         name: String,
         rows: [MenuRow],
@@ -185,8 +190,35 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         isLoaded: Bool = true,
         repositories: [String] = []
     ) {
+        self.init(
+            name: name,
+            groups: rows.isEmpty ? [] : [RowGroup(
+                id: GroupID(project: name, key: .ungrouped),
+                title: "",
+                rows: rows,
+                attentionCount: rows.filter(\.needsAttention).count
+            )],
+            errors: errors,
+            showsRepository: showsRepository,
+            attentionCount: attentionCount,
+            isCollapsed: isCollapsed,
+            isLoaded: isLoaded,
+            repositories: repositories
+        )
+    }
+
+    public init(
+        name: String,
+        groups: [RowGroup],
+        errors: [MenuErrorRow] = [],
+        showsRepository: Bool = false,
+        attentionCount: Int = 0,
+        isCollapsed: Bool = false,
+        isLoaded: Bool = true,
+        repositories: [String] = []
+    ) {
         self.name = name
-        self.rows = rows
+        self.groups = groups
         self.errors = errors
         self.showsRepository = showsRepository
         self.attentionCount = attentionCount

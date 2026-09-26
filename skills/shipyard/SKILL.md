@@ -78,6 +78,16 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
 
+How every project's items are grouped and sorted in the menu, set straight under `[defaults]` (not in a sub-table), and what a project may override in its own block:
+
+| Key | Default | Allowed |
+|---|---|---|
+| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z), `"none"` (one list); one level only |
+| `[defaults] subsections` | unset | boolean: `true` draws each group under a subheader (its name and count), `false` after a divider line; unset keeps each layout's own look (dividers in the list, subheaders in tabs) |
+| `[defaults] sort-by` | `"updated"` | `"updated"` (newest first), `"created"` (newest first), `"title"` (A to Z); open or running items always come first. `"date"` groups by this date (`"updated"` when sorting by title) |
+
+The All tab of the tabs layout always groups by kind, newest first.
+
 A project, one `[[projects]]` block each, shown as sections in file order:
 
 | Key | Required | Allowed |
@@ -85,6 +95,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 | `name` | yes | non-empty, unique across projects; the section's title |
 | `repositories` | yes | at least one `owner/name` slug: the owner is letters, digits and `-`; the name adds `_` and `.`; no URLs |
 | `pull-requests`, `issues`, `workflow-runs` | no | inline tables with the keys above |
+| `group-by`, `subsections`, `sort-by` | no | as under `[defaults]` above |
 | `notifications` | no | a list of rules |
 
 ## Overrides
@@ -240,6 +251,18 @@ name = "shipyard reviews"
 repositories = ["yahyabedirhan/shipyard"]
 pull-requests = { review-requested = true }
 ```
+
+**"Group this project by repository, with a header for each."** Set `group-by` and `subsections` in the project's block (in `[defaults]` for every project):
+
+```toml
+[[projects]]
+name = "contributions"
+repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
+group-by = "repository"
+subsections = true
+```
+
+For the most recently opened first, add `sort-by = "created"`; for what changed today at the top, `group-by = "date"`.
 
 **"Switch the menu to tabs."** One key in the `[menu]` table; uncomment the header's `# [menu]` lines where the placement rule allows it. The layout button in the menu's header makes the same edit with one click.
 

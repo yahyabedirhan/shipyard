@@ -38,7 +38,8 @@ public struct Configuration: Equatable, Sendable {
             pullRequests: project.pullRequests.applied(to: defaults.pullRequests),
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
-            notifications: project.notifications ?? defaults.notifications
+            notifications: project.notifications ?? defaults.notifications,
+            arrangement: project.arrangement.applied(to: defaults.arrangement)
         )
     }
 }
@@ -90,6 +91,8 @@ extension Configuration {
         public var workflowRuns = WorkflowRunSettings()
         /// `[[defaults.notifications]]`; a new pull request in any project by default.
         public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
+        /// `group-by`, `subsections` and `sort-by`, written straight under `[defaults]`.
+        public var arrangement = ArrangementSettings()
         public init() {}
     }
 
@@ -104,6 +107,8 @@ extension Configuration {
         public var workflowRuns = WorkflowRunOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
+        /// The project's own `group-by`, `subsections` and `sort-by`.
+        public var arrangement = ArrangementOverrides()
 
         public init(
             name: String,
@@ -111,7 +116,8 @@ extension Configuration {
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
-            notifications: [NotificationRule]? = nil
+            notifications: [NotificationRule]? = nil,
+            arrangement: ArrangementOverrides = .init()
         ) {
             self.name = name
             self.repositories = repositories
@@ -119,6 +125,7 @@ extension Configuration {
             self.issues = issues
             self.workflowRuns = workflowRuns
             self.notifications = notifications
+            self.arrangement = arrangement
         }
     }
 }
@@ -155,6 +162,24 @@ public enum RateLimitDisplay: String, CaseIterable, Sendable {
     case always
     case whenLow = "when-low"
     case never
+}
+
+/// `group-by`: what a project's items are grouped by. One level only;
+/// `none` lists them as one group.
+public enum GroupBy: String, CaseIterable, Sendable {
+    case kind
+    case repository
+    case date
+    case author
+    case none
+}
+
+/// `sort-by`: the order within a group, newest first or A to Z. Open (or
+/// running) items always come before closed (or finished) ones.
+public enum SortBy: String, CaseIterable, Sendable {
+    case updated
+    case created
+    case title
 }
 
 /// `workflow-runs.branches`
@@ -340,6 +365,40 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
     }
 }
 
+/// How a project's listed items are grouped, sorted and drawn.
+public struct ArrangementSettings: Equatable, Sendable {
+    public var groupBy: GroupBy = .kind
+    /// Groups drawn as subheaders (`true`) or dividers (`false`); `nil`
+    /// keeps each layout's own: dividers in the list, subheaders in a tab.
+    public var subsections: Bool?
+    public var sortBy: SortBy = .updated
+    public init(groupBy: GroupBy = .kind, subsections: Bool? = nil, sortBy: SortBy = .updated) {
+        self.groupBy = groupBy
+        self.subsections = subsections
+        self.sortBy = sortBy
+    }
+}
+
+/// The arrangement keys a table sets; unset keys keep the value below.
+public struct ArrangementOverrides: Equatable, Sendable {
+    public var groupBy: GroupBy?
+    public var subsections: Bool?
+    public var sortBy: SortBy?
+    public init(groupBy: GroupBy? = nil, subsections: Bool? = nil, sortBy: SortBy? = nil) {
+        self.groupBy = groupBy
+        self.subsections = subsections
+        self.sortBy = sortBy
+    }
+
+    public func applied(to base: ArrangementSettings) -> ArrangementSettings {
+        ArrangementSettings(
+            groupBy: groupBy ?? base.groupBy,
+            subsections: subsections ?? base.subsections,
+            sortBy: sortBy ?? base.sortBy
+        )
+    }
+}
+
 /// A project with defaults and its overrides merged: what the refresh, the
 /// menu model and the notification rules read.
 public struct ProjectSettings: Equatable, Sendable {
@@ -349,6 +408,7 @@ public struct ProjectSettings: Equatable, Sendable {
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
     public var notifications: [NotificationRule]
+    public var arrangement: ArrangementSettings
 
     public init(
         name: String,
@@ -356,7 +416,8 @@ public struct ProjectSettings: Equatable, Sendable {
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
-        notifications: [NotificationRule]
+        notifications: [NotificationRule],
+        arrangement: ArrangementSettings = ArrangementSettings()
     ) {
         self.name = name
         self.repositories = repositories
@@ -364,6 +425,7 @@ public struct ProjectSettings: Equatable, Sendable {
         self.issues = issues
         self.workflowRuns = workflowRuns
         self.notifications = notifications
+        self.arrangement = arrangement
     }
 
     /// Whether the project lists items of `kind` (its `show` for that kind).
@@ -472,6 +534,13 @@ extension Configuration {
         # take authors the same way; a project can override it in its block.
         # [defaults.pull-requests]
         # authors = { show = [], hide = [] }
+
+        # How each project's items are grouped: "kind" (pull requests, issues,
+        # runs), "repository", "date", "author" or "none"; and sorted within a
+        # group: "updated", "created" or "title". A project can set its own.
+        # [defaults]
+        # group-by = "kind"
+        # sort-by = "updated"
 
         # List issues too, not only pull requests, in every project: set show
         # to true. A project can override it in its own block.

@@ -59,6 +59,7 @@ Shipyard starts at login: it registers itself as a login item when it launches. 
 - **↑** and **↓** move through the projects and items, wrapping at the ends; **Return** opens the highlighted item and **⌥Return** marks it seen. In the list, **←** goes to the item's project and collapses it, **→** expands it and goes to its first item, and **Return** on a project opens its (first) repository on GitHub. In tabs, **←** and **→** switch tabs.
 - **⌘R** refreshes now; otherwise shipyard refreshes on its own, within GitHub's rate limit.
 - Choose the layout in the configuration: `[menu] layout = "list"` (the default) puts every project in one scrolling list; `"tabs"` shows one project at a time.
+- A project's items are grouped by kind (pull requests, issues, runs), newest first; `group-by` (`"repository"`, `"date"`, `"author"`, `"none"`), `sort-by` (`"created"`, `"title"`) and `subsections = true` (a subheader over each group) change that, in `[defaults]` or per project.
 - Projects, what's shown and when you're notified live in `~/.config/shipyard/config.toml`; see [Configuration](#configuration). What you've seen lives in `~/Library/Application Support/Shipyard/`.
 
 ### Update

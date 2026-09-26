@@ -285,6 +285,8 @@ struct ConfigSchemaTests {
         #expect(enumValues(["menu-bar", "properties", "count"], in: properties) == MenuBarCount.allCases.map(\.rawValue))
         #expect(enumValues(["menu", "properties", "layout"], in: properties) == MenuLayout.allCases.map(\.rawValue))
         #expect(enumValues(["rate-limit", "properties", "show"], in: properties) == RateLimitDisplay.allCases.map(\.rawValue))
+        #expect(enumValues(["group-by"], in: definitions) == GroupBy.allCases.map(\.rawValue))
+        #expect(enumValues(["sort-by"], in: definitions) == SortBy.allCases.map(\.rawValue))
     }
 
     @Test("the schema rejects what validation rejects")
@@ -346,6 +348,8 @@ struct ConfigSchemaTests {
         #expect(try table.table(forKey: "menu-bar").string(forKey: "count") == "total")
         #expect(try table.table(forKey: "rate-limit").integer(forKey: "max-share-percent") == 10)
         let defaults = try table.table(forKey: "defaults")
+        #expect(try defaults.string(forKey: "group-by") == "kind")
+        #expect(try defaults.string(forKey: "sort-by") == "updated")
         let authors = try defaults.table(forKey: "pull-requests").table(forKey: "authors")
         #expect(try authors.array(forKey: "show").count == 0)
         #expect(try authors.array(forKey: "hide").count == 0)

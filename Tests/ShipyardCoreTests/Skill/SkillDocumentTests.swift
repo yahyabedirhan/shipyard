@@ -217,10 +217,14 @@ struct SkillDocumentTests {
             ("workflow-runs.show", "\(c.defaults.workflowRuns.show)"),
             ("workflow-runs.finished-window-hours", "\(c.defaults.workflowRuns.finishedWindowHours)"),
             ("workflow-runs.branches", literal(c.defaults.workflowRuns.branches)),
+            ("[defaults] group-by", literal(c.defaults.arrangement.groupBy)),
+            ("[defaults] sort-by", literal(c.defaults.arrangement.sortBy)),
         ]
         for (key, value) in rows {
             #expect(text.contains("| `\(key)` | `\(value)` |"), "no row `\(key)` = `\(value)`")
         }
+        #expect(c.defaults.arrangement.subsections == nil)
+        #expect(text.contains("| `[defaults] subsections` | unset |"))
         #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
         #expect(text.contains("| `notifications` | one rule: `pr.opened`, `authors = []` |"))
     }
@@ -230,7 +234,7 @@ struct SkillDocumentTests {
         let text = try skill()
         let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description) + NotificationRule.legacyAuthors
             + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
-            + WorkflowRunBranches.allCases.map(\.rawValue)
+            + WorkflowRunBranches.allCases.map(\.rawValue) + GroupBy.allCases.map(\.rawValue) + SortBy.allCases.map(\.rawValue)
         for value in values {
             #expect(text.contains("`\(value)`") || text.contains("`\"\(value)\"`"), "`\(value)` isn't listed")
         }

@@ -108,6 +108,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "group-by": { "$ref": "#/definitions/group-by" },
+        "subsections": { "$ref": "#/definitions/subsections" },
+        "sort-by": { "$ref": "#/definitions/sort-by" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
@@ -126,6 +129,22 @@
     }
   },
   "definitions": {
+    "group-by": {
+      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z), or none (one list).",
+      "type": "string",
+      "enum": ["kind", "repository", "date", "author", "none"],
+      "default": "kind"
+    },
+    "subsections": {
+      "description": "Draw each group under a subheader (its name and count) instead of after a divider line. Unset, each layout keeps its own look: dividers in the list, subheaders in tabs. A value set applies to both layouts.",
+      "type": "boolean"
+    },
+    "sort-by": {
+      "description": "The order within a group: last updated (newest first), created (newest first) or title (A to Z). Open or running items always come before closed or finished ones.",
+      "type": "string",
+      "enum": ["updated", "created", "title"],
+      "default": "updated"
+    },
     "project": {
       "description": "A named group of one or more GitHub repositories, shown as one section. Tables here merge key by key onto [defaults]; notifications replaces the default list.",
       "type": "object",
@@ -147,6 +166,9 @@
             "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
           }
         },
+        "group-by": { "$ref": "#/definitions/group-by" },
+        "subsections": { "$ref": "#/definitions/subsections" },
+        "sort-by": { "$ref": "#/definitions/sort-by" },
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
