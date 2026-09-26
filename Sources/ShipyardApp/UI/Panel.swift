@@ -66,7 +66,15 @@ struct Panel: View {
                 .accessibilityLabel(PanelText.layoutButton(layout))
             }
             Button(action: actions.refresh) {
-                RefreshIcon(isSpinning: shipyard.isRefreshing)
+                // While a refresh runs, the footer's native spinner stands in
+                // for the arrow; the hidden arrow keeps the button's size.
+                Image(systemName: "arrow.clockwise")
+                    .opacity(shipyard.isRefreshing ? 0 : 1)
+                    .overlay {
+                        if shipyard.isRefreshing {
+                            ProgressView().controlSize(.mini)
+                        }
+                    }
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut("r")
@@ -340,38 +348,6 @@ extension MenuLayout {
         case .list: "list.bullet"
         case .tabs: "rectangle.split.3x1"
         }
-    }
-}
-
-/// The Refresh button's arrow: turns steadily around its centre while a
-/// refresh runs and stands still otherwise. The angle is read from the
-/// timeline's clock on every frame rather than animated, so nothing keeps
-/// spinning once `isSpinning` turns false. The square frame keeps the
-/// header from shifting and puts the rotation's anchor on the glyph's centre.
-private struct RefreshIcon: View {
-    let isSpinning: Bool
-
-    /// One full turn per this many seconds.
-    private static let secondsPerTurn = 1.0
-
-    var body: some View {
-        if isSpinning {
-            TimelineView(.animation) { context in
-                icon.rotationEffect(Self.angle(at: context.date))
-            }
-        } else {
-            icon
-        }
-    }
-
-    private var icon: some View {
-        Image(systemName: "arrow.clockwise")
-            .frame(width: 16, height: 16)
-    }
-
-    private static func angle(at date: Date) -> Angle {
-        let turns = date.timeIntervalSinceReferenceDate / secondsPerTurn
-        return .degrees(turns.truncatingRemainder(dividingBy: 1) * 360)
     }
 }
 
