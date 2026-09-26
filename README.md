@@ -42,7 +42,7 @@ make install    # builds, ad-hoc signs, copies Shipyard.app to /Applications and
 
 ### From a release zip
 
-There's no GitHub release yet, so build the zip yourself with `make release` in a clone (it runs the tests and writes `build/Shipyard-<version>-macos.zip`). The zip is ad-hoc signed, not notarized, so macOS blocks the first launch of a copy that was downloaded. Unzip it, move `Shipyard.app` to `/Applications`, clear the quarantine flag and open it:
+Download `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest), or build it yourself with `make release` in a clone (it runs the tests and writes `build/Shipyard-<version>-macos.zip`). The zip is ad-hoc signed, not notarized, so macOS blocks the first launch of a copy that was downloaded. Unzip it, move `Shipyard.app` to `/Applications`, clear the quarantine flag and open it:
 
 ```sh
 unzip Shipyard-<version>-macos.zip

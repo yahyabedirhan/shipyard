@@ -59,8 +59,8 @@ struct PortsTests {
         #expect(opener.opened == [url])
     }
 
-    @Test("the version is 0.0.1")
+    @Test("the version is 0.0.2")
     func version() {
-        #expect(ShipyardVersion.current == "0.0.1")
+        #expect(ShipyardVersion.current == "0.0.2")
     }
 }
