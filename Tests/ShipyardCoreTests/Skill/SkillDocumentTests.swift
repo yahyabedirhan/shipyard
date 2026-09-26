@@ -68,10 +68,12 @@ struct SkillDocumentTests {
         #expect(skillURL.deletingLastPathComponent().lastPathComponent == "shipyard")
         let description = try #require(fields.first { $0.hasPrefix("description: ") })
         #expect(description.count > "description: ".count + 20)
-        // "Change my shipyard" means its configuration, inside this repository too.
+        // "Change my shipyard" means its configuration. The skill is for any
+        // shipyard user: shipyard's own repository and code are AGENTS.md's.
         #expect(description.contains("my shipyard"))
         #expect(description.contains("the shipyard app"))
-        #expect(description.contains("shipyard repository"))
+        let described = words(description.lowercased())
+        #expect(described.isDisjoint(with: ["repository", "repo", "code", "source"]), "the description speaks to shipyard's maintainers")
     }
 
     @Test("every TOML example decodes cleanly and validates against the schema")
