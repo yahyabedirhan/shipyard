@@ -44,20 +44,41 @@ struct Hairline: View {
 
 /// A count in a capsule that rolls to its new number: the accent colour
 /// when it asks to be seen, muted when the rows it counts are in view.
+///
+/// Both colourings are drawn, one over the other, and muting fades between
+/// them. Restyling the number instead would change the text itself, and
+/// its numeric content transition would roll the digits on a colour change
+/// alone; this way only a new count rolls them.
 struct CountBadge: View {
     let count: Int
     var muted = false
 
     var body: some View {
+        ZStack {
+            number.foregroundStyle(.secondary).opacity(muted ? 1 : 0)
+            number.foregroundStyle(Color.white).opacity(muted ? 0 : 1)
+        }
+        // Fixed, so a tab's label style changing around the badge doesn't
+        // restyle the muted number either.
+        .foregroundStyle(Color.primary)
+        .padding(.horizontal, 5)
+        .frame(minWidth: 17, minHeight: 15)
+        .background {
+            ZStack {
+                Capsule().fill(Color.primary.opacity(0.09)).opacity(muted ? 1 : 0)
+                Capsule().fill(Palette.accent).opacity(muted ? 0 : 1)
+            }
+        }
+        .animation(Motion.tint, value: muted)
+        .animation(Motion.count, value: count)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(count) need attention")
+    }
+
+    private var number: some View {
         Text(String(count))
             .font(TypeScale.badge)
             .contentTransition(.numericText(value: Double(count)))
-            .foregroundStyle(muted ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.white))
-            .padding(.horizontal, 5)
-            .frame(minWidth: 17, minHeight: 15)
-            .background(Capsule().fill(muted ? Color.primary.opacity(0.09) : Palette.accent))
-            .animation(Motion.count, value: count)
-            .accessibilityLabel("\(count) need attention")
     }
 }
 

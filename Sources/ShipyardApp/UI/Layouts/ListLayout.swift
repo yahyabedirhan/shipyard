@@ -213,8 +213,8 @@ private struct ListSectionHeader: View {
                         .lineLimit(1)
                     if section.attentionCount > 0 {
                         // Muted while its rows are in view; the accent once collapsed.
+                        // The badge fades its own colour, and keeps its number still.
                         CountBadge(count: section.attentionCount, muted: !section.isCollapsed)
-                            .animation(Motion.collapse, value: section.isCollapsed)
                             .transition(.scale(scale: 0.4).combined(with: .opacity))
                     }
                     Spacer(minLength: 8)
