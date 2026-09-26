@@ -219,20 +219,21 @@ struct PanelTextTests {
         #expect(PanelText.rowCard(issue, now: now).lines == ["updated 2h ago"])
     }
 
-    @Test("a card says why its row needs attention, as tags and in words")
+    @Test("a card tags a review request and failed checks, in words too, but not new or changed")
     func attentionCard() {
         var unseen = row(checks: .failed)
         unseen.needsAttention = true
         unseen.attentionReasons = [.unseen, .reviewRequested, .checksFailed]
         let card = PanelText.rowCard(unseen, now: now)
-        #expect(card.reasons == [.unseen, .reviewRequested, .checksFailed])
+        #expect(card.reasons == [.reviewRequested, .checksFailed])
         #expect(card.kind == .pullRequest)
-        #expect(card.attention == "New · Your review is requested · Checks failed")
-        #expect(card.spoken == "Checks failed. No comments. New · Your review is requested · Checks failed")
+        #expect(card.attention == "Your review is requested · Checks failed")
+        #expect(card.spoken == "Checks failed. No comments. Your review is requested · Checks failed")
 
         var changed = unseen
         changed.attentionReasons = [.changed]
-        #expect(PanelText.rowCard(changed, now: now).attention == "Changed since you saw it")
+        #expect(PanelText.rowCard(changed, now: now).reasons == [])
+        #expect(PanelText.rowCard(changed, now: now).attention == nil)
     }
 
     @Test("a run's card has its title, what started it and who, and how long it ran")

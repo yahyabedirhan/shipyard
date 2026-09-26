@@ -3,7 +3,8 @@ import Foundation
 /// A row's hover card: only what the row doesn't already show. Its title
 /// and second line are on the row, so the card has the author's avatar, the
 /// rest of the item (branches, size, review, comments, when it last moved,
-/// what started a run and how long it took) and why the row needs attention.
+/// what started a run and how long it took), and whether it waits on the
+/// viewer's review or failed its checks.
 public struct RowCard: Hashable, Sendable {
     /// The author's avatar (a run: whoever triggered it).
     public var avatarURL: URL?
@@ -15,10 +16,12 @@ public struct RowCard: Hashable, Sendable {
     public var facts: [[Fact]]
     /// What kind of item it is, for the words of `reasons`.
     public var kind: ItemKind
-    /// Why the row needs attention, which the app draws as tags; empty
-    /// when it doesn't.
+    /// The reasons the row needs attention that the card shows, as tags:
+    /// a review request and failed checks. New and changed aren't worth a
+    /// tag; the row's attention dot says as much.
     public var reasons: [Attention.Reason]
-    /// The same in words: "New · Checks failed"; `nil` when it doesn't.
+    /// The same in words: "Your review is requested · Checks failed";
+    /// `nil` when there are none.
     public var attention: String?
 
     /// Each line of facts in words: "+120 −43 · 6 files".
@@ -79,7 +82,7 @@ extension PanelText {
             if !review.isEmpty { facts.append(review) }
             facts.append(activity(row, now: now))
         case .issue:
-            // An issue's card is its title and why it needs attention; a
+            // An issue's card is its title and its tags; a
             // lone "No comments" under them would be noise.
             let activity = activity(row, now: now).filter { $0 != .comments(0) }
             if !activity.isEmpty { facts.append(activity) }
@@ -89,13 +92,14 @@ extension PanelText {
             facts.append([runTime(row, now: now)])
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
-        let reasons = row.attentionReasons.map { attentionWord($0, kind: row.kind) }
+        let tagged = row.attentionReasons.filter { $0 == .reviewRequested || $0 == .checksFailed }
+        let reasons = tagged.map { attentionWord($0, kind: row.kind) }
         return RowCard(
             avatarURL: row.item.avatarURL,
             headline: headline,
             facts: facts,
             kind: row.kind,
-            reasons: row.attentionReasons,
+            reasons: tagged,
             attention: reasons.isEmpty ? nil : reasons.joined(separator: " · ")
         )
     }

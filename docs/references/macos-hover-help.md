@@ -80,7 +80,7 @@ The 14 `.help(` sites in `Sources/ShipyardApp`, and what each became:
 
 | Site | Now | Why |
 |---|---|---|
-| Row (`itemRow`, both layouts) | Card: `PanelText.rowCard`, lined up with the title | Only what the row doesn't show (the maintainer found a card repeating the row pointless): the author's avatar, why it needs attention as tinted tags, then branches, size, review, comments, a run's trigger and duration, each with an SF Symbol. No ⌥-click hint. The avatar URL and the extra pull request fields are plain GraphQL fields, which add no cost (the cost counts connections) |
+| Row (`itemRow`, both layouts) | Card: `PanelText.rowCard`, lined up with the title | Only what the row doesn't show (the maintainer found a card repeating the row pointless): the author's avatar, a review request and failed checks as tinted tags (the maintainer found new and changed not worth one), then branches, size, review, comments, a run's trigger and duration, each with an SF Symbol. No ⌥-click hint. The avatar URL and the extra pull request fields are plain GraphQL fields, which add no cost (the cost counts connections) |
 | Check dot (`CheckDot`) | No hover help; its words moved into the row's help ("Checks failed") | A help source nested inside the row's would compete with it; VoiceOver keeps the dot's label |
 | Layout button | Card: `PanelText.layoutButton` | Says the current layout and what a click does |
 | Refresh | Card: `PanelText.refreshHelp`, "Refresh (⌘R)" | An icon-only button; the help names the shortcut |

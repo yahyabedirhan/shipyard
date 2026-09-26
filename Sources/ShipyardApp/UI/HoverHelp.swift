@@ -362,8 +362,8 @@ private struct RowCardView: View {
     }
 }
 
-/// A reason the row needs attention, as a tinted tag: new and changed in
-/// the attention dot's blue, a review request amber, failed checks red.
+/// A reason the row needs attention, as a tinted tag: a review request
+/// amber, failed checks red.
 private struct AttentionTag: View {
     let reason: Attention.Reason
     let kind: ItemKind
