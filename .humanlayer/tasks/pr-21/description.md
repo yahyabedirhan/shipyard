@@ -7,6 +7,7 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
 ## Special things to note
 
 - **0.0.x connects through `gh` only.** Sign-in without `gh` (the device flow, which needs an OAuth App client ID, plus the Keychain) moved to its own effort, #22, with #23 and #14. The device-flow code stays in the core, switched off. With a `gh` token, Sign out only lasts until Try again or the next launch; that is deferred to #22 too.
+- **Don't merge until QA is done:** #45 and #33 are blocking QA tickets, assigned to the maintainer with `ready-for-qa` and steps to try. Merge once both are closed. Two commits say "closes #45" or "closes #33", so merging closes them automatically.
 - **Still for the maintainer, in the real menu (#20):**
   - **The keys (#45), in the list layout:**
     - Press ↓ as soon as the menu opens, with no click. Do it again after closing and reopening.
