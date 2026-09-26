@@ -1,4 +1,4 @@
-[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Phase 1: #2–#12 | Phase 2: #13, #15–#20, #24–#27, #29–#32, #35–#40 | Follow-ups: #33, #44, #45 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Install](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/README.md#install) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/configuration.md)
+[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Phase 1: #2–#12 | Phase 2: #13, #15–#20, #24–#27, #29–#32, #35–#40 | Follow-ups: #33, #44–#52 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Install](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/README.md#install) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/configuration.md)
 
 ## Why the change
 
@@ -7,7 +7,7 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
 ## Special things to note
 
 - **0.0.x connects through `gh` only.** Sign-in without `gh` (the device flow, which needs an OAuth App client ID, plus the Keychain) moved to its own effort, #22, with #23 and #14. The device-flow code stays in the core, switched off. With a `gh` token, Sign out only lasts until Try again or the next launch; that is deferred to #22 too.
-- **Don't merge until QA is done:** #45 and #33 are blocking QA tickets, assigned to the maintainer with `ready-for-qa` and steps to try. Merge once both are closed. Two commits say "closes #45" or "closes #33", so merging closes them automatically.
+- **Don't merge until QA is done:** #45, #33 and #51 are blocking QA tickets, assigned to the maintainer with `ready-for-qa` and steps to try on the installed build. Merge once all three are closed. Two commits say "closes #45" or "closes #33", so merging closes them automatically.
 - **Still for the maintainer, in the real menu (#20):**
   - **The keys (#45), in the list layout:**
     - Press ↓ as soon as the menu opens, with no click. Do it again after closing and reopening.
@@ -16,6 +16,8 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
     - ← goes to the project header, then collapses it; → expands it, then goes to its first item.
     - Return on a header opens its repository; Return opens an item; ⌥Return only marks it seen.
   - **The keys in the tabs layout:** ←/→ switch tabs, and the new tab starts at the top with its first row highlighted. ↑/↓ scroll correctly straight after a switch.
+  - **The layout button (#51):** it shows the current layout; a click switches to the next and writes only `[menu] layout` in `config.toml`.
+  - **A look, no QA:** your avatar and @handle in the header (a click opens your profile); the refresh icon spins around its centre; a missing `config.toml` comes back with commented examples on launch.
   - **Other checks:**
     - The tabs tooltip now reads like the list's: state, then details.
     - A `[rate-limit]` edit shows in the footer at once.
@@ -93,12 +95,25 @@ The follow-ups put the row highlight, and the keys that move it, under one teste
    TabsLayout: ←/→ switch tabs, scroll to a stable top anchor
 ```
 
+The last round made the configuration friendlier for users and agents:
+
+```diff
+ ConfigStore
++  createIfMissing() on every start and on Refresh      starter header: common settings commented out at their defaults
++  setLayout(_:)                                        the layout button's one targeted edit
+ Shipyard
++  publishConfigStatus()     → Application Support/Shipyard/config-status.json   the app's verdict, for agents
++  viewer: name, avatar, profile URL (from the existing /user call) → header account, AvatarCache on disk
+ skills/shipyard           reads the verdict after saving; written for users only
+ AGENTS.md                 "change my shipyard" means config.toml; no issue numbers in code
+```
+
 What lands where:
 
 ```text
 Sources/ShipyardCore/         configuration, GitHub, items, menu model + words, state, skill installer, Shipyard
 Sources/ShipyardApp/          adapters above; UI/Design.swift, Components.swift and RowKeys.swift shared by both layouts
-Tests/ShipyardCoreTests/      384 tests; Harness drives Shipyard end to end over recorded GitHub answers
+Tests/ShipyardCoreTests/      424 tests; Harness drives Shipyard end to end over recorded GitHub answers
 Makefile, Packaging/          make install / release (ad-hoc signed zip) / icon; origami app icon + sailboat, night, sunset alternates
 schema/, skills/shipyard/     published schema; the user-facing agent skill, checked key by key in tests
 docs/                         low-level design, configuration.md for maintainers, references (incl. end-to-end testing)
