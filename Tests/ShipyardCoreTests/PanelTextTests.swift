@@ -433,10 +433,25 @@ struct PanelTextTests {
     func connectSignedOutGhStillSignedIn() {
         let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: true)
         #expect(text.title == "Welcome back")
-        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this Mac, so connecting takes one click. Or sign in with GitHub, if you'd rather.")
+        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:")
+        #expect(text.alternative == "Alternatively, sign in with GitHub, if you'd rather:")
         #expect(!text.message.contains("logout"))
         #expect(text.lead == .connectWithGh)
         #expect(!text.showsInstallHint)
+    }
+
+    @Test("without a client ID, signed out while gh is still signed in has no second block")
+    func connectSignedOutGhStillSignedInWithoutClientID() {
+        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn), canSignIn: false)
+        #expect(text.message == "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:")
+        #expect(text.alternative == nil)
+    }
+
+    @Test("only signed out while gh is still signed in splits into two blocks", arguments: [
+        Shipyard.SignedOutReason.noToken, .rejected(.gh), .rejected(.tokenStore), .userSignedOut(.signedOut),
+    ])
+    func connectOneBlock(reason: Shipyard.SignedOutReason) {
+        #expect(PanelText.connect(reason, canSignIn: true).alternative == nil)
     }
 
     @Test("a rejected Keychain token says so in a line, then Sign in with GitHub leads")
@@ -501,7 +516,7 @@ struct PanelTextTests {
         var words = reasons.flatMap { reason in
             [true, false].flatMap { canSignIn in
                 let text = PanelText.connect(reason, canSignIn: canSignIn)
-                return [text.title, text.message]
+                return [text.title, text.message, text.alternative ?? ""]
             } + [PanelText.stillSignedOut(reason)]
         }
         words += [PanelText.connectWithGh, PanelText.useGhInstead, PanelText.useGhInsteadHelp, PanelText.installGhHelp]

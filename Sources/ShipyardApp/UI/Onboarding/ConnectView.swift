@@ -7,14 +7,15 @@ import SwiftUI
 /// Sign in with GitHub (the device flow) with the `gh` way folded in a
 /// disclosure under it; or the `gh auth login` box over Connect with gh,
 /// then Sign in with GitHub; or Connect with gh, when `gh` is signed in
-/// already, then Sign in with GitHub. Connect with gh looks for a token once
-/// more (`start()`). A build without an OAuth App client ID shows Sign in
-/// with GitHub disabled, with why, and `gh` leads. While the device flow
+/// already, then a divider and Sign in with GitHub under a line of its
+/// own. Connect with gh looks for a token once more (`start()`). A build
+/// without an OAuth App client ID shows Sign in with GitHub disabled, with
+/// why (or not at all when `gh` is signed in), and `gh` leads. While the device flow
 /// waits (`connecting`) it shows the code (a click on it, or on its copy
 /// icon, copies it), a button that copies it and opens
 /// github.com/login/device, and Cancel. The words come from
 /// `PanelText.connect` and `PanelText.deviceCode`; `gh` in them is set in
-/// code font explicitly (`Text(markdown:code:)`).
+/// code font on a chip (`CodeText`).
 ///
 /// `start()` clears the reason while it looks for a token, so the last one
 /// stays on screen during Connect with gh; before any is known (at launch)
@@ -65,10 +66,7 @@ struct ConnectView: View {
     private func screen(_ text: PanelText.Connect) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
-            markdown(text.message, size: 12)
-                .foregroundStyle(.secondary)
-                .lineSpacing(1.5)
-                .fixedSize(horizontal: false, vertical: true)
+            line(text.message)
                 .padding(.bottom, 16)
             VStack(alignment: .leading, spacing: 8) {
                 switch text.lead {
@@ -88,12 +86,26 @@ struct ConnectView: View {
                     signIn(prominent: false, unavailable: text.signInUnavailable)
                 case .connectWithGh:
                     connectWithGh(prominent: true)
-                    signIn(prominent: false, unavailable: text.signInUnavailable)
+                    if let alternative = text.alternative {
+                        Divider()
+                            .padding(.vertical, 8)
+                        line(alternative)
+                            .padding(.bottom, 8)
+                        signIn(prominent: false, unavailable: text.signInUnavailable)
+                    }
                 }
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A line of the screen's words, over the buttons it leads to.
+    private func line(_ text: String) -> some View {
+        markdown(text, size: 12)
+            .foregroundStyle(.secondary)
+            .lineSpacing(1.5)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// The `gh auth login` box, with the install hint beside it, over
@@ -178,10 +190,9 @@ struct ConnectView: View {
     }
 
     /// Text from `PanelText` that may hold Markdown (`gh` in backticks, a
-    /// link), `size` points, with its code spans monospaced at the same size.
+    /// link), `size` points, with its code spans as code (`CodeText`).
     private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> Text {
-        Text(markdown: text, code: .system(size: size, weight: weight, design: .monospaced))
-            .font(.system(size: size, weight: weight))
+        Text(markdown: text, size: size, weight: weight)
     }
 
     // MARK: - The code (connecting)

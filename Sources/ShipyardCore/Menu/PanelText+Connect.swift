@@ -15,8 +15,9 @@ extension PanelText {
             /// The `gh auth login` box with Connect with gh beside it,
             /// prominent; Sign in with GitHub under it.
             case ghCommand
-            /// Connect with gh, prominent, beside the message (`gh` is
-            /// signed in already); Sign in with GitHub under it.
+            /// Connect with gh, prominent, under the message (`gh` is
+            /// signed in already); then, after a divider, `alternative` and
+            /// Sign in with GitHub.
             case connectWithGh
         }
 
@@ -31,6 +32,10 @@ extension PanelText {
         /// Whether `gh` may not be installed at all, so the `gh` way has the
         /// install hint (`installGh`) beside it.
         public var showsInstallHint: Bool
+        /// The line over Sign in with GitHub when it's a second block, after
+        /// a divider; `nil` when Sign in with GitHub has no line of its own
+        /// (or, in `connectWithGh` without a client ID, isn't offered).
+        public var alternative: String? = nil
     }
 
     /// What the code screen says while the device flow waits for approval.
@@ -124,11 +129,12 @@ extension PanelText {
         case .userSignedOut(.ghStillSignedIn):
             return Connect(
                 title: "Welcome back",
-                message: "The GitHub CLI (`gh`) is already signed in on this Mac, so connecting takes one click."
-                    + (canSignIn ? " Or sign in with GitHub, if you'd rather." : ""),
+                message: "The GitHub CLI (`gh`) is already signed in on this computer, so connecting takes one click:",
                 lead: .connectWithGh,
                 signInUnavailable: unavailable,
-                showsInstallHint: false
+                showsInstallHint: false,
+                // Without a client ID there's no second way to offer.
+                alternative: canSignIn ? "Alternatively, sign in with GitHub, if you'd rather:" : nil
             )
         case .rejected(.tokenStore):
             return Connect(

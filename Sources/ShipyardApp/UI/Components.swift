@@ -552,17 +552,43 @@ private struct TextButtonBody: View {
     }
 }
 
-extension Text {
-    /// Inline Markdown from `PanelText` (a command in backticks, a link),
-    /// with each code span set in `code` explicitly: `Text` given a
-    /// `LocalizedStringKey` drops the backticks but, under a `.font(_:)` of a
-    /// fixed size, keeps the span in the surrounding font.
-    init(markdown: String, code: Font) {
+/// Inline Markdown from `PanelText` (a command in backticks, a link) as
+/// the panel draws it: `size` points, with each code span monospaced on a
+/// faint chip. The chip is what makes it read as code: SF Mono's "g" and "h"
+/// are drawn almost like SF Pro's, so a short command such as `gh` in the
+/// monospaced font alone looks like the words around it.
+enum CodeText {
+    /// The chip behind a code span.
+    static let chip = Color.primary.opacity(0.09)
+    /// The chip's padding at each end: a thin space, so it doesn't hug the letters.
+    static let padding = "\u{2009}"
+
+    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        var text = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
-        for run in text.runs where run.inlinePresentationIntent?.contains(.code) == true {
-            text[run.range].font = code
+        let parsed = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
+        let code = Font.system(size: size, weight: weight, design: .monospaced)
+        var text = AttributedString()
+        for run in parsed.runs {
+            var piece = AttributedString(parsed[run.range])
+            piece.font = .system(size: size, weight: weight)
+            if run.inlinePresentationIntent?.contains(.code) == true {
+                piece.font = code
+                piece.backgroundColor = chip
+                var pad = AttributedString(padding)
+                pad.font = .system(size: size, weight: weight)
+                pad.backgroundColor = chip
+                piece = pad + piece + pad
+            }
+            text += piece
         }
-        self.init(text)
+        return text
+    }
+}
+
+extension Text {
+    /// `CodeText.attributed(markdown, size:weight:)`: the font is in the
+    /// runs, so a `.font(_:)` on the view doesn't change it.
+    init(markdown: String, size: CGFloat, weight: Font.Weight = .regular) {
+        self.init(CodeText.attributed(markdown, size: size, weight: weight))
     }
 }
