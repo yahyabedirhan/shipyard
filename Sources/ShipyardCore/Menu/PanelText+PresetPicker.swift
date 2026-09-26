@@ -3,7 +3,7 @@ import Foundation
 // Onboarding's preset step's words (`PresetPicker`).
 extension PanelText {
     public static let presetTitle = "How will you use Shipyard?"
-    public static let presetIntro = "Pick a starting point. Shipyard sets up your configuration from it, and you can change it at any time."
+    public static let presetIntro = "Pick a starting point for your configuration. You can change it at any time."
     /// `incoming-contributions`' two ways to choose its repositories.
     public static let watchOwned = "All my repositories (owned)"
     public static let pickRepositories = "Pick repositories"

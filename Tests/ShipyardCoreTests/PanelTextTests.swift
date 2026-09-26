@@ -605,10 +605,11 @@ struct PanelTextTests {
 
     // MARK: - The project picker
 
-    @Test("the preset step speaks to the user and doesn't name the configuration file")
+    @Test("the preset step speaks to the user and names neither the app nor the configuration file in its description")
     func presetWords() {
-        #expect(PanelText.presetIntro == "Pick a starting point. Shipyard sets up your configuration from it, and you can change it at any time.")
+        #expect(PanelText.presetIntro == "Pick a starting point for your configuration. You can change it at any time.")
         #expect(!PanelText.presetIntro.contains("config.toml"))
+        #expect(!PanelText.presetIntro.contains("Shipyard"))
         #expect(Preset.myAgents.title == "You and your agents")
         #expect(Preset.myAgents.summary == "The pull requests and issues you and your agents open, in the repositories you pick.")
     }
