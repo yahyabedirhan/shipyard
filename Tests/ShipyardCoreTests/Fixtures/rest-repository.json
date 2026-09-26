@@ -1,0 +1,27 @@
+{
+  "id": 861234567,
+  "node_id": "R_kgDOM1a2bw",
+  "name": "shipyard-notes",
+  "full_name": "yahyabedirhan/shipyard-notes",
+  "private": false,
+  "owner": {
+    "login": "yahyabedirhan",
+    "id": 42,
+    "node_id": "MDQ6VXNlcjQy",
+    "type": "User",
+    "site_admin": false
+  },
+  "html_url": "https://github.com/yahyabedirhan/shipyard-notes",
+  "description": "Notes for shipyard",
+  "fork": false,
+  "url": "https://api.github.com/repos/yahyabedirhan/shipyard-notes",
+  "created_at": "2026-08-01T10:00:00Z",
+  "updated_at": "2026-09-24T16:00:00Z",
+  "pushed_at": "2026-09-24T15:59:00Z",
+  "default_branch": "main",
+  "archived": false,
+  "disabled": false,
+  "visibility": "public",
+  "open_issues_count": 2,
+  "permissions": { "admin": true, "maintain": true, "push": true, "triage": true, "pull": true }
+}

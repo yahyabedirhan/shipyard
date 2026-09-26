@@ -1,0 +1,32 @@
+{
+  "data": {
+    "viewer": { "login": "yabepa" },
+    "repo0": {
+      "nameWithOwner": "yahyabedirhan/job-search",
+      "openPullRequests": {
+        "nodes": [
+          {
+            "number": 3, "title": "Track applications in a table", "url": "https://github.com/yahyabedirhan/job-search/pull/3",
+            "isDraft": false, "state": "OPEN",
+            "createdAt": "2026-09-25T08:00:00Z", "updatedAt": "2026-09-25T08:30:00Z", "closedAt": null, "mergedAt": null,
+            "author": { "login": "yabepa", "__typename": "User" },
+            "comments": { "totalCount": 0 }, "reviews": { "totalCount": 0 },
+            "reviewRequests": { "nodes": [] },
+            "commits": { "nodes": [ { "commit": { "statusCheckRollup": { "state": "SUCCESS" } } } ] }
+          }
+        ]
+      },
+      "closedPullRequests": { "nodes": [] }
+    },
+    "repo1": null,
+    "rateLimit": { "limit": 5000, "remaining": 4998, "used": 2, "resetAt": "2026-09-25T12:42:00Z", "cost": 1 }
+  },
+  "errors": [
+    {
+      "type": "NOT_FOUND",
+      "path": ["repo1"],
+      "locations": [{ "line": 3, "column": 3 }],
+      "message": "Could not resolve to a Repository with the name 'yahyabedirhan/gone'."
+    }
+  ]
+}

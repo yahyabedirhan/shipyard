@@ -1,0 +1,111 @@
+# shipyard: build, test, bundle, sign and install the menu bar app with
+# SwiftPM alone (no Xcode project).
+#
+#   make            build the app (release)
+#   make test       run the tests (swift test)
+#   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), ad-hoc signed
+#   make install    bundle, then replace /Applications/Shipyard.app and open it
+#   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
+#   make run        run the executable from .build, without a bundle
+#   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=origami)
+#   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
+#   make clean
+
+APP         := Shipyard
+# The version lives in one place, the core; the bundle is stamped with it.
+VERSION     := $(shell sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/ShipyardCore/Version.swift)
+
+BUILD_DIR   := build
+APP_BUNDLE  := $(BUILD_DIR)/$(APP).app
+CONTENTS    := $(APP_BUNDLE)/Contents
+ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
+INSTALL_DIR := /Applications
+ICON_FILE   := Packaging/Icon/AppIcon.icns
+ICONSET     := $(BUILD_DIR)/AppIcon.iconset
+# The variant make-icon.swift draws for the app: origami, sailboat, night or sunset.
+ICON        ?= origami
+ALTERNATES  := sailboat night sunset
+
+# With the Command Line Tools alone (no Xcode), swift test can't find the
+# Testing framework the tests use: point the compiler and the test runner at
+# the copy the Command Line Tools ship. With Xcode (CI) nothing is needed.
+DEVELOPER_DIR := $(shell xcode-select -p 2>/dev/null)
+ifneq (,$(findstring CommandLineTools,$(DEVELOPER_DIR)))
+TESTING_FRAMEWORKS := $(DEVELOPER_DIR)/Library/Developer/Frameworks
+TESTING_LIBRARIES  := $(DEVELOPER_DIR)/Library/Developer/usr/lib
+TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
+	-Xlinker -F -Xlinker $(TESTING_FRAMEWORKS) \
+	-Xlinker -rpath -Xlinker $(TESTING_FRAMEWORKS) \
+	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
+endif
+
+.PHONY: all build test bundle install release run icon icon-alternates clean
+
+all: build
+
+build:
+	swift build -c release --product $(APP)
+
+test:
+	swift test $(TEST_FLAGS)
+
+run:
+	swift run $(APP)
+
+bundle: build
+	@rm -rf $(APP_BUNDLE)
+	@mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
+	cp "$$(swift build -c release --show-bin-path)/$(APP)" $(CONTENTS)/MacOS/$(APP)
+	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
+	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
+	@printf 'APPL????' > $(CONTENTS)/PkgInfo
+	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
+	@# bundle gives it the stable identity notifications and login items need.
+	codesign --force --sign - --timestamp=none $(APP_BUNDLE)
+	codesign --verify --strict $(APP_BUNDLE)
+	@echo "bundled $(APP_BUNDLE) ($(VERSION))"
+
+install: bundle
+	@# Only this user's copy; one that hasn't quit after about 10 s is killed.
+	@pkill -u "$$USER" -x $(APP) 2>/dev/null || true
+	@tries=0; while pgrep -u "$$USER" -x $(APP) >/dev/null; do \
+		if [ $$tries -ge 50 ]; then \
+			echo "$(APP) didn't quit within 10 s; killing it"; \
+			pkill -9 -u "$$USER" -x $(APP) 2>/dev/null || true; \
+			sleep 0.5; break; \
+		fi; \
+		tries=$$((tries + 1)); sleep 0.2; \
+	done
+	rm -rf $(INSTALL_DIR)/$(APP).app
+	ditto $(APP_BUNDLE) $(INSTALL_DIR)/$(APP).app
+	@echo "installed $(INSTALL_DIR)/$(APP).app"
+	open $(INSTALL_DIR)/$(APP).app
+
+release: test bundle
+	@rm -f $(ZIP)
+	@# Without extended attributes: they're this Mac's (com.apple.provenance),
+	@# and the signature doesn't need them. So unzip leaves no __MACOSX folder.
+	cd $(BUILD_DIR) && ditto -c -k --keepParent --norsrc --noextattr --noacl $(APP).app $(notdir $(ZIP))
+	@shasum -a 256 $(ZIP)
+
+# The icon is committed, so bundling doesn't redraw it; run this after
+# changing make-icon.swift, or with ICON=<variant> to switch the app's icon.
+icon:
+	swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $(ICON)
+	iconutil -c icns $(ICONSET) -o $(ICON_FILE)
+	@rm -rf $(ICONSET)
+
+# The variants the app doesn't use, kept to switch to: an .icns and a 512 pt
+# preview of each in Packaging/Icon/alternates/, committed.
+icon-alternates:
+	@mkdir -p Packaging/Icon/alternates
+	@for variant in $(ALTERNATES); do \
+		swift Packaging/Icon/make-icon.swift $(ICONSET) --variant $$variant || exit 1; \
+		iconutil -c icns $(ICONSET) -o Packaging/Icon/alternates/$$variant.icns || exit 1; \
+		cp $(ICONSET)/icon_512x512.png Packaging/Icon/alternates/$$variant.png; \
+		echo "drew Packaging/Icon/alternates/$$variant.icns"; \
+	done
+	@rm -rf $(ICONSET)
+
+clean:
+	rm -rf $(BUILD_DIR) .build

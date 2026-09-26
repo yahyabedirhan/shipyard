@@ -2,9 +2,14 @@
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
+## Changing The Maintainer's Shipyard
+
+A request to change the maintainer's shipyard (its layout, projects, notifications, what it shows) means their `config.toml`: edit it through the **shipyard** skill, even from this repository. Change the app's code only when the request asks for code (a new setting, a bug fix, a feature). When no setting does what's asked, say so; the code change waits for the maintainer to ask for it.
+
 ## Git, Commits, And Pull Requests
 
 - Opening a pull request, or changing an existing one's description, goes through the **to-pr** skill, which owns the description's shape and where it is saved. Invoke it as part of the work, without waiting to be asked.
+- Issue and pull request numbers belong in commit messages, pull requests and docs. Code, comments and test names say what they mean in words, so they read without the tracker.
 
 Use lowercase multi-line commit messages with a Conventional Commits type on the subject line:
 
@@ -38,6 +43,10 @@ Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/age
 ## Design
 
 `docs/low-level-design.md` is the agreed module design: requirements, modules and their state, the folder tree, the refresh pipeline and traced flows. Read it before adding or moving a module, and update it in the same change when the design moves.
+
+## Testing
+
+Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac. Accessibility access is blocked for agents on purpose, so clicking, scripting or opening the installed app always fails; don't retry it or look for a way around it. When a change needs a check in the real menu, name the check in the handoff or pull request and leave it to the maintainer.
 
 ## References
 

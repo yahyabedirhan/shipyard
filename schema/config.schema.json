@@ -1,0 +1,260 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json",
+  "title": "shipyard configuration",
+  "description": "config.toml for shipyard, the macOS menu bar app for the pull requests, issues and workflow runs on your projects. The file lives in $XDG_CONFIG_HOME/shipyard/ (default ~/.config/shipyard/). Every key is optional; a missing key takes its default, so an empty file means defaults with no projects. Keys are kebab-case. Shipyard applies edits live, keeps the last valid configuration when an edit is broken, and ignores unknown keys with a warning.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "The configuration format version. Only 1 exists.",
+      "type": "integer",
+      "enum": [1],
+      "default": 1
+    },
+    "refresh-interval-seconds": {
+      "description": "How often to refresh, in seconds. A floor: shipyard stretches it when a refresh at this interval would spend more than max-share-percent of a GitHub rate limit.",
+      "type": "integer",
+      "minimum": 30,
+      "default": 120
+    },
+    "launch-at-login": {
+      "description": "Start shipyard when you log in.",
+      "type": "boolean",
+      "default": true
+    },
+    "hide-authors": {
+      "description": "Logins whose items are hidden, e.g. \"dependabot[bot]\".",
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "menu-bar": {
+      "description": "What the menu bar shows next to the icon.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "description": "The attention count: one total, split by kind (pull requests, issues, runs), or no number.",
+          "type": "string",
+          "enum": ["total", "per-kind", "none"],
+          "default": "total"
+        }
+      }
+    },
+    "menu": {
+      "description": "How the panel draws your projects.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "description": "One scrolling list of every project, one line per item under pinned project headers, or one project at a time in tabs.",
+          "type": "string",
+          "enum": ["list", "tabs"],
+          "default": "list"
+        }
+      }
+    },
+    "rate-limit": {
+      "description": "How much of your GitHub rate limit shipyard may use, and whether the panel shows it. The limit is shared with every other tool using your account, your agents included.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "Show the rate limit in the panel footer always, only when it's low (below 25%), or never.",
+          "type": "string",
+          "enum": ["always", "when-low", "never"],
+          "default": "always"
+        },
+        "max-share-percent": {
+          "description": "The largest share of each hourly GitHub limit (GraphQL points, REST requests) shipyard spends, in percent.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10
+        }
+      }
+    },
+    "attention": {
+      "description": "Which reasons make an open item need attention (count in the menu bar). Clicking an item clears all of them until it changes again. Closed items never need attention.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "unseen": {
+          "description": "An item you haven't clicked yet.",
+          "type": "boolean",
+          "default": true
+        },
+        "changed": {
+          "description": "An item that changed (commits, comments, reviews, checks, review request) since you clicked it.",
+          "type": "boolean",
+          "default": true
+        },
+        "review-requested": {
+          "description": "A pull request that requests your review.",
+          "type": "boolean",
+          "default": true
+        },
+        "checks-failed": {
+          "description": "A pull request whose checks failed.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "defaults": {
+      "description": "What every project shows and notifies about, unless the project overrides it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pull-requests": { "$ref": "#/definitions/pull-requests" },
+        "issues": { "$ref": "#/definitions/issues" },
+        "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "notifications": {
+          "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
+          "$ref": "#/definitions/notifications",
+          "default": [{ "event": "pr.opened", "authors": "any" }]
+        }
+      }
+    },
+    "projects": {
+      "description": "One [[projects]] block per project, shown as a section in this order.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/project" },
+      "default": []
+    }
+  },
+  "definitions": {
+    "project": {
+      "description": "A named group of one or more GitHub repositories, shown as one section. Tables here merge key by key onto [defaults]; notifications replaces the default list.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "repositories"],
+      "properties": {
+        "name": {
+          "description": "The section's title; unique across projects.",
+          "type": "string",
+          "minLength": 1
+        },
+        "repositories": {
+          "description": "The project's repositories as owner/name slugs, each listed once. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+          }
+        },
+        "pull-requests": { "$ref": "#/definitions/pull-requests" },
+        "issues": { "$ref": "#/definitions/issues" },
+        "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "notifications": {
+          "description": "This project's notification rules; replaces [[defaults.notifications]]. An empty list means no notifications for this project.",
+          "$ref": "#/definitions/notifications"
+        }
+      }
+    },
+    "pull-requests": {
+      "description": "Pull requests from anyone: open ones, then those closed within the closed window, newest first.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List pull requests.",
+          "type": "boolean",
+          "default": true
+        },
+        "closed-window-days": {
+          "description": "How many days closed and merged pull requests stay listed; 0 hides them.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 7
+        },
+        "drafts": {
+          "description": "List draft pull requests (in gray).",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "issues": {
+      "description": "Issues from anyone: open ones, then those closed within the closed window.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List issues.",
+          "type": "boolean",
+          "default": false
+        },
+        "closed-window-days": {
+          "description": "How many days closed issues stay listed; 0 hides them.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 7
+        }
+      }
+    },
+    "workflow-runs": {
+      "description": "GitHub Actions runs: running now, plus finished within the finished window.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List workflow runs.",
+          "type": "boolean",
+          "default": false
+        },
+        "finished-window-hours": {
+          "description": "How many hours finished runs stay listed; 0 hides them.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 3
+        },
+        "branches": {
+          "description": "Which branches' runs to list: the default branch and open pull request branches, or all branches.",
+          "type": "string",
+          "enum": ["default-and-pull-requests", "all"],
+          "default": "default-and-pull-requests"
+        }
+      }
+    },
+    "notifications": {
+      "description": "Notification rules: a macOS notification is sent for an event when a rule names it and its author filter matches.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/notification-rule" }
+    },
+    "notification-rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event"],
+      "properties": {
+        "event": {
+          "description": "The change to notify about.",
+          "type": "string",
+          "enum": [
+            "pr.opened",
+            "pr.merged",
+            "pr.closed",
+            "pr.reopened",
+            "pr.review_requested",
+            "pr.checks_failed",
+            "pr.commented",
+            "issue.opened",
+            "issue.closed",
+            "issue.commented",
+            "run.failed",
+            "run.succeeded"
+          ]
+        },
+        "authors": {
+          "description": "Whose items: anyone, you (me), anyone but you and bots (others), or bots (a Bot account or a [bot] login).",
+          "type": "string",
+          "enum": ["any", "me", "others", "bots"],
+          "default": "any"
+        }
+      }
+    }
+  }
+}
