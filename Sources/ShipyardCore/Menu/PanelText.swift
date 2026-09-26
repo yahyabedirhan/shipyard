@@ -89,16 +89,6 @@ public enum PanelText {
         repository.split(separator: "/").last.map(String.init) ?? repository
     }
 
-    /// A row's hover help, in either layout: its state and its full second
-    /// line; under it, a pull request's checks (what its check dot means);
-    /// then, while it needs attention, the ⌥-click hint. One line each.
-    public static func rowHelp(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
-        let detail = "\(stateLabel(row)) · \(rowDetail(row, showingRepository: showingRepository, now: now))"
-        let checkLine = row.checks.flatMap { Self.checks($0) }
-        let hint = row.needsAttention ? optionClickHint : nil
-        return ([detail, checkLine, hint] as [String?]).compactMap { $0 }.joined(separator: "\n")
-    }
-
     /// A list section's header, for VoiceOver's hint: what a click does to
     /// it. "Collapse shipyard", "Expand shipyard".
     public static func sectionFoldHelp(_ name: String, isCollapsed: Bool) -> String {
@@ -111,8 +101,6 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
-    /// Said in a row's hover help, on its last line, while it needs attention.
-    public static let optionClickHint = "⌥-click to mark seen"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 

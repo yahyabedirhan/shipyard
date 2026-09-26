@@ -166,7 +166,8 @@ public struct MenuModel: Equatable, Sendable {
     /// the rows behind a Show more alike.
     private static func flagAttention(_ rows: inout [MenuRow], attention: Attention, toggles: Configuration.AttentionToggles) {
         for row in rows.indices {
-            rows[row].needsAttention = attention.needsAttention(rows[row].item, toggles: toggles)
+            rows[row].attentionReasons = attention.reasons(rows[row].item, toggles: toggles)
+            rows[row].needsAttention = !rows[row].attentionReasons.isEmpty
         }
     }
 
@@ -354,6 +355,8 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// Whether the item needs attention (unseen, changed since seen, review
     /// requested or checks failed, as `[attention]` allows).
     public var needsAttention: Bool
+    /// Why it needs attention; empty when it doesn't.
+    public var attentionReasons: [Attention.Reason] = []
     /// The item as fetched: marking the row seen records this version.
     public var item: Item
 

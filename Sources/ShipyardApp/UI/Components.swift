@@ -125,7 +125,7 @@ struct CheckDot: View {
                 Circle().fill(Palette.panel).frame(width: 8, height: 8)
                 Circle().fill(color).frame(width: 5.5, height: 5.5)
             }
-            // Its words are in the row's hover help (`PanelText.rowHelp`).
+            // Its words are in the row's hover card (`PanelText.rowCard`).
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
     }
@@ -150,7 +150,7 @@ struct AttentionDot: View {
 extension View {
     /// An item's row at `place`, in either layout: clicking opens it and
     /// marks it seen, ⌥-click (or the VoiceOver action) only marks it seen;
-    /// its hover help holds its state, full second line and checks; the attention
+    /// its hover card holds what the row doesn't show (`PanelText.rowCard`); the attention
     /// dot and weight animate as it's seen; and it's `highlightable`. The
     /// layout still puts `.id(place)` on the lazy list's own child.
     func itemRow(
@@ -178,7 +178,7 @@ private struct ItemRow: ViewModifier {
             .buttonStyle(RowButtonStyle())
             // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-            .hoverHelp(PanelText.rowHelp(row, showingRepository: showsRepository, now: now), leadingInset: HoverHelp.rowInset)
+            .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
             .animation(Motion.seen, value: row.needsAttention)
             .highlightable(place, $highlight)
     }

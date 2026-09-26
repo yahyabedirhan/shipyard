@@ -149,7 +149,8 @@ enum ProjectQuery {
 
                 fragment PullRequestFields on PullRequest {
                   number title url isDraft state createdAt updatedAt closedAt mergedAt headRefName
-                  author { login __typename }
+                  baseRefName additions deletions changedFiles reviewDecision
+                  author { login __typename avatarUrl }
                   comments { totalCount }
                   reviews { totalCount }
                   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -162,7 +163,7 @@ enum ProjectQuery {
 
                 fragment IssueFields on Issue {
                   number title url state createdAt updatedAt closedAt
-                  author { login __typename }
+                  author { login __typename avatarUrl }
                   comments { totalCount }
                 }
 
@@ -410,6 +411,7 @@ enum ProjectQuery {
     private struct AuthorNode: Decodable {
         var login: String
         var __typename: String?
+        var avatarUrl: URL?
     }
 
     /// One result of the review search: a pull request and its repository.
@@ -447,6 +449,11 @@ enum ProjectQuery {
         var closedAt: Date?
         var mergedAt: Date?
         var headRefName: String?
+        var baseRefName: String?
+        var additions: Int?
+        var deletions: Int?
+        var changedFiles: Int?
+        var reviewDecision: String?
         var author: AuthorNode?
         var comments: Count?
         var reviews: Count?
@@ -473,7 +480,18 @@ enum ProjectQuery {
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 closedAt: state.isOpen ? nil : (closedAt ?? mergedAt ?? updatedAt),
-                activity: (comments?.totalCount ?? 0) + (reviews?.totalCount ?? 0)
+                activity: (comments?.totalCount ?? 0) + (reviews?.totalCount ?? 0),
+                avatarURL: self.author?.avatarUrl,
+                details: ItemDetails(
+                    headBranch: headRefName,
+                    baseBranch: baseRefName,
+                    additions: additions,
+                    deletions: deletions,
+                    changedFiles: changedFiles,
+                    review: reviewDecision.flatMap(ReviewDecision.init(rawValue:)),
+                    comments: comments?.totalCount ?? 0,
+                    reviews: reviews?.totalCount ?? 0
+                )
             )
         }
 
@@ -529,7 +547,9 @@ enum ProjectQuery {
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 closedAt: state.isOpen ? nil : (closedAt ?? updatedAt),
-                activity: comments?.totalCount ?? 0
+                activity: comments?.totalCount ?? 0,
+                avatarURL: self.author?.avatarUrl,
+                details: ItemDetails(comments: comments?.totalCount ?? 0)
             )
         }
     }

@@ -128,6 +128,11 @@ struct WorkflowRunsTests {
         #expect(runs[1].authorKind == .bot)
         #expect(runs[2].authorKind == .me)
         #expect(runs[2].url == URL(string: "https://github.com/yahyabedirhan/shop/actions/runs/9041"))
+        // What only the hover card shows: the run's title, what started it and who.
+        #expect(runs[0].item.details.runTitle == "Add order export")
+        #expect(runs[0].item.details.runEvent == "pull_request")
+        #expect(runs[0].item.details.runAttempt == 1)
+        #expect(runs[0].item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
         // Age: a running run's from when it started, a finished one's from when it finished.
         #expect(runs[1].since == date("2026-09-25T11:55:10Z"))
         #expect(runs[1].age(at: Harness.now) == 290)
@@ -147,6 +152,9 @@ struct WorkflowRunsTests {
         let query = try harness.lastQuery()
         #expect(query.contains("defaultBranchRef { name }"))
         #expect(query.contains("headRefName"))
+        // The hover card's fields are plain fields, so they cost nothing more.
+        #expect(query.contains("baseRefName additions deletions changedFiles reviewDecision"))
+        #expect(query.contains("author { login __typename avatarUrl }"))
     }
 
     @Test("branches = \"all\" keeps runs on every branch, and asks GraphQL for no branches")

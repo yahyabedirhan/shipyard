@@ -7,7 +7,7 @@ Checked 2026-09-26 for issue #72, against the sources listed at the end. The que
 **A small SwiftUI card that the panel draws itself (`hoverHelp(_:)` on a view, `hoverHelpHost()` once on the panel), placed by a pure, tested rule in the core. No package.**
 
 - It looks like the panel: the system's `.regularMaterial`, the panel's hairline and corner radius, the panel's type scale. Its motion is the system spring the row highlight already uses, and an opacity fade. Nothing is hand-drawn beyond a rounded rectangle, and nothing is hand-animated.
-- It meets each thing the ticket asks for. It never covers the row the pointer is on: it sits under the hovered view, or over it when there's no room below. The panel's edge can't cut it off, because it's placed inside the panel's bounds with a margin, and it's drawn at the panel's frame, so the scroll view's clip doesn't cut it either. It shows after a 0.5 s rest and at once while warm, as native tooltips do. It glides from row to row instead of lingering. It never takes the pointer, the keyboard focus or the key window.
+- It meets each thing the ticket asks for. It never covers the row the pointer is on: it sits under the hovered view, or over it when there's no room below. The panel's edge can't cut it off, because it's placed inside the panel's bounds with a margin, and it's drawn at the panel's frame, so the scroll view's clip doesn't cut it either. On the header's buttons it shows after a 0.5 s rest and at once while warm, as native tooltips do, gliding from one to the next. On the item rows it waits 1 s and closes as the pointer leaves, so it doesn't follow the pointer down the list and cover the rows under it. It never takes the pointer, the keyboard focus or the key window.
 - VoiceOver keeps the text: `.help` set the view's accessibility hint (Apple: "Adding help to a view configures the view's accessibility hint and its help tag"), so `hoverHelp(_:)` sets `.accessibilityHint` with the same words, and the card itself is hidden from accessibility.
 - The style is chosen in one place (`HoverHelp.style`), and the placement rule is `HoverHelpPlacement` in `ShipyardCore/Menu/`, with tests.
 
@@ -80,7 +80,7 @@ The 14 `.help(` sites in `Sources/ShipyardApp`, and what each became:
 
 | Site | Now | Why |
 |---|---|---|
-| Row (`itemRow`, both layouts) | Card: `PanelText.rowHelp`, lined up with the title | The full detail doesn't fit the row. The first line is primary, the checks and ⌥-click lines are quieter |
+| Row (`itemRow`, both layouts) | Card: `PanelText.rowCard`, lined up with the title | Only what the row doesn't show (the maintainer found a card repeating the row pointless): the author's avatar, why it needs attention as tinted tags, then branches, size, review, comments, a run's trigger and duration, each with an SF Symbol. No ⌥-click hint. The avatar URL and the extra pull request fields are plain GraphQL fields, which add no cost (the cost counts connections) |
 | Check dot (`CheckDot`) | No hover help; its words moved into the row's help ("Checks failed") | A help source nested inside the row's would compete with it; VoiceOver keeps the dot's label |
 | Layout button | Card: `PanelText.layoutButton` | Says the current layout and what a click does |
 | Refresh | Card: `PanelText.refreshHelp`, "Refresh (⌘R)" | An icon-only button; the help names the shortcut |

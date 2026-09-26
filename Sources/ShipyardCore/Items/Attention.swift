@@ -43,13 +43,33 @@ public struct Attention: Equatable, Sendable {
 
     /// Whether `item` needs attention under `toggles`.
     public func needsAttention(_ item: Item, toggles: Configuration.AttentionToggles) -> Bool {
-        guard Self.canNeedAttention(item) else { return false }
+        !reasons(item, toggles: toggles).isEmpty
+    }
+
+    /// Why `item` needs attention under `toggles`, in `Reason` order;
+    /// empty when it doesn't.
+    public func reasons(_ item: Item, toggles: Configuration.AttentionToggles) -> [Reason] {
+        guard Self.canNeedAttention(item) else { return [] }
         let seenPrint = seen[item.id]?.fingerprint
-        if seenPrint == item.fingerprint { return false }
-        let standing = (toggles.reviewRequested && item.reviewRequestedFromViewer)
-            || (toggles.checksFailed && item.checks == .failed)
-        if seenPrint == nil { return toggles.unseen || standing }
-        return toggles.changed || standing
+        if seenPrint == item.fingerprint { return [] }
+        var reasons: [Reason] = []
+        if seenPrint == nil, toggles.unseen { reasons.append(.unseen) }
+        if seenPrint != nil, toggles.changed { reasons.append(.changed) }
+        if toggles.reviewRequested, item.reviewRequestedFromViewer { reasons.append(.reviewRequested) }
+        if toggles.checksFailed, item.checks == .failed { reasons.append(.checksFailed) }
+        return reasons
+    }
+
+    /// One of the reasons an item needs attention, as `[attention]` names them.
+    public enum Reason: Equatable, Hashable, Sendable {
+        /// Never seen.
+        case unseen
+        /// Changed since it was seen.
+        case changed
+        /// Waits on the viewer's review.
+        case reviewRequested
+        /// Its checks failed (a workflow run: it failed).
+        case checksFailed
     }
 
     /// Whether an item in this state may need attention at all: open ones

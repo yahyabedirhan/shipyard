@@ -160,35 +160,126 @@ struct PanelTextTests {
         #expect(PanelText.repositoryName("shipyard") == "shipyard")
     }
 
-    @Test("a row's hover help holds its state and full second line, and the ⌥-click hint while it needs attention")
-    func rowHelp() {
-        let seen = row()
-        #expect(PanelText.rowHelp(seen, showingRepository: true, now: now) == "open pull request · #21 · shipyard · yahyabedirhan · 37m")
-        #expect(PanelText.rowHelp(seen, showingRepository: false, now: now) == "open pull request · #21 · yahyabedirhan · 37m")
-
-        var unseen = seen
-        unseen.needsAttention = true
-        #expect(PanelText.rowHelp(unseen, showingRepository: false, now: now) == """
-            open pull request · #21 · yahyabedirhan · 37m
-            ⌥-click to mark seen
-            """)
-        #expect(PanelText.optionClickHint == "⌥-click to mark seen")
+    @Test("a pull request's card holds only what its row doesn't: branches, size, review, comments and when it last moved")
+    func pullRequestCard() {
+        var pullRequest = row(checks: .passed)
+        pullRequest.item.avatarURL = URL(string: "https://avatars.githubusercontent.com/u/42?v=4")
+        pullRequest.item.updatedAt = now.addingTimeInterval(-5 * 60)
+        pullRequest.item.details = ItemDetails(
+            headBranch: "attention-dot",
+            baseBranch: "main",
+            additions: 120,
+            deletions: 43,
+            changedFiles: 6,
+            review: .approved,
+            comments: 3,
+            reviews: 1
+        )
+        let card = PanelText.rowCard(pullRequest, now: now)
+        #expect(card.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
+        #expect(card.headline == "Attention in the panel")
+        #expect(card.lines == [
+            "attention-dot → main",
+            "+120 −43 · 6 files",
+            "Approved · Checks passed",
+            "3 comments · 1 review · updated 5m ago",
+        ])
+        // The app draws each fact with its icon, a line of them at a time.
+        #expect(card.facts == [
+            [.branches(head: "attention-dot", base: "main")],
+            [.size(additions: 120, deletions: 43), .files(6)],
+            [.review(.approved), .checks(.passed)],
+            [.comments(3), .reviews(1), .updated("5m")],
+        ])
+        #expect(card.reasons == [])
+        #expect(card.attention == nil)
     }
 
-    @Test("a pull request's hover help says what its check dot means, on its own line above the ⌥-click hint")
-    func rowHelpChecks() {
-        var failing = row(checks: .failed)
-        #expect(PanelText.rowHelp(failing, showingRepository: false, now: now) == """
-            open pull request · #21 · yahyabedirhan · 37m
-            Checks failed
-            """)
-        failing.needsAttention = true
-        #expect(PanelText.rowHelp(failing, showingRepository: false, now: now) == """
-            open pull request · #21 · yahyabedirhan · 37m
-            Checks failed
-            ⌥-click to mark seen
-            """)
-        #expect(PanelText.rowHelp(row(checks: .none), showingRepository: false, now: now) == "open pull request · #21 · yahyabedirhan · 37m")
+    @Test("a card leaves out what GitHub didn't give, and the update time when it's the row's age")
+    func sparseCard() {
+        let card = PanelText.rowCard(row(), now: now)
+        #expect(card.lines == ["No comments"])
+    }
+
+    @Test("an issue's card leaves out no comments, so a quiet issue is its title and why it needs attention")
+    func issueCard() {
+        var issue = row()
+        issue.kind = .issue
+        issue.item.kind = .issue
+        #expect(PanelText.rowCard(issue, now: now).facts == [])
+
+        issue.item.details.comments = 1
+        #expect(PanelText.rowCard(issue, now: now).lines == ["1 comment"])
+
+        issue.item.details.comments = 0
+        issue.item.updatedAt = now.addingTimeInterval(-2 * 3600)
+        issue.item.createdAt = now.addingTimeInterval(-3 * 86_400)
+        issue = MenuRow(issue.item)
+        #expect(PanelText.rowCard(issue, now: now).facts == [[.updated("2h")]])
+        #expect(PanelText.rowCard(issue, now: now).lines == ["updated 2h ago"])
+    }
+
+    @Test("a card says why its row needs attention, as tags and in words")
+    func attentionCard() {
+        var unseen = row(checks: .failed)
+        unseen.needsAttention = true
+        unseen.attentionReasons = [.unseen, .reviewRequested, .checksFailed]
+        let card = PanelText.rowCard(unseen, now: now)
+        #expect(card.reasons == [.unseen, .reviewRequested, .checksFailed])
+        #expect(card.kind == .pullRequest)
+        #expect(card.attention == "New · Your review is requested · Checks failed")
+        #expect(card.spoken == "Checks failed. No comments. New · Your review is requested · Checks failed")
+
+        var changed = unseen
+        changed.attentionReasons = [.changed]
+        #expect(PanelText.rowCard(changed, now: now).attention == "Changed since you saw it")
+    }
+
+    @Test("a run's card has its title, what started it and who, and how long it ran")
+    func runCard() {
+        let started = now.addingTimeInterval(-10 * 60)
+        var item = Item(
+            kind: .workflowRun,
+            repository: "yahyabedirhan/shipyard",
+            number: 41,
+            title: "CI",
+            url: URL(string: "https://github.com/yahyabedirhan/shipyard/actions/runs/41")!,
+            author: "yahyabedirhan",
+            authorKind: .me,
+            state: .failed,
+            checks: .failed,
+            createdAt: started,
+            updatedAt: started.addingTimeInterval(192),
+            closedAt: started.addingTimeInterval(192),
+            branch: "main",
+            details: ItemDetails(runTitle: "Add the hover card", runEvent: "push", runAttempt: 2)
+        )
+        var failed = MenuRow(item, needsAttention: true)
+        failed.attentionReasons = [.checksFailed]
+        let card = PanelText.rowCard(failed, now: now)
+        #expect(card.headline == "Add the hover card")
+        #expect(card.lines == ["Push by yahyabedirhan · attempt 2", "Took 3m 12s"])
+        #expect(card.attention == "Run failed")
+        #expect(card.facts == [
+            [.trigger(event: "push", by: "yahyabedirhan"), .attempt(2)],
+            [.duration("3m 12s", running: false)],
+        ])
+
+        item.state = .running
+        item.closedAt = nil
+        item.details = ItemDetails(runEvent: "workflow_dispatch", runAttempt: 1)
+        let running = PanelText.rowCard(MenuRow(item), now: now)
+        #expect(running.headline == "CI")
+        #expect(running.lines == ["Manual run by yahyabedirhan", "Running for 10m"])
+    }
+
+    @Test("a duration reads in seconds, minutes and seconds, or hours and minutes")
+    func duration() {
+        #expect(PanelText.duration(42) == "42s")
+        #expect(PanelText.duration(180) == "3m")
+        #expect(PanelText.duration(192) == "3m 12s")
+        #expect(PanelText.duration(3600) == "1h")
+        #expect(PanelText.duration(3900) == "1h 5m")
     }
 
     @Test("the header's refresh and settings buttons have hover help, refresh naming its shortcut")
