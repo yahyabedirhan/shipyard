@@ -115,8 +115,14 @@ struct TabsLayout: View {
             .onHover { inside in
                 if !inside { highlight.pointerLeftRows() }
             }
-            // Within the selected tab.
-            .rowKeys($highlight, places: content.rowPlaces, scroll: proxy) { place, markSeenOnly in
+            // ↑ and ↓ within the selected tab; ← and → switch tabs.
+            .rowKeys(
+                $highlight,
+                places: content.rowPlaces,
+                scroll: proxy,
+                left: { switchTab(by: -1) },
+                right: { switchTab(by: 1) }
+            ) { place, markSeenOnly in
                 guard let row = content.row(at: place) else { return false }
                 withAnimation(Motion.seen) {
                     if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
@@ -124,6 +130,16 @@ struct TabsLayout: View {
                 return true
             }
         }
+    }
+
+    /// ← and → (#45, provisional): the previous or next tab, wrapping, with
+    /// the highlight on its first row.
+    private func switchTab(by step: Int) -> RowKeyMove {
+        let next = model.tab(beside: tab, by: step)
+        guard next != tab else { return .ignored }
+        select(next)
+        highlight.moveToFirst(in: model.tabContent(for: next).rowPlaces)
+        return .newList
     }
 }
 
@@ -259,8 +275,10 @@ private struct TabList: View {
                 KindHeader(kind: group.kind, count: group.rows.count)
                     .clearsRowHighlight($highlight)
                 ForEach(group.rows) { row in
+                    let place = MenuRowPlace(section: nil, row: row.id)
                     TabRow(row: row, showsRepository: content.showsRepository, actions: actions)
-                        .highlightable(MenuRowPlace(section: nil, row: row.id), $highlight)
+                        .highlightable(place, $highlight)
+                        .id(place)
                 }
             }
             if let empty = PanelText.emptyTab(content) {

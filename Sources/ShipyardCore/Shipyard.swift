@@ -522,6 +522,14 @@ public final class Shipyard {
         markSeen(row)
     }
 
+    /// Opens the project's repository on GitHub in the browser (Return on
+    /// its header, #45): the first one the configuration lists. It marks
+    /// nothing seen.
+    public func openRepository(of project: MenuSection) {
+        guard let url = project.repositoryURL else { return }
+        urlOpener.open(url)
+    }
+
     /// A notification was clicked: opens its item on GitHub and marks it
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls

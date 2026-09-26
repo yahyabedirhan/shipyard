@@ -108,7 +108,8 @@ final class AppServices {
     // MARK: - Layout actions
 
     /// What the menu's layout can do: open or mark seen a row, mark a
-    /// project (or every project) seen, collapse a project.
+    /// project (or every project) seen, collapse a project, open a
+    /// project's repository.
     var layoutActions: LayoutActions {
         let shipyard = shipyard
         return LayoutActions(
@@ -118,7 +119,11 @@ final class AppServices {
             },
             markSeen: { shipyard.markSeen($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
-            toggleCollapsed: { shipyard.toggleCollapsed($0.name) }
+            toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
+            openRepository: { [weak self] project in
+                shipyard.openRepository(of: project)
+                self?.closeMenu()
+            }
         )
     }
 

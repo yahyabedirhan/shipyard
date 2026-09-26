@@ -50,6 +50,16 @@ extension MenuModel {
         }
     }
 
+    /// The tab `step` places from `tab` in the strip (← is -1, → is 1),
+    /// wrapping from the last tab to All and back (#45). A tab whose
+    /// project is gone counts as All.
+    public func tab(beside tab: MenuTab, by step: Int) -> MenuTab {
+        let tabs = tabs
+        let index = tabs.firstIndex(of: resolved(tab)) ?? 0
+        let count = tabs.count
+        return tabs[((index + step) % count + count) % count]
+    }
+
     /// `tab`, or All once its project was removed from the configuration.
     public func resolved(_ tab: MenuTab) -> MenuTab {
         switch tab {

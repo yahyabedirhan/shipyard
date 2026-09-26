@@ -74,7 +74,13 @@ public struct MenuModel: Equatable, Sendable {
     public static func build(snapshot: Snapshot?, configuration: Configuration, state: AppState, now: Date) -> MenuModel {
         guard let snapshot else {
             let sections = configuration.projects.map { project in
-                MenuSection(name: project.name, rows: [], showsRepository: project.repositories.count > 1, isLoaded: false)
+                MenuSection(
+                    name: project.name,
+                    rows: [],
+                    showsRepository: project.repositories.count > 1,
+                    isLoaded: false,
+                    repositories: project.repositories
+                )
             }
             var model = MenuModel(sections: sections, layout: configuration.menu.layout)
             model.applyAttention(state, configuration: configuration)
@@ -108,7 +114,8 @@ public struct MenuModel: Equatable, Sendable {
                 },
                 showsRepository: project.repositories.count > 1,
                 // A project added since the snapshot was fetched has no data yet.
-                isLoaded: snapshot.items[project.name] != nil
+                isLoaded: snapshot.items[project.name] != nil,
+                repositories: project.repositories
             )
         }
         var model = MenuModel(sections: sections, layout: configuration.menu.layout, lastUpdated: snapshot.fetchedAt)
@@ -176,6 +183,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether its rows were fetched: `false` before the first refresh
     /// succeeded, when the section is listed without rows.
     public var isLoaded: Bool
+    /// The project's repositories (`owner/name`), in configuration order.
+    public var repositories: [String]
 
     public var id: String { name }
 
@@ -186,7 +195,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         showsRepository: Bool = false,
         attentionCount: Int = 0,
         isCollapsed: Bool = false,
-        isLoaded: Bool = true
+        isLoaded: Bool = true,
+        repositories: [String] = []
     ) {
         self.name = name
         self.rows = rows
@@ -195,6 +205,13 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         self.attentionCount = attentionCount
         self.isCollapsed = isCollapsed
         self.isLoaded = isLoaded
+        self.repositories = repositories
+    }
+
+    /// What Return on the project's header opens (#45): its first
+    /// repository in the configuration, on GitHub; `nil` without one.
+    public var repositoryURL: URL? {
+        repositories.first.flatMap { URL(string: "https://github.com/\($0)") }
     }
 }
 

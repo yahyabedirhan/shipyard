@@ -7,4 +7,6 @@ struct LayoutActions {
     /// `nil` marks every project seen.
     var markAllSeen: (MenuSection?) -> Void
     var toggleCollapsed: (MenuSection) -> Void
+    /// Opens the project's first repository on GitHub (Return on its header).
+    var openRepository: (MenuSection) -> Void
 }

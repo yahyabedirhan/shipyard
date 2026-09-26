@@ -7,11 +7,19 @@ import SwiftUI
 /// project headers that stay pinned while their rows scroll by. A header
 /// collapses its project, shows its attention count and, on hover, Mark
 /// all seen.
+///
+/// The keys (#45): ↑ and ↓ step through headers and items, wrapping at
+/// the ends; ← goes from an item to its header and collapses an expanded
+/// header; → expands a collapsed header and goes from an expanded one to
+/// its first item; Return opens the highlighted item (⌥Return marks it
+/// seen) or the header's repository. Every row is a direct child of the
+/// lazy stack, with its place as its id, so the keys can scroll to a row
+/// that isn't laid out yet.
 struct ListLayout: View {
     let model: MenuModel
     let actions: LayoutActions
-    /// The row under the pointer or chosen with ↑ and ↓; one highlight
-    /// glides between rows.
+    /// The row or header under the pointer or chosen with the keys; one
+    /// highlight glides between rows, and a header draws its own.
     @State private var highlight = RowHighlight()
 
     var body: some View {
@@ -21,15 +29,17 @@ struct ListLayout: View {
                     ForEach(model.sections) { section in
                         Section {
                             if !section.isCollapsed {
-                                rows(section)
-                                    .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .offset(y: -6)),
-                                        removal: .opacity.animation(.easeOut(duration: 0.12))
-                                    ))
+                                lines(section)
                             }
                         } header: {
-                            ListSectionHeader(section: section, actions: actions)
-                                .clearsRowHighlight($highlight)
+                            let place = MenuRowPlace.header(section.name)
+                            ListSectionHeader(
+                                section: section,
+                                isHighlighted: highlight.isHighlighted(place),
+                                actions: actions
+                            )
+                            .highlightable(place, $highlight, drawsOwnHighlight: true)
+                            .id(place)
                         }
                     }
                 }
@@ -38,54 +48,98 @@ struct ListLayout: View {
             .onHover { inside in
                 if !inside { highlight.pointerLeftRows() }
             }
-            .rowKeys($highlight, places: model.listRowPlaces, scroll: proxy) { place, markSeenOnly in
-                guard let row = model.listRow(at: place) else { return false }
-                withAnimation(Motion.seen) {
-                    if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
-                }
-                return true
-            }
+            .rowKeys(
+                $highlight,
+                places: model.listRowPlaces,
+                pinnedHeader: Grid.headerHeight,
+                scroll: proxy,
+                left: { fold(highlight.moveLeft(in: model)) },
+                right: { fold(highlight.moveRight(in: model)) },
+                activate: activate
+            )
         }
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
 
-    @ViewBuilder
-    private func rows(_ section: MenuSection) -> some View {
-        let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
-        if hasContent {
-            VStack(spacing: 0) {
-                if !section.isLoaded {
-                    SkeletonRow(width: 190).clearsRowHighlight($highlight)
-                    SkeletonRow(width: 140).clearsRowHighlight($highlight)
-                }
-                ForEach(section.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
-                ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
-                    ListRow(row: row, showsRepository: section.showsRepository, actions: actions)
-                        .highlightable(
-                            MenuRowPlace(section: section.name, row: row.id),
-                            $highlight,
-                            pinnedAbove: Grid.headerHeight
-                        )
-                    if index < section.rows.count - 1, row.kind != section.rows[index + 1].kind {
-                        // A line only where the kind changes: pull requests | issues | runs.
-                        Hairline()
-                            .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
-                            .padding(.trailing, Grid.gutter)
-                    }
-                }
+    /// After ← or →: collapses or expands the project it asks for.
+    private func fold(_ change: ProjectFold?) -> RowKeyMove {
+        guard let change else { return .moved }
+        if let section = model.sections.first(where: { $0.name == change.project }) {
+            withAnimation(Motion.collapse) { actions.toggleCollapsed(section) }
+        }
+        return .moved
+    }
+
+    /// Return: opens the item (⌥Return: marks it seen) or the header's
+    /// repository. ⌥Return on a header does nothing.
+    private func activate(_ place: MenuRowPlace, markSeenOnly: Bool) -> Bool {
+        switch model.listTarget(at: place) {
+        case .item(let row):
+            withAnimation(Motion.seen) {
+                if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
             }
-            .padding(.vertical, 3)
-            .clipped()
+            return true
+        case .project(let section):
+            guard !markSeenOnly, section.repositoryURL != nil else { return false }
+            actions.openRepository(section)
+            return true
+        case nil:
+            return false
         }
     }
+
+    /// An expanded project's lines, each its own child of the lazy stack:
+    /// placeholders while it loads, its error rows, then its rows, with a
+    /// line where the kind changes.
+    @ViewBuilder
+    private func lines(_ section: MenuSection) -> some View {
+        let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
+        if hasContent {
+            Color.clear.frame(height: 3).transition(Self.lineTransition)
+        }
+        if !section.isLoaded {
+            SkeletonRow(width: 190).clearsRowHighlight($highlight).transition(Self.lineTransition)
+            SkeletonRow(width: 140).clearsRowHighlight($highlight).transition(Self.lineTransition)
+        }
+        ForEach(section.errors) {
+            ErrorRow(error: $0).clearsRowHighlight($highlight).transition(Self.lineTransition)
+        }
+        ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
+            let place = MenuRowPlace(section: section.name, row: row.id)
+            VStack(spacing: 0) {
+                if index > 0, row.kind != section.rows[index - 1].kind {
+                    // A line only where the kind changes: pull requests | issues | runs.
+                    Hairline()
+                        .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
+                        .padding(.trailing, Grid.gutter)
+                }
+                ListRow(row: row, showsRepository: section.showsRepository, actions: actions)
+                    .highlightable(place, $highlight)
+            }
+            .id(place)
+            .transition(Self.lineTransition)
+        }
+        if hasContent {
+            Color.clear.frame(height: 3).transition(Self.lineTransition)
+        }
+    }
+
+    /// A project's lines coming in as it expands and going as it collapses.
+    private static let lineTransition = AnyTransition.asymmetric(
+        insertion: .opacity.combined(with: .offset(y: -6)),
+        removal: .opacity.animation(.easeOut(duration: 0.12))
+    )
 }
 
 // MARK: - A project's header
 
 /// The chevron, the project's name and attention count, then what the
-/// project says in place of rows ("Nothing open") or, on hover, Mark all seen.
+/// project says in place of rows ("Nothing open") or, on hover, Mark all
+/// seen. Highlighted by the pointer or the keys, it draws the highlight
+/// over its own background, since it pins above the rows.
 private struct ListSectionHeader: View {
     let section: MenuSection
+    let isHighlighted: Bool
     let actions: LayoutActions
     @State private var hover = false
 
@@ -142,7 +196,18 @@ private struct ListSectionHeader: View {
         .padding(.leading, 6)
         .padding(.trailing, 8)
         .frame(height: Grid.headerHeight)
-        .background(Palette.header)
+        .background {
+            ZStack {
+                Palette.header
+                if isHighlighted {
+                    RowHighlightShape()
+                        .padding(.horizontal, Grid.inset)
+                        .padding(.vertical, 1)
+                        .transition(.opacity)
+                }
+            }
+            .animation(Motion.hover, value: isHighlighted)
+        }
         .overlay(alignment: .bottom) { Hairline() }
         .overlay(alignment: .top) { Hairline().opacity(0.6) }
         .onHover { hover = $0 }

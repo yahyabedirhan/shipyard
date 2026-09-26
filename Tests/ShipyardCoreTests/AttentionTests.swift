@@ -93,6 +93,18 @@ struct AttentionTests {
         #expect(harness.count == 0)
     }
 
+    @Test("Return on a project's header opens its first configured repository on GitHub and marks nothing seen")
+    func openingAProjectsRepository() async throws {
+        let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
+        let eCommerce = try #require(harness.section("e-commerce"))
+        #expect(eCommerce.repositories == ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"])
+
+        harness.shipyard.openRepository(of: eCommerce)
+
+        #expect(harness.opener.opened == [try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend"))])
+        #expect(harness.count == 6)
+    }
+
     @Test("a new push resurfaces a seen pull request, even when the push was made as the user")
     func pushResurfaces() async throws {
         var pullRequest = PR(1)
