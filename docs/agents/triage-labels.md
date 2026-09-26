@@ -12,4 +12,8 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
+## After the build
+
+One more label, not one of the triage roles: `ready-for-qa`. It marks a ticket that is built, committed and installed, and is waiting for the maintainer to use it in the real app. Such a ticket is assigned to the maintainer and carries a comment on how to use and try the change. The maintainer closes it when it's done, or comments with feedback, which sends it back to `ready-for-agent`. Agents don't close a ticket that's in QA.
+
 Edit the right-hand column to match whatever vocabulary you actually use.
