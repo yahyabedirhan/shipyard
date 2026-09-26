@@ -1,15 +1,16 @@
 import CoreGraphics
 
-/// shipyard's logo: the sailboat (`Sailboat.path`) in cream on an olive khaki
-/// squircle. The app icon (`make-icon.swift`'s `olive-khaki`) and the welcome
+/// shipyard's logo: the sailboat (`Sailboat.path`) in cream on a khaki green
+/// squircle. The app icon (`make-icon.swift`'s `khaki-green`) and the welcome
 /// screens' badge both draw it from here, so their shape, colours and figure
 /// can't drift apart.
 ///
 /// CoreGraphics only, so the icon script compiles this same file.
 enum Logo {
-    /// The body's gradient, top to bottom, and the figure's colour.
-    static let top: UInt32 = 0x8C8660
-    static let bottom: UInt32 = 0x6A6541
+    /// The body's gradient, top to bottom, and the figure's colour. The
+    /// gradient runs either side of the logo's khaki green, 0x72873A.
+    static let top: UInt32 = 0x809741
+    static let bottom: UInt32 = 0x637532
     static let figure: UInt32 = 0xFBF6EA
     /// A white sheen over the body's top half, fading out at the middle.
     static let sheen: CGFloat = 0.14

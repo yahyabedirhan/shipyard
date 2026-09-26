@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on an olive khaki tile"></p>
+<p align="center"><img src="docs/assets/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on a khaki green tile"></p>
 
 <h1 align="center">shipyard</h1>
 
