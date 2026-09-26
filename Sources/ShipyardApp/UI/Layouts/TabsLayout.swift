@@ -1,4 +1,3 @@
-import AppKit
 import ShipyardCore
 import SwiftUI
 
@@ -68,15 +67,9 @@ struct TabsLayout: View {
                 .lineLimit(1)
             Spacer(minLength: 8)
             if content.attentionCount > 0 {
-                Button {
+                MarkSeenButton(title: PanelText.markTabSeen(tab)) {
                     withAnimation(Motion.seen) { actions.markAllSeen(section(for: tab)) }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "checkmark.circle")
-                        Text(PanelText.markTabSeen(tab))
-                    }
                 }
-                .buttonStyle(TextButtonStyle())
                 .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
             }
         }
@@ -276,8 +269,8 @@ private struct TabList: View {
                     .clearsRowHighlight($highlight)
                 ForEach(group.rows) { row in
                     let place = MenuRowPlace(section: nil, row: row.id)
-                    TabRow(row: row, showsRepository: content.showsRepository, actions: actions)
-                        .highlightable(place, $highlight)
+                    TabRow(row: row, showsRepository: content.showsRepository)
+                        .itemRow(row, at: place, highlight: $highlight, showsRepository: content.showsRepository, actions: actions)
                         .id(place)
                 }
             }
@@ -316,64 +309,48 @@ private struct KindHeader: View {
 
 /// One item: the attention dot, its state icon in a tinted square (with a
 /// pull request's check dot on it), its title (bold while it needs
-/// attention) over the second line, and its age on the right. Clicking
-/// opens it and marks it seen; ⌥-click only marks it seen.
+/// attention) over the second line, and its age on the right. What a
+/// click does, its tooltip and its highlight come from `itemRow(…)`.
 private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool
-    let actions: LayoutActions
     @Environment(\.panelNow) private var now
 
     var body: some View {
-        Button(action: click) {
-            HStack(spacing: 0) {
-                AttentionDot(isOn: row.needsAttention)
-                    .frame(width: Grid.dotColumn, alignment: .leading)
-                StateSymbol(row: row)
-                    .frame(width: 22, height: 22)
-                    .background(
-                        RoundedRectangle(cornerRadius: Grid.smallRadius + 1, style: .continuous)
-                            .fill(Palette.color(row.state, kind: row.kind).opacity(0.14))
-                    )
-                    .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
-                    .padding(.trailing, 10)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(row.title)
-                        .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
-                        .foregroundStyle(row.state.isActive || row.needsAttention ? .primary : .secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Text(PanelText.rowDetail(row, showingRepository: showsRepository))
-                        .font(TypeScale.meta)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        // A long branch or author gives way in the middle.
-                        .truncationMode(.middle)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Text(PanelText.age(row.age(at: now)))
+        HStack(spacing: 0) {
+            AttentionDot(isOn: row.needsAttention)
+                .frame(width: Grid.dotColumn, alignment: .leading)
+            StateSymbol(row: row)
+                .frame(width: 22, height: 22)
+                .background(
+                    RoundedRectangle(cornerRadius: Grid.smallRadius + 1, style: .continuous)
+                        .fill(Palette.color(row.state, kind: row.kind).opacity(0.14))
+                )
+                .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
+                .padding(.trailing, 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title)
+                    .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
+                    .foregroundStyle(row.state.isActive || row.needsAttention ? .primary : .secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                     .font(TypeScale.meta)
-                    .foregroundStyle(row.needsAttention ? .secondary : .tertiary)
-                    .padding(.leading, 8)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    // A long branch or author gives way in the middle.
+                    .truncationMode(.middle)
             }
-            .padding(.leading, Grid.gutter - 4)
-            .padding(.trailing, Grid.gutter)
-            .padding(.vertical, 5)
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(PanelText.age(row.age(at: now)))
+                .font(TypeScale.meta)
+                .foregroundStyle(row.needsAttention ? .secondary : .tertiary)
+                .padding(.leading, 8)
         }
-        .buttonStyle(RowButtonStyle())
-        // ⌥-click's equivalent for the keyboard and VoiceOver.
-        .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-        .help(row.needsAttention ? "\(row.url.absoluteString)\n\(PanelText.optionClickHint)" : row.url.absoluteString)
-        .animation(Motion.seen, value: row.needsAttention)
-    }
-
-    /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
-    private func click() {
-        let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
-        withAnimation(Motion.seen) {
-            if flags.contains(.option) { actions.markSeen(row) } else { actions.open(row) }
-        }
+        .padding(.leading, Grid.gutter - 4)
+        .padding(.trailing, Grid.gutter)
+        .padding(.vertical, 5)
+        .contentShape(Rectangle())
     }
 }
 

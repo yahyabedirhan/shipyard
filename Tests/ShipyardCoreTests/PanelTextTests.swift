@@ -122,6 +122,26 @@ struct PanelTextTests {
         #expect(PanelText.rowDetail(row(), showingRepository: false, now: now) == "#21 · yahyabedirhan · 37m")
     }
 
+    @Test("a repository is named without its owner")
+    func repositoryName() {
+        #expect(PanelText.repositoryName("yahyabedirhan/shipyard") == "shipyard")
+        #expect(PanelText.repositoryName("shipyard") == "shipyard")
+    }
+
+    @Test("a row's tooltip holds its state and full second line, and the ⌥-click hint while it needs attention")
+    func rowHelp() {
+        let seen = row()
+        #expect(PanelText.rowHelp(seen, showingRepository: true, now: now) == "open pull request · #21 · shipyard · yahyabedirhan · 37m")
+        #expect(PanelText.rowHelp(seen, showingRepository: false, now: now) == "open pull request · #21 · yahyabedirhan · 37m")
+
+        var unseen = seen
+        unseen.needsAttention = true
+        #expect(PanelText.rowHelp(unseen, showingRepository: false, now: now) == """
+            open pull request · #21 · yahyabedirhan · 37m
+            ⌥-click to mark seen
+            """)
+    }
+
     private func issue(state: ItemState) -> MenuRow {
         MenuRow(Item(
             kind: .issue,

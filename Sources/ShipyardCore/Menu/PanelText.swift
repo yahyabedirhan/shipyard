@@ -44,14 +44,24 @@ public enum PanelText {
     }
 
     private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
-        let repository = showingRepository
-            ? [row.repository.split(separator: "/").last.map(String.init) ?? row.repository]
-            : []
+        let repository = showingRepository ? [repositoryName(row.repository)] : []
         let subject: [String] = switch row.kind {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         }
         return ["#\(row.number)"] + repository + subject
+    }
+
+    /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".
+    public static func repositoryName(_ repository: String) -> String {
+        repository.split(separator: "/").last.map(String.init) ?? repository
+    }
+
+    /// A row's tooltip, in either layout: its state and its full second
+    /// line, then, while it needs attention, the ⌥-click hint.
+    public static func rowHelp(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
+        let detail = "\(stateLabel(row)) · \(rowDetail(row, showingRepository: showingRepository, now: now))"
+        return row.needsAttention ? "\(detail)\n\(optionClickHint)" : detail
     }
 
     /// The button that marks everything it covers seen: the footer's for
@@ -60,7 +70,7 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
-    /// Said in a row's tooltip, under its URL, while it needs attention.
+    /// Said in a row's tooltip, under its detail, while it needs attention.
     public static let optionClickHint = "⌥-click to mark seen"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"

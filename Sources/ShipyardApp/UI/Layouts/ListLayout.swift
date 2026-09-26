@@ -1,4 +1,3 @@
-import AppKit
 import ShipyardCore
 import SwiftUI
 
@@ -113,8 +112,8 @@ struct ListLayout: View {
                         .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
                         .padding(.trailing, Grid.gutter)
                 }
-                ListRow(row: row, showsRepository: section.showsRepository, actions: actions)
-                    .highlightable(place, $highlight)
+                ListRow(row: row, showsRepository: section.showsRepository)
+                    .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
             }
             .id(place)
             .transition(Self.lineTransition)
@@ -181,15 +180,9 @@ private struct ListSectionHeader: View {
                     .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
             } else if section.attentionCount > 0 {
-                Button {
+                MarkSeenButton(title: PanelText.markAllSeen) {
                     withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "checkmark.circle")
-                        Text(PanelText.markAllSeen)
-                    }
                 }
-                .buttonStyle(TextButtonStyle())
                 .opacity(hover ? 1 : 0)
             }
         }
@@ -222,66 +215,59 @@ private struct ListSectionHeader: View {
 /// request's check dot on it), the number, the title (bold when it needs
 /// attention; a run's is its workflow's name, followed by its branch as a
 /// chip), the author or, in a multi-repository project, the repository,
-/// and the age. Clicking opens it and marks it seen; ⌥-click only marks it seen.
+/// and the age. What a click does, its tooltip and its highlight come
+/// from `itemRow(…)`.
 private struct ListRow: View {
     let row: MenuRow
     let showsRepository: Bool
-    let actions: LayoutActions
     @Environment(\.panelNow) private var now
 
     var body: some View {
-        Button(action: click) {
-            HStack(spacing: 0) {
-                AttentionDot(isOn: row.needsAttention)
-                    .frame(width: Grid.dotColumn, alignment: .leading)
-                stateIcon
-                Text(String(row.number))
-                    .font(TypeScale.meta)
-                    .foregroundStyle(.tertiary)
-                    .frame(minWidth: Grid.numberColumn, alignment: .trailing)
-                    .fixedSize()
-                    .padding(.trailing, 8)
-                Text(row.title)
-                    .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
-                    .foregroundStyle(row.state.isActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .layoutPriority(1)
-                if let branch = row.branch {
-                    BranchChip(branch: branch).padding(.leading, 6)
-                }
-                Spacer(minLength: 8)
-                if let meta {
-                    HStack(spacing: 3) {
-                        if let symbol = metaSymbol {
-                            Image(systemName: symbol)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Text(meta)
-                            .font(TypeScale.meta)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-                    .frame(width: Grid.metaColumn, alignment: .leading)
-                    .padding(.leading, 6)
-                }
-                Text(PanelText.age(row.age(at: now)))
-                    .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
-                    .frame(width: Grid.ageColumn, alignment: .trailing)
+        HStack(spacing: 0) {
+            AttentionDot(isOn: row.needsAttention)
+                .frame(width: Grid.dotColumn, alignment: .leading)
+            stateIcon
+            Text(String(row.number))
+                .font(TypeScale.meta)
+                .foregroundStyle(.tertiary)
+                .frame(minWidth: Grid.numberColumn, alignment: .trailing)
+                .fixedSize()
+                .padding(.trailing, 8)
+            Text(row.title)
+                .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
+                .foregroundStyle(row.state.isActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .layoutPriority(1)
+            if let branch = row.branch {
+                BranchChip(branch: branch).padding(.leading, 6)
             }
-            .padding(.leading, Grid.gutter - 4)
-            .padding(.trailing, Grid.gutter)
-            .frame(height: Grid.rowHeight)
-            .contentShape(Rectangle())
+            Spacer(minLength: 8)
+            if let meta {
+                HStack(spacing: 3) {
+                    if let symbol = metaSymbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                    }
+                    Text(meta)
+                        .font(TypeScale.meta)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .frame(width: Grid.metaColumn, alignment: .leading)
+                .padding(.leading, 6)
+            }
+            Text(PanelText.age(row.age(at: now)))
+                .font(TypeScale.meta)
+                .foregroundStyle(.secondary)
+                .frame(width: Grid.ageColumn, alignment: .trailing)
         }
-        .buttonStyle(RowButtonStyle())
-        // ⌥-click's equivalent for the keyboard and VoiceOver.
-        .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-        .help(help)
-        .animation(Motion.seen, value: row.needsAttention)
+        .padding(.leading, Grid.gutter - 4)
+        .padding(.trailing, Grid.gutter)
+        .frame(height: Grid.rowHeight)
+        .contentShape(Rectangle())
     }
 
     private var stateIcon: some View {
@@ -294,7 +280,7 @@ private struct ListRow: View {
     /// The author, or in a project of several repositories, the repository
     /// (without its owner); a run names no author.
     private var meta: String? {
-        if showsRepository { return row.repository.split(separator: "/").last.map(String.init) ?? row.repository }
+        if showsRepository { return PanelText.repositoryName(row.repository) }
         return row.kind == .workflowRun ? nil : row.author
     }
 
@@ -302,21 +288,6 @@ private struct ListRow: View {
         if showsRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
     }
-
-    /// The row's state and its full second line, and the ⌥-click hint.
-    private var help: String {
-        let detail = "\(PanelText.stateLabel(row)) · \(PanelText.rowDetail(row, showingRepository: showsRepository, now: now))"
-        return row.needsAttention ? "\(detail)\n\(PanelText.optionClickHint)" : detail
-    }
-
-    /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
-    private func click() {
-        let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
-        withAnimation(Motion.seen) {
-            if flags.contains(.option) { actions.markSeen(row) } else { actions.open(row) }
-        }
-    }
-
 }
 
 /// A run's branch, after its workflow's name.

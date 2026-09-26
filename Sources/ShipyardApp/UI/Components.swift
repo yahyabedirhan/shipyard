@@ -147,6 +147,51 @@ struct AttentionDot: View {
     }
 }
 
+extension View {
+    /// An item's row at `place`, in either layout: clicking opens it and
+    /// marks it seen, ⌥-click (or the VoiceOver action) only marks it seen;
+    /// the tooltip holds its state and full second line; the attention
+    /// dot and weight animate as it's seen; and it's `highlightable`. The
+    /// layout still puts `.id(place)` on the lazy list's own child.
+    func itemRow(
+        _ row: MenuRow,
+        at place: MenuRowPlace,
+        highlight: Binding<RowHighlight>,
+        showsRepository: Bool,
+        actions: LayoutActions
+    ) -> some View {
+        modifier(ItemRow(row: row, place: place, highlight: highlight, showsRepository: showsRepository, actions: actions))
+    }
+}
+
+/// `itemRow(_:at:highlight:showsRepository:actions:)`.
+private struct ItemRow: ViewModifier {
+    let row: MenuRow
+    let place: MenuRowPlace
+    @Binding var highlight: RowHighlight
+    let showsRepository: Bool
+    let actions: LayoutActions
+    @Environment(\.panelNow) private var now
+
+    func body(content: Content) -> some View {
+        Button(action: click) { content }
+            .buttonStyle(RowButtonStyle())
+            // ⌥-click's equivalent for the keyboard and VoiceOver.
+            .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
+            .help(PanelText.rowHelp(row, showingRepository: showsRepository, now: now))
+            .animation(Motion.seen, value: row.needsAttention)
+            .highlightable(place, $highlight)
+    }
+
+    /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
+    private func click() {
+        let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
+        withAnimation(Motion.seen) {
+            if flags.contains(.option) { actions.markSeen(row) } else { actions.open(row) }
+        }
+    }
+}
+
 /// A repository of a project that couldn't be fetched, in a row's place.
 struct ErrorRow: View {
     let error: MenuErrorRow
@@ -601,6 +646,23 @@ struct PressButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.75 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+/// A layout's Mark all seen (or Mark seen) for a project or a tab: a
+/// checkmark and `title` as a text button. `action` brings its own animation.
+struct MarkSeenButton: View {
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 3) {
+                Image(systemName: "checkmark.circle")
+                Text(title)
+            }
+        }
+        .buttonStyle(TextButtonStyle())
     }
 }
 
