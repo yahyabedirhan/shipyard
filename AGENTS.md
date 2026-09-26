@@ -2,6 +2,10 @@
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
+## Changing The Maintainer's Shipyard
+
+A request to change the maintainer's shipyard (its layout, projects, notifications, what it shows) means their `config.toml`: edit it through the **shipyard** skill, even from this repository. Change the app's code only when the request asks for code (a new setting, a bug fix, a feature). When no setting does what's asked, say so; the code change waits for the maintainer to ask for it.
+
 ## Git, Commits, And Pull Requests
 
 - Opening a pull request, or changing an existing one's description, goes through the **to-pr** skill, which owns the description's shape and where it is saved. Invoke it as part of the work, without waiting to be asked.

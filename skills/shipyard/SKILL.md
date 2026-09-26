@@ -1,11 +1,13 @@
 ---
 name: shipyard
-description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to watch or group repositories in shipyard, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file.
+description: Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows), inside the shipyard repository too: watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file.
 ---
 
 # shipyard configuration
 
 Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface: there is no CLI and no settings window. The app applies every save live.
+
+A request to change the user's shipyard is a change to this file, also when you're working in shipyard's own repository. The app's code changes only when the request asks for code: a new setting, a bug fix, a feature. When no key below does what's asked, say that shipyard has no such setting; adding one is a code change for the user to ask for.
 
 ## The file
 

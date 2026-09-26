@@ -68,6 +68,10 @@ struct SkillDocumentTests {
         #expect(skillURL.deletingLastPathComponent().lastPathComponent == "shipyard")
         let description = try #require(fields.first { $0.hasPrefix("description: ") })
         #expect(description.count > "description: ".count + 20)
+        // "Change my shipyard" means its configuration, inside this repository too.
+        #expect(description.contains("my shipyard"))
+        #expect(description.contains("the shipyard app"))
+        #expect(description.contains("shipyard repository"))
     }
 
     @Test("every TOML example decodes cleanly and validates against the schema")
