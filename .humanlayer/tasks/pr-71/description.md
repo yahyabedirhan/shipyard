@@ -24,9 +24,9 @@ The app on a real Mac, build 05e285e:
 
 | List: `group-by = "repository"`, `subsections = true`, `show-first = 4` | List: `group-by = "date"`, `show-first = 3` |
 |---|---|
-| ![Repository subsections with Show more](https://raw.githubusercontent.com/yahyabedirhan/shipyard/9a5ca8283245a9cdbaafe6a09b8eb90bbeaf9771/0.0.2-repo-subsections-showfirst.png) | ![Date groups with Show more](https://raw.githubusercontent.com/yahyabedirhan/shipyard/9a5ca8283245a9cdbaafe6a09b8eb90bbeaf9771/0.0.2-date.png) |
+| ![Repository subsections with Show more](https://raw.githubusercontent.com/yahyabedirhan/shipyard/23901d4e16460ce4f5bdbfd211eea000d84cf2d4/docs/assets/shipyard-0.0.2/repo-subsections-showfirst.png) | ![Date groups with Show more](https://raw.githubusercontent.com/yahyabedirhan/shipyard/23901d4e16460ce4f5bdbfd211eea000d84cf2d4/docs/assets/shipyard-0.0.2/date.png) |
 | **Tabs: the All tab keeps its look, by kind** | **Onboarding starts with a preset** |
-| ![Tabs layout, All tab](https://raw.githubusercontent.com/yahyabedirhan/shipyard/9a5ca8283245a9cdbaafe6a09b8eb90bbeaf9771/0.0.2-tabs.png) | ![Preset step](https://raw.githubusercontent.com/yahyabedirhan/shipyard/9a5ca8283245a9cdbaafe6a09b8eb90bbeaf9771/0.0.2-presets.png) |
+| ![Tabs layout, All tab](https://raw.githubusercontent.com/yahyabedirhan/shipyard/23901d4e16460ce4f5bdbfd211eea000d84cf2d4/docs/assets/shipyard-0.0.2/tabs.png) | ![Preset step](https://raw.githubusercontent.com/yahyabedirhan/shipyard/23901d4e16460ce4f5bdbfd211eea000d84cf2d4/docs/assets/shipyard-0.0.2/presets.png) |
 
 What a user can now write, all optional, with every 0.0.1 file still valid:
 
