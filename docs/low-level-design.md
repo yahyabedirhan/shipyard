@@ -648,7 +648,7 @@ shipyard/
 ├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
 ├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
-├── docs/assets/<topic>/             # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md)
+├── docs/assets/<topic>/             # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's logo (logo/) and example screenshots (shipyard-0.0.2/), by relative path
 ├── Sources/ShipyardCore/             # Foundation, FoundationNetworking, Observation and TOMLDecoder only, so agents can build and test it on a Linux VPS
 │   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
 │   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
@@ -660,6 +660,7 @@ shipyard/
 │   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
 │   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
 │   │   ├── Selectors.swift           # AuthorSelector, AuthorFilter, RepositorySelector: parse, match, the hints (ADR 0002)
+│   │   ├── WindowDuration.swift      # closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   │   ├── Presets.swift             # the three presets: names, what they ask for, their file text
 │   │   ├── PresetSetting.swift       # the third writer: a preset into a file whose only live key is version
 │   │   ├── LayoutSetting.swift       # the layout button's edit: set [menu] layout in the text, every other line kept
