@@ -99,20 +99,30 @@ struct TabsLayout: View {
     /// As tall as the rows, scrolling past the maximum (#27). The rows
     /// slide in from the direction of travel when the tab changes.
     private func list(_ content: MenuTabContent) -> some View {
-        MeasuredScrollView {
-            ZStack(alignment: .top) {
-                TabList(content: content, actions: actions, highlight: $highlight)
-                    .id(tab)
-                    .transition(.asymmetric(
-                        insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
-                        removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
-                    ))
+        ScrollViewReader { proxy in
+            MeasuredScrollView {
+                ZStack(alignment: .top) {
+                    TabList(content: content, actions: actions, highlight: $highlight)
+                        .id(tab)
+                        .transition(.asymmetric(
+                            insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
+                            removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
+                        ))
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+                .clipped()
             }
-            .frame(maxWidth: .infinity, alignment: .top)
-            .clipped()
-        }
-        .onHover { inside in
-            if !inside { highlight.pointerLeftRows() }
+            .onHover { inside in
+                if !inside { highlight.pointerLeftRows() }
+            }
+            // Within the selected tab.
+            .rowKeys($highlight, places: content.rowPlaces, scroll: proxy) { place, markSeenOnly in
+                guard let row = content.row(at: place) else { return false }
+                withAnimation(Motion.seen) {
+                    if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
+                }
+                return true
+            }
         }
     }
 }
@@ -244,9 +254,10 @@ private struct TabList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(content.errors) { ErrorRow(error: $0) }
+            ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
             ForEach(content.groups) { group in
                 KindHeader(kind: group.kind, count: group.rows.count)
+                    .clearsRowHighlight($highlight)
                 ForEach(group.rows) { row in
                     TabRow(row: row, showsRepository: content.showsRepository, actions: actions)
                         .highlightable(MenuRowPlace(section: nil, row: row.id), $highlight)

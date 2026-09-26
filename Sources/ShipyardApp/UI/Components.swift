@@ -325,9 +325,16 @@ private struct RowBoundsKey: PreferenceKey {
 
 extension View {
     /// A row at `place`: reports its bounds to the layout's highlight and
-    /// feeds the pointer's enter and exit to `highlight` (#44).
-    func highlightable(_ place: MenuRowPlace, _ highlight: Binding<RowHighlight>) -> some View {
+    /// feeds the pointer's enter and exit to `highlight` (#44). It's the
+    /// target the keys scroll to (#45); `pinnedAbove` is the height of a
+    /// pinned header over it, so a row scrolled into view from below the
+    /// top isn't left under the header.
+    func highlightable(_ place: MenuRowPlace, _ highlight: Binding<RowHighlight>, pinnedAbove: CGFloat = 0) -> some View {
         anchorPreference(key: RowBoundsKey.self, value: .bounds) { [place: $0] }
+            .background {
+                // Taller than the row by the pinned header, upwards.
+                Color.clear.id(place).padding(.top, -pinnedAbove)
+            }
             .onHover { inside in
                 if inside {
                     highlight.wrappedValue.pointerEntered(place)
@@ -335,6 +342,30 @@ extension View {
                     highlight.wrappedValue.pointerExited(place)
                 }
             }
+    }
+
+    /// Something among the rows that isn't one (a header, an error row, a
+    /// placeholder): the pointer on it highlights nothing, even if the
+    /// row it came from never reported its exit.
+    func clearsRowHighlight(_ highlight: Binding<RowHighlight>) -> some View {
+        onHover { inside in
+            if inside { highlight.wrappedValue.pointerLeftRows() }
+        }
+    }
+
+    /// The keys for a layout's rows (#45), on its scrolling list: ↑ and ↓
+    /// move `highlight` through `places` and scroll the row into view,
+    /// Return calls `activate(place, false)` (open) and ⌥Return
+    /// `activate(place, true)` (mark seen); `activate` says whether the
+    /// place was a row. The list takes the keyboard focus when it
+    /// appears. Moving the pointer hands the highlight back to it.
+    func rowKeys(
+        _ highlight: Binding<RowHighlight>,
+        places: [MenuRowPlace],
+        scroll: ScrollViewProxy,
+        activate: @escaping (MenuRowPlace, _ markSeenOnly: Bool) -> Bool
+    ) -> some View {
+        modifier(RowKeys(highlight: highlight, places: places, scroll: scroll, activate: activate))
     }
 
     /// Draws `highlight` behind the rows in this view: one shape, at the
@@ -357,6 +388,54 @@ extension View {
             .animation(Motion.highlight, value: highlight.place)
         }
     }
+}
+
+/// `rowKeys(_:places:scroll:activate:)`.
+private struct RowKeys: ViewModifier {
+    @Binding var highlight: RowHighlight
+    let places: [MenuRowPlace]
+    let scroll: ScrollViewProxy
+    let activate: (MenuRowPlace, Bool) -> Bool
+    @FocusState private var focused: Bool
+    /// Where the pointer last was, in the window. Kept out of the view's
+    /// state: it changes on every move and draws nothing.
+    @State private var pointer = PointerLocation()
+
+    func body(content: Content) -> some View {
+        content
+            // The panel's window is key while the menu is open, so the
+            // focused list gets the keys; closed, the panel isn't on
+            // screen and takes none.
+            .focusable()
+            .focusEffectDisabled()
+            .focused($focused)
+            .onAppear { focused = true }
+            .onKeyPress(.downArrow) { move { $0.moveDown(in: places) } }
+            .onKeyPress(.upArrow) { move { $0.moveUp(in: places) } }
+            .onKeyPress(keys: [.return]) { press in
+                guard let place = highlight.place,
+                      activate(place, press.modifiers.contains(.option)) else { return .ignored }
+                return .handled
+            }
+            .onContinuousHover(coordinateSpace: .global) { phase in
+                // Scrolling moves the rows under a resting pointer, not the
+                // pointer: only a new location hands the highlight back.
+                guard case .active(let location) = phase, location != pointer.location else { return }
+                pointer.location = location
+                if !highlight.followsPointer { highlight.pointerMoved() }
+            }
+    }
+
+    private func move(_ step: (inout RowHighlight) -> Void) -> KeyPress.Result {
+        step(&highlight)
+        guard let place = highlight.place else { return .ignored }
+        withAnimation(Motion.highlight) { scroll.scrollTo(place) }
+        return .handled
+    }
+}
+
+private final class PointerLocation {
+    var location: CGPoint?
 }
 
 /// A plain button that dims and shrinks a hair while pressed (a tab).

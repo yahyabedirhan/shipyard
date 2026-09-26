@@ -10,30 +10,41 @@ import SwiftUI
 struct ListLayout: View {
     let model: MenuModel
     let actions: LayoutActions
-    /// The row under the pointer; one highlight glides between rows.
+    /// The row under the pointer or chosen with ↑ and ↓; one highlight
+    /// glides between rows.
     @State private var highlight = RowHighlight()
 
     var body: some View {
-        MeasuredScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                ForEach(model.sections) { section in
-                    Section {
-                        if !section.isCollapsed {
-                            rows(section)
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .offset(y: -6)),
-                                    removal: .opacity.animation(.easeOut(duration: 0.12))
-                                ))
+        ScrollViewReader { proxy in
+            MeasuredScrollView {
+                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    ForEach(model.sections) { section in
+                        Section {
+                            if !section.isCollapsed {
+                                rows(section)
+                                    .transition(.asymmetric(
+                                        insertion: .opacity.combined(with: .offset(y: -6)),
+                                        removal: .opacity.animation(.easeOut(duration: 0.12))
+                                    ))
+                            }
+                        } header: {
+                            ListSectionHeader(section: section, actions: actions)
+                                .clearsRowHighlight($highlight)
                         }
-                    } header: {
-                        ListSectionHeader(section: section, actions: actions)
                     }
                 }
+                .rowHighlight(highlight)
             }
-            .rowHighlight(highlight)
-        }
-        .onHover { inside in
-            if !inside { highlight.pointerLeftRows() }
+            .onHover { inside in
+                if !inside { highlight.pointerLeftRows() }
+            }
+            .rowKeys($highlight, places: model.listRowPlaces, scroll: proxy) { place, markSeenOnly in
+                guard let row = model.listRow(at: place) else { return false }
+                withAnimation(Motion.seen) {
+                    if markSeenOnly { actions.markSeen(row) } else { actions.open(row) }
+                }
+                return true
+            }
         }
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
@@ -44,13 +55,17 @@ struct ListLayout: View {
         if hasContent {
             VStack(spacing: 0) {
                 if !section.isLoaded {
-                    SkeletonRow(width: 190)
-                    SkeletonRow(width: 140)
+                    SkeletonRow(width: 190).clearsRowHighlight($highlight)
+                    SkeletonRow(width: 140).clearsRowHighlight($highlight)
                 }
-                ForEach(section.errors) { ErrorRow(error: $0) }
+                ForEach(section.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
                 ForEach(Array(section.rows.enumerated()), id: \.element.id) { index, row in
                     ListRow(row: row, showsRepository: section.showsRepository, actions: actions)
-                        .highlightable(MenuRowPlace(section: section.name, row: row.id), $highlight)
+                        .highlightable(
+                            MenuRowPlace(section: section.name, row: row.id),
+                            $highlight,
+                            pinnedAbove: Grid.headerHeight
+                        )
                     if index < section.rows.count - 1, row.kind != section.rows[index + 1].kind {
                         // A line only where the kind changes: pull requests | issues | runs.
                         Hairline()
