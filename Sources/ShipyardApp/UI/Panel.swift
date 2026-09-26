@@ -178,8 +178,13 @@ struct Panel: View {
             // Signed out, or the device flow's code waiting for approval.
             ConnectView(shipyard: shipyard)
         case .needsProjects:
-            // Onboarding's second step, and its offer to install the skill.
-            ProjectPicker(shipyard: shipyard)
+            // Onboarding's preset step while the file holds nothing but
+            // `version`, else the plain picker; and its offer to install the skill.
+            if shipyard.presets.isEmpty {
+                ProjectPicker(shipyard: shipyard)
+            } else {
+                PresetPicker(shipyard: shipyard)
+            }
             SkillInstallCard(installation: actions.skillInstallation)
                 .padding(.horizontal, Grid.gutter)
                 .padding(.bottom, Grid.gutter)

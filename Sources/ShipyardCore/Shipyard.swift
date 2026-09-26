@@ -70,6 +70,11 @@ public final class Shipyard {
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
     public private(set) var configWarnings: [ConfigIssue] = []
+    /// The presets onboarding offers as its first step: all of them while
+    /// the file holds nothing but `version` (missing, or the app's header);
+    /// none once it has other settings, when onboarding shows the plain
+    /// project picker instead. Follows every reload.
+    public private(set) var presets: [Preset] = Preset.all
     /// What the rate budget knows: limits, recent costs, a pause.
     public private(set) var budget = RateBudget()
     /// Whether ⌘R may refresh now: false only while the rate budget pauses
@@ -354,6 +359,7 @@ public final class Shipyard {
     private func publishConfigStatus() {
         configError = configStore.error
         configWarnings = configStore.warnings
+        presets = configStore.acceptsPreset ? Preset.all : []
         configStatusStore.record(ConfigStatus(
             checked: clock.now,
             config: configStore.url,
@@ -415,6 +421,29 @@ public final class Shipyard {
     @discardableResult
     public func addProjects(_ projects: [NewProject]) async throws -> ConfigStore.ReloadResult {
         let result = try configStore.append(projects: projects)
+        await follow(result)
+        return result
+    }
+
+    /// Onboarding's first step: writes `preset`'s whole file, with
+    /// `projects` as the repositories picked for it (none for
+    /// `review-queue`, or for `incoming-contributions` watching `owned`), and
+    /// follows the reload like `addProjects`: the phase moves to `ready` and
+    /// the first refresh runs, without a restart. Throws a `ConfigError`
+    /// (and writes nothing) when the file already holds settings besides
+    /// `version`, which also stops offering presets, or when a project is
+    /// invalid; throws the file system's error when it can't write.
+    @discardableResult
+    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigStore.ReloadResult {
+        let result: ConfigStore.ReloadResult
+        do {
+            result = try configStore.writePreset(preset, projects: projects)
+        } catch let error as ConfigError where error == Configuration.presetRefused {
+            // The file changed since the last reload: read it, so the panel
+            // shows the plain picker.
+            await reloadConfiguration()
+            throw error
+        }
         await follow(result)
         return result
     }

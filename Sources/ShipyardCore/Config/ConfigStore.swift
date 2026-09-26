@@ -7,7 +7,9 @@ import Foundation
 /// directory and calls `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
 /// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
-/// the end, and `setLayout(_:)` changes or adds only `[menu] layout`.
+/// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and
+/// `writePreset(_:projects:)` writes a whole file only over one that holds
+/// nothing but `version`.
 public final class ConfigStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
@@ -27,6 +29,7 @@ public final class ConfigStore: @unchecked Sendable {
     private var _error: ConfigError?
     private var _warnings: [ConfigIssue] = []
     private var _modified: Date?
+    private var _acceptsPreset = true
 
     public init(url: URL) {
         self.url = url
@@ -63,6 +66,11 @@ public final class ConfigStore: @unchecked Sendable {
     /// before any reload and when there was no file.
     public var modified: Date? { synchronized { _modified } }
 
+    /// Whether the latest reload found a file onboarding may write a preset
+    /// over: missing, or holding no live key but `version` (the header the
+    /// app creates). `writePreset` checks the file again before writing.
+    public var acceptsPreset: Bool { synchronized { _acceptsPreset } }
+
     /// Reads the file again. A missing or empty file is the defaults with no
     /// projects. A broken file keeps the last valid configuration, sets
     /// `error` and clears `warnings`; a valid one clears the error.
@@ -72,14 +80,18 @@ public final class ConfigStore: @unchecked Sendable {
         // another reload, so the time never claims a newer file than was read.
         let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         let outcome: Result<Configuration.Decoded, ConfigError>
+        var acceptsPreset = false
         do throws(ConfigError) {
-            outcome = .success(try Configuration.decode(read()))
+            let data = try read()
+            outcome = .success(try Configuration.decode(data))
+            acceptsPreset = String(data: data, encoding: .utf8).map(Configuration.acceptsPreset) ?? false
         } catch {
             outcome = .failure(error)
         }
 
         return synchronized {
             _modified = modified
+            _acceptsPreset = acceptsPreset
             switch outcome {
             case .failure(let error):
                 _error = error
@@ -119,7 +131,7 @@ public final class ConfigStore: @unchecked Sendable {
     /// the reload that follows.
     @discardableResult
     public func append(projects: [NewProject]) throws -> ReloadResult {
-        try validate(projects)
+        try validate(projects, against: lastValid.projects.map(\.name))
         try createIfMissing()
         let existing = try Data(contentsOf: url)
         var addition = Configuration.appendText(projects: projects)
@@ -155,9 +167,42 @@ public final class ConfigStore: @unchecked Sendable {
         return reload()
     }
 
-    private func validate(_ projects: [NewProject]) throws(ConfigError) {
+    /// Writes `preset`'s whole file, with `projects` as its picked
+    /// repositories, for onboarding's first step: only when the file is
+    /// missing or its only live key is `version`. Creates the directory when
+    /// it's missing. Throws a `ConfigError` (and writes nothing) when the
+    /// file holds anything else or doesn't read, when a project is invalid
+    /// (as for `append(projects:)`), or when the preset's file wouldn't read
+    /// with these projects; throws the file system's error when it can't
+    /// write. Returns the reload that follows.
+    @discardableResult
+    public func writePreset(_ preset: Preset, projects: [NewProject] = []) throws -> ReloadResult {
+        try validate(projects, against: [])
+        let text = preset.text(projects: projects)
+        _ = try Configuration.decode(text)
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: url.path) {
+            guard let current = String(data: try read(), encoding: .utf8), Configuration.acceptsPreset(current) else {
+                throw Configuration.presetRefused
+            }
+            // In place, as `setLayout`: a symlinked file stays a symlink.
+            let handle = try FileHandle(forWritingTo: url)
+            defer { try? handle.close() }
+            try handle.truncate(atOffset: 0)
+            try handle.write(contentsOf: Data(text.utf8))
+        } else {
+            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            // `withoutOverwriting`: a file an editor wrote meanwhile wins.
+            try Data(text.utf8).write(to: url, options: .withoutOverwriting)
+        }
+        return reload()
+    }
+
+    /// Checks the picker's projects before a write: names not empty and not
+    /// among `existing` or each other, at least one `owner/name` each, none twice.
+    private func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigError) {
         var issues: [ConfigIssue] = []
-        var names = Set(lastValid.projects.map(\.name))
+        var names = Set(existing)
         for project in projects {
             if project.name.trimmingCharacters(in: .whitespaces).isEmpty {
                 issues.append(ConfigIssue(line: nil, message: "a project's `name` can't be empty"))

@@ -479,6 +479,17 @@ struct PanelTextTests {
 
     // MARK: - The project picker
 
+    @Test("the preset step's button goes on to the picker when repositories are still needed, otherwise starts with the preset")
+    func presetContinue() {
+        #expect(PanelText.presetContinue(PresetChoice()) == "Continue")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .myAgents)) == "Choose repositories")
+        #expect(PanelText.presetContinue(PresetChoice(preset: .reviewQueue)) == "Start with Review queue")
+        var incoming = PresetChoice(preset: .incomingContributions)
+        #expect(PanelText.presetContinue(incoming) == "Start with Incoming contributions")
+        incoming.watchesOwned = false
+        #expect(PanelText.presetContinue(incoming) == "Choose repositories")
+    }
+
     @Test("the picker's Add button counts the projects it writes")
     func addProjects() {
         #expect(PanelText.addProjects(0) == "Add projects")

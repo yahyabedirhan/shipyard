@@ -13,7 +13,7 @@ A request to change the user's shipyard is a change to this file. When no key be
 
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.
 - Every key is optional. A missing or empty file means the defaults with no projects (the app then shows its project picker).
-- The app writes to the file itself in two ways only: its project picker appends `[[projects]]` blocks, and the layout button in the menu's header sets `layout` under `[menu]` to the next layout in turn (list, then tabs, then list again), keeping every other line. So read the file afresh before each edit.
+- The app writes to the file itself in three ways only: onboarding writes a whole preset (see below), but only into a file that is missing or holds nothing live but `version`; its project picker appends `[[projects]]` blocks; and the layout button in the menu's header sets `layout` under `[menu]` to the next layout in turn (list, then tabs, then list again), keeping every other line. So read the file afresh before each edit.
 - Keys are kebab-case. The schema is `https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json`, named by the file's first line, `#:schema <url>`.
 
 ## Starting from a preset

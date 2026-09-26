@@ -24,3 +24,5 @@ Every other line and comment stays as the user wrote it. The consequence above t
 ## Amendment, 2026-09-26: a third targeted edit, the preset at onboarding
 
 From 0.0.2, onboarding also writes a **preset** (`my-agents`, `incoming-contributions` or `review-queue`): a whole commented configuration, with the repositories the user picked. It writes one only when the file is missing or its only live key is `version`, which is the case for the header the app creates. Any other file is refused, and onboarding then shows the plain project picker, which appends projects as before. The app still never rewrites a file that holds the user's own settings.
+
+"Only live key" is read from the file's text, not its meaning: comments and blank lines don't count, and any other key or table does, even one set to its default or an empty `[menu]`. A file that doesn't read is refused too. The check runs again just before writing, so a setting saved while onboarding was open is never overwritten. The file is written in place, like the layout edit, so a symlinked file stays a symlink.
