@@ -1,4 +1,4 @@
-[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Phase 1: #2–#12 | Phase 2: #13, #15–#20, #24–#27, #29–#32, #35–#40 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Install](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/README.md#install) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/configuration.md)
+[Spec #1](https://github.com/yahyabedirhan/shipyard/issues/1) | Phase 1: #2–#12 | Phase 2: #13, #15–#20, #24–#27, #29–#32, #35–#40 | Follow-ups: #33, #44, #45 | [Design](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/low-level-design.md) | [Install](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/README.md#install) | [Configuration docs](https://github.com/yahyabedirhan/shipyard/blob/build/shipyard-core-0.0.x/docs/configuration.md)
 
 ## Why the change
 
@@ -7,19 +7,27 @@ This delivers shipyard 0.0.1: a macOS menu bar app, built over a tested Foundati
 ## Special things to note
 
 - **0.0.x connects through `gh` only.** Sign-in without `gh` (the device flow, which needs an OAuth App client ID, plus the Keychain) moved to its own effort, #22, with #23 and #14. The device-flow code stays in the core, switched off. With a `gh` token, Sign out only lasts until Try again or the next launch; that is deferred to #22 too.
-- **Still for the maintainer (#20):**
-  - install from the zip through the README's `xattr` step;
-  - launch at login after a reboot;
-  - refresh on wake;
-  - offline;
-  - typing in the picker with a real click.
+- **Still for the maintainer, in the real menu (#20):**
+  - **The keys (#45), in the list layout:**
+    - Press ↓ as soon as the menu opens, with no click. Do it again after closing and reopening.
+    - Hold ↓ through several projects: it should scroll at key-repeat speed, clear of the pinned header.
+    - ↑/↓ wrap at both ends.
+    - ← goes to the project header, then collapses it; → expands it, then goes to its first item.
+    - Return on a header opens its repository; Return opens an item; ⌥Return only marks it seen.
+  - **The keys in the tabs layout:** ←/→ switch tabs, and the new tab starts at the top with its first row highlighted. ↑/↓ scroll correctly straight after a switch.
+  - **Other checks:**
+    - The tabs tooltip now reads like the list's: state, then details.
+    - A `[rate-limit]` edit shows in the footer at once.
+    - From the first pass: install from the zip through the README's `xattr` step, launch at login after a reboot, refresh on wake, offline, and typing in the picker with a real click.
 
-  Everything else in the spec's user stories was walked in the real menu on a Mac, including both layouts in light and dark (screenshots on #20). One intermittent issue is open: the menu once needed extra clicks to reopen after opening an item (#42).
+  The hover fix (#44) has already been confirmed in the real menu. #42 (extra clicks to reopen, seen once) is diagnosed but not fixed: the likely causes and the steps to try are on the issue.
 - **Choices worth a look:**
   - opening the menu never refreshes (#26);
   - the menu closes after opening an item through the status item's own click, with a guarded private fallback on newer macOS, because SwiftUI can't dismiss a `.window` `MenuBarExtra` (#39);
   - unknown settings warn instead of failing (#38);
   - the layout is a setting, `[menu] layout = "list" | "tabs"` (#35, #36).
+
+  - the keyboard navigation fixes our own SwiftUI list rather than moving to `NSOutlineView`, SwiftUI `List` or a real `NSMenu` (reasons on #45); `NSOutlineView` is the fallback if it doesn't feel native.
 
   Phase 1's choices still hold: only a first launch or a newly added project, repository or kind is silent; sign-out keeps seen state; running workflow runs never need attention.
 
@@ -68,12 +76,28 @@ The core gained what the menu needed:
 +    [menu] layout; unknown settings → warnings with "did you mean"
 ```
 
+The follow-ups put the row highlight, and the keys that move it, under one tested model. The pointer and the keys share it, and each layout draws it as a single shape:
+
+```diff
+ ListLayout / TabsLayout
+-  per-row hovered + matchedGeometryEffect + a spring per row
++  @State highlight: RowHighlight                  (ShipyardCore, tested)
++    pointerEntered / pointerExited / pointerLeftRows / keep(in:)
++    moveUp / moveDown (wrap) · left / right (header ↔ items, fold) · Return target
++  rowHighlight(_:)                                 one shape at the highlighted row's bounds
++  rowKeys(…)          (UI/RowKeys.swift)           focus when the panel window becomes key; ↑↓←→ Return ⌥Return
++    RowScroll.reveal                               (ShipyardCore) scroll just enough, clear of the pinned header
++  itemRow(…)                                       one row behaviour for both layouts: click, ⌥-click, tooltip, highlight
+   ListLayout: a project header is a row: highlightable, ←/→ fold, Return opens its first repository
+   TabsLayout: ←/→ switch tabs, scroll to a stable top anchor
+```
+
 What lands where:
 
 ```text
 Sources/ShipyardCore/         configuration, GitHub, items, menu model + words, state, skill installer, Shipyard
-Sources/ShipyardApp/          adapters above; UI/Design.swift + Components.swift shared by both layouts
-Tests/ShipyardCoreTests/      332 tests; Harness drives Shipyard end to end over recorded GitHub answers
+Sources/ShipyardApp/          adapters above; UI/Design.swift, Components.swift and RowKeys.swift shared by both layouts
+Tests/ShipyardCoreTests/      384 tests; Harness drives Shipyard end to end over recorded GitHub answers
 Makefile, Packaging/          make install / release (ad-hoc signed zip) / icon; origami app icon + sailboat, night, sunset alternates
 schema/, skills/shipyard/     published schema; the user-facing agent skill, checked key by key in tests
 docs/                         low-level design, configuration.md for maintainers, references (incl. end-to-end testing)
