@@ -55,6 +55,8 @@ enum HoverHelp {
     }
     /// A row card's avatar.
     static let avatarSize: CGFloat = 20
+    /// The space between a row card's avatar and its title.
+    static let avatarGap: CGFloat = 8
     /// The widest the card gets; longer lines wrap.
     static let maxWidth: CGFloat = 320
     /// How far the card stays in from the panel's edges.
@@ -330,34 +332,42 @@ private struct HoverHelpBody: View {
     }
 }
 
-/// A row's card: the author's avatar beside the full title, why the row
-/// needs attention as tags under it, then the facts.
+/// A row's card: the author's avatar centred beside the full title, then,
+/// under the title, its tags and facts.
 private struct RowCardView: View {
     let card: RowCard
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            AuthorAvatar(url: card.avatarURL)
-            VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 3) {
+            // The avatar and the title are the card's header: the avatar
+            // centres on the title, one line or three.
+            HStack(alignment: .center, spacing: HoverHelp.avatarGap) {
+                AuthorAvatar(url: card.avatarURL)
                 Text(card.headline)
                     .font(TypeScale.meta.weight(.semibold))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            // The rest sits under the title, not the avatar.
+            VStack(alignment: .leading, spacing: 3) {
                 if !card.reasons.isEmpty {
                     HStack(spacing: 4) {
                         ForEach(card.reasons, id: \.self) { AttentionTag(reason: $0, kind: card.kind) }
                     }
                     .padding(.top, 3)
                 }
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(card.facts, id: \.self) { line in
-                        HStack(spacing: 10) {
-                            ForEach(line, id: \.self) { FactView(fact: $0) }
+                if !card.facts.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(card.facts, id: \.self) { line in
+                            HStack(spacing: 10) {
+                                ForEach(line, id: \.self) { FactView(fact: $0) }
+                            }
                         }
                     }
+                    .padding(.top, 2)
                 }
-                .padding(.top, 2)
             }
+            .padding(.leading, HoverHelp.avatarSize + HoverHelp.avatarGap)
         }
     }
 }
