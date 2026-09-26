@@ -87,7 +87,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 ## Notification rules
 
-A rule is `{ event = "…", authors = "…" }`; `authors` defaults to `"any"`. An event is notified when a rule in the project's list names it and its author filter matches the item's author. Each event is notified once, and a project's existing items never notify when it's added.
+A rule, one element of a `notifications` list, is `{ event = "…", authors = "…" }`; `authors` defaults to `"any"`. An event is notified when a rule in the project's list names it and its author filter matches the item's author. Each event is notified once, and a project's existing items never notify when it's added.
 
 | Event | When |
 |---|---|

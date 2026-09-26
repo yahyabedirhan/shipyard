@@ -68,6 +68,16 @@ public struct SystemClock: WallClock {
     public var now: Date { Date() }
 }
 
+/// Waits the given number of seconds; throws `CancellationError` when
+/// cancelled. The device flow and the skill install wait with it, so tests
+/// can pass one that returns at once.
+public typealias Sleep = @Sendable (TimeInterval) async throws -> Void
+
+/// Real waiting, for the app.
+public let systemSleep: Sleep = { seconds in
+    try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
+}
+
 /// Opens an item's page on GitHub in the user's browser.
 public protocol URLOpening: Sendable {
     func open(_ url: URL)

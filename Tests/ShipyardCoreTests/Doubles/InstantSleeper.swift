@@ -19,7 +19,7 @@ final class InstantSleeper: Sendable {
     /// Runs `body` during every sleep, with the sleep's index (from 0).
     func onSleep(_ body: @escaping Hook) { hook.withValue { $0 = body } }
 
-    var sleep: DeviceFlow.Sleep {
+    var sleep: Sleep {
         { [self] seconds in
             let index = log.withValue { log in
                 log.append(seconds)

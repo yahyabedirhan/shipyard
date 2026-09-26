@@ -143,6 +143,32 @@ struct RateLimitTests {
         #expect(harness.shipyard.menu.canRefreshNow)
     }
 
+    @Test("a `[rate-limit]` edit shows at once, before the refresh it starts comes back")
+    func rateLimitEditShowsAtOnce() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), pullRequests())
+        let shipyard = harness.shipyard
+        #expect(shipyard.menu.refreshDelay == .configured(120))
+        #expect(shipyard.menu.rateIndicator != nil)
+
+        // Seen while the refresh the edit starts is still waiting on GitHub.
+        let during = Locked<(RefreshDelay?, RateIndicator?)?>(nil)
+        harness.stub.onSend { request in
+            guard request.url == GitHubClient.graphQLURL else { return }
+            let menu = await shipyard.menu
+            during.withValue { $0 = (menu.refreshDelay, menu.rateIndicator) }
+        }
+        // 3 points a refresh at 1% of 5,000 an hour: one every 216 s.
+        try harness.writeConfig("[rate-limit]\nmax-share-percent = 1\nshow = \"never\"\n\n" + projects)
+        await shipyard.reloadConfiguration()
+
+        let seen = try #require(during.current)
+        #expect(seen.0 == .stretched(216, api: .graphql, cost: 3))
+        #expect(seen.1 == nil)
+        #expect(harness.graphQLRequests.count == 2)
+        #expect(shipyard.menu.refreshDelay == .stretched(216, api: .graphql, cost: 3))
+        #expect(shipyard.menu.rateIndicator == nil)
+    }
+
     @Test("the refresh that spends the last point shows its items, then pauses until the reset")
     func lastPoint() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests(remaining: 0))

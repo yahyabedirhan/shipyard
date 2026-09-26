@@ -3,6 +3,10 @@ import Foundation
 /// The words the panel shows for what the menu model and the orchestrator
 /// hold: a row's age, when the list was last updated, and why the
 /// configuration or a refresh failed. Pure, so tests reach them without SwiftUI.
+///
+/// This file holds the words of the menu itself (header, rows, tabs,
+/// banners, rate limit); each onboarding screen and the skill install card
+/// have their own `PanelText+…` file next to it.
 public enum PanelText {
     /// The panel's heading.
     public static let title = "Shipyard"
@@ -250,7 +254,7 @@ public enum PanelText {
     }
 
     /// An interval in whole minutes, rounded up: "4 min", "1 h", "1 h 30 min".
-    private static func interval(_ seconds: TimeInterval) -> String {
+    static func interval(_ seconds: TimeInterval) -> String {
         let minutes = max(1, Int((seconds / 60).rounded(.up)))
         let (hours, rest) = minutes.quotientAndRemainder(dividingBy: 60)
         switch (hours, rest) {
@@ -268,200 +272,5 @@ public enum PanelText {
         formatter.dateStyle = .none
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-
-    // MARK: - The connect screen
-
-    /// What the connect screen says: a title, what happened and what to do,
-    /// the `gh` command to copy, and whether to point at installing `gh`.
-    public struct Connect: Equatable, Sendable {
-        /// The screen's heading, e.g. "Connect to GitHub".
-        public var title: String
-        /// What happened and what to do, ending where the command follows.
-        public var message: String
-        /// The `gh` command to run in a terminal, with a Copy button.
-        public var command: String
-        /// Whether `gh` may not be installed at all, so the screen shows `installGh`.
-        public var suggestsInstallingGh: Bool
-    }
-
-    private static let ghLoginCommand = "gh auth login"
-    private static let ghLogoutCommand = "gh auth logout"
-
-    /// Where to get `gh`, as Markdown (the link is clickable in the panel).
-    public static let installGh = "Get gh at [cli.github.com](https://cli.github.com) or with `brew install gh`."
-
-    /// Shown while `start()` looks for a token, before there's a reason to show.
-    public static let connecting = "Connecting to GitHub…"
-
-    /// Said under Try again when it left shipyard signed out, for `reason`
-    /// as it stands after the try, so the click doesn't look like it did nothing.
-    public static func stillSignedOut(_ reason: Shipyard.SignedOutReason) -> String {
-        switch reason {
-        case .noToken: "gh still isn't signed in."
-        case .rejected(.gh): "GitHub still rejects gh's token."
-        case .rejected(.tokenStore): "GitHub still rejects the token."
-        case .signedOut: "Still not connected."
-        }
-    }
-
-    /// The connect screen for why shipyard is signed out. 0.0.x connects
-    /// through `gh` only, so every way back in is `gh auth login`.
-    public static func connect(_ reason: Shipyard.SignedOutReason) -> Connect {
-        switch reason {
-        case .noToken:
-            Connect(
-                title: "Connect to GitHub",
-                message: "Shipyard connects to GitHub through the GitHub CLI, gh. Install it, then sign in with it in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: true
-            )
-        case .rejected(let source):
-            Connect(
-                title: source == .gh ? "GitHub rejected gh's token" : "GitHub rejected shipyard's token",
-                message: "It was revoked or has expired. Sign in to gh again in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: false
-            )
-        case .signedOut(.ghStillSignedIn):
-            Connect(
-                title: "Signed out",
-                message: "gh is still signed in, so Try again, or the next launch, connects again. To disconnect for good, sign gh out in a terminal:",
-                command: ghLogoutCommand,
-                suggestsInstallingGh: false
-            )
-        case .signedOut(.signedOut):
-            Connect(
-                title: "Signed out",
-                message: "To connect again, sign in to gh in a terminal:",
-                command: ghLoginCommand,
-                suggestsInstallingGh: false
-            )
-        }
-    }
-
-    // MARK: - The project picker
-
-    public static let pickerTitle = "Pick your projects"
-    public static let pickerIntro = "Each repository you choose is a project, one section in the list. Give several the same project name to group them into one."
-    /// The field for a repository that isn't suggested.
-    public static let typeRepository = "owner/name or a github.com link"
-    public static let findingSuggestions = "Finding the repositories you worked on recently…"
-    public static let noSuggestions = "You haven't pushed to any repository lately. Add one by name above."
-    /// Said while a chosen repository's project name is empty; Add waits for it.
-    public static let unnamedProject = "Give every project a name."
-    /// Said when Add wrote the projects but the file around them doesn't load.
-    public static let addedToBrokenFile = "Added to config.toml, but the file has an error (see above). Shipyard picks the projects up once it's fixed."
-
-    /// Why the suggestions didn't load; typing a repository still works.
-    public static func suggestionsFailed(_ error: GitHubError) -> String {
-        "Couldn't load suggestions: \(fetchError(error))"
-    }
-
-    /// Why Add couldn't write the file.
-    public static func couldNotWrite(_ reason: String) -> String {
-        "Couldn't write config.toml: \(reason)"
-    }
-
-    /// The picker's confirm button: "Add 2 projects".
-    public static func addProjects(_ count: Int) -> String {
-        switch count {
-        case 0: "Add projects"
-        case 1: "Add 1 project"
-        default: "Add \(count) projects"
-        }
-    }
-
-    /// What Add writes, above its button: "Adds e-commerce (2 repositories),
-    /// job-search"; `nil` while nothing is chosen.
-    public static func pickedProjects(_ projects: [NewProject]) -> String? {
-        guard !projects.isEmpty else { return nil }
-        let names = projects.map { project in
-            project.repositories.count > 1 ? "\(project.name) (\(project.repositories.count) repositories)" : project.name
-        }
-        return "Adds " + names.joined(separator: ", ")
-    }
-
-    // MARK: - The agent skill
-
-    /// What the skill install card says: a title, what happened or what to
-    /// do, the command's output, the command to copy, and its button.
-    public struct SkillInstall: Equatable, Sendable {
-        /// The card's button: Install, Cancel (while running) or Try again.
-        public enum Action: Equatable, Sendable {
-            case install, cancel, tryAgain
-        }
-
-        /// The card's icon: the offer, a success or a problem.
-        public enum Tone: Equatable, Sendable {
-            case neutral, success, warning
-        }
-
-        /// The card's heading.
-        public var title: String
-        /// What happened or what to do.
-        public var message: String
-        /// What the command printed, when it's worth showing.
-        public var output: String?
-        /// `SkillInstaller.command`, with a Copy button, when running it by hand helps.
-        public var command: String?
-        /// The card's button, if any.
-        public var action: Action?
-        public var tone: Tone = .neutral
-    }
-
-    /// The footer's button for the skill install card.
-    public static let installSkill = "Install agent skill…"
-
-    /// The skill install card for `state`.
-    public static func skillInstall(_ state: SkillInstallation.State) -> SkillInstall {
-        let command = SkillInstaller.command
-        switch state {
-        case .idle:
-            return SkillInstall(
-                title: "Install the agent skill",
-                message: "It teaches your agents shipyard's configuration file, so you can ask one to watch a repository for you. Shipyard runs this in your login shell:",
-                command: command,
-                action: .install
-            )
-        case .running:
-            return SkillInstall(
-                title: "Installing the agent skill…",
-                message: "Running npx in your login shell. It can take a minute.",
-                action: .cancel
-            )
-        case .finished(.installed(let output)):
-            return SkillInstall(
-                title: "Agent skill installed",
-                message: "Your agents can now edit shipyard's configuration file for you.",
-                output: output.isEmpty ? nil : output,
-                tone: .success
-            )
-        case .finished(.failed(let output)):
-            return SkillInstall(
-                title: "Couldn't install the agent skill",
-                message: "The command failed. Try again, or run it in a terminal:",
-                output: output,
-                command: command,
-                action: .tryAgain,
-                tone: .warning
-            )
-        case .finished(.npxNotFound(let command)):
-            return SkillInstall(
-                title: "npx wasn't found",
-                message: "Shipyard couldn't find npx (it comes with Node.js) in your login shell. Run this in a terminal instead:",
-                command: command,
-                action: .tryAgain,
-                tone: .warning
-            )
-        case .timedOut(let seconds):
-            return SkillInstall(
-                title: "The install took too long",
-                message: "It was stopped after \(interval(seconds)). Try again, or run it in a terminal:",
-                command: command,
-                action: .tryAgain,
-                tone: .warning
-            )
-        }
     }
 }

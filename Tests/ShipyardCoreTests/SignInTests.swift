@@ -340,7 +340,7 @@ struct SignInTests {
 
         harness.shipyard.signOut()
 
-        #expect(harness.shipyard.signedOutReason == .signedOut(.ghStillSignedIn))
+        #expect(harness.shipyard.signedOutReason == .userSignedOut(.ghStillSignedIn))
     }
 
     @Test("signing out of a stored token gives the plain signed-out reason")
@@ -351,6 +351,6 @@ struct SignInTests {
 
         harness.shipyard.signOut()
 
-        #expect(harness.shipyard.signedOutReason == .signedOut(.signedOut))
+        #expect(harness.shipyard.signedOutReason == .userSignedOut(.signedOut))
     }
 }

@@ -36,14 +36,6 @@ final class ConfigWatcher {
         watch()
     }
 
-    func stop() {
-        pending?.cancel()
-        directorySource?.cancel()
-        fileSource?.cancel()
-        directorySource = nil
-        fileSource = nil
-    }
-
     /// (Re)opens both watches on whatever is at the paths now.
     private func watch() {
         directorySource?.cancel()

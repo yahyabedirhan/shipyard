@@ -32,6 +32,30 @@ private func tomlBlocks(in text: String) -> [String] {
     return blocks
 }
 
+/// The key-like words in a code span: `[menu-bar] count` has `menu-bar` and `count`.
+private func words(_ span: String) -> Set<String> {
+    Set(span.split { !($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }.map(String.init))
+}
+
+/// `prose` split at blank lines into paragraphs, list runs and tables; a
+/// table stays with the paragraph that introduces it.
+private func proseBlocks(_ prose: String) -> [String] {
+    var blocks: [[String]] = []
+    var current: [String] = []
+    for line in prose.components(separatedBy: "\n") {
+        if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            if !current.isEmpty { blocks.append(current) }
+            current = []
+        } else if current.isEmpty, line.hasPrefix("|"), let introduction = blocks.popLast() {
+            current = introduction + [line]
+        } else {
+            current.append(line)
+        }
+    }
+    if !current.isEmpty { blocks.append(current) }
+    return blocks.map { $0.joined(separator: "\n") }
+}
+
 @Suite("Agent skill document")
 struct SkillDocumentTests {
     @Test("it has the frontmatter `npx skills add` needs, named after its folder")
@@ -108,16 +132,29 @@ struct SkillDocumentTests {
         }
         // A nested key is named beside its table, as `[menu-bar] count` or
         // `pull-requests.show`, so `show` in one table doesn't cover another's.
-        // Keys of an array's elements (a project's `name`, a rule's `event`)
-        // are named in that element's own table.
-        let spanWords = spans.map { span in
-            Set(span.split { !($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }.map(String.init))
-        }
+        let spanWords = spans.map(words)
         for path in declaredPaths(schema, root: schema).sorted() {
             let segments = path.split(separator: ".").map(String.init)
             guard segments.count > 1, !segments[segments.count - 2].hasSuffix("[]") else { continue }
             let (table, key) = (segments[segments.count - 2], segments[segments.count - 1])
             #expect(spanWords.contains { $0.contains(table) && $0.contains(key) }, "`\(path)` isn't named beside `\(table)`")
+        }
+        // A key of an array's elements (a project's `name`, a rule's `event`)
+        // is named in a code span in the same paragraph or table as a span
+        // naming its array (`[[projects]]`, `notifications`), so a bare
+        // mention elsewhere doesn't count.
+        let blockWords = proseBlocks(prose).map { block in
+            block.components(separatedBy: "`").enumerated().filter { $0.offset % 2 == 1 }.map { words($0.element) }
+        }
+        for path in declaredPaths(schema, root: schema).sorted() {
+            let segments = path.split(separator: ".").map(String.init)
+            guard segments.count > 1, segments[segments.count - 2].hasSuffix("[]") else { continue }
+            let array = String(segments[segments.count - 2].dropLast(2))
+            let key = segments[segments.count - 1]
+            let named = blockWords.contains { spans in
+                spans.contains { $0.contains(array) } && spans.contains { $0.contains(key) }
+            }
+            #expect(named, "`\(path)` isn't named next to `\(array)`")
         }
     }
 

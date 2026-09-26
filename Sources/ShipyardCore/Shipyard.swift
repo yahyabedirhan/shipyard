@@ -33,7 +33,7 @@ public final class Shipyard {
         /// GitHub rejected the token from this source (401): revoked or expired.
         case rejected(TokenSource)
         /// The user signed out; the result says whether `gh` still holds a token.
-        case signedOut(SignOutResult)
+        case userSignedOut(SignOutResult)
     }
 
     /// Where shipyard is in its lifecycle.
@@ -107,7 +107,7 @@ public final class Shipyard {
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
-        sleep: @escaping DeviceFlow.Sleep = DeviceFlow.systemSleep,
+        sleep: @escaping Sleep = systemSleep,
         oauthClientID: String = OAuthApp.clientID
     ) {
         self.configStore = configStore
@@ -258,7 +258,7 @@ public final class Shipyard {
         signInError = nil
         endSession()
         let result: SignOutResult = source == .gh ? .ghStillSignedIn : .signedOut
-        signedOutReason = .signedOut(result)
+        signedOutReason = .userSignedOut(result)
         return result
     }
 
@@ -302,6 +302,10 @@ public final class Shipyard {
             // once, even if the refresh below can't run (paused) or fails.
             rebuildMenu(configuration)
             if phase.canRefresh {
+                // So does `[rate-limit]`: the delay and the indicator follow
+                // the new share and `show` from the limits already heard,
+                // rather than wait for the refresh to come back.
+                publishRateStatus()
                 await refresh()
             } else {
                 timer.disarm()

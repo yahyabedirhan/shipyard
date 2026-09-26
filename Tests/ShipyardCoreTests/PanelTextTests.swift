@@ -254,8 +254,8 @@ struct PanelTextTests {
         (Shipyard.SignedOutReason.noToken, "gh still isn't signed in."),
         (.rejected(.gh), "GitHub still rejects gh's token."),
         (.rejected(.tokenStore), "GitHub still rejects the token."),
-        (.signedOut(.signedOut), "Still not connected."),
-        (.signedOut(.ghStillSignedIn), "Still not connected."),
+        (.userSignedOut(.signedOut), "Still not connected."),
+        (.userSignedOut(.ghStillSignedIn), "Still not connected."),
     ])
     func stillSignedOut(reason: Shipyard.SignedOutReason, text: String) {
         #expect(PanelText.stillSignedOut(reason) == text)
@@ -279,7 +279,7 @@ struct PanelTextTests {
 
     @Test("signing out while gh is still signed in says to run gh auth logout")
     func connectSignedOutGhStillSignedIn() {
-        let text = PanelText.connect(.signedOut(.ghStillSignedIn))
+        let text = PanelText.connect(.userSignedOut(.ghStillSignedIn))
         #expect(text.title == "Signed out")
         #expect(text.message.contains("still signed in"))
         #expect(text.command == "gh auth logout")
@@ -288,7 +288,7 @@ struct PanelTextTests {
 
     @Test("signing out with nothing left signed in points back at gh auth login")
     func connectSignedOut() {
-        let text = PanelText.connect(.signedOut(.signedOut))
+        let text = PanelText.connect(.userSignedOut(.signedOut))
         #expect(text.title == "Signed out")
         #expect(text.command == "gh auth login")
     }

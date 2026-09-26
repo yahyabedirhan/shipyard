@@ -30,7 +30,7 @@ public final class SkillInstallation {
 
     private let installer: SkillInstaller
     private let timeout: TimeInterval
-    private let sleep: DeviceFlow.Sleep
+    private let sleep: Sleep
     private var task: Task<Void, Never>?
     /// Counts installs, so one that was cancelled (and still winds down)
     /// never writes over the state of a later one.
@@ -39,7 +39,7 @@ public final class SkillInstallation {
     public init(
         installer: SkillInstaller = SkillInstaller(),
         timeout: TimeInterval = SkillInstallation.defaultTimeout,
-        sleep: @escaping DeviceFlow.Sleep = DeviceFlow.systemSleep
+        sleep: @escaping Sleep = systemSleep
     ) {
         self.installer = installer
         self.timeout = timeout

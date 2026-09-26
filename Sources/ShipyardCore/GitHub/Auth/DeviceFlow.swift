@@ -74,9 +74,6 @@ public enum DeviceFlowError: Error, Equatable, Sendable {
 /// GitHub's OAuth device flow: request a code, let the user enter it on
 /// github.com, poll for the token. See `docs/references/github-device-flow.md`.
 public struct DeviceFlow: Sendable {
-    /// Waits the given number of seconds; throws `CancellationError` when cancelled.
-    public typealias Sleep = @Sendable (TimeInterval) async throws -> Void
-
     public static let codeURL = URL(string: "https://github.com/login/device/code")!
     public static let tokenURL = URL(string: "https://github.com/login/oauth/access_token")!
     static let defaultVerificationURL = URL(string: "https://github.com/login/device")!
@@ -87,11 +84,6 @@ public struct DeviceFlow: Sendable {
     /// What a `slow_down` answer adds to the interval.
     static let slowDownStep: TimeInterval = 5
 
-    /// Real waiting, for the app.
-    public static let systemSleep: Sleep = { seconds in
-        try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
-    }
-
     private let clientID: String
     private let transport: any HTTPTransport
     private let clock: any WallClock
@@ -101,7 +93,7 @@ public struct DeviceFlow: Sendable {
         clientID: String = OAuthApp.clientID,
         transport: any HTTPTransport,
         clock: any WallClock = SystemClock(),
-        sleep: @escaping Sleep = DeviceFlow.systemSleep
+        sleep: @escaping Sleep = systemSleep
     ) {
         self.clientID = clientID
         self.transport = transport

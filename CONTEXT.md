@@ -12,7 +12,11 @@ _Avoid_: Repo (when the group is meant), workspace
 
 **Item**:
 Anything listed under a project: a pull request, an issue or a workflow run.
-_Avoid_: Entry, row
+_Avoid_: Entry, row (a row is how an item is drawn, not the item)
+
+**Row**:
+One line in the menu: usually an item as the menu draws it, but a project's header and a repository's error line are rows too.
+_Avoid_: Entry, line
 
 **Closed window**:
 How far back closed items stay visible, counted from when they were closed.
