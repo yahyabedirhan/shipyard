@@ -35,6 +35,8 @@ final class RowFrames {
     var visibleHeight: Double = 0
     /// Each laid-out row's span, and which row view reported it.
     private var spans: [RowSlot: (span: RowSpan, owner: UUID)] = [:]
+    /// Called after a row reports a new span: the rows moved.
+    var rowsMoved: (() -> Void)?
 
     /// Where the row at `slot` sits, if it's laid out.
     func span(at slot: RowSlot) -> RowSpan? {
@@ -44,6 +46,7 @@ final class RowFrames {
     /// The row view `owner` at `slot` is at `span`.
     func report(_ span: RowSpan, at slot: RowSlot, by owner: UUID) {
         spans[slot] = (span, owner)
+        rowsMoved?()
     }
 
     /// The row view `owner` at `slot` is gone. A span another view has
@@ -76,12 +79,24 @@ extension EnvironmentValues {
     }
 }
 
-/// The top of a layout's scrolling list, above anything that transitions:
-/// where `rowKeys(…)` scrolls when ← or → moves the highlight to a new
-/// list (another tab). It's there before the new tab is laid out, and
-/// unlike a row it can't be the outgoing tab's.
+/// The top of a layout's scrolling list, outside the lazy stack and above
+/// anything that transitions: where `rowKeys(…)` scrolls when ↓ wraps to
+/// the first row, and when ← or → moves the highlight to a new list
+/// (another tab). It's always laid out, unlike a row the lazy stack hasn't
+/// made yet, a new tab's rows, or a row the outgoing tab shares.
 struct RowListTop: View {
     static let id = "row-list-top"
+
+    var body: some View {
+        Color.clear.frame(height: 0).id(Self.id)
+    }
+}
+
+/// The bottom of a layout's scrolling list, below the rows and outside the
+/// lazy stack: where `rowKeys(…)` scrolls when ↑ wraps to the last row,
+/// which the lazy stack usually hasn't laid out.
+struct RowListBottom: View {
+    static let id = "row-list-bottom"
 
     var body: some View {
         Color.clear.frame(height: 0).id(Self.id)
@@ -116,10 +131,12 @@ extension View {
     }
 
     /// The keys for a layout's rows, on its scrolling list. ↑ and ↓
-    /// move `highlight` through `places`, wrapping at the ends; `left` and
-    /// `right` are the layout's ← and →. The highlighted row is kept in
+    /// move `highlight` through `places`, wrapping at the ends, and repeat
+    /// while held; `left` and `right` are the layout's ← and →, which move
+    /// the highlight they're given. The highlighted row is kept in
     /// view, clear of a `pinnedHeader` that tall, without animating the
-    /// scroll. Return calls `activate(place, false)` and ⌥Return
+    /// scroll; a wrap goes to the list's `RowListTop` or `RowListBottom`,
+    /// which the layout puts around its rows. Return calls `activate(place, false)` and ⌥Return
     /// `activate(place, true)`; `activate` says whether it acted. `list`
     /// is the list the highlight is in (the selected tab, as its rows'
     /// `rowList(_:)`; `nil` in the list layout). The list
@@ -132,8 +149,8 @@ extension View {
         in list: AnyHashable? = nil,
         pinnedHeader: CGFloat = 0,
         scroll: ScrollViewProxy,
-        left: @escaping () -> RowKeyMove,
-        right: @escaping () -> RowKeyMove,
+        left: @escaping (inout RowHighlight) -> RowKeyMove,
+        right: @escaping (inout RowHighlight) -> RowKeyMove,
         activate: @escaping (MenuRowPlace, _ markSeenOnly: Bool) -> Bool
     ) -> some View {
         modifier(RowKeys(
@@ -166,9 +183,10 @@ private struct Highlightable: ViewModifier {
     let drawsOwnHighlight: Bool
     @Environment(\.rowFrames) private var frames
     @Environment(\.rowList) private var list
-    /// This row view, among others at the same slot: the outgoing tab's
-    /// row, or one the lazy list dropped and made again.
-    @State private var owner = UUID()
+    /// This row view, among others at the same slot (the outgoing tab's
+    /// row, or one the lazy list dropped and made again), and the span it
+    /// last saw.
+    @State private var report = RowReport()
 
     private var slot: RowSlot { RowSlot(list: list, place: place) }
 
@@ -176,10 +194,18 @@ private struct Highlightable: ViewModifier {
         content
             .anchorPreference(key: RowBoundsKey.self, value: .bounds) { drawsOwnHighlight ? [:] : [slot: $0] }
             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(RowFrames.space)) } action: { frame in
-                frames?.report(RowSpan(top: frame.minY, bottom: frame.maxY), at: slot, by: owner)
+                let span = RowSpan(top: frame.minY, bottom: frame.maxY)
+                report.last = span
+                frames?.report(span, at: slot, by: report.owner)
             }
             // A row the lazy list dropped isn't where it last was.
-            .onDisappear { frames?.forget(slot, by: owner) }
+            .onDisappear { frames?.forget(slot, by: report.owner) }
+            // A row the lazy list kept and shows again, where it was when
+            // it went (a wrap back to the list's end it wrapped from),
+            // sees no geometry change, so it reports its span again here.
+            .onAppear {
+                if let last = report.last { frames?.report(last, at: slot, by: report.owner) }
+            }
             .onHover { inside in
                 if inside {
                     highlight.pointerEntered(place)
@@ -197,17 +223,19 @@ private struct RowKeys: ViewModifier {
     let list: AnyHashable?
     let pinnedHeader: CGFloat
     let scroll: ScrollViewProxy
-    let left: () -> RowKeyMove
-    let right: () -> RowKeyMove
+    let left: (inout RowHighlight) -> RowKeyMove
+    let right: (inout RowHighlight) -> RowKeyMove
     let activate: (MenuRowPlace, Bool) -> Bool
     @FocusState private var focused: Bool
     @State private var frames = RowFrames()
     /// Where the pointer last was, in the window. Kept out of the view's
     /// state: it changes on every move and draws nothing.
     @State private var pointer = PointerLocation()
+    @State private var latest = LatestRowKeys()
 
     func body(content: Content) -> some View {
-        content
+        latest.update(self)
+        return content
             .coordinateSpace(.named(RowFrames.space))
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { frames.visibleHeight = $0 }
             .environment(\.rowFrames, frames)
@@ -219,43 +247,67 @@ private struct RowKeys: ViewModifier {
             .focusable()
             .focusEffectDisabled()
             .focused($focused)
-            .onAppear { focused = true }
+            .onAppear {
+                focused = true
+                frames.rowsMoved = { [latest] in latest.keys?.rowsMoved() }
+            }
             .background(WindowBecameKey { focused = true })
-            // Held down, a key repeats at the system's rate (`onKeyPress`
-            // gets the repeats), and each step scrolls without animating.
-            .onKeyPress(.downArrow) { step { $0.moveDown(in: places) } }
-            .onKeyPress(.upArrow) { step { $0.moveUp(in: places) } }
-            .onKeyPress(.leftArrow) { side(left) }
-            .onKeyPress(.rightArrow) { side(right) }
-            .onKeyPress(keys: [.return]) { press in
-                guard let place = highlight.place,
-                      activate(place, press.modifiers.contains(.option)) else { return .ignored }
-                return .handled
+            // Held down, ↑ and ↓ repeat at the system's rate: `onKeyPress`
+            // calls the handler it had at the key-down for each repeat, so
+            // the handlers act through `latest`, the modifier as last
+            // drawn. Each step scrolls without animating. ←, → and Return
+            // act once per press.
+            .onKeyPress(.downArrow, phases: [.down, .repeat]) { _ in latest.keys?.step(down: true) ?? .ignored }
+            .onKeyPress(.upArrow, phases: [.down, .repeat]) { _ in latest.keys?.step(down: false) ?? .ignored }
+            .onKeyPress(.leftArrow, phases: .down) { _ in latest.keys?.side(\.left) ?? .ignored }
+            .onKeyPress(.rightArrow, phases: .down) { _ in latest.keys?.side(\.right) ?? .ignored }
+            .onKeyPress(.return, phases: .down) { press in
+                latest.keys?.activate(markSeenOnly: press.modifiers.contains(.option)) ?? .ignored
             }
             .onContinuousHover(coordinateSpace: .global) { phase in
                 // Scrolling moves the rows under a resting pointer, not the
                 // pointer: only a new location hands the highlight back.
                 guard case .active(let location) = phase, location != pointer.location else { return }
                 pointer.location = location
+                latest.landing = nil
                 if !highlight.followsPointer { highlight.pointerMoved() }
             }
     }
 
-    private func step(_ move: (inout RowHighlight) -> Void) -> KeyPress.Result {
-        let previous = highlight.place
-        move(&highlight)
-        guard let place = highlight.place else { return .ignored }
+    /// The highlight as the keys last left it: a binding reads the value
+    /// from the view's last update, not one just written to it.
+    private var current: RowHighlight {
+        latest.unrendered ?? highlight
+    }
+
+    private func set(_ next: RowHighlight) {
+        highlight = next
+        latest.unrendered = next
+    }
+
+    /// ↓ (`down`) or ↑: the next or previous row, wrapping, scrolled into view.
+    private func step(down: Bool) -> KeyPress.Result {
+        latest.landing = nil
+        var next = current
+        let previous = next.place
+        if down { next.moveDown(in: places) } else { next.moveUp(in: places) }
+        set(next)
+        guard let place = next.place else { return .ignored }
         reveal(place, from: previous)
         return .handled
     }
 
-    private func side(_ move: () -> RowKeyMove) -> KeyPress.Result {
-        let previous = highlight.place
-        switch move() {
-        case .ignored:
-            return .ignored
-        case .moved:
-            if let place = highlight.place { reveal(place, from: previous) }
+    /// ← or →, as the layout's `move` has it.
+    private func side(_ move: KeyPath<RowKeys, (inout RowHighlight) -> RowKeyMove>) -> KeyPress.Result {
+        latest.landing = nil
+        var next = current
+        let previous = next.place
+        let result = self[keyPath: move](&next)
+        guard result != .ignored else { return .ignored }
+        set(next)
+        switch result {
+        case .ignored, .moved:
+            if let place = next.place { reveal(place, from: previous) }
         case .newList:
             // Not to the highlighted row: the new tab isn't laid out yet,
             // and the outgoing one has a row with the same id.
@@ -264,7 +316,14 @@ private struct RowKeys: ViewModifier {
         return .handled
     }
 
-    /// Scrolls `place` into view, as far as it takes and no further.
+    /// Return: acts on the highlighted row, if there is one and it acts.
+    private func activate(markSeenOnly: Bool) -> KeyPress.Result {
+        guard let place = current.place, activate(place, markSeenOnly) else { return .ignored }
+        return .handled
+    }
+
+    /// Scrolls `place` into view, as far as it takes and no further; a
+    /// wrap goes straight to the list's other end.
     private func reveal(_ place: MenuRowPlace, from previous: MenuRowPlace?) {
         let move = RowScroll.reveal(
             place,
@@ -278,8 +337,80 @@ private struct RowKeys: ViewModifier {
         case .stay: break
         case .alignTop(let anchor): scroll.scrollTo(place, anchor: UnitPoint(x: 0.5, y: anchor))
         case .alignBottom: scroll.scrollTo(place, anchor: .bottom)
+        case .wrapToTop, .wrapToBottom:
+            scrollToEnd(move)
+            latest.landing = RowWrapLanding(move, to: place)
+            // Checked once this scroll is laid out, even if no row moved.
+            rowsMoved()
         }
     }
+
+    /// The list's top (`RowListTop`) for `.wrapToTop`, its bottom
+    /// (`RowListBottom`) for `.wrapToBottom`.
+    private func scrollToEnd(_ end: RowScroll) {
+        if end == .wrapToTop {
+            scroll.scrollTo(RowListTop.id, anchor: .top)
+        } else {
+            scroll.scrollTo(RowListBottom.id, anchor: .bottom)
+        }
+    }
+
+    /// Rows moved while a wrap is landing: once they're all laid out (after
+    /// this update), checks the wrap's row and scrolls to the end again if
+    /// it's short of it.
+    fileprivate func rowsMoved() {
+        guard latest.landing != nil, !latest.checkQueued else { return }
+        latest.checkQueued = true
+        DispatchQueue.main.async { [latest] in
+            latest.checkQueued = false
+            latest.keys?.checkLanding()
+        }
+    }
+
+    private func checkLanding() {
+        guard var landing = latest.landing else { return }
+        let frame = frames.span(at: RowSlot(list: list, place: landing.target))
+        switch landing.check(frame: frame, visibleHeight: frames.visibleHeight) {
+        case .landed, .giveUp:
+            latest.landing = nil
+        case .scrollAgain:
+            latest.landing = landing
+            scrollToEnd(landing.scroll)
+        }
+    }
+}
+
+/// The `RowKeys` last drawn, for its key handlers, and the highlight a key
+/// set since. SwiftUI calls a key-down's handler again for each repeat,
+/// with that handler's copy of the modifier: its rows, and its binding's
+/// value, from before the first step, so every repeat would take the same
+/// step. A reference kept out of view state: it changes on every update
+/// and draws nothing.
+@MainActor
+private final class LatestRowKeys {
+    private(set) var keys: RowKeys?
+    /// The highlight a key set that the view hasn't been updated with yet,
+    /// for a repeat that comes before the update.
+    var unrendered: RowHighlight?
+    /// A wrap still scrolling to the list's far end, until its row lands;
+    /// any key or pointer move ends it.
+    var landing: RowWrapLanding?
+    /// Whether a check of `landing` is already waiting for the rows to
+    /// be laid out.
+    var checkQueued = false
+
+    /// The view was updated with `keys`, whose binding has the highlight.
+    func update(_ keys: RowKeys) {
+        self.keys = keys
+        unrendered = nil
+    }
+}
+
+/// `Highlightable`'s row view and the span it last saw. Kept out of view
+/// state: it changes on every scroll and draws nothing.
+private final class RowReport {
+    let owner = UUID()
+    var last: RowSpan?
 }
 
 private final class PointerLocation {

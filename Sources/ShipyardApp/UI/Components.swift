@@ -385,7 +385,7 @@ extension View {
     }
 }
 
-/// The highlight's shape: the rows' one, and a project header's own.
+/// The rows' highlight shape, rounded and inset; a project header's is its whole band, square.
 struct RowHighlightShape: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover)

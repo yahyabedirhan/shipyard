@@ -24,25 +24,31 @@ struct ListLayout: View {
     var body: some View {
         ScrollViewReader { proxy in
             MeasuredScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    ForEach(model.sections) { section in
-                        Section {
-                            if !section.isCollapsed {
-                                lines(section)
+                VStack(spacing: 0) {
+                    // The list's ends, outside the lazy stack, for ↑ and ↓ to
+                    // wrap to: always laid out, unlike the far end's rows.
+                    RowListTop()
+                    LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                        ForEach(model.sections) { section in
+                            Section {
+                                if !section.isCollapsed {
+                                    lines(section)
+                                }
+                            } header: {
+                                let place = MenuRowPlace.header(section.name)
+                                ListSectionHeader(
+                                    section: section,
+                                    isHighlighted: highlight.isHighlighted(place),
+                                    actions: actions
+                                )
+                                .highlightable(place, $highlight, drawsOwnHighlight: true)
+                                .id(place)
                             }
-                        } header: {
-                            let place = MenuRowPlace.header(section.name)
-                            ListSectionHeader(
-                                section: section,
-                                isHighlighted: highlight.isHighlighted(place),
-                                actions: actions
-                            )
-                            .highlightable(place, $highlight, drawsOwnHighlight: true)
-                            .id(place)
                         }
                     }
+                    .rowHighlight(highlight)
+                    RowListBottom()
                 }
-                .rowHighlight(highlight)
             }
             .onHover { inside in
                 if !inside { highlight.pointerLeftRows() }
@@ -52,8 +58,8 @@ struct ListLayout: View {
                 places: model.listRowPlaces,
                 pinnedHeader: Grid.headerHeight,
                 scroll: proxy,
-                left: { fold(highlight.moveLeft(in: model)) },
-                right: { fold(highlight.moveRight(in: model)) },
+                left: { fold($0.moveLeft(in: model)) },
+                right: { fold($0.moveRight(in: model)) },
                 activate: activate
             )
         }
@@ -135,7 +141,7 @@ struct ListLayout: View {
 /// The chevron, the project's name and attention count, then what the
 /// project says in place of rows ("Nothing open") or, on hover, Mark all
 /// seen. Highlighted by the pointer or the keys, it draws the highlight
-/// over its own background, since it pins above the rows.
+/// over its own background, since it pins above the rows: a square band the header's full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
     let isHighlighted: Bool
@@ -193,9 +199,9 @@ private struct ListSectionHeader: View {
             ZStack {
                 Palette.header
                 if isHighlighted {
-                    RowHighlightShape()
-                        .padding(.horizontal, Grid.inset)
-                        .padding(.vertical, 1)
+                    // The header's whole band, square: not the rows' rounded, inset shape.
+                    Rectangle()
+                        .fill(Palette.hover)
                         .transition(.opacity)
                 }
             }

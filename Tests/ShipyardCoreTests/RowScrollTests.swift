@@ -57,12 +57,31 @@ struct RowScrollTests {
 
     @Test("a row the list hasn't laid out yet is scrolled to by the way the highlight moved: up to the top, down to the bottom")
     func notLaidOut() {
-        // ↓ wrapping from the last row to the first.
-        #expect(reveal(.header("shipyard"), from: next, top: nil) == .alignTop(anchor: 0))
-        // ↑ from the header wrapping to the last row.
-        #expect(reveal(next, from: .header("shipyard"), top: nil) == .alignBottom)
         // An item above: below the pinned header, near enough without its height.
         #expect(reveal(item, from: next, top: nil) == .alignTop(anchor: 26.0 / 560))
+        // An item below.
+        #expect(reveal(next, from: item, top: nil) == .alignBottom)
+    }
+
+    @Test("↓ from the last row wraps to the first: the list goes straight to its top, laid out or not")
+    func wrapToTop() {
+        #expect(reveal(.header("shipyard"), from: next, top: nil) == .wrapToTop)
+        #expect(reveal(.header("shipyard"), from: next, top: -400) == .wrapToTop)
+        #expect(reveal(.header("shipyard"), from: next, top: 0) == .wrapToTop)
+    }
+
+    @Test("↑ from the first row wraps to the last: the list goes straight to its bottom, laid out or not")
+    func wrapToBottom() {
+        #expect(reveal(next, from: .header("shipyard"), top: nil) == .wrapToBottom)
+        #expect(reveal(next, from: .header("shipyard"), top: 900) == .wrapToBottom)
+        #expect(reveal(next, from: .header("shipyard"), top: 300) == .wrapToBottom)
+    }
+
+    @Test("a list of one row doesn't wrap")
+    func oneRowDoesNotWrap() {
+        let only = RowScroll.reveal(item, from: item, in: [item], frame: RowSpan(top: 0, bottom: 24), visibleHeight: 560, pinnedHeader: 0)
+
+        #expect(only == .stay)
     }
 
     @Test("from a pinned header to its first item not laid out: just below the header, not to the bottom")
@@ -71,7 +90,9 @@ struct RowScrollTests {
         // the visible area, under the header pinned at the top.
         #expect(reveal(item, from: .header("shipyard"), top: nil) == .alignTop(anchor: 26.0 / 560))
         // A row further down still goes the way the highlight moved.
-        #expect(reveal(next, from: .header("shipyard"), top: nil) == .alignBottom)
+        #expect(RowScroll.reveal(
+            next, from: .header("shipyard"), in: places + [.header("other")], frame: nil, visibleHeight: 560, pinnedHeader: 26
+        ) == .alignBottom)
     }
 
     @Test("with nothing highlighted before, a row not laid out goes to the top if it's the first, else to the bottom")
@@ -91,5 +112,41 @@ struct RowScrollTests {
 
         #expect(tiny == .alignTop(anchor: 0))
         #expect(short == .alignTop(anchor: 1))
+    }
+
+    @Test("a wrap to the bottom keeps scrolling to the end until its row lands in full view")
+    func wrapLandsAtBottom() {
+        var landing = RowWrapLanding(.wrapToBottom, to: next)
+        // The lazy stack guessed the rows above too short: once they're
+        // laid out, the last row is still below the list's bottom edge.
+        #expect(landing?.check(frame: RowSpan(top: 580, bottom: 604), visibleHeight: 560) == .scrollAgain)
+        // Not laid out at all yet: short of the end too.
+        #expect(landing?.check(frame: nil, visibleHeight: 560) == .scrollAgain)
+        #expect(landing?.check(frame: RowSpan(top: 533, bottom: 557), visibleHeight: 560) == .landed)
+    }
+
+    @Test("a wrap to the top lands once its row is in full view at the top")
+    func wrapLandsAtTop() {
+        var landing = RowWrapLanding(.wrapToTop, to: .header("shipyard"))
+
+        #expect(landing?.check(frame: RowSpan(top: -26, bottom: 0), visibleHeight: 560) == .scrollAgain)
+        #expect(landing?.check(frame: RowSpan(top: 0, bottom: 26), visibleHeight: 560) == .landed)
+    }
+
+    @Test("a wrap that doesn't land after a few scrolls gives up, so it can't hold the list")
+    func wrapGivesUp() {
+        var landing = RowWrapLanding(.wrapToBottom, to: next)
+        var steps: [RowWrapLanding.Step] = []
+        for _ in 0..<5 {
+            steps.append(landing!.check(frame: nil, visibleHeight: 560))
+        }
+
+        #expect(steps == [.scrollAgain, .scrollAgain, .scrollAgain, .scrollAgain, .giveUp])
+    }
+
+    @Test("only a wrap is followed until it lands")
+    func onlyWrapsLand() {
+        #expect(RowWrapLanding(.alignBottom, to: next) == nil)
+        #expect(RowWrapLanding(.stay, to: next) == nil)
     }
 }

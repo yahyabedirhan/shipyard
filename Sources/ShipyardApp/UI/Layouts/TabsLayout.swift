@@ -109,6 +109,7 @@ struct TabsLayout: View {
                     // Drawn here, not in each tab's list, so only the
                     // selected tab's row is lit while the lists slide.
                     .rowHighlight(highlight, in: tab)
+                    RowListBottom()
                 }
                 .clipped()
             }
@@ -121,8 +122,8 @@ struct TabsLayout: View {
                 places: content.rowPlaces,
                 in: tab,
                 scroll: proxy,
-                left: { switchTab(by: -1) },
-                right: { switchTab(by: 1) }
+                left: { switchTab(&$0, by: -1) },
+                right: { switchTab(&$0, by: 1) }
             ) { place, markSeenOnly in
                 guard let row = content.row(at: place) else { return false }
                 withAnimation(Motion.seen) {
@@ -134,8 +135,8 @@ struct TabsLayout: View {
     }
 
     /// ← and → (provisional): the previous or next tab, wrapping, with
-    /// the highlight on its first row.
-    private func switchTab(by step: Int) -> RowKeyMove {
+    /// `highlight` on its first row.
+    private func switchTab(_ highlight: inout RowHighlight, by step: Int) -> RowKeyMove {
         let next = model.tab(beside: tab, by: step)
         guard next != tab else { return .ignored }
         select(next)
