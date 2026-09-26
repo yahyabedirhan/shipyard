@@ -219,9 +219,10 @@ struct ConnectView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The code, large, in a card with the copy icon at its end. Clicking
-    /// the code copies it too; either way the icon turns into a checkmark,
-    /// and the code's hover help says Copied.
+    /// The code, large, in a card with the copy icon and its word ("Copy")
+    /// at its end. Clicking the code copies it too; either way the icon
+    /// turns into a checkmark and the word rolls to "Copied", the only
+    /// feedback: the code has no hover help.
     private func code(_ text: PanelText.DeviceCodeScreen) -> some View {
         Button(action: { copy(text.code) }) {
             Text(text.code)
@@ -230,13 +231,20 @@ struct ConnectView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .hoverHelp(codeCopied ? text.copied : text.copyCode)
         .accessibilityLabel(text.code)
+        .accessibilityHint(codeCopied ? text.copied : text.copyCode)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .overlay(alignment: .trailing) {
-            CopyButton(text: text.code, label: text.copyCode, copiedLabel: text.copied, copied: $codeCopied)
-                .padding(.trailing, 6)
+            CopyButton(
+                text: text.code,
+                label: text.copyCode,
+                copiedLabel: text.copied,
+                title: text.copyTitle,
+                copiedTitle: text.copied,
+                copied: $codeCopied
+            )
+            .padding(.trailing, 6)
         }
         .card()
         .onChange(of: text.code) { codeCopied = false }

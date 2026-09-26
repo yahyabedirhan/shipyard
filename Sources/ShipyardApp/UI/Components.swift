@@ -279,13 +279,18 @@ struct CommandBox: View {
 
 /// The copy icon beside text to copy (a `CommandBox`'s command, the
 /// sign-in code): puts `text` on the clipboard and turns into a checkmark.
-/// No hover help: the checkmark says it was copied. `copied` is the
-/// caller's, so another way of copying the same text can show it too.
+/// No hover help: the checkmark says it was copied. With a `title` it has a
+/// short word beside the icon ("Copy"), which rolls to `copiedTitle`
+/// ("Copied") with the counts' text transition. `copied` is the caller's,
+/// so another way of copying the same text can show it too.
 struct CopyButton: View {
     let text: String
     /// VoiceOver's label before and after copying.
     var label = "Copy"
     var copiedLabel = "Copied"
+    /// The word beside the icon before and after copying; none without it.
+    var title: String? = nil
+    var copiedTitle: String? = nil
     @Binding var copied: Bool
 
     var body: some View {
@@ -293,10 +298,23 @@ struct CopyButton: View {
             Clipboard.copy(text)
             withAnimation(.spring(duration: 0.3)) { copied = true }
         } label: {
-            Image(systemName: copied ? "checkmark" : "doc.on.doc")
-                .contentTransition(.symbolEffect(.replace))
+            HStack(spacing: 4) {
+                Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                    .contentTransition(.symbolEffect(.replace))
+                if let title {
+                    let after = copiedTitle ?? title
+                    // Sized for the longer word, so the icon doesn't shift as it rolls.
+                    ZStack(alignment: .leading) {
+                        Text(title.count > after.count ? title : after).hidden()
+                        Text(copied ? after : title)
+                            .contentTransition(.numericText())
+                            .animation(Motion.count, value: copied)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                }
+            }
         }
-        .buttonStyle(IconButtonStyle())
+        .buttonStyle(IconButtonStyle(labeled: title != nil))
         .accessibilityLabel(copied ? copiedLabel : label)
     }
 }
@@ -327,13 +345,17 @@ extension View {
 
 /// A borderless icon button with hover and pressed states.
 struct IconButtonStyle: ButtonStyle {
+    /// An icon with a word beside it: as wide as both, rather than square.
+    var labeled = false
+
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        IconButtonBody(configuration: configuration)
+        IconButtonBody(configuration: configuration, labeled: labeled)
     }
 }
 
 private struct IconButtonBody: View {
     let configuration: ButtonStyleConfiguration
+    let labeled: Bool
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
 
@@ -342,7 +364,8 @@ private struct IconButtonBody: View {
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(hover && isEnabled ? .primary : .secondary)
             .opacity(isEnabled ? 1 : 0.4)
-            .frame(width: 24, height: 22)
+            .padding(.horizontal, labeled ? 6 : 0)
+            .frame(width: labeled ? nil : 24, height: 22)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(configuration.isPressed ? Palette.pressed : hover && isEnabled ? Palette.hover : .clear)

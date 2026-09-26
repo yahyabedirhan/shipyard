@@ -41,10 +41,13 @@ extension PanelText {
         public var code: String
         /// What to do with the code.
         public var message: String
-        /// What clicking the code, or the copy icon beside it, does: its
-        /// hover help and VoiceOver label.
+        /// What clicking the code, or the copy icon beside it, does: the
+        /// icon's VoiceOver label and the code's hint.
         public var copyCode: String
-        /// Said in `copyCode`'s place once the code is on the clipboard.
+        /// The short word beside the copy icon.
+        public var copyTitle: String
+        /// Once the code is on the clipboard: the word beside the icon, and
+        /// said in `copyCode`'s place to VoiceOver.
         public var copied: String
         /// The button that copies the code and opens the page to enter it on.
         public var openButton: String
@@ -160,6 +163,7 @@ extension PanelText {
             code: code.userCode,
             message: "Copy the code, open \(page) and paste it there. Shipyard connects once you approve.",
             copyCode: "Copy code",
+            copyTitle: "Copy",
             copied: "Copied",
             openButton: "Copy code and open GitHub",
             waiting: "Waiting for approval · the code expires at \(clockTime(code.expiresAt, locale: locale, timeZone: timeZone))"

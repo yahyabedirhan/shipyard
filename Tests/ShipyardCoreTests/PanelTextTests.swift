@@ -527,6 +527,7 @@ struct PanelTextTests {
         #expect(text.code == "WDJB-MJHT")
         #expect(text.message == "Copy the code, open github.com/login/device and paste it there. Shipyard connects once you approve.")
         #expect(text.copyCode == "Copy code")
+        #expect(text.copyTitle == "Copy")
         #expect(text.copied == "Copied")
         #expect(text.openButton == "Copy code and open GitHub")
         #expect(text.waiting == "Waiting for approval · the code expires at 13:15")
