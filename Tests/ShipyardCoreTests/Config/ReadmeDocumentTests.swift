@@ -2,8 +2,8 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-// The README is the project's front page. Its examples table puts each
-// configuration beside the screenshot it produced; these tests keep every
+// The README is the project's front page. Its examples show each
+// configuration, then the screenshot it produced; these tests keep every
 // configuration decoding cleanly and saying what its screenshot shows.
 
 private func readme() throws -> String {
@@ -21,26 +21,20 @@ private func spans(in text: String, from open: String, to close: String) -> [Str
     return found
 }
 
-/// A `<pre>` block's text as TOML: its HTML entities decoded.
-private func unescaped(_ html: String) -> String {
-    html.replacingOccurrences(of: "&lt;", with: "<")
-        .replacingOccurrences(of: "&gt;", with: ">")
-        .replacingOccurrences(of: "&quot;", with: "\"")
-        .replacingOccurrences(of: "&amp;", with: "&")
-}
-
-/// Every TOML example: the ```toml fences and the examples table's `<pre lang="toml">` blocks.
+/// Every TOML example: the ```toml fences.
 private func tomlExamples(in text: String) -> [String] {
-    spans(in: text, from: "```toml\n", to: "```") + spans(in: text, from: "<pre lang=\"toml\">\n", to: "</pre>").map(unescaped)
+    spans(in: text, from: "```toml\n", to: "```")
 }
 
-/// The examples table's rows, as the screenshot's path and the configuration beside it.
-private func exampleRows(in text: String) -> [(image: String, toml: String)] {
-    spans(in: text, from: "<tr>", to: "</tr>").compactMap { row in
-        guard let toml = spans(in: row, from: "<pre lang=\"toml\">\n", to: "</pre>").first,
-              let image = spans(in: row, from: "<img src=\"", to: "\"").first
+/// The Examples section's examples, each as its configuration and the screenshot under it.
+private func examples(in text: String) throws -> [(image: String, toml: String)] {
+    let start = try #require(text.range(of: "\n## Examples\n")).upperBound
+    let end = text[start...].range(of: "\n## ")?.lowerBound ?? text.endIndex
+    return text[start..<end].components(separatedBy: "```toml\n").dropFirst().compactMap { example in
+        guard let fence = example.range(of: "```"),
+              let image = spans(in: String(example[fence.upperBound...]), from: "](", to: ")").first
         else { return nil }
-        return (image, unescaped(toml))
+        return (image, String(example[..<fence.lowerBound]))
     }
 }
 
@@ -64,7 +58,7 @@ struct ReadmeDocumentTests {
 
     @Test("each example's screenshot is in the repository, linked by a relative path")
     func screenshotsExist() throws {
-        let rows = exampleRows(in: try readme())
+        let rows = try examples(in: try readme())
         #expect(rows.count == 4)
         for row in rows {
             #expect(row.image.hasPrefix("docs/assets/"), "\(row.image) isn't a relative path into docs/assets")
@@ -75,7 +69,7 @@ struct ReadmeDocumentTests {
 
     @Test("each example configures what its screenshot shows")
     func examplesMatchScreenshots() throws {
-        let rows = exampleRows(in: try readme())
+        let rows = try examples(in: try readme())
         var configurations: [String: Configuration] = [:]
         for row in rows {
             configurations[(row.image as NSString).lastPathComponent] = try Configuration.decode(row.toml).configuration
