@@ -19,9 +19,10 @@ struct ShipyardMenuBarApp: App {
     }
 }
 
-/// The menu bar icon and the attention count next to it (the model's
-/// label: none at 0, or when `[menu-bar] count = "none"`). While the rate
-/// budget pauses refreshing, the icon is a pause glyph.
+/// The menu bar icon, shipyard's sailboat (the app icon's figure), and the
+/// attention count next to it (the model's label: none at 0, or when
+/// `[menu-bar] count = "none"`). While the rate budget pauses refreshing, the
+/// icon is a pause glyph.
 struct MenuBarLabelView: View {
     let shipyard: Shipyard
 
@@ -29,7 +30,11 @@ struct MenuBarLabelView: View {
         // Read in the view's body, so it redraws when the model changes.
         let menu = shipyard.menu
         HStack(spacing: 3) {
-            Image(systemName: menu.canRefreshNow ? "sailboat" : "pause.circle")
+            if menu.canRefreshNow {
+                Image(nsImage: SailboatImage.menuBar())
+            } else {
+                Image(systemName: "pause.circle")
+            }
             if let text = menu.menuBarLabel.text {
                 Text(text).monospacedDigit()
             }

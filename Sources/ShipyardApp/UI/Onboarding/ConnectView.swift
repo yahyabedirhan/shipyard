@@ -265,9 +265,9 @@ struct ConnectView: View {
                 .fill(LinearGradient(colors: [Palette.accent, Palette.accent.opacity(0.75)], startPoint: .top, endPoint: .bottom))
                 .frame(width: 32, height: 32)
                 .overlay(
-                    Image(systemName: "sailboat.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
+                    SailboatShape()
+                        .fill(.white)
+                        .frame(width: 18, height: 18)
                 )
                 .accessibilityHidden(true)
             Text(title).font(TypeScale.display)

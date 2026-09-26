@@ -643,7 +643,7 @@ shipyard/
 ├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon), ad-hoc sign, zip, install, redraw the icon
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
-├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (origami, the menu bar's sailboat folded from paper, is the app's; sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch
+├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (origami, the menu bar's sailboat folded from paper, is the app's; sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` (`make icon-exploration` draws the minimal sailboat options from that path)
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
 ├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
 ├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
@@ -713,6 +713,9 @@ shipyard/
 │   ├── Keychain.swift                # TokenStore on the login keychain: the app's token store since 0.0.2 (S1)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
+│   ├── Brand/
+│   │   ├── Sailboat.swift            # shipyard's sailboat, one CGPath (CoreGraphics only): make-icon.swift compiles this file, so the icon's minimal options, the menu bar item and the badge draw one figure (#80)
+│   │   └── SailboatImage.swift       # the menu bar item (a template NSImage of the path) and SailboatShape, the connect screen's badge
 │   └── UI/
 │       ├── Panel.swift               # the shared frame: header (the account button, #49), banners, phase switch, layout switch, footer
 │       ├── Design.swift              # design tokens: spacing grid, type scale, Palette (state and surface colours, light/dark), motion
@@ -737,7 +740,7 @@ shipyard/
 │   ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
 │   ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
 │   └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake shell, hanging shell, instant sleeper
-└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip)
+└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path
 ```
 
 Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports. `ShipyardCore` imports only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder, all of which exist on Linux (Observation ships with the Swift toolchain; the rule keeps Apple-only frameworks out); the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`.

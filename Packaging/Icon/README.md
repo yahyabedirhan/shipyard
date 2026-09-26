@@ -32,13 +32,13 @@ make icon-alternates   # alternates/*.icns and alternates/*.png
 To review every variant at 16, 32, 128 and 512 on light and dark:
 
 ```sh
-swift Packaging/Icon/make-icon.swift --sheet /tmp/icons.png
+make build/make-icon/make-icon && build/make-icon/make-icon --sheet /tmp/icons.png
 ```
 
-The minimal sailboat options (#80), shipyard's right-facing sailboat redrawn as a flat mark of our own paths, in two families (`solid-*`, a white mark on colour, and `white-*`, a coloured mark on white), aren't app variants yet. To redraw their previews and comparison sheet:
+The minimal sailboat options (#80) draw shipyard's sailboat from `Sources/ShipyardApp/Brand/Sailboat.swift`, the one path the menu bar item and the connect screen's badge draw too. The Makefile compiles `make-icon.swift` with that file, so the script can't run alone with `swift`. The options come in two families (`solid-*`, a white figure on colour, and `white-*`, the figure in colour on white) and aren't app variants yet. To redraw their previews and comparison sheet:
 
 ```sh
-swift Packaging/Icon/make-icon.swift --exploration docs/assets/app-icon/exploration
+make icon-exploration
 ```
 
 The script needs the Command Line Tools only (AppKit and CoreGraphics), and its output is the same on every run.
