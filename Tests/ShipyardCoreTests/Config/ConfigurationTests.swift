@@ -610,7 +610,7 @@ struct ConfigurationMergeTests {
         #expect(settings.name == "overrides")
         #expect(settings.repositories == ["o/a", "o/b"])
         // `authors` merges key by key too: the project's `hide`, the default `show`.
-        #expect(settings.pullRequests == .init(
+        #expect(settings.pullRequests == PullRequestSettings(
             show: true, closedWindow: 3 * 86_400, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
         ))
         #expect(settings.issues == .init(show: true, closedWindow: 7 * 86_400))
