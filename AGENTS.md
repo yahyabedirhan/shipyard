@@ -6,6 +6,8 @@ A macOS menu bar app for seeing and reviewing the pull requests your agents open
 
 A request to change the maintainer's shipyard (its layout, projects, notifications, what it shows) means their `config.toml`: edit it through the **shipyard** skill, even from this repository. Change the app's code only when the request asks for code (a new setting, a bug fix, a feature). When no setting does what's asked, say so; the code change waits for the maintainer to ask for it.
 
+The shipyard skill (`skills/shipyard/SKILL.md`), its description included, is for shipyard's users editing their `config.toml`. It never mentions this repository, its code, or how to maintain the project: guidance for agents working here goes in this file. Check skill diffs for maintainer-facing wording before committing.
+
 ## Git, Commits, And Pull Requests
 
 - Opening a pull request, or changing an existing one's description, goes through the **to-pr** skill, which owns the description's shape and where it is saved. Invoke it as part of the work, without waiting to be asked.
@@ -39,6 +41,10 @@ The five default triage labels, each named after its role (`needs-triage`, `need
 ### Domain docs
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+## QA
+
+When a ticket that changes what the maintainer sees or does is built, close it and open a separate QA ticket, linked to it both ways. Label it `ready-for-qa` and assign it to the maintainer. It holds the installed build, how to use the feature, numbered try-this steps with known risks marked, what to do when done, and screenshots when there are any. QA doesn't hold the pull request. Only visual, interactive changes get a QA ticket; configuration, agent and skill changes close when built.
 
 ## Design
 
