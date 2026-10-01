@@ -84,7 +84,7 @@ Agents edit the file but can't see the panel's banner, so after every reload (at
 
 ## Configuration and app state
 
-Two stores, kept apart on purpose (ADR 0001; the terms are in `CONTEXT.md`):
+Two stores, kept apart on purpose (ADR 0001; the terms are in `GLOSSARY.md`):
 
 - **Configuration** is what the user chose: projects, what they show, windows, notification rules, the refresh interval, the layout. It's in `config.toml`, written by the user and their agents, and read-only to the app except for appending projects, the layout button's `[menu] layout`, and the preset onboarding writes into a file that holds nothing but `version`.
 - **App state** is what shipyard remembers from use: seen items, collapsed sections, the items it knew last refresh, what it already notified. It's in `~/Library/Application Support/Shipyard/state.json`, owned by `AppStateStore`, and never written to the configuration.

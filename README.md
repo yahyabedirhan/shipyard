@@ -131,7 +131,7 @@ version = 1
 
 ## Development
 
-`make test` runs the tests, and `make release` builds the release zip. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`CONTEXT.md`](CONTEXT.md).
+`make test` runs the tests, and `make release` builds the release zip. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 
 ### Forks: your own OAuth App
 
