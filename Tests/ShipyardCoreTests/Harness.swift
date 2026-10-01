@@ -8,7 +8,7 @@ import FoundationNetworking
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
 /// directory and the app state in another; the clock, the refresh timer and
-/// waiting are manual; the URL opener, notifier and login item record what
+/// waiting are manual; the action port, notifier and login item record what
 /// they're asked.
 ///
 /// A scenario writes a configuration, registers answers, drives the
@@ -34,7 +34,7 @@ struct Harness {
     private let ghToken: String?
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
-    let opener = RecordingURLOpener()
+    let actions = RecordingActions()
     let notifier = RecordingNotifier()
     let loginItem = RecordingLoginItem()
     /// `config.toml` in a fresh temporary directory.
@@ -81,7 +81,7 @@ struct Harness {
             pingStore: pingStore,
             repositoriesStore: repositoriesStore,
             tokenStore: store,
-            urlOpener: opener,
+            actions: actions,
             notifier: notifier,
             loginItem: loginItem,
             gh: gh,
@@ -167,6 +167,12 @@ struct Harness {
     /// `origin` (`nil`: not a git repository).
     @discardableResult
     func cli(_ arguments: String..., origin: String? = nil) -> CommandResult {
+        cli(arguments, origin: origin)
+    }
+
+    /// `cli(_:origin:)` with the arguments as a list.
+    @discardableResult
+    func cli(_ arguments: [String], origin: String? = nil) -> CommandResult {
         ShipyardCLI.run(
             arguments,
             environment: CommandEnvironment(

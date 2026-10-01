@@ -127,7 +127,7 @@ struct PingsTests {
 
         harness.shipyard.open(row)
 
-        #expect(harness.opener.opened.isEmpty)
+        #expect(harness.actions.opened.isEmpty)
         #expect(harness.pingRows().first?.needsAttention == false)
         #expect(harness.section("shop")?.attentionCount == 1)
         #expect(harness.shipyard.menu.attention.total == 1)

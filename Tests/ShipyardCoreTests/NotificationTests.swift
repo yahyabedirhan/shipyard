@@ -295,7 +295,7 @@ struct NotificationTests {
         let posted = try #require(harness.notifier.posted.first)
         harness.shipyard.openNotification(posted.itemURL)
 
-        #expect(harness.opener.opened == [pr(2).url(in: shopRepository)])
+        #expect(harness.actions.opened == [pr(2).url(in: shopRepository)])
         #expect(harness.shipyard.menu.attention.total == 0)
         #expect(harness.section("shop")?.rows.contains { $0.needsAttention } == false)
     }
@@ -310,7 +310,7 @@ struct NotificationTests {
         relaunched.shipyard.appStateStore.load()
         relaunched.shipyard.openNotification(posted.itemURL)
 
-        #expect(relaunched.opener.opened == [posted.itemURL])
+        #expect(relaunched.actions.opened == [posted.itemURL])
         #expect(relaunched.shipyard.appStateStore.state.attention.seen[posted.itemURL.absoluteString] != nil)
     }
 }

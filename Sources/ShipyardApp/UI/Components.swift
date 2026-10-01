@@ -127,12 +127,12 @@ struct Banner: View {
 // MARK: - A row's pieces
 
 /// A row's state icon: its symbol in its state's colour, a running run
-/// pulsing.
+/// pulsing; a ping's says what clicking it does.
 struct StateSymbol: View {
     let row: MenuRow
 
     var body: some View {
-        Image(systemName: Palette.symbol(row.state, kind: row.kind))
+        Image(systemName: row.pingIcon.map { Palette.symbol($0) } ?? Palette.symbol(row.state, kind: row.kind))
             .symbolRenderingMode(.hierarchical)
             .font(.system(size: 11.5, weight: .semibold))
             .foregroundStyle(Palette.color(row.state, kind: row.kind))

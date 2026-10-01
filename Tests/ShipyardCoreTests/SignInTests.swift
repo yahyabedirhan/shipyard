@@ -267,7 +267,7 @@ struct SignInTests {
 
         await harness.shipyard.beginDeviceFlow().value
 
-        #expect(harness.opener.opened == [URL(string: "https://github.com/login/device")!])
+        #expect(harness.actions.opened == [URL(string: "https://github.com/login/device")!])
     }
 
     @Test("opening GitHub does nothing when no code is showing")
@@ -277,7 +277,7 @@ struct SignInTests {
 
         harness.shipyard.openVerificationPage()
 
-        #expect(harness.opener.opened.isEmpty)
+        #expect(harness.actions.opened.isEmpty)
     }
 
     @Test("a device-flow token survives a restart: the next start signs in with the stored token")

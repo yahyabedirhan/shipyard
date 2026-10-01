@@ -47,11 +47,21 @@ public struct PingStore: Sendable {
         try Self.encoder.encode(ping).write(to: url(id: ping.id), options: .atomic)
     }
 
-    /// Records that the user saw ping `id` at `now`. A ping already seen
-    /// keeps its first time; an unknown one changes nothing.
+    /// Records that the user saw ping `id` at `now`, clearing its action's
+    /// failure. A ping already seen keeps its first time; an unknown one
+    /// changes nothing.
     public func markSeen(id: String, at now: Date) throws {
-        guard var ping = ping(id: id), ping.seen == nil else { return }
-        ping.seen = now
+        guard var ping = ping(id: id), ping.seen == nil || ping.failure != nil else { return }
+        ping.seen = ping.seen ?? now
+        ping.failure = nil
+        try save(ping)
+    }
+
+    /// Records why ping `id`'s action failed, for its row; it stays as
+    /// seen or unseen as it was. An unknown id changes nothing.
+    public func recordFailure(id: String, reason: String) throws {
+        guard var ping = ping(id: id), ping.failure != reason else { return }
+        ping.failure = reason
         try save(ping)
     }
 

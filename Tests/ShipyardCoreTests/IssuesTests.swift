@@ -240,7 +240,7 @@ struct IssuesTests {
         // Clicking an issue opens it and marks it seen.
         let seven = try #require(rows.first { $0.number == 7 })
         harness.shipyard.open(seven)
-        #expect(harness.opener.opened == [seven.url])
+        #expect(harness.actions.opened == [seven.url])
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 1, issues: 1))
         #expect(harness.shipyard.menu.menuBarLabel.text == "1 PR · 1 issue")
 

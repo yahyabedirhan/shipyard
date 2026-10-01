@@ -189,6 +189,15 @@ enum Palette {
         }
     }
 
+    /// A ping's icon: what clicking it does.
+    static func symbol(_ icon: PingIcon) -> String {
+        switch icon {
+        case .link: "link"
+        case .app: "macwindow"
+        case .noAction: "bell.fill"
+        }
+    }
+
     // MARK: Building them
 
     private static func dynamic(light: UInt32, dark: UInt32, alpha: CGFloat = 1) -> Color {

@@ -98,7 +98,7 @@ public final class Shipyard {
     /// to file a ping by its repository without calling GitHub.
     public let repositoriesStore: ResolvedRepositoriesStore
     private let tokenStore: any TokenStore
-    private let urlOpener: any URLOpening
+    private let actions: any ActionRunning
     private let notifier: any Notifying
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
@@ -134,7 +134,7 @@ public final class Shipyard {
         pingStore: PingStore,
         repositoriesStore: ResolvedRepositoriesStore,
         tokenStore: any TokenStore,
-        urlOpener: any URLOpening,
+        actions: any ActionRunning,
         notifier: any Notifying,
         loginItem: any LoginItem,
         gh: any GhTokenLookup = GhCLI(),
@@ -150,7 +150,7 @@ public final class Shipyard {
         self.pingStore = pingStore
         self.repositoriesStore = repositoriesStore
         self.tokenStore = tokenStore
-        self.urlOpener = urlOpener
+        self.actions = actions
         self.notifier = notifier
         self.loginItem = loginItem
         self.clock = clock
@@ -222,7 +222,7 @@ public final class Shipyard {
     /// while the code shows; otherwise does nothing.
     public func openVerificationPage() {
         guard case .connecting(let code) = phase else { return }
-        urlOpener.open(code.verificationURL)
+        actions.open(code.verificationURL)
     }
 
     private func runDeviceFlow(_ generation: Int) async {
@@ -703,10 +703,15 @@ public final class Shipyard {
     // MARK: - User actions
 
     /// Opens the row's item on GitHub in the browser and marks it seen. A
-    /// ping's row only marks it seen: it has nothing to open yet.
-    public func open(_ row: MenuRow) {
-        if row.kind != .ping { urlOpener.open(row.url) }
+    /// ping's row runs the ping's action instead (`runAction(ofPing:)`).
+    /// Returns the work still running (a ping's action), for tests to
+    /// await; the app doesn't wait for it.
+    @discardableResult
+    public func open(_ row: MenuRow) -> Task<Void, Never> {
+        if let ping = row.item.ping { return runAction(ofPing: ping.id) }
+        actions.open(row.url)
         markSeen(row)
+        return Task {}
     }
 
     /// Opens the project's repository on GitHub in the browser (Return on
@@ -714,7 +719,7 @@ public final class Shipyard {
     /// nothing seen.
     public func openRepository(of project: MenuSection) {
         guard let url = project.repositoryURL else { return }
-        urlOpener.open(url)
+        actions.open(url)
     }
 
     /// Opens the signed-in account's profile on GitHub in the browser (a
@@ -722,31 +727,32 @@ public final class Shipyard {
     /// the account is known.
     public func openProfile() {
         guard let viewer else { return }
-        urlOpener.open(viewer.profileURL)
+        actions.open(viewer.profileURL)
     }
 
     /// A notification was clicked: opens its item on GitHub and marks it
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls
-    /// this with the notification's `itemURL`.
-    /// A ping's notification only marks the ping seen: it has nothing to
-    /// open yet.
-    public func openNotification(_ itemURL: URL) {
-        if let ping = Ping.id(from: itemURL) {
-            markPingsSeen([ping])
-            return
-        }
-        urlOpener.open(itemURL)
+    /// this with the notification's `itemURL`. A ping's notification runs
+    /// the ping's action, as its row does. Returns the work still running
+    /// (a ping's action), for tests to await.
+    @discardableResult
+    public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
+        if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
+        actions.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
             ?? appStateStore.state.known.items[id]?.fingerprint
-        guard let fingerprint else { return }
-        let now = clock.now
-        updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
+        if let fingerprint {
+            let now = clock.now
+            updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
+        }
+        return Task {}
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs
-    /// attention again only once it changes.
+    /// attention again only once it changes. A ping's action isn't run,
+    /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
         if let ping = row.item.ping {
             markPingsSeen([ping.id])
@@ -800,6 +806,28 @@ public final class Shipyard {
         }
     }
 
+    /// Runs the action of the ping `id` names, as the store has it now (a
+    /// replace may have changed it), through the action port. When it
+    /// works, or the ping has none, the ping is marked seen (and any earlier
+    /// failure cleared); when it fails, the ping stays as it was and the
+    /// failure's reason is recorded on it for its row. A ping no longer
+    /// stored does nothing.
+    private func runAction(ofPing id: String) -> Task<Void, Never> {
+        guard let action = pingStore.ping(id: id)?.action else {
+            markPingsSeen([id])
+            return Task {}
+        }
+        return Task {
+            switch await actions.run(action) {
+            case .done:
+                markPingsSeen([id])
+            case .failed(let reason):
+                try? pingStore.recordFailure(id: id, reason: reason)
+                listPings()
+            }
+        }
+    }
+
     /// Reads the ping store again and, when anything changed, lists the
     /// pings from the last snapshot. Returns whether anything changed.
     @discardableResult
@@ -811,8 +839,9 @@ public final class Shipyard {
         return true
     }
 
-    /// Records the pings `ids` names as seen now, in the ping store, and
-    /// lists them again. A store that can't be written leaves them unseen.
+    /// Records the pings `ids` names as seen now, in the ping store,
+    /// clearing their actions' failures, and lists them again. A store that
+    /// can't be written leaves them as they were.
     private func markPingsSeen(_ ids: [String]) {
         let now = clock.now
         for id in ids { try? pingStore.markSeen(id: id, at: now) }

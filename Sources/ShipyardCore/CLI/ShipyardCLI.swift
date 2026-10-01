@@ -57,7 +57,9 @@ public enum ShipyardCLI {
 
         commands:
           ping    send the user a ping, filed by the working folder's repository:
-                  shipyard ping "<title>" [--repo <owner/name> | --project <name>]
+                  shipyard ping "<title>" [--body <text>] [--from <label>]
+                                [--open <url> | --app <bundle id or name>]
+                                [--repo <owner/name> | --project <name>]
 
         options:
           --help     show this help (shipyard ping --help for the command's)

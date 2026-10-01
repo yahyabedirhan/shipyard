@@ -222,8 +222,8 @@ struct PingCommandTests {
     @Test("a missing or empty title, a second title, an unknown flag or a flag without its value is a usage error")
     func usageErrors() throws {
         let cases: [([String], String)] = [
-            (["--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"),
-            (["  ", "--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"),
+            (["--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"),
+            (["  ", "--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"),
             (["Ready", "now", "--project", "shop"], "shipyard ping: one title only; quote it: shipyard ping \"Ready now\""),
             (["Ready", "--projcet", "shop"], "shipyard ping: unknown option `--projcet`"),
             (["Ready", "--project"], "shipyard ping: `--project` needs a value"),
@@ -281,11 +281,11 @@ struct ShipyardCLITests {
 
         let help = harness.cli("--help")
         #expect(help.status == 0)
-        #expect(help.output.contains("shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
+        #expect(help.output.contains("shipyard ping \"<title>\" [--body <text>] [--from <label>]"))
 
         let bare = harness.cli()
         #expect(bare.status == 2)
-        #expect(bare.error.contains("shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
+        #expect(bare.error.contains("[--open <url> | --app <bundle id or name>]"))
 
         let unknown = harness.cli("pnig", "Ready")
         #expect(unknown.status == 2)
@@ -302,7 +302,7 @@ struct ShipyardCLITests {
     func pingHelp() throws {
         let result = try Harness(config: twoProjects).cli("ping", "--help")
         #expect(result.status == 0)
-        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
+        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>]\n"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")

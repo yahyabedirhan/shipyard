@@ -522,14 +522,14 @@ struct RefreshTests {
 
     // MARK: - Opening an item
 
-    @Test("opening a row opens its URL through the URL opener")
+    @Test("opening a row opens its URL through the action port")
     func openRow() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
         let row = try #require(harness.section("job-search")?.rows.first)
 
         harness.shipyard.open(row)
 
-        #expect(harness.opener.opened == [URL(string: "https://github.com/yahyabedirhan/job-search/pull/3")!])
+        #expect(harness.actions.opened == [URL(string: "https://github.com/yahyabedirhan/job-search/pull/3")!])
     }
 }
 

@@ -369,7 +369,8 @@ private struct TabRow: View {
                     .truncationMode(.tail)
                 Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                     .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    // A ping's failed action reads in red until it's cleared.
+                    .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
                     .lineLimit(1)
                     // A long branch or author gives way in the middle.
                     .truncationMode(.middle)

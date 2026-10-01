@@ -100,7 +100,7 @@ How every project's items are grouped and sorted in the menu, set straight under
 
 | Key | Default | Allowed |
 |---|---|---|
-| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z), `"none"` (one list); one level only |
+| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z; pings by who sent them, then those that don't say, as "Pings"), `"none"` (one list); one level only |
 | `[defaults] subsections` | unset | boolean: `true` draws each group under a subheader (its name and count), `false` after a divider line; unset keeps each layout's own look (dividers in the list, subheaders in tabs) |
 | `[defaults] sort-by` | `"updated"` | `"updated"` (newest first), `"created"` (newest first), `"title"` (A to Z); open or running items always come first. `"date"` groups by this date (`"updated"` when sorting by title) |
 | `[defaults] show-first` | `0` | a whole number, 0 or more: each group shows its first N rows and a "Show N more" row, which reveals the rest and then reads "Show less"; `0` shows every row. With `group-by = "none"` it caps the whole project. A group's count includes the rows it hides, and every cap comes back when the menu closes |
@@ -191,7 +191,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `issue.commented` | an issue got comments |
 | `run.failed` | a workflow run finished failed (also timed out or failed to start) |
 | `run.succeeded` | a workflow run finished successfully |
-| `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification marks it seen. Pings have no author, so a rule with `authors` never selects one |
+| `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification does what clicking the ping does: runs its action (opens its link or app) and marks it seen. Pings have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
 

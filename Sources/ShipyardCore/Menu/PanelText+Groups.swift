@@ -3,14 +3,16 @@ import Foundation
 // The words of a project's groups: their titles and the date buckets' names.
 extension PanelText {
     /// A group's title: its kind ("Pull requests"), repository
-    /// ("owner/name"), date bucket ("Today") or author ("@login"); empty
-    /// for the one group of `group-by = "none"`, which has no header.
+    /// ("owner/name"), date bucket ("Today"), author ("@login") or a
+    /// ping's sender (as the agent wrote it); empty for the one group of
+    /// `group-by = "none"`, which has no header.
     public static func groupTitle(_ key: GroupKey) -> String {
         switch key {
         case .kind(let kind): kindGroup(kind)
         case .repository(let repository): repository
         case .date(let bucket): dateBucket(bucket)
         case .author(let login): "@\(login)"
+        case .sender(let label): label
         case .ungrouped: ""
         }
     }
@@ -42,7 +44,7 @@ extension PanelText {
     public static func groupHeader(_ group: RowGroup) -> String {
         switch group.id.key {
         case .kind, .date, .ungrouped: group.title.uppercased()
-        case .repository, .author: group.title
+        case .repository, .author, .sender: group.title
         }
     }
 

@@ -73,7 +73,7 @@ final class AppServices {
         transport: URLSessionTransport()
     )
     private let notifier = Notifier()
-    private let opener = WorkspaceURLOpener()
+    private let opener = WorkspaceActions()
     private var configWatcher: ConfigWatcher?
     private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
@@ -87,7 +87,7 @@ final class AppServices {
             pingStore: PingStore(directory: PingStore.defaultDirectory),
             repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
             tokenStore: Keychain(),
-            urlOpener: opener,
+            actions: opener,
             notifier: notifier,
             loginItem: LaunchAtLogin()
         )

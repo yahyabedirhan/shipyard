@@ -386,6 +386,20 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
         since = item.state.isActive ? item.createdAt : (item.closedAt ?? item.updatedAt)
     }
 
+    /// A ping's icon: what clicking it does (open a link, bring an app
+    /// forward, or only mark it seen); `nil` for any other kind.
+    public var pingIcon: PingIcon? {
+        item.ping.map { $0.action?.icon ?? .noAction }
+    }
+
+    /// Who sent a ping (`--from`); `nil` for any other kind, or a ping sent
+    /// without one.
+    public var sender: String? { item.ping?.sender }
+
+    /// Why a ping's action failed at its last click, shown on its row
+    /// until the next click, ⌥-click or dismiss; `nil` otherwise.
+    public var actionError: String? { item.ping?.failure }
+
     /// How old the row is at `now`, never negative.
     public func age(at now: Date) -> TimeInterval {
         max(0, now.timeIntervalSince(since))

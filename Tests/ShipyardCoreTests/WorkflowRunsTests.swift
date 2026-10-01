@@ -424,7 +424,7 @@ struct WorkflowRunsTests {
 
         let failed = try #require(harness.runRows.first { $0.number == 41 })
         harness.shipyard.open(failed)
-        #expect(harness.opener.opened == [failed.url])
+        #expect(harness.actions.opened == [failed.url])
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 1))
 
         // Re-run: running (no attention), then failed again (attention again).

@@ -24,6 +24,12 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var body: String?
     /// Which agent or task sent it (`--from`); `nil` when the agent gave none.
     public var sender: String?
+    /// What clicking it does (`--open`, `--app`); `nil` when it only marks
+    /// it seen.
+    public var action: PingAction?
+    /// Why its action last failed, shown on its row until the next click,
+    /// ⌥-click or dismiss; `nil` when it hasn't failed.
+    public var failure: String?
 
     public init(
         id: String,
@@ -33,7 +39,9 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         seen: Date? = nil,
         repository: String? = nil,
         body: String? = nil,
-        sender: String? = nil
+        sender: String? = nil,
+        action: PingAction? = nil,
+        failure: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -43,6 +51,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.repository = repository
         self.body = body
         self.sender = sender
+        self.action = action
+        self.failure = failure
     }
 
     /// What its notification says under the title: the body, then
@@ -52,8 +62,10 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     }
 
     /// The ping as a listed item: kind `ping`, always open, aged from when
-    /// it was sent, in the repository it was filed by (if any). Its URL only names it (`shipyard://ping/<id>`), so it
-    /// never collides with a GitHub item's; nothing opens it.
+    /// it was sent, in the repository it was filed by (if any). Its URL only
+    /// names it (`shipyard://ping/<id>`), so it never collides with a GitHub
+    /// item's; a click runs its `action` instead. It has no GitHub author:
+    /// its sender is on the ping, apart from author filters and rules.
     public var item: Item {
         Item(
             kind: .ping,
@@ -91,4 +103,55 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         var generator = SystemRandomNumberGenerator()
         return String((0..<6).map { _ in idAlphabet.randomElement(using: &generator)! })
     }
+}
+
+/// What clicking a ping does: one action at most, given by the flag the
+/// agent passed. Stored as `{"url": "…"}` or `{"app": "…"}`.
+public enum PingAction: Codable, Equatable, Hashable, Sendable {
+    /// Opens a URL (`--open`): a web page, an artifact, an app's deep link.
+    case url(URL)
+    /// Brings an app forward (`--app`), named by its bundle id
+    /// (`com.anthropic.claudefordesktop`) or its name (`Claude`).
+    case app(String)
+
+    /// The icon a ping's row shows for it.
+    public var icon: PingIcon {
+        switch self {
+        case .url: .link
+        case .app: .app
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case url, app
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let url = try container.decodeIfPresent(URL.self, forKey: .url) {
+            self = .url(url)
+        } else if let app = try container.decodeIfPresent(String.self, forKey: .app) {
+            self = .app(app)
+        } else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "an action this build doesn't know"))
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .url(let url): try container.encode(url, forKey: .url)
+        case .app(let app): try container.encode(app, forKey: .app)
+        }
+    }
+}
+
+/// The icon a ping's row shows: what clicking it does.
+public enum PingIcon: Equatable, Sendable {
+    /// Opens a link.
+    case link
+    /// Brings an app forward.
+    case app
+    /// Only marks it seen.
+    case noAction
 }

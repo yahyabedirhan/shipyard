@@ -134,7 +134,7 @@
   },
   "definitions": {
     "group-by": {
-      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z), or none (one list).",
+      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z; pings by who sent them), or none (one list).",
       "type": "string",
       "enum": ["kind", "repository", "date", "author", "none"],
       "default": "kind"

@@ -11,19 +11,31 @@ import Foundation
 public enum PingCommand {
     /// What `shipyard ping --help` prints.
     public static let usageText = """
-        usage: shipyard ping "<title>" [--repo <owner/name> | --project <name>]
+        usage: shipyard ping "<title>" [--body <text>] [--from <label>]
+                             [--open <url> | --app <bundle id or name>]
+                             [--repo <owner/name> | --project <name>]
 
         Sends the user a ping: it's listed under the projects that watch the
         repository of the working folder (its git remote `origin`), needs
-        their attention until they click it, and prints its id.
+        their attention until they click it, and prints its id. Clicking it
+        runs its action, if it has one, and marks it seen.
 
+          --body <text>        say more than the title fits
+          --from <label>       who sent it: the agent or the task
+          --open <url>         clicking it opens this URL (a page, an app's deep link)
+          --app <id or name>   clicking it brings this app forward, by bundle id or name
           --repo <owner/name>  file it by this repository instead of the working folder's
           --project <name>     file it under this project (its name in config.toml) only
+
+        One action at most; with none, clicking it only marks it seen.
 
         """
 
     /// The usage line errors point at.
-    static let usageLine = "shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"
+    static let usageLine = "shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"
+
+    /// The flags that give a ping its action; it takes one at most.
+    static let actionFlags = ["--open", "--app"]
 
     /// Sends a ping with `arguments` (those after `ping`), sent at `now`.
     /// Without `--project` it's filed under every project of `configuration`
@@ -73,7 +85,16 @@ public enum PingCommand {
         var id = newID()
         while store.ping(id: id) != nil { id = newID() }
         do {
-            try store.save(Ping(id: id, title: request.title, projects: projects, sent: now, repository: repository))
+            try store.save(Ping(
+                id: id,
+                title: request.title,
+                projects: projects,
+                sent: now,
+                repository: repository,
+                body: request.body,
+                sender: request.sender,
+                action: request.action
+            ))
         } catch {
             return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
@@ -126,13 +147,22 @@ public enum PingCommand {
         var project: String?
         /// `--repo`'s `owner/name`.
         var repository: String?
+        var body: String?
+        /// `--from`'s label.
+        var sender: String?
+        var action: PingAction?
 
-        /// Reads `arguments`: one title, and `--repo <owner/name>` or
-        /// `--project <name>`, in any order.
+        /// Reads `arguments`: one title; `--body` and `--from`; one action
+        /// flag at most (`--open`, `--app`); `--repo <owner/name>` or
+        /// `--project <name>`; in any order. An empty `--body` or `--from`
+        /// is none.
         static func parse(_ arguments: [String]) -> Result<Request, ParseError> {
             var titles: [String] = []
             var project: String?
             var repository: String?
+            var body: String?
+            var sender: String?
+            var actions: [PingAction] = []
             var index = 0
             while index < arguments.count {
                 let argument = arguments[index]
@@ -154,6 +184,25 @@ public enum PingCommand {
                         return .failure(ParseError("`--repo` takes a repository as owner/name, not `\(value)`"))
                     }
                     repository = value
+                case "--body", "--from":
+                    guard index < arguments.count else { return .failure(ParseError("`\(argument)` needs a value")) }
+                    let value = arguments[index].trimmingCharacters(in: .whitespacesAndNewlines)
+                    index += 1
+                    if argument == "--body" { body = value.isEmpty ? nil : value } else { sender = value.isEmpty ? nil : value }
+                case "--open":
+                    guard index < arguments.count else { return .failure(ParseError("`\(argument)` needs a value")) }
+                    let value = arguments[index].trimmingCharacters(in: .whitespaces)
+                    index += 1
+                    guard let url = URL(string: value), url.scheme?.isEmpty == false else {
+                        return .failure(ParseError("`--open` takes a URL with its scheme, such as https://example.com, not `\(value)`"))
+                    }
+                    actions.append(.url(url))
+                case "--app":
+                    guard index < arguments.count else { return .failure(ParseError("`\(argument)` needs a value")) }
+                    let value = arguments[index].trimmingCharacters(in: .whitespaces)
+                    index += 1
+                    guard !value.isEmpty else { return .failure(ParseError("`--app` takes an app's bundle id or name")) }
+                    actions.append(.app(value))
                 default:
                     return .failure(ParseError("unknown option `\(argument)`"))
                 }
@@ -166,7 +215,17 @@ public enum PingCommand {
             if project != nil, repository != nil {
                 return .failure(ParseError("pass --repo or --project, not both"))
             }
-            return .success(Request(title: title, project: project, repository: repository))
+            if actions.count > 1 {
+                return .failure(ParseError("a ping has one action at most; pass one of \(actionFlags.joined(separator: ", "))"))
+            }
+            return .success(Request(
+                title: title,
+                project: project,
+                repository: repository,
+                body: body,
+                sender: sender,
+                action: actions.first
+            ))
         }
     }
 

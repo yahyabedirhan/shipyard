@@ -56,6 +56,12 @@ public struct RowCard: Hashable, Sendable {
         case attempt(Int)
         /// How long a run ran, or has been running: "3m 12s".
         case duration(String, running: Bool)
+        /// A ping's body, whole.
+        case body(String)
+        /// What clicking a ping does.
+        case action(PingAction)
+        /// Why a ping's action failed at its last click.
+        case failure(String)
     }
 }
 
@@ -65,7 +71,8 @@ extension PanelText {
     /// A pull request: "feat/hover-help → main", "+120 −43 · 6 files",
     /// "Approved · Checks passed", "3 comments · 1 review · updated 5m ago".
     /// An issue: its comments and when it was updated. A run: "Push by
-    /// yahyabedirhan · attempt 2", "Took 3m 12s" (or "Running for 2m").
+    /// yahyabedirhan · attempt 2", "Took 3m 12s" (or "Running for 2m"). A
+    /// ping: its body, "Opens https://…" (or the app), and why that failed.
     public static func rowCard(_ row: MenuRow, now: Date) -> RowCard {
         let details = row.item.details
         var facts: [[RowCard.Fact]] = []
@@ -91,8 +98,12 @@ extension PanelText {
             facts.append([.trigger(event: details.runEvent, by: row.author)] + attempt)
             facts.append([runTime(row, now: now)])
         case .ping:
-            // A ping's card is its title, until it has a body and a sender.
-            break
+            // Its whole body (the row may cut it off), where clicking it
+            // takes you, and why that last failed.
+            let ping = row.item.ping
+            if let body = ping?.body { facts.append([.body(body)]) }
+            if let action = ping?.action { facts.append([.action(action)]) }
+            if let failure = ping?.failure { facts.append([.failure(failure)]) }
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
         let tagged = row.attentionReasons.filter { $0 == .reviewRequested || $0 == .checksFailed }
@@ -124,6 +135,10 @@ extension PanelText {
         case .trigger(let event, let by): "\(event.map(eventWord) ?? "Run") by \(by)"
         case .attempt(let attempt): "attempt \(attempt)"
         case .duration(let time, let running): running ? "Running for \(time)" : "Took \(time)"
+        case .body(let text): text
+        case .action(.url(let url)): "Opens \(url.absoluteString)"
+        case .action(.app(let app)): "Opens \(app)"
+        case .failure(let reason): reason
         }
     }
 

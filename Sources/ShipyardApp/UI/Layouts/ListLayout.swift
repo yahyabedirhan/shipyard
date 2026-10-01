@@ -279,7 +279,8 @@ private struct ListRow: View {
             AttentionDot(isOn: row.needsAttention)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
-            Text(String(row.number))
+            // A ping has no number; the column stays, so titles line up.
+            Text(row.kind == .ping ? "" : String(row.number))
                 .font(TypeScale.meta)
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: Grid.numberColumn, alignment: .trailing)
@@ -304,7 +305,7 @@ private struct ListRow: View {
                     }
                     Text(meta)
                         .font(TypeScale.meta)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -330,13 +331,17 @@ private struct ListRow: View {
     }
 
     /// The author, or in a project of several repositories, the repository
-    /// (without its owner); a run names no author.
+    /// (without its owner); a run names no author. A ping names its sender,
+    /// or why its action failed, while it has (the hover card has it whole).
     private var meta: String? {
+        if let error = row.actionError { return error }
         if showsRepository { return PanelText.repositoryName(row.repository) }
+        if row.kind == .ping { return row.sender }
         return row.kind == .workflowRun ? nil : row.author
     }
 
     private var metaSymbol: String? {
+        if row.actionError != nil { return "exclamationmark.triangle.fill" }
         if showsRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
     }

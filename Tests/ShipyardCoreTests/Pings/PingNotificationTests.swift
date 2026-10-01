@@ -203,7 +203,7 @@ struct PingNotificationTests {
 
         harness.shipyard.openNotification(notification.itemURL)
 
-        #expect(harness.opener.opened.isEmpty)
+        #expect(harness.actions.opened.isEmpty)
         #expect(harness.pingStore.ping(id: id)?.seen == harness.clock.now)
         #expect(harness.pingRows().first?.needsAttention == false)
         #expect(harness.shipyard.menu.attention.pings == 0)

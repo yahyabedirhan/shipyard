@@ -51,12 +51,12 @@ struct PortsTests {
         #expect(now >= before && now <= Date())
     }
 
-    @Test("the URL opener records what it opened")
-    func urlOpener() {
-        let opener = RecordingURLOpener()
+    @Test("the action port records the URLs it opened")
+    func actionsOpenURLs() {
+        let actions = RecordingActions()
         let url = URL(string: "https://github.com/yahyabedirhan/shipyard/pull/7")!
-        opener.open(url)
-        #expect(opener.opened == [url])
+        actions.open(url)
+        #expect(actions.opened == [url])
     }
 
     @Test("the version is 0.0.3")
