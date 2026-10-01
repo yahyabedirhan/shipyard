@@ -67,6 +67,11 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
+    /// The offer to link the bundled CLI into `~/.local/bin`.
+    let cliLink = CLILink(
+        cli: CLILink.bundledCLI(in: Bundle.main.bundleURL),
+        home: FileManager.default.homeDirectoryForCurrentUser
+    )
     /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
         directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
