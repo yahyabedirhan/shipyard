@@ -131,9 +131,11 @@ enum Palette {
 
     /// A row's colour, by kind: a pull request open green, draft gray,
     /// merged purple, closed red; an issue open green, closed purple; a
-    /// workflow run running amber, succeeded green, failed red.
+    /// workflow run running amber, succeeded green, failed red; a ping
+    /// the accent blue.
     static func color(_ state: ItemState, kind: ItemKind) -> Color {
-        switch state {
+        if kind == .ping { return accent }
+        return switch state {
         case .open, .succeeded: green
         case .draft: gray
         case .merged: purple
@@ -183,6 +185,7 @@ enum Palette {
         case (.workflowRun, .running): "arrow.triangle.2.circlepath.circle.fill"
         case (.workflowRun, .failed): "xmark.circle.fill"
         case (.workflowRun, _): "checkmark.circle.fill"
+        case (.ping, _): "bell.fill"
         }
     }
 

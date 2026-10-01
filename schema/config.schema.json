@@ -115,6 +115,7 @@
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "pings": { "$ref": "#/definitions/pings" },
         "notifications": {
           "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
           "$ref": "#/definitions/notifications",
@@ -194,6 +195,7 @@
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "pings": { "$ref": "#/definitions/pings" },
         "notifications": {
           "description": "This project's notification rules; replaces [[defaults.notifications]]. An empty list means no notifications for this project.",
           "$ref": "#/definitions/notifications"
@@ -310,6 +312,18 @@
           "default": "default-and-pull-requests"
         },
         "authors": { "$ref": "#/definitions/authors" }
+      }
+    },
+    "pings": {
+      "description": "The pings agents send with the shipyard CLI (shipyard ping), each filed under a project. Pings take no states, authors, drafts or review-requested.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List pings.",
+          "type": "boolean",
+          "default": true
+        }
       }
     },
     "authors": {

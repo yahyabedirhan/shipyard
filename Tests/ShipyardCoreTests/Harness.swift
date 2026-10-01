@@ -41,6 +41,8 @@ struct Harness {
     let configURL: URL
     /// A fresh temporary directory for app state (`state.json`).
     let stateDirectory: URL
+    /// The ping store the CLI and the app share, in `stateDirectory`.
+    let pingStore: PingStore
     let shipyard: Shipyard
 
     var clock: ManualClock { sleeper.clock }
@@ -68,10 +70,12 @@ struct Harness {
         self.store = store
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
+        pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true))
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: stateDirectory),
             configStatusStore: ConfigStatusStore(directory: stateDirectory),
+            pingStore: pingStore,
             tokenStore: store,
             urlOpener: opener,
             notifier: notifier,
@@ -147,6 +151,20 @@ struct Harness {
     /// Replaces the configuration file with `text`.
     func writeConfig(_ text: String) throws {
         try Data(text.utf8).write(to: configURL)
+    }
+
+    /// Runs the `shipyard` CLI with `arguments` (without the program's
+    /// name) against this harness's configuration file and ping store, at
+    /// the clock's time, as an agent would in a terminal.
+    @discardableResult
+    func cli(_ arguments: String...) -> CommandResult {
+        ShipyardCLI.run(
+            arguments,
+            environment: CommandEnvironment(workingDirectory: stateDirectory, variables: [:]),
+            configURL: configURL,
+            pingStore: pingStore,
+            now: clock.now
+        )
     }
 
     /// The section named `name` in the current menu.

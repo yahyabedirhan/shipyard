@@ -70,9 +70,10 @@ public enum Arrangement {
     static func key(for item: Item, settings: ArrangementSettings, now: Date, calendar: Calendar) -> GroupKey {
         switch settings.groupBy {
         case .kind: .kind(item.kind)
-        case .repository: .repository(item.repository)
+        // A ping with no repository or sender joins its kind's group, last.
+        case .repository: item.repository.isEmpty ? .kind(item.kind) : .repository(item.repository)
         case .date: .date(DateBucket(sortDate(item, settings.sortBy == .created ? .created : .updated), now: now, calendar: calendar))
-        case .author: .author(item.author)
+        case .author: item.author.isEmpty ? .kind(item.kind) : .author(item.author)
         case .none: .ungrouped
         }
     }
@@ -114,8 +115,13 @@ public enum Arrangement {
             left.rawValue < right.rawValue
         case (.repository(let left), .repository(let right)), (.author(let left), .author(let right)):
             left.lowercased() == right.lowercased() ? left < right : left.lowercased() < right.lowercased()
+        case (.kind, _):
+            // A kind among repositories or authors: pings without one, last.
+            false
+        case (_, .kind):
+            true
         default:
-            // One project's groups all have the same kind of key.
+            // One project's other groups all have the same kind of key.
             false
         }
     }

@@ -21,8 +21,22 @@ var targets: [Target] = [
     ),
 ]
 
+// The `shipyard` command line agents send pings with (ADR 0004): a thin
+// wrapper over `ShipyardCLI` in the core. Its product is `shipyard-cli`, not
+// `shipyard`, because on a case-insensitive disk that would be the app's
+// `Shipyard` executable; `make bundle` puts it in the app as
+// `Contents/Helpers/shipyard`.
+targets.append(
+    .executableTarget(
+        name: "ShipyardCLI",
+        dependencies: ["ShipyardCore"],
+        path: "Sources/ShipyardCLI"
+    )
+)
+
 var products: [Product] = [
     .library(name: "ShipyardCore", targets: ["ShipyardCore"]),
+    .executable(name: "shipyard-cli", targets: ["ShipyardCLI"]),
 ]
 
 #if os(macOS)

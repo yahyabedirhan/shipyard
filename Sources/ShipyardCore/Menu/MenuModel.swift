@@ -88,10 +88,19 @@ public struct MenuModel: Equatable, Sendable {
         now: Date
     ) -> MenuModel {
         guard let snapshot else {
+            // Not loaded yet, but its pings (the listing's only items) show.
             let sections = configuration.projects.map { project in
                 MenuSection(
                     name: project.name,
-                    groups: [],
+                    groups: Arrangement.groups(
+                        listings[project.name] ?? [],
+                        project: project.name,
+                        settings: configuration.settings(for: project).arrangement,
+                        layout: configuration.menu.layout,
+                        folded: state.collapsedGroups,
+                        expanded: expanded,
+                        now: now
+                    ),
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
                     repositories: project.repositories.compactMap(\.slug)
@@ -130,8 +139,8 @@ public struct MenuModel: Equatable, Sendable {
                 notes: reviewSearchNotes(snapshot, settings: settings),
                 // `anywhere` brings in pull requests from any repository.
                 showsRepository: repositories.count > 1 || settings.usesAnywhere,
-                // A project added since the snapshot was fetched has no listing yet.
-                isLoaded: listings[project.name] != nil,
+                // A project added since the snapshot was fetched isn't in it yet.
+                isLoaded: snapshot.items[project.name] != nil,
                 repositories: repositories
             )
         }
@@ -229,7 +238,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// The order kinds appear in within a section.
-    static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun]
+    static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping]
 }
 
 /// One project in the panel.
@@ -411,6 +420,7 @@ public enum MenuBarLabel: Equatable, Sendable {
                 Self.part(counts.pullRequests, "PR", "PRs"),
                 Self.part(counts.issues, "issue", "issues"),
                 Self.part(counts.workflowRuns, "run", "runs"),
+                Self.part(counts.pings, "ping", "pings"),
             ].compactMap { $0 }
             return parts.isEmpty ? nil : parts.joined(separator: " · ")
         case .hidden:

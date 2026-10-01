@@ -75,6 +75,7 @@ final class AppServices {
     private let notifier = Notifier()
     private let opener = WorkspaceURLOpener()
     private var configWatcher: ConfigWatcher?
+    private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
 
     init() {
@@ -83,6 +84,7 @@ final class AppServices {
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
+            pingStore: PingStore(directory: PingStore.defaultDirectory),
             tokenStore: Keychain(),
             urlOpener: opener,
             notifier: notifier,
@@ -108,6 +110,12 @@ final class AppServices {
             Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
+        // The `shipyard` CLI writes one file per ping into the store's
+        // directory: watching it as a "file" sees each one arrive.
+        pingWatcher = ConfigWatcher(file: shipyard.pingStore.directory) {
+            shipyard.reloadPings()
+        }
+        pingWatcher?.start()
         wake = WakeObserver {
             Task { await shipyard.refresh() }
         }

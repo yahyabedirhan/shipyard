@@ -6,6 +6,14 @@ Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with th
 
 Since 0.0.2 a refresh also **resolves** each project's repository selectors (groups such as `owned`, and wildcards such as `owner/*`) into repositories, fetches them in batches with one **review search** (the open PRs waiting on the user, teams included), and then works from each project's **listing**: the items its filters keep. The menu, the counts and the notifications all read the listing, and an **arrangement** groups, sorts and caps it for the panel.
 
+Since 0.0.5 agents also send the user **pings** with the `shipyard` command line, a second executable bundled in the app (ADR 0004). The **ping command** files a ping under a project and writes it to the **ping store**, one file per ping in Application Support, which the app watches; a ping is listed as a fourth kind of item beside the fetched ones, with no GitHub request.
+
+```text
+agent ──▶ shipyard ping (CLI) ──▶ PingCommand ──▶ PingStore (Pings/<id>.json) ──watched──▶ Shipyard.reloadPings()
+                                       ▲                                                     │
+                              config.toml (projects)                 Listing (pings among the items) ──▶ MenuModel
+```
+
 ```text
 config.toml ──▶ ConfigStore ─┐
                              ▼
@@ -74,6 +82,16 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | P2 | Onboarding starts by choosing a preset: `my-agents` then shows the repository picker; `incoming-contributions` offers "all my repositories (`owned`)", on by default, or picking; `review-queue` needs no repositories. |
 | S1 | Sign in without `gh` (formerly #22): the connect screen offers **Sign in with GitHub** (the device flow) beside the `gh` instructions; the token goes to the login Keychain and survives restarts; Sign out deletes it; a revoked token returns to the connect screen; the README says how a fork sets its own OAuth App client ID. |
 
+**Added in 0.0.5** (effort `shipyard-0-0-5`, pings; built ticket by ticket, so these rows grow with them):
+
+| # | Requirement |
+|---|---|
+| N1 | `shipyard ping "<title>" --project <name>` stores a **ping** under that project, prints its id (short, readable, global) and exits 0. A project the configuration doesn't name fails with the projects listed and exit 1; arguments that don't read fail with exit 2. Errors are one line on standard error (#97). |
+| N2 | The `shipyard` CLI is a second executable in `Shipyard.app` (`Contents/Helpers/shipyard`), a thin wrapper over the core's `ShipyardCLI`; `ping` is its one command so far (ADR 0004). |
+| N3 | A ping is a fourth kind of item: listed under its project, in a "Pings" group under `group-by = "kind"`, in the list, its project's tab and the All tab. It needs attention until seen (whatever `[attention]` says) and counts in its project, its tab and the menu bar. Clicking its row (or ⌥-click, or Mark all seen) marks it seen. |
+| N4 | Pings are kept in the **ping store**, apart from `state.json`, and survive restarts: one sent while the app isn't running shows when it starts, one sent while it runs shows when the store changes, with no GitHub request, even before GitHub has answered. |
+| N5 | `[defaults.pings] show` (default `true`) and a project's `pings = { show = … }` decide whether pings are listed; `states`, `authors`, `drafts` and `review-requested` under pings are rejected with their line. |
+
 ### Rules and completion
 
 - The app writes the configuration in three targeted ways only (ADR 0001): the project picker appends projects (R13), the layout button sets `[menu] layout`, and onboarding writes a preset (P2), only to a file whose only live key is `version` (the app's own commented header). Every other change comes from the user or their agents editing the file.
@@ -109,7 +127,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Excluded | Why |
 |---|---|
 | Reviewing inside the app (diff, comments), merge/close actions | Agreed: click-through to GitHub for now. |
-| A CLI or a settings window | ADR 0001: the file is the interface. The panel's menu only has "Open configuration file". |
+| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's menu only has "Open configuration file". The `shipyard` CLI (0.0.5) sends pings only (ADR 0004). |
 | GitLab, GitHub Enterprise, several accounts | Nobody asked; the GraphQL host is one constant if GHE comes up. |
 | Telling agent PRs from hand-written ones | Agreed: not reliable today (see Extensibility). |
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
@@ -133,7 +151,10 @@ Nouns from the requirements, sorted:
 | Shipyard (the app) | **Entity**, orchestrator: lifecycle state, refresh. |
 | Configuration | **Entity** (value) with rules: defaults, per-project overrides, validation. |
 | Project | Field group inside Configuration (name, repositories, overrides). |
-| Item (PR, issue, run) | **Entity** (value): kind, state, author, fingerprint. |
+| Item (PR, issue, run, ping) | **Entity** (value): kind, state, author, fingerprint; a ping's item carries its `Ping`. |
+| Ping | **Entity** (value): id, title, the projects it's filed under, when it was sent and seen. |
+| Ping store | **Entity** (store): the pings, one file each, written by the CLI and the app. |
+| Ping command | **Entity** (pure, over the store): reads `shipyard ping`'s arguments, files and saves the ping. |
 | Snapshot | **Entity** (value): all items of all projects from one refresh, plus per-source errors (a repository and a kind) and the rate limits seen. |
 | Rate budget | **Entity**: owns the quota rule (share, back-off, pause). |
 | Attention (seen records) | **Entity**: owns the "needs attention" rule and seen records. |
@@ -164,6 +185,9 @@ Shipyard -> Listing                items(project, snapshot, viewer, now) -> the 
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
 Shipyard -> ConfigStatusStore      record(verdict) after every reload, for agents
+Shipyard -> PingStore              all() at start and on every change the app's watcher sees; markSeen(id) on a click
+ShipyardCLI -> PingCommand         run(arguments, environment, configuration, store) -> output, exit status
+PingCommand -> PingStore           save(ping) under a project the configuration names
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]
 Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification)
@@ -199,6 +223,8 @@ Where each rule lives:
 | How listed items are grouped, sorted and capped | `Arrangement` |
 | Whether a group is folded / expanded past its cap | `AppState.collapsedGroups` / `Shipyard.expandedGroups` |
 | Which preset text is written, and when writing it is safe | `Preset` + `ConfigStore.writePreset` |
+| Which project a ping is filed under; its id | `PingCommand` |
+| Whether a ping was seen | the ping itself, in `PingStore` (read by `Attention`) |
 
 ---
 
@@ -221,6 +247,8 @@ fetchError: GitHubError?           (last refresh's failure, if any)
 menu: MenuModel                    (what the panel draws; a failed refresh keeps its rows and sets fetchError; before any succeeded, it lists every project not loaded yet)
 budget: RateBudget                 (limits, recent costs, pause; reset on sign-out)
 appStateStore: AppStateStore       (seen, collapsed; loaded at start, kept on sign-out)
+pingStore: PingStore               (the pings agents send; the CLI writes to it too)
+pings: [Ping]                      (the store as last read: at start and on reloadPings(); listed by every refresh and rebuild)
 configStatusStore: ConfigStatusStore (config-status.json: the verdict after every reload, for agents; write-only)
 gate: RefreshGate                  (one refresh at a time, queues one more)
 timer: RefreshTimer                (port; armed with the budget's delay after every refresh, disarmed outside ready)
@@ -241,16 +269,17 @@ Operations:
 
 | Operation | Does | Rejects / edge |
 |---|---|---|
-| `start()` | create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); load config; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Connect with `gh` calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
+| `start()` | create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); read the ping store; load config; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Connect with `gh` calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
 | `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()` | as `refresh()`; an existing file is never touched |
 | `refresh()` | the refresh pipeline (§4), which resolves repository selectors first (forced after a configuration change and on ⌘R, else at most hourly); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing, rebuilds the menu from the last snapshot (so a closed item past its window leaves) and re-arms the timer for the configured interval or the pause's end, whichever is sooner |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`, in `publishConfigStatus()`, which also writes the verdict to `configStatusStore`, accepted, rejected or unchanged); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
-| `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | — |
+| `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | a ping's row opens nothing (its action comes later): `pingStore.markSeen(id)`, then `reloadPings()` |
+| `reloadPings()` | the app's watcher on the ping store calls it: reads the store and, when a ping arrived, changed or went, rebuilds the menu from the last snapshot (or none) with the pings listed; no GitHub request | an unchanged store changes nothing; a file that doesn't read is skipped |
 | `openRepository(of: section)` | Return on a project's header (#45): opens the section's `repositoryURL`, the first repository the configuration lists for the project, on GitHub; marks nothing seen | a section without repositories opens nothing |
 | `openProfile()` | a click on the header's account (#49): opens `viewer.profileURL` through `URLOpening`; the app then closes the menu, as for a row | opens nothing while `viewer` is `nil` |
 | `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
-| `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen | rows hidden by the configuration are left alone |
+| `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen, pings in the ping store | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core since 0.0.1; since 0.0.2 the connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder; shipyard's own is compiled in since #23) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
 | `openVerificationPage()` | the code screen's Copy code and open GitHub (the app copies the code first): opens the code's `verificationURL` (github.com/login/device) through `URLOpening` | only while `connecting(code)`; otherwise does nothing |
@@ -315,6 +344,9 @@ branches = "default-and-pull-requests"   # | "all"
 states = ["in-progress", "failed", "succeeded"]
 authors = { show = [], hide = [] }
 
+[defaults.pings]
+show = true                               # the pings agents send with `shipyard ping`; no states, authors, drafts or review-requested
+
 [defaults]                                # how a project is arranged, and what groups bring in (per project too)
 group-by = "kind"                         # "kind" | "repository" | "date" | "author" | "none"
 # subsections: unset keeps each layout's own (dividers in the list, subheaders in tabs)
@@ -375,7 +407,7 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 ### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
-Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2), `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails), `writePreset(preset, projects)` (the third writer, below) and `acceptsPreset` (whether the latest reload found a file a preset may be written over). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
+Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2), `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails), `writePreset(preset, projects)` (the third writer, below) and `acceptsPreset` (whether the latest reload found a file a preset may be written over). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
 The app's `ConfigWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms.
 
 ### ConfigStatusStore — `ShipyardCore/Config/ConfigStatus.swift`
@@ -436,7 +468,7 @@ The calls sit in `GitHub/Repositories.swift` (`RepositoryListQuery`, `GitHubClie
 ```text
 Item
   id: String                  (URL; unique across PRs, issues, runs)
-  kind: pullRequest | issue | workflowRun
+  kind: pullRequest | issue | workflowRun | ping
   repository: String          ("owner/name")
   number/title/url/author/authorKind(me|other|bot)   (a Bot's login keeps GitHub's `[bot]` suffix; a deleted account is `ghost`; a run: its run number, the workflow's name, the actor)
   state: open | draft | merged | closed | running | succeeded | failed   (issues: open | closed; runs: queued counts as running)
@@ -449,6 +481,9 @@ Item
   details: ItemDetails        (only the row's hover card shows these: a PR's head and base branch, additions, deletions,
                                changed files, reviewDecision, comments and reviews; an issue's comments; a run's
                                display_title, event and run_attempt; not in the fingerprint)
+  ping: Ping?                 (0.0.5, kind ping only: the ping it lists, whose `seen` attention reads. A ping's item is open,
+                               has no repository, number or author yet, is aged from when it was sent, and is known by
+                               shipyard://ping/<id>, which no GitHub item can be)
   fingerprint: String          (state|updatedAt|checks|reviewRequested|activity) — any change = "changed"
 
 Snapshot
@@ -472,12 +507,13 @@ Pure, and the only place that decides what a project has (ADR 0003):
 | Operation | Returns |
 |---|---|
 | `items(for: ProjectSettings, in: Snapshot, viewer, now) -> [Item]` | the snapshot's items for the project (from its resolved repositories, and for `anywhere` the search's PRs, which the fetch puts among them) that pass every check, combined with AND: kind shown, `states`, the window, `drafts`, `authors`, `review-requested` |
-| `listings(for: [ProjectSettings], in: Snapshot, now) -> [ProjectName: [Item]]` | every project's listing, the viewer being the snapshot's `viewerLogin`; a project the snapshot has no entry for (added since) has none, so the menu shows it not loaded yet |
+| `listings(for: [ProjectSettings], in: Snapshot?, pings: [Ping], now) -> [ProjectName: [Item]]` | every project's listing, the viewer being the snapshot's `viewerLogin`: its fetched items, then the pings filed under it, through the same checks (a ping passes on `pings.show` alone). A project with neither (added since the snapshot) has none; without a snapshot a project lists its pings alone. Whether a section is loaded is the snapshot's to say, not the listing's |
 
 `MenuModel`, `Attention.counts` and the notification filter all take a listing, so they can't disagree; the two `hide-authors` checks (in `MenuModel` and in `Shipyard`'s notification step) go.
 ### Attention — `ShipyardCore/Items/Attention.swift`
 
 Owns the rule, so the rule sits with the data it reads (seen records). It's keyed on the generic `Item`, so issues and runs reuse it.
+A ping (0.0.5) is the exception: it needs attention (`unseen`) until it's seen, whatever `[attention]` says, and whether it was seen is the `seen` time on the ping, in the ping store, so a seen-window can count from it later without GitHub data; `counts` has a `pings` kind.
 State: `seen: [ItemID: SeenRecord]`, where `SeenRecord` = the fingerprint seen and `present`, the last time a refresh still listed the item (bumped at most once a day, so the file isn't rewritten every refresh).
 
 | Operation | Returns |
@@ -625,6 +661,33 @@ State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the
 
 After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it (`paused` arms for the configured interval, or the time left until the pause ends when that's sooner: each such firing sends nothing and only lists again from the last snapshot, so a closed item leaves within an interval of its window passing even while paused), so a busy hour slows shipyard down on its own instead of running the limit dry. Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
+### PingStore — `ShipyardCore/Pings/PingStore.swift` (0.0.5)
+
+The pings agents send, one JSON file per ping (`<id>.json`) in `~/Library/Application Support/Shipyard/Pings/` (`PingStore.defaultDirectory`; tests pass a temporary one), apart from `state.json`: app state is what shipyard remembers from use, pings are data agents send. The format is private (ADR 0004); `Ping` is `Codable`, and a field added later is optional, so an older record still reads. The CLI and the running app write to it at the same time: each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet. A plain `struct`, not tied to the main actor, since the CLI uses it too.
+
+| Operation | Returns / rejects |
+|---|---|
+| `all() -> [Ping]` | every `*.json` that reads, oldest first; none when the directory doesn't exist yet. A file that doesn't read is skipped |
+| `ping(id:) -> Ping?` | one ping |
+| `save(ping) throws` | creates the directory when missing; replaces the ping's file atomically |
+| `markSeen(id:at:) throws` | sets `seen` once (a second click keeps the first time); an unknown id changes nothing |
+
+The app watches the directory with `ConfigWatcher` (as the "file", inside its parent, so creating it is seen too) and calls `Shipyard.reloadPings()`; the parent also holds `state.json`, so most of those calls find nothing new and change nothing.
+
+### PingCommand and ShipyardCLI — `ShipyardCore/Pings/PingCommand.swift`, `ShipyardCore/CLI/ShipyardCLI.swift` (0.0.5)
+
+`ShipyardCLI.run(arguments, environment, configURL, pingStore, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and `ping`, which reads `config.toml` as the app does (a missing file is no projects; one that doesn't read fails with its first problem, since the CLI has no last valid configuration to fall back on) and runs `PingCommand.run`. `CommandResult` is the output, the error text and the exit status: 0 done, 1 refused (`failedStatus`), 2 arguments that don't read (`usageStatus`). `CommandEnvironment` is the working folder and the environment variables, for filing by the git remote and Herdr later.
+
+| Operation | Returns / rejects |
+|---|---|
+| `PingCommand.run(arguments, environment, configuration, store, now, newID) -> CommandResult` | `<title> --project <name>`, in any order: saves `Ping(id, title, projects: [name], sent: now)` and prints the id. The id is `newID()` (`Ping.newID`: six letters and digits without `0 o 1 l i`), drawn again while the store has it, since ids are global | no title, two titles, an unknown option or a flag without its value: exit 2; no `--project`: exit 2, listing the projects; a project the configuration doesn't name: exit 1, listing them (or saying there are none); a store that can't be written: exit 1 |
+
+`PingCommand.Request.parse` reads the arguments; a subcommand word (`withdraw`) is checked before them when one joins.
+
+### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
+
+A thin executable target over `ShipyardCore`: it gathers the arguments, the working folder, the environment, `ConfigStore.defaultURL(environment:)` and `PingStore.defaultDirectory`, calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
+
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
 Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (`ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`): an interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open. The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state (`idle`, `running`, `finished(result)`, `timedOut(seconds)`); `start()` races the install against a 180 s timeout (the sleep is injected, so tests don't wait), `cancel()` goes back to `idle` at once and stops the shell (a result that arrives after is dropped, so Install can start again straight away), and a timeout stops the shell and says so.
@@ -639,9 +702,9 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 
 ```text
 shipyard/
-├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
+├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
 ├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
-├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon), ad-hoc sign, zip, install, redraw the icon
+├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon, and the CLI as Contents/Helpers/shipyard), ad-hoc sign, zip, install, redraw the icon
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (olive-khaki, shipyard's logo, is the app's; origami, sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` and `Logo.swift` (`make icon-exploration` redraws the options the logo was chosen from)
 ├── schema/config.schema.json         # public contract for config.toml (ADR 0001); JSON Schema describes TOML too
@@ -685,6 +748,12 @@ shipyard/
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
 │   │   └── NotificationRules.swift   # event + project settings → notify?; what to post; NotifiedEvents
+│   ├── Pings/
+│   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen; as an Item; new ids
+│   │   ├── PingStore.swift           # one JSON file per ping, atomic writes, safe for the CLI and the app at once
+│   │   └── PingCommand.swift         # shipyard ping: arguments → a ping filed under a project, saved; output and exit status
+│   ├── CLI/
+│   │   └── ShipyardCLI.swift         # the shipyard command line: help, version, reading config.toml, dispatching to ping; CommandResult, CommandEnvironment
 │   ├── State/
 │   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified; tolerant, versioned
 │   ├── Menu/
@@ -708,9 +777,10 @@ shipyard/
 │   └── Skill/
 │       ├── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port, cancellable), SkillInstallResult
 │       └── SkillInstallation.swift   # one install as the panel shows it: running, result, timeout, cancel
+├── Sources/ShipyardCLI/main.swift    # the `shipyard` executable: gathers arguments, environment and paths, prints ShipyardCLI.run's result
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
 │   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below, routes notification clicks, holds the panel's actions and closes the menu after opening something
-│   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration()
+│   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration(); watches the ping store's directory too, calling reloadPings()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # URLOpening on NSWorkspace; opens config.toml in its editor (TextEdit when none)
 │   ├── Keychain.swift                # TokenStore on the login keychain: the app's token store since 0.0.2 (S1)
@@ -741,6 +811,7 @@ shipyard/
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
 │   ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
+│   ├── Pings/                        # the ping command and the CLI as functions; pings end to end: CLI → store → Shipyard → menu
 │   ├── Onboarding/                   # ProjectChoices: choosing, typing, naming, grouping; PresetChoice: each preset's next step
 │   ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
 │   ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
@@ -917,6 +988,19 @@ Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backe
 |---|---|
 | An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
 | `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
+### Trace 6: an agent pings (0.0.5, happy path and a rejection)
+
+Setup: projects `shop` and `blog`; the app is running, its last refresh listed one PR in `shop`, attention count 1.
+
+| Step | Call (owner) | State after |
+|---|---|---|
+| 1 | agent runs `shipyard ping "Ready for review" --project shop` → `ShipyardCLI.run` (CLI/) | `config.toml` read: projects `shop`, `blog` |
+| 2 | `PingCommand.run` (Pings/) | id `k7qm2x` drawn, not in the store; `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
+| 3 | `ConfigWatcher` on the store's directory → `Shipyard.reloadPings()` | `pings` has the new one; no GitHub request |
+| 4 | `Listing.listings(…, pings:)` → `MenuModel.build` → `Arrangement` | `shop` lists the PR, then a "Pings" group with the ping; it needs attention (`unseen`); count **2** |
+| 5 | user clicks the ping's row → `Shipyard.open` → `PingStore.markSeen` → `reloadPings()` | nothing opened; `seen` set in its file; count **1**, and still after a relaunch |
+| — | agent runs `shipyard ping "Done" --project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written |
+
 ### Trace 3: agents drain the limit (rejection by budget)
 
 Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agents are running `gh` heavily.
@@ -954,9 +1038,14 @@ What the traces turned up and the design now handles: the first refresh after ad
 | A new `group-by` (e.g. `label`) | a case in `Arrangement`'s key and title, the schema, the skill |
 | Oldest first | a `sort-by` choice in `Arrangement`, the schema |
 | A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
+| A ping filed by the agent's repository, `--repo` (#98) | `PingCommand` (a flag; the git remote from `CommandEnvironment`); `Ping` gains a repository, which `Ping.item` fills |
+| A ping's body, sender and action (#100) | optional `Ping` fields, `PingCommand.Request` flags, `Ping.item`, the action port |
+| Replace and withdraw by id (#102) | `PingCommand` (`--id`, and `withdraw` read before the title), `PingStore` (remove) |
+| A seen ping leaving after a seen-window (#103) | `PingSettings` (a window), one check in `Listing` against `Ping.seen`, pruning in `PingStore` |
+| Another CLI command | a case in `ShipyardCLI.run` and its own core function |
 | The picker offering more groups | `PresetChoice` and `PresetPicker` only |
 
-Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI (ADR 0001), multi-account support. Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), persisting resolved repositories (resolving costs a few points once an hour), and a plugin seam for filters (each is a field and one line in `Listing`).
+Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI for the configuration (ADR 0001; the 0.0.5 CLI sends pings only, ADR 0004), multi-account support. Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), persisting resolved repositories (resolving costs a few points once an hour), and a plugin seam for filters (each is a field and one line in `Listing`).
 
 ---
 

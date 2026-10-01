@@ -38,6 +38,7 @@ public struct Configuration: Equatable, Sendable {
             pullRequests: project.pullRequests.applied(to: defaults.pullRequests),
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
+            pings: project.pings.applied(to: defaults.pings),
             notifications: project.notifications ?? defaults.notifications,
             arrangement: project.arrangement.applied(to: defaults.arrangement),
             archived: project.archived ?? defaults.archived,
@@ -91,6 +92,7 @@ extension Configuration {
         public var pullRequests = PullRequestSettings()
         public var issues = IssueSettings()
         public var workflowRuns = WorkflowRunSettings()
+        public var pings = PingSettings()
         /// `[[defaults.notifications]]`; a new pull request in any project by default.
         public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
         /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
@@ -111,6 +113,7 @@ extension Configuration {
         public var pullRequests = PullRequestOverrides()
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
+        public var pings = PingOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
         /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
@@ -125,6 +128,7 @@ extension Configuration {
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
+            pings: PingOverrides = .init(),
             notifications: [NotificationRule]? = nil,
             arrangement: ArrangementOverrides = .init(),
             archived: Bool? = nil,
@@ -135,6 +139,7 @@ extension Configuration {
             self.pullRequests = pullRequests
             self.issues = issues
             self.workflowRuns = workflowRuns
+            self.pings = pings
             self.notifications = notifications
             self.arrangement = arrangement
             self.archived = archived
@@ -408,6 +413,27 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
     }
 }
 
+/// `pings`: the pings agents send with the `shipyard` CLI. They take no
+/// `states`, `authors`, `drafts` or `review-requested`.
+public struct PingSettings: Equatable, Sendable {
+    public var show = true
+    public init(show: Bool = true) {
+        self.show = show
+    }
+}
+
+/// The `pings` keys a table sets; unset keys keep the value below.
+public struct PingOverrides: Equatable, Sendable {
+    public var show: Bool?
+    public init(show: Bool? = nil) {
+        self.show = show
+    }
+
+    public func applied(to base: PingSettings) -> PingSettings {
+        PingSettings(show: show ?? base.show)
+    }
+}
+
 /// How a project's listed items are grouped, sorted and drawn.
 public struct ArrangementSettings: Equatable, Sendable {
     public var groupBy: GroupBy = .kind
@@ -459,6 +485,7 @@ public struct ProjectSettings: Equatable, Sendable {
     public var pullRequests: PullRequestSettings
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
+    public var pings: PingSettings
     public var notifications: [NotificationRule]
     public var arrangement: ArrangementSettings
     /// Whether groups and `owner/*` bring in archived repositories.
@@ -472,6 +499,7 @@ public struct ProjectSettings: Equatable, Sendable {
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
+        pings: PingSettings = PingSettings(),
         notifications: [NotificationRule],
         arrangement: ArrangementSettings = ArrangementSettings(),
         archived: Bool = false,
@@ -482,6 +510,7 @@ public struct ProjectSettings: Equatable, Sendable {
         self.pullRequests = pullRequests
         self.issues = issues
         self.workflowRuns = workflowRuns
+        self.pings = pings
         self.notifications = notifications
         self.arrangement = arrangement
         self.archived = archived
@@ -513,6 +542,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.show
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
+        case .ping: pings.show
         }
     }
 
@@ -522,6 +552,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.states
         case .issue: issues.states
         case .workflowRun: workflowRuns.states
+        case .ping: Set(StateGroup.all(for: .ping))
         }
     }
 
@@ -531,6 +562,8 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.authors
         case .issue: issues.authors
         case .workflowRun: workflowRuns.authors
+        // A ping has no GitHub author: every one is listed.
+        case .ping: AuthorFilter()
         }
     }
 }
@@ -614,7 +647,7 @@ extension Configuration {
         # layout = "list"
 
         # The number next to the menu bar icon: "total" (items that need your
-        # attention), "per-kind" (pull requests, issues and runs apart) or "none".
+        # attention), "per-kind" (pull requests, issues, runs and pings apart) or "none".
         # [menu-bar]
         # count = "total"
 
@@ -645,6 +678,11 @@ extension Configuration {
         # List GitHub Actions workflow runs in every project: set show to true.
         # [defaults.workflow-runs]
         # show = false
+
+        # List the pings your agents send with `shipyard ping` in every
+        # project: set show to false to hide them. A project can override it.
+        # [defaults.pings]
+        # show = true
 
         # When to notify, for every project: one block per rule. The list
         # replaces the default rule below, so keep it to hear of new pull

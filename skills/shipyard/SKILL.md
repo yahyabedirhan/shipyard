@@ -33,9 +33,9 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    - A top-level key (`refresh-interval-seconds`, `launch-at-login`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
    - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
-   - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
+   - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
@@ -61,7 +61,7 @@ Tables:
 
 | Key | Default | Allowed |
 |---|---|---|
-| `[menu-bar] count` | `"total"` | `"total"`, `"per-kind"` (PRs, issues, runs apart), `"none"` |
+| `[menu-bar] count` | `"total"` | `"total"`, `"per-kind"` (PRs, issues, runs, pings apart), `"none"` |
 | `[menu] layout` | `"list"` | `"list"` (every project in one scrolling list, one line per item), `"tabs"` (one project at a time) |
 | `[rate-limit] show` | `"always"` | `"always"`, `"when-low"` (below 25%), `"never"` |
 | `[rate-limit] max-share-percent` | `10` | `1`–`50`: the share of each hourly GitHub limit shipyard may spend (it's shared with the user's agents) |
@@ -70,7 +70,7 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 
-What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
+What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]` and `[defaults.pings]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
 | Key | Default | Allowed |
 |---|---|---|
@@ -89,6 +89,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.finished-window` | `"3h"` | a window: how long finished runs stay listed (running ones always are) |
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
+| `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
@@ -119,14 +120,14 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 |---|---|---|
 | `name` | yes | non-empty, unique across projects; the section's title |
 | `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere` (see Which repositories); no URLs |
-| `pull-requests`, `issues`, `workflow-runs` | no | inline tables with the keys above |
+| `pull-requests`, `issues`, `workflow-runs`, `pings` | no | inline tables with the keys above |
 | `group-by`, `subsections`, `sort-by`, `show-first` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
 
 ## Overrides
 
-- A project's `pull-requests`, `issues` and `workflow-runs` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
+- A project's `pull-requests`, `issues`, `workflow-runs` and `pings` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
 - `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
 

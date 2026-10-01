@@ -90,6 +90,9 @@ extension PanelText {
             let attempt: [RowCard.Fact] = details.runAttempt.flatMap { $0 > 1 ? [.attempt($0)] : nil } ?? []
             facts.append([.trigger(event: details.runEvent, by: row.author)] + attempt)
             facts.append([runTime(row, now: now)])
+        case .ping:
+            // A ping's card is its title, until it has a body and a sender.
+            break
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
         let tagged = row.attentionReasons.filter { $0 == .reviewRequested || $0 == .checksFailed }

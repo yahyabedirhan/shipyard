@@ -16,6 +16,7 @@ struct MenuTabsTests {
         case .pullRequest: "pull"
         case .issue: "issues"
         case .workflowRun: "actions/runs"
+        case .ping: "pings"
         }
         return MenuRow(Item(
             kind: kind,
@@ -52,6 +53,7 @@ struct MenuTabsTests {
             case .pullRequest: counts.pullRequests += 1
             case .issue: counts.issues += 1
             case .workflowRun: counts.workflowRuns += 1
+            case .ping: counts.pings += 1
             }
         }
         return MenuModel(sections: sections, attention: counts)

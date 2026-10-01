@@ -76,12 +76,14 @@ public enum PanelText {
     }
 
     private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
-        let repository = showingRepository ? [repositoryName(row.repository)] : []
+        let repository = showingRepository && !row.repository.isEmpty ? [repositoryName(row.repository)] : []
         let subject: [String] = switch row.kind {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
+        // A ping has no number: its sender, or "ping" until it has one.
+        case .ping: [row.author.isEmpty ? "ping" : row.author]
         }
-        return ["#\(row.number)"] + repository + subject
+        return (row.kind == .ping ? [] : ["#\(row.number)"]) + repository + subject
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".
@@ -122,6 +124,7 @@ public enum PanelText {
         case .pullRequest: "pull request"
         case .issue: "issue"
         case .workflowRun: "workflow run"
+        case .ping: "ping"
         }
         return "\(state(row.state)) \(kind)"
     }

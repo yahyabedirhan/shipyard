@@ -2,7 +2,8 @@ import Foundation
 
 /// The one place that decides what a project has (ADR 0003). Pure.
 ///
-/// A project's listing is the snapshot's items for it that pass every one of
+/// A project's listing is the snapshot's items for it, and the pings filed
+/// under it, that pass every one of
 /// its filters, combined with AND: the kind is shown, the item's state is
 /// one of the kind's `states`, a closed (or finished) item is inside its
 /// window, a draft is allowed, the author passes the kind's `authors`, and
@@ -22,13 +23,22 @@ public enum Listing {
         }
     }
 
-    /// Every project's listing, by project name, for the projects the
-    /// snapshot has an entry for; a project it has none for (added since it
-    /// was fetched) has no listing yet.
-    public static func listings(for projects: [ProjectSettings], in snapshot: Snapshot, now: Date) -> [String: [Item]] {
+    /// Every project's listing, by project name: the snapshot's items for
+    /// it, then the `pings` filed under it, each passing the project's
+    /// filters. A project with neither (added since the snapshot was
+    /// fetched, or before any was) has no listing yet; without a snapshot
+    /// a project lists its pings alone, so they show before GitHub answers.
+    public static func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, pings: [Ping] = [], now: Date) -> [String: [Item]] {
         var listings: [String: [Item]] = [:]
-        for project in projects where snapshot.items[project.name] != nil {
-            listings[project.name] = items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now)
+        for project in projects {
+            let fetched = snapshot.flatMap { snapshot in
+                snapshot.items[project.name] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
+            }
+            let filed = pings.filter { $0.projects.contains(project.name) }.map(\.item)
+            guard fetched != nil || !filed.isEmpty else { continue }
+            listings[project.name] = (fetched ?? []) + filed.filter {
+                lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
+            }
         }
         return listings
     }
@@ -53,6 +63,8 @@ public enum Listing {
         case .pullRequest: project.pullRequests.closedWindow
         case .issue: project.issues.closedWindow
         case .workflowRun: project.workflowRuns.finishedWindow
+        // A ping is always open, so it never gets here.
+        case .ping: 0
         }
         guard window > 0, let closedAt = item.closedAt else { return false }
         return closedAt >= now.addingTimeInterval(-window)

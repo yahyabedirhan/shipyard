@@ -11,8 +11,9 @@ import Observation
 /// ones the notification rules select, publish the menu model (with which
 /// rows need attention), and ask the rate budget when to run next. What the
 /// user has seen and collapsed, the items it knew and the events it notified
-/// are app state, kept by `appStateStore`. Observable, so the panel redraws
-/// when what it reads changes.
+/// are app state, kept by `appStateStore`. The pings agents send are kept by
+/// `pingStore` and listed with the projects' items, without GitHub.
+/// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
 public final class Shipyard {
@@ -58,6 +59,9 @@ public final class Shipyard {
     public private(set) var expandedGroups: Set<GroupID> = []
     /// The last refresh that succeeded; `nil` before one did.
     public private(set) var snapshot: Snapshot?
+    /// The pings in the ping store, as last read: at start and whenever the
+    /// store changes (`reloadPings()`).
+    public private(set) var pings: [Ping] = []
     /// Why the latest refresh failed; `nil` once one succeeds.
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
@@ -87,6 +91,9 @@ public final class Shipyard {
     /// The verdict on the configuration file after each reload, in
     /// `config-status.json`, for agents that can't see the banner.
     public let configStatusStore: ConfigStatusStore
+    /// The pings agents send with the `shipyard` CLI, which writes to the
+    /// same store.
+    public let pingStore: PingStore
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
     private let notifier: any Notifying
@@ -121,6 +128,7 @@ public final class Shipyard {
         configStore: ConfigStore,
         appStateStore: AppStateStore,
         configStatusStore: ConfigStatusStore,
+        pingStore: PingStore,
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
         notifier: any Notifying,
@@ -135,6 +143,7 @@ public final class Shipyard {
         self.configStore = configStore
         self.appStateStore = appStateStore
         self.configStatusStore = configStatusStore
+        self.pingStore = pingStore
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
         self.notifier = notifier
@@ -158,6 +167,7 @@ public final class Shipyard {
     public func start() async {
         signedOutReason = nil
         appStateStore.load(at: clock.now)
+        pings = pingStore.all()
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
@@ -542,7 +552,7 @@ public final class Shipyard {
             budget.record(snapshot.rateLimits, at: clock.now)
             // What each project has: the menu, the counts and the
             // notifications below all read these, and nothing else.
-            let listings = Listing.listings(for: projects, in: snapshot, now: clock.now)
+            let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
             var notifications: [PostedNotification] = []
             appStateStore.update { state in
                 notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
@@ -667,9 +677,10 @@ public final class Shipyard {
 
     // MARK: - User actions
 
-    /// Opens the row's item on GitHub in the browser and marks it seen.
+    /// Opens the row's item on GitHub in the browser and marks it seen. A
+    /// ping's row only marks it seen: it has nothing to open yet.
     public func open(_ row: MenuRow) {
-        urlOpener.open(row.url)
+        if row.kind != .ping { urlOpener.open(row.url) }
         markSeen(row)
     }
 
@@ -706,6 +717,10 @@ public final class Shipyard {
     /// Marks the row's item seen without opening it (⌥-click): it needs
     /// attention again only once it changes.
     public func markSeen(_ row: MenuRow) {
+        if let ping = row.item.ping {
+            markPingsSeen([ping.id])
+            return
+        }
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
     }
 
@@ -718,9 +733,33 @@ public final class Shipyard {
             .filter { Attention.canNeedAttention($0.item) }
         guard !rows.isEmpty else { return }
         let now = clock.now
+        let pingIDs = rows.compactMap(\.item.ping?.id)
+        if !pingIDs.isEmpty { markPingsSeen(pingIDs) }
+        let items = rows.filter { $0.item.ping == nil }.map(\.item)
+        guard !items.isEmpty else { return }
         updateAppState { state in
-            for row in rows { state.attention.markSeen(row.item, at: now) }
+            for item in items { state.attention.markSeen(item, at: now) }
         }
+    }
+
+    // MARK: - Pings
+
+    /// Reads the ping store again and, when a ping arrived, changed or
+    /// went, lists the pings at once from the last snapshot: no GitHub
+    /// request. The app's watcher on the store calls this.
+    public func reloadPings() {
+        let stored = pingStore.all()
+        guard stored != pings else { return }
+        pings = stored
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// Records the pings `ids` names as seen now, in the ping store, and
+    /// lists them again. A store that can't be written leaves them unseen.
+    private func markPingsSeen(_ ids: [String]) {
+        let now = clock.now
+        for id in ids { try? pingStore.markSeen(id: id, at: now) }
+        reloadPings()
     }
 
     /// Collapses the project's section, or expands it if it's collapsed.
@@ -777,9 +816,12 @@ public final class Shipyard {
     /// rate-limit indicator: a project added since shows as not loaded yet,
     /// a removed one disappears. Follows the menu bar rule of `applyAttention`.
     private func rebuildMenu(_ configuration: Configuration) {
-        let listings = snapshot.map { snapshot in
-            Listing.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, now: clock.now)
-        } ?? [:]
+        let listings = Listing.listings(
+            for: configuration.projects.map(configuration.settings(for:)),
+            in: snapshot,
+            pings: pings,
+            now: clock.now
+        )
         var rebuilt = MenuModel.build(
             listings: listings,
             snapshot: snapshot,
