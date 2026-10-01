@@ -83,12 +83,12 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | P2 | Onboarding starts by choosing a preset: `my-agents` then shows the repository picker; `incoming-contributions` offers "all my repositories (`owned`)", on by default, or picking; `review-queue` needs no repositories. |
 | S1 | Sign in without `gh` (formerly #22): the connect screen offers **Sign in with GitHub** (the device flow) beside the `gh` instructions; the token goes to the login Keychain and survives restarts; Sign out deletes it; a revoked token returns to the connect screen; the README says how a fork sets its own OAuth App client ID. |
 
-**Added in 0.0.5** (effort `shipyard-0-0-5`, pings; built ticket by ticket, so these rows grow with them):
+**Added in 0.0.5** (effort `shipyard-0-0-5`, pings, spec #96; Trace 6 follows one ping through them):
 
 | # | Requirement |
 |---|---|
-| N1 | `shipyard ping "<title>" --project <name>` stores a **ping** under that project, prints its id (short, readable, global) and exits 0. A project the configuration doesn't name fails with the projects listed and exit 1; arguments that don't read fail with exit 2. Errors are one line on standard error (#97). |
-| N2 | The `shipyard` CLI is a second executable in `Shipyard.app` (`Contents/Helpers/shipyard`), a thin wrapper over the core's `ShipyardCLI`; `ping` is its one command so far (ADR 0004). |
+| N1 | `shipyard ping "<title>"` stores a **ping**, filed as N6 says or under the one project `--project <name>` names, prints its id (N12) and exits 0. A `--project` the configuration doesn't name fails with the projects listed and exit 1; arguments that don't read fail with exit 2. Exit 0 is done, 1 refused, 2 a usage error, and every error is one line on standard error (#97). |
+| N2 | The `shipyard` CLI is a second executable in `Shipyard.app` (`Contents/Helpers/shipyard`), a thin wrapper over the core's `ShipyardCLI`; `ping` is its one command so far (ADR 0004). It needs neither the app running nor GitHub, and the app links it onto the PATH (N10). |
 | N3 | A ping is a fourth kind of item: listed under its project, in a "Pings" group under `group-by = "kind"`, in the list, its project's tab and the All tab. It needs attention until seen (whatever `[attention]` says) and counts in its project, its tab and the menu bar. Clicking its row (or ⌥-click, or Mark all seen) marks it seen. |
 | N4 | Pings are kept in the **ping store**, apart from `state.json`, and survive restarts: one sent while the app isn't running shows when it starts, one sent while it runs shows when the store changes, with no GitHub request, even before GitHub has answered. |
 | N5 | `[defaults.pings] show` (default `true`) and a project's `pings = { show = … }` decide whether pings are listed; `states`, `authors`, `drafts` and `review-requested` under pings are rejected with their line. |
@@ -99,6 +99,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | N10 | Like the skill install (R14), onboarding and the panel's menu offer to link the bundled CLI: **Link** makes `~/.local/bin/shipyard` a symbolic link to `Shipyard.app/Contents/Helpers/shipyard` (making `~/.local/bin` when it's missing). It never replaces anything: a link already pointing at this app's CLI shows as linked and is left alone; anything else there (a file, a folder, a link elsewhere, as from an older copy of the app) or a link that can't be made (no permission) shows why, with `mkdir -p ~/.local/bin && ln -sf <the app's CLI> ~/.local/bin/shipyard` and a Copy button, and Try again. A copy of the app without the CLI inside (`make run`) says there's nothing to link. Linked, it reminds the user to put `~/.local/bin` on their PATH (#104). |
 | N11 | `--herdr [<tab or pane id>]` gives a ping a Herdr action, a third action flag (still one at most). The argument after it is its id only when it's shaped like a Herdr id (`<workspace>:t<n>` or `<workspace>:p<n>`, as Herdr prints them); otherwise `--herdr` means the agent's own pane, `HERDR_PANE_ID`, and without that variable (outside Herdr) it's a usage error (exit 2). Clicking the ping (row or notification) focuses the tab, or the tab the pane is in (`herdr pane get`, then `herdr tab focus`; Herdr's CLI focuses no pane by id), then brings `[herdr] terminal` (an app name or bundle id, unset by default) forward as an `--app` action would; without it only the focus runs. A gone pane or tab, `herdr` not found, Herdr not running, or a terminal that won't come forward fails the action as in N8. The row's icon is a terminal, its card "Focuses <id> in Herdr" (#101). |
 | N12 | Ids are global: one names one ping wherever it's filed. `--id <id>` names a ping (1 to 64 lowercase letters, digits, `-` and `_`, starting with a letter or digit; anything else is exit 2); without it one is made up and printed. Sending an id that's stored replaces that ping: title, body, sender, action and filing are the new ones, its sent time stays, it's unseen again with no failure (so it needs attention again), and no second notification is posted. `shipyard ping withdraw <id>` removes the ping, prints the id and exits 0; the app takes it out of the menu and its notification out of Notification Center. An id no ping has fails with one line and exit 1; no id, two, or one that isn't an id is exit 2. Withdraw reads no `config.toml`. `--` ends the flags, so a title can be `withdraw` or start with `--` (`shipyard ping -- withdraw`). A ping that leaves any way (withdrawn, dismissed, past its seen-window, or gone while the app wasn't running) takes its notification with it and is forgotten, so its id sent again later is a new ping that notifies again (#102). |
+| N13 | The shipyard skill teaches agents the CLI beside the configuration: when to ping, every flag, the exit codes, where a ping is filed, replacing and withdrawing, and worked examples ("ping me when the PR is ready", "bring me back to this pane" with `--herdr`, "withdraw it when I've answered"). It says a file that lists its own notification rules needs `ping.sent` added, and lists `[defaults.pings]` and `[herdr]` with the other keys. A test checks the skill against `PingCommand`'s help and reads each example command as the CLI does (#105). |
 
 ### Rules and completion
 
@@ -147,6 +148,9 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Folding busy projects automatically (ghbar folds repositories with more than three items) | Deferred: the maintainer doesn't need it yet |
 | The picker offering repository groups other than a preset's `owned` | Groups come through the skill in 0.0.2 |
 | More than 100 review requests at once | The search returns the first 100; the section says so when there are more |
+| More than one action per ping, buttons on its notification, or a shell command as an action | Spec #96: one clear action, and nothing a ping runs beyond opening, activating or focusing |
+| Pings filed under no project, a maximum age for unseen pings, a sender inferred from Herdr | Spec #96: a ping is always filed, stays until seen, and says only what the agent passes |
+| Pings from other machines, remote Herdr, syncing pings | Spec #96: pings stay on the Mac, in the ping store |
 
 ---
 
@@ -1054,25 +1058,38 @@ Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backe
 |---|---|
 | An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
 | `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
-### Trace 6: an agent pings (0.0.5, happy path and a rejection)
+### Trace 6: an agent pings, from the CLI to a click (0.0.5)
 
-Setup: projects `shop` and `blog`; the app is running, its last refresh listed one PR in `shop`, attention count 1.
+Setup: projects `shop` (`repositories = ["yahyabedirhan/shop"]`) and `blog`, the default notification rules, `[herdr] terminal = "Ghostty"`. The app is running; its last refresh listed one PR in `shop`, attention count 1. An agent works in a clone of `yahyabedirhan/shop`, in Herdr pane `w1:p3`, and needs the user's answer.
 
 | Step | Call (owner) | State after |
 |---|---|---|
-| 1 | agent runs `shipyard ping "Ready for review" --project shop` → `ShipyardCLI.run` (CLI/) | `config.toml` read: projects `shop`, `blog` |
-| 2 | `PingCommand.run` (Pings/) | id `k7qm2x` drawn, not in the store; `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
-| 3 | `ConfigWatcher` on the store's directory → `Shipyard.reloadPings()` | `pings` has the new one; no GitHub request |
-| 4 | `Listing.listings(…, pings:)` → `MenuModel.build` → `Arrangement` | `shop` lists the PR, then a "Pings" group with the ping; it needs attention (`unseen`); count **2** |
-| 4a | `EventDetector.pingEvents` → `NotificationRules` (default rules hold `ping.sent`) → `Notifier.post` (#99) | `notified` has `ping.sent` for `shipyard://ping/k7qm2x`; banner "shop · Ready for review" |
-| 5 | user clicks the ping's row (or its banner: `openNotification`) → `runAction(ofPing:)`: no action, so `PingStore.markSeen` → the pings listed again | nothing run; `seen` set in its file; count **1**, and still after a relaunch |
-| 5′ | the agent had sent `--open https://claude.ai/artifact/42 --from claude` (#100); the row shows a link icon and "claude"; a click → `ActionRunning.run(.url(…))` → `done` → `markSeen` | the artifact opens; count **1** |
-| 5‴ | the agent in Herdr pane `w1:p3` had sent `--herdr` (#101), and `[herdr] terminal = "Ghostty"`; the row shows a terminal icon; a click → `HerdrFocus.focus("w1:p3")`: `herdr pane get w1:p3` → tab `w1:t1` → `herdr tab focus w1:t1` → `done` → `ActionRunning.run(.app("Ghostty"))` → `done` → `markSeen` | Herdr shows the agent's tab, Ghostty comes forward; count **1**. Had the pane closed: `failed("Herdr pane w1:p3 is gone")`, as 5″ |
-| 5″ | the same with `--app Claude` and no such app: `run(.app("Claude"))` → `failed("No app named Claude")` → `PingStore.recordFailure` | still unseen, count **2**; the row reads "No app named Claude" in red until the next click that works, ⌥-click, Mark all seen or a dismiss |
-| — | agent runs `shipyard ping "Done" --project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written |
-| 1′ | agent in a clone of `yahyabedirhan/shop` runs `shipyard ping "Ready for review"` (no flag; #98) → `ShipyardCLI.run` | `config.toml` and `repositories.json` read |
-| 2′ | `PingCommand.run` → `CommandEnvironment.git.origin(in:)` → `GitRemote.repository(fromURL:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `shop` with that repository; then steps 2–5 |
-| — | agent in a folder whose `origin` no project watches runs `shipyard ping "Done"` | exit 1: "no project watches `someone/else`; pass --project <name> to file it under one; the projects are `shop`, `blog`"; nothing written |
+| 1 | agent runs `shipyard ping "Waiting for your input" --from claude --herdr --id cache-question` → `ShipyardCLI.run` (CLI/) | `config.toml` read (projects `shop`, `blog`), and `repositories.json` (the lists the app last resolved) |
+| 2 | `PingCommand.Request.parse` (Pings/) | title, sender `claude`, id `cache-question`; `--id` isn't shaped like a Herdr id, so `--herdr` takes `HERDR_PANE_ID`: action `.herdr("w1:p3")` (N11) |
+| 3 | `GitCLI.origin(in:)` → `GitRemote.repository(fromURL:)` → `PingCommand.watchers(of:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `[shop]` with that repository (N6) |
+| 4 | `PingStore.save` | `cache-question` isn't stored: a new ping, `sent` now, a new `instance`; `Pings/cache-question.json` written atomically; prints `cache-question`, exit 0 (N1, N12) |
+| 5 | `ConfigWatcher` on the store's directory → `Shipyard.reloadPings()` → `listPings()` | `pings` has the new one; no GitHub request (N4) |
+| 6 | `Listing.listings(…, pings:)` → `MenuModel.build` → `Arrangement` | `shop` lists the PR, then a "Pings" group with the ping: a terminal icon, "claude" on its second line; unseen, so it needs attention; count **2** (N3, N8) |
+| 7 | `EventDetector.pingEvents` → `NotificationRules` (the default rules hold `ping.sent`) → `AppStateStore.update` → `Notifier.post` | `notified` has `ping.sent` for `shipyard://ping/cache-question` with its `instance`; banner "shop · Waiting for your input" over "from claude" (N7) |
+| 8 | ten minutes on, the agent sends the same command titled "Still waiting (10 min)" → steps 1–5 again | a replace: the stored `sent` and `instance` kept, the new title; the row shows it; still count **2**, and `pingEvents`' event is already in `notified`, so no second banner (N12) |
+| 9 | user clicks the banner → `Shipyard.openNotification` → `runAction(ofPing:)` → `runHerdr`: `HerdrFocus.focus("w1:p3")` (`herdr pane get w1:p3` → tab `w1:t1` → `herdr tab focus w1:t1`) → `done` → `ActionRunning.run(.app("Ghostty"))` → `done` → `markPingsSeen` | Herdr shows the agent's tab and Ghostty comes forward; `seen` set in the ping's file; count **1**, and still after a relaunch (N8, N11) |
+| 10 | the user answers in the pane; the agent runs `shipyard ping withdraw cache-question` → `PingCommand.withdraw` → `PingStore.remove` | prints `cache-question`, exit 0; reads no `config.toml` (N12) |
+| 11 | `reloadPings()` → `listPings()` → `forgetLeftPings` → `removeLeftBanners` → `Notifier.removeDelivered` | the row leaves `shop`; the banner leaves Notification Center; the `ping.sent` record is forgotten, so `cache-question` sent again later is a new ping that notifies again (N12) |
+
+Had the agent not withdrawn it, the seen ping would stay listed for `shop`'s `seen-window` (24 h), then leave the listing and the store at the next refresh or store change (N9). The other ways through:
+
+| Variant | What happens |
+|---|---|
+| `--open https://claude.ai/artifact/42` or `--app Claude` instead of `--herdr` | the row shows a link or app icon; a click runs `ActionRunning.run(.url(…))` or `.app("Claude")` through the action port, then `markPingsSeen` (N8) |
+| the action fails: the pane closed (`failed("Herdr pane w1:p3 is gone")`) or no app named Claude | `PingStore.recordFailure`; the ping stays unseen, count **2**; its row reads the reason in red until the next click that works, ⌥-click, Mark all seen or a dismiss (N8) |
+| no action | a click only marks it seen (N8) |
+| ⌥-click, Mark all seen | marked seen, no action run (N3, N9) |
+| the ✕ on the highlighted row, or ⌫ | `Shipyard.dismiss` → `PingStore.remove`; it leaves every project at once, banner and record as in step 11 (N9) |
+| the app isn't running at step 4 | the file waits in the store; at launch the pings are listed (and notified) before GitHub answers (N4) |
+| `--project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written (N1) |
+| a folder whose `origin` no project watches, or no `origin` | exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; nothing written (N6) |
+| `--herdr` alone outside Herdr, two action flags, `--repo` with `--project`, an id that isn't one | exit 2, one line on standard error; nothing written (N8, N11, N12) |
+| `shipyard ping withdraw cache-question` after the user dismissed it | exit 1: "no ping has the id `cache-question`; …" (N12) |
 
 ### Trace 3: agents drain the limit (rejection by budget)
 

@@ -1,11 +1,13 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command: when a PR is ready, when you need my input, or to bring me back to this pane."
 ---
 
 # shipyard configuration
 
-Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface: there is no CLI and no settings window. The app applies every save live.
+Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface for settings: there is no settings window, and no command changes it. The app applies every save live.
+
+Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
@@ -415,4 +417,89 @@ notifications = [
   { event = "ping.sent" },
   { event = "run.failed" },
 ]
+```
+
+**"Shipyard doesn't notify me about pings."** The file lists its own rules without `ping.sent` (see Overrides). Add the rule beside the ones already there, in `[[defaults.notifications]]` or in each project's `notifications` that lists its own:
+
+```toml
+[[defaults.notifications]]
+event = "pr.opened"
+authors = ["others"]
+
+[[defaults.notifications]]
+event = "ping.sent"
+```
+
+To keep a project's pings out of its menu, `pings = { show = false }` in its block; to keep seen pings for a week, `seen-window = "7d"` in `[defaults.pings]`.
+
+## Sending pings
+
+A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Pings stay on the user's Mac; nothing reaches GitHub.
+
+Ping when the user should act or would want to know now: a pull request is ready for review, you're blocked waiting on their answer, something they asked for is published, a long task finished or failed. Don't ping for progress along the way, or when the user is talking to you right now. Prefer one ping you replace (same `--id`) over a pile of them, and withdraw a ping once it's no longer true.
+
+### The command
+
+The app links its command at `~/.local/bin/shipyard` (onboarding, or **Link shipyard CLI…** in the panel's gear menu). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from the gear menu. The app needn't be running: a ping sent meanwhile shows when it starts.
+
+```sh
+shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
+                        [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
+                        [--repo <owner/name> | --project <name>]
+shipyard ping withdraw <id>
+```
+
+| Flag | What it does |
+|---|---|
+| `"<title>"` | the one line the menu and the notification show; quote it, it's one argument |
+| `--body <text>` | more than the title fits, shown under it and in the notification |
+| `--from <label>` | who sent it, such as your name and the task (`"claude · checkout"`); `group-by = "author"` groups pings by it |
+| `--id <id>` | names the ping, so you can replace or withdraw it: 1 to 64 lowercase letters, digits, `-` and `_`, starting with a letter or digit. Without it, one is made up |
+| `--open <url>` | clicking it opens the URL: a page, a pull request, an artifact, or an app's deep link; the URL needs its scheme (`https://…`) |
+| `--app <bundle id or name>` | clicking it brings the app forward, by name (`"Claude"`) or bundle id (`com.anthropic.claudefordesktop`) |
+| `--herdr [<id>]` | clicking it focuses a Herdr tab. Alone, your own pane's tab (from `HERDR_PANE_ID`, so only inside Herdr); or a tab or pane id as Herdr prints them, such as `w1:t2` or `w1:p3`. The argument after `--herdr` is its id only when it has that shape |
+| `--repo <owner/name>` | file the ping by this repository instead of the working folder's |
+| `--project <name>` | file it under this one project, by its `name` in `config.toml` |
+| `--` | ends the flags: everything after it is the title, even `withdraw` or a word starting with `--` |
+
+- **One action at most.** With none, clicking the ping only marks it seen. When an action fails (the pane closed, no such app), the ping stays unseen and its row says why.
+- **Where it's filed.** Without `--repo` or `--project`, the repository is the working folder's git remote `origin`, as `owner/name`, and the ping is filed under every project that watches it: one whose `repositories` names it, or brings it in through a group or `owner/*` (as the app last looked them up, so a project just added needs the app to have refreshed once). `--repo` and `--project` don't go together.
+- **Output.** On success it prints the ping's id and exits 0. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, the id to withdraw is unknown, `config.toml` doesn't read), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
+- **Replacing.** Sending an id that's already there replaces that ping: the new title, body, sender, action and projects, unseen again, with no second notification.
+- **Withdrawing.** `shipyard ping withdraw <id>` takes the ping back: it leaves the menu and its notification leaves Notification Center. An id no ping has exits 1; the user may have dismissed it, or it left after being seen, so there's nothing left to do.
+- **Herdr's terminal.** A `--herdr` click focuses the tab in Herdr; to bring the terminal Herdr runs in forward too, the user sets `[herdr] terminal` (see Keys and defaults).
+
+### Worked pings
+
+**"Ping me when the PR is ready."** Once the pull request is open and its checks pass, a ping that opens it:
+
+```sh
+shipyard ping "PR #57 is ready for review" --body "Adds the order export" --from "claude · orders" \
+  --open https://github.com/my-org/shop/pull/57
+```
+
+**"Bring me back to this pane when you need me."** From inside Herdr, `--herdr` alone points at your own pane. Give it an id so you can update or withdraw it later:
+
+```sh
+shipyard ping "Waiting for your input" --body "Postgres or SQLite for the cache?" --from "claude · cache" \
+  --herdr --id cache-question
+```
+
+Still waiting after a while, send the same id again: the ping is updated and needs attention again, without a second notification.
+
+```sh
+shipyard ping "Still waiting for your input (10 min)" --body "Postgres or SQLite for the cache?" --from "claude · cache" \
+  --herdr --id cache-question
+```
+
+**"Withdraw it when I've answered."** When the user answers (in the pane, or anywhere), take the ping back so nothing stale is left:
+
+```sh
+shipyard ping withdraw cache-question
+```
+
+**"Tell me when Claude needs me."** An action that brings an app forward, filed under a named project when the working folder isn't one of the user's repositories:
+
+```sh
+shipyard ping "Claude is asking for permission" --app Claude --project shop
 ```
