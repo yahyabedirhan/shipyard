@@ -28,6 +28,17 @@ type(scope): what changed
 - Keep the whole message lowercase, including company and product names. The `Co-Authored-By` trailer keeps its standard spelling.
 - Never add a `Claude-Session:` trailer or any other session link to a commit message. The `Co-Authored-By` line from the session's attribution rule is the only trailer.
 
+## Where Agent Records Go
+
+```text
+.handoff/<date>-<topic>.md     tracked   handoffs between sessions
+docs/assets/<topic>/           tracked   screenshots worth keeping, linked from issues, pull requests and docs
+.scratch/                      ignored   notes, logs, temp files, raw captures and pull request description sources
+.claude/worktrees/             ignored   sub-agent worktrees
+```
+
+`.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
+
 ## Agent skills
 
 ### Issue tracker
