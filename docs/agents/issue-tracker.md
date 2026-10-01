@@ -20,7 +20,7 @@ An **effort** is one spec issue and the tickets that build it.
 
 - **Tickets under the spec**: each ticket is a GitHub sub-issue of its spec (`gh api --method POST repos/<owner>/<repo>/issues/<spec>/sub_issues -F sub_issue_id=<ticket-db-id>`), with `## Parent` naming the spec in its body. Moving a ticket to another effort means removing it from the old spec's sub-issues and adding it to the new one's.
 - **Order**: GitHub's native "blocked by" dependencies, as described under Wayfinding operations below. A blocking edge may cross efforts.
-- **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:shipyard-0-0-2` on #54 and its tickets). When publishing a new spec, create its label (`gh label create effort:<name> --color f9d0c4`; every effort label shares this pale brick, since the name tells them apart) and apply it to the spec and each ticket; a ticket moved to another effort swaps its label too. Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
+- **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:shipyard-0-0-2` on #54 and its tickets). When publishing a new spec, create its label if it's missing (`gh label create effort:<name> --color f9d0c4`; every effort label shares this pale brick, since the name tells them apart) and apply it to the spec and each ticket; a ticket moved to another effort swaps its label too. Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
 
 ## Bugs and screenshots
 
@@ -42,7 +42,15 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue. When it belongs to an effort, create the `effort:<effort>` label first, as the Efforts section says (`gh label create effort:<name> --color f9d0c4`), then pass it to `gh issue create`. `--label` fails when the label does not exist yet.
+Create a GitHub issue. When it belongs to an effort, make sure the `effort:<effort>` label exists before `gh issue create`, because `--label` fails on a label the repo does not have yet. List labels and create it, in the Efforts section's color, only when that exact name is missing, so a later ticket of the same effort does not try to recreate it:
+
+```bash
+gh label list --limit 1000 --json name --jq '.[] | select(.name == "effort:<effort>") | .name'
+gh label create "effort:<effort>" --color f9d0c4
+gh issue create --title "..." --body "..." --label "effort:<effort>"
+```
+
+Run `gh label create` only when the list prints nothing. An issue that is not part of an effort is `gh issue create --title "..." --body "..."` with no label.
 
 ## When a skill says "fetch the relevant ticket"
 
