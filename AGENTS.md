@@ -24,7 +24,7 @@ type(scope): what changed
 ```
 
 - Types: `feat` (new capability, MINOR bump) and `fix` (a patched bug, PATCH bump); `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, and `chore` for maintenance. Nothing else, and no bare subjects.
-- Scope is optional and names the area (`jobs`, `prep`, `dashboard`, `vault`, `migration`); moves and path rewrites are `refactor`, tickets and ledgers are `chore`, handoffs and reports are `docs`.
+- Scope is optional and names the area: the app's (`menu`, `panel`, `sign-in`, `onboarding`, `config`, `arrangement`, `runs`, `icon`) or the repo's (`release`, `skill`, `agents`, `handoff`, `readme`, `design`, `adr`, `references`, `assets`). Moves and path rewrites are `refactor`, tickets and ledgers are `chore`, handoffs and reports are `docs`.
 - Keep the whole message lowercase, including company and product names. The `Co-Authored-By` trailer keeps its standard spelling.
 - Never add a `Claude-Session:` trailer or any other session link to a commit message. The `Co-Authored-By` line from the session's attribution rule is the only trailer.
 
