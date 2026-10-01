@@ -11,7 +11,7 @@ A named group of one or more GitHub repositories, shown as one section in the me
 _Avoid_: Repo (when the group is meant), workspace
 
 **Item**:
-Anything listed under a project: a pull request, an issue or a workflow run.
+Anything listed under a project: a pull request, an issue, a workflow run or a ping.
 _Avoid_: Entry, row (a row is how an item is drawn, not the item)
 
 **Row**:
@@ -86,8 +86,16 @@ _Avoid_: Badge, unread count
 
 ### Notifications
 
+**Notification**:
+A macOS banner shipyard posts when a notification rule matches an event. A ping can cause one; it isn't one.
+_Avoid_: Ping, alert
+
 **Event**:
 A change in an item that shipyard can notify about, such as `pr.opened` or `run.failed`.
+
+**Ping**:
+A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent.
+_Avoid_: Notification (that's the macOS banner), message, alert
 
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
