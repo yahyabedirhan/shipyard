@@ -137,7 +137,8 @@ extension View {
     /// view, clear of a `pinnedHeader` that tall, without animating the
     /// scroll; a wrap goes to the list's `RowListTop` or `RowListBottom`,
     /// which the layout puts around its rows. Return calls `activate(place, false)` and ⌥Return
-    /// `activate(place, true)`; `activate` says whether it acted. `list`
+    /// `activate(place, true)`; `activate` says whether it acted. ⌫ calls
+    /// `dismiss(place)`, which says whether it acted (on a ping's row). `list`
     /// is the list the highlight is in (the selected tab, as its rows'
     /// `rowList(_:)`; `nil` in the list layout). The list
     /// takes the keyboard focus each time its window becomes key (each
@@ -151,6 +152,7 @@ extension View {
         scroll: ScrollViewProxy,
         left: @escaping (inout RowHighlight) -> RowKeyMove,
         right: @escaping (inout RowHighlight) -> RowKeyMove,
+        dismiss: @escaping (MenuRowPlace) -> Bool,
         activate: @escaping (MenuRowPlace, _ markSeenOnly: Bool) -> Bool
     ) -> some View {
         modifier(RowKeys(
@@ -161,6 +163,7 @@ extension View {
             scroll: scroll,
             left: left,
             right: right,
+            dismiss: dismiss,
             activate: activate
         ))
     }
@@ -216,7 +219,7 @@ private struct Highlightable: ViewModifier {
     }
 }
 
-/// `rowKeys(_:places:in:pinnedHeader:scroll:left:right:activate:)`.
+/// `rowKeys(_:places:in:pinnedHeader:scroll:left:right:dismiss:activate:)`.
 private struct RowKeys: ViewModifier {
     @Binding var highlight: RowHighlight
     let places: [MenuRowPlace]
@@ -225,6 +228,7 @@ private struct RowKeys: ViewModifier {
     let scroll: ScrollViewProxy
     let left: (inout RowHighlight) -> RowKeyMove
     let right: (inout RowHighlight) -> RowKeyMove
+    let dismiss: (MenuRowPlace) -> Bool
     let activate: (MenuRowPlace, Bool) -> Bool
     @FocusState private var focused: Bool
     @State private var frames = RowFrames()
@@ -264,6 +268,7 @@ private struct RowKeys: ViewModifier {
             .onKeyPress(.return, phases: .down) { press in
                 latest.keys?.activate(markSeenOnly: press.modifiers.contains(.option)) ?? .ignored
             }
+            .onKeyPress(.delete, phases: .down) { _ in latest.keys?.dismissHighlighted() ?? .ignored }
             .onContinuousHover(coordinateSpace: .global) { phase in
                 // Scrolling moves the rows under a resting pointer, not the
                 // pointer: only a new location hands the highlight back.
@@ -319,6 +324,12 @@ private struct RowKeys: ViewModifier {
     /// Return: acts on the highlighted row, if there is one and it acts.
     private func activate(markSeenOnly: Bool) -> KeyPress.Result {
         guard let place = current.place, activate(place, markSeenOnly) else { return .ignored }
+        return .handled
+    }
+
+    /// ⌫: dismisses the highlighted row, if there is one and it's a ping's.
+    private func dismissHighlighted() -> KeyPress.Result {
+        guard let place = current.place, dismiss(place) else { return .ignored }
         return .handled
     }
 

@@ -112,6 +112,8 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
+    /// A ping row's ✕, and its VoiceOver action: removes the ping now.
+    public static let dismissPing = "Dismiss"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 

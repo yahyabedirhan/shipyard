@@ -323,6 +323,12 @@
           "description": "List pings.",
           "type": "boolean",
           "default": true
+        },
+        "seen-window": {
+          "description": "How long a seen ping stays listed, counted from when it was seen: a whole number and one unit, s, m, h or d, such as \"30m\" or \"24h\"; \"0\" lets it leave at once. An unseen ping stays until it's seen.",
+          "type": "string",
+          "pattern": "^(0|[0-9]+[smhd])$",
+          "default": "24h"
         }
       }
     },

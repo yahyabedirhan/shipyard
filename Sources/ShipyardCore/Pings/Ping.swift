@@ -61,6 +61,14 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         [body, sender.map { "from \($0)" }].compactMap { $0 }.joined(separator: "\n")
     }
 
+    /// Whether it's still listed under a `seen-window` of `seenWindow`
+    /// seconds at `now`: an unseen ping always is; a seen one until
+    /// `seenWindow` has passed since it was seen (a window of 0: not at all).
+    public func isListed(seenWindow: TimeInterval, at now: Date) -> Bool {
+        guard let seen else { return true }
+        return now < seen.addingTimeInterval(seenWindow)
+    }
+
     /// The ping as a listed item: kind `ping`, always open, aged from when
     /// it was sent, in the repository it was filed by (if any). Its URL only
     /// names it (`shipyard://ping/<id>`), so it never collides with a GitHub

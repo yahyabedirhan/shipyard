@@ -203,6 +203,13 @@ private struct ItemRow: ViewModifier {
     func body(content: Content) -> some View {
         Button(action: click) { content }
             .buttonStyle(RowButtonStyle())
+            // A ping's ✕, over its age while the row is highlighted.
+            .overlay(alignment: .trailing) {
+                if row.item.ping != nil, highlight.isHighlighted(place) {
+                    DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
+                        .padding(.trailing, Grid.inset)
+                }
+            }
             // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
             .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
@@ -216,6 +223,27 @@ private struct ItemRow: ViewModifier {
         withAnimation(Motion.seen) {
             if flags.contains(.option) { actions.markSeen(row) } else { actions.open(row) }
         }
+    }
+}
+
+/// A ping row's ✕: removes the ping now. It sits over the row's age on
+/// the row's own highlight, so its background is that highlight on the panel.
+private struct DismissButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 9, weight: .bold))
+        }
+        .buttonStyle(IconButtonStyle())
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Palette.panel)
+                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover))
+        )
+        .hoverHelp(PanelText.dismissPing)
+        .accessibilityLabel(PanelText.dismissPing)
     }
 }
 

@@ -65,6 +65,14 @@ public struct PingStore: Sendable {
         try save(ping)
     }
 
+    /// Removes ping `id` (a dismiss, or a seen ping whose window has
+    /// passed). An id that isn't stored changes nothing.
+    public func remove(id: String) throws {
+        let file = url(id: id)
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        try FileManager.default.removeItem(at: file)
+    }
+
     private func url(id: String) -> URL {
         directory.appendingPathComponent("\(id).json", isDirectory: false)
     }

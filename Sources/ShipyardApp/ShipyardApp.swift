@@ -139,6 +139,7 @@ final class AppServices {
                 self?.closeMenu()
             },
             markSeen: { shipyard.markSeen($0) },
+            dismiss: { shipyard.dismiss($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
             toggleGroup: { shipyard.toggleGroup($0.id) },

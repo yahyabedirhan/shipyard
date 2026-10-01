@@ -422,20 +422,26 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
 /// `states`, `authors`, `drafts` or `review-requested`.
 public struct PingSettings: Equatable, Sendable {
     public var show = true
-    public init(show: Bool = true) {
+    /// `seen-window`: how long a seen ping stays listed, in seconds, counted
+    /// from when it was seen; 0 lets it leave at once. An unseen ping stays.
+    public var seenWindow: TimeInterval = 86_400
+    public init(show: Bool = true, seenWindow: TimeInterval = 86_400) {
         self.show = show
+        self.seenWindow = seenWindow
     }
 }
 
 /// The `pings` keys a table sets; unset keys keep the value below.
 public struct PingOverrides: Equatable, Sendable {
     public var show: Bool?
-    public init(show: Bool? = nil) {
+    public var seenWindow: TimeInterval?
+    public init(show: Bool? = nil, seenWindow: TimeInterval? = nil) {
         self.show = show
+        self.seenWindow = seenWindow
     }
 
     public func applied(to base: PingSettings) -> PingSettings {
-        PingSettings(show: show ?? base.show)
+        PingSettings(show: show ?? base.show, seenWindow: seenWindow ?? base.seenWindow)
     }
 }
 
@@ -685,9 +691,12 @@ extension Configuration {
         # show = false
 
         # List the pings your agents send with `shipyard ping` in every
-        # project: set show to false to hide them. A project can override it.
+        # project: set show to false to hide them. A seen ping stays listed
+        # for seen-window, then leaves; an unseen one stays until you see it.
+        # A project can override both.
         # [defaults.pings]
         # show = true
+        # seen-window = "24h"
 
         # When to notify, for every project: one block per rule. The list
         # replaces the default rules below, so keep them to hear of new pull

@@ -502,6 +502,8 @@ public final class Shipyard {
     /// the configured interval, or at the end of the pause when that's sooner.
     public func refresh() async {
         guard phase.canRefresh else { return }
+        // A seen ping whose seen-window has passed leaves the store too.
+        listPings()
         guard canRefreshNow else {
             if !gate.isRunning {
                 rebuildMenu(configStore.lastValid)
@@ -779,6 +781,15 @@ public final class Shipyard {
         }
     }
 
+    /// Removes the row's ping now (the hover ✕, or ⌫ on the selected
+    /// row), seen or not, with any failure on it. Any other row stays: only
+    /// pings can be dismissed.
+    public func dismiss(_ row: MenuRow) {
+        guard let ping = row.item.ping else { return }
+        try? pingStore.remove(id: ping.id)
+        listPings()
+    }
+
     // MARK: - Pings
 
     /// Reads the ping store again and, when a ping arrived, changed or
@@ -828,15 +839,37 @@ public final class Shipyard {
         }
     }
 
-    /// Reads the ping store again and, when anything changed, lists the
+    /// Reads the ping store again, removing the seen pings whose
+    /// seen-window has passed, and, when anything changed, lists the
     /// pings from the last snapshot. Returns whether anything changed.
     @discardableResult
     private func listPings() -> Bool {
-        let stored = pingStore.all()
+        let configuration = configStore.lastValid
+        let now = clock.now
+        let stored = pingStore.all().filter { ping in
+            guard Self.hasLeft(ping, in: configuration, at: now) else { return true }
+            // One that can't be removed stays stored; no listing shows it.
+            try? pingStore.remove(id: ping.id)
+            return false
+        }
         guard stored != pings else { return false }
         pings = stored
         rebuildMenu(configStore.lastValid)
         return true
+    }
+
+    /// Whether `ping` has left every project it's filed under: it's seen,
+    /// and each of those projects' `seen-window` has passed since. A
+    /// project no longer configured counts with `[defaults.pings]`'s window,
+    /// so a ping whose projects are all gone still leaves once it's seen.
+    private static func hasLeft(_ ping: Ping, in configuration: Configuration, at now: Date) -> Bool {
+        guard ping.seen != nil else { return false }
+        let windows = ping.projects.map { name in
+            configuration.projects.first { $0.name == name }
+                .map { configuration.settings(for: $0).pings.seenWindow }
+                ?? configuration.defaults.pings.seenWindow
+        }
+        return windows.allSatisfy { !ping.isListed(seenWindow: $0, at: now) }
     }
 
     /// Records the pings `ids` names as seen now, in the ping store,

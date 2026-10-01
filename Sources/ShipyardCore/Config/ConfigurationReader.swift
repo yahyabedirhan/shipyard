@@ -277,11 +277,11 @@ final class ConfigurationReader {
 
     private func pings(_ parent: Node) -> PingOverrides {
         guard let node = table(parent, "pings") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show"] + Self.notPingKeys)
+        warnUnknownKeys(in: node, known: ["show", "seen-window"] + Self.notPingKeys)
         for key in Self.notPingKeys where node.table.contains(key: key) {
-            error("`\(key)` doesn't apply to pings; `pings` takes only `show`", at: node.path + [.key(key)])
+            error("`\(key)` doesn't apply to pings; `pings` takes only `show` and `seen-window`", at: node.path + [.key(key)])
         }
-        return PingOverrides(show: bool(node, "show"))
+        return PingOverrides(show: bool(node, "show"), seenWindow: duration(node, "seen-window"))
     }
 
     /// A kind's `states`: a list of the states that kind takes. Each one it

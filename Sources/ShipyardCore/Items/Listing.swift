@@ -5,8 +5,8 @@ import Foundation
 /// A project's listing is the snapshot's items for it, and the pings filed
 /// under it, that pass every one of
 /// its filters, combined with AND: the kind is shown, the item's state is
-/// one of the kind's `states`, a closed (or finished) item is inside its
-/// window, a draft is allowed, the author passes the kind's `authors`, and
+/// one of the kind's `states`, a closed (or finished) item, or a seen
+/// ping, is inside its window, a draft is allowed, the author passes the kind's `authors`, and
 /// with `review-requested` a pull request waits on the user's review. The
 /// menu model, the attention counts and the
 /// notification step all read listings, so an item the filters leave out is
@@ -56,14 +56,16 @@ public enum Listing {
 
     /// Open and running items always are; closed ones for their kind's
     /// `closed-window`, finished runs for their `finished-window`,
-    /// counted back from `now`. A window of 0 leaves them all out.
+    /// counted back from `now`. A window of 0 leaves them all out. A ping
+    /// is while it's unseen, and for its `seen-window` once it's seen.
     private static func inWindow(_ item: Item, project: ProjectSettings, now: Date) -> Bool {
+        if let ping = item.ping { return ping.isListed(seenWindow: project.pings.seenWindow, at: now) }
         guard !item.state.isActive else { return true }
         let window: TimeInterval = switch item.kind {
         case .pullRequest: project.pullRequests.closedWindow
         case .issue: project.issues.closedWindow
         case .workflowRun: project.workflowRuns.finishedWindow
-        // A ping is always open, so it never gets here.
+        // A ping's window is its seen-window, above.
         case .ping: 0
         }
         guard window > 0, let closedAt = item.closedAt else { return false }

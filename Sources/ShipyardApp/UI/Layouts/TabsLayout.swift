@@ -123,7 +123,13 @@ struct TabsLayout: View {
                 in: tab,
                 scroll: proxy,
                 left: { side(&$0, content, by: -1) },
-                right: { side(&$0, content, by: 1) }
+                right: { side(&$0, content, by: 1) },
+                dismiss: { place in
+                    // ⌫: removes the highlighted row when it's a ping's.
+                    guard let row = content.row(at: place), row.item.ping != nil else { return false }
+                    withAnimation(Motion.seen) { actions.dismiss(row) }
+                    return true
+                }
             ) { place, markSeenOnly in
                 if let group = content.subsection(at: place) {
                     guard !markSeenOnly else { return false }

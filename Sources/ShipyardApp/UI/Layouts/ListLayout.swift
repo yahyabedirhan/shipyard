@@ -61,6 +61,7 @@ struct ListLayout: View {
                 scroll: proxy,
                 left: { fold($0.moveLeft(in: model)) },
                 right: { fold($0.moveRight(in: model)) },
+                dismiss: dismiss,
                 activate: activate
             )
         }
@@ -110,6 +111,13 @@ struct ListLayout: View {
         case nil:
             return false
         }
+    }
+
+    /// ⌫: removes the highlighted row when it's a ping's.
+    private func dismiss(_ place: MenuRowPlace) -> Bool {
+        guard case .item(let row) = model.listTarget(at: place), row.item.ping != nil else { return false }
+        withAnimation(Motion.seen) { actions.dismiss(row) }
+        return true
     }
 
     /// An expanded project's lines, each its own child of the lazy stack:

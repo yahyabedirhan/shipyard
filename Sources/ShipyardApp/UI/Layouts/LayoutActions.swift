@@ -4,6 +4,8 @@ import ShipyardCore
 struct LayoutActions {
     var open: (MenuRow) -> Void
     var markSeen: (MenuRow) -> Void
+    /// Removes a ping's row now (its hover ✕, ⌫ on it); other rows stay.
+    var dismiss: (MenuRow) -> Void
     /// `nil` marks every project seen.
     var markAllSeen: (MenuSection?) -> Void
     var toggleCollapsed: (MenuSection) -> Void

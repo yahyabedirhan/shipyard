@@ -44,10 +44,10 @@ struct ConfigurationPingsTests {
             pings = { drafts = false, review-requested = true }
             """)
         #expect(issues == [
-            ConfigIssue(line: 3, message: "`states` doesn't apply to pings; `pings` takes only `show`"),
-            ConfigIssue(line: 4, message: "`authors` doesn't apply to pings; `pings` takes only `show`"),
-            ConfigIssue(line: 9, message: "`drafts` doesn't apply to pings; `pings` takes only `show`"),
-            ConfigIssue(line: 9, message: "`review-requested` doesn't apply to pings; `pings` takes only `show`"),
+            ConfigIssue(line: 3, message: "`states` doesn't apply to pings; `pings` takes only `show` and `seen-window`"),
+            ConfigIssue(line: 4, message: "`authors` doesn't apply to pings; `pings` takes only `show` and `seen-window`"),
+            ConfigIssue(line: 9, message: "`drafts` doesn't apply to pings; `pings` takes only `show` and `seen-window`"),
+            ConfigIssue(line: 9, message: "`review-requested` doesn't apply to pings; `pings` takes only `show` and `seen-window`"),
         ])
     }
 
@@ -56,5 +56,39 @@ struct ConfigurationPingsTests {
         #expect(rejection("[defaults.pings]\nshow = \"yes\"\n") == [ConfigIssue(line: 2, message: "`defaults.pings.show` must be true or false")])
         let warnings = try #require(decoded("[defaults.pings]\nshwo = false\n")).warnings
         #expect(warnings == [ConfigIssue(line: 2, message: "unknown setting `defaults.pings.shwo` (ignored; did you mean `show`?)")])
+    }
+
+    @Test("seen-window is 24 hours by default; [defaults.pings] sets every project's and a project's overrides it")
+    func seenWindow() throws {
+        let plain = try #require(decoded("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n")).configuration
+        #expect(plain.settings(for: plain.projects[0]).pings.seenWindow == 86_400)
+        let config = try #require(decoded("""
+            [defaults.pings]
+            seen-window = "30m"
+
+            [[projects]]
+            name = "short"
+            repositories = ["o/a"]
+
+            [[projects]]
+            name = "long"
+            repositories = ["o/b"]
+            pings = { seen-window = "7d" }
+            """)).configuration
+        #expect(config.settings(for: config.projects[0]).pings.seenWindow == 1800)
+        #expect(config.settings(for: config.projects[1]).pings.seenWindow == 7 * 86_400)
+        #expect(config.settings(for: config.projects[1]).pings.show)
+    }
+
+    @Test("seen-window is written like closed-window, and a bad one is rejected on its line with the nearest spelling")
+    func seenWindowSyntax() {
+        #expect(rejection("[defaults.pings]\nseen-window = \"1 day\"\n") == [ConfigIssue(
+            line: 2,
+            message: "`seen-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\" (got \"1 day\"; did you mean \"1d\"?)"
+        )])
+        #expect(rejection("[defaults.pings]\nseen-window = 24\n") == [ConfigIssue(
+            line: 2,
+            message: "`defaults.pings.seen-window` must be a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\""
+        )])
     }
 }
