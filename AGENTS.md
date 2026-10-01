@@ -28,7 +28,7 @@ type(scope): what changed
 - Keep the whole message lowercase, including company and product names. The `Co-Authored-By` trailer keeps its standard spelling.
 - Never add a `Claude-Session:` trailer or any other session link to a commit message. The `Co-Authored-By` line from the session's attribution rule is the only trailer.
 
-## Where Agent Records Go
+## Folder Layout
 
 ```text
 .handoff/<date>-<topic>.md     tracked   handoffs between sessions
