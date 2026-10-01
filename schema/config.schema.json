@@ -117,9 +117,9 @@
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
         "pings": { "$ref": "#/definitions/pings" },
         "notifications": {
-          "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
+          "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone, and a new ping.",
           "$ref": "#/definitions/notifications",
-          "default": [{ "event": "pr.opened", "authors": [] }]
+          "default": [{ "event": "pr.opened", "authors": [] }, { "event": "ping.sent", "authors": [] }]
         },
         "archived": { "$ref": "#/definitions/archived" },
         "forks": { "$ref": "#/definitions/forks" }
@@ -376,11 +376,12 @@
             "issue.closed",
             "issue.commented",
             "run.failed",
-            "run.succeeded"
+            "run.succeeded",
+            "ping.sent"
           ]
         },
         "authors": {
-          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping has no author, so a rule with authors never selects one. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
           "anyOf": [
             { "$ref": "#/definitions/author-selectors" },
             {

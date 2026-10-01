@@ -7,7 +7,8 @@ import Foundation
 /// the right one). An event is notified when a rule names it and the rule's
 /// authors cover the item's author. It's asked only for items the project
 /// lists (`Listing`): what the filters leave out is never notified, and a
-/// rule's `authors` can only narrow that further (ADR 0003).
+/// rule's `authors` can only narrow that further (ADR 0003). A ping has no
+/// GitHub author, so only a rule without `authors` selects one.
 public enum NotificationRules {
     /// `viewer` is the signed-in login, which `me` matches.
     public static func shouldNotify(_ event: Event, settings: ProjectSettings, viewer: String? = nil) -> Bool {
@@ -16,15 +17,17 @@ public enum NotificationRules {
         }
     }
 
-    /// What to post for `event`, in the project it's notified for.
+    /// What to post for `event`, in the project it's notified for. A
+    /// ping's is titled with the project and its title, over its body and sender.
     public static func notification(for event: Event) -> PostedNotification {
         PostedNotification(
             id: event.id,
             event: event.kind,
             project: event.project,
             headline: event.headline,
-            // A run's title is its workflow; its branch says which change it tested.
-            itemTitle: event.item.branch.map { "\(event.item.title) · \($0)" } ?? event.item.title,
+            itemTitle: event.item.ping?.notificationBody
+                // A run's title is its workflow; its branch says which change it tested.
+                ?? event.item.branch.map { "\(event.item.title) · \($0)" } ?? event.item.title,
             itemURL: event.item.url
         )
     }

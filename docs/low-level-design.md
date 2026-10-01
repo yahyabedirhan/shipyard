@@ -48,7 +48,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | R6 | List **workflow runs** when turned on (off by default): running now, plus finished within the last N hours (default 3), on the default branch and open PR branches. |
 | R7 | Clicking an item opens it on GitHub and marks it **seen**. ⌥-click marks it seen without opening. "Mark all seen" exists per project and globally. Opening the panel marks nothing. |
 | R8 | An open item **needs attention** when it is unseen, changed since seen (commits, comments, reviews, checks, review request), requests the user's review, or has failed checks. Closed items never do. |
-| R9 | Send macOS notifications for **events** matched by **notification rules** (event + scope + author selectors, F2). Default: `pr.opened`, any author, all projects. |
+| R9 | Send macOS notifications for **events** matched by **notification rules** (event + scope + author selectors, F2). Default: `pr.opened`, any author, all projects; since 0.0.5 `ping.sent` too (N7). |
 | R10 | Refresh on an interval (default 120 s), when the Mac wakes, when the configuration changes, and on ⌘R. Opening the panel doesn't refresh: it shows the last fetched data and spends no GitHub request. |
 | R11 | Read everything the user controls from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
 | R12 | Keep app state (seen, known items, collapsed sections, notified) in `~/Library/Application Support/Shipyard/state.json`, never in the configuration. |
@@ -93,6 +93,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | N4 | Pings are kept in the **ping store**, apart from `state.json`, and survive restarts: one sent while the app isn't running shows when it starts, one sent while it runs shows when the store changes, with no GitHub request, even before GitHub has answered. |
 | N5 | `[defaults.pings] show` (default `true`) and a project's `pings = { show = … }` decide whether pings are listed; `states`, `authors`, `drafts` and `review-requested` under pings are rejected with their line. |
 | N6 | Without `--project`, a ping is filed under every project that watches the repository of the agent's working folder (its git remote `origin`, as `owner/name`); `--repo <owner/name>` names the repository instead, and `--repo` with `--project` is a usage error (exit 2). A project watches a repository its configuration names as `owner/name`, or one the app last resolved for it (a group or `owner/*`), matching ignoring case; the CLI never calls GitHub. No match (not a git folder, no `origin`, a remote that isn't `owner/name`, or a repository no project watches) fails with the projects listed and exit 1 (#98). |
+| N7 | A new ping posts one macOS notification through the ordinary notification rules, as the event `ping.sent`, which is in the default rules: titled "<project> · <ping title>", its body the ping's body and "from <sender>" (each when given). A project whose rules leave out `ping.sent` doesn't notify for pings, and a rule with `authors` never selects one (a ping has no GitHub author). A ping is notified at most once, keyed by its id, so a replace never posts again; clicking the notification marks the ping seen (#99). |
 
 ### Rules and completion
 
@@ -154,7 +155,7 @@ Nouns from the requirements, sorted:
 | Configuration | **Entity** (value) with rules: defaults, per-project overrides, validation. |
 | Project | Field group inside Configuration (name, repositories, overrides). |
 | Item (PR, issue, run, ping) | **Entity** (value): kind, state, author, fingerprint; a ping's item carries its `Ping`. |
-| Ping | **Entity** (value): id, title, the projects it's filed under, when it was sent and seen. |
+| Ping | **Entity** (value): id, title, the projects it's filed under, when it was sent and seen; optionally its repository, body and sender. |
 | Ping store | **Entity** (store): the pings, one file each, written by the CLI and the app. |
 | Ping command | **Entity** (pure, over the store): reads `shipyard ping`'s arguments, files and saves the ping. |
 | Snapshot | **Entity** (value): all items of all projects from one refresh, plus per-source errors (a repository and a kind) and the rate limits seen. |
@@ -193,7 +194,7 @@ ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories 
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
-Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]
+Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]; pingEvents(listings, projects) -> a ping.sent per unseen listed ping
 Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification)
 Notifier -> Shipyard               openNotification(itemURL) on a click
@@ -281,11 +282,11 @@ Operations:
 | `refresh()` | the refresh pipeline (§4), which resolves repository selectors first (forced after a configuration change and on ⌘R, else at most hourly); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay | no-op outside `ready`; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing, rebuilds the menu from the last snapshot (so a closed item past its window leaves) and re-arms the timer for the configured interval or the pause's end, whichever is sooner |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`, in `publishConfigStatus()`, which also writes the verdict to `configStatusStore`, accepted, rejected or unchanged); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
-| `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | a ping's row opens nothing (its action comes later): `pingStore.markSeen(id)`, then `reloadPings()` |
-| `reloadPings()` | the app's watcher on the ping store calls it: reads the store and, when a ping arrived, changed or went, rebuilds the menu from the last snapshot (or none) with the pings listed; no GitHub request | an unchanged store changes nothing; a file that doesn't read is skipped |
+| `open(row)` / `markSeen(row)` | opens the URL through the `URLOpening` port (or not, for ⌥-click), `attention.markSeen` with the row's item; saves app state and re-applies attention to the menu model | a ping's row opens nothing (its action comes later): `pingStore.markSeen(id)`, then the pings are listed again |
+| `reloadPings()` (async) | the app's watcher on the ping store calls it: reads the store and, when a ping arrived, changed or went, rebuilds the menu from the last snapshot (or none) with the pings listed; no GitHub request. Then each unseen listed ping whose `ping.sent` isn't in `notified` is recorded there and posted when its first listing project's rules select it, as a refresh does (#99) | an unchanged store changes nothing; a file that doesn't read is skipped; a ping no project lists (`pings.show = false`) isn't recorded, so it notifies if a later edit lists it while it's still unseen |
 | `openRepository(of: section)` | Return on a project's header (#45): opens the section's `repositoryURL`, the first repository the configuration lists for the project, on GitHub; marks nothing seen | a section without repositories opens nothing |
 | `openProfile()` | a click on the header's account (#49): opens `viewer.profileURL` through `URLOpening`; the app then closes the menu, as for a row | opens nothing while `viewer` is `nil` |
-| `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh) | an item neither lists is only opened |
+| `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh). A ping's URL (`shipyard://ping/<id>`, `Ping.id(from:)`) opens nothing and marks the ping seen in the store (#99) | an item neither lists is only opened; a ping gone from the store changes nothing |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen, pings in the ping store | rows hidden by the configuration are left alone |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core since 0.0.1; since 0.0.2 the connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder; shipyard's own is compiled in since #23) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
@@ -366,6 +367,10 @@ forks = true
 event = "pr.opened"
 authors = []                              # author selectors; [] (or the old "any") is everyone
 
+[[defaults.notifications]]
+event = "ping.sent"                       # a new ping; a rule with authors never selects one
+authors = []
+
 # One [[projects]] block per project, shown in this order.
 [[projects]]
 name = "e-commerce"
@@ -395,7 +400,7 @@ pull-requests = { review-requested = true }
 
 Keys are kebab-case (TOML's usual style, as in Cargo and Starship). Per-project overrides are written as inline tables so each `[[projects]]` block stays self-contained and can be appended on its own.
 
-Events: `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded`. Author selectors: `me`, `others`, `bots` or `@login` (ADR 0002); the old notification strings `any | me | others | bots` still read, with a warning.
+Events: `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded ping.sent` (0.0.5; in the default rules beside `pr.opened`). Author selectors: `me`, `others`, `bots` or `@login` (ADR 0002); the old notification strings `any | me | others | bots` still read, with a warning.
 
 **Selectors** (`Config/Selectors.swift`): `AuthorSelector` and `RepositorySelector` parse a string or reject it with the hints in §1's error table; the key a selector sits under says which set it's from, so a bare word is a group, `@` marks a login and `/` a repository. `AuthorSelector.matches(author, authorKind, viewer)` is the only author match in the codebase; `AuthorFilter.includes` is `(show.isEmpty || show.contains(where: matches)) && !hide.contains(where: matches)`. `ProjectSettings.repositories` is `[RepositorySelector]`, and each kind's settings carry `states` (a set of `StateGroup`, the values that kind takes; `ItemState.group` maps a draft to `open` and a running run to `in-progress`) and `authors` (and pull requests `reviewRequested`); `ArrangementSettings` holds `groupBy`, `subsections` (optional: unset keeps the layout's own), `sortBy` and `showFirst`, and `archived` and `forks` sit beside them. All merge key by key in `settings(for:)`. The cross-key rule for `anywhere` (G2) is checked in the reader. The schema keeps `hide-authors` and the old notification strings, marked deprecated, so `taplo check` still passes on files the app accepts.
 
@@ -428,8 +433,8 @@ Writes the latest `ConfigStatus` (`checked`, `config`, `configModified`, `error`
 | Preset | Contents |
 |---|---|
 | `my-agents` | issues shown (`[defaults.issues] show = true`); `[defaults] group-by = "kind"`; each of `projects` as its own block (onboarding passes one per chosen repository); the default notification. The maintainer's setup. |
-| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`. Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested]`, since a request, not a new PR, is its news. ghbar's view. |
-| `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notification `pr.review_requested`. Ignores `projects`. |
+| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`, and `ping.sent` (0.0.5). Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested, ping.sent]`, since a request, not a new PR, is its news. ghbar's view. |
+| `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notifications `pr.review_requested` and `ping.sent`. Ignores `projects`. |
 
 `ConfigStore.writePreset(preset, projects)` is the third writer (ADR 0001's amendment): it writes `preset.text(projects:)` in place when the file is missing or its only live key is `version`, and otherwise refuses with a `ConfigError` so onboarding falls back to the picker. "Only live key" is `Configuration.acceptsPreset(text)`: the file reads, and `TOMLSourceMap` finds no entry but `version` (comments don't count; any table does). Each reload records it as `acceptsPreset`, which `Shipyard.presets` follows; `writePreset` checks the file again before writing, and also refuses invalid picked projects and a preset that wouldn't read with them.
 ### Auth — `ShipyardCore/GitHub/Auth/` (+ `ShipyardApp/Keychain.swift`, #22)
@@ -536,11 +541,12 @@ State: `seen: [ItemID: SeenRecord]`, where `SeenRecord` = the fingerprint seen a
 Pure: `events(known: KnownItems, snapshot, projects: [ProjectSettings]) -> [Event]`, per project in configuration order.
 `KnownItems` = `items: [ItemID: KnownItem]` (the last state, checks, review request, activity, repository and fingerprint of each item, and `present`: when a refresh last listed it, bumped at most once a day) and `sources: [ProjectName: Set<ItemSource>]`, where an `ItemSource` is one repository and one item kind. Items from a source the project hasn't been fetched from before produce no events: the first refresh ever, a project or repository just added, a kind just shown. `known.updated(with: snapshot, projects:)` is what the next refresh compares with: the snapshot's items and fetched sources; a source that failed keeps its known-ness (so its return isn't a burst), and only that source: a runs 403 doesn't hold back the repository's pull requests; an item missing from the snapshot (out of the most recent 50, or its repository failed) is kept for 30 days after it was last listed, and while its repository fails, so when it comes back it's compared with its last version (no `opened`; `merged` if it merged meanwhile) rather than announced as new; a project, repository or kind no longer fetched is forgotten (adding it back is a first sight again).
 The detector finds generic `ItemChange`s and `EventKind.of(change, for: item.kind)` names them, so issues and runs only add names (and runs their own changes): absent → open (drafts too) = opened (absent → closed is nothing: it may be an old item coming back into the closed list); open → merged = merged; open → closed = closed; closed → open = reopened; review requested newly true (open) = review_requested; checks newly failed (open) = checks_failed; activity went up = commented. For issues only opened, closed and commented have names (`issue.*`); an issue reopened is no event, and its next close is a new occurrence of `issue.closed`. Runs have their own changes: failed (found failed, unknown or not failed before) = `run.failed`, succeeded likewise = `run.succeeded`; a run found already finished counts, since only recent runs are asked for, so it finished between two refreshes. Both recur (a re-run that fails again is a new occurrence). Runs of one repository are a source of their own, so turning runs on is a silent first sight. Pull requests and issues of one repository are separate sources, so showing issues in a project that already has its pull requests known is a silent first sight. **Since 0.0.2**, a project using `anywhere` has one more source, `ItemSource.anywhere` (the review search), for its PRs from repositories it doesn't watch: its first answer is a silent first sight (and a failed search's stand-in isn't one); after that a PR the search finds for the first time is `pr.opened` and `pr.review_requested` both, since it's a new item and a request that just arrived, whatever rules pick. While a project uses `anywhere`, `KnownItems.updated` keeps known items of any repository for their retention, so a PR that leaves the search and comes back isn't new again. An `Event` has the kind, project, item and an occurrence: empty for events that happen once in an item's life (opened, merged), the item's fingerprint for ones that recur; `id` = kind + item URL (+ occurrence), the same in every project.
+**Since 0.0.5**, `pingEvents(listings:projects:)` makes a `ping.sent` (no occurrence) for every unseen ping each project lists. Pings aren't fetched, so they aren't compared with `KnownItems`: a ping is new until its `ping.sent` is in `NotifiedEvents`, keyed by the ping's URL (its id), so a replace (same id, new content) is never new again. There's no first-sight silence for pings: one sent while the app wasn't running notifies at the first refresh.
 
 ### NotificationRules — `ShipyardCore/Items/NotificationRules.swift`
 
-Pure: `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, asked only for items the project lists (since 0.0.2; before, it took `hiddenAuthors`) — the project's rule list contains the event, and the rule's author selectors match the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither, or an `@login`). `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57", "Run #41 failed"), the item's title (for a run, "CI · main": workflow and branch) and URL.
-`NotifiedEvents` (app state, apart from the seen records) holds every event handled, notified or passed over, per item: `contains(event)`, `insert(event, at:)`, and `prune(present:at:)`, which keeps an item's record while it's known and 30 days after, so an item that leaves the list and comes back isn't announced again.
+Pure: `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, asked only for items the project lists (since 0.0.2; before, it took `hiddenAuthors`) — the project's rule list contains the event, and the rule's author selectors match the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither, or an `@login`). `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57", "Run #41 failed"), the item's title (for a run, "CI · main": workflow and branch) and URL. A `ping.sent`'s title text is the ping's title and its body `Ping.notificationBody` (the body, then "from <sender>"); `NotificationRule.covers` never lets a rule with `authors` cover a ping.
+`NotifiedEvents` (app state, apart from the seen records) holds every event handled, notified or passed over, per item: `contains(event)`, `insert(event, at:)`, and `prune(present:at:)`, which keeps an item's record while it's known and 30 days after, so an item that leaves the list and comes back isn't announced again. A ping's record counts as present while the ping is in the store.
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
@@ -765,7 +771,7 @@ shipyard/
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
 │   │   └── NotificationRules.swift   # event + project settings → notify?; what to post; NotifiedEvents
 │   ├── Pings/
-│   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen, repository; as an Item; new ids
+│   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen, repository, body, sender; as an Item; new ids
 │   │   ├── PingStore.swift           # one JSON file per ping, atomic writes, safe for the CLI and the app at once
 │   │   └── PingCommand.swift         # shipyard ping: arguments → a ping filed by its repository or under a project, saved; output and exit status
 │   ├── CLI/
@@ -869,11 +875,12 @@ refresh()
   listings = projects.map { Listing.items(for: $0, in: snapshot, viewer, now) }   // 0.0.2: what each project has
   appStateStore.update { state in                     // saves only if it changed
     events = EventDetector.events(state.known, snapshot, projects)   // first sight of a project's source: none
+      + EventDetector.pingEvents(listings, projects)  // 0.0.5: a ping.sent per unseen listed ping
     for id, occurrences in events grouped by id where id ∉ state.notified   // an item in two projects: one event
       if first occurrence listed by its project (listings) and selected by its rules (NotificationRules.shouldNotify)
         toPost.append(NotificationRules.notification(for: it))
       state.notified.insert(id)                         // notified or not, never again
-    state.known = state.known.updated(with: snapshot, projects); state.notified.prune(present: known items, now)
+    state.known = state.known.updated(with: snapshot, projects); state.notified.prune(present: known items + pings, now)
     state.attention.prune(present: snapshot items, now)
   }
   self.snapshot = snapshot; fetchError = nil
@@ -1017,7 +1024,8 @@ Setup: projects `shop` and `blog`; the app is running, its last refresh listed o
 | 2 | `PingCommand.run` (Pings/) | id `k7qm2x` drawn, not in the store; `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
 | 3 | `ConfigWatcher` on the store's directory → `Shipyard.reloadPings()` | `pings` has the new one; no GitHub request |
 | 4 | `Listing.listings(…, pings:)` → `MenuModel.build` → `Arrangement` | `shop` lists the PR, then a "Pings" group with the ping; it needs attention (`unseen`); count **2** |
-| 5 | user clicks the ping's row → `Shipyard.open` → `PingStore.markSeen` → `reloadPings()` | nothing opened; `seen` set in its file; count **1**, and still after a relaunch |
+| 4a | `EventDetector.pingEvents` → `NotificationRules` (default rules hold `ping.sent`) → `Notifier.post` (#99) | `notified` has `ping.sent` for `shipyard://ping/k7qm2x`; banner "shop · Ready for review" |
+| 5 | user clicks the ping's row (or its banner: `openNotification`) → `PingStore.markSeen` → the pings listed again | nothing opened; `seen` set in its file; count **1**, and still after a relaunch |
 | — | agent runs `shipyard ping "Done" --project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written |
 | 1′ | agent in a clone of `yahyabedirhan/shop` runs `shipyard ping "Ready for review"` (no flag; #98) → `ShipyardCLI.run` | `config.toml` and `repositories.json` read |
 | 2′ | `PingCommand.run` → `CommandEnvironment.git.origin(in:)` → `GitRemote.repository(fromURL:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `shop` with that repository; then steps 2–5 |
@@ -1060,7 +1068,7 @@ What the traces turned up and the design now handles: the first refresh after ad
 | A new `group-by` (e.g. `label`) | a case in `Arrangement`'s key and title, the schema, the skill |
 | Oldest first | a `sort-by` choice in `Arrangement`, the schema |
 | A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
-| A ping's body, sender and action (#100) | optional `Ping` fields, `PingCommand.Request` flags, `Ping.item`, the action port |
+| A ping's body, sender and action (#100) | `PingCommand.Request` flags (`body` and `sender` are already optional `Ping` fields the notification shows, #99), `Ping.item`, the action port |
 | Replace and withdraw by id (#102) | `PingCommand` (`--id`, and `withdraw` read before the title), `PingStore` (remove) |
 | A seen ping leaving after a seen-window (#103) | `PingSettings` (a window), one check in `Listing` against `Ping.seen`, pruning in `PingStore` |
 | Another CLI command | a case in `ShipyardCLI.run` and its own core function |

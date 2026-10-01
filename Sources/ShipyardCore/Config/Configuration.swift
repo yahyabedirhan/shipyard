@@ -93,8 +93,9 @@ extension Configuration {
         public var issues = IssueSettings()
         public var workflowRuns = WorkflowRunSettings()
         public var pings = PingSettings()
-        /// `[[defaults.notifications]]`; a new pull request in any project by default.
-        public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
+        /// `[[defaults.notifications]]`; a new pull request and a new ping
+        /// in any project by default.
+        public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent)]
         /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
         public var arrangement = ArrangementSettings()
         /// Whether repository groups and `owner/*` bring in archived repositories.
@@ -220,6 +221,8 @@ public enum EventKind: String, CaseIterable, Sendable {
     case issueCommented = "issue.commented"
     case runFailed = "run.failed"
     case runSucceeded = "run.succeeded"
+    /// An agent sent a new ping (`shipyard ping`).
+    case pingSent = "ping.sent"
 }
 
 /// An event and the authors it covers. Its scope is where it's written:
@@ -240,9 +243,11 @@ public struct NotificationRule: Equatable, Sendable {
     }
 
     /// Whether the rule covers an item's author: any of its selectors
-    /// matches, or it has none.
+    /// matches, or it has none. A ping has no GitHub author, so a rule with
+    /// `authors` never covers one.
     public func covers(_ item: Item, viewer: String?) -> Bool {
-        authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
+        if item.kind == .ping { return authors.isEmpty }
+        return authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
     }
 }
 
@@ -685,11 +690,15 @@ extension Configuration {
         # show = true
 
         # When to notify, for every project: one block per rule. The list
-        # replaces the default rule below, so keep it to hear of new pull
-        # requests. Other events include "run.failed" and "pr.review_requested";
-        # authors narrows a rule to some authors, as above (empty: everyone).
+        # replaces the default rules below, so keep them to hear of new pull
+        # requests and pings. Other events include "run.failed" and
+        # "pr.review_requested"; authors narrows a rule to some authors, as
+        # above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
+        # authors = []
+        # [[defaults.notifications]]
+        # event = "ping.sent"
         # authors = []
 
         # The largest share of each hourly GitHub rate limit shipyard may spend,

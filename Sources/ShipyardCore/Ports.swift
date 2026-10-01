@@ -27,7 +27,8 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
     public var project: String
     /// The title text, for example "New PR #107".
     public var headline: String
-    /// The item's title, for example "Fix checkout totals".
+    /// The item's title, for example "Fix checkout totals"; for a ping, its
+    /// body and sender (`Ping.notificationBody`), since its title is the headline.
     public var itemTitle: String
     /// The item the notification is about. Clicking the notification hands
     /// it to `Shipyard.openNotification(_:)`, which opens the item and marks
@@ -45,7 +46,7 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
 
     /// The notification's title: "e-commerce · New PR #107".
     public var title: String { "\(project) · \(headline)" }
-    /// The notification's body: the item's title.
+    /// The notification's body: the item's title (a ping's body and sender).
     public var body: String { itemTitle }
 }
 

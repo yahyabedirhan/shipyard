@@ -20,14 +20,35 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// The repository (`owner/name`) it was filed by, from the agent's
     /// working folder or `--repo`; `nil` when it was filed with `--project`.
     public var repository: String?
+    /// More than the title fits (`--body`); `nil` when the agent gave none.
+    public var body: String?
+    /// Which agent or task sent it (`--from`); `nil` when the agent gave none.
+    public var sender: String?
 
-    public init(id: String, title: String, projects: [String], sent: Date, seen: Date? = nil, repository: String? = nil) {
+    public init(
+        id: String,
+        title: String,
+        projects: [String],
+        sent: Date,
+        seen: Date? = nil,
+        repository: String? = nil,
+        body: String? = nil,
+        sender: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.projects = projects
         self.sent = sent
         self.seen = seen
         self.repository = repository
+        self.body = body
+        self.sender = sender
+    }
+
+    /// What its notification says under the title: the body, then
+    /// "from <sender>", each on its own line when given; empty when neither is.
+    public var notificationBody: String {
+        [body, sender.map { "from \($0)" }].compactMap { $0 }.joined(separator: "\n")
     }
 
     /// The ping as a listed item: kind `ping`, always open, aged from when
@@ -52,6 +73,13 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// The URL a ping's item is known by.
     public static func url(id: String) -> URL {
         URL(string: "shipyard://ping/\(id)")!
+    }
+
+    /// The id a ping's URL names; `nil` for any other URL.
+    public static func id(from url: URL) -> String? {
+        guard url.scheme == "shipyard", url.host == "ping" else { return nil }
+        let id = url.lastPathComponent
+        return id.isEmpty || id == "/" ? nil : id
     }
 
     /// The letters a generated id is made of: lowercase letters and digits

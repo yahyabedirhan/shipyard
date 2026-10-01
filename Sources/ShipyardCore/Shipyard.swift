@@ -563,7 +563,7 @@ public final class Shipyard {
             let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
             var notifications: [PostedNotification] = []
             appStateStore.update { state in
-                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
+                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, pings: pings, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
             var built = MenuModel.build(
@@ -602,21 +602,40 @@ public final class Shipyard {
         }
     }
 
-    /// Finds the events in `snapshot` and records them in `state`, returning
-    /// what to post: each event not handled before, once, in the first
-    /// project (in configuration order) that lists the item and whose rules
-    /// select it. Every event is recorded as handled, notified or not, and
-    /// every fetched item becomes known, listed or not: `snapshot` becomes
+    /// Finds the events in `snapshot`, and the new pings the listings hold,
+    /// and records them in `state`, returning what to post (`select`).
+    /// Every fetched item becomes known, listed or not: `snapshot` becomes
     /// the known items, and its sources known, so the next refresh compares
     /// with it, and an item a filter change brings into view later isn't new.
     private static func notify(
         snapshot: Snapshot,
         listings: [String: [Item]],
         projects: [ProjectSettings],
+        pings: [Ping],
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
         let events = EventDetector.events(known: state.known, snapshot: snapshot, projects: projects)
+            + EventDetector.pingEvents(listings: listings, projects: projects)
+        let notifications = select(events, listings: listings, projects: projects, viewer: snapshot.viewerLogin, state: &state, at: now)
+        state.known = state.known.updated(with: snapshot, projects: projects)
+        // A ping's record stays while the ping does, so it's never notified again.
+        state.notified.prune(present: Array(state.known.items.keys) + pings.map(\.item.id), at: now)
+        return notifications
+    }
+
+    /// Records `events` in `state` and returns what to post: each event not
+    /// handled before, once, in the first project (in configuration order)
+    /// that lists the item and whose rules select it. Every event is
+    /// recorded as handled, notified or not.
+    private static func select(
+        _ events: [Event],
+        listings: [String: [Item]],
+        projects: [ProjectSettings],
+        viewer: String?,
+        state: inout AppState,
+        at now: Date
+    ) -> [PostedNotification] {
         let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         let listed = listings.mapValues { Set($0.map(\.id)) }
         var byID: [String: [Event]] = [:]
@@ -630,13 +649,11 @@ public final class Shipyard {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
             let selected = occurrences.first { event in
                 guard listed[event.project]?.contains(event.item.id) == true, let project = settings[event.project] else { return false }
-                return NotificationRules.shouldNotify(event, settings: project, viewer: snapshot.viewerLogin)
+                return NotificationRules.shouldNotify(event, settings: project, viewer: viewer)
             }
             if let selected { notifications.append(NotificationRules.notification(for: selected)) }
             state.notified.insert(first, at: now)
         }
-        state.known = state.known.updated(with: snapshot, projects: projects)
-        state.notified.prune(present: state.known.items.keys, at: now)
         return notifications
     }
 
@@ -712,7 +729,13 @@ public final class Shipyard {
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls
     /// this with the notification's `itemURL`.
+    /// A ping's notification only marks the ping seen: it has nothing to
+    /// open yet.
     public func openNotification(_ itemURL: URL) {
+        if let ping = Ping.id(from: itemURL) {
+            markPingsSeen([ping])
+            return
+        }
         urlOpener.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
@@ -754,12 +777,38 @@ public final class Shipyard {
 
     /// Reads the ping store again and, when a ping arrived, changed or
     /// went, lists the pings at once from the last snapshot: no GitHub
-    /// request. The app's watcher on the store calls this.
-    public func reloadPings() {
+    /// request. A new ping a project lists posts its `ping.sent`
+    /// notification when the project's rules select it. The app's watcher
+    /// on the store calls this.
+    public func reloadPings() async {
+        guard listPings() else { return }
+        let configuration = configStore.lastValid
+        let projects = configuration.projects.map(configuration.settings(for:))
+        let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
+        let events = EventDetector.pingEvents(listings: listings, projects: projects)
+        let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
+        guard !unhandled.isEmpty else { return }
+        let now = clock.now
+        let viewer = snapshot?.viewerLogin
+        var notifications: [PostedNotification] = []
+        // Recorded (and saved) before posting, as in a refresh.
+        appStateStore.update { state in
+            notifications = Self.select(unhandled, listings: listings, projects: projects, viewer: viewer, state: &state, at: now)
+        }
+        for notification in notifications {
+            await notifier.post(notification)
+        }
+    }
+
+    /// Reads the ping store again and, when anything changed, lists the
+    /// pings from the last snapshot. Returns whether anything changed.
+    @discardableResult
+    private func listPings() -> Bool {
         let stored = pingStore.all()
-        guard stored != pings else { return }
+        guard stored != pings else { return false }
         pings = stored
         rebuildMenu(configStore.lastValid)
+        return true
     }
 
     /// Records the pings `ids` names as seen now, in the ping store, and
@@ -767,7 +816,7 @@ public final class Shipyard {
     private func markPingsSeen(_ ids: [String]) {
         let now = clock.now
         for id in ids { try? pingStore.markSeen(id: id, at: now) }
-        reloadPings()
+        listPings()
     }
 
     /// Collapses the project's section, or expands it if it's collapsed.

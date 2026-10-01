@@ -294,7 +294,7 @@ struct EventDetectorTests {
         #expect(EventKind.prOpened.headline(number: 57) == "New PR #57")
         #expect(EventKind.prMerged.headline(number: 57) == "Merged PR #57")
         #expect(EventKind.prChecksFailed.headline(number: 57) == "Checks failed on PR #57")
-        #expect(EventKind.allCases.allSatisfy { $0.headline(number: 1).contains("#1") })
+        #expect(EventKind.allCases.filter { $0 != .pingSent }.allSatisfy { $0.headline(number: 1).contains("#1") })
     }
 }
 

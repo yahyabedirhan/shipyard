@@ -141,7 +141,7 @@ struct SkillDocumentTests {
         // project alone, with the default pr.opened rule kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
         #expect(config.settings(for: runs).workflowRuns.finishedWindow == config.defaults.workflowRuns.finishedWindow)
-        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .runFailed)])
+        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent), NotificationRule(event: .runFailed)])
     }
 
     @Test("every key the schema declares is named")
@@ -240,8 +240,8 @@ struct SkillDocumentTests {
         }
         #expect(c.defaults.arrangement.subsections == nil)
         #expect(text.contains("| `[defaults] subsections` | unset |"))
-        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
-        #expect(text.contains("| `notifications` | one rule: `pr.opened`, `authors = []` |"))
+        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
+        #expect(text.contains("| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` |"))
     }
 
     @Test("every choice, event and author filter is listed")

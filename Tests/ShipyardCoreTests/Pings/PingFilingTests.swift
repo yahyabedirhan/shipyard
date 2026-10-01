@@ -36,7 +36,7 @@ struct PingFilingTests {
 
         let result = harness.cli("ping", "Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
         try #require(result.status == 0, "\(result.error)")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         for project in ["shop", "everything"] {
             let section = try #require(harness.section(project))
@@ -73,7 +73,7 @@ struct PingFilingTests {
         await harness.shipyard.start()
         let after = harness.cli("ping", "Ready", origin: origin)
         try #require(after.status == 0, "\(after.error)")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.section("mine")?.rows.filter { $0.kind == .ping }.map(\.title) == ["Ready"])
     }
@@ -100,7 +100,7 @@ struct PingFilingTests {
 
         let result = harness.cli("ping", "Published", "--repo", "yahyabedirhan/blog", origin: "git@github.com:yahyabedirhan/shop.git")
         try #require(result.status == 0, "\(result.error)")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.section("blog")?.rows.map(\.title) == ["Published"])
         #expect(harness.section("shop")?.rows.isEmpty == true)
@@ -122,7 +122,7 @@ struct PingFilingTests {
             graphQL: PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)])])
         )
         try #require(harness.cli("ping", "Ready", origin: "git@github.com:YahyaBedirhan/Shop.git").status == 0)
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         let groups = try #require(harness.section("shop")?.groups)
         #expect(groups.map(\.title) == ["yahyabedirhan/shop"])

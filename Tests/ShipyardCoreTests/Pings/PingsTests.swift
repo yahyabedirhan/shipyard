@@ -67,7 +67,7 @@ struct PingsTests {
     func inTheTabs() async throws {
         let harness = try await Harness.started(config: "[menu]\nlayout = \"tabs\"\n" + shop, graphQL: onePullRequest)
         try harness.ping("Ready for review")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         let menu = harness.shipyard.menu
         let tab = menu.tabContent(for: .project("shop"))
@@ -84,7 +84,7 @@ struct PingsTests {
         let requests = harness.graphQLRequests.count
 
         try harness.ping("Waiting for your input")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.pingRows().map(\.title) == ["Waiting for your input"])
         #expect(harness.graphQLRequests.count == requests)
@@ -108,7 +108,7 @@ struct PingsTests {
     func newPingNeedsAttention() async throws {
         let harness = try await Harness.started(config: "[menu-bar]\ncount = \"per-kind\"\n" + shop, graphQL: onePullRequest)
         try harness.ping("Ready for review")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.pingRows().first?.needsAttention == true)
         #expect(harness.pingRows().first?.attentionReasons == [.unseen])
@@ -122,7 +122,7 @@ struct PingsTests {
     func clickMarksSeen() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         let id = try harness.ping("Ready for review")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
         let row = try #require(harness.pingRows().first)
 
         harness.shipyard.open(row)
@@ -146,7 +146,7 @@ struct PingsTests {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try harness.ping("First")
         try harness.ping("Second", project: "blog")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         harness.shipyard.markSeen(try #require(harness.pingRows().first))
         #expect(harness.shipyard.menu.attention.pings == 1)
@@ -161,7 +161,7 @@ struct PingsTests {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try harness.ping("In the shop")
         try harness.ping("In the blog", project: "blog")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
         #expect(harness.shipyard.menu.attention.pings == 2)
 
         try harness.writeConfig("""
@@ -191,7 +191,7 @@ struct PingsTests {
     func otherGroupings() async throws {
         let harness = try await Harness.started(config: "[defaults]\ngroup-by = \"repository\"\n" + shop, graphQL: onePullRequest)
         try harness.ping("Ready")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
         #expect(harness.groupTitles() == ["yahyabedirhan/shop", "Pings"])
         let row = try #require(harness.pingRows().first)
         #expect(PanelText.rowDetail(row, showingRepository: true) == "ping")
@@ -205,10 +205,10 @@ struct PingsTests {
     func unchangedStore() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try harness.ping("Ready")
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
         let menu = harness.shipyard.menu
 
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.shipyard.menu == menu)
     }
@@ -219,7 +219,7 @@ struct PingsTests {
         try harness.ping("Ready")
         try Data("{ not json".utf8).write(to: harness.pingStore.directory.appendingPathComponent("broken.json"))
 
-        harness.shipyard.reloadPings()
+        await harness.shipyard.reloadPings()
 
         #expect(harness.pingRows().map(\.title) == ["Ready"])
     }

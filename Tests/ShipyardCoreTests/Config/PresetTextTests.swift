@@ -78,6 +78,7 @@ struct PresetTextTests {
         #expect(incoming.notifications == [
             NotificationRule(event: .prOpened, authors: [.others]),
             NotificationRule(event: .issueOpened, authors: [.others]),
+            NotificationRule(event: .pingSent),
         ])
 
         let reviews = config.settings(for: config.projects[1])
@@ -85,7 +86,7 @@ struct PresetTextTests {
         #expect(reviews.pullRequests.reviewRequested)
         #expect(!reviews.issues.show)
         #expect(reviews.arrangement.groupBy == .repository)
-        #expect(reviews.notifications == [NotificationRule(event: .prReviewRequested)])
+        #expect(reviews.notifications == [NotificationRule(event: .prReviewRequested), NotificationRule(event: .pingSent)])
 
         // Picked repositories take owned's place.
         let chosen = try decoded(.incomingContributions, [NewProject(name: "Incoming", repositories: ["octocat/hello-world"])])
@@ -104,7 +105,7 @@ struct PresetTextTests {
         #expect(!queue.issues.show && !queue.workflowRuns.show)
         #expect(queue.arrangement.groupBy == .repository)
         #expect(queue.arrangement.subsections == true)
-        #expect(queue.notifications == [NotificationRule(event: .prReviewRequested)])
+        #expect(queue.notifications == [NotificationRule(event: .prReviewRequested), NotificationRule(event: .pingSent)])
     }
 
     @Test("a project name with quotes is written as a TOML string")

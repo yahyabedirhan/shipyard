@@ -90,7 +90,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
-| `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
+| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
 
@@ -129,7 +129,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 - A project's `pull-requests`, `issues`, `workflow-runs` and `pings` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
-- `[[defaults.notifications]]` blocks likewise replace the built-in default (`pr.opened`, from everyone): once the file has one, write the `pr.opened` rule too if it should stay.
+- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, and `ping.sent`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them.
 
 ## Which repositories: repository selectors
 
@@ -191,6 +191,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `issue.commented` | an issue got comments |
 | `run.failed` | a workflow run finished failed (also timed out or failed to start) |
 | `run.succeeded` | a workflow run finished successfully |
+| `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification marks it seen. Pings have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
 
@@ -400,7 +401,7 @@ To show issues in every project instead, set it once in the defaults:
 show = true
 ```
 
-**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the default `pr.opened` beside `run.failed`:
+**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the defaults `pr.opened` and `ping.sent` beside `run.failed`:
 
 ```toml
 [[projects]]
@@ -409,6 +410,7 @@ repositories = ["yahyabedirhan/shipyard"]
 workflow-runs = { show = true }
 notifications = [
   { event = "pr.opened" },
+  { event = "ping.sent" },
   { event = "run.failed" },
 ]
 ```
