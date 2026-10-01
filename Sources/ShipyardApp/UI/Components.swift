@@ -20,7 +20,9 @@ extension EnvironmentValues {
 /// A scroll view as tall as its content, up to `maxHeight`. The
 /// `MenuBarExtra` window sizes the panel from a zero-height proposal, which a
 /// plain scroll view (or `ViewThatFits`) takes as 0; so the content is
-/// measured and the height fixed from it.
+/// measured and the height fixed from it, capped, and changed only when the
+/// capped value really moves (`MeasuredHeight`), so a lazy stack's estimates
+/// under each new viewport don't resize the panel forever.
 struct MeasuredScrollView<Content: View>: View {
     var maxHeight: CGFloat = Grid.maxListHeight
     @ViewBuilder var content: Content
@@ -29,9 +31,13 @@ struct MeasuredScrollView<Content: View>: View {
     var body: some View {
         ScrollView {
             content
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured in
+                    if let next = MeasuredHeight.next(current: height, measured: measured, maxHeight: maxHeight) {
+                        height = next
+                    }
+                }
         }
-        .frame(height: min(height, maxHeight))
+        .frame(height: height)
     }
 }
 
