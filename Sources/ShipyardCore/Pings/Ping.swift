@@ -69,6 +69,20 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         [body, sender.map { "from \($0)" }].compactMap { $0 }.joined(separator: "\n")
     }
 
+    /// Whether `other` is this same sending of the ping: the same id and
+    /// instance with the same content, whatever the app recorded on it since
+    /// (seen, a failure). A ping withdrawn and sent anew under its id is a
+    /// different instance; a replace keeps the instance but changes what
+    /// it says, so it's a different sending too.
+    public func isSameSending(as other: Ping) -> Bool {
+        var mine = self, theirs = other
+        mine.seen = nil
+        mine.failure = nil
+        theirs.seen = nil
+        theirs.failure = nil
+        return mine == theirs
+    }
+
     /// Whether it's still listed under a `seen-window` of `seenWindow`
     /// seconds at `now`: an unseen ping always is; a seen one until
     /// `seenWindow` has passed since it was seen (a window of 0: not at all).

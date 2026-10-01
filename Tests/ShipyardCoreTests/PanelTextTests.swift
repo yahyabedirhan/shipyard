@@ -705,6 +705,16 @@ struct PanelTextTests {
         #expect(text.action == nil)
     }
 
+    @Test("a translocated copy says to move Shipyard to Applications first, with no command or button")
+    func cliLinkTranslocated() {
+        let text = PanelText.cliLink(.translocated, command: linkCommand)
+        #expect(text.title == "Move Shipyard to Applications")
+        #expect(text.message.hasSuffix("Move Shipyard to Applications first, then link the CLI."))
+        #expect(text.command == nil)
+        #expect(text.action == nil)
+        #expect(text.tone == .warning)
+    }
+
     // MARK: - The project picker
 
     @Test("the preset step speaks to the user and names neither the app nor the configuration file in its description")

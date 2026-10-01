@@ -54,7 +54,10 @@ public struct FileManagerLinkFileSystem: LinkFileSystem {
 /// `~/.local/bin/shipyard` to it, as the panel offers in onboarding and from
 /// its menu. It never replaces anything: a link already pointing at this
 /// app's CLI is left alone, and anything else at that path, or a folder it
-/// can't write to, leaves the link to the user, with `command` to run.
+/// can't write to, leaves the link to the user, with `command` to run. A
+/// link that's left pointing at a CLI that's gone (an older copy of the
+/// app, moved or deleted) is in the way too, so the user sees the command
+/// that fixes it. A translocated copy of the app links nothing.
 @MainActor
 @Observable
 public final class CLILink {
@@ -72,6 +75,11 @@ public final class CLILink {
         /// This copy of the app has no CLI inside it (it isn't running from
         /// `Shipyard.app`), so there's nothing to link.
         case missingCLI
+        /// macOS runs this copy from a temporary, read-only path (App
+        /// Translocation: the app was opened where it was downloaded, not
+        /// moved to Applications), so a link would point at a path that's
+        /// gone after it quits. Moving the app fixes it.
+        case translocated
     }
 
     /// Where the link goes, as the user writes it.
@@ -126,7 +134,14 @@ public final class CLILink {
         }
     }
 
+    /// Whether `cli` is inside a translocated copy of the app, which macOS
+    /// runs from a temporary path under `/AppTranslocation/`.
+    nonisolated public static func isTranslocated(_ cli: URL) -> Bool {
+        cli.standardizedFileURL.path.contains("/AppTranslocation/")
+    }
+
     private func inspect() -> State {
+        guard !Self.isTranslocated(cli) else { return .translocated }
         guard fileSystem.fileExists(at: cli) else { return .missingCLI }
         switch fileSystem.entry(at: link) {
         case .none:

@@ -143,6 +143,37 @@ struct CLILinkTests {
         #expect(!FileManager.default.fileExists(atPath: sandbox.link.deletingLastPathComponent().path))
     }
 
+    @Test("a link left pointing at a CLI that's gone is in the way, with the command that fixes it")
+    func brokenLink() throws {
+        let sandbox = try Sandbox()
+        defer { sandbox.remove() }
+        try sandbox.makeBin()
+        let gone = sandbox.root.appendingPathComponent("Downloads/Shipyard.app/Contents/Helpers/shipyard").path
+        try FileManager.default.createSymbolicLink(atPath: sandbox.link.path, withDestinationPath: gone)
+
+        let link = CLILink(cli: sandbox.cli, home: sandbox.home)
+        link.check()
+
+        #expect(link.state == .occupied(destination: gone))
+        let text = PanelText.cliLink(link.state, command: link.command)
+        #expect(text.command == link.command)
+        #expect(text.action == .tryAgain)
+    }
+
+    @Test("a copy macOS runs translocated links nothing and says to move the app first")
+    func translocated() throws {
+        let sandbox = try Sandbox(cliPath: "private/var/folders/xy/T/AppTranslocation/0A1B2C/d/Shipyard.app")
+        defer { sandbox.remove() }
+        let link = CLILink(cli: sandbox.cli, home: sandbox.home)
+        #expect(link.state == .translocated)
+
+        link.makeLink()
+
+        #expect(link.state == .translocated)
+        #expect(!FileManager.default.fileExists(atPath: sandbox.link.deletingLastPathComponent().path))
+        #expect(!CLILink.isTranslocated(CLILink.bundledCLI(in: URL(fileURLWithPath: "/Applications/Shipyard.app"))))
+    }
+
     @Test("check sees a link made or removed by hand")
     func check() throws {
         let sandbox = try Sandbox()

@@ -60,6 +60,12 @@ extension PanelText {
                 action: .tryAgain,
                 tone: .warning
             )
+        case .translocated:
+            return CLILinkCard(
+                title: "Move Shipyard to Applications",
+                message: "macOS is running Shipyard from a temporary copy, so a link to its CLI would break. Move Shipyard to Applications first, then link the CLI.",
+                tone: .warning
+            )
         case .missingCLI:
             return CLILinkCard(
                 title: "No CLI to link",

@@ -86,6 +86,9 @@ struct HerdrActionTests {
         #expect(!PingCommand.isHerdrID("w1:x2"))
         #expect(!PingCommand.isHerdrID("a b:t2"))
         #expect(!PingCommand.isHerdrID("--from"))
+        // A trailing newline isn't part of an id.
+        #expect(!PingCommand.isHerdrID("w1:t2\n"))
+        #expect(!PingCommand.isHerdrID("w1:t2\nw1:t3"))
     }
 
     @Test("--herdr with another action flag is a usage error")
@@ -273,6 +276,22 @@ struct HerdrActionTests {
         #expect(found(["/opt/homebrew/bin/herdr", "/custom/herdr"], path: "/custom") == "/opt/homebrew/bin/herdr")
         #expect(found(["/custom/bin/herdr"], path: "/usr/bin:/custom/bin/") == "/custom/bin/herdr")
         #expect(found([], path: "/usr/bin") == nil)
+    }
+
+    @Test("a herdr that doesn't answer in time is stopped, and the action fails")
+    func herdrHangs() async {
+        let shell = HangingShell()
+        let focus = HerdrFocus(
+            home: URL(fileURLWithPath: "/nonexistent-home"),
+            pathEnvironment: nil,
+            isExecutable: { $0 == FakeHerdr.path },
+            runner: shell,
+            timeout: 0.01
+        )
+
+        #expect(await focus.focus("w1:t2") == .failed("Herdr didn't answer"))
+        #expect(shell.started == 1)
+        #expect(shell.cancelled == 1)
     }
 
     @Test("an id ending in a tab number is a tab's; any other is a pane's")

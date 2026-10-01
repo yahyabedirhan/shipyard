@@ -179,10 +179,12 @@ public final class Shipyard {
     public func start() async {
         signedOutReason = nil
         appStateStore.load(at: clock.now)
-        pings = pingStore.all()
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
+        // Pings sent while the app wasn't running list and notify now,
+        // signed in or not, without waiting for GitHub.
+        await reloadPings()
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -499,7 +501,9 @@ public final class Shipyard {
 
     /// Fetches every project's items and publishes the menu model. The timer,
     /// ⌘R, waking and a configuration change all come here.
-    /// Does nothing outside `ready`. One refresh runs at a time: a call while
+    /// It lists the pings again first, so a seen ping whose window has
+    /// passed leaves even while signed out; outside `ready` that's all it
+    /// does. One refresh runs at a time: a call while
     /// one runs returns at once and the running one goes again when it's done
     /// (several calls meanwhile make one more run). Afterwards the timer is
     /// armed for the next one, as the rate budget says. While the budget
@@ -508,10 +512,11 @@ public final class Shipyard {
     /// item whose window has passed leaves, and the timer comes back after
     /// the configured interval, or at the end of the pause when that's sooner.
     public func refresh() async {
-        guard phase.canRefresh else { return }
-        // A seen ping whose seen-window has passed leaves the store too.
+        // A seen ping whose seen-window has passed leaves the store too,
+        // and its notification Notification Center, signed in or not.
         listPings()
         await removeLeftBanners()
+        guard phase.canRefresh else { return }
         guard canRefreshNow else {
             if !gate.isRunning {
                 rebuildMenu(configStore.lastValid)
@@ -765,7 +770,7 @@ public final class Shipyard {
     /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
         if let ping = row.item.ping {
-            markPingsSeen([ping.id])
+            markPingsSeen([ping])
             return
         }
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
@@ -780,8 +785,8 @@ public final class Shipyard {
             .filter { Attention.canNeedAttention($0.item) }
         guard !rows.isEmpty else { return }
         let now = clock.now
-        let pingIDs = rows.compactMap(\.item.ping?.id)
-        if !pingIDs.isEmpty { markPingsSeen(pingIDs) }
+        let listed = rows.compactMap(\.item.ping)
+        if !listed.isEmpty { markPingsSeen(listed) }
         let items = rows.filter { $0.item.ping == nil }.map(\.item)
         guard !items.isEmpty else { return }
         updateAppState { state in
@@ -837,11 +842,17 @@ public final class Shipyard {
     /// action through `runHerdr`). When it
     /// works, or the ping has none, the ping is marked seen (and any earlier
     /// failure cleared); when it fails, the ping stays as it was and the
-    /// failure's reason is recorded on it for its row. A ping no longer
-    /// stored does nothing.
+    /// failure's reason is recorded on it for its row. Either is written
+    /// only to the sending of the ping that ran: one withdrawn, replaced or
+    /// sent anew while its action ran is left as the CLI wrote it. A ping
+    /// no longer stored does nothing.
     private func runAction(ofPing id: String) -> Task<Void, Never> {
-        guard let action = pingStore.ping(id: id)?.action else {
-            markPingsSeen([id])
+        guard let ping = pingStore.ping(id: id) else {
+            listPings()
+            return Task {}
+        }
+        guard let action = ping.action else {
+            markPingsSeen([ping])
             return Task {}
         }
         return Task {
@@ -853,9 +864,9 @@ public final class Shipyard {
             }
             switch outcome {
             case .done:
-                markPingsSeen([id])
+                markPingsSeen([ping])
             case .failed(let reason):
-                try? pingStore.recordFailure(id: id, reason: reason)
+                try? pingStore.recordFailure(ping, reason: reason)
                 listPings()
             }
         }
@@ -878,11 +889,13 @@ public final class Shipyard {
     private func listPings() -> Bool {
         let configuration = configStore.lastValid
         let now = clock.now
-        let stored = pingStore.all().filter { ping in
-            guard Self.hasLeft(ping, in: configuration, at: now) else { return true }
-            // One that can't be removed stays stored; no listing shows it.
-            try? pingStore.remove(id: ping.id)
-            return false
+        let stored = pingStore.all().compactMap { ping -> Ping? in
+            guard Self.hasLeft(ping, in: configuration, at: now) else { return ping }
+            // Removed only as it was read: one the CLI replaced or sent anew
+            // meanwhile is listed as it is now. One that can't be removed
+            // stays stored; no listing shows it.
+            guard (try? pingStore.removeIfUnchanged(ping)) == false else { return nil }
+            return pingStore.ping(id: ping.id)
         }
         forgetLeftPings(stored: stored)
         guard stored != pings else { return false }
@@ -940,12 +953,14 @@ public final class Shipyard {
         return windows.allSatisfy { !ping.isListed(seenWindow: $0, at: now) }
     }
 
-    /// Records the pings `ids` names as seen now, in the ping store,
-    /// clearing their actions' failures, and lists them again. A store that
-    /// can't be written leaves them as they were.
-    private func markPingsSeen(_ ids: [String]) {
+    /// Records `listed` (the pings as the user saw them) as seen now, in
+    /// the ping store, clearing their actions' failures, and lists them
+    /// again. One withdrawn, replaced or sent anew since is left as it is
+    /// (`PingStore.markSeen(_:at:)`). A store that can't be written leaves
+    /// them as they were.
+    private func markPingsSeen(_ listed: [Ping]) {
         let now = clock.now
-        for id in ids { try? pingStore.markSeen(id: id, at: now) }
+        for ping in listed { try? pingStore.markSeen(ping, at: now) }
         listPings()
     }
 

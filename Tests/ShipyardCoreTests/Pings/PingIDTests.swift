@@ -78,6 +78,8 @@ struct PingIDTests {
 
     @Test("an id that isn't 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, is a usage error", arguments: [
         "Checkout", "-x", "_x", "a b", "a/b", "../x", "a.b", "é", "", String(repeating: "a", count: 65),
+        // A newline isn't part of an id, trailing or not.
+        "build-42\n", "a\nb",
     ])
     func badID(id: String) throws {
         let harness = try Harness(config: shopAndBlog)
@@ -116,7 +118,7 @@ struct PingIDTests {
         let sent = harness.clock.now
         try await harness.send("Waiting for your input", "--project", "shop", "--id", "input", "--body", "Which total?", "--from", "agent", "--open", "https://example.com")
         harness.shipyard.markSeen(try #require(harness.pingRows().first))
-        try harness.pingStore.recordFailure(id: "input", reason: "the app isn't installed")
+        try harness.pingStore.recordFailure(try #require(harness.pingStore.ping(id: "input")), reason: "the app isn't installed")
         #expect(harness.shipyard.menu.attention.pings == 0)
 
         harness.clock.advance(by: 600)
@@ -197,6 +199,7 @@ struct PingIDTests {
 
         #expect(harness.cli("ping", "withdraw") == CommandResult(error: usage, status: 2))
         #expect(harness.cli("ping", "withdraw", "a", "b") == CommandResult(error: usage, status: 2))
+        #expect(harness.cli("ping", "withdraw", "build-42\n").status == 2)
         #expect(harness.cli("ping", "withdraw", "../state") == CommandResult(
             error: "shipyard ping withdraw: an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `../state`\n",
             status: 2

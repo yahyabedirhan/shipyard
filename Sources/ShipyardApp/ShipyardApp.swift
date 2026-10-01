@@ -104,11 +104,9 @@ final class AppServices {
     }
 
     /// `~/Library/Application Support/Shipyard/`, where `state.json` and
-    /// `config-status.json` live.
-    static var appSupportDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shipyard", isDirectory: true)
-    }
+    /// `config-status.json` live: the core's one definition, which the CLI
+    /// reads `repositories.json` from, so the two can't disagree.
+    static var appSupportDirectory: URL { ResolvedRepositoriesStore.defaultDirectory }
 
     func start() {
         let shipyard = shipyard

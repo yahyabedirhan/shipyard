@@ -20,9 +20,7 @@ public struct PingStore: Sendable {
 
     /// `~/Library/Application Support/Shipyard/Pings/`, beside `state.json`.
     public static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shipyard", isDirectory: true)
-            .appendingPathComponent("Pings", isDirectory: true)
+        ResolvedRepositoriesStore.defaultDirectory.appendingPathComponent("Pings", isDirectory: true)
     }
 
     /// Every ping that reads, oldest first (then by id); none when the
@@ -47,22 +45,41 @@ public struct PingStore: Sendable {
         try Self.encoder.encode(ping).write(to: url(id: ping.id), options: .atomic)
     }
 
-    /// Records that the user saw ping `id` at `now`, clearing its action's
-    /// failure. A ping already seen keeps its first time; an unknown one
-    /// changes nothing.
-    public func markSeen(id: String, at now: Date) throws {
-        guard var ping = ping(id: id), ping.seen == nil || ping.failure != nil else { return }
-        ping.seen = ping.seen ?? now
-        ping.failure = nil
-        try save(ping)
+    /// Records that the user saw `ping` at `now`, clearing its action's
+    /// failure. A ping already seen keeps its first time. It's read again
+    /// just before the write, and changes nothing unless the store still
+    /// holds the same sending of it (`isSameSending(as:)`): one withdrawn
+    /// meanwhile stays gone, and one replaced or sent anew under its id
+    /// stays unseen.
+    public func markSeen(_ ping: Ping, at now: Date) throws {
+        guard var stored = self.ping(id: ping.id), stored.isSameSending(as: ping),
+              stored.seen == nil || stored.failure != nil else { return }
+        stored.seen = stored.seen ?? now
+        stored.failure = nil
+        try save(stored)
     }
 
-    /// Records why ping `id`'s action failed, for its row; it stays as
-    /// seen or unseen as it was. An unknown id changes nothing.
-    public func recordFailure(id: String, reason: String) throws {
-        guard var ping = ping(id: id), ping.failure != reason else { return }
-        ping.failure = reason
-        try save(ping)
+    /// Records why `ping`'s action failed, for its row; it stays as seen
+    /// or unseen as it was. Read again just before the write, as
+    /// `markSeen(_:at:)` is: a ping withdrawn, replaced or sent anew since
+    /// changes nothing.
+    public func recordFailure(_ ping: Ping, reason: String) throws {
+        guard var stored = self.ping(id: ping.id), stored.isSameSending(as: ping),
+              stored.failure != reason else { return }
+        stored.failure = reason
+        try save(stored)
+    }
+
+    /// Removes `ping` (a seen ping whose window has passed) only while the
+    /// store holds it exactly as given, read again just before: a ping
+    /// replaced, sent anew or marked seen again since stays. Returns
+    /// whether it's gone.
+    @discardableResult
+    public func removeIfUnchanged(_ ping: Ping) throws -> Bool {
+        guard let stored = self.ping(id: ping.id) else { return true }
+        guard stored == ping else { return false }
+        try remove(id: ping.id)
+        return true
     }
 
     /// Removes ping `id` (a dismiss, or a seen ping whose window has

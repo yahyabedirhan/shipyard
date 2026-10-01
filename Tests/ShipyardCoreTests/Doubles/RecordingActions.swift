@@ -8,6 +8,7 @@ final class RecordingActions: ActionRunning {
     private let urls = Locked<[URL]>([])
     private let actions = Locked<[PingAction]>([])
     private let failing = Locked<String?>(nil)
+    private let hook = Locked<(@Sendable () -> Void)?>(nil)
 
     var opened: [URL] { urls.current }
     /// Every ping action it was asked to run, failed ones too.
@@ -19,10 +20,18 @@ final class RecordingActions: ActionRunning {
         set { failing.withValue { $0 = newValue } }
     }
 
+    /// What happens while a ping action runs, before it reports back:
+    /// the CLI writing to the store meanwhile, say. `nil` (the default): nothing.
+    var whileRunning: (@Sendable () -> Void)? {
+        get { hook.current }
+        set { hook.withValue { $0 = newValue } }
+    }
+
     func open(_ url: URL) { urls.withValue { $0.append(url) } }
 
     func run(_ action: PingAction) async -> ActionOutcome {
         actions.withValue { $0.append(action) }
+        whileRunning?()
         return failure.map(ActionOutcome.failed) ?? .done
     }
 }

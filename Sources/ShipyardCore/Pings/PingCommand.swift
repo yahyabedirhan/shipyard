@@ -160,7 +160,9 @@ public enum PingCommand {
     /// ids too. One rule for every id keeps it a safe file name and a URL
     /// path, the same on case-insensitive disks.
     static func isID(_ id: String) -> Bool {
-        id.range(of: "^[a-z0-9][a-z0-9_-]{0,63}$", options: .regularExpression) != nil
+        // `\A` and `\z`, not `^` and `$`, which also match before a
+        // trailing newline: "build-42\n" isn't an id.
+        id.range(of: #"\A[a-z0-9][a-z0-9_-]{0,63}\z"#, options: .regularExpression) != nil
     }
 
     /// What's wrong with an id that isn't one, for the error line.
@@ -330,7 +332,7 @@ public enum PingCommand {
     /// (`w1:t2`, `w1:p3`). Only such an argument after `--herdr` is its id,
     /// so `--herdr "Ready"` still reads "Ready" as the title.
     static func isHerdrID(_ argument: String) -> Bool {
-        argument.range(of: "^[^\\s:]+:[tp][0-9]+$", options: .regularExpression) != nil
+        argument.range(of: #"\A[^\s:]+:[tp][0-9]+\z"#, options: .regularExpression) != nil
     }
 
     /// Why the arguments don't read, as the error line says it.

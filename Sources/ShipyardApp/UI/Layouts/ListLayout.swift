@@ -340,18 +340,26 @@ private struct ListRow: View {
 
     /// The author, or in a project of several repositories, the repository
     /// (without its owner); a run names no author. A ping names its sender,
-    /// or why its action failed, while it has (the hover card has it whole).
+    /// or why its action failed, while it has (the hover card has it whole);
+    /// one filed with `--project` has no repository, so it names its
+    /// sender there too.
     private var meta: String? {
         if let error = row.actionError { return error }
-        if showsRepository { return PanelText.repositoryName(row.repository) }
+        if showsRowRepository { return PanelText.repositoryName(row.repository) }
         if row.kind == .ping { return row.sender }
         return row.kind == .workflowRun ? nil : row.author
     }
 
     private var metaSymbol: String? {
         if row.actionError != nil { return "exclamationmark.triangle.fill" }
-        if showsRepository { return "shippingbox" }
+        if showsRowRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
+    }
+
+    /// Whether the meta column names this row's repository: in a project of
+    /// several, when the row has one (a ping may not).
+    private var showsRowRepository: Bool {
+        showsRepository && !row.repository.isEmpty
     }
 }
 
