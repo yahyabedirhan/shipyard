@@ -42,7 +42,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue, labelled `effort:<effort>` when it belongs to an effort.
+Create a GitHub issue. When it belongs to an effort, create the `effort:<effort>` label first, as the Efforts section says (`gh label create effort:<name> --color f9d0c4`), then pass it to `gh issue create`. `--label` fails when the label does not exist yet.
 
 ## When a skill says "fetch the relevant ticket"
 
