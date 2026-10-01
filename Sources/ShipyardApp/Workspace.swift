@@ -1,8 +1,9 @@
 import AppKit
 import ShipyardCore
 
-/// Opens items in the browser, runs pings' actions, and opens documents in
-/// their editor, through `NSWorkspace`.
+/// Opens items in the browser, runs pings' link and app actions (and so
+/// brings `[herdr] terminal` forward), and opens documents in their editor,
+/// through `NSWorkspace`.
 struct WorkspaceActions: ActionRunning {
     func open(_ url: URL) {
         Task { @MainActor in NSWorkspace.shared.open(url) }
@@ -17,6 +18,10 @@ struct WorkspaceActions: ActionRunning {
             return opened ? .done : .failed("Couldn't open the link")
         case .app(let app):
             return await Self.activate(app)
+        case .herdr:
+            // `Shipyard` focuses Herdr itself (`HerdrFocus`) and asks for
+            // `[herdr] terminal` as an app; a Herdr action never comes here.
+            return .failed("Couldn't focus Herdr")
         }
     }
 

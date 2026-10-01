@@ -32,7 +32,7 @@ public struct CommandResult: Equatable, Sendable {
 }
 
 /// What a command reads from where it runs: the working folder, the
-/// environment variables (`XDG_CONFIG_HOME`; later `HERDR_PANE_ID`) and
+/// environment variables (`XDG_CONFIG_HOME`, `HERDR_PANE_ID`) and
 /// git, which says the working folder's remote `origin`.
 public struct CommandEnvironment: Sendable {
     public var workingDirectory: URL
@@ -58,7 +58,7 @@ public enum ShipyardCLI {
         commands:
           ping    send the user a ping, filed by the working folder's repository:
                   shipyard ping "<title>" [--body <text>] [--from <label>]
-                                [--open <url> | --app <bundle id or name>]
+                                [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                                 [--repo <owner/name> | --project <name>]
 
         options:

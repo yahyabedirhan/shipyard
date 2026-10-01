@@ -24,7 +24,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var body: String?
     /// Which agent or task sent it (`--from`); `nil` when the agent gave none.
     public var sender: String?
-    /// What clicking it does (`--open`, `--app`); `nil` when it only marks
+    /// What clicking it does (`--open`, `--app`, `--herdr`); `nil` when it only marks
     /// it seen.
     public var action: PingAction?
     /// Why its action last failed, shown on its row until the next click,
@@ -114,24 +114,29 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
 }
 
 /// What clicking a ping does: one action at most, given by the flag the
-/// agent passed. Stored as `{"url": "…"}` or `{"app": "…"}`.
+/// agent passed. Stored as `{"url": "…"}`, `{"app": "…"}` or `{"herdr": "…"}`.
 public enum PingAction: Codable, Equatable, Hashable, Sendable {
     /// Opens a URL (`--open`): a web page, an artifact, an app's deep link.
     case url(URL)
     /// Brings an app forward (`--app`), named by its bundle id
     /// (`com.anthropic.claudefordesktop`) or its name (`Claude`).
     case app(String)
+    /// Focuses a Herdr tab or pane (`--herdr`), by the id Herdr gives it:
+    /// a tab's (`w1:t2`) or a pane's (`w1:p3`). Then `[herdr] terminal`, when
+    /// set, is brought forward (`HerdrFocus`).
+    case herdr(String)
 
     /// The icon a ping's row shows for it.
     public var icon: PingIcon {
         switch self {
         case .url: .link
         case .app: .app
+        case .herdr: .terminal
         }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case url, app
+        case url, app, herdr
     }
 
     public init(from decoder: any Decoder) throws {
@@ -140,6 +145,8 @@ public enum PingAction: Codable, Equatable, Hashable, Sendable {
             self = .url(url)
         } else if let app = try container.decodeIfPresent(String.self, forKey: .app) {
             self = .app(app)
+        } else if let herdr = try container.decodeIfPresent(String.self, forKey: .herdr) {
+            self = .herdr(herdr)
         } else {
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "an action this build doesn't know"))
         }
@@ -150,6 +157,7 @@ public enum PingAction: Codable, Equatable, Hashable, Sendable {
         switch self {
         case .url(let url): try container.encode(url, forKey: .url)
         case .app(let app): try container.encode(app, forKey: .app)
+        case .herdr(let id): try container.encode(id, forKey: .herdr)
         }
     }
 }
@@ -160,6 +168,8 @@ public enum PingIcon: Equatable, Sendable {
     case link
     /// Brings an app forward.
     case app
+    /// Focuses a Herdr tab or pane, then the terminal.
+    case terminal
     /// Only marks it seen.
     case noAction
 }

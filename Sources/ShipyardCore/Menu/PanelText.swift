@@ -135,6 +135,7 @@ public enum PanelText {
         switch row.pingIcon {
         case .link: return "ping, opens a link"
         case .app: return "ping, opens an app"
+        case .terminal: return "ping, focuses a Herdr tab"
         case .noAction: return "ping"
         case nil: break
         }

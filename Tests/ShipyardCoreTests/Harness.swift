@@ -35,6 +35,8 @@ struct Harness {
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
     let actions = RecordingActions()
+    /// The Herdr a ping's `--herdr` action focuses: no tabs until opened.
+    let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
     let loginItem = RecordingLoginItem()
     /// `config.toml` in a fresh temporary directory.
@@ -85,6 +87,7 @@ struct Harness {
             notifier: notifier,
             loginItem: loginItem,
             gh: gh,
+            herdr: herdr.focus,
             transport: stub,
             clock: sleeper.clock,
             timer: timer,
@@ -164,20 +167,21 @@ struct Harness {
     /// name) against this harness's configuration file, resolved
     /// repositories and ping store, at the clock's time, as an agent would
     /// in a terminal: in `workingFolder`, whose git remote `origin` is
-    /// `origin` (`nil`: not a git repository).
+    /// `origin` (`nil`: not a git repository), in the Herdr pane
+    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr).
     @discardableResult
-    func cli(_ arguments: String..., origin: String? = nil) -> CommandResult {
-        cli(arguments, origin: origin)
+    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
+        cli(arguments, origin: origin, herdrPane: herdrPane)
     }
 
-    /// `cli(_:origin:)` with the arguments as a list.
+    /// `cli(_:origin:herdrPane:)` with the arguments as a list.
     @discardableResult
-    func cli(_ arguments: [String], origin: String? = nil) -> CommandResult {
+    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
         ShipyardCLI.run(
             arguments,
             environment: CommandEnvironment(
                 workingDirectory: workingFolder,
-                variables: [:],
+                variables: herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:],
                 git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
             ),
             configURL: configURL,

@@ -90,7 +90,9 @@ public enum ActionOutcome: Equatable, Sendable {
 /// Takes the user where shipyard sends them: opens an item's page on
 /// GitHub in the browser, and runs a ping's action (opens its link, brings
 /// its app forward), saying whether that worked. The app does both through
-/// `NSWorkspace`.
+/// `NSWorkspace`. A Herdr action (`.herdr`) isn't sent here: `Shipyard`
+/// focuses Herdr through `HerdrFocus`, then sends `[herdr] terminal` as an
+/// `.app` action.
 public protocol ActionRunning: Sendable {
     /// Opens `url` (a GitHub page), without waiting to see whether it opened.
     func open(_ url: URL)

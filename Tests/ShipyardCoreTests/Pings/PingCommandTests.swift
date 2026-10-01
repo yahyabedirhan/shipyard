@@ -285,7 +285,7 @@ struct ShipyardCLITests {
 
         let bare = harness.cli()
         #expect(bare.status == 2)
-        #expect(bare.error.contains("[--open <url> | --app <bundle id or name>]"))
+        #expect(bare.error.contains("[--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]"))
 
         let unknown = harness.cli("pnig", "Ready")
         #expect(unknown.status == 2)

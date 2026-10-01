@@ -84,9 +84,9 @@ struct PingActionTests {
     @Test(
         "more than one action flag, a URL without a scheme or an empty app is a usage error, and nothing is stored",
         arguments: [
-            (["--open", "https://example.com", "--app", "Claude"], "shipyard ping: a ping has one action at most; pass one of --open, --app"),
-            (["--app", "Claude", "--open", "https://example.com"], "shipyard ping: a ping has one action at most; pass one of --open, --app"),
-            (["--open", "https://a.example", "--open", "https://b.example"], "shipyard ping: a ping has one action at most; pass one of --open, --app"),
+            (["--open", "https://example.com", "--app", "Claude"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
+            (["--app", "Claude", "--open", "https://example.com"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
+            (["--open", "https://a.example", "--open", "https://b.example"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
             (["--open", "example.com"], "shipyard ping: `--open` takes a URL with its scheme, such as https://example.com, not `example.com`"),
             (["--app", " "], "shipyard ping: `--app` takes an app's bundle id or name"),
             (["--open"], "shipyard ping: `--open` needs a value"),

@@ -194,6 +194,7 @@ enum Palette {
         switch icon {
         case .link: "link"
         case .app: "macwindow"
+        case .terminal: "terminal"
         case .noAction: "bell.fill"
         }
     }

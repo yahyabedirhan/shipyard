@@ -99,6 +99,7 @@ public final class Shipyard {
     public let repositoriesStore: ResolvedRepositoriesStore
     private let tokenStore: any TokenStore
     private let actions: any ActionRunning
+    private let herdr: HerdrFocus
     private let notifier: any Notifying
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
@@ -138,6 +139,7 @@ public final class Shipyard {
         notifier: any Notifying,
         loginItem: any LoginItem,
         gh: any GhTokenLookup = GhCLI(),
+        herdr: HerdrFocus = HerdrFocus(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
@@ -151,6 +153,7 @@ public final class Shipyard {
         self.repositoriesStore = repositoriesStore
         self.tokenStore = tokenStore
         self.actions = actions
+        self.herdr = herdr
         self.notifier = notifier
         self.loginItem = loginItem
         self.clock = clock
@@ -818,7 +821,8 @@ public final class Shipyard {
     }
 
     /// Runs the action of the ping `id` names, as the store has it now (a
-    /// replace may have changed it), through the action port. When it
+    /// replace may have changed it), through the action port (a Herdr
+    /// action through `runHerdr`). When it
     /// works, or the ping has none, the ping is marked seen (and any earlier
     /// failure cleared); when it fails, the ping stays as it was and the
     /// failure's reason is recorded on it for its row. A ping no longer
@@ -829,7 +833,13 @@ public final class Shipyard {
             return Task {}
         }
         return Task {
-            switch await actions.run(action) {
+            let outcome: ActionOutcome
+            if case .herdr(let target) = action {
+                outcome = await runHerdr(target)
+            } else {
+                outcome = await actions.run(action)
+            }
+            switch outcome {
             case .done:
                 markPingsSeen([id])
             case .failed(let reason):
@@ -837,6 +847,16 @@ public final class Shipyard {
                 listPings()
             }
         }
+    }
+
+    /// A ping's Herdr action: focuses the tab or pane `target` names
+    /// (`HerdrFocus`), then, once that worked, brings `[herdr] terminal`
+    /// forward through the action port, as an `--app` action would. Without
+    /// a terminal set, only the focus runs. Either failing fails the action.
+    private func runHerdr(_ target: String) async -> ActionOutcome {
+        let focused = await herdr.focus(target)
+        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
+        return await actions.run(.app(terminal))
     }
 
     /// Reads the ping store again, removing the seen pings whose

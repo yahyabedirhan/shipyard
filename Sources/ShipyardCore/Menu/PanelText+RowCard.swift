@@ -138,6 +138,7 @@ extension PanelText {
         case .body(let text): text
         case .action(.url(let url)): "Opens \(url.absoluteString)"
         case .action(.app(let app)): "Opens \(app)"
+        case .action(.herdr(let id)): "Focuses \(id) in Herdr"
         case .failure(let reason): reason
         }
     }

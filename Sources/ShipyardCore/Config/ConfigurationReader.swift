@@ -84,7 +84,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -122,6 +122,18 @@ final class ConfigurationReader {
                     config.rateLimit.maxSharePercent = share
                 } else {
                     error("`max-share-percent` must be between 1 and 50 (got \(share))", at: rateLimit.path + [.key("max-share-percent")])
+                }
+            }
+        }
+
+        if let herdr = table(node, "herdr") {
+            warnUnknownKeys(in: herdr, known: ["terminal"])
+            if let terminal = string(herdr, "terminal") {
+                let app = terminal.trimmingCharacters(in: .whitespaces)
+                if app.isEmpty {
+                    error("`terminal` names your terminal app, by name or bundle id; leave it out to only focus the tab", at: herdr.path + [.key("terminal")])
+                } else {
+                    config.herdr.terminal = app
                 }
             }
         }

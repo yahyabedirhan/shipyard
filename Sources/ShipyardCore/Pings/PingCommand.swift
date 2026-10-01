@@ -12,7 +12,7 @@ public enum PingCommand {
     /// What `shipyard ping --help` prints.
     public static let usageText = """
         usage: shipyard ping "<title>" [--body <text>] [--from <label>]
-                             [--open <url> | --app <bundle id or name>]
+                             [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                              [--repo <owner/name> | --project <name>]
 
         Sends the user a ping: it's listed under the projects that watch the
@@ -24,10 +24,14 @@ public enum PingCommand {
           --from <label>       who sent it: the agent or the task
           --open <url>         clicking it opens this URL (a page, an app's deep link)
           --app <id or name>   clicking it brings this app forward, by bundle id or name
+          --herdr [<id>]       clicking it focuses this Herdr tab or pane (an id such as
+                               w1:t2 or w1:p3); with no id, your own pane ($HERDR_PANE_ID)
           --repo <owner/name>  file it by this repository instead of the working folder's
           --project <name>     file it under this project (its name in config.toml) only
 
-        One action at most; with none, clicking it only marks it seen.
+        One action at most; with none, clicking it only marks it seen. The
+        argument after --herdr is its id only when it's shaped like one
+        (workspace:tab or workspace:pane, as Herdr prints them).
 
         """
 
@@ -35,7 +39,11 @@ public enum PingCommand {
     static let usageLine = "shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"
 
     /// The flags that give a ping its action; it takes one at most.
-    static let actionFlags = ["--open", "--app"]
+    static let actionFlags = ["--open", "--app", "--herdr"]
+
+    /// The environment variable Herdr sets in each of its panes to that
+    /// pane's id, which `--herdr` without an id takes.
+    static let herdrPaneVariable = "HERDR_PANE_ID"
 
     /// Sends a ping with `arguments` (those after `ping`), sent at `now`.
     /// Without `--project` it's filed under every project of `configuration`
@@ -53,7 +61,7 @@ public enum PingCommand {
         newID: () -> String = Ping.newID
     ) -> CommandResult {
         let request: Request
-        switch Request.parse(arguments) {
+        switch Request.parse(arguments, herdrPane: environment.variables[herdrPaneVariable]) {
         case .success(let parsed): request = parsed
         case .failure(let error): return .usage("shipyard ping: \(error.message)")
         }
@@ -153,10 +161,12 @@ public enum PingCommand {
         var action: PingAction?
 
         /// Reads `arguments`: one title; `--body` and `--from`; one action
-        /// flag at most (`--open`, `--app`); `--repo <owner/name>` or
-        /// `--project <name>`; in any order. An empty `--body` or `--from`
-        /// is none.
-        static func parse(_ arguments: [String]) -> Result<Request, ParseError> {
+        /// flag at most (`--open`, `--app`, `--herdr`); `--repo <owner/name>`
+        /// or `--project <name>`; in any order. An empty `--body` or `--from`
+        /// is none. `--herdr` takes the next argument as its id when it's
+        /// shaped like a Herdr id (`isHerdrID`), and `herdrPane` (the
+        /// agent's own pane, from `HERDR_PANE_ID`) otherwise.
+        static func parse(_ arguments: [String], herdrPane: String? = nil) -> Result<Request, ParseError> {
             var titles: [String] = []
             var project: String?
             var repository: String?
@@ -203,6 +213,17 @@ public enum PingCommand {
                     index += 1
                     guard !value.isEmpty else { return .failure(ParseError("`--app` takes an app's bundle id or name")) }
                     actions.append(.app(value))
+                case "--herdr":
+                    if index < arguments.count, isHerdrID(arguments[index]) {
+                        actions.append(.herdr(arguments[index]))
+                        index += 1
+                    } else {
+                        let pane = herdrPane?.trimmingCharacters(in: .whitespaces) ?? ""
+                        guard !pane.isEmpty else {
+                            return .failure(ParseError("`--herdr` without an id focuses your own pane, but \(herdrPaneVariable) isn't set (you're not in Herdr); pass a tab or pane id such as w1:t2"))
+                        }
+                        actions.append(.herdr(pane))
+                    }
                 default:
                     return .failure(ParseError("unknown option `\(argument)`"))
                 }
@@ -227,6 +248,14 @@ public enum PingCommand {
                 action: actions.first
             ))
         }
+    }
+
+    /// Whether `argument` is shaped like a Herdr tab or pane id, as Herdr
+    /// prints them: a workspace, a colon, then `t` or `p` and a number
+    /// (`w1:t2`, `w1:p3`). Only such an argument after `--herdr` is its id,
+    /// so `--herdr "Ready"` still reads "Ready" as the title.
+    static func isHerdrID(_ argument: String) -> Bool {
+        argument.range(of: "^[^\\s:]+:[tp][0-9]+$", options: .regularExpression) != nil
     }
 
     /// Why the arguments don't read, as the error line says it.

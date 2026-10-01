@@ -103,6 +103,18 @@
         }
       }
     },
+    "herdr": {
+      "description": "How a ping's Herdr action (shipyard ping --herdr) takes you there: clicking it focuses the Herdr tab, then brings this terminal forward.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terminal": {
+          "description": "The terminal app Herdr runs in, by name (\"Ghostty\") or bundle id (\"com.mitchellh.ghostty\"), brought forward after the tab is focused. Unset: only the tab is focused.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "defaults": {
       "description": "What every project shows and notifies about, unless the project overrides it.",
       "type": "object",

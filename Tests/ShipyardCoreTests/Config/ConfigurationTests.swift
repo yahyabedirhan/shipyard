@@ -63,6 +63,9 @@ let everyKey = """
     review-requested = false
     checks-failed = false
 
+    [herdr]
+    terminal = "Ghostty"
+
     [defaults]
     group-by = "repository"
     subsections = true
@@ -203,6 +206,7 @@ struct ConfigurationDecodingTests {
         #expect(config.menu.layout == .tabs)
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
+        #expect(config.herdr == .init(terminal: "Ghostty"))
         #expect(config.defaults.pullRequests == .init(
             show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),

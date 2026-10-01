@@ -51,6 +51,19 @@ struct ConfigurationPingsTests {
         ])
     }
 
+    @Test("[herdr] terminal is unset by default, and names an app when set")
+    func herdrTerminal() throws {
+        #expect(Configuration().herdr.terminal == nil)
+        let config = try #require(decoded("[herdr]\nterminal = \" Ghostty \"\n")).configuration
+        #expect(config.herdr.terminal == "Ghostty")
+        #expect(rejection("[herdr]\nterminal = \" \"\n") == [
+            ConfigIssue(line: 2, message: "`terminal` names your terminal app, by name or bundle id; leave it out to only focus the tab"),
+        ])
+        #expect(rejection("[herdr]\nterminal = true\n") == [ConfigIssue(line: 2, message: "`herdr.terminal` must be a string")])
+        let warnings = try #require(decoded("[herdr]\nterminl = \"Ghostty\"\n")).warnings
+        #expect(warnings == [ConfigIssue(line: 2, message: "unknown setting `herdr.terminl` (ignored; did you mean `terminal`?)")])
+    }
+
     @Test("show must be true or false; another key under pings is only a warning")
     func showTypeAndUnknownKeys() throws {
         #expect(rejection("[defaults.pings]\nshow = \"yes\"\n") == [ConfigIssue(line: 2, message: "`defaults.pings.show` must be true or false")])

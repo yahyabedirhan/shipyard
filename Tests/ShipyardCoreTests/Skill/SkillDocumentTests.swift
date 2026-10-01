@@ -240,6 +240,8 @@ struct SkillDocumentTests {
         }
         #expect(c.defaults.arrangement.subsections == nil)
         #expect(text.contains("| `[defaults] subsections` | unset |"))
+        #expect(c.herdr.terminal == nil)
+        #expect(text.contains("| `[herdr] terminal` | unset |"))
         #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
         #expect(text.contains("| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` |"))
     }

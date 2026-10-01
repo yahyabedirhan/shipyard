@@ -19,6 +19,7 @@ public struct Configuration: Equatable, Sendable {
     public var menu = Menu()
     public var rateLimit = RateLimitSettings()
     public var attention = AttentionToggles()
+    public var herdr = HerdrSettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -71,6 +72,15 @@ extension Configuration {
             self.show = show
             self.maxSharePercent = maxSharePercent
         }
+    }
+
+    /// `[herdr]`: how a ping's Herdr action (`--herdr`) takes the user there.
+    public struct HerdrSettings: Equatable, Sendable {
+        /// The terminal app Herdr runs in, by name (`Ghostty`) or bundle id,
+        /// brought forward after the tab is focused; `nil` (the default)
+        /// only focuses the tab.
+        public var terminal: String?
+        public init(terminal: String? = nil) { self.terminal = terminal }
     }
 
     /// `[attention]`: which reasons make an item need attention.
@@ -709,6 +719,10 @@ extension Configuration {
         # [[defaults.notifications]]
         # event = "ping.sent"
         # authors = []
+
+        # Using Herdr? A ping an agent sends with --herdr focuses its tab when
+        # clicked. To bring your terminal forward too, add a [herdr] table and
+        # set terminal in it to the terminal app's name or bundle id, such as "Ghostty".
 
         # The largest share of each hourly GitHub rate limit shipyard may spend,
         # in percent (1 to 50). The limit is shared with your other tools.
