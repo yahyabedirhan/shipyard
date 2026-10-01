@@ -31,15 +31,18 @@ public struct CommandResult: Equatable, Sendable {
     }
 }
 
-/// What a command reads from where it runs: the working folder and the
-/// environment variables (`XDG_CONFIG_HOME`; later `HERDR_PANE_ID`).
+/// What a command reads from where it runs: the working folder, the
+/// environment variables (`XDG_CONFIG_HOME`; later `HERDR_PANE_ID`) and
+/// git, which says the working folder's remote `origin`.
 public struct CommandEnvironment: Sendable {
     public var workingDirectory: URL
     public var variables: [String: String]
+    public var git: any GitRemoteLookup
 
-    public init(workingDirectory: URL, variables: [String: String]) {
+    public init(workingDirectory: URL, variables: [String: String], git: any GitRemoteLookup = GitCLI()) {
         self.workingDirectory = workingDirectory
         self.variables = variables
+        self.git = git
     }
 }
 
@@ -53,8 +56,8 @@ public enum ShipyardCLI {
         usage: shipyard <command> [options]
 
         commands:
-          ping    send the user a ping, filed under a project:
-                  shipyard ping "<title>" --project <name>
+          ping    send the user a ping, filed by the working folder's repository:
+                  shipyard ping "<title>" [--repo <owner/name> | --project <name>]
 
         options:
           --help     show this help (shipyard ping --help for the command's)
@@ -64,11 +67,14 @@ public enum ShipyardCLI {
 
     /// Runs `arguments` (without the program's name): reads the
     /// configuration at `configURL` (a missing file is no projects; one that
-    /// doesn't read fails the command) and runs the command named first.
+    /// doesn't read fails the command) and the repositories the app last
+    /// resolved from `repositories` (none, when it hasn't yet), and runs the
+    /// command named first.
     public static func run(
         _ arguments: [String],
         environment: CommandEnvironment,
         configURL: URL,
+        repositories: ResolvedRepositoriesStore,
         pingStore: PingStore,
         now: Date
     ) -> CommandResult {
@@ -88,7 +94,14 @@ public enum ShipyardCLI {
             case .success(let read): configuration = read
             case .failure(let failure): return failure
             }
-            return PingCommand.run(rest, environment: environment, configuration: configuration, store: pingStore, now: now)
+            return PingCommand.run(
+                rest,
+                environment: environment,
+                configuration: configuration,
+                resolved: repositories.load(),
+                store: pingStore,
+                now: now
+            )
         default:
             return CommandResult(error: "shipyard: unknown command `\(command)`\n" + usageText, status: CommandResult.usageStatus)
         }

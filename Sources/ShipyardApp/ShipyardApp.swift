@@ -85,6 +85,7 @@ final class AppServices {
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
             pingStore: PingStore(directory: PingStore.defaultDirectory),
+            repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
             tokenStore: Keychain(),
             urlOpener: opener,
             notifier: notifier,

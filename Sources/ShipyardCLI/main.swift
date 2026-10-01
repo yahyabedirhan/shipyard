@@ -11,6 +11,7 @@ let result = ShipyardCLI.run(
         variables: environment
     ),
     configURL: ConfigStore.defaultURL(environment: environment),
+    repositories: ResolvedRepositoriesStore(directory: ResolvedRepositoriesStore.defaultDirectory),
     pingStore: PingStore(directory: PingStore.defaultDirectory),
     now: Date()
 )

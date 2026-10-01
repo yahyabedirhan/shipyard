@@ -43,6 +43,8 @@ struct Harness {
     let stateDirectory: URL
     /// The ping store the CLI and the app share, in `stateDirectory`.
     let pingStore: PingStore
+    /// The repositories the app last resolved, for the CLI, in `stateDirectory`.
+    let repositoriesStore: ResolvedRepositoriesStore
     let shipyard: Shipyard
 
     var clock: ManualClock { sleeper.clock }
@@ -71,11 +73,13 @@ struct Harness {
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
         pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true))
+        repositoriesStore = ResolvedRepositoriesStore(directory: stateDirectory)
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: stateDirectory),
             configStatusStore: ConfigStatusStore(directory: stateDirectory),
             pingStore: pingStore,
+            repositoriesStore: repositoriesStore,
             tokenStore: store,
             urlOpener: opener,
             notifier: notifier,
@@ -153,15 +157,25 @@ struct Harness {
         try Data(text.utf8).write(to: configURL)
     }
 
+    /// The folder the CLI runs in, as an agent's terminal would be.
+    var workingFolder: URL { stateDirectory.deletingLastPathComponent().appendingPathComponent("work", isDirectory: true) }
+
     /// Runs the `shipyard` CLI with `arguments` (without the program's
-    /// name) against this harness's configuration file and ping store, at
-    /// the clock's time, as an agent would in a terminal.
+    /// name) against this harness's configuration file, resolved
+    /// repositories and ping store, at the clock's time, as an agent would
+    /// in a terminal: in `workingFolder`, whose git remote `origin` is
+    /// `origin` (`nil`: not a git repository).
     @discardableResult
-    func cli(_ arguments: String...) -> CommandResult {
+    func cli(_ arguments: String..., origin: String? = nil) -> CommandResult {
         ShipyardCLI.run(
             arguments,
-            environment: CommandEnvironment(workingDirectory: stateDirectory, variables: [:]),
+            environment: CommandEnvironment(
+                workingDirectory: workingFolder,
+                variables: [:],
+                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
+            ),
             configURL: configURL,
+            repositories: repositoriesStore,
             pingStore: pingStore,
             now: clock.now
         )

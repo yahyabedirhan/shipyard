@@ -17,22 +17,26 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var sent: Date
     /// When the user saw it (clicked its row); `nil` while it needs attention.
     public var seen: Date?
+    /// The repository (`owner/name`) it was filed by, from the agent's
+    /// working folder or `--repo`; `nil` when it was filed with `--project`.
+    public var repository: String?
 
-    public init(id: String, title: String, projects: [String], sent: Date, seen: Date? = nil) {
+    public init(id: String, title: String, projects: [String], sent: Date, seen: Date? = nil, repository: String? = nil) {
         self.id = id
         self.title = title
         self.projects = projects
         self.sent = sent
         self.seen = seen
+        self.repository = repository
     }
 
     /// The ping as a listed item: kind `ping`, always open, aged from when
-    /// it was sent. Its URL only names it (`shipyard://ping/<id>`), so it
+    /// it was sent, in the repository it was filed by (if any). Its URL only names it (`shipyard://ping/<id>`), so it
     /// never collides with a GitHub item's; nothing opens it.
     public var item: Item {
         Item(
             kind: .ping,
-            repository: "",
+            repository: repository ?? "",
             number: 0,
             title: title,
             url: Self.url(id: id),

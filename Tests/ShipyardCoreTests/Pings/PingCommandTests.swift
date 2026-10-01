@@ -20,13 +20,26 @@ private let twoProjects = """
 struct PingCommandTests {
     let store = PingStore(directory: FileManager.default.temporaryDirectory
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
-    let environment = CommandEnvironment(workingDirectory: FileManager.default.temporaryDirectory, variables: [:])
+    /// The agent's working folder, a fake one: `origin` says its remote.
+    static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
+    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
 
-    private func ping(_ arguments: String..., config: String = twoProjects, id: String = "k7qm2x") throws -> CommandResult {
+    private func ping(
+        _ arguments: String...,
+        config: String = twoProjects,
+        origin: String? = nil,
+        resolved: [String: [String]] = [:],
+        id: String = "k7qm2x"
+    ) throws -> CommandResult {
         PingCommand.run(
             arguments,
-            environment: environment,
+            environment: CommandEnvironment(
+                workingDirectory: Self.folder,
+                variables: [:],
+                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:])
+            ),
             configuration: try Configuration.decode(config).configuration,
+            resolved: resolved,
             store: store,
             now: Harness.now,
             newID: { id }
@@ -65,23 +78,156 @@ struct PingCommandTests {
         #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
     }
 
-    @Test("without --project, it says to name one and lists the projects")
-    func projectMissing() throws {
-        let result = try ping("Ready")
+    @Test("without a flag, the working folder's origin remote picks the repository, and the ping is filed under its project")
+    func filedByTheWorkingFolder() throws {
+        let result = try ping("Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
+
+        #expect(result == CommandResult(output: "k7qm2x\n"))
+        #expect(store.all() == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, repository: "yahyabedirhan/shop")])
+    }
+
+    @Test("a repository two projects watch files the ping under both, matching its name ignoring case, spelled as the configuration does")
+    func filedUnderEveryWatcher() throws {
+        let config = twoProjects + """
+
+            [[projects]]
+            name = "everything"
+            repositories = ["yahyabedirhan/blog", "YahyaBedirhan/Shop"]
+
+            """
+        #expect(try ping("Ready", config: config, origin: "https://github.com/yahyabedirhan/shop").status == 0)
+
+        let filed = try #require(store.all().first)
+        #expect(filed.projects == ["shop", "everything"])
+        #expect(filed.repository == "yahyabedirhan/shop")
+    }
+
+    @Test("--repo overrides the working folder")
+    func repoOverrides() throws {
+        #expect(try ping("Published", "--repo", "yahyabedirhan/blog", origin: "git@github.com:yahyabedirhan/shop.git").status == 0)
+        #expect(store.all().map(\.projects) == [["blog"]])
+        #expect(store.all().map(\.repository) == ["yahyabedirhan/blog"])
+    }
+
+    @Test("--repo works outside a git folder")
+    func repoOutsideGit() throws {
+        #expect(try ping("Published", "--repo", "yahyabedirhan/blog").status == 0)
+        #expect(store.all().map(\.projects) == [["blog"]])
+    }
+
+    @Test("--project files the ping under that project alone, with no repository, whatever the working folder")
+    func projectOverrides() throws {
+        #expect(try ping("Ready", "--project", "blog", origin: "git@github.com:yahyabedirhan/shop.git").status == 0)
+        #expect(store.all().map(\.projects) == [["blog"]])
+        #expect(store.all().map(\.repository) == [nil])
+    }
+
+    @Test("--repo and --project together are a usage error")
+    func repoAndProject() throws {
+        let result = try ping("Ready", "--repo", "yahyabedirhan/shop", "--project", "shop")
 
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: name the project to file it under with --project <name>; the projects are `shop`, `blog`\n")
+        #expect(result.error == "shipyard ping: pass --repo or --project, not both\n")
         #expect(store.all().isEmpty)
+    }
+
+    @Test("--repo takes owner/name only")
+    func repoMustBeASlug() throws {
+        for value in ["shop", "yahyabedirhan/*", "https://github.com/yahyabedirhan/shop"] {
+            let result = try ping("Ready", "--repo", value)
+            #expect(result.status == 2, "\(value)")
+            #expect(result.error == "shipyard ping: `--repo` takes a repository as owner/name, not `\(value)`\n")
+        }
+        #expect(store.all().isEmpty)
+    }
+
+    @Test("a repository a group or owner/* brought in matches once the app has resolved it")
+    func resolvedRepository() throws {
+        let config = """
+            [[projects]]
+            name = "mine"
+            repositories = ["owned"]
+
+            [[projects]]
+            name = "org"
+            repositories = ["some-org/*"]
+
+            """
+        let unresolved = try ping("Ready", config: config, origin: "git@github.com:some-org/app.git")
+        #expect(unresolved.status == 1)
+
+        let result = try ping(
+            "Ready",
+            config: config,
+            origin: "git@github.com:some-org/app.git",
+            resolved: ["mine": ["yahyabedirhan/shop"], "org": ["Some-Org/app"], "gone": ["some-org/app"]]
+        )
+        #expect(result.status == 0)
+        #expect(store.all().map(\.projects) == [["org"]])
+        #expect(store.all().map(\.repository) == ["Some-Org/app"])
+    }
+
+    @Test("an unwatched repository fails, listing the projects, and stores nothing")
+    func unwatchedRepository() throws {
+        for result in [
+            try ping("Ready", origin: "git@github.com:someone/else.git"),
+            try ping("Ready", "--repo", "someone/else"),
+        ] {
+            #expect(result.status == 1)
+            #expect(result.output.isEmpty)
+            #expect(result.error == "shipyard ping: no project watches `someone/else`; pass --project <name> to file it under one; the projects are `shop`, `blog`\n")
+        }
+        #expect(store.all().isEmpty)
+    }
+
+    @Test("a working folder that isn't a git repository, or has no origin remote, fails with the projects listed")
+    func noRemote() throws {
+        let result = try ping("Ready")
+
+        #expect(result.status == 1)
+        #expect(result.error == "shipyard ping: the working folder (/work/shop) isn't a git repository with a remote `origin` to file the ping by; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
+        #expect(store.all().isEmpty)
+    }
+
+    @Test("an origin remote that doesn't name owner/name fails with the projects listed")
+    func remoteWithoutRepository() throws {
+        let result = try ping("Ready", origin: "/srv/git/shop")
+
+        #expect(result.status == 1)
+        #expect(result.error == "shipyard ping: the working folder's remote `origin` (/srv/git/shop) doesn't name a repository as owner/name; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
+    }
+
+    @Test(
+        "a remote's URL reads as owner/name in each form git writes it",
+        arguments: [
+            ("https://github.com/yahyabedirhan/shop.git", "yahyabedirhan/shop"),
+            ("https://github.com/yahyabedirhan/shop", "yahyabedirhan/shop"),
+            ("https://github.com/yahyabedirhan/shop/", "yahyabedirhan/shop"),
+            ("https://token@github.com/yahyabedirhan/shop.git", "yahyabedirhan/shop"),
+            ("git@github.com:yahyabedirhan/shop.git", "yahyabedirhan/shop"),
+            ("github.com:yahyabedirhan/my.site", "yahyabedirhan/my.site"),
+            ("ssh://git@github.com:22/yahyabedirhan/shop.git", "yahyabedirhan/shop"),
+            ("git://github.com/yahyabedirhan/shop", "yahyabedirhan/shop"),
+        ]
+    )
+    func remoteForms(url: String, slug: String) {
+        #expect(GitRemote.repository(fromURL: url) == slug)
+    }
+
+    @Test("a local remote, or one that names no owner/name, reads as none", arguments: ["/srv/git/shop", "file:///srv/git/shop", "shop", "https://github.com/shop", "https://gitlab.com/group/sub/shop", "git@host:", ""])
+    func remoteWithoutSlug(url: String) {
+        #expect(GitRemote.repository(fromURL: url) == nil)
     }
 
     @Test("a missing or empty title, a second title, an unknown flag or a flag without its value is a usage error")
     func usageErrors() throws {
         let cases: [([String], String)] = [
-            (["--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" --project <name>"),
-            (["  ", "--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" --project <name>"),
+            (["--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"),
+            (["  ", "--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"),
             (["Ready", "now", "--project", "shop"], "shipyard ping: one title only; quote it: shipyard ping \"Ready now\""),
             (["Ready", "--projcet", "shop"], "shipyard ping: unknown option `--projcet`"),
             (["Ready", "--project"], "shipyard ping: `--project` needs a value"),
+            (["Ready", "--repo"], "shipyard ping: `--repo` needs a value"),
         ]
         for (arguments, message) in cases {
             let result = PingCommand.run(
@@ -135,11 +281,11 @@ struct ShipyardCLITests {
 
         let help = harness.cli("--help")
         #expect(help.status == 0)
-        #expect(help.output.contains("shipyard ping \"<title>\" --project <name>"))
+        #expect(help.output.contains("shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
 
         let bare = harness.cli()
         #expect(bare.status == 2)
-        #expect(bare.error.contains("shipyard ping \"<title>\" --project <name>"))
+        #expect(bare.error.contains("shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
 
         let unknown = harness.cli("pnig", "Ready")
         #expect(unknown.status == 2)
@@ -156,7 +302,7 @@ struct ShipyardCLITests {
     func pingHelp() throws {
         let result = try Harness(config: twoProjects).cli("ping", "--help")
         #expect(result.status == 0)
-        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" --project <name>"))
+        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--repo <owner/name> | --project <name>]"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")

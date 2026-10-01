@@ -94,6 +94,9 @@ public final class Shipyard {
     /// The pings agents send with the `shipyard` CLI, which writes to the
     /// same store.
     public let pingStore: PingStore
+    /// Each project's repositories as last resolved, for the `shipyard` CLI
+    /// to file a ping by its repository without calling GitHub.
+    public let repositoriesStore: ResolvedRepositoriesStore
     private let tokenStore: any TokenStore
     private let urlOpener: any URLOpening
     private let notifier: any Notifying
@@ -129,6 +132,7 @@ public final class Shipyard {
         appStateStore: AppStateStore,
         configStatusStore: ConfigStatusStore,
         pingStore: PingStore,
+        repositoriesStore: ResolvedRepositoriesStore,
         tokenStore: any TokenStore,
         urlOpener: any URLOpening,
         notifier: any Notifying,
@@ -144,6 +148,7 @@ public final class Shipyard {
         self.appStateStore = appStateStore
         self.configStatusStore = configStatusStore
         self.pingStore = pingStore
+        self.repositoriesStore = repositoriesStore
         self.tokenStore = tokenStore
         self.urlOpener = urlOpener
         self.notifier = notifier
@@ -544,6 +549,9 @@ public final class Shipyard {
                 try await self.request { try await $0.repositories(of: lookup, at: now) }
             }
             guard current == session else { return }
+            // For the CLI; a file that can't be written leaves pings to
+            // match the configuration's `owner/name` selectors alone.
+            try? repositoriesStore.record(resolved.mapValues(\.repositories))
             let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
             let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }

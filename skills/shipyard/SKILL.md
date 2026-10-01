@@ -89,7 +89,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.finished-window` | `"3h"` | a window: how long finished runs stay listed (running ones always are) |
 | `workflow-runs.branches` | `"default-and-pull-requests"` | or `"all"` |
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
-| `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
+| `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `notifications` | one rule: `pr.opened`, `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
