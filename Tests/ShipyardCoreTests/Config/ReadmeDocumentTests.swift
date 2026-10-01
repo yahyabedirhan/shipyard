@@ -61,7 +61,7 @@ struct ReadmeDocumentTests {
         let rows = try examples(in: try readme())
         #expect(rows.count == 4)
         for row in rows {
-            #expect(row.image.hasPrefix("docs/assets/"), "\(row.image) isn't a relative path into docs/assets")
+            #expect(row.image.hasPrefix("assets/screenshots/"), "\(row.image) isn't a relative path into assets/screenshots")
             let path = repositoryRoot.appendingPathComponent(row.image).path
             #expect(FileManager.default.fileExists(atPath: path), "\(row.image) is missing")
         }

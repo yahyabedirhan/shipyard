@@ -32,7 +32,8 @@ type(scope): what changed
 
 ```text
 .handoff/<date>-<topic>.md     tracked   handoffs between sessions
-docs/assets/<topic>/           tracked   screenshots worth keeping, linked from issues, pull requests and docs
+assets/images/<topic>/         tracked   images the project uses, such as the logo and the app icon's drafts
+assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from issues, pull requests and docs
 .scratch/                      ignored   notes, logs, temp files, raw captures and pull request description sources
 .claude/worktrees/             ignored   sub-agent worktrees
 ```

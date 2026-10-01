@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/assets/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on a khaki green tile"></p>
+<p align="center"><img src="assets/images/logo/shipyard.png" width="128" alt="shipyard's logo: a cream sailboat on two waves, on a khaki green tile"></p>
 
 <h1 align="center">shipyard</h1>
 
@@ -83,7 +83,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="docs/assets/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+<img src="assets/screenshots/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 
 The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
 
@@ -101,7 +101,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="docs/assets/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
+<img src="assets/screenshots/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
 
 Grouped by date, three rows a group:
 
@@ -119,7 +119,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="docs/assets/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
+<img src="assets/screenshots/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
 
 A file with no projects (or no file at all): the panel asks how you'll use shipyard, offers the three presets, and offers the agent skill:
 
@@ -127,7 +127,7 @@ A file with no projects (or no file at all): the panel asks how you'll use shipy
 version = 1
 ```
 
-<img src="docs/assets/shipyard-0.0.2/presets.png" width="400" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
+<img src="assets/screenshots/shipyard-0.0.2/presets.png" width="400" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 
 ## Development
 
