@@ -122,7 +122,7 @@ icon-alternates: $(ICON_TOOL)
 # The minimal sailboat options, not yet the app's icon: a 512 pt PNG of each and
 # a comparison sheet (with the menu bar item and the badge) in the exploration folder.
 icon-exploration: $(ICON_TOOL)
-	$(ICON_TOOL) --exploration docs/assets/app-icon/exploration
+	$(ICON_TOOL) --exploration assets/images/app-icon/exploration
 
 clean:
 	rm -rf $(BUILD_DIR) .build
