@@ -62,6 +62,10 @@ public final class Shipyard {
     /// The pings in the ping store, as last read: at start and whenever the
     /// store changes (`reloadPings()`).
     public private(set) var pings: [Ping] = []
+    /// The notifications of pings that left (withdrawn, dismissed, past
+    /// their seen-window), still to take out of Notification Center
+    /// (`removeLeftBanners()`).
+    private var leftBanners: [String] = []
     /// Why the latest refresh failed; `nil` once one succeeds.
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
@@ -507,6 +511,7 @@ public final class Shipyard {
         guard phase.canRefresh else { return }
         // A seen ping whose seen-window has passed leaves the store too.
         listPings()
+        await removeLeftBanners()
         guard canRefreshNow else {
             if !gate.isRunning {
                 rebuildMenu(configStore.lastValid)
@@ -785,12 +790,16 @@ public final class Shipyard {
     }
 
     /// Removes the row's ping now (the hover ✕, or ⌫ on the selected
-    /// row), seen or not, with any failure on it. Any other row stays: only
-    /// pings can be dismissed.
-    public func dismiss(_ row: MenuRow) {
-        guard let ping = row.item.ping else { return }
+    /// row), seen or not, with any failure on it, and takes its
+    /// notification out of Notification Center. Any other row stays: only
+    /// pings can be dismissed. Returns the removal still running, for tests
+    /// to await; the app doesn't wait for it.
+    @discardableResult
+    public func dismiss(_ row: MenuRow) -> Task<Void, Never> {
+        guard let ping = row.item.ping else { return Task {} }
         try? pingStore.remove(id: ping.id)
         listPings()
+        return Task { await removeLeftBanners() }
     }
 
     // MARK: - Pings
@@ -798,10 +807,13 @@ public final class Shipyard {
     /// Reads the ping store again and, when a ping arrived, changed or
     /// went, lists the pings at once from the last snapshot: no GitHub
     /// request. A new ping a project lists posts its `ping.sent`
-    /// notification when the project's rules select it. The app's watcher
-    /// on the store calls this.
+    /// notification when the project's rules select it; a replaced one
+    /// (same id, same sent time) doesn't again. A ping that went (withdrawn
+    /// with the CLI) takes its notification out of Notification Center.
+    /// The app's watcher on the store calls this.
     public func reloadPings() async {
         guard listPings() else { return }
+        await removeLeftBanners()
         let configuration = configStore.lastValid
         let projects = configuration.projects.map(configuration.settings(for:))
         let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
@@ -872,10 +884,46 @@ public final class Shipyard {
             try? pingStore.remove(id: ping.id)
             return false
         }
+        forgetLeftPings(stored: stored)
         guard stored != pings else { return false }
         pings = stored
         rebuildMenu(configStore.lastValid)
         return true
+    }
+
+    /// Forgets the pings that left the store, so an id sent again later is
+    /// a new ping that notifies again (a replace, which keeps its
+    /// `instance`, never does), and queues their notifications for
+    /// `removeLeftBanners()`. A ping left when its `ping.sent` record names
+    /// no stored ping (withdrawn, dismissed, past its window, or gone while
+    /// the app wasn't running), or another instance than the stored one
+    /// (withdrawn and sent anew under its id, however soon).
+    private func forgetLeftPings(stored: [Ping]) {
+        let current = Dictionary(
+            stored.map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let pingRecords = appStateStore.state.notified.records.filter { key, record in
+            guard let url = URL(string: key), Ping.id(from: url) != nil else { return false }
+            return record.events.contains { $0 != current[key] }
+        }
+        guard !pingRecords.isEmpty else { return }
+        appStateStore.update { state in
+            for key in pingRecords.keys.sorted() {
+                leftBanners += state.notified.remove(itemID: key) { $0 != current[key] }
+            }
+        }
+    }
+
+    /// Takes the notifications of the pings that left out of Notification
+    /// Center. Before any new notification is posted, since a ping sent
+    /// again with the same id posts under the same notification id.
+    private func removeLeftBanners() async {
+        let banners = leftBanners
+        leftBanners = []
+        for id in banners {
+            await notifier.removeDelivered(id: id)
+        }
     }
 
     /// Whether `ping` has left every project it's filed under: it's seen,

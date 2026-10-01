@@ -30,6 +30,12 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// Why its action last failed, shown on its row until the next click,
     /// ⌥-click or dismiss; `nil` when it hasn't failed.
     public var failure: String?
+    /// Made new each time the id is sent as a new ping, and kept by a
+    /// replace: its `ping.sent` occurrence, so a ping withdrawn and sent
+    /// again under its id is new (and notifies) however soon it comes back,
+    /// even while the app wasn't running, and a replace never is. `nil` for
+    /// a ping written before it was kept.
+    public var instance: String?
 
     public init(
         id: String,
@@ -41,7 +47,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         body: String? = nil,
         sender: String? = nil,
         action: PingAction? = nil,
-        failure: String? = nil
+        failure: String? = nil,
+        instance: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -53,6 +60,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.sender = sender
         self.action = action
         self.failure = failure
+        self.instance = instance
     }
 
     /// What its notification says under the title: the body, then

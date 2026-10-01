@@ -300,13 +300,15 @@ public enum EventDetector {
     /// A `ping.sent` for every unseen ping each project lists, per project
     /// in `projects`' order. Pings aren't fetched, so they're not compared
     /// with known items: a ping is new until its `ping.sent` is recorded in
-    /// `NotifiedEvents`, which keys it by the ping's id, so it's notified at
-    /// most once, even when it's replaced or listed in two projects.
+    /// `NotifiedEvents`, which keys it by the ping's id, with its `instance`
+    /// as the occurrence, so it's notified at most once, even when it's
+    /// replaced or listed in two projects, and again only when it's sent
+    /// anew under its id.
     public static func pingEvents(listings: [String: [Item]], projects: [ProjectSettings]) -> [Event] {
         projects.flatMap { project in
             (listings[project.name] ?? [])
                 .filter { $0.kind == .ping && $0.ping?.seen == nil }
-                .map { Event(kind: .pingSent, project: project.name, item: $0) }
+                .map { Event(kind: .pingSent, project: project.name, item: $0, occurrence: $0.ping?.instance ?? "") }
         }
     }
 

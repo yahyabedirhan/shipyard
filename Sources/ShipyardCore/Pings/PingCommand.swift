@@ -6,14 +6,15 @@ import Foundation
 /// git remote it reads through `CommandEnvironment`, so tests call it as a
 /// function; the `shipyard` executable only prints what it returns.
 ///
-/// Its arguments are read as a subcommand first (so `withdraw` can join),
-/// then as a title and flags, in any order.
+/// Its arguments are read as a subcommand first (`withdraw`), then as a
+/// title and flags, in any order; `--` ends the flags.
 public enum PingCommand {
     /// What `shipyard ping --help` prints.
     public static let usageText = """
-        usage: shipyard ping "<title>" [--body <text>] [--from <label>]
+        usage: shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
                              [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                              [--repo <owner/name> | --project <name>]
+               shipyard ping withdraw <id>
 
         Sends the user a ping: it's listed under the projects that watch the
         repository of the working folder (its git remote `origin`), needs
@@ -22,6 +23,10 @@ public enum PingCommand {
 
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
+          --id <id>            name it, to replace or withdraw it later; sending
+                               an id again replaces that ping (new title, body,
+                               action and projects, unseen again, no second
+                               notification); without --id one is made up
           --open <url>         clicking it opens this URL (a page, an app's deep link)
           --app <id or name>   clicking it brings this app forward, by bundle id or name
           --herdr [<id>]       clicking it focuses this Herdr tab or pane (an id such as
@@ -31,7 +36,14 @@ public enum PingCommand {
 
         One action at most; with none, clicking it only marks it seen. The
         argument after --herdr is its id only when it's shaped like one
-        (workspace:tab or workspace:pane, as Herdr prints them).
+        (workspace:tab or workspace:pane, as Herdr prints them). An id is 1 to
+        64 lowercase letters, digits, - and _, starting with a letter or digit.
+        Everything after -- is the title, even `withdraw` or a word starting
+        with --: shipyard ping -- withdraw
+
+        `shipyard ping withdraw <id>` takes the ping back: it leaves the menu,
+        and its notification leaves Notification Center. It prints the id, or
+        fails when no ping has it.
 
         """
 
@@ -50,7 +62,9 @@ public enum PingCommand {
     /// that watches its repository: one the configuration names as
     /// `owner/name`, or one in the project's list in `resolved` (each
     /// project's repositories as the app last resolved them, by name).
-    /// `newID` makes the id; one already stored is drawn again.
+    /// `newID` makes the id when `--id` gives none; one already stored is
+    /// drawn again. A `--id` already stored replaces that ping: its sent
+    /// time stays, and it's unseen again with no failure.
     public static func run(
         _ arguments: [String],
         environment: CommandEnvironment,
@@ -90,23 +104,68 @@ public enum PingCommand {
             projects = watching.map(\.project)
             repository = watching[0].spelling
         }
-        var id = newID()
-        while store.ping(id: id) != nil { id = newID() }
+        let id: String
+        if let named = request.id {
+            id = named
+        } else {
+            var drawn = newID()
+            while store.ping(id: drawn) != nil { drawn = newID() }
+            id = drawn
+        }
+        let replaced = store.ping(id: id)
         do {
+            // A replace keeps when the ping was first sent, and its
+            // instance, so it isn't notified again; seen and failure start
+            // over, so it needs attention again.
             try store.save(Ping(
                 id: id,
                 title: request.title,
                 projects: projects,
-                sent: now,
+                sent: replaced?.sent ?? now,
                 repository: repository,
                 body: request.body,
                 sender: request.sender,
-                action: request.action
+                action: request.action,
+                instance: replaced?.instance ?? UUID().uuidString.lowercased()
             ))
         } catch {
             return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
         return CommandResult(output: id + "\n")
+    }
+
+    /// `shipyard ping withdraw <id>`, with `arguments` those after
+    /// `withdraw`: removes the ping `id` names from the store and prints
+    /// the id. The app, watching the store, takes it out of the menu and
+    /// its notification out of Notification Center. An id no ping has is
+    /// refused (exit 1), so a typo shows.
+    public static func withdraw(_ arguments: [String], store: PingStore) -> CommandResult {
+        guard arguments.count == 1, let id = arguments.first else {
+            return .usage("shipyard ping withdraw: give the id of one ping: shipyard ping withdraw <id>")
+        }
+        guard isID(id) else { return .usage("shipyard ping withdraw: \(idRule(id))") }
+        guard store.ping(id: id) != nil else {
+            return .failed("shipyard ping withdraw: no ping has the id `\(id)`; it may have been withdrawn, dismissed or have left already")
+        }
+        do {
+            try store.remove(id: id)
+        } catch {
+            return .failed("shipyard ping withdraw: couldn't remove the ping from \(store.directory.path) (\(error.localizedDescription))")
+        }
+        return CommandResult(output: id + "\n")
+    }
+
+    /// Whether `id` can name a ping: 1 to 64 lowercase letters, digits,
+    /// `-` and `_`, starting with a letter or digit. Generated ids are such
+    /// ids too. One rule for every id keeps it a safe file name and a URL
+    /// path, the same on case-insensitive disks.
+    static func isID(_ id: String) -> Bool {
+        id.range(of: "^[a-z0-9][a-z0-9_-]{0,63}$", options: .regularExpression) != nil
+    }
+
+    /// What's wrong with an id that isn't one, for the error line.
+    static func idRule(_ id: String) -> String {
+        "an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`"
     }
 
     /// Why the working folder names no repository, as the error line says it.
@@ -159,10 +218,13 @@ public enum PingCommand {
         /// `--from`'s label.
         var sender: String?
         var action: PingAction?
+        /// `--id`'s id; `nil` to make one up.
+        var id: String?
 
         /// Reads `arguments`: one title; `--body` and `--from`; one action
         /// flag at most (`--open`, `--app`, `--herdr`); `--repo <owner/name>`
-        /// or `--project <name>`; in any order. An empty `--body` or `--from`
+        /// or `--project <name>`; `--id <id>`; in any order. Everything after
+        /// `--` is the title, flags or not. An empty `--body` or `--from`
         /// is none. `--herdr` takes the next argument as its id when it's
         /// shaped like a Herdr id (`isHerdrID`), and `herdrPane` (the
         /// agent's own pane, from `HERDR_PANE_ID`) otherwise.
@@ -173,11 +235,17 @@ public enum PingCommand {
             var body: String?
             var sender: String?
             var actions: [PingAction] = []
+            var id: String?
             var index = 0
+            var flagsEnded = false
             while index < arguments.count {
                 let argument = arguments[index]
                 index += 1
-                guard argument.hasPrefix("--") else {
+                if argument == "--", !flagsEnded {
+                    flagsEnded = true
+                    continue
+                }
+                guard argument.hasPrefix("--"), !flagsEnded else {
                     titles.append(argument)
                     continue
                 }
@@ -194,6 +262,12 @@ public enum PingCommand {
                         return .failure(ParseError("`--repo` takes a repository as owner/name, not `\(value)`"))
                     }
                     repository = value
+                case "--id":
+                    guard index < arguments.count else { return .failure(ParseError("`\(argument)` needs a value")) }
+                    let value = arguments[index]
+                    index += 1
+                    guard isID(value) else { return .failure(ParseError("`--id`: \(idRule(value))")) }
+                    id = value
                 case "--body", "--from":
                     guard index < arguments.count else { return .failure(ParseError("`\(argument)` needs a value")) }
                     let value = arguments[index].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -245,7 +319,8 @@ public enum PingCommand {
                 repository: repository,
                 body: body,
                 sender: sender,
-                action: actions.first
+                action: actions.first,
+                id: id
             ))
         }
     }

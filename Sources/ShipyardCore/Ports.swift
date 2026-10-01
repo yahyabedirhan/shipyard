@@ -55,6 +55,10 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
 /// `Shipyard.openNotification(_:)` with the notification's `itemURL`.
 public protocol Notifying: Sendable {
     func post(_ notification: PostedNotification) async
+    /// Takes the notification `id` (`PostedNotification.id`) out of
+    /// Notification Center, as when its ping is withdrawn or dismissed. One
+    /// that was never posted, or is gone already, is no error.
+    func removeDelivered(id: String) async
 }
 
 /// Tells the core what time it is, so tests can fix and move time.

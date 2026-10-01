@@ -57,9 +57,10 @@ public enum ShipyardCLI {
 
         commands:
           ping    send the user a ping, filed by the working folder's repository:
-                  shipyard ping "<title>" [--body <text>] [--from <label>]
+                  shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
                                 [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                                 [--repo <owner/name> | --project <name>]
+                  shipyard ping withdraw <id>
 
         options:
           --help     show this help (shipyard ping --help for the command's)
@@ -90,7 +91,11 @@ public enum ShipyardCLI {
             return CommandResult(output: "shipyard \(ShipyardVersion.current)\n")
         case "ping":
             let rest = Array(arguments.dropFirst())
-            if rest.contains("--help") || rest.contains("-h") { return CommandResult(output: PingCommand.usageText) }
+            // After `--` it's the title's, not a flag.
+            let flags = rest.prefix { $0 != "--" }
+            if flags.contains("--help") || flags.contains("-h") { return CommandResult(output: PingCommand.usageText) }
+            // Withdrawing needs no projects, so a broken config.toml doesn't stop it.
+            if rest.first == "withdraw" { return PingCommand.withdraw(Array(rest.dropFirst()), store: pingStore) }
             let configuration: Configuration
             switch readConfiguration(at: configURL) {
             case .success(let read): configuration = read

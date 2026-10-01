@@ -46,12 +46,23 @@ struct PingCommandTests {
         )
     }
 
+    /// The stored pings, each without its `instance` (made up at random,
+    /// tested end to end in `PingIDTests`).
+    private var storedWithoutInstance: [Ping] {
+        store.all().map { ping in
+            var ping = ping
+            #expect(ping.instance != nil)
+            ping.instance = nil
+            return ping
+        }
+    }
+
     @Test("a ping with --project is stored under it, and its id printed")
     func sendsAPing() throws {
         let result = try ping("Ready for review", "--project", "shop")
 
         #expect(result == CommandResult(output: "k7qm2x\n"))
-        #expect(store.all() == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now)])
+        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now)])
     }
 
     @Test("the flags can come before the title")
@@ -83,7 +94,7 @@ struct PingCommandTests {
         let result = try ping("Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
 
         #expect(result == CommandResult(output: "k7qm2x\n"))
-        #expect(store.all() == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, repository: "yahyabedirhan/shop")])
+        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, repository: "yahyabedirhan/shop")])
     }
 
     @Test("a repository two projects watch files the ping under both, matching its name ignoring case, spelled as the configuration does")
@@ -302,7 +313,7 @@ struct ShipyardCLITests {
     func pingHelp() throws {
         let result = try Harness(config: twoProjects).cli("ping", "--help")
         #expect(result.status == 0)
-        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>]\n"))
+        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>] [--id <id>]\n"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")

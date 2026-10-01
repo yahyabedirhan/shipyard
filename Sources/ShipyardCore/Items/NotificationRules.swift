@@ -74,6 +74,23 @@ public struct NotifiedEvents: Equatable, Sendable {
         records[event.item.id, default: Record(events: [], present: now)].events.insert(Self.key(event))
     }
 
+    /// Drops the recorded events of the item `id` names that `isGone`
+    /// picks (by `key(_:)`), and the record once it holds none, returning
+    /// their ids (`Event.id`, which their notifications were posted under).
+    /// For a ping that left, or was sent anew under its id: that id sent
+    /// again is new, and notifies again.
+    public mutating func remove(itemID id: String, where isGone: (String) -> Bool) -> [String] {
+        guard var record = records[id] else { return [] }
+        let gone = record.events.filter(isGone)
+        guard !gone.isEmpty else { return [] }
+        record.events.subtract(gone)
+        records[id] = record.events.isEmpty ? nil : record
+        return gone.sorted().map { key in
+            let parts = key.split(separator: " ", maxSplits: 1).map(String.init)
+            return parts.count == 2 ? "\(parts[0]) \(id) \(parts[1])" : "\(key) \(id)"
+        }
+    }
+
     /// Notes which items a refresh still knows and drops the records of items
     /// gone for longer than `Attention.retention`, so an item that leaves the
     /// list and comes back (reopened after it fell out of the closed list)
@@ -92,7 +109,8 @@ public struct NotifiedEvents: Equatable, Sendable {
         return changed || records.count != before
     }
 
-    private static func key(_ event: Event) -> String {
+    /// How `event` is recorded in its item's record: its kind, then its occurrence.
+    static func key(_ event: Event) -> String {
         event.occurrence.isEmpty ? event.kind.rawValue : "\(event.kind.rawValue) \(event.occurrence)"
     }
 }
