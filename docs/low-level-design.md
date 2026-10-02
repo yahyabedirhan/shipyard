@@ -772,7 +772,7 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 ```text
 shipyard/
 ├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
-├── .github/workflows/ci.yml          # core build + tests on Ubuntu (Swift 6); everything built, bundled and tested on macOS
+├── .github/workflows/ci.yml          # core, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; .build cached between runs (docs/references/github-actions-cache.md)
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon, and the CLI as Contents/Helpers/shipyard), ad-hoc sign, zip, install, redraw the icon
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (olive-khaki, shipyard's logo, is the app's; origami, sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` and `Logo.swift` (`make icon-exploration` redraws the options the logo was chosen from)
