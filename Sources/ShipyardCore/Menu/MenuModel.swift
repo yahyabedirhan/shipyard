@@ -238,7 +238,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// The order kinds appear in within a section.
-    static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping]
+    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun]
 }
 
 /// One project in the panel.
@@ -246,7 +246,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
     /// Its listed items as `Arrangement` groups and sorts them: by default
-    /// pull requests, then issues, then workflow runs; within each kind, open
+    /// pull requests, then pings, then issues, then workflow runs; within each kind, open
     /// (or running) items first (most recently updated first), then closed
     /// (or finished) ones (most recently closed first).
     public var groups: [RowGroup]

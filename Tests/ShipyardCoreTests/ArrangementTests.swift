@@ -69,7 +69,7 @@ struct ArrangementTests {
 
     // MARK: - The default: today's grouping
 
-    @Test("by default: pull requests, issues, runs; open by last update, then closed by when they closed")
+    @Test("by default: pull requests, pings, issues, runs; open by last update, then closed by when they closed")
     func defaultIsToday() {
         let items = [
             item(1, .issue, updated: 3 * hour),
@@ -78,14 +78,15 @@ struct ArrangementTests {
             item(4, .workflowRun, state: .running, updated: hour),
             item(5, state: .closed, updated: 4 * hour, closed: 4 * hour),
             item(6, updated: hour),
+            item(7, .ping, updated: 2 * hour),
         ]
 
         let groups = arrange(items)
 
-        #expect(groups.map(\.id.key) == [.kind(.pullRequest), .kind(.issue), .kind(.workflowRun)])
-        #expect(numbers(groups) == [[6, 3, 5, 2], [1], [4]])
-        #expect(groups.map(\.title) == ["Pull requests", "Issues", "Runs"])
-        #expect(groups.map(\.id.project) == ["shipyard", "shipyard", "shipyard"])
+        #expect(groups.map(\.id.key) == [.kind(.pullRequest), .kind(.ping), .kind(.issue), .kind(.workflowRun)])
+        #expect(numbers(groups) == [[6, 3, 5, 2], [7], [1], [4]])
+        #expect(groups.map(\.title) == ["Pull requests", "Pings", "Issues", "Runs"])
+        #expect(groups.map(\.id.project) == ["shipyard", "shipyard", "shipyard", "shipyard"])
     }
 
     @Test("no items make no groups")
