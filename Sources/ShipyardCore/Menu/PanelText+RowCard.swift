@@ -103,7 +103,7 @@ extension PanelText {
             let ping = row.item.ping
             if let body = ping?.body { facts.append([.body(body)]) }
             if let action = ping?.action { facts.append([.action(action)]) }
-            if let failure = ping?.failure { facts.append([.failure(failure)]) }
+            if let failure = ping?.failureDetail ?? ping?.failure { facts.append([.failure(failure)]) }
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
         let tagged = row.attentionReasons.filter { $0 == .reviewRequested || $0 == .checksFailed }

@@ -179,8 +179,18 @@ struct HerdrActionTests {
             }
         }
 
-        /// The reason the row shows.
+        /// The reason the row shows, short enough for its meta column.
         var reason: String {
+            switch self {
+            case .paneGone: "Pane gone"
+            case .tabGone: "Tab gone"
+            case .notInstalled: "No herdr"
+            case .notRunning: "Herdr off"
+            }
+        }
+
+        /// The reason the hover card shows, whole.
+        var detail: String {
             switch self {
             case .paneGone: "Herdr pane w1:p9 is gone"
             case .tabGone: "Herdr tab w1:t9 is gone"
@@ -200,7 +210,7 @@ struct HerdrActionTests {
     }
 
     @Test(
-        "a gone pane or tab, a missing herdr or a Herdr not running fails the action: the ping stays unseen, the reason on its row, and the terminal stays put",
+        "a gone pane or tab, a missing herdr or a Herdr not running fails the action: the ping stays unseen, a short reason on its row and the whole one on its card, and the terminal stays put",
         arguments: Breakage.allCases
     )
     func failure(_ breakage: Breakage) async throws {
@@ -214,6 +224,7 @@ struct HerdrActionTests {
         #expect(row.needsAttention)
         #expect(row.actionError == breakage.reason)
         #expect(PanelText.rowDetail(row, showingRepository: false) == breakage.reason)
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == breakage.detail)
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.actions.ran.isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 1)
@@ -289,7 +300,7 @@ struct HerdrActionTests {
             timeout: 0.01
         )
 
-        #expect(await focus.focus("w1:t2") == .failed("Herdr didn't answer"))
+        #expect(await focus.focus("w1:t2") == .failed("No answer", detail: "Herdr didn't answer"))
         #expect(shell.started == 1)
         #expect(shell.cancelled == 1)
     }

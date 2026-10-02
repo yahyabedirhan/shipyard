@@ -68,27 +68,31 @@ public struct HerdrFocus: Sendable {
     /// when Herdr isn't running or doesn't answer within `timeout`, and
     /// when the tab or pane is gone.
     public func focus(_ id: String) async -> ActionOutcome {
-        guard let herdr = locate() else { return .failed("Couldn't find herdr") }
+        guard let herdr = locate() else { return .failed("No herdr", detail: "Couldn't find herdr") }
         var tab = id
         if !Self.isTab(id) {
             switch await run(herdr, ["pane", "get", id], about: id) {
-            case .failure(let reason): return .failed(reason.message)
+            case .failure(let reason): return reason.outcome
             case .success(let answer):
                 guard let found = (answer["pane"] as? [String: Any])?["tab_id"] as? String else {
-                    return .failed("Herdr didn't say which tab pane \(id) is in")
+                    return .failed("No tab", detail: "Herdr didn't say which tab pane \(id) is in")
                 }
                 tab = found
             }
         }
         switch await run(herdr, ["tab", "focus", tab], about: tab) {
-        case .failure(let reason): return .failed(reason.message)
+        case .failure(let reason): return reason.outcome
         case .success: return .done
         }
     }
 
-    /// Why a `herdr` command failed, as the ping's row says it.
+    /// Why a `herdr` command failed: in a few words for the ping's row,
+    /// and whole for its hover card.
     struct Failure: Error {
-        var message: String
+        var reason: String
+        var detail: String
+
+        var outcome: ActionOutcome { .failed(reason, detail: detail) }
     }
 
     /// Runs `herdr` with `arguments` and reads its answer, one JSON object:
@@ -96,11 +100,11 @@ public struct HerdrFocus: Sendable {
     private func run(_ herdr: String, _ arguments: [String], about id: String) async -> Result<[String: Any], Failure> {
         let output: ShellOutput?
         switch await runInTime(ShellInvocation(executable: herdr, arguments: arguments)) {
-        case .timedOut: return .failure(Failure(message: "Herdr didn't answer"))
+        case .timedOut: return .failure(Failure(reason: "No answer", detail: "Herdr didn't answer"))
         case .finished(let finished): output = finished
         }
         guard let output else {
-            return .failure(Failure(message: "Couldn't run herdr"))
+            return .failure(Failure(reason: "No herdr", detail: "Couldn't run herdr"))
         }
         let answer = (try? JSONSerialization.jsonObject(with: Data(output.output.utf8))) as? [String: Any]
         if output.status == 0 {
@@ -108,10 +112,10 @@ public struct HerdrFocus: Sendable {
         }
         let error = answer?["error"] as? [String: Any]
         switch error?["code"] as? String {
-        case "pane_not_found": return .failure(Failure(message: "Herdr pane \(id) is gone"))
-        case "tab_not_found": return .failure(Failure(message: "Herdr tab \(id) is gone"))
-        case "server_not_running": return .failure(Failure(message: "Herdr isn't running"))
-        default: return .failure(Failure(message: "Herdr couldn't focus \(id)"))
+        case "pane_not_found": return .failure(Failure(reason: "Pane gone", detail: "Herdr pane \(id) is gone"))
+        case "tab_not_found": return .failure(Failure(reason: "Tab gone", detail: "Herdr tab \(id) is gone"))
+        case "server_not_running": return .failure(Failure(reason: "Herdr off", detail: "Herdr isn't running"))
+        default: return .failure(Failure(reason: "No focus", detail: "Herdr couldn't focus \(id)"))
         }
     }
 

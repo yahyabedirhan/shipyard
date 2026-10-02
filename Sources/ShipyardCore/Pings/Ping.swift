@@ -27,9 +27,12 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// What clicking it does (`--open`, `--app`, `--herdr`); `nil` when it only marks
     /// it seen.
     public var action: PingAction?
-    /// Why its action last failed, shown on its row until the next click,
-    /// ⌥-click or dismiss; `nil` when it hasn't failed.
+    /// Why its action last failed, in a few words for its row, shown until
+    /// the next click, ⌥-click or dismiss; `nil` when it hasn't failed.
     public var failure: String?
+    /// The same, whole, for its hover card; `nil` when `failure` says it
+    /// all, or was written before the row's reason was kept short.
+    public var failureDetail: String?
     /// Made new each time the id is sent as a new ping, and kept by a
     /// replace: its `ping.sent` occurrence, so a ping withdrawn and sent
     /// again under its id is new (and notifies) however soon it comes back,
@@ -48,6 +51,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         sender: String? = nil,
         action: PingAction? = nil,
         failure: String? = nil,
+        failureDetail: String? = nil,
         instance: String? = nil
     ) {
         self.id = id
@@ -60,6 +64,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.sender = sender
         self.action = action
         self.failure = failure
+        self.failureDetail = failureDetail
         self.instance = instance
     }
 
@@ -78,8 +83,10 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         var mine = self, theirs = other
         mine.seen = nil
         mine.failure = nil
+        mine.failureDetail = nil
         theirs.seen = nil
         theirs.failure = nil
+        theirs.failureDetail = nil
         return mine == theirs
     }
 

@@ -865,8 +865,8 @@ public final class Shipyard {
             switch outcome {
             case .done:
                 markPingsSeen([ping])
-            case .failed(let reason):
-                try? pingStore.recordFailure(ping, reason: reason)
+            case .failed(let reason, let detail):
+                try? pingStore.recordFailure(ping, reason: reason, detail: detail)
                 listPings()
             }
         }

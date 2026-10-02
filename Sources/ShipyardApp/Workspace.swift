@@ -15,13 +15,13 @@ struct WorkspaceActions: ActionRunning {
         switch action {
         case .url(let url):
             let opened = await MainActor.run { NSWorkspace.shared.open(url) }
-            return opened ? .done : .failed("Couldn't open the link")
+            return opened ? .done : .failed("Bad link", detail: "Couldn't open the link")
         case .app(let app):
             return await Self.activate(app)
         case .herdr:
             // `Shipyard` focuses Herdr itself (`HerdrFocus`) and asks for
             // `[herdr] terminal` as an app; a Herdr action never comes here.
-            return .failed("Couldn't focus Herdr")
+            return .failed("No focus", detail: "Couldn't focus Herdr")
         }
     }
 
@@ -31,13 +31,13 @@ struct WorkspaceActions: ActionRunning {
     private static func activate(_ app: String) async -> ActionOutcome {
         let workspace = NSWorkspace.shared
         guard let url = workspace.urlForApplication(withBundleIdentifier: app) ?? application(named: app) else {
-            return .failed("No app named \(app)")
+            return .failed("No app", detail: "No app named \(app)")
         }
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = true
         return await withCheckedContinuation { continuation in
             workspace.openApplication(at: url, configuration: configuration) { _, error in
-                continuation.resume(returning: error == nil ? .done : .failed("Couldn't open \(app)"))
+                continuation.resume(returning: error == nil ? .done : .failed("App error", detail: "Couldn't open \(app)"))
             }
         }
     }

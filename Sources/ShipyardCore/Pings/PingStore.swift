@@ -56,17 +56,19 @@ public struct PingStore: Sendable {
               stored.seen == nil || stored.failure != nil else { return }
         stored.seen = stored.seen ?? now
         stored.failure = nil
+        stored.failureDetail = nil
         try save(stored)
     }
 
-    /// Records why `ping`'s action failed, for its row; it stays as seen
-    /// or unseen as it was. Read again just before the write, as
+    /// Records why `ping`'s action failed, in short for its row and whole
+    /// (`detail`) for its hover card; it stays as seen or unseen as it was. Read again just before the write, as
     /// `markSeen(_:at:)` is: a ping withdrawn, replaced or sent anew since
     /// changes nothing.
-    public func recordFailure(_ ping: Ping, reason: String) throws {
+    public func recordFailure(_ ping: Ping, reason: String, detail: String? = nil) throws {
         guard var stored = self.ping(id: ping.id), stored.isSameSending(as: ping),
-              stored.failure != reason else { return }
+              stored.failure != reason || stored.failureDetail != detail else { return }
         stored.failure = reason
+        stored.failureDetail = detail
         try save(stored)
     }
 
