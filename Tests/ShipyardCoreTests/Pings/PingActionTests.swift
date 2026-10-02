@@ -262,8 +262,8 @@ struct PingActionTests {
         let note = try harness.pingRow("Done")
         #expect(note.pingIcon == .noAction)
         #expect(PanelText.rowDetail(note, showingRepository: false) == "ping")
-        #expect(PanelText.stateLabel(note) == "ping")
-        #expect(PanelText.rowCard(note, now: harness.clock.now).lines.isEmpty)
+        #expect(PanelText.stateLabel(note) == "ping, click marks it seen")
+        #expect(PanelText.rowCard(note, now: harness.clock.now).lines == ["Nothing to open: clicking marks it seen"])
     }
 
     @Test("a pull request's row has no ping icon")

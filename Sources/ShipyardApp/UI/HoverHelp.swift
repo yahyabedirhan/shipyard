@@ -467,7 +467,7 @@ private struct FactView: View {
                 .foregroundStyle(.primary.opacity(0.78))
                 .lineLimit(8)
                 .fixedSize(horizontal: false, vertical: true)
-        case .action:
+        case .action, .noAction:
             Text(PanelText.fact(fact)).foregroundStyle(.secondary).truncationMode(.middle)
         default:
             Text(PanelText.fact(fact)).foregroundStyle(tint ?? .secondary)
@@ -493,6 +493,7 @@ private struct FactView: View {
         case .duration(_, let running): running ? "hourglass" : "timer"
         case .body: "text.alignleft"
         case .action(let action): Palette.symbol(action.icon)
+        case .noAction: "checkmark.circle"
         case .failure: "exclamationmark.triangle.fill"
         }
     }

@@ -60,6 +60,8 @@ public struct RowCard: Hashable, Sendable {
         case body(String)
         /// What clicking a ping does.
         case action(PingAction)
+        /// A ping with no action: clicking it only marks it seen.
+        case noAction
         /// Why a ping's action failed at its last click.
         case failure(String)
     }
@@ -102,7 +104,7 @@ extension PanelText {
             // takes you, and why that last failed.
             let ping = row.item.ping
             if let body = ping?.body { facts.append([.body(body)]) }
-            if let action = ping?.action { facts.append([.action(action)]) }
+            if let ping { facts.append([ping.action.map { .action($0) } ?? .noAction]) }
             if let failure = ping?.failureDetail ?? ping?.failure { facts.append([.failure(failure)]) }
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
@@ -139,6 +141,7 @@ extension PanelText {
         case .action(.url(let url)): "Opens \(url.absoluteString)"
         case .action(.app(let app)): "Opens \(app)"
         case .action(.herdr(let id)): "Focuses \(id) in Herdr"
+        case .noAction: "Nothing to open: clicking marks it seen"
         case .failure(let reason): reason
         }
     }

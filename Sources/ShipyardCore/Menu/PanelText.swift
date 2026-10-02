@@ -136,7 +136,7 @@ public enum PanelText {
         case .link: return "ping, opens a link"
         case .app: return "ping, opens an app"
         case .terminal: return "ping, focuses a Herdr tab"
-        case .noAction: return "ping"
+        case .noAction: return "ping, click marks it seen"
         case nil: break
         }
         let kind = switch row.kind {
