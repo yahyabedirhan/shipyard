@@ -171,9 +171,9 @@ Nouns from the requirements, sorted:
 | Configuration | **Entity** (value) with rules: defaults, per-project overrides, validation. |
 | Project | Field group inside Configuration (name, repositories, overrides). |
 | Item (PR, issue, run, ping) | **Entity** (value): kind, state, author, fingerprint; a ping's item carries its `Ping`. |
-| Ping | **Entity** (value): id, title, the projects it's filed under, when it was sent and seen; optionally its repository, body, sender, action (`PingAction`: `url`, `app` or `herdr`), the terminal app a `herdr` ping was sent from and its action's last failure. |
-| Action port | **Port** (`ActionRunning`): opens GitHub pages and runs a ping's link or app action, reporting `done` or `failed(reason)`. |
-| Herdr focus | **Entity** (`HerdrFocus`, over the `ShellRunning` port): runs `herdr` to focus a ping's tab or pane, reporting `done` or `failed(reason)`. Each `herdr` run races a timeout (`defaultTimeout`, 5 s; tests pass a short one): one that doesn't answer is cancelled (`ProcessShellRunner` stops the process) and fails with "Herdr didn't answer". |
+| Ping | **Entity** (value): id, title, the projects it's filed under, when it was sent and seen; optionally its number (per machine, N14), repository, body, sender, action (`PingAction`: `url`, `app` or `herdr`), the terminal app a `herdr` ping was sent from, and its action's last failure: a few words for the row (`failure`) and the whole reason for the hover card (`failureDetail`). |
+| Action port | **Port** (`ActionRunning`): opens GitHub pages and runs a ping's link or app action, reporting `done` or `failed(reason, detail:)` (a few words for the row, the whole reason for the hover card). |
+| Herdr focus | **Entity** (`HerdrFocus`, over the `ShellRunning` port): runs `herdr` to focus a ping's tab or pane, reporting `done` or `failed(reason, detail:)` (a few words for the row, the whole reason for the hover card). Each `herdr` run races a timeout (`defaultTimeout`, 5 s; tests pass a short one): one that doesn't answer is cancelled (`ProcessShellRunner` stops the process) and fails with "Herdr didn't answer". |
 | Ping store | **Entity** (store): the pings, one file each, written by the CLI and the app. |
 | Ping command | **Entity** (pure, over the store): reads `shipyard ping`'s arguments, files and saves the ping. |
 | Snapshot | **Entity** (value): all items of all projects from one refresh, plus per-source errors (a repository and a kind) and the rate limits seen. |
@@ -206,9 +206,9 @@ Shipyard -> Listing                items(project, snapshot, viewer, now) -> the 
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
 Shipyard -> ConfigStatusStore      record(verdict) after every reload, for agents
-Shipyard -> PingStore              all() at start and on every change the app's watcher sees; markSeen(ping) on a click that works or an ⌥-click; recordFailure(ping, reason) on one that doesn't; remove(id) on a dismiss; removeIfUnchanged(ping) for a seen ping past its seen-window
-Shipyard -> ActionRunning          open(url) for GitHub pages; run(ping's action) -> done | failed(reason) on a ping's click; run(.app([herdr] terminal)) after a Herdr focus
-Shipyard -> HerdrFocus             focus(tab or pane id) -> done | failed(reason) on a Herdr ping's click (#101)
+Shipyard -> PingStore              all() at start and on every change the app's watcher sees; markSeen(ping) on a click that works or an ⌥-click; recordFailure(ping, reason, detail) on one that doesn't; remove(id) on a dismiss; removeIfUnchanged(ping) for a seen ping past its seen-window
+Shipyard -> ActionRunning          open(url) for GitHub pages; run(ping's action) -> done | failed(reason, detail) on a ping's click; run(.app([herdr] terminal)) after a Herdr focus
+Shipyard -> HerdrFocus             focus(tab or pane id) -> done | failed(reason, detail) on a Herdr ping's click (#101)
 HerdrFocus -> ShellRunning         herdr pane get <pane> (its tab_id), herdr tab focus <tab>
 Shipyard -> ResolvedRepositoriesStore  record(each project's repositories) after every resolve, for the CLI
 CLILink -> LinkFileSystem          fileExists(app's CLI), entry(~/.local/bin/shipyard) -> none | link(destination) | other; createDirectory, createSymbolicLink on Link
@@ -720,7 +720,7 @@ The pings agents send, one JSON file per ping (`<id>.json`) in `~/Library/Applic
 | `ping(id:) -> Ping?` | one ping |
 | `save(ping) throws` | creates the directory when missing; replaces the ping's file atomically |
 | `markSeen(ping, at:) throws` | sets `seen` once (a second click keeps the first time) and clears `failure`. The ping is read again just before the write, and only the same sending as `ping` (`Ping.isSameSending`: same id, instance and content, whatever `seen` and `failure` say) is written: one withdrawn meanwhile stays gone, one replaced or sent anew stays unseen |
-| `recordFailure(ping, reason:) throws` | sets `failure`, leaving `seen` as it is; only on the same sending, as `markSeen` (#100) |
+| `recordFailure(ping, reason:detail:) throws` | sets `failure` (a few words, about 9 characters, to fit the row's meta column) and `failureDetail` (the whole reason, for the hover card; `nil` when the short one says it all, and on a failure written by 0.0.5), leaving `seen` as it is; only on the same sending, as `markSeen` (#100) |
 | `removeIfUnchanged(ping) throws -> Bool` | removes the ping only while the store holds it exactly as `ping` (read again just before), for a seen ping past its window: one replaced, sent anew or seen again since stays; whether it's gone |
 | `remove(id:) throws` | deletes the ping's file, its failure with it; an unknown id changes nothing (#103) |
 | `takeNumber() throws -> Int` | the store's next ping number (N14, #136): one more than the last it gave, kept in `last-number` beside the pings (not `.json`, so `all()` skips it), read and written in place under an exclusive `flock` on that file, so the CLI, the app and agents sending at once each get their own. A counter, not the highest stored number plus one, because a withdrawn number must not come back; a counter that's missing or doesn't read starts above the highest stored number |
@@ -1091,7 +1091,7 @@ Had the agent not withdrawn it, the seen ping would stay listed for `shop`'s `se
 | Variant | What happens |
 |---|---|
 | `--open https://claude.ai/artifact/42` or `--app Claude` instead of `--herdr` | the row shows a link or app icon; a click runs `ActionRunning.run(.url(…))` or `.app("Claude")` through the action port, then `markPingsSeen` (N8) |
-| the action fails: the pane closed (`failed("Herdr pane w1:p3 is gone")`) or no app named Claude | `PingStore.recordFailure`; the ping stays unseen, count **2**; its row reads the reason in red until the next click that works, ⌥-click, Mark all seen or a dismiss (N8) |
+| the action fails: the pane closed (`failed("Pane gone", detail: "Herdr pane w1:p3 is gone")`) or no app named Claude | `PingStore.recordFailure`; the ping stays unseen, count **2**; its row reads the short reason in red (the hover card has the whole one) until the next click that works, ⌥-click, Mark all seen or a dismiss (N8) |
 | no action | a click only marks it seen (N8) |
 | ⌥-click, Mark all seen | marked seen, no action run (N3, N9) |
 | the ✕ on the highlighted row, or ⌫ | `Shipyard.dismiss` → `PingStore.remove`; it leaves every project at once, banner and record as in step 11 (N9) |
