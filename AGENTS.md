@@ -66,6 +66,13 @@ When a ticket that changes what the maintainer sees or does is built, close it a
 
 Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac. Accessibility access is blocked for agents on purpose, so clicking, scripting or opening the installed app always fails; don't retry it or look for a way around it. When a change needs a check in the real menu, name the check in the handoff or pull request and leave it to the maintainer.
 
+Each contract has one owner test at the strongest boundary, usually a `Harness` scenario. A new or changed test passes this gate first, and a missing answer means it isn't added yet:
+
+1. What behaviour does the test protect: observable behaviour, or an independent contract (configuration, storage, CLI output and exit codes, platform, defaults, notifications)?
+2. What credible regression fails it?
+3. Why doesn't existing coverage catch that regression? Extend the owner's table or scenario before writing a near-duplicate.
+4. Does it need a seam (a `public` member, a hook, an overload) that no production caller needs? Then test through the real boundary instead.
+
 ## References
 
 Facts from GitHub's documentation that shipyard depends on (rate limits, workflow runs, device flow) live in `docs/references/`. Read the one for an area before changing it, and update it when you learn something new from the source.

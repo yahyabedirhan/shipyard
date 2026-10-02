@@ -37,16 +37,6 @@ struct ConfigStoreTests {
         #expect(store.error == nil)
     }
 
-    @Test("an empty file means the defaults with no projects")
-    func emptyFile() throws {
-        let url = temporaryConfigURL()
-        try write("", to: url)
-        let store = ConfigStore(url: url)
-        store.reload()
-        #expect(store.lastValid.projects.isEmpty)
-        #expect(store.error == nil)
-    }
-
     @Test("a broken file keeps the last valid configuration; fixing it clears the error")
     func lastValidFallback() throws {
         let url = temporaryConfigURL()
@@ -110,34 +100,6 @@ struct ConfigStoreTests {
         try FileManager.default.removeItem(at: url)
         #expect(store.reload() == .changed(Configuration()))
         #expect(!store.lastValid.hasProjects)
-    }
-}
-
-@Suite("Configuration store: creating the file")
-struct ConfigStoreCreateTests {
-    @Test("a missing file is created with the header alone, and reads as no projects")
-    func createsMissing() throws {
-        let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
-
-        let created = try store.createIfMissing()
-
-        #expect(created)
-        #expect(try contents(of: url) == Configuration.header)
-        #expect(store.reload() == .unchanged)
-        #expect(store.error == nil)
-    }
-
-    @Test("an existing file is left untouched")
-    func keepsExisting() throws {
-        let url = temporaryConfigURL()
-        try write(valid, to: url)
-        let store = ConfigStore(url: url)
-
-        let created = try store.createIfMissing()
-
-        #expect(!created)
-        #expect(try contents(of: url) == valid)
     }
 }
 

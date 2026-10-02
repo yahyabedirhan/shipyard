@@ -39,13 +39,6 @@ private extension Harness {
         try #require(section(project)?.rows.first { $0.number == number })
     }
 
-    /// Refreshes with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// The attention count.
     var count: Int { shipyard.menu.attention.total }
 }

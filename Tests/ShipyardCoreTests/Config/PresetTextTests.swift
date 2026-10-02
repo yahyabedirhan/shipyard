@@ -107,10 +107,4 @@ struct PresetTextTests {
         #expect(queue.arrangement.subsections == true)
         #expect(queue.notifications == [NotificationRule(event: .prReviewRequested), NotificationRule(event: .pingSent)])
     }
-
-    @Test("a project name with quotes is written as a TOML string")
-    func escapesNames() throws {
-        let config = try decoded(.myAgents, [NewProject(name: #"the "main" one"#, repositories: ["octocat/hello-world"])])
-        #expect(config.projects.map(\.name) == [#"the "main" one"#])
-    }
 }

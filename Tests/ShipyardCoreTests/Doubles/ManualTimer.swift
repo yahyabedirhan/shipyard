@@ -10,16 +10,12 @@ final class ManualTimer: RefreshTimer {
     }
 
     private let state = Locked<Arming?>(nil)
-    private let log = Locked<[TimeInterval]>([])
 
     /// The delay the timer is armed with now; `nil` when disarmed.
     var armed: TimeInterval? { state.current?.delay }
-    /// Every delay it was armed with, in order.
-    var armings: [TimeInterval] { log.current }
 
     func arm(after seconds: TimeInterval, _ fire: @escaping @Sendable () async -> Void) {
         state.withValue { $0 = Arming(delay: seconds, fire: fire) }
-        log.withValue { $0.append(seconds) }
     }
 
     func disarm() {

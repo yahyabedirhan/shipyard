@@ -51,12 +51,6 @@ struct MenuLayoutTests {
         #expect(harness.shipyard.menu.layout == .list)
     }
 
-    @Test("the layouts form a cycle: list, then tabs, then back to list")
-    func cycle() {
-        #expect(MenuLayout.list.next == .tabs)
-        #expect(MenuLayout.tabs.next == .list)
-    }
-
     @Test("stepping through the cycle visits every layout once before wrapping")
     func cycleVisitsEveryLayout() {
         for start in MenuLayout.allCases {

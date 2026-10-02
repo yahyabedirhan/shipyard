@@ -199,11 +199,6 @@ public struct GroupID: Hashable, Sendable {
         self.project = project
         self.key = key
     }
-
-    /// The All tab's group of `key`: the All tab has no project.
-    public static func allTab(_ key: GroupKey) -> GroupID {
-        GroupID(project: "", key: key)
-    }
 }
 
 // In `state.json`: `{ "project": "shop", "group": "kind:pullRequest" }`. A

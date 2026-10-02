@@ -40,14 +40,4 @@ struct PresetTests {
         #expect(refreshed.groups.map(\.title) == ["another/place", "someone/else"])
         #expect(harness.notifier.posted.map(\.title) == ["Review queue · Review requested on PR #9"])
     }
-
-    @Test("my-agents makes a project per picked repository, issues shown")
-    func myAgents() async throws {
-        let harness = try await Harness.started(config: Preset.myAgents.text(projects: [
-            NewProject(name: "shop", repositories: ["yabepa/shop"]),
-        ]))
-        #expect(harness.shipyard.configError == nil)
-        #expect(harness.shipyard.menu.sections.map(\.name) == ["shop"])
-        #expect(harness.shipyard.configStore.lastValid.defaults.issues.show)
-    }
 }

@@ -111,16 +111,14 @@ public final class ConfigStore: @unchecked Sendable {
 
     /// Creates the file (and its directory) with the commented header and
     /// the `#:schema` line when it's missing: at every start, on the Refresh
-    /// button, and before "Open configuration file" opens it. Returns
-    /// whether it created it; an existing file is never touched.
-    @discardableResult
-    public func createIfMissing() throws -> Bool {
+    /// button, and before "Open configuration file" opens it. An existing
+    /// file is never touched.
+    public func createIfMissing() throws {
         let fileManager = FileManager.default
-        guard !fileManager.fileExists(atPath: url.path) else { return false }
+        guard !fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         // `withoutOverwriting`: a file an editor wrote meanwhile wins.
         try Data(Configuration.header.utf8).write(to: url, options: .withoutOverwriting)
-        return true
     }
 
     /// Adds `projects` as `[[projects]]` blocks at the end of the file,
