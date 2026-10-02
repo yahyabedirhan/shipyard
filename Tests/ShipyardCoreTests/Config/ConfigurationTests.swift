@@ -66,6 +66,9 @@ let everyKey = """
     [herdr]
     terminal = "Ghostty"
 
+    [remote]
+    machines = ["hetzner-vps", "netcup-vps"]
+
     [defaults]
     group-by = "repository"
     subsections = true
@@ -207,6 +210,7 @@ struct ConfigurationDecodingTests {
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.herdr == .init(terminal: "Ghostty"))
+        #expect(config.remote == .init(machines: ["hetzner-vps", "netcup-vps"]))
         #expect(config.defaults.pullRequests == .init(
             show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),

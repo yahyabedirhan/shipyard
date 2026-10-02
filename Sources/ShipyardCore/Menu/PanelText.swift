@@ -86,13 +86,23 @@ public enum PanelText {
     }
 
     /// A ping's second line, which has no number: why its action failed,
-    /// while it has; otherwise its sender and its body on one line, each
-    /// when given, or "ping" when neither is: "claude · Waiting for your input".
+    /// while it has; otherwise the machine a remote ping came from, its
+    /// sender and its body on one line, each when given, or "ping" when
+    /// none is: "netcup-vps · claude · Waiting for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
-        let parts = [row.sender, body].compactMap { $0 }
+        let parts = [row.machine, row.sender, body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
+    }
+
+    /// What a ping's row names in the list layout's narrow column: the
+    /// machine a remote ping came from and its sender, "netcup-vps ·
+    /// claude", either alone when the other isn't there; `nil` when
+    /// neither is.
+    public static func pingMeta(_ row: MenuRow) -> String? {
+        let parts = [row.machine, row.sender].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".

@@ -41,6 +41,15 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// unanswered ping doesn't stay forever. `nil` on the Mac, where it stays
     /// until seen. Kept on the machine, never listed (`PingList`).
     public var expires: Date?
+    /// The Herdr label of the machine it was sent on, for a remote ping
+    /// the Mac read from that machine (`RemoteMachines`); `nil` for a ping
+    /// sent on this computer. Set by the reader, never stored or listed:
+    /// it isn't encoded.
+    public var machine: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, projects, sent, seen, repository, body, sender, action, failure, instance, expires
+    }
 
     public init(
         id: String,
@@ -54,7 +63,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         action: PingAction? = nil,
         failure: String? = nil,
         instance: String? = nil,
-        expires: Date? = nil
+        expires: Date? = nil,
+        machine: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -68,6 +78,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.failure = failure
         self.instance = instance
         self.expires = expires
+        self.machine = machine
     }
 
     /// What its notification says under the title: the body, then
@@ -106,8 +117,9 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
 
     /// The ping as a listed item: kind `ping`, always open, aged from when
     /// it was sent, in the repository it was filed by (if any). Its URL only
-    /// names it (`shipyard://ping/<id>`), so it never collides with a GitHub
-    /// item's; a click runs its `action` instead. It has no GitHub author:
+    /// names it (`shipyard://ping/<id>`, or `shipyard://ping/<machine>/<id>`
+    /// for a remote ping), so it never collides with a GitHub item's, nor
+    /// the same id on another machine; a click runs its `action` instead. It has no GitHub author:
     /// its sender is on the ping, apart from author filters and rules.
     public var item: Item {
         Item(
@@ -115,7 +127,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
             repository: repository ?? "",
             number: 0,
             title: title,
-            url: Self.url(id: id),
+            url: machine.map { Self.url(machine: $0, id: id) } ?? Self.url(id: id),
             author: "",
             authorKind: .other,
             state: .open,
@@ -130,11 +142,36 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         URL(string: "shipyard://ping/\(id)")!
     }
 
-    /// The id a ping's URL names; `nil` for any other URL.
+    /// The URL a remote ping's item is known by: its machine's label and
+    /// its id, each percent-encoded (a label may hold a space).
+    public static func url(machine: String, id: String) -> URL {
+        URL(string: "shipyard://ping/\(pathSegment(machine))/\(pathSegment(id))")!
+    }
+
+    /// The id a local ping's URL names; `nil` for a remote ping's URL, or
+    /// any other.
     public static func id(from url: URL) -> String? {
+        let path = segments(of: url)
+        return path?.count == 1 ? path?.first : nil
+    }
+
+    /// The machine and id a remote ping's URL names; `nil` for a local
+    /// ping's URL, or any other.
+    public static func remote(from url: URL) -> (machine: String, id: String)? {
+        guard let path = segments(of: url), path.count == 2 else { return nil }
+        return (path[0], path[1])
+    }
+
+    /// A ping URL's path, decoded: `[id]` or `[machine, id]`.
+    private static func segments(of url: URL) -> [String]? {
         guard url.scheme == "shipyard", url.host == "ping" else { return nil }
-        let id = url.lastPathComponent
-        return id.isEmpty || id == "/" ? nil : id
+        let path = url.pathComponents.filter { $0 != "/" }
+        return path.isEmpty || path.contains(where: \.isEmpty) ? nil : path
+    }
+
+    /// `text` as one path segment: everything but unreserved characters percent-encoded.
+    private static func pathSegment(_ text: String) -> String {
+        text.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? text
     }
 
     /// The letters a generated id is made of: lowercase letters and digits

@@ -1,32 +1,17 @@
 import Foundation
 
 /// Runs a ping's Herdr action (`--herdr`): focuses the tab or pane it
-/// names through the `herdr` command, so `Shipyard` can then bring
-/// `[herdr] terminal` forward. Herdr has no command that focuses a pane by
-/// its id, so a pane's tab is looked up (`herdr pane get`) and focused
-/// (`herdr tab focus`); a tab is focused at once.
-///
-/// It runs `herdr` itself, not through a shell, behind the `ShellRunning`
-/// port the skill installer uses (standard output and error together), so
-/// tests answer for `herdr`. An `.app` starts with an almost empty `PATH`,
-/// so `herdr` is looked for where its installer and Homebrew put it first,
-/// then on `PATH`, as `gh` is.
+/// names through the `herdr` command (`HerdrCommand`), so `Shipyard` can
+/// then bring `[herdr] terminal` forward. Herdr has no command that
+/// focuses a pane by its id, so a pane's tab is looked up (`herdr pane
+/// get`) and focused (`herdr tab focus`); a tab is focused at once.
 public struct HerdrFocus: Sendable {
     /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
     public static func knownPaths(home: URL) -> [String] {
-        [
-            home.appendingPathComponent(".local/bin/herdr").path,
-            "/opt/homebrew/bin/herdr",
-            "/usr/local/bin/herdr",
-        ]
+        HerdrCommand.knownPaths(home: home)
     }
 
-    private let home: URL
-    private let pathEnvironment: String?
-    private let isExecutable: @Sendable (String) -> Bool
-    private let runner: any ShellRunning
-    private let timeout: TimeInterval
-    private let sleep: Sleep
+    private let herdr: HerdrCommand
 
     /// How long one `herdr` run may take before it's stopped and the
     /// action fails: Herdr answers at once when it's well.
@@ -40,12 +25,14 @@ public struct HerdrFocus: Sendable {
         timeout: TimeInterval = HerdrFocus.defaultTimeout,
         sleep: @escaping Sleep = systemSleep
     ) {
-        self.home = home
-        self.pathEnvironment = pathEnvironment
-        self.isExecutable = isExecutable
-        self.runner = runner
-        self.timeout = timeout
-        self.sleep = sleep
+        herdr = HerdrCommand(
+            home: home,
+            pathEnvironment: pathEnvironment,
+            isExecutable: isExecutable,
+            runner: runner,
+            timeout: timeout,
+            sleep: sleep
+        )
     }
 
     /// Whether `id` is a tab's id (`w1:t2`); any other is taken for a pane's.
@@ -55,18 +42,13 @@ public struct HerdrFocus: Sendable {
 
     /// The first `herdr` found: the known paths, then each `PATH` directory.
     func locate() -> String? {
-        Self.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
+        herdr.locate()
     }
 
     /// The first `herdr` found under the home folder `home`: the known
     /// paths, then each directory of `pathEnvironment`.
     static func locate(home: URL, pathEnvironment: String?, isExecutable: (String) -> Bool) -> String? {
-        if let known = knownPaths(home: home).first(where: isExecutable) { return known }
-        for directory in (pathEnvironment ?? "").split(separator: ":") {
-            let candidate = directory.hasSuffix("/") ? "\(directory)herdr" : "\(directory)/herdr"
-            if isExecutable(candidate) { return candidate }
-        }
-        return nil
+        HerdrCommand.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
     }
 
     /// Focuses the tab `id` names, or the tab of the pane it names, and
@@ -74,10 +56,9 @@ public struct HerdrFocus: Sendable {
     /// when Herdr isn't running or doesn't answer within `timeout`, and
     /// when the tab or pane is gone.
     public func focus(_ id: String) async -> ActionOutcome {
-        guard let herdr = locate() else { return .failed("Couldn't find herdr") }
         var tab = id
         if !Self.isTab(id) {
-            switch await run(herdr, ["pane", "get", id], about: id) {
+            switch await run(["pane", "get", id], about: id) {
             case .failure(let reason): return .failed(reason.message)
             case .success(let answer):
                 guard let found = (answer["pane"] as? [String: Any])?["tab_id"] as? String else {
@@ -86,7 +67,7 @@ public struct HerdrFocus: Sendable {
                 tab = found
             }
         }
-        switch await run(herdr, ["tab", "focus", tab], about: tab) {
+        switch await run(["tab", "focus", tab], about: tab) {
         case .failure(let reason): return .failed(reason.message)
         case .success: return .done
         }
@@ -99,51 +80,20 @@ public struct HerdrFocus: Sendable {
 
     /// Runs `herdr` with `arguments` and reads its answer, one JSON object:
     /// its `result` when it worked, else why not, for the tab or pane `id`.
-    private func run(_ herdr: String, _ arguments: [String], about id: String) async -> Result<[String: Any], Failure> {
-        let output: ShellOutput?
-        switch await runInTime(ShellInvocation(executable: herdr, arguments: arguments)) {
+    private func run(_ arguments: [String], about id: String) async -> Result<[String: Any], Failure> {
+        switch await herdr.run(arguments) {
+        case .notFound: return .failure(Failure(message: "Couldn't find herdr"))
+        case .couldNotRun: return .failure(Failure(message: "Couldn't run herdr"))
         case .timedOut: return .failure(Failure(message: "Herdr didn't answer"))
-        case .finished(let finished): output = finished
-        }
-        guard let output else {
-            return .failure(Failure(message: "Couldn't run herdr"))
-        }
-        let answer = (try? JSONSerialization.jsonObject(with: Data(output.output.utf8))) as? [String: Any]
-        if output.status == 0 {
-            return .success(answer?["result"] as? [String: Any] ?? [:])
-        }
-        let error = answer?["error"] as? [String: Any]
-        switch error?["code"] as? String {
-        case "pane_not_found": return .failure(Failure(message: "Herdr pane \(id) is gone"))
-        case "tab_not_found": return .failure(Failure(message: "Herdr tab \(id) is gone"))
-        case "server_not_running": return .failure(Failure(message: "Herdr isn't running"))
-        default: return .failure(Failure(message: "Herdr couldn't focus \(id)"))
-        }
-    }
-
-    private enum Run: Sendable {
-        case finished(ShellOutput?)
-        case timedOut
-    }
-
-    /// Runs `invocation`, racing it against `timeout`: whichever ends first
-    /// stops the other (the runner returns at once when cancelled, and
-    /// `ProcessShellRunner` stops the process).
-    private func runInTime(_ invocation: ShellInvocation) async -> Run {
-        let runner = runner, timeout = timeout, sleep = sleep
-        return await withTaskGroup(of: Run?.self) { group in
-            group.addTask { .finished(await runner.run(invocation)) }
-            group.addTask {
-                // `nil` when the sleep is cancelled: herdr answered first.
-                guard (try? await sleep(timeout)) != nil else { return nil }
-                return .timedOut
+        case .finished(let output):
+            return HerdrCommand.answer(output).mapError { error in
+                switch error.code {
+                case "pane_not_found": Failure(message: "Herdr pane \(id) is gone")
+                case "tab_not_found": Failure(message: "Herdr tab \(id) is gone")
+                case "server_not_running": Failure(message: "Herdr isn't running")
+                default: Failure(message: "Herdr couldn't focus \(id)")
+                }
             }
-            var first: Run?
-            for await run in group where first == nil {
-                first = run
-                if run != nil { group.cancelAll() }
-            }
-            return first ?? .timedOut
         }
     }
 }

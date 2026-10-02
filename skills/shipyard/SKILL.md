@@ -72,6 +72,7 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, only the tab is focused |
+| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]` and `[defaults.pings]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 

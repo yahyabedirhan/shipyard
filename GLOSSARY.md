@@ -97,6 +97,14 @@ A change in an item that shipyard can notify about, such as `pr.opened` or `run.
 A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent.
 _Avoid_: Notification (that's the macOS banner), message, alert
 
+**Machine**:
+A computer where agents run in Herdr, known to the Mac's Herdr as a saved machine by its label, such as `netcup-vps`. The user names the machines shipyard asks for pings by those labels. The Mac itself is the local machine.
+_Avoid_: Host, server, remote (on its own)
+
+**Remote ping**:
+A ping sent on a machine other than the Mac. The Mac asks each machine for its pings and lists them beside its own, saying which machine each came from. One that no project takes is listed under its machine's name.
+_Avoid_: Remote notification, synced ping
+
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
 _Avoid_: Alert, subscription, watch

@@ -34,8 +34,11 @@ struct Harness {
     private let ghToken: String?
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
+    /// The remote machines' poll timer, apart from the refresh's.
+    let machineTimer = ManualTimer()
     let actions = RecordingActions()
-    /// The Herdr a ping's `--herdr` action focuses: no tabs until opened.
+    /// The Herdr a ping's `--herdr` action focuses, and the remote
+    /// machines are asked through: no tabs or machines until added.
     let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
     let loginItem = RecordingLoginItem()
@@ -88,9 +91,11 @@ struct Harness {
             loginItem: loginItem,
             gh: gh,
             herdr: herdr.focus,
+            remote: herdr.remote,
             transport: stub,
             clock: sleeper.clock,
             timer: timer,
+            machineTimer: machineTimer,
             sleep: sleeper.sleep,
             oauthClientID: clientID
         )

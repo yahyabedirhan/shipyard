@@ -12,7 +12,9 @@ import Observation
 /// rows need attention), and ask the rate budget when to run next. What the
 /// user has seen and collapsed, the items it knew and the events it notified
 /// are app state, kept by `appStateStore`. The pings agents send are kept by
-/// `pingStore` and listed with the projects' items, without GitHub.
+/// `pingStore` and listed with the projects' items, without GitHub; the
+/// pings of the remote machines (`[remote] machines`) are polled through
+/// Herdr on a timer of their own (`pollMachines()`) and listed with them.
 /// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
@@ -62,6 +64,11 @@ public final class Shipyard {
     /// The pings in the ping store, as last read: at start and whenever the
     /// store changes (`reloadPings()`).
     public private(set) var pings: [Ping] = []
+    /// What each remote machine (`[remote] machines`) last listed, and how
+    /// its latest poll went (`pollMachines()`).
+    public private(set) var remote = RemoteMachines()
+    /// How often the remote machines are polled, apart from the refresh.
+    public static let machinePollInterval: TimeInterval = 30
     /// The notifications of pings that left (withdrawn, dismissed, past
     /// their seen-window), still to take out of Notification Center
     /// (`removeLeftBanners()`).
@@ -104,6 +111,12 @@ public final class Shipyard {
     private let tokenStore: any TokenStore
     private let actions: any ActionRunning
     private let herdr: HerdrFocus
+    private let remoteReader: RemotePingReader
+    /// Polls the remote machines, apart from `timer`: no GitHub request.
+    private let machineTimer: any RefreshTimer
+    /// One poll of the remote machines at a time; a call meanwhile (an
+    /// edit adding a machine, ⌘R) makes one more run after it.
+    @ObservationIgnored private var machineGate = RefreshGate()
     private let notifier: any Notifying
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
@@ -144,9 +157,11 @@ public final class Shipyard {
         loginItem: any LoginItem,
         gh: any GhTokenLookup = GhCLI(),
         herdr: HerdrFocus = HerdrFocus(),
+        remote: RemotePingReader = RemotePingReader(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
+        machineTimer: any RefreshTimer = TaskRefreshTimer(),
         sleep: @escaping Sleep = systemSleep,
         oauthClientID: String = OAuthApp.clientID
     ) {
@@ -158,6 +173,8 @@ public final class Shipyard {
         self.tokenStore = tokenStore
         self.actions = actions
         self.herdr = herdr
+        self.remoteReader = remote
+        self.machineTimer = machineTimer
         self.notifier = notifier
         self.loginItem = loginItem
         self.clock = clock
@@ -185,6 +202,8 @@ public final class Shipyard {
         // Pings sent while the app wasn't running list and notify now,
         // signed in or not, without waiting for GitHub.
         await reloadPings()
+        // So do the remote machines' pings, from their first poll.
+        followMachines()
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -360,6 +379,7 @@ public final class Shipyard {
             // New selectors, or `archived` and `forks` changed: look them up now.
             forceResolve = true
             followLaunchAtLogin()
+            followMachines()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // Projects, filters, `[attention]` and `[menu-bar]` apply at
             // once, even if the refresh below can't run (paused) or fails.
@@ -575,10 +595,11 @@ public final class Shipyard {
             budget.record(snapshot.rateLimits, at: clock.now)
             // What each project has: the menu, the counts and the
             // notifications below all read these, and nothing else.
-            let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
+            let listings = self.listings(for: projects, in: snapshot, configuration: configuration)
             var notifications: [PostedNotification] = []
+            let listed = listedPings
             appStateStore.update { state in
-                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, pings: pings, state: &state, at: now)
+                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, pings: listed, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
             var built = MenuModel.build(
@@ -590,7 +611,10 @@ public final class Shipyard {
                 now: clock.now
             )
             // A fold whose group is gone, or whose project is, goes too.
+            // A machine's section may only be waiting for its poll: its folds stay.
+            let machines = Set(configuration.remote.machines)
             let folds = built.foldsToKeep(appStateStore.state.collapsedGroups)
+                .union(appStateStore.state.collapsedGroups.filter { machines.contains($0.project) })
             appStateStore.update { $0.collapsedGroups = folds }
             built.foldedGroups = folds
             menu = built
@@ -723,7 +747,11 @@ public final class Shipyard {
     /// await; the app doesn't wait for it.
     @discardableResult
     public func open(_ row: MenuRow) -> Task<Void, Never> {
-        if let ping = row.item.ping { return runAction(ofPing: ping.id) }
+        if let ping = row.item.ping {
+            // A remote ping isn't in the ping store: its click is its machine's.
+            guard ping.machine == nil else { return Task {} }
+            return runAction(ofPing: ping.id)
+        }
         actions.open(row.url)
         markSeen(row)
         return Task {}
@@ -754,6 +782,7 @@ public final class Shipyard {
     @discardableResult
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
+        guard Ping.remote(from: itemURL) == nil else { return Task {} }
         actions.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
@@ -770,7 +799,7 @@ public final class Shipyard {
     /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
         if let ping = row.item.ping {
-            markPingsSeen([ping])
+            if ping.machine == nil { markPingsSeen([ping]) }
             return
         }
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
@@ -785,7 +814,7 @@ public final class Shipyard {
             .filter { Attention.canNeedAttention($0.item) }
         guard !rows.isEmpty else { return }
         let now = clock.now
-        let listed = rows.compactMap(\.item.ping)
+        let listed = rows.compactMap(\.item.ping).filter { $0.machine == nil }
         if !listed.isEmpty { markPingsSeen(listed) }
         let items = rows.filter { $0.item.ping == nil }.map(\.item)
         guard !items.isEmpty else { return }
@@ -801,7 +830,7 @@ public final class Shipyard {
     /// to await; the app doesn't wait for it.
     @discardableResult
     public func dismiss(_ row: MenuRow) -> Task<Void, Never> {
-        guard let ping = row.item.ping else { return Task {} }
+        guard let ping = row.item.ping, ping.machine == nil else { return Task {} }
         try? pingStore.remove(id: ping.id)
         listPings()
         return Task { await removeLeftBanners() }
@@ -821,7 +850,7 @@ public final class Shipyard {
         await removeLeftBanners()
         let configuration = configStore.lastValid
         let projects = configuration.projects.map(configuration.settings(for:))
-        let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
+        let listings = self.listings(for: projects, in: snapshot, configuration: configuration)
         let events = EventDetector.pingEvents(listings: listings, projects: projects)
         let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
         guard !unhandled.isEmpty else { return }
@@ -880,6 +909,76 @@ public final class Shipyard {
         let focused = await herdr.focus(target)
         guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
         return await actions.run(.app(terminal))
+    }
+
+    // MARK: - Remote machines
+
+    /// The pings listed: the ping store's, then the remote machines'.
+    private var listedPings: [Ping] { pings + remote.pings }
+
+    /// Every project's listing, and each remote machine's own, from
+    /// `snapshot` and the listed pings (`Listing.listings`).
+    private func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, configuration: Configuration) -> [String: [Item]] {
+        Listing.listings(
+            for: projects,
+            in: snapshot,
+            pings: listedPings,
+            machines: configuration.remote.machines.map(configuration.settings(forMachine:)),
+            now: clock.now
+        )
+    }
+
+    /// Follows `[remote] machines` in the last valid configuration: at
+    /// start and on every valid change. A changed list keeps what the
+    /// machines still listed know, drops the removed ones' pings, and
+    /// polls at once; no machines stops polling.
+    private func followMachines() {
+        let labels = configStore.lastValid.remote.machines
+        guard labels != remote.labels else { return }
+        remote.follow(labels)
+        rebuildMenu(configStore.lastValid)
+        armMachineTimer(after: 0)
+    }
+
+    /// Asks every remote machine for its pings at once, through Herdr
+    /// (`RemotePingReader`), and lists each machine's as it answers, so a
+    /// slow one never holds up another. A machine that fails keeps its
+    /// last pings and records why. No GitHub request is made. Then the
+    /// machine timer comes back in `machinePollInterval`. Its timer calls
+    /// this. A call while a poll runs returns at once, and the running poll
+    /// goes again when it's done, so a machine added meanwhile is asked.
+    public func pollMachines() async {
+        guard !remote.labels.isEmpty, machineGate.begin() else { return }
+        repeat {
+            await pollMachinesOnce()
+        } while machineGate.finish() && machineGate.begin()
+        armMachineTimer(after: Self.machinePollInterval)
+    }
+
+    private func pollMachinesOnce() async {
+        let reader = remoteReader
+        await withTaskGroup(of: (String, Result<PingList, RemotePingReader.Failure>).self) { group in
+            for label in remote.labels {
+                group.addTask { (label, await reader.list(machine: label)) }
+            }
+            for await (label, result) in group {
+                let before = remote.machine(label)?.pings
+                remote.record(result, for: label, at: clock.now)
+                if remote.machine(label)?.pings != before { rebuildMenu(configStore.lastValid) }
+            }
+        }
+    }
+
+    /// Arms the machine timer to poll after `seconds` while there are
+    /// remote machines, and stops it otherwise.
+    private func armMachineTimer(after seconds: TimeInterval) {
+        guard !remote.labels.isEmpty else {
+            machineTimer.disarm()
+            return
+        }
+        machineTimer.arm(after: seconds) { [weak self] in
+            await self?.pollMachines()
+        }
     }
 
     /// Reads the ping store again, removing the seen pings whose
@@ -1018,12 +1117,7 @@ public final class Shipyard {
     /// rate-limit indicator: a project added since shows as not loaded yet,
     /// a removed one disappears. Follows the menu bar rule of `applyAttention`.
     private func rebuildMenu(_ configuration: Configuration) {
-        let listings = Listing.listings(
-            for: configuration.projects.map(configuration.settings(for:)),
-            in: snapshot,
-            pings: pings,
-            now: clock.now
-        )
+        let listings = self.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, configuration: configuration)
         var rebuilt = MenuModel.build(
             listings: listings,
             snapshot: snapshot,
