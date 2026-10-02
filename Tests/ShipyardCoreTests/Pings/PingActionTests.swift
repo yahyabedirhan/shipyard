@@ -306,14 +306,6 @@ struct PingActionTests {
         #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
     }
 
-    @Test("each known agent has its own mark: a two-letter monogram and a hue")
-    func agentMarks() {
-        let marks = KnownAgent.allCases.map(\.mark)
-        #expect(Set(marks.map(\.monogram)).count == KnownAgent.allCases.count)
-        #expect(Set(marks.map(\.hue)).count == KnownAgent.allCases.count)
-        #expect(marks.allSatisfy { $0.monogram.count == 2 && (0..<1).contains($0.hue) })
-    }
-
     // MARK: Grouping
 
     @Test("group-by = \"author\" groups pings by sender, after the authors; pings without one sit in a Pings group, last")

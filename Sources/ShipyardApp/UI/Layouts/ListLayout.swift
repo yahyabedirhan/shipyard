@@ -308,7 +308,7 @@ private struct ListRow: View {
             if let meta {
                 HStack(spacing: 3) {
                     if let agent = metaAgent {
-                        AgentMarkView(agent: agent, size: 12)
+                        AgentMarkView(agent: agent, size: Grid.agentMark)
                     } else if let symbol = metaSymbol {
                         Image(systemName: symbol)
                             .font(.system(size: 9, weight: .medium))

@@ -141,25 +141,30 @@ struct StateSymbol: View {
     }
 }
 
-/// A known agent's mark: its monogram in white on a circle of its hue,
-/// shipyard's own drawing rather than the agent's logo. Decoration: the
-/// sender's name beside it, or the card's words, say who sent the ping.
+/// A known agent's mark: its logo, fitted to a square with the corners an
+/// app icon has; a one-colour glyph is tinted like text, and a logo with a
+/// dark-mode file switches to it. Decoration: the sender's name beside it,
+/// or the card's words, say who sent the ping.
 struct AgentMarkView: View {
     let agent: KnownAgent
     let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Circle()
-            .fill(Palette.agent(agent.mark))
-            .overlay {
-                Text(agent.mark.monogram)
-                    .font(.system(size: size * 0.46, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.5)
-                    .lineLimit(1)
+        Group {
+            if let image = AgentLogoImage.image(for: agent, dark: colorScheme == .dark) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .foregroundStyle(.primary)
+            } else {
+                Color.clear
             }
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .accessibilityHidden(true)
     }
 }
 
