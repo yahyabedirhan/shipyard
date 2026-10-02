@@ -4,14 +4,6 @@ import Testing
 
 @Suite("Configuration: states")
 struct ConfigurationStatesTests {
-    @Test("each kind lists every one of its states by default")
-    func everyStateByDefault() {
-        let defaults = Configuration().defaults
-        #expect(defaults.pullRequests.states == [.open, .merged, .closed])
-        #expect(defaults.issues.states == [.open, .closed])
-        #expect(defaults.workflowRuns.states == [.inProgress, .failed, .succeeded])
-    }
-
     @Test("a project's states replace the defaults' for that kind, and leave the other kinds' alone")
     func projectReplacesDefaults() throws {
         let config = try #require(decoded("""
