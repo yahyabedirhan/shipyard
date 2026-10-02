@@ -23,7 +23,7 @@ private extension Harness {
         let result = cli(["ping", title, "--project", "shop"] + flags, herdrPane: pane, variables: variables)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping row titled `title` in `shop`.
@@ -77,7 +77,7 @@ struct HerdrActionTests {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         let result = harness.cli("ping", "--herdr", "Ready: w1", "--project", "shop", herdrPane: "w1:p3")
         try #require(result.status == 0, "\(result.error)")
-        let ping = try #require(harness.pingStore.ping(id: result.output.trimmingCharacters(in: .newlines)))
+        let ping = try #require(harness.pingStore.ping(id: result.pingID))
         #expect(ping.title == "Ready: w1")
         #expect(ping.action == .herdr("w1:p3"))
         #expect(PingCommand.isHerdrID("w1:t2"))
@@ -300,7 +300,7 @@ struct HerdrActionTests {
         let row = try harness.pingRow("Waiting")
         #expect(row.needsAttention)
         #expect(row.actionError == breakage.reason)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == breakage.reason)
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(breakage.reason)")
         #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == breakage.detail)
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.actions.ran.isEmpty)

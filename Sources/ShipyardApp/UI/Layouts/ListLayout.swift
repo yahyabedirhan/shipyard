@@ -287,8 +287,9 @@ private struct ListRow: View {
             AttentionDot(isOn: row.needsAttention)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
-            // A ping has no number; the column stays, so titles line up.
-            Text(row.kind == .ping ? "" : String(row.number))
+            // A ping written before pings were numbered has none (0); the
+            // column stays, so titles line up.
+            Text(row.number > 0 ? String(row.number) : "")
                 .font(TypeScale.meta)
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: Grid.numberColumn, alignment: .trailing)

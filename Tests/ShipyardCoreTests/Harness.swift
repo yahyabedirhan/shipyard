@@ -212,6 +212,14 @@ extension GroupID {
     }
 }
 
+extension CommandResult {
+    /// The id a `shipyard ping` that worked printed, from its line
+    /// `#<number> <id>`.
+    var pingID: String {
+        output.trimmingCharacters(in: .newlines).split(separator: " ").last.map(String.init) ?? ""
+    }
+}
+
 /// An ISO 8601 date, for comparing with the fixtures.
 func date(_ text: String) -> Date {
     ISO8601DateFormatter().date(from: text)!

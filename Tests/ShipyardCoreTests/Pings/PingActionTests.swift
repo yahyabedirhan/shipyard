@@ -28,7 +28,7 @@ private extension Harness {
         let result = cli(["ping", title, "--project", "shop"] + flags)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping row titled `title` in `shop`.
@@ -169,7 +169,7 @@ struct PingActionTests {
         var row = try harness.pingRow("Needs you")
         #expect(row.needsAttention)
         #expect(row.actionError == "No app named Claude")
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "No app named Claude")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · No app named Claude")
         #expect(PanelText.rowCard(row, now: harness.clock.now).lines.contains("No app named Claude"))
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.shipyard.menu.attention.pings == 1)
@@ -180,7 +180,7 @@ struct PingActionTests {
         row = try harness.pingRow("Needs you")
         #expect(row.actionError == nil)
         #expect(row.needsAttention == false)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "claude")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · claude")
         #expect(harness.actions.ran == [.app("Claude"), .app("Claude")])
     }
 
@@ -246,9 +246,9 @@ struct PingActionTests {
         #expect(link.sender == "claude")
         #expect(link.agent == .claude)
         #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
-        #expect(PanelText.rowDetail(link, showingRepository: false) == "claude · The design doc, ready to read")
+        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · claude · The design doc, ready to read")
         harness.clock.advance(by: 300)
-        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "claude · The design doc, ready to read · 5m")
+        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · claude · The design doc, ready to read · 5m")
         #expect(PanelText.stateLabel(link) == "ping, opens a link")
         #expect(PanelText.rowCard(link, now: harness.clock.now).lines == [
             "The design doc,\nready to read",
@@ -257,7 +257,7 @@ struct PingActionTests {
 
         let app = try harness.pingRow("Needs you")
         #expect(app.pingIcon == .app)
-        #expect(PanelText.rowDetail(app, showingRepository: false) == "Waiting for input")
+        #expect(PanelText.rowDetail(app, showingRepository: false) == "#2 · Waiting for input")
         #expect(PanelText.stateLabel(app) == "ping, opens an app")
         #expect(PanelText.rowCard(app, now: harness.clock.now).lines == ["Waiting for input", "Opens Claude"])
 
@@ -265,7 +265,7 @@ struct PingActionTests {
         #expect(note.pingIcon == .noAction)
         #expect(note.agent == nil)
         #expect(PanelText.rowCard(note, now: harness.clock.now).agent == nil)
-        #expect(PanelText.rowDetail(note, showingRepository: false) == "ping")
+        #expect(PanelText.rowDetail(note, showingRepository: false) == "#3 · ping")
         #expect(PanelText.stateLabel(note) == "ping, click marks it seen")
         #expect(PanelText.rowCard(note, now: harness.clock.now).lines == ["Nothing to open: clicking marks it seen"])
     }
