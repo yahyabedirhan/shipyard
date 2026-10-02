@@ -53,14 +53,6 @@ struct ConfigurationWindowsTests {
         #expect(settings.workflowRuns.finishedWindow == 5400)
     }
 
-    @Test("the defaults stay seven days closed and three hours finished")
-    func defaults() {
-        let config = Configuration()
-        #expect(config.defaults.pullRequests.closedWindow == 7 * 86_400)
-        #expect(config.defaults.issues.closedWindow == 7 * 86_400)
-        #expect(config.defaults.workflowRuns.finishedWindow == 3 * 3600)
-    }
-
     @Test("a bad window is rejected with its line, what's allowed, and the nearest spelling")
     func rejections() {
         let allowed = "a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\""

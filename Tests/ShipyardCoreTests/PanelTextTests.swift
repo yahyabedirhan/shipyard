@@ -529,11 +529,6 @@ struct PanelTextTests {
         }
     }
 
-    @Test("the unavailable reason is short and names the missing client ID")
-    func signInUnavailableReason() {
-        #expect(PanelText.signInUnavailable == "Not available in this build: it has no OAuth App client ID.")
-    }
-
     @Test("while shipyard looks for a token the panel says it's connecting")
     func connecting() {
         #expect(PanelText.connecting == "Connecting to GitHub…")

@@ -142,15 +142,6 @@ public struct AttentionCounts: Equatable, Sendable {
     /// The attention count.
     public var total: Int { pullRequests + issues + workflowRuns + pings }
 
-    public subscript(kind: ItemKind) -> Int {
-        switch kind {
-        case .pullRequest: pullRequests
-        case .issue: issues
-        case .workflowRun: workflowRuns
-        case .ping: pings
-        }
-    }
-
     mutating func add(_ kind: ItemKind) {
         switch kind {
         case .pullRequest: pullRequests += 1

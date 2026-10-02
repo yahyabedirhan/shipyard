@@ -152,6 +152,13 @@ struct Harness {
         stub.on("POST", GitHubClient.graphQLURL, answers: answers)
     }
 
+    /// Refreshes, two minutes later, with GitHub answering `answer`.
+    func refresh(answering answer: StubHTTP.Answer) async {
+        graphQL([answer])
+        clock.advance(by: 120)
+        await shipyard.refresh()
+    }
+
     /// Every GraphQL request sent.
     var graphQLRequests: [URLRequest] { stub.requests("POST", GitHubClient.graphQLURL) }
 
@@ -201,6 +208,13 @@ struct Harness {
     /// The section named `name` in the current menu.
     func section(_ name: String) -> MenuSection? {
         shipyard.menu.sections.first { $0.name == name }
+    }
+}
+
+extension GroupID {
+    /// The All tab's group of `key`: the All tab has no project.
+    static func allTab(_ key: GroupKey) -> GroupID {
+        GroupID(project: "", key: key)
     }
 }
 

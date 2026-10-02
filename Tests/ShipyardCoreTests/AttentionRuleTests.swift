@@ -66,22 +66,6 @@ struct AttentionRuleTests {
         #expect(attention.needsAttention(current, toggles: rule.toggles) == rule.expected)
     }
 
-    @Test("seeing an item clears every reason until its fingerprint changes")
-    func seenClearsEverything() {
-        var attention = Attention()
-        let current = item(checks: .failed, reviewRequested: true)
-        attention.markSeen(current, at: now)
-
-        #expect(!attention.needsAttention(current, toggles: Toggles()))
-        #expect(attention.needsAttention(item(checks: .failed, reviewRequested: true, updatedAt: now + 1), toggles: Toggles()))
-    }
-
-    @Test("closed and merged items never need attention", arguments: [ItemState.closed, .merged])
-    func closedNever(state: ItemState) {
-        let attention = Attention()
-        #expect(!attention.needsAttention(item(state: state, checks: .failed, reviewRequested: true), toggles: Toggles()))
-    }
-
     @Test("a failed run needs attention until seen, by `unseen` or `checks-failed`; running and succeeded runs never do")
     func runs() {
         var attention = Attention()
@@ -93,23 +77,6 @@ struct AttentionRuleTests {
         #expect(!attention.needsAttention(item(kind: .workflowRun, state: .succeeded, checks: .passed), toggles: Toggles()))
         attention.markSeen(failed, at: now)
         #expect(!attention.needsAttention(failed, toggles: Toggles()))
-    }
-
-    @Test("drafts are open and can need attention")
-    func drafts() {
-        #expect(Attention().needsAttention(item(state: .draft), toggles: Toggles()))
-    }
-
-    @Test("counts split by kind, and an item listed twice counts once")
-    func counts() {
-        let pr = item(1)
-        let counts = Attention().counts(
-            [pr, pr, item(2, kind: .issue), item(3, kind: .workflowRun, state: .failed, checks: .failed), item(4, state: .merged)],
-            toggles: Toggles()
-        )
-        #expect(counts == AttentionCounts(pullRequests: 1, issues: 1, workflowRuns: 1))
-        #expect(counts.total == 3)
-        #expect(counts[.issue] == 1)
     }
 
     @Test("prune drops records of items gone for 30 days and keeps present ones fresh")

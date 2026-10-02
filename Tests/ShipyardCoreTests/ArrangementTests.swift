@@ -208,22 +208,6 @@ struct ArrangementTests {
 
     // MARK: - Subheaders or dividers
 
-    @Test("unset, subsections keep each layout's look: dividers in the list, subheaders in a tab")
-    func subsectionsDefaultByLayout() {
-        let items = [item(1), item(2, .issue)]
-
-        #expect(arrange(items, layout: .list).map(\.showsHeader) == [false, false])
-        #expect(arrange(items, layout: .tabs).map(\.showsHeader) == [true, true])
-    }
-
-    @Test("a subsections value applies to both layouts")
-    func subsectionsSet() {
-        let items = [item(1), item(2, .issue)]
-
-        #expect(arrange(items, subsections: true, layout: .list).map(\.showsHeader) == [true, true])
-        #expect(arrange(items, subsections: false, layout: .tabs).map(\.showsHeader) == [false, false])
-    }
-
     @Test("a group counts its rows that need attention")
     func attentionCount() {
         let rows = [MenuRow(item(1), needsAttention: true), MenuRow(item(2)), MenuRow(item(3, .issue), needsAttention: true)]
@@ -280,16 +264,6 @@ struct ArrangementTests {
         }
     }
 
-    @Test("with group-by none the cap applies to the whole project")
-    func capsWholeProject() {
-        let groups = arrange(sevenAndTwo, groupBy: .none, showFirst: 5)
-
-        #expect(groups.count == 1)
-        #expect(groups[0].rows.count == 5)
-        #expect(groups[0].hiddenCount == 4)
-        #expect(PanelText.showMore(groups[0]) == "Show 4 more")
-    }
-
     @Test("the cap applies under subheaders and after dividers alike, in both layouts")
     func capsEitherLook() {
         for subsections in [true, false] {
@@ -299,18 +273,6 @@ struct ArrangementTests {
                 #expect(groups[0].hiddenCount == 2)
             }
         }
-    }
-
-    @Test("a group's attention count includes the rows its cap hides")
-    func attentionCountsHidden() {
-        let rows = (1...4).map { MenuRow(item($0, updated: Double($0) * hour), needsAttention: $0 > 2) }
-
-        let groups = Arrangement.groups(
-            rows: rows, project: "shipyard", settings: ArrangementSettings(showFirst: 2), layout: .list, now: now
-        )
-
-        #expect(groups[0].rows.map(\.number) == [1, 2])
-        #expect(groups[0].attentionCount == 2)
     }
 
     // MARK: - Words

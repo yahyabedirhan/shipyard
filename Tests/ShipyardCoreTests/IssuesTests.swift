@@ -54,13 +54,6 @@ private struct QueryBody: Decodable {
 
 @MainActor
 private extension Harness {
-    /// Refreshes, two minutes later, with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// The query text of the latest GraphQL request.
     func lastQuery() throws -> String {
         let body = try #require(graphQLRequests.last?.httpBody)

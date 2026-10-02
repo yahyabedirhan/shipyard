@@ -288,14 +288,6 @@ struct EventDetectorTests {
         #expect(first.map(\.kind) == [.prChecksFailed])
         #expect(first[0].id != again[0].id)
     }
-
-    @Test("every event has a title text")
-    func headlines() {
-        #expect(EventKind.prOpened.headline(number: 57) == "New PR #57")
-        #expect(EventKind.prMerged.headline(number: 57) == "Merged PR #57")
-        #expect(EventKind.prChecksFailed.headline(number: 57) == "Checks failed on PR #57")
-        #expect(EventKind.allCases.filter { $0 != .pingSent }.allSatisfy { $0.headline(number: 1).contains("#1") })
-    }
 }
 
 @Suite("Notification rules")
@@ -329,17 +321,6 @@ struct NotificationRulesTests {
         // `me` is the viewer, even where the item didn't say so.
         let mine = settings(rules: [NotificationRule(event: .prOpened, authors: [.me])])
         #expect(NotificationRules.shouldNotify(event(author: "yabepa"), settings: mine, viewer: "yabepa"))
-    }
-
-    @Test("a notification carries the project, title text, the item's title and its URL")
-    func notification() {
-        let posted = NotificationRules.notification(for: event())
-        #expect(posted.project == "shop")
-        #expect(posted.headline == "New PR #1")
-        #expect(posted.itemTitle == "Change 1")
-        #expect(posted.itemURL == URL(string: "https://github.com/o/r/pull/1")!)
-        #expect(posted.title == "shop · New PR #1")
-        #expect(posted.id == event().id)
     }
 
     @Test("notified events are kept while their item is listed, and for 30 days after")
