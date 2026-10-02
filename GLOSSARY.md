@@ -94,7 +94,7 @@ _Avoid_: Ping, alert
 A change in an item that shipyard can notify about, such as `pr.opened` or `run.failed`.
 
 **Ping**:
-A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent.
+A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent, by its id. Each machine numbers its pings (`#1`, `#2`, …) and never gives a number twice; a replace keeps it.
 _Avoid_: Notification (that's the macOS banner), message, alert
 
 **Notification rule**:
