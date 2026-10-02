@@ -20,6 +20,7 @@ public struct Configuration: Equatable, Sendable {
     public var rateLimit = RateLimitSettings()
     public var attention = AttentionToggles()
     public var herdr = HerdrSettings()
+    public var remote = RemoteSettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -28,6 +29,12 @@ public struct Configuration: Equatable, Sendable {
     public init() {}
 
     public var hasProjects: Bool { !projects.isEmpty }
+
+    /// What a machine's own section (`[remote] machines`) lists with: the
+    /// defaults, as for a project that overrides nothing.
+    public func settings(forMachine label: String) -> ProjectSettings {
+        settings(for: Project(name: label, repositories: []))
+    }
 
     /// A project's effective settings: each of its tables merges key by key
     /// onto `defaults`, and its `notifications` list, when present, replaces
@@ -81,6 +88,16 @@ extension Configuration {
         /// only focuses the tab.
         public var terminal: String?
         public init(terminal: String? = nil) { self.terminal = terminal }
+    }
+
+    /// `[remote]`: the other machines whose pings the menu lists.
+    public struct RemoteSettings: Equatable, Sendable {
+        /// The machines, by the labels the Mac's Herdr knows them by as
+        /// saved machines (`herdr --machine <label>`), in the order their
+        /// sections follow the projects; none by default. Labels only:
+        /// never a host or an address.
+        public var machines: [String]
+        public init(machines: [String] = []) { self.machines = machines }
     }
 
     /// `[attention]`: which reasons make an item need attention.

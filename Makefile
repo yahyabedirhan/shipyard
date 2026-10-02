@@ -6,6 +6,7 @@
 #   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), with the shipyard CLI, ad-hoc signed
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
+#                   (bump Version.swift first; README's Development section has the release order)
 #   make run        run the executable from .build, without a bundle
 #   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=khaki-green)
 #   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/

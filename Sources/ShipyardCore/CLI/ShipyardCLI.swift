@@ -32,17 +32,53 @@ public struct CommandResult: Equatable, Sendable {
 }
 
 /// What a command reads from where it runs: the working folder, the
-/// environment variables (`XDG_CONFIG_HOME`, `HERDR_PANE_ID`) and
-/// git, which says the working folder's remote `origin`.
+/// environment variables (`XDG_CONFIG_HOME`, `HERDR_PANE_ID`, the
+/// `HERDR_PLUGIN_EVENT`s), git, which says a folder's remote `origin`, the
+/// platform, and how it runs a program (`herdr`) and tells whether one can
+/// be run.
 public struct CommandEnvironment: Sendable {
     public var workingDirectory: URL
     public var variables: [String: String]
     public var git: any GitRemoteLookup
+    public var platform: CommandPlatform
+    public var run: GhCLI.Run
+    public var isExecutable: @Sendable (String) -> Bool
 
-    public init(workingDirectory: URL, variables: [String: String], git: any GitRemoteLookup = GitCLI()) {
+    public init(
+        workingDirectory: URL,
+        variables: [String: String],
+        git: any GitRemoteLookup = GitCLI(),
+        platform: CommandPlatform,
+        run: @escaping GhCLI.Run = GhCLI.runProcess,
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) {
         self.workingDirectory = workingDirectory
         self.variables = variables
         self.git = git
+        self.platform = platform
+        self.run = run
+        self.isExecutable = isExecutable
+    }
+}
+
+/// The platform the `shipyard` command runs on, which decides what a ping
+/// is there. On macOS the app is beside it: a ping is filed against
+/// `config.toml` and stays until seen. Linux is a machine without the app,
+/// whose pings the Mac reads through Herdr: a ping is saved as the agent
+/// gave it (the Mac files it), records the Herdr pane it was sent from, and
+/// expires a day after its sending or its last replace.
+public enum CommandPlatform: Sendable, Equatable {
+    case macOS
+    case linux
+
+    /// The platform this build runs on; anything but macOS is a machine
+    /// without the app.
+    public static var current: CommandPlatform {
+        #if os(macOS)
+        .macOS
+        #else
+        .linux
+        #endif
     }
 }
 
@@ -61,6 +97,10 @@ public enum ShipyardCLI {
                                 [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                                 [--repo <owner/name> | --project <name>]
                   shipyard ping withdraw <id>
+                  shipyard ping list --json
+          herdr-event
+                  what Herdr's plugin hooks run: pings when an agent is blocked,
+                  and withdraws that ping when it goes on or its pane closes
 
         options:
           --help     show this help (shipyard ping --help for the command's)
@@ -72,7 +112,9 @@ public enum ShipyardCLI {
     /// configuration at `configURL` (a missing file is no projects; one that
     /// doesn't read fails the command) and the repositories the app last
     /// resolved from `repositories` (none, when it hasn't yet), and runs the
-    /// command named first.
+    /// command named first. On Linux a ping reads neither: there's no app
+    /// to file it for, so it's saved as given. There, the pings that have
+    /// expired by `now` are removed before `ping` and `herdr-event` run.
     public static func run(
         _ arguments: [String],
         environment: CommandEnvironment,
@@ -94,17 +136,37 @@ public enum ShipyardCLI {
             // After `--` it's the title's, not a flag.
             let flags = rest.prefix { $0 != "--" }
             if flags.contains("--help") || flags.contains("-h") { return CommandResult(output: PingCommand.usageText) }
-            // Withdrawing needs no projects, so a broken config.toml doesn't stop it.
+            // An expired ping is gone: it isn't listed, can't be withdrawn,
+            // and its id sent again is a new ping.
+            if environment.platform == .linux { pingStore.removeExpired(at: now) }
+            // Withdrawing and listing need no projects, so a broken config.toml doesn't stop them.
             if rest.first == "withdraw" { return PingCommand.withdraw(Array(rest.dropFirst()), store: pingStore) }
-            let configuration: Configuration
-            switch readConfiguration(at: configURL) {
-            case .success(let read): configuration = read
-            case .failure(let failure): return failure
+            if rest.first == "list" { return PingCommand.list(Array(rest.dropFirst()), store: pingStore, now: now) }
+            var configuration = Configuration()
+            if environment.platform == .macOS {
+                switch readConfiguration(at: configURL) {
+                case .success(let read): configuration = read
+                case .failure(let failure): return failure
+                }
             }
             return PingCommand.run(
                 rest,
                 environment: environment,
                 configuration: configuration,
+                resolved: repositories.load(),
+                store: pingStore,
+                now: now
+            )
+        case "herdr-event":
+            guard arguments.count == 1 else {
+                return .usage("shipyard herdr-event: takes no arguments; it reads HERDR_PLUGIN_EVENT and HERDR_PLUGIN_EVENT_JSON")
+            }
+            if environment.platform == .linux { pingStore.removeExpired(at: now) }
+            // Withdrawing needs no projects, so only a blocked agent's ping
+            // reads config.toml, and only on macOS.
+            return HerdrEvent.run(
+                environment: environment,
+                configuration: { environment.platform == .macOS ? readConfiguration(at: configURL) : .success(Configuration()) },
                 resolved: repositories.load(),
                 store: pingStore,
                 now: now

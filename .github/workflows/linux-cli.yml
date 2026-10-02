@@ -1,0 +1,101 @@
+name: linux cli
+
+# Static Linux builds of the `shipyard` command, for the herdr-shipyard plugin
+# to install on machines without the app. Releasing stays the maintainer's:
+# `make release` and the GitHub release are made by hand as before, and when
+# that release is published this workflow attaches the Linux files to it.
+#
+#   release published   build, check, and upload to that release
+#   workflow_dispatch   build and check, kept as workflow artifacts only
+#   push to this file   the same, so a change to it proves itself on any branch
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/linux-cli.yml
+
+permissions:
+  contents: read
+
+env:
+  # The static SDK must match the toolchain exactly: change all three together.
+  # The SDK's checksum is the one swift.org lists for the release.
+  SWIFT_SDK_URL: https://download.swift.org/swift-6.4.0-release/static-sdk/swift-6.4.0-RELEASE/swift-6.4.0-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
+  SWIFT_SDK_CHECKSUM: 47d2fd89eebfdf9eb4d536b6710414297f755c17926cdebc4742c08982b40a9e
+
+jobs:
+  build:
+    name: build (static linux sdk)
+    runs-on: ubuntu-latest
+    container: swift:6.4.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: install the static linux sdk
+        run: swift sdk install "$SWIFT_SDK_URL" --checksum "$SWIFT_SDK_CHECKSUM"
+      - name: build shipyard for x86_64 and aarch64
+        run: |
+          mkdir -p dist
+          for arch in x86_64 aarch64; do
+            # -s strips the symbols, which would otherwise make it ~160 MB.
+            flags="--swift-sdk $arch-swift-linux-musl --product shipyard-cli -c release -Xlinker -s"
+            swift build $flags
+            cp "$(swift build $flags --show-bin-path)/shipyard-cli" "dist/shipyard-linux-$arch"
+          done
+          cd dist
+          for file in shipyard-linux-*; do sha256sum "$file" > "$file.sha256"; done
+          ls -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shipyard-linux
+          path: dist/
+          if-no-files-found: error
+
+  check:
+    name: check (static, runs on x86_64)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: shipyard-linux
+          path: dist
+      - name: checksums match, both are static, the x86_64 build runs
+        working-directory: dist
+        run: |
+          chmod +x shipyard-linux-x86_64 shipyard-linux-aarch64
+          sha256sum -c shipyard-linux-*.sha256
+          for file in shipyard-linux-x86_64 shipyard-linux-aarch64; do
+            file "$file"
+            file "$file" | grep -q 'statically linked' || { echo "$file isn't static"; exit 1; }
+          done
+          file shipyard-linux-x86_64 | grep -q 'x86-64'
+          file shipyard-linux-aarch64 | grep -q 'ARM aarch64'
+          ./shipyard-linux-x86_64 --version
+      - name: the version is the release's
+        if: github.event_name == 'release'
+        working-directory: dist
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          test "$(./shipyard-linux-x86_64 --version)" = "shipyard ${TAG#v}" \
+            || { echo "built $(./shipyard-linux-x86_64 --version), released $TAG"; exit 1; }
+
+  release:
+    name: attach to the release
+    if: github.event_name == 'release'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: shipyard-linux
+          path: dist
+      - name: upload the builds and their checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"

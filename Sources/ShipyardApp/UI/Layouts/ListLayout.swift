@@ -342,9 +342,11 @@ private struct ListRow: View {
     /// (without its owner); a run names no author. A ping names its sender,
     /// or why its action failed, while it has (the hover card has it whole);
     /// one filed with `--project` has no repository, so it names its
-    /// sender there too.
+    /// sender there too. A remote ping names its machine first, wherever
+    /// it's listed.
     private var meta: String? {
         if let error = row.actionError { return error }
+        if row.machine != nil { return PanelText.pingMeta(row) }
         if showsRowRepository { return PanelText.repositoryName(row.repository) }
         if row.kind == .ping { return row.sender }
         return row.kind == .workflowRun ? nil : row.author
@@ -352,6 +354,7 @@ private struct ListRow: View {
 
     private var metaSymbol: String? {
         if row.actionError != nil { return "exclamationmark.triangle.fill" }
+        if row.machine != nil { return "server.rack" }
         if showsRowRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
     }

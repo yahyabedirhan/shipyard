@@ -86,13 +86,23 @@ public enum PanelText {
     }
 
     /// A ping's second line, which has no number: why its action failed,
-    /// while it has; otherwise its sender and its body on one line, each
-    /// when given, or "ping" when neither is: "claude · Waiting for your input".
+    /// while it has; otherwise the machine a remote ping came from, its
+    /// sender and its body on one line, each when given, or "ping" when
+    /// none is: "netcup-vps · claude · Waiting for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
-        let parts = [row.sender, body].compactMap { $0 }
+        let parts = [row.machine, row.sender, body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
+    }
+
+    /// What a ping's row names in the list layout's narrow column: the
+    /// machine a remote ping came from and its sender, "netcup-vps ·
+    /// claude", either alone when the other isn't there; `nil` when
+    /// neither is.
+    public static func pingMeta(_ row: MenuRow) -> String? {
+        let parts = [row.machine, row.sender].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".
@@ -256,6 +266,19 @@ public enum PanelText {
         case .graphQL(let message): "GitHub: \(message)"
         case .rateLimited(_, let api): "The \(api.name) rate limit ran out."
         case .secondaryLimit: "GitHub asked shipyard to slow down."
+        }
+    }
+
+    /// A remote machine's quiet line (`MachineNotice`): why it couldn't be
+    /// read, and that its last pings stay listed when it answered before;
+    /// or that it holds more than it sent.
+    public static func machineNotice(_ notice: MachineNotice) -> String {
+        switch notice.kind {
+        case .unreachable(let reason, let answered):
+            let sentence = reason.hasSuffix(".") ? reason : reason + "."
+            return answered ? "\(sentence) Its last pings stay listed." : sentence
+        case .truncated(let listed):
+            return "\(notice.machine) has more pings than it could send. Showing its newest \(listed)."
         }
     }
 

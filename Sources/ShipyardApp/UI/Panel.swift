@@ -134,7 +134,7 @@ struct Panel: View {
     }
 
     /// Configuration error, configuration warnings (gray), refresh delay (stretched or backed off: amber;
-    /// paused: red), fetch error, notifications off: each slides in and out.
+    /// paused: red), fetch error, each remote machine's quiet line (gray), notifications off: each slides in and out.
     private var bannerItems: [BannerItem] {
         var items: [BannerItem] = []
         if let error = shipyard.configError {
@@ -156,6 +156,10 @@ struct Panel: View {
         if let error = menu.bannerFetchError {
             // The rows are kept; the footer says how old they are.
             items.append(BannerItem(id: "fetch", symbol: "wifi.exclamationmark", text: PanelText.fetchError(error), tint: Palette.amber))
+        }
+        // One quiet line per remote machine that couldn't be read, or sent less than it has.
+        for notice in menu.machineNotices {
+            items.append(BannerItem(id: "machine-\(notice.id)", symbol: "server.rack", text: PanelText.machineNotice(notice), tint: Palette.gray))
         }
         if actions.notificationsAreOff {
             items.append(BannerItem(

@@ -28,7 +28,19 @@ public enum Listing {
     /// filters. A project with neither (added since the snapshot was
     /// fetched, or before any was) has no listing yet; without a snapshot
     /// a project lists its pings alone, so they show before GitHub answers.
-    public static func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, pings: [Ping] = [], now: Date) -> [String: [Item]] {
+    ///
+    /// A remote ping (`Ping.machine`) is filed as a local one is, under
+    /// the projects it names; one filed under none of `projects` is listed
+    /// by its machine instead, under the machine's label, with the
+    /// settings `machines` gives it (`Configuration.settings(forMachine:)`).
+    /// A machine with no such ping has no listing.
+    public static func listings(
+        for projects: [ProjectSettings],
+        in snapshot: Snapshot?,
+        pings: [Ping] = [],
+        machines: [ProjectSettings] = [],
+        now: Date
+    ) -> [String: [Item]] {
         var listings: [String: [Item]] = [:]
         for project in projects {
             let fetched = snapshot.flatMap { snapshot in
@@ -38,6 +50,16 @@ public enum Listing {
             guard fetched != nil || !filed.isEmpty else { continue }
             listings[project.name] = (fetched ?? []) + filed.filter {
                 lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
+            }
+        }
+        let names = Set(projects.map(\.name))
+        for machine in machines {
+            let unfiled = pings
+                .filter { $0.machine == machine.name && !$0.projects.contains(where: names.contains) }
+                .map(\.item)
+            guard !unfiled.isEmpty else { continue }
+            listings[machine.name] = unfiled.filter {
+                lists($0, project: machine, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
         return listings
