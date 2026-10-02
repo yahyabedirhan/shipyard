@@ -71,7 +71,7 @@ Tables:
 | `[attention] changed` | `true` | an item that changed since it was clicked needs attention |
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
-| `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, only the tab is focused |
+| `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]` and `[defaults.pings]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
@@ -105,7 +105,7 @@ How every project's items are grouped and sorted in the menu, set straight under
 
 | Key | Default | Allowed |
 |---|---|---|
-| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z; pings by who sent them, then those that don't say, as "Pings"), `"none"` (one list); one level only |
+| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then pings, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z; pings by who sent them, then those that don't say, as "Pings"), `"none"` (one list); one level only |
 | `[defaults] subsections` | unset | boolean: `true` draws each group under a subheader (its name and count), `false` after a divider line; unset keeps each layout's own look (dividers in the list, subheaders in tabs) |
 | `[defaults] sort-by` | `"updated"` | `"updated"` (newest first), `"created"` (newest first), `"title"` (A to Z); open or running items always come first. `"date"` groups by this date (`"updated"` when sorting by title) |
 | `[defaults] show-first` | `0` | a whole number, 0 or more: each group shows its first N rows and a "Show N more" row, which reveals the rest and then reads "Show less"; `0` shows every row. With `group-by = "none"` it caps the whole project. A group's count includes the rows it hides, and every cap comes back when the menu closes |
@@ -484,11 +484,11 @@ shipyard ping withdraw <id>
 
 - **One action at most.** With none, clicking the ping only marks it seen. When an action fails (the pane closed, no such app), the ping stays unseen and its row says why.
 - **Where it's filed.** Without `--repo` or `--project`, the repository is the working folder's git remote `origin`, as `owner/name`, and the ping is filed under every project that watches it: one whose `repositories` names it, or brings it in through a group or `owner/*` (as the app last looked them up, so a project just added needs the app to have refreshed once). `--repo` and `--project` don't go together.
-- **Output.** On success it prints the ping's id and exits 0. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, or `config.toml` doesn't read, which only the Mac checks; the id to withdraw is unknown), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
+- **Output.** On success it prints the ping's number and its id on one line, such as `#3 k7qm2x`, and exits 0: the number is what the user sees on its row, the id what `--id` and `withdraw` take. A replace keeps the number. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, or `config.toml` doesn't read, which only the Mac checks; the id to withdraw is unknown), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
 - **Replacing.** Sending an id that's already there replaces that ping: the new title, body, sender, action and projects, unseen again, with no second notification.
 - **Withdrawing.** `shipyard ping withdraw <id>` takes the ping back: it leaves the menu and its notification leaves Notification Center. An id no ping has exits 1; the user may have dismissed it, or it left after being seen, so there's nothing left to do.
 - **Listing.** `shipyard ping list` with `--json` prints the computer's pings as JSON, for shipyard on the user's Mac to read; you don't need it to ping.
-- **Herdr's terminal.** A `--herdr` click focuses the tab in Herdr; to bring the terminal Herdr runs in forward too, the user sets `[herdr] terminal` (see Keys and defaults).
+- **Herdr's terminal.** A `--herdr` click focuses the tab in Herdr; the click also brings forward the terminal app the ping was sent from, which the CLI notes by itself. The user can name another with `[herdr] terminal` (see Keys and defaults), which wins.
 
 ### On another machine
 

@@ -94,8 +94,12 @@ _Avoid_: Ping, alert
 A change in an item that shipyard can notify about, such as `pr.opened` or `run.failed`.
 
 **Ping**:
-A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent.
+A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent, by its id. Each machine numbers its pings (`#1`, `#2`, …) and never gives a number twice; a replace keeps it.
 _Avoid_: Notification (that's the macOS banner), message, alert
+
+**Known agent**:
+A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with that agent's real logo, which the app bundles.
+_Avoid_: Agent icon, monogram
 
 **Machine**:
 A computer where agents run in Herdr, known to the Mac's Herdr as a saved machine by its label, such as `netcup-vps`. The user names the machines shipyard asks for pings by those labels. The Mac itself is the local machine.

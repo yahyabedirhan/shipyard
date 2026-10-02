@@ -44,7 +44,9 @@ targets.append(
     .executableTarget(
         name: "ShipyardApp",
         dependencies: ["ShipyardCore"],
-        path: "Sources/ShipyardApp"
+        path: "Sources/ShipyardApp",
+        // The known agents' logos (`make agent-logos`), read by `AgentLogoImage`.
+        resources: [.copy("Resources/AgentLogos")]
     )
 )
 // The app's own pure helpers (how the panel builds its text), tested on macOS.

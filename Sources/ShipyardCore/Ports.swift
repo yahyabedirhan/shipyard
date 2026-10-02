@@ -86,9 +86,10 @@ public let systemSleep: Sleep = { seconds in
 /// What running a ping's action came to.
 public enum ActionOutcome: Equatable, Sendable {
     case done
-    /// It didn't work, with a short reason for the ping's row, such as
-    /// "No app named Claude".
-    case failed(String)
+    /// It didn't work: a reason short enough for the ping's row, such as
+    /// "No app", and the whole of it for its hover card, such as "No app
+    /// named Claude" (`nil` when the short one says it all).
+    case failed(String, detail: String? = nil)
 }
 
 /// Takes the user where shipyard sends them: opens an item's page on

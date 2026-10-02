@@ -96,7 +96,7 @@ struct HerdrEventTests {
 
         let result = harness.agent("blocked")
 
-        #expect(result == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(result == CommandResult(output: "#1 herdr-w1-p3\n"))
         #expect(harness.herdr.runs == [["pane", "get", "w1:p3"], ["tab", "get", "w1:t2"]])
         let ping = try #require(harness.pingStore.ping(id: "herdr-w1-p3"))
         #expect(ping.title == "Claude is waiting in CC · checkout")
@@ -120,7 +120,7 @@ struct HerdrEventTests {
 
         let result = harness.herdrEvent("pane.agent_status_changed", statusChanged("blocked"), platform: .linux, focusedPane: "w1:p9")
 
-        #expect(result == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(result == CommandResult(output: "#1 herdr-w1-p3\n"))
         let ping = try #require(harness.pingStore.ping(id: "herdr-w1-p3"))
         #expect(ping.action == .herdr("w1:p3"))
         #expect(ping.projects == [])
@@ -155,7 +155,7 @@ struct HerdrEventTests {
 
         let missing = try Harness(config: shop)
         missing.herdr.installed = false
-        #expect(missing.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(missing.agent("blocked") == CommandResult(output: "#1 herdr-w1-p3\n"))
         #expect(missing.herdr.runs.isEmpty)
         #expect(missing.pingStore.ping(id: "herdr-w1-p3")?.title == "Claude is waiting in w1:p3")
     }
@@ -174,14 +174,14 @@ struct HerdrEventTests {
         let unwatched = try Harness(config: shop)
         unwatched.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "blog", folder: agentFolder)
         let result = unwatched.herdrEvent("pane.agent_status_changed", statusChanged("blocked"), origin: "git@github.com:yahyabedirhan/blog.git")
-        #expect(result == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(result == CommandResult(output: "#1 herdr-w1-p3\n"))
         let ping = try #require(unwatched.pingStore.ping(id: "herdr-w1-p3"))
         #expect(ping.projects == [])
         #expect(ping.repository == "yahyabedirhan/blog")
 
         let unconfigured = try Harness()
         unconfigured.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout")
-        #expect(unconfigured.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(unconfigured.agent("blocked") == CommandResult(output: "#1 herdr-w1-p3\n"))
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.projects == [])
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.repository == nil)
     }
@@ -197,7 +197,7 @@ struct HerdrEventTests {
 
         harness.clock.advance(by: 60)
         harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout, again", folder: agentFolder)
-        #expect(harness.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(harness.agent("blocked") == CommandResult(output: "#1 herdr-w1-p3\n"))
         await harness.shipyard.reloadPings()
 
         #expect(harness.pingStore.all().count == 1)
@@ -376,7 +376,7 @@ struct HerdrEventTests {
     func topLevelPayload() throws {
         let harness = try Harness(config: shop)
         let json = #"{"pane_id":"w1:p3","workspace_id":"w1","agent_status":"Blocked","agent":"codex"}"#
-        #expect(harness.herdrEvent("pane.agent_status_changed", json) == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(harness.herdrEvent("pane.agent_status_changed", json) == CommandResult(output: "#1 herdr-w1-p3\n"))
         #expect(harness.pingStore.ping(id: "herdr-w1-p3")?.sender == "codex")
     }
 

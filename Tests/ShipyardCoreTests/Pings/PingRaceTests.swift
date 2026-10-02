@@ -141,6 +141,30 @@ struct PingRaceTests {
         #expect(store.ping(id: "input") == nil)
     }
 
+    // MARK: Numbers
+
+    @Test("pings sent at once each take a number of their own")
+    func numbersSentAtOnce() throws {
+        let harness = try Harness(config: shop)
+        let (configURL, repositories, store) = (harness.configURL, harness.repositoriesStore, harness.pingStore)
+        let environment = CommandEnvironment(workingDirectory: harness.workingFolder, variables: [:], git: FakeGitRemote(), platform: .macOS)
+        let now = harness.clock.now
+        let count = 24
+
+        DispatchQueue.concurrentPerform(iterations: count) { index in
+            _ = ShipyardCLI.run(
+                ["ping", "Ready", "--project", "shop", "--id", "agent-\(index)"],
+                environment: environment,
+                configURL: configURL,
+                repositories: repositories,
+                pingStore: store,
+                now: now
+            )
+        }
+
+        #expect(store.all().compactMap(\.number).sorted() == Array(1...count))
+    }
+
     // MARK: A click whose action is still running
 
     @Test("a ping replaced while its action runs stays unseen, as the replacement")

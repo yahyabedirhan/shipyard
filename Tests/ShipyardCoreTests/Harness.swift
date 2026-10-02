@@ -180,20 +180,21 @@ struct Harness {
     /// repositories and ping store, at the clock's time, as an agent would
     /// in a terminal: in `workingFolder`, whose git remote `origin` is
     /// `origin` (`nil`: not a git repository), in the Herdr pane
-    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr).
+    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr), with any other
+    /// environment `variables` (`TERM_PROGRAM`, say).
     @discardableResult
-    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
-        cli(arguments, origin: origin, herdrPane: herdrPane)
+    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil, variables: [String: String] = [:]) -> CommandResult {
+        cli(arguments, origin: origin, herdrPane: herdrPane, variables: variables)
     }
 
     /// `cli(_:origin:herdrPane:)` with the arguments as a list.
     @discardableResult
-    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
+    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil, variables: [String: String] = [:]) -> CommandResult {
         ShipyardCLI.run(
             arguments,
             environment: CommandEnvironment(
                 workingDirectory: workingFolder,
-                variables: herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:],
+                variables: (herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:]).merging(variables) { $1 },
                 git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:]),
                 // The harness is the Mac's app, so its CLI is the Mac's.
                 platform: .macOS
@@ -215,6 +216,14 @@ extension GroupID {
     /// The All tab's group of `key`: the All tab has no project.
     static func allTab(_ key: GroupKey) -> GroupID {
         GroupID(project: "", key: key)
+    }
+}
+
+extension CommandResult {
+    /// The id a `shipyard ping` that worked printed, from its line
+    /// `#<number> <id>`.
+    var pingID: String {
+        output.trimmingCharacters(in: .newlines).split(separator: " ").last.map(String.init) ?? ""
     }
 }
 

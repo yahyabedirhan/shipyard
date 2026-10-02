@@ -287,8 +287,9 @@ private struct ListRow: View {
             AttentionDot(isOn: row.needsAttention)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
-            // A ping has no number; the column stays, so titles line up.
-            Text(row.kind == .ping ? "" : String(row.number))
+            // A ping written before pings were numbered has none (0); the
+            // column stays, so titles line up.
+            Text(row.number > 0 ? String(row.number) : "")
                 .font(TypeScale.meta)
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: Grid.numberColumn, alignment: .trailing)
@@ -305,8 +306,11 @@ private struct ListRow: View {
             }
             Spacer(minLength: 8)
             if let meta {
-                HStack(spacing: 3) {
-                    if let symbol = metaSymbol {
+                // A known agent's logo sits a little apart from its name.
+                HStack(spacing: metaAgent == nil ? 3 : 5) {
+                    if let agent = metaAgent {
+                        AgentMarkView(agent: agent, size: Grid.agentMark)
+                    } else if let symbol = metaSymbol {
                         Image(systemName: symbol)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.tertiary)
@@ -348,7 +352,7 @@ private struct ListRow: View {
         if let error = row.actionError { return error }
         if row.machine != nil { return PanelText.pingMeta(row) }
         if showsRowRepository { return PanelText.repositoryName(row.repository) }
-        if row.kind == .ping { return row.sender }
+        if row.kind == .ping { return PanelText.sender(row) }
         return row.kind == .workflowRun ? nil : row.author
     }
 
@@ -357,6 +361,13 @@ private struct ListRow: View {
         if row.machine != nil { return "server.rack" }
         if showsRowRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
+    }
+
+    /// A known agent's logo before its name, when the column names the
+    /// sender.
+    private var metaAgent: KnownAgent? {
+        guard row.actionError == nil, !showsRowRepository else { return nil }
+        return row.agent
     }
 
     /// Whether the meta column names this row's repository: in a project of

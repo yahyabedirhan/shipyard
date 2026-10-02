@@ -82,27 +82,37 @@ public enum PanelText {
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         case .ping: pingDetail(row)
         }
-        return (row.kind == .ping ? [] : ["#\(row.number)"]) + repository + subject
+        // A ping written before pings were numbered has none (0).
+        return (row.number > 0 ? ["#\(row.number)"] : []) + repository + subject
     }
 
-    /// A ping's second line, which has no number: why its action failed,
+    /// A ping's second line after its number: why its action failed,
     /// while it has; otherwise the machine a remote ping came from, its
     /// sender and its body on one line, each when given, or "ping" when
-    /// none is: "netcup-vps · claude · Waiting for your input".
+    /// none is: "#3 · netcup-vps · claude-code · Waiting for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
-        let parts = [row.machine, row.sender, body].compactMap { $0 }
+        let parts = [row.machine, sender(row), body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
     }
 
     /// What a ping's row names in the list layout's narrow column: the
     /// machine a remote ping came from and its sender, "netcup-vps ·
-    /// claude", either alone when the other isn't there; `nil` when
+    /// claude-code", either alone when the other isn't there; `nil` when
     /// neither is.
     public static func pingMeta(_ row: MenuRow) -> String? {
-        let parts = [row.machine, row.sender].compactMap { $0 }
+        let parts = [row.machine, sender(row)].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// A ping's sender as its row shows it, in kebab-case: lowercase, each
+    /// run of anything but letters and digits a single dash, none at the
+    /// ends. "Claude Code" is "claude-code"; `nil` when it names none.
+    public static func sender(_ row: MenuRow) -> String? {
+        guard let sender = row.sender else { return nil }
+        let words = sender.lowercased().split { !$0.isLetter && !$0.isNumber }
+        return words.isEmpty ? nil : words.joined(separator: "-")
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".
@@ -146,7 +156,7 @@ public enum PanelText {
         case .link: return "ping, opens a link"
         case .app: return "ping, opens an app"
         case .terminal: return "ping, focuses a Herdr tab"
-        case .noAction: return "ping"
+        case .noAction: return "ping, click marks it seen"
         case nil: break
         }
         let kind = switch row.kind {

@@ -10,7 +10,7 @@ public enum MenuTab: Hashable, Sendable {
 /// error rows, and what the line under the tab strip counts.
 public struct MenuTabContent: Equatable, Sendable {
     /// A project's groups as its arrangement makes them, the same as in
-    /// the list; All's by kind (pull requests, then issues, then runs) under
+    /// the list; All's by kind (pull requests, then pings, then issues, then runs) under
     /// subheaders, newest first. A group with no rows is left out.
     public var groups: [RowGroup]
     /// One per repository of the tab's projects that couldn't be fetched.

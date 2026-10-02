@@ -50,6 +50,7 @@ public struct RemoteMachines: Equatable, Sendable {
     private struct Failure: Equatable, Sendable {
         var sending: Ping
         var reason: String
+        var detail: String?
     }
 
     /// By the ping's URL.
@@ -64,6 +65,7 @@ public struct RemoteMachines: Equatable, Sendable {
         guard let failure = failures[ping.item.url], failure.sending.isSameSending(as: ping) else { return ping }
         var ping = ping
         ping.failure = failure.reason
+        ping.failureDetail = failure.detail
         return ping
     }
 
@@ -76,9 +78,9 @@ public struct RemoteMachines: Equatable, Sendable {
     /// Records why `ping`'s action failed, for its row. A sending no
     /// machine lists any more (withdrawn, replaced or sent anew since) is
     /// left out.
-    public mutating func recordFailure(_ ping: Ping, reason: String) {
+    public mutating func recordFailure(_ ping: Ping, reason: String, detail: String? = nil) {
         guard let sending = listed(ping) else { return }
-        failures[sending.item.url] = Failure(sending: sending, reason: reason)
+        failures[sending.item.url] = Failure(sending: sending, reason: reason, detail: detail)
     }
 
     /// Clears the failure recorded on `ping`'s sending: its action worked,

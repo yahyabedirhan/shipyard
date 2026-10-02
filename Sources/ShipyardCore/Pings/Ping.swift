@@ -27,15 +27,28 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// What clicking it does (`--open`, `--app`, `--herdr`); `nil` when it only marks
     /// it seen.
     public var action: PingAction?
-    /// Why its action last failed, shown on its row until the next click,
-    /// ⌥-click or dismiss; `nil` when it hasn't failed.
+    /// The terminal app (a bundle id) a `--herdr` ping was sent from, brought
+    /// forward on a click when `[herdr] terminal` isn't set; `nil` for any
+    /// other ping, when the CLI couldn't tell, or before it was kept.
+    public var terminal: String?
+    /// Why its action last failed, in a few words for its row, shown until
+    /// the next click, ⌥-click or dismiss; `nil` when it hasn't failed.
     public var failure: String?
+    /// The same, whole, for its hover card; `nil` when `failure` says it
+    /// all, or was written before the row's reason was kept short.
+    public var failureDetail: String?
     /// Made new each time the id is sent as a new ping, and kept by a
     /// replace: its `ping.sent` occurrence, so a ping withdrawn and sent
     /// again under its id is new (and notifies) however soon it comes back,
     /// even while the app wasn't running, and a replace never is. `nil` for
     /// a ping written before it was kept.
     public var instance: String?
+    /// Its number in its machine's store (`#3`), counted up from 1 as pings
+    /// are sent and never given again (`PingStore.takeNumber()`), and kept
+    /// by a replace. Numbers are per machine, so it's unique only beside
+    /// the machine it came from. `nil` for a ping written before pings were
+    /// numbered, which shows none.
+    public var number: Int?
     /// When it leaves the machine it was sent on, a day after its sending or
     /// its last replace: set on Linux, where no app sees it seen, so an
     /// unanswered ping doesn't stay forever. `nil` on the Mac, where it stays
@@ -48,7 +61,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var machine: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, projects, sent, seen, repository, body, sender, action, failure, instance, expires
+        case id, title, projects, sent, seen, repository, body, sender, action, terminal, failure, failureDetail, instance, number, expires
     }
 
     public init(
@@ -61,8 +74,11 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         body: String? = nil,
         sender: String? = nil,
         action: PingAction? = nil,
+        terminal: String? = nil,
         failure: String? = nil,
+        failureDetail: String? = nil,
         instance: String? = nil,
+        number: Int? = nil,
         expires: Date? = nil,
         machine: String? = nil
     ) {
@@ -75,8 +91,11 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.body = body
         self.sender = sender
         self.action = action
+        self.terminal = terminal
         self.failure = failure
+        self.failureDetail = failureDetail
         self.instance = instance
+        self.number = number
         self.expires = expires
         self.machine = machine
     }
@@ -96,8 +115,10 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         var mine = self, theirs = other
         mine.seen = nil
         mine.failure = nil
+        mine.failureDetail = nil
         theirs.seen = nil
         theirs.failure = nil
+        theirs.failureDetail = nil
         return mine == theirs
     }
 
@@ -115,7 +136,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         return now < seen.addingTimeInterval(seenWindow)
     }
 
-    /// The ping as a listed item: kind `ping`, always open, aged from when
+    /// The ping as a listed item: kind `ping`, numbered as its store
+    /// numbered it (0, no number, for one written before), always open, aged from when
     /// it was sent, in the repository it was filed by (if any). Its URL only
     /// names it (`shipyard://ping/<id>`, or `shipyard://ping/<machine>/<id>`
     /// for a remote ping), so it never collides with a GitHub item's, nor
@@ -125,7 +147,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         Item(
             kind: .ping,
             repository: repository ?? "",
-            number: 0,
+            number: number ?? 0,
             title: title,
             url: machine.map { Self.url(machine: $0, id: id) } ?? Self.url(id: id),
             author: "",

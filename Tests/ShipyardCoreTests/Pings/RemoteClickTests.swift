@@ -161,11 +161,12 @@ struct RemoteClickTests {
         try await harness.clickRemote("Deploy?")
 
         var row = try harness.remoteRow("Deploy?")
-        #expect(row.actionError == "Herdr pane w1:p3 is gone on netcup-vps")
+        #expect(row.actionError == "Pane gone")
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Herdr pane w1:p3 is gone on netcup-vps")
         #expect(row.needsAttention)
         #expect(harness.actions.ran.isEmpty)
         _ = await harness.machineTimer.fire()
-        #expect(try harness.remoteRow("Deploy?").actionError == "Herdr pane w1:p3 is gone on netcup-vps")
+        #expect(try harness.remoteRow("Deploy?").actionError == "Pane gone")
 
         harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "netcup-vps")
         try await harness.clickRemote("Deploy?")
@@ -183,7 +184,8 @@ struct RemoteClickTests {
         try await harness.clickRemote("Deploy?")
 
         let row = try harness.remoteRow("Deploy?")
-        #expect(row.actionError == "Couldn't reach netcup-vps through Herdr")
+        #expect(row.actionError == "Offline")
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Couldn't reach netcup-vps through Herdr")
         #expect(row.needsAttention)
         #expect(harness.actions.ran.isEmpty)
     }
@@ -215,7 +217,7 @@ struct HerdrMachineFocusTests {
             runner: shell,
             machineTimeout: 0.01
         )
-        #expect(await focus.focus("w1:p3", on: "netcup-vps") == .failed("netcup-vps didn't answer in time"))
+        #expect(await focus.focus("w1:p3", on: "netcup-vps") == .failed("No answer", detail: "netcup-vps didn't answer in time"))
         #expect(shell.started == 1)
         #expect(shell.cancelled == 1)
     }
@@ -229,7 +231,7 @@ struct HerdrMachineFocusTests {
             isExecutable: { $0 == FakeHerdr.path },
             runner: shell
         )
-        #expect(await focus.focus("w1:p3", on: "typo-vps") == .failed("Herdr has no saved machine named typo-vps"))
+        #expect(await focus.focus("w1:p3", on: "typo-vps") == .failed("No machine", detail: "Herdr has no saved machine named typo-vps"))
         #expect(shell.invocations.map(\.arguments) == [["--machine", "typo-vps", "agent", "focus", "w1:p3"]])
     }
 }

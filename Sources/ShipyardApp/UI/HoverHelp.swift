@@ -344,7 +344,8 @@ private struct HoverHelpBody: View {
     }
 }
 
-/// A row's card: the author's avatar centred beside the full title, then,
+/// A row's card: the author's avatar (a known agent's mark, for a ping it
+/// sent) centred beside the full title, then,
 /// under the title, its tags and facts.
 private struct RowCardView: View {
     let card: RowCard
@@ -354,7 +355,11 @@ private struct RowCardView: View {
             // The avatar and the title are the card's header: the avatar
             // centres on the title, one line or three.
             HStack(alignment: .center, spacing: HoverHelp.avatarGap) {
-                AuthorAvatar(url: card.avatarURL)
+                if let agent = card.agent {
+                    AgentMarkView(agent: agent, size: HoverHelp.avatarSize)
+                } else {
+                    AuthorAvatar(url: card.avatarURL)
+                }
                 Text(card.headline)
                     .font(TypeScale.meta.weight(.semibold))
                     .lineLimit(3)
@@ -467,7 +472,7 @@ private struct FactView: View {
                 .foregroundStyle(.primary.opacity(0.78))
                 .lineLimit(8)
                 .fixedSize(horizontal: false, vertical: true)
-        case .action:
+        case .action, .noAction:
             Text(PanelText.fact(fact)).foregroundStyle(.secondary).truncationMode(.middle)
         default:
             Text(PanelText.fact(fact)).foregroundStyle(tint ?? .secondary)
@@ -493,6 +498,7 @@ private struct FactView: View {
         case .duration(_, let running): running ? "hourglass" : "timer"
         case .body: "text.alignleft"
         case .action(let action): Palette.symbol(action.icon)
+        case .noAction: "checkmark.circle"
         case .failure: "exclamationmark.triangle.fill"
         }
     }

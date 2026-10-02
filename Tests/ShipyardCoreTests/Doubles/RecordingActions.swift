@@ -32,6 +32,6 @@ final class RecordingActions: ActionRunning {
     func run(_ action: PingAction) async -> ActionOutcome {
         actions.withValue { $0.append(action) }
         whileRunning?()
-        return failure.map(ActionOutcome.failed) ?? .done
+        return failure.map { .failed($0) } ?? .done
     }
 }

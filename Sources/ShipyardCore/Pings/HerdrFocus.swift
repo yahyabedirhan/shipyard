@@ -87,30 +87,33 @@ public struct HerdrFocus: Sendable {
             if machine != nil {
                 switch await run(["agent", "focus", id], about: id, on: machine) {
                 case .success: return .done
-                case .failure(let failure) where failure.code != "agent_not_found": return .failed(failure.message)
+                case .failure(let failure) where failure.code != "agent_not_found": return failure.outcome
                 case .failure: break
                 }
             }
             switch await run(["pane", "get", id], about: id, on: machine) {
-            case .failure(let failure): return .failed(failure.message)
+            case .failure(let failure): return failure.outcome
             case .success(let answer):
                 guard let found = (answer["pane"] as? [String: Any])?["tab_id"] as? String else {
-                    return .failed("Herdr didn't say which tab pane \(id) is in")
+                    return .failed("No tab", detail: "Herdr didn't say which tab pane \(id) is in")
                 }
                 tab = found
             }
         }
         switch await run(["tab", "focus", tab], about: tab, on: machine) {
-        case .failure(let failure): return .failed(failure.message)
+        case .failure(let failure): return failure.outcome
         case .success: return .done
         }
     }
 
-    /// Why a `herdr` command failed, as the ping's row says it, with
-    /// Herdr's error code when it gave one.
+    /// Why a `herdr` command failed: in a few words for the ping's row,
+    /// whole for its hover card, with Herdr's error code when it gave one.
     struct Failure: Error {
-        var message: String
+        var reason: String
+        var detail: String
         var code: String?
+
+        var outcome: ActionOutcome { .failed(reason, detail: detail) }
     }
 
     /// Runs `herdr` with `arguments`, on the saved machine `machine` when
@@ -118,17 +121,36 @@ public struct HerdrFocus: Sendable {
     /// when it worked, else why not, for the tab or pane `id`.
     private func run(_ arguments: [String], about id: String, on machine: String?) async -> Result<[String: Any], Failure> {
         switch await (machine == nil ? herdr : remote).run(arguments, on: machine) {
-        case .notFound: return .failure(Failure(message: "Couldn't find herdr"))
-        case .couldNotRun: return .failure(Failure(message: "Couldn't run herdr"))
-        case .timedOut: return .failure(Failure(message: machine.map { "\($0) didn't answer in time" } ?? "Herdr didn't answer"))
+        case .notFound: return .failure(Failure(reason: "No herdr", detail: "Couldn't find herdr"))
+        case .couldNotRun: return .failure(Failure(reason: "No herdr", detail: "Couldn't run herdr"))
+        case .timedOut: return .failure(Failure(reason: "No answer", detail: machine.map { "\($0) didn't answer in time" } ?? "Herdr didn't answer"))
         case .finished(let output):
             return HerdrCommand.answer(output).mapError { error in
-                Failure(message: Self.reason(error.code, about: id, on: machine, output: output.output), code: error.code)
+                Failure(
+                    reason: Self.shortReason(error.code, on: machine, output: output.output),
+                    detail: Self.reason(error.code, about: id, on: machine, output: output.output),
+                    code: error.code
+                )
             }
         }
     }
 
-    /// What a failed run's row says, from Herdr's error `code` for the tab
+    /// What a failed run's row says in a few words, to fit its narrow
+    /// column, from Herdr's error `code`, run on `machine` (if any); the
+    /// hover card has the whole of it (`reason`).
+    private static func shortReason(_ code: String?, on machine: String?, output: String) -> String {
+        switch code {
+        case "pane_not_found", "agent_not_found": "Pane gone"
+        case "tab_not_found": "Tab gone"
+        case "server_not_running": "Herdr off"
+        case nil where machine != nil:
+            // Herdr refused the label, or the machine never answered.
+            HerdrCommand.refusal(output, machine: machine!) == nil ? "Offline" : "No machine"
+        default: "No focus"
+        }
+    }
+
+    /// What a failed run's hover card says, from Herdr's error `code` for the tab
     /// or pane `id`, run on `machine` (if any) with `output`.
     private static func reason(_ code: String?, about id: String, on machine: String?, output: String) -> String {
         let on = machine.map { " on \($0)" } ?? ""

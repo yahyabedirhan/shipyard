@@ -287,7 +287,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// The order kinds appear in within a section.
-    static let kindOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping]
+    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun]
 }
 
 /// One project in the panel.
@@ -295,7 +295,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
     /// Its listed items as `Arrangement` groups and sorts them: by default
-    /// pull requests, then issues, then workflow runs; within each kind, open
+    /// pull requests, then pings, then issues, then workflow runs; within each kind, open
     /// (or running) items first (most recently updated first), then closed
     /// (or finished) ones (most recently closed first).
     public var groups: [RowGroup]
@@ -448,6 +448,9 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// without one.
     public var sender: String? { item.ping?.sender }
 
+    /// The known agent a ping's sender names, whose logo the row shows by
+    /// the sender; `nil` for an unknown sender, none, or any other kind.
+    public var agent: KnownAgent? { sender.flatMap(KnownAgent.init(sender:)) }
     /// The machine a remote ping came from, by its Herdr label; `nil` for a
     /// ping sent on this Mac, or any other kind.
     public var machine: String? { item.ping?.machine }

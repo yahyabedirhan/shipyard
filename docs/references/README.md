@@ -10,5 +10,7 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 | [github-device-flow.md](github-device-flow.md) | Signing in with GitHub's OAuth device flow |
 | [github-search.md](github-search.md) | The review search: `review-requested` and team requests, its 100-result page |
 | [github-repositories.md](github-repositories.md) | Listing and checking repositories for the project picker; listing a repository group's or an owner's repositories (affiliations, `isArchived`, `isFork`, paging) |
+| [herdr-terminal.md](herdr-terminal.md) | What Herdr's panes expose about the outer terminal app, and how `shipyard ping --herdr` finds it |
 | [macos-end-to-end-testing.md](macos-end-to-end-testing.md) | End-to-end testing options for a SwiftUI menu bar app without Xcode, and what shipyard adopts |
 | [macos-hover-help.md](macos-hover-help.md) | Hover help in the panel instead of native tooltips: packages, native options (popover, a drawn card, inline text), what menu bar apps do, and each call site |
+| [agent-icons.md](agent-icons.md) | Where each coding agent's icon is published and under what terms; why shipyard draws its own marks instead of bundling them |

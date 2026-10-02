@@ -2,7 +2,7 @@ import Foundation
 
 /// `shipyard ping`: reads its arguments, files the ping under the projects
 /// that watch its repository (or under the one `--project` names), saves it
-/// to the ping store and prints its id. Pure apart from the store and the
+/// to the ping store and prints its number and id (`#3 k7qm2x`). Pure apart from the store and the
 /// git remote it reads through `CommandEnvironment`, so tests call it as a
 /// function; the `shipyard` executable only prints what it returns.
 ///
@@ -18,8 +18,9 @@ public enum PingCommand {
 
         Sends the user a ping: it's listed under the projects that watch the
         repository of the working folder (its git remote `origin`), needs
-        their attention until they click it, and prints its id. Clicking it
-        runs its action, if it has one, and marks it seen.
+        their attention until they click it, and prints its number and its
+        id on one line, such as `#3 k7qm2x`. Clicking it runs its action, if
+        it has one, and marks it seen.
 
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
@@ -30,7 +31,9 @@ public enum PingCommand {
           --open <url>         clicking it opens this URL (a page, an app's deep link)
           --app <id or name>   clicking it brings this app forward, by bundle id or name
           --herdr [<id>]       clicking it focuses this Herdr tab or pane (an id such as
-                               w1:t2 or w1:p3); with no id, your own pane ($HERDR_PANE_ID)
+                               w1:t2 or w1:p3); with no id, your own pane ($HERDR_PANE_ID).
+                               It notes the terminal app you ran it in, and clicking brings
+                               that app forward unless [herdr] terminal names one
           --repo <owner/name>  file it by this repository instead of the working folder's
           --project <name>     file it under this project (its name in config.toml) only
 
@@ -65,6 +68,32 @@ public enum PingCommand {
     /// pane's id, which `--herdr` without an id takes.
     static let herdrPaneVariable = "HERDR_PANE_ID"
 
+    /// The bundle id of the terminal app the CLI runs in, which a `--herdr`
+    /// ping brings forward on a click when `[herdr] terminal` is unset.
+    /// `TERM_PROGRAM` names it when it's a known terminal's; Herdr sets its
+    /// own (`herdr`) in its panes, so then `__CFBundleIdentifier`, the app
+    /// macOS launched the process tree from, does, and last the variables a
+    /// terminal sets for itself. `nil` when none says.
+    static func outerTerminal(_ variables: [String: String]) -> String? {
+        let known = [
+            "ghostty": "com.mitchellh.ghostty",
+            "iTerm.app": "com.googlecode.iterm2",
+            "Apple_Terminal": "com.apple.Terminal",
+            "WezTerm": "com.github.wez.wezterm",
+            "vscode": "com.microsoft.VSCode",
+            "WarpTerminal": "dev.warp.Warp-Stable",
+        ]
+        func value(_ name: String) -> String? {
+            let text = variables[name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? nil : text
+        }
+        if let program = value("TERM_PROGRAM"), let bundle = known[program] { return bundle }
+        if let bundle = value("__CFBundleIdentifier") { return bundle }
+        if value("KITTY_WINDOW_ID") != nil || value("TERM") == "xterm-kitty" { return "net.kovidgoyal.kitty" }
+        if value("ALACRITTY_WINDOW_ID") != nil { return "org.alacritty" }
+        return nil
+    }
+
     /// How long a ping lives on Linux, a machine without the app, from its
     /// sending or its last replace: no one marks it seen there, so an
     /// unanswered one would otherwise stay forever.
@@ -76,8 +105,10 @@ public enum PingCommand {
     /// `owner/name`, or one in the project's list in `resolved` (each
     /// project's repositories as the app last resolved them, by name).
     /// `newID` makes the id when `--id` gives none; one already stored is
-    /// drawn again. A `--id` already stored replaces that ping: its sent
-    /// time stays, and it's unseen again with no failure.
+    /// drawn again. A new ping takes the store's next number
+    /// (`PingStore.takeNumber()`). A `--id` already stored replaces that
+    /// ping: its sent time and number stay, and it's unseen again with no
+    /// failure.
     ///
     /// On Linux (`environment.platform`), a machine without the app, it
     /// isn't filed (`send`), and a ping without an action takes the
@@ -103,8 +134,11 @@ public enum PingCommand {
            let pane = environment.variables[herdrPaneVariable]?.trimmingCharacters(in: .whitespaces), !pane.isEmpty {
             sending.action = .herdr(pane)
         }
+        let terminal: String?
+        if case .herdr = sending.action { terminal = outerTerminal(environment.variables) } else { terminal = nil }
         return send(
             sending,
+            terminal: terminal,
             folder: environment.workingDirectory,
             git: environment.git,
             platform: environment.platform,
@@ -116,7 +150,8 @@ public enum PingCommand {
         )
     }
 
-    /// Files `request` and saves it, as `run` does once its arguments read:
+    /// Files `request` and saves it, with the terminal a `--herdr` ping was
+    /// sent from (`outerTerminal`), as `run` does once its arguments read:
     /// under the one `--project` names, else under every project that
     /// watches its repository (`--repo`, else the `origin` of `folder`;
     /// none when `folder` is `nil`), then prints its id. An id already
@@ -132,6 +167,7 @@ public enum PingCommand {
     /// after `now`.
     static func send(
         _ request: Request,
+        terminal: String? = nil,
         folder: URL?,
         git: any GitRemoteLookup,
         platform: CommandPlatform,
@@ -167,10 +203,13 @@ public enum PingCommand {
             id = drawn
         }
         let replaced = store.ping(id: id)
+        let number: Int
         do {
-            // A replace keeps when the ping was first sent, and its
-            // instance, so it isn't notified again; seen and failure start
-            // over, so it needs attention again.
+            // A replace keeps when the ping was first sent, its instance,
+            // so it isn't notified again, and its number; seen and failure
+            // start over, so it needs attention again. A ping written
+            // before pings were numbered takes one when it's replaced.
+            number = try replaced?.number ?? store.takeNumber()
             try store.save(Ping(
                 id: id,
                 title: request.title,
@@ -180,13 +219,15 @@ public enum PingCommand {
                 body: request.body,
                 sender: request.sender,
                 action: request.action,
+                terminal: terminal,
                 instance: replaced?.instance ?? UUID().uuidString.lowercased(),
+                number: number,
                 expires: expires
             ))
         } catch {
             return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
-        return CommandResult(output: id + "\n")
+        return CommandResult(output: "#\(number) \(id)\n")
     }
 
     /// The projects `request` is filed under against `configuration`, and

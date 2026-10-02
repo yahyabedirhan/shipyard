@@ -933,15 +933,15 @@ public final class Shipyard {
         return Task {
             let outcome: ActionOutcome
             if case .herdr(let target) = action {
-                outcome = await runHerdr(target)
+                outcome = await runHerdr(target, sentFrom: ping.terminal)
             } else {
                 outcome = await actions.run(action)
             }
             switch outcome {
             case .done:
                 markPingsSeen([ping])
-            case .failed(let reason):
-                try? pingStore.recordFailure(ping, reason: reason)
+            case .failed(let reason, let detail):
+                try? pingStore.recordFailure(ping, reason: reason, detail: detail)
                 listPings()
             }
         }
@@ -974,8 +974,8 @@ public final class Shipyard {
             case .done:
                 // The sending clicked, so one replaced meanwhile stays unseen.
                 markRemoteSeen([ping])
-            case .failed(let reason):
-                remote.recordFailure(ping, reason: reason)
+            case .failed(let reason, let detail):
+                remote.recordFailure(ping, reason: reason, detail: detail)
                 rebuildMenu(configStore.lastValid)
             }
         }
@@ -984,11 +984,12 @@ public final class Shipyard {
     /// A ping's Herdr action: focuses the tab or pane `target` names
     /// (`HerdrFocus`), on the saved machine `machine` for a remote ping,
     /// then, once that worked, brings `[herdr] terminal` forward through
-    /// the action port, as an `--app` action would. Without a terminal
-    /// set, only the focus runs. Either failing fails the action.
-    private func runHerdr(_ target: String, on machine: String? = nil) async -> ActionOutcome {
+    /// the action port, as an `--app` action would. Without a terminal set,
+    /// the one the ping was sent from (`sentFrom`) comes forward instead;
+    /// with neither, only the focus runs. Either failing fails the action.
+    private func runHerdr(_ target: String, on machine: String? = nil, sentFrom: String? = nil) async -> ActionOutcome {
         let focused = await herdr.focus(target, on: machine)
-        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
+        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal ?? sentFrom else { return focused }
         return await actions.run(.app(terminal))
     }
 

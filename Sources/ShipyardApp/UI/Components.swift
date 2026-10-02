@@ -141,6 +141,33 @@ struct StateSymbol: View {
     }
 }
 
+/// A known agent's mark: its logo, fitted to a square with the corners an
+/// app icon has; a one-colour glyph is tinted like text, and a logo with a
+/// dark-mode file switches to it. Decoration: the sender's name beside it,
+/// or the card's words, say who sent the ping.
+struct AgentMarkView: View {
+    let agent: KnownAgent
+    let size: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Group {
+            if let image = AgentLogoImage.image(for: agent, dark: colorScheme == .dark) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .foregroundStyle(.primary)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
 /// A pull request's check dot, cut out of what it sits on like a status
 /// badge; nothing when there are no checks.
 struct CheckDot: View {

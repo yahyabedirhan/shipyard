@@ -66,7 +66,7 @@ struct RemotePingCommandTests {
         shipyard("ping", "Second", "--id", "second")
 
         let files = try FileManager.default.contentsOfDirectory(atPath: store.directory.path).sorted()
-        #expect(files == ["first.json", "second.json"])
+        #expect(files == ["first.json", "last-number", "second.json"])
     }
 
     // MARK: - Saved as given
@@ -75,7 +75,7 @@ struct RemotePingCommandTests {
     func savedByOrigin() throws {
         let result = shipyard("ping", "Which cache?", "--id", "cache", origin: "git@github.com:yahyabedirhan/shop.git")
 
-        #expect(result == CommandResult(output: "cache\n"))
+        #expect(result == CommandResult(output: "#1 cache\n"))
         let ping = try stored()
         #expect(ping.repository == "yahyabedirhan/shop")
         #expect(ping.projects == [])
@@ -103,7 +103,7 @@ struct RemotePingCommandTests {
     func savedWithNothing() throws {
         let result = shipyard("ping", "Done", "--id", "done")
 
-        #expect(result == CommandResult(output: "done\n"))
+        #expect(result == CommandResult(output: "#1 done\n"))
         let ping = try stored()
         #expect(ping.repository == nil)
         #expect(ping.projects == [])
@@ -168,7 +168,7 @@ struct RemotePingCommandTests {
         let first = try stored()
         let later = Self.now.addingTimeInterval(3600)
 
-        #expect(shipyard("ping", "Built", "--id", "build", at: later) == CommandResult(output: "build\n"))
+        #expect(shipyard("ping", "Built", "--id", "build", at: later) == CommandResult(output: "#1 build\n"))
 
         let replaced = try stored()
         #expect(replaced.title == "Built")

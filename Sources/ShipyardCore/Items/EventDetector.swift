@@ -100,7 +100,7 @@ extension EventKind {
         case .issueCommented: "New comment on issue #\(number)"
         case .runFailed: "Run #\(number) failed"
         case .runSucceeded: "Run #\(number) succeeded"
-        // A ping has no number: `Event.headline` uses its title instead.
+        // A ping's headline is its title (`Event.headline`), not its number.
         case .pingSent: "New ping"
         }
     }

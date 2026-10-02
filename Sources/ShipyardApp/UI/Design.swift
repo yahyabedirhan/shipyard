@@ -26,6 +26,9 @@ enum Grid {
     static let numberColumn: CGFloat = 30
     /// The author's, or the repository's, column.
     static let metaColumn: CGFloat = 74
+    /// A known agent's logo before a ping's sender: big enough for a logo
+    /// to read, small enough to leave the column the sender's name.
+    static let agentMark: CGFloat = 14
     /// The age's column.
     static let ageColumn: CGFloat = 26
     /// How far a row's hover highlight sits in from the panel's edges.
@@ -132,9 +135,9 @@ enum Palette {
     /// A row's colour, by kind: a pull request open green, draft gray,
     /// merged purple, closed red; an issue open green, closed purple; a
     /// workflow run running amber, succeeded green, failed red; a ping
-    /// the accent blue.
+    /// gray, as a message (its dot and bold title say it's unseen).
     static func color(_ state: ItemState, kind: ItemKind) -> Color {
-        if kind == .ping { return accent }
+        if kind == .ping { return gray }
         return switch state {
         case .open, .succeeded: green
         case .draft: gray

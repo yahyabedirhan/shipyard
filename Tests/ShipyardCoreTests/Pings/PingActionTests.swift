@@ -28,7 +28,7 @@ private extension Harness {
         let result = cli(["ping", title, "--project", "shop"] + flags)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping row titled `title` in `shop`.
@@ -169,7 +169,7 @@ struct PingActionTests {
         var row = try harness.pingRow("Needs you")
         #expect(row.needsAttention)
         #expect(row.actionError == "No app named Claude")
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "No app named Claude")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · No app named Claude")
         #expect(PanelText.rowCard(row, now: harness.clock.now).lines.contains("No app named Claude"))
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.shipyard.menu.attention.pings == 1)
@@ -180,7 +180,7 @@ struct PingActionTests {
         row = try harness.pingRow("Needs you")
         #expect(row.actionError == nil)
         #expect(row.needsAttention == false)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "claude")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · claude")
         #expect(harness.actions.ran == [.app("Claude"), .app("Claude")])
     }
 
@@ -244,9 +244,11 @@ struct PingActionTests {
         let link = try harness.pingRow("Published")
         #expect(link.pingIcon == .link)
         #expect(link.sender == "claude")
-        #expect(PanelText.rowDetail(link, showingRepository: false) == "claude · The design doc, ready to read")
+        #expect(link.agent == .claude)
+        #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
+        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · claude · The design doc, ready to read")
         harness.clock.advance(by: 300)
-        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "claude · The design doc, ready to read · 5m")
+        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · claude · The design doc, ready to read · 5m")
         #expect(PanelText.stateLabel(link) == "ping, opens a link")
         #expect(PanelText.rowCard(link, now: harness.clock.now).lines == [
             "The design doc,\nready to read",
@@ -255,15 +257,17 @@ struct PingActionTests {
 
         let app = try harness.pingRow("Needs you")
         #expect(app.pingIcon == .app)
-        #expect(PanelText.rowDetail(app, showingRepository: false) == "Waiting for input")
+        #expect(PanelText.rowDetail(app, showingRepository: false) == "#2 · Waiting for input")
         #expect(PanelText.stateLabel(app) == "ping, opens an app")
         #expect(PanelText.rowCard(app, now: harness.clock.now).lines == ["Waiting for input", "Opens Claude"])
 
         let note = try harness.pingRow("Done")
         #expect(note.pingIcon == .noAction)
-        #expect(PanelText.rowDetail(note, showingRepository: false) == "ping")
-        #expect(PanelText.stateLabel(note) == "ping")
-        #expect(PanelText.rowCard(note, now: harness.clock.now).lines.isEmpty)
+        #expect(note.agent == nil)
+        #expect(PanelText.rowCard(note, now: harness.clock.now).agent == nil)
+        #expect(PanelText.rowDetail(note, showingRepository: false) == "#3 · ping")
+        #expect(PanelText.stateLabel(note) == "ping, click marks it seen")
+        #expect(PanelText.rowCard(note, now: harness.clock.now).lines == ["Nothing to open: clicking marks it seen"])
     }
 
     @Test("a pull request's row has no ping icon")
@@ -272,7 +276,38 @@ struct PingActionTests {
         let row = try #require(harness.section("shop")?.rows.first { $0.kind == .pullRequest })
         #expect(row.pingIcon == nil)
         #expect(row.sender == nil)
+        #expect(row.agent == nil)
+        #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
         #expect(row.actionError == nil)
+    }
+
+    @Test(
+        "a ping's sender names a known agent, ignoring case, spaces and dashes, and leading words after the agent's name, and is shown in kebab-case",
+        arguments: [
+            ("claude", KnownAgent.claude, "claude"), ("Claude Code", .claude, "claude-code"), ("claude-code", .claude, "claude-code"),
+            ("CLAUDE", .claude, "claude"), ("claude: fix totals", .claude, "claude-fix-totals"), ("codex", .codex, "codex"),
+            ("Codex CLI", .codex, "codex-cli"), ("opencode", .opencode, "opencode"), ("OpenCode", .opencode, "opencode"),
+            ("cursor", .cursor, "cursor"), ("cursor-agent", .cursor, "cursor-agent"), ("pi", .pi, "pi"), ("gemini", .gemini, "gemini"),
+            ("gemini-cli", .gemini, "gemini-cli"), ("copilot", .copilot, "copilot"), ("GitHub Copilot", .copilot, "github-copilot"),
+            ("amp", .amp, "amp"), ("droid", .droid, "droid"), ("Factory Droid", .droid, "factory-droid"),
+        ] as [(String, KnownAgent?, String)]
+    )
+    func knownAgent(sender: String, agent: KnownAgent?, shown: String) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        try await harness.send("Ready", "--from", sender)
+        let row = try harness.pingRow("Ready")
+        #expect(row.agent == agent)
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(shown)")
+    }
+
+    @Test("a sender that only starts like an agent's name, or names no agent, is none, and is named in words", arguments: ["pipeline", "claudette", "deploy bot", "my claude"])
+    func unknownSender(sender: String) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        try await harness.send("Ready", "--from", sender)
+        let row = try harness.pingRow("Ready")
+        #expect(row.agent == nil)
+        #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(sender.replacingOccurrences(of: " ", with: "-"))")
     }
 
     // MARK: Grouping
