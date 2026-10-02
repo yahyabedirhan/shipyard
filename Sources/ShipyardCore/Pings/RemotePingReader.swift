@@ -135,16 +135,20 @@ public struct RemotePingReader: Sendable {
         }
     }
 
-    /// Runs `herdr --machine <label>` with `arguments`: its `result`, or why not.
+    /// Runs `herdr --machine <label>` with `arguments`: its `result`, or
+    /// why not. Every reason names the machine, as the panel shows it alone.
     private func run(_ arguments: [String], on label: String) async -> Result<[String: Any], Failure> {
         switch await herdr.run(arguments, on: label) {
-        case .notFound: return .failure(Failure("Couldn't find herdr"))
-        case .couldNotRun: return .failure(Failure("Couldn't run herdr"))
+        case .notFound: return .failure(Failure("Couldn't find herdr to reach \(label)"))
+        case .couldNotRun: return .failure(Failure("Couldn't run herdr to reach \(label)"))
         case .timedOut: return .failure(Failure("\(label) didn't answer in time"))
         case .finished(let output):
+            if output.status != 0, let refusal = HerdrCommand.refusal(output.output, machine: label) {
+                return .failure(Failure(refusal))
+            }
             return HerdrCommand.answer(output).mapError { error in
                 switch error.code {
-                case "server_not_running": Failure("Herdr isn't running")
+                case "server_not_running": Failure("Herdr isn't running, so \(label) can't be reached")
                 default: Failure("Couldn't reach \(label) through Herdr" + (error.message.map { ": \($0)" } ?? ""))
                 }
             }

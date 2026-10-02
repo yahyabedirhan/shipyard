@@ -269,6 +269,18 @@ public enum PanelText {
         }
     }
 
+    /// A remote machine's quiet line (`MachineNotice`): why it couldn't be
+    /// read, its last pings still listed; or that it holds more than it sent.
+    public static func machineNotice(_ notice: MachineNotice) -> String {
+        switch notice.kind {
+        case .unreachable(let reason):
+            let sentence = reason.hasSuffix(".") ? reason : reason + "."
+            return "\(sentence) Its last pings stay listed."
+        case .truncated(let listed):
+            return "\(notice.machine) has more pings than it could send. Showing its newest \(listed)."
+        }
+    }
+
     // MARK: - Notifications
 
     /// The banner while macOS doesn't let shipyard post notifications.

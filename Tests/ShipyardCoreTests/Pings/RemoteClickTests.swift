@@ -178,7 +178,7 @@ struct RemoteClickTests {
     @Test("a machine Herdr can't reach says so on the row, and the ping stays unseen")
     func unreachable() async throws {
         let harness = try await Harness.polled(netcup: [ping("q1", "Deploy?", action: .herdr("w1:p3"))])
-        harness.herdr.setReachable(false, "netcup-vps")
+        harness.herdr.setReach(.unreachable, on: "netcup-vps")
 
         try await harness.clickRemote("Deploy?")
 
@@ -220,7 +220,7 @@ struct HerdrMachineFocusTests {
         #expect(shell.cancelled == 1)
     }
 
-    @Test("a label Herdr doesn't know fails with Herdr's own reason")
+    @Test("a label Herdr doesn't know fails with the reason the poll gives")
     func unknownLabel() async {
         let shell = FakeShell(ShellOutput(status: 2, output: "error: unknown machine 'typo-vps'; use `herdr machine list`\n"))
         let focus = HerdrFocus(
@@ -229,7 +229,7 @@ struct HerdrMachineFocusTests {
             isExecutable: { $0 == FakeHerdr.path },
             runner: shell
         )
-        #expect(await focus.focus("w1:p3", on: "typo-vps") == .failed("Couldn't reach typo-vps through Herdr: unknown machine 'typo-vps'; use `herdr machine list`"))
+        #expect(await focus.focus("w1:p3", on: "typo-vps") == .failed("Herdr has no saved machine named typo-vps"))
         #expect(shell.invocations.map(\.arguments) == [["--machine", "typo-vps", "agent", "focus", "w1:p3"]])
     }
 }

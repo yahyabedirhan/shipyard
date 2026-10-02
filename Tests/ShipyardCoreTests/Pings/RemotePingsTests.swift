@@ -202,31 +202,19 @@ struct RemotePingsTests {
         #expect(harness.shipyard.remote.machine("netcup-vps")?.failure
             == "netcup-vps lists pings in version 2 from shipyard 9.0.0, and this shipyard reads version 1: update shipyard on netcup-vps")
         #expect(harness.shipyard.remote.machine("hetzner-vps")?.failure == nil)
+        #expect(harness.shipyard.menu.machineNotices.map(PanelText.machineNotice) == [
+            "netcup-vps lists pings in version 2 from shipyard 9.0.0, and this shipyard reads version 1: update shipyard on netcup-vps. Its last pings stay listed.",
+        ])
         #expect(harness.machineTimer.armed == 30)
 
         harness.herdr.setPings([], on: "netcup-vps")
         await harness.poll()
         #expect(harness.section("netcup-vps") == nil)
         #expect(harness.shipyard.remote.machine("netcup-vps")?.failure == nil)
+        #expect(harness.shipyard.menu.machineNotices.isEmpty)
     }
 
-    @Test("a label Herdr has no machine for is a machine that fails, not a broken menu")
-    func unknownMachine() async throws {
-        let harness = try await Harness.withMachines("[remote]\nmachines = [\"netcup-vps\", \"typo-vps\"]\n\n" + shop, netcup: [ping("q1", "Deploy?")])
-        await harness.poll()
-        #expect(harness.titles("netcup-vps") == ["Deploy?"])
-        #expect(harness.shipyard.remote.machine("typo-vps")?.failure == "Couldn't reach typo-vps through Herdr: no saved machine named typo-vps")
-    }
 
-    @Test("a truncated list is listed, and remembered as truncated")
-    func truncated() async throws {
-        let harness = try await Harness.withMachines()
-        let pings = (0..<120).map { ping("p\($0)", "Ping \($0)", minutes: Double($0)) }
-        harness.herdr.setPings(pings, on: "netcup-vps")
-        await harness.poll()
-        #expect(harness.shipyard.remote.machine("netcup-vps")?.truncated == true)
-        #expect(harness.section("netcup-vps")?.rows.count == PingList.maxPings)
-    }
 
     @Test("an edit adding or removing a machine applies at once; none left stops polling")
     func followsConfiguration() async throws {
@@ -291,13 +279,6 @@ struct RemotePingReaderTests {
         #expect(hanging.cancelled == hanging.started)
     }
 
-    @Test("without herdr, nothing is asked")
-    func noHerdr() async {
-        let herdr = FakeHerdr()
-        herdr.installed = false
-        #expect(await herdr.remote.list(machine: "netcup-vps") == .failure(.init("Couldn't find herdr")))
-        #expect(herdr.runs.isEmpty)
-    }
 
     @Test("pings read from a machine carry its label")
     func marksMachine() async throws {

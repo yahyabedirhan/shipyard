@@ -33,6 +33,9 @@ public struct MenuModel: Equatable, Sendable {
     /// sections' groups carry theirs, and the All tab, arranged when it's
     /// drawn, reads its own from here.
     public var foldedGroups: Set<GroupID>
+    /// One quiet line per remote machine that couldn't be read, or whose
+    /// list stopped early (`MachineNotice.notices`), in configuration order.
+    public var machineNotices: [MachineNotice] = []
 
     public init(
         sections: [MenuSection] = [],

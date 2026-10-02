@@ -15,10 +15,12 @@ import ShipyardCore
 /// a command log record of the machine's pings as `shipyard ping list
 /// --json` prints them, and `… plugin log list --plugin …` lists the
 /// machine's records, as Herdr 0.9.3 does. A record can stay `running` for
-/// a number of log lists first. A label it doesn't know is refused. A
-/// machine's panes and agents (`open(pane:tab:agent:on:)`) answer `agent
-/// focus`, `pane get` and `tab focus` through `--machine`, and a machine
-/// can stop being reachable (`setReachable`).
+/// a number of log lists first. A label it doesn't know, and a machine
+/// disabled, are refused with the line Herdr prints (`cli/target.rs` at
+/// commit 65e35a3). A machine's panes and agents (`open(pane:tab:agent:on:)`)
+/// answer `agent focus`, `pane get` and `tab focus` through `--machine`,
+/// and a machine can be out of reach, or hang until its read times out
+/// (`setReach`, `timeOutReads`).
 final class FakeHerdr: ShellRunning {
     static let path = "/usr/local/bin/herdr"
 
@@ -39,6 +41,20 @@ final class FakeHerdr: ShellRunning {
         var focused: [String] = []
         var machines: [String: Machine] = [:]
         var nextLog = 1
+        /// Set by `timeOutReads`: every wait for an answer ends at once.
+        var timingOut = false
+    }
+
+    /// How a saved machine answers.
+    enum Reach {
+        /// As asked.
+        case up
+        /// Saved but disabled in Herdr.
+        case disabled
+        /// Herdr can't connect to it.
+        case unreachable
+        /// Never answers, until its run is stopped.
+        case hanging
     }
 
     /// A saved machine with the herdr-shipyard plugin installed.
@@ -55,8 +71,8 @@ final class FakeHerdr: ShellRunning {
         var tabs: Set<String> = []
         /// The panes an agent occupies.
         var agents: Set<String> = []
-        /// Whether Herdr's connection to it works.
-        var reachable = true
+        /// How Herdr reaches it.
+        var reach = Reach.up
     }
 
     private struct Log {
@@ -161,11 +177,16 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Whether Herdr reaches the machine `label`: while it doesn't, every
-    /// run on it fails as Herdr's does when the connection fails, with no
-    /// JSON answer.
-    func setReachable(_ reachable: Bool, _ label: String) {
-        state.withValue { $0.machines[label]?.reachable = reachable }
+    /// How Herdr reaches the machine `label` from now on.
+    func setReach(_ reach: Reach, on label: String) {
+        state.withValue { $0.machines[label]?.reach = reach }
+    }
+
+    /// From now on, every wait for an answer ends at once, as if its time
+    /// passed: a machine left hanging times out. One that answers may
+    /// time out too, so afterwards poll only while the others hang.
+    func timeOutReads() {
+        state.withValue { $0.timingOut = true }
     }
 
     /// The runs made on the machine `label` (`--machine <label>` and what followed).
@@ -174,13 +195,19 @@ final class FakeHerdr: ShellRunning {
     }
 
     /// `RemotePingReader` over this Herdr, with no `PATH` to search, asking
-    /// again at once while a record is running.
+    /// again at once while a record is running, and timing out only when
+    /// `timeOutReads` says so.
     var remote: RemotePingReader {
         RemotePingReader(
             home: URL(fileURLWithPath: "/nonexistent-home"),
             pathEnvironment: nil,
             isExecutable: isExecutable,
             runner: self,
+            sleep: { [state] _ in
+                while !state.withValue({ $0.timingOut }) {
+                    try await Task.sleep(for: .milliseconds(2))
+                }
+            },
             wait: { _ in try Task.checkCancellation() }
         )
     }
@@ -195,7 +222,15 @@ final class FakeHerdr: ShellRunning {
     }
 
     func run(_ invocation: ShellInvocation) async -> ShellOutput? {
-        answer(invocation.arguments)
+        let arguments = invocation.arguments
+        if arguments.first == "--machine", arguments.count > 1, state.current.machines[arguments[1]]?.reach == .hanging {
+            state.withValue { $0.runs.append(arguments) }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3600))
+            }
+            return ShellOutput(status: 143, output: "Terminated")
+        }
+        return answer(arguments)
     }
 
     private func answer(_ arguments: [String]) -> ShellOutput {
@@ -234,15 +269,19 @@ final class FakeHerdr: ShellRunning {
     /// Answers `arguments` run with `--machine <label>`.
     private static func answer(_ arguments: [String], on label: String, in state: inout State) -> ShellOutput {
         guard var machine = state.machines[label] else {
-            // What Herdr says for a label it has no saved machine for isn't
-            // pinned down; an error of this shape stands in for it.
-            return error("machine_not_found", "no saved machine named \(label)")
+            return ShellOutput(status: 2, output: "error: unknown machine '\(label)'; use `herdr machine list`\n")
+        }
+        switch machine.reach {
+        case .up, .hanging:
+            break
+        case .disabled:
+            return ShellOutput(status: 2, output: "error: machine '\(label)' is disabled\n")
+        case .unreachable:
+            // `main` returns the connection's io::Error, which Rust prints
+            // in its Debug form; the inner text stands in for ssh's.
+            return ShellOutput(status: 1, output: #"Error: Custom { kind: Other, error: "machine '\#(label)' (session default): ssh: connect to host \#(label) port 22: Connection timed out" }"# + "\n")
         }
         defer { state.machines[label] = machine }
-        guard machine.reachable else {
-            // Herdr's `main` returns the connection's I/O error, which Rust prints with `Debug`.
-            return ShellOutput(status: 1, output: #"Error: Custom { kind: Other, error: "machine '\#(label)' (session default): connection refused" }"# + "\n")
-        }
         let plugin = RemotePingReader.pluginID
         switch arguments {
         case ["agent", "focus", arguments.last ?? ""]:

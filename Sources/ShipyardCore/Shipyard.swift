@@ -554,12 +554,15 @@ public final class Shipyard {
     }
 
     /// The Refresh button (⌘R): creates the configuration file with its
-    /// commented header when it's missing, then refreshes like `refresh()`.
+    /// commented header when it's missing, then refreshes like `refresh()`
+    /// and, at the same time, polls every remote machine (`pollMachines()`).
     /// A file that exists is never touched.
     public func refreshNow() async {
         createConfigurationIfMissing()
         forceResolve = true
+        async let polled: Void = pollMachines()
         await refresh()
+        await polled
     }
 
     /// Creates `config.toml` with its commented header when it's missing, so
@@ -625,6 +628,7 @@ public final class Shipyard {
                 .union(appStateStore.state.collapsedGroups.filter { machines.contains($0.project) })
             appStateStore.update { $0.collapsedGroups = folds }
             built.foldedGroups = folds
+            built.machineNotices = MachineNotice.notices(remote)
             menu = built
             publishRateStatus()
             // Recorded (and saved) before posting: a crash in between loses a
@@ -1111,6 +1115,7 @@ public final class Shipyard {
             for await (label, result) in group {
                 let before = remote.machine(label)?.pings
                 remote.record(result, for: label, at: clock.now)
+                menu.machineNotices = MachineNotice.notices(remote)
                 guard remote.machine(label)?.pings != before else { continue }
                 rebuildMenu(configStore.lastValid)
                 forgetLeftPings(stored: pings)
@@ -1295,6 +1300,7 @@ public final class Shipyard {
         rebuilt.fetchError = menu.fetchError
         rebuilt.refreshDelay = menu.refreshDelay
         rebuilt.rateIndicator = menu.rateIndicator
+        rebuilt.machineNotices = MachineNotice.notices(remote)
         if phase != .ready { rebuilt.menuBarLabel = .hidden }
         menu = rebuilt
     }

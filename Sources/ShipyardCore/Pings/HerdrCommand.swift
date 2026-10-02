@@ -107,6 +107,25 @@ public struct HerdrCommand: Sendable {
         return .failure(HerdrError(code: error?["code"] as? String, message: error?["message"] as? String))
     }
 
+    /// Why Herdr refused the saved machine `label` before asking it, from
+    /// the plain line (not JSON) it prints then, when it's one of these; the
+    /// poll and a click both say it. As Herdr's `cli/target.rs`
+    /// (`resolve_machine`, at commit 65e35a3) words them, after `error: `,
+    /// with exit status 2.
+    static func refusal(_ output: String, machine label: String) -> String? {
+        let line = output.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        switch line {
+        case "error: unknown machine '\(label)'; use `herdr machine list`":
+            return "Herdr has no saved machine named \(label)"
+        case "error: machine '\(label)' is disabled":
+            return "\(label) is disabled in Herdr"
+        case "error: machine label '\(label)' is ambiguous; use its profile ID":
+            return "Herdr has more than one machine named \(label)"
+        default:
+            return nil
+        }
+    }
+
     /// The error Herdr answered with; both `nil` when it didn't say.
     struct HerdrError: Error {
         var code: String?

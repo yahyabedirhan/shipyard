@@ -138,22 +138,11 @@ public struct HerdrFocus: Sendable {
         case "server_not_running": return "Herdr isn't running\(on)"
         default:
             // Without Herdr's JSON error the machine never answered: Herdr
-            // doesn't know its label or it's disabled (which its `error: `
-            // line says), or the connection failed.
+            // refused its label (`HerdrCommand.refusal`), or the connection failed.
             if let machine, code == nil {
-                return "Couldn't reach \(machine) through Herdr" + (usageError(output).map { ": \($0)" } ?? "")
+                return HerdrCommand.refusal(output, machine: machine) ?? "Couldn't reach \(machine) through Herdr"
             }
             return "Herdr couldn't focus \(id)\(on)"
         }
-    }
-
-    /// What Herdr's `error: <why>` line in `output` says, as for a label
-    /// it doesn't know (`unknown machine '<label>'; …`) or a disabled one;
-    /// `nil` when there's none.
-    private static func usageError(_ output: String) -> String? {
-        output.split(whereSeparator: \.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { $0.hasPrefix("error: ") }
-            .map { String($0.dropFirst("error: ".count)) }
     }
 }
