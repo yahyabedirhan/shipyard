@@ -175,20 +175,21 @@ struct Harness {
     /// repositories and ping store, at the clock's time, as an agent would
     /// in a terminal: in `workingFolder`, whose git remote `origin` is
     /// `origin` (`nil`: not a git repository), in the Herdr pane
-    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr).
+    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr), with any other
+    /// environment `variables` (`TERM_PROGRAM`, say).
     @discardableResult
-    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
-        cli(arguments, origin: origin, herdrPane: herdrPane)
+    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil, variables: [String: String] = [:]) -> CommandResult {
+        cli(arguments, origin: origin, herdrPane: herdrPane, variables: variables)
     }
 
     /// `cli(_:origin:herdrPane:)` with the arguments as a list.
     @discardableResult
-    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
+    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil, variables: [String: String] = [:]) -> CommandResult {
         ShipyardCLI.run(
             arguments,
             environment: CommandEnvironment(
                 workingDirectory: workingFolder,
-                variables: herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:],
+                variables: (herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:]).merging(variables) { $1 },
                 git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
             ),
             configURL: configURL,
