@@ -799,7 +799,7 @@ public final class Shipyard {
     /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
         if let ping = row.item.ping {
-            if ping.machine == nil { markPingsSeen([ping]) }
+            if ping.machine == nil { markPingsSeen([ping]) } else { markRemoteSeen([ping]) }
             return
         }
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
@@ -816,6 +816,8 @@ public final class Shipyard {
         let now = clock.now
         let listed = rows.compactMap(\.item.ping).filter { $0.machine == nil }
         if !listed.isEmpty { markPingsSeen(listed) }
+        let remote = rows.compactMap(\.item.ping).filter { $0.machine != nil }
+        if !remote.isEmpty { markRemoteSeen(remote) }
         let items = rows.filter { $0.item.ping == nil }.map(\.item)
         guard !items.isEmpty else { return }
         updateAppState { state in
@@ -826,11 +828,22 @@ public final class Shipyard {
     /// Removes the row's ping now (the hover ✕, or ⌫ on the selected
     /// row), seen or not, with any failure on it, and takes its
     /// notification out of Notification Center. Any other row stays: only
-    /// pings can be dismissed. Returns the removal still running, for tests
+    /// pings can be dismissed. A remote ping is hidden on the Mac until its
+    /// machine stops listing that instance (`RemotePingMarks`): only its
+    /// agent can withdraw it. Returns the removal still running, for tests
     /// to await; the app doesn't wait for it.
     @discardableResult
     public func dismiss(_ row: MenuRow) -> Task<Void, Never> {
-        guard let ping = row.item.ping, ping.machine == nil else { return Task {} }
+        guard let ping = row.item.ping else { return Task {} }
+        guard ping.machine == nil else {
+            let id = ping.item.id
+            appStateStore.update { state in
+                state.remotePings.dismiss(ping)
+                leftBanners += state.notified.remove(itemID: id) { _ in true }
+            }
+            rebuildMenu(configStore.lastValid)
+            return Task { await removeLeftBanners() }
+        }
         try? pingStore.remove(id: ping.id)
         listPings()
         return Task { await removeLeftBanners() }
@@ -913,14 +926,57 @@ public final class Shipyard {
 
     // MARK: - Remote machines
 
-    /// The pings listed: the ping store's, then the remote machines'.
-    private var listedPings: [Ping] { pings + remote.pings }
+    /// The pings listed: the ping store's, then the remote machines' as
+    /// the user's marks leave them (seen, dismissed: `RemotePingMarks`).
+    private var listedPings: [Ping] { pings + appStateStore.state.remotePings.apply(to: remote.pings) }
+
+    /// Marks the remote ping `url` names seen, as its machine lists it now:
+    /// the one way a remote ping is seen (a click that worked, ⌥-click,
+    /// Mark all seen). Kept on the Mac, in the app state; a seen ping
+    /// leaves its listing after its project's `seen-window` (the
+    /// defaults' in its machine's section). A URL no machine lists, or a
+    /// local ping's, does nothing.
+    func markSeen(_ url: URL) {
+        guard Ping.remote(from: url) != nil, let ping = remote.pings.first(where: { $0.item.url == url }) else { return }
+        markRemoteSeen([ping])
+    }
+
+    /// Records `listed` (remote pings as the user saw them) as seen now,
+    /// and lists them again: one replaced since stays unseen.
+    /// Each is marked as its machine lists it (before filing, which only
+    /// the Mac does), when that's still the sending the user saw.
+    private func markRemoteSeen(_ listed: [Ping]) {
+        let now = clock.now
+        let sendings = listed.compactMap { seen -> Ping? in
+            guard let current = remote.pings.first(where: { $0.item.id == seen.item.id }) else { return nil }
+            var unfiled = seen
+            unfiled.projects = current.projects
+            unfiled.repository = current.repository
+            return unfiled.isSameSending(as: current) ? current : nil
+        }
+        guard !sendings.isEmpty else { return }
+        appStateStore.update { state in
+            for ping in sendings { state.remotePings.markSeen(ping, at: now) }
+        }
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// Forgets the marks of remote pings no machine lists any more, and
+    /// of machines no longer configured. A machine that failed keeps its
+    /// last pings, and so their marks; one not heard from since the app
+    /// started keeps its marks from the last run.
+    private func pruneRemoteMarks() {
+        guard !appStateStore.state.remotePings.marks.isEmpty else { return }
+        let listed = remote.pings
+        let unknown = Set(remote.machines.filter { $0.answered == nil }.map(\.label))
+        appStateStore.update { $0.remotePings.prune(listed: listed, keeping: unknown) }
+    }
 
     /// The listed pings, the remote ones filed against `configuration` and
     /// the repositories last resolved (`PingCommand.filed(remote:)`), as
     /// the CLI files a local one when it's sent.
     private func filedPings(_ configuration: Configuration) -> [Ping] {
-        let remotePings = remote.pings
+        let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
         guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
         let resolved = repositoriesStore.load()
         return pings + remotePings.map { PingCommand.filed(remote: $0, configuration: configuration, resolved: resolved) }
@@ -946,6 +1002,7 @@ public final class Shipyard {
         let labels = configStore.lastValid.remote.machines
         guard labels != remote.labels else { return }
         remote.follow(labels)
+        pruneRemoteMarks()
         rebuildMenu(configStore.lastValid)
         armMachineTimer(after: 0)
     }
@@ -962,6 +1019,9 @@ public final class Shipyard {
         repeat {
             await pollMachinesOnce()
         } while machineGate.finish() && machineGate.begin()
+        pruneRemoteMarks()
+        // A seen remote ping may have passed its seen-window since.
+        if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) { rebuildMenu(configStore.lastValid) }
         armMachineTimer(after: Self.machinePollInterval)
     }
 

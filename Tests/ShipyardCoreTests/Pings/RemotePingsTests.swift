@@ -270,7 +270,7 @@ struct RemotePingsTests {
         #expect(harness.actions.ran.isEmpty)
         let local = try #require(harness.pingStore.ping(id: "q1"))
         #expect(local.title == "Local")
-        #expect(harness.titles("netcup-vps") == ["Remote"])
+        #expect(harness.section("shop")?.rows.filter { $0.kind == .ping }.map(\.title) == ["Local"])
         #expect(harness.notifier.posted.map(\.itemTitle).allSatisfy { !$0.contains("Remote") })
     }
 }
