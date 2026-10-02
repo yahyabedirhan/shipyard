@@ -858,7 +858,7 @@ public final class Shipyard {
         return Task {
             let outcome: ActionOutcome
             if case .herdr(let target) = action {
-                outcome = await runHerdr(target)
+                outcome = await runHerdr(target, sentFrom: ping.terminal)
             } else {
                 outcome = await actions.run(action)
             }
@@ -875,10 +875,12 @@ public final class Shipyard {
     /// A ping's Herdr action: focuses the tab or pane `target` names
     /// (`HerdrFocus`), then, once that worked, brings `[herdr] terminal`
     /// forward through the action port, as an `--app` action would. Without
-    /// a terminal set, only the focus runs. Either failing fails the action.
-    private func runHerdr(_ target: String) async -> ActionOutcome {
+    /// a terminal set, the one the ping was sent from (`sentFrom`) comes
+    /// forward instead; with neither, only the focus runs. Either failing
+    /// fails the action.
+    private func runHerdr(_ target: String, sentFrom: String?) async -> ActionOutcome {
         let focused = await herdr.focus(target)
-        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
+        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal ?? sentFrom else { return focused }
         return await actions.run(.app(terminal))
     }
 

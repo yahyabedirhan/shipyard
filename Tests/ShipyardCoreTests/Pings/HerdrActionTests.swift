@@ -19,8 +19,8 @@ private extension Harness {
     /// Sends a ping to `shop` through the CLI with `flags`, from the Herdr
     /// pane `pane`, and returns its id, then lets the app see the store change.
     @discardableResult
-    func send(_ title: String, _ flags: String..., pane: String? = nil) async throws -> String {
-        let result = cli(["ping", title, "--project", "shop"] + flags, herdrPane: pane)
+    func send(_ title: String, _ flags: String..., pane: String? = nil, variables: [String: String] = [:]) async throws -> String {
+        let result = cli(["ping", title, "--project", "shop"] + flags, herdrPane: pane, variables: variables)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
         return result.output.trimmingCharacters(in: .newlines)
@@ -100,6 +100,51 @@ struct HerdrActionTests {
         #expect(harness.pingStore.all().isEmpty)
     }
 
+    // MARK: The terminal it was sent from
+
+    /// An environment and the terminal app `--herdr` records from it.
+    struct Outer: Sendable, CustomTestStringConvertible {
+        var variables: [String: String]
+        var terminal: String?
+        var testDescription: String { "\(variables) -> \(terminal ?? "none")" }
+    }
+
+    nonisolated static let outers: [Outer] = [
+        Outer(variables: ["TERM_PROGRAM": "ghostty"], terminal: "com.mitchellh.ghostty"),
+        Outer(variables: ["TERM_PROGRAM": "iTerm.app"], terminal: "com.googlecode.iterm2"),
+        Outer(variables: ["TERM_PROGRAM": "Apple_Terminal"], terminal: "com.apple.Terminal"),
+        Outer(variables: ["TERM_PROGRAM": "WezTerm"], terminal: "com.github.wez.wezterm"),
+        Outer(variables: ["TERM_PROGRAM": "vscode"], terminal: "com.microsoft.VSCode"),
+        Outer(variables: ["TERM_PROGRAM": "WarpTerminal"], terminal: "dev.warp.Warp-Stable"),
+        Outer(variables: ["KITTY_WINDOW_ID": "3"], terminal: "net.kovidgoyal.kitty"),
+        Outer(variables: ["TERM": "xterm-kitty"], terminal: "net.kovidgoyal.kitty"),
+        Outer(variables: ["ALACRITTY_WINDOW_ID": "1"], terminal: "org.alacritty"),
+        // Inside Herdr, TERM_PROGRAM is herdr's own; the app that launched
+        // the shell's server is named by __CFBundleIdentifier.
+        Outer(variables: ["TERM_PROGRAM": "herdr", "__CFBundleIdentifier": "com.mitchellh.ghostty"], terminal: "com.mitchellh.ghostty"),
+        Outer(variables: ["TERM_PROGRAM": "ghostty", "__CFBundleIdentifier": "com.apple.Terminal"], terminal: "com.mitchellh.ghostty"),
+        Outer(variables: ["TERM_PROGRAM": "herdr"], terminal: nil),
+        Outer(variables: ["TERM_PROGRAM": "unheard-of", "__CFBundleIdentifier": " "], terminal: nil),
+        Outer(variables: [:], terminal: nil),
+    ]
+
+    @Test("--herdr records the terminal app it was run in", arguments: outers)
+    func recordsTerminal(_ outer: Outer) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let id = try await harness.send("Waiting", "--herdr", pane: "w1:p3", variables: outer.variables)
+        #expect(harness.pingStore.ping(id: id)?.terminal == outer.terminal)
+    }
+
+    @Test("only a --herdr ping records a terminal")
+    func otherActionsRecordNone() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let variables = ["TERM_PROGRAM": "ghostty"]
+        let app = try await harness.send("App", "--app", "Claude", variables: variables)
+        let none = try await harness.send("None", variables: variables)
+        #expect(harness.pingStore.ping(id: app)?.terminal == nil)
+        #expect(harness.pingStore.ping(id: none)?.terminal == nil)
+    }
+
     // MARK: Clicking
 
     @Test("clicking a tab's ping focuses the tab and marks it seen; without [herdr] terminal nothing else runs")
@@ -116,6 +161,38 @@ struct HerdrActionTests {
         #expect(harness.actions.opened.isEmpty)
         #expect(harness.pingStore.ping(id: id)?.seen == harness.clock.now)
         #expect(try harness.pingRow("Tab").needsAttention == false)
+    }
+
+    @Test("with no [herdr] terminal, the click brings forward the terminal the ping was sent from")
+    func recordedTerminal() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        harness.herdr.open(tab: "w1:t2")
+        try await harness.send("Tab", "--herdr", "w1:t2", variables: ["TERM_PROGRAM": "herdr", "__CFBundleIdentifier": "com.mitchellh.ghostty"])
+
+        try await harness.click("Tab")
+
+        #expect(harness.herdr.focused == ["w1:t2"])
+        #expect(harness.actions.ran == [.app("com.mitchellh.ghostty")])
+    }
+
+    @Test("[herdr] terminal wins over the terminal the ping was sent from")
+    func configuredTerminalWins() async throws {
+        let harness = try await Harness.started(config: shopInGhostty, graphQL: onePullRequest)
+        harness.herdr.open(tab: "w1:t2")
+        try await harness.send("Tab", "--herdr", "w1:t2", variables: ["TERM_PROGRAM": "iTerm.app"])
+
+        try await harness.click("Tab")
+
+        #expect(harness.actions.ran == [.app("Ghostty")])
+    }
+
+    @Test("a ping sent from an unknown terminal brings none forward")
+    func noTerminalKnown() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        harness.herdr.open(tab: "w1:t2")
+        try await harness.send("Tab", "--herdr", "w1:t2")
+        try await harness.click("Tab")
+        #expect(harness.actions.ran.isEmpty)
     }
 
     @Test("clicking a pane's ping focuses the pane's tab, then brings [herdr] terminal forward")

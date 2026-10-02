@@ -30,7 +30,9 @@ public enum PingCommand {
           --open <url>         clicking it opens this URL (a page, an app's deep link)
           --app <id or name>   clicking it brings this app forward, by bundle id or name
           --herdr [<id>]       clicking it focuses this Herdr tab or pane (an id such as
-                               w1:t2 or w1:p3); with no id, your own pane ($HERDR_PANE_ID)
+                               w1:t2 or w1:p3); with no id, your own pane ($HERDR_PANE_ID).
+                               It notes the terminal app you ran it in, and clicking brings
+                               that app forward unless [herdr] terminal names one
           --repo <owner/name>  file it by this repository instead of the working folder's
           --project <name>     file it under this project (its name in config.toml) only
 
@@ -56,6 +58,32 @@ public enum PingCommand {
     /// The environment variable Herdr sets in each of its panes to that
     /// pane's id, which `--herdr` without an id takes.
     static let herdrPaneVariable = "HERDR_PANE_ID"
+
+    /// The bundle id of the terminal app the CLI runs in, which a `--herdr`
+    /// ping brings forward on a click when `[herdr] terminal` is unset.
+    /// `TERM_PROGRAM` names it when it's a known terminal's; Herdr sets its
+    /// own (`herdr`) in its panes, so then `__CFBundleIdentifier`, the app
+    /// macOS launched the process tree from, does, and last the variables a
+    /// terminal sets for itself. `nil` when none says.
+    static func outerTerminal(_ variables: [String: String]) -> String? {
+        let known = [
+            "ghostty": "com.mitchellh.ghostty",
+            "iTerm.app": "com.googlecode.iterm2",
+            "Apple_Terminal": "com.apple.Terminal",
+            "WezTerm": "com.github.wez.wezterm",
+            "vscode": "com.microsoft.VSCode",
+            "WarpTerminal": "dev.warp.Warp-Stable",
+        ]
+        func value(_ name: String) -> String? {
+            let text = variables[name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? nil : text
+        }
+        if let program = value("TERM_PROGRAM"), let bundle = known[program] { return bundle }
+        if let bundle = value("__CFBundleIdentifier") { return bundle }
+        if value("KITTY_WINDOW_ID") != nil || value("TERM") == "xterm-kitty" { return "net.kovidgoyal.kitty" }
+        if value("ALACRITTY_WINDOW_ID") != nil { return "org.alacritty" }
+        return nil
+    }
 
     /// Sends a ping with `arguments` (those after `ping`), sent at `now`.
     /// Without `--project` it's filed under every project of `configuration`
@@ -126,6 +154,10 @@ public enum PingCommand {
                 body: request.body,
                 sender: request.sender,
                 action: request.action,
+                terminal: request.action.flatMap { action in
+                    if case .herdr = action { return outerTerminal(environment.variables) }
+                    return nil
+                },
                 instance: replaced?.instance ?? UUID().uuidString.lowercased()
             ))
         } catch {

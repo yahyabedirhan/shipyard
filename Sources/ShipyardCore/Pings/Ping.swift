@@ -27,6 +27,10 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// What clicking it does (`--open`, `--app`, `--herdr`); `nil` when it only marks
     /// it seen.
     public var action: PingAction?
+    /// The terminal app (a bundle id) a `--herdr` ping was sent from, brought
+    /// forward on a click when `[herdr] terminal` isn't set; `nil` for any
+    /// other ping, when the CLI couldn't tell, or before it was kept.
+    public var terminal: String?
     /// Why its action last failed, in a few words for its row, shown until
     /// the next click, ⌥-click or dismiss; `nil` when it hasn't failed.
     public var failure: String?
@@ -50,6 +54,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         body: String? = nil,
         sender: String? = nil,
         action: PingAction? = nil,
+        terminal: String? = nil,
         failure: String? = nil,
         failureDetail: String? = nil,
         instance: String? = nil
@@ -63,6 +68,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.body = body
         self.sender = sender
         self.action = action
+        self.terminal = terminal
         self.failure = failure
         self.failureDetail = failureDetail
         self.instance = instance
