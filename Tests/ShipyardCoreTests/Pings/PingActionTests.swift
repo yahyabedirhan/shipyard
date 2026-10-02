@@ -244,6 +244,8 @@ struct PingActionTests {
         let link = try harness.pingRow("Published")
         #expect(link.pingIcon == .link)
         #expect(link.sender == "claude")
+        #expect(link.agent == .claude)
+        #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
         #expect(PanelText.rowDetail(link, showingRepository: false) == "claude · The design doc, ready to read")
         harness.clock.advance(by: 300)
         #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "claude · The design doc, ready to read · 5m")
@@ -261,6 +263,8 @@ struct PingActionTests {
 
         let note = try harness.pingRow("Done")
         #expect(note.pingIcon == .noAction)
+        #expect(note.agent == nil)
+        #expect(PanelText.rowCard(note, now: harness.clock.now).agent == nil)
         #expect(PanelText.rowDetail(note, showingRepository: false) == "ping")
         #expect(PanelText.stateLabel(note) == "ping")
         #expect(PanelText.rowCard(note, now: harness.clock.now).lines.isEmpty)
@@ -272,7 +276,42 @@ struct PingActionTests {
         let row = try #require(harness.section("shop")?.rows.first { $0.kind == .pullRequest })
         #expect(row.pingIcon == nil)
         #expect(row.sender == nil)
+        #expect(row.agent == nil)
+        #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
         #expect(row.actionError == nil)
+    }
+
+    @Test(
+        "a ping's sender names a known agent, ignoring case, spaces and dashes, and leading words after the agent's name; any other sender is none",
+        arguments: [
+            ("claude", KnownAgent.claude), ("Claude Code", .claude), ("claude-code", .claude), ("CLAUDE", .claude),
+            ("claude: fix totals", .claude), ("codex", .codex), ("Codex CLI", .codex), ("opencode", .opencode),
+            ("OpenCode", .opencode), ("cursor", .cursor), ("cursor-agent", .cursor), ("pi", .pi), ("gemini", .gemini),
+            ("gemini-cli", .gemini), ("copilot", .copilot), ("GitHub Copilot", .copilot), ("amp", .amp), ("droid", .droid),
+            ("Factory Droid", .droid),
+        ] as [(String, KnownAgent?)]
+    )
+    func knownAgent(sender: String, agent: KnownAgent?) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        try await harness.send("Ready", "--from", sender)
+        #expect(try harness.pingRow("Ready").agent == agent)
+    }
+
+    @Test("a sender that only starts like an agent's name, or names no agent, is none", arguments: ["pipeline", "claudette", "deploy bot", "my claude"])
+    func unknownSender(sender: String) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        try await harness.send("Ready", "--from", sender)
+        let row = try harness.pingRow("Ready")
+        #expect(row.agent == nil)
+        #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
+    }
+
+    @Test("each known agent has its own mark: a two-letter monogram and a hue")
+    func agentMarks() {
+        let marks = KnownAgent.allCases.map(\.mark)
+        #expect(Set(marks.map(\.monogram)).count == KnownAgent.allCases.count)
+        #expect(Set(marks.map(\.hue)).count == KnownAgent.allCases.count)
+        #expect(marks.allSatisfy { $0.monogram.count == 2 && (0..<1).contains($0.hue) })
     }
 
     // MARK: Grouping

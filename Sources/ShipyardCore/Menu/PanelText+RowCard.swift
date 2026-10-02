@@ -1,13 +1,17 @@
 import Foundation
 
 /// A row's hover card: only what the row doesn't already show. Its title
-/// and second line are on the row, so the card has the author's avatar, the
-/// rest of the item (branches, size, review, comments, when it last moved,
-/// what started a run and how long it took), and whether it waits on the
-/// viewer's review or failed its checks.
+/// and second line are on the row, so the card has the author's avatar (a
+/// ping: its agent's mark), the rest of the item (branches, size, review,
+/// comments, when it last moved, what started a run and how long it took),
+/// and whether it waits on the viewer's review or failed its checks.
 public struct RowCard: Hashable, Sendable {
     /// The author's avatar (a run: whoever triggered it).
     public var avatarURL: URL?
+    /// A ping's: the known agent that sent it, whose mark takes the
+    /// avatar's place; `nil` for an unknown sender (the avatar's empty
+    /// placeholder) and any other kind.
+    public var agent: KnownAgent?
     /// The item's full title, which the row may cut off; a run's title
     /// (its commit's message or pull request's title), where the row shows
     /// the workflow's name.
@@ -110,6 +114,7 @@ extension PanelText {
         let reasons = tagged.map { attentionWord($0, kind: row.kind) }
         return RowCard(
             avatarURL: row.item.avatarURL,
+            agent: row.agent,
             headline: headline,
             facts: facts,
             kind: row.kind,
