@@ -15,7 +15,10 @@ import ShipyardCore
 /// a command log record of the machine's pings as `shipyard ping list
 /// --json` prints them, and `… plugin log list --plugin …` lists the
 /// machine's records, as Herdr 0.9.3 does. A record can stay `running` for
-/// a number of log lists first. A label it doesn't know is refused.
+/// a number of log lists first. A label it doesn't know is refused. A
+/// machine's panes and agents (`open(pane:tab:agent:on:)`) answer `agent
+/// focus`, `pane get` and `tab focus` through `--machine`, and a machine
+/// can stop being reachable (`setReachable`).
 final class FakeHerdr: ShellRunning {
     static let path = "/usr/local/bin/herdr"
 
@@ -46,6 +49,14 @@ final class FakeHerdr: ShellRunning {
         var runningFor = 0
         /// Its command log records, oldest first.
         var logs: [Log] = []
+        /// Each pane's tab, on the machine.
+        var panes: [String: String] = [:]
+        /// The tabs open on the machine.
+        var tabs: Set<String> = []
+        /// The panes an agent occupies.
+        var agents: Set<String> = []
+        /// Whether Herdr's connection to it works.
+        var reachable = true
     }
 
     private struct Log {
@@ -138,6 +149,25 @@ final class FakeHerdr: ShellRunning {
         state.withValue { $0.machines[label]?.output = output }
     }
 
+    /// Opens the pane `pane` in the tab `tab` on the machine `label`, with
+    /// an agent in it unless `agent` is false. `herdr --machine <label>
+    /// agent focus <pane>` focuses an agent's pane; `pane get` and `tab
+    /// focus` answer as on this computer.
+    func open(pane: String, tab: String, agent: Bool = true, on label: String) {
+        state.withValue { state in
+            state.machines[label]?.panes[pane] = tab
+            state.machines[label]?.tabs.insert(tab)
+            if agent { state.machines[label]?.agents.insert(pane) }
+        }
+    }
+
+    /// Whether Herdr reaches the machine `label`: while it doesn't, every
+    /// run on it fails as Herdr's does when the connection fails, with no
+    /// JSON answer.
+    func setReachable(_ reachable: Bool, _ label: String) {
+        state.withValue { $0.machines[label]?.reachable = reachable }
+    }
+
     /// The runs made on the machine `label` (`--machine <label>` and what followed).
     func runs(on label: String) -> [[String]] {
         runs.filter { $0.starts(with: ["--machine", label]) }.map { Array($0.dropFirst(2)) }
@@ -209,8 +239,24 @@ final class FakeHerdr: ShellRunning {
             return error("machine_not_found", "no saved machine named \(label)")
         }
         defer { state.machines[label] = machine }
+        guard machine.reachable else {
+            // Herdr's `main` returns the connection's I/O error, which Rust prints with `Debug`.
+            return ShellOutput(status: 1, output: #"Error: Custom { kind: Other, error: "machine '\#(label)' (session default): connection refused" }"# + "\n")
+        }
         let plugin = RemotePingReader.pluginID
         switch arguments {
+        case ["agent", "focus", arguments.last ?? ""]:
+            let pane = arguments[2]
+            guard machine.agents.contains(pane) else { return error("agent_not_found", "agent target \(pane) not found") }
+            return json(["id": "cli:agent:focus", "result": ["type": "agent_info", "agent": ["pane_id": pane]] as [String: Any]])
+        case ["pane", "get", arguments.last ?? ""]:
+            let pane = arguments[2]
+            guard let tab = machine.panes[pane] else { return error("pane_not_found", "pane \(pane) not found") }
+            return json(["id": "cli:pane:get", "result": ["type": "pane_info", "pane": ["pane_id": pane, "tab_id": tab]] as [String: Any]])
+        case ["tab", "focus", arguments.last ?? ""]:
+            let tab = arguments[2]
+            guard machine.tabs.contains(tab) else { return error("tab_not_found", "tab \(tab) not found") }
+            return json(["id": "cli:tab:focus", "result": ["type": "ok"]])
         case ["plugin", "action", "invoke", RemotePingReader.actionID, "--plugin", plugin]:
             let log = Log(id: "plugin-log-\(state.nextLog)", stdout: machine.output, runningFor: machine.runningFor, started: 1_790_966_526_794 + state.nextLog)
             state.nextLog += 1

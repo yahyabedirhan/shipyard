@@ -41,8 +41,57 @@ public struct RemoteMachines: Equatable, Sendable {
     /// The configured labels, in order.
     public var labels: [String] { machines.map(\.label) }
 
-    /// Every machine's pings, machine by machine.
-    public var pings: [Ping] { machines.flatMap(\.pings) }
+    /// Why a remote ping's action last failed, for its row: the Mac's
+    /// record, which the machine's list never carries. It holds for one
+    /// sending of the ping only (`sending`, compared with
+    /// `Ping.isSameSending`), so a ping replaced on its machine, or sent
+    /// anew under its id, starts without it, as a local one does. Seen is
+    /// kept apart, in the app state (`RemotePingMarks`).
+    private struct Failure: Equatable, Sendable {
+        var sending: Ping
+        var reason: String
+    }
+
+    /// By the ping's URL.
+    private var failures: [URL: Failure] = [:]
+
+    /// Every machine's pings, machine by machine, each with why its
+    /// action last failed, if it did.
+    public var pings: [Ping] { machines.flatMap(\.pings).map(withFailure) }
+
+    /// `ping` with the failure recorded on its sending.
+    private func withFailure(_ ping: Ping) -> Ping {
+        guard let failure = failures[ping.item.url], failure.sending.isSameSending(as: ping) else { return ping }
+        var ping = ping
+        ping.failure = failure.reason
+        return ping
+    }
+
+    /// The sending of `ping` a machine lists now; `nil` when none lists
+    /// it, or lists another sending under its URL.
+    private func listed(_ ping: Ping) -> Ping? {
+        machines.lazy.flatMap(\.pings).first { $0.item.url == ping.item.url && $0.isSameSending(as: ping) }
+    }
+
+    /// Records why `ping`'s action failed, for its row. A sending no
+    /// machine lists any more (withdrawn, replaced or sent anew since) is
+    /// left out.
+    public mutating func recordFailure(_ ping: Ping, reason: String) {
+        guard let sending = listed(ping) else { return }
+        failures[sending.item.url] = Failure(sending: sending, reason: reason)
+    }
+
+    /// Clears the failure recorded on `ping`'s sending: its action worked,
+    /// or the user saw it.
+    public mutating func clearFailure(_ ping: Ping) {
+        guard let failure = failures[ping.item.url], failure.sending.isSameSending(as: ping) else { return }
+        failures[ping.item.url] = nil
+    }
+
+    /// Forgets the failures of sendings no machine lists any more.
+    private mutating func pruneFailures() {
+        failures = failures.filter { listed($0.value.sending) != nil }
+    }
 
     /// The machine `label` names, if it's configured.
     public func machine(_ label: String) -> Machine? {
@@ -55,6 +104,7 @@ public struct RemoteMachines: Equatable, Sendable {
     public mutating func follow(_ labels: [String]) {
         let known = Dictionary(machines.map { ($0.label, $0) }, uniquingKeysWith: { first, _ in first })
         machines = labels.map { known[$0] ?? Machine(label: $0) }
+        pruneFailures()
     }
 
     /// Records how polling `label` went at `now`: its list replaces the
@@ -69,6 +119,7 @@ public struct RemoteMachines: Equatable, Sendable {
             machines[index].truncated = list.truncated
             machines[index].failure = nil
             machines[index].answered = now
+            pruneFailures()
         case .failure(let failure):
             machines[index].failure = failure.reason
         }

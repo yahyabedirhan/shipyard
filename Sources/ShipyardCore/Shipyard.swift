@@ -758,8 +758,7 @@ public final class Shipyard {
     @discardableResult
     public func open(_ row: MenuRow) -> Task<Void, Never> {
         if let ping = row.item.ping {
-            // A remote ping isn't in the ping store: its click is its machine's.
-            guard ping.machine == nil else { return Task {} }
+            guard ping.machine == nil else { return runAction(ofRemotePing: row.item.url) }
             return runAction(ofPing: ping.id)
         }
         actions.open(row.url)
@@ -794,10 +793,7 @@ public final class Shipyard {
     @discardableResult
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
-        if Ping.remote(from: itemURL) != nil {
-            let row = menu.sections.lazy.flatMap(\.rows).first { $0.url == itemURL && $0.item.ping != nil }
-            return row.map { open($0) } ?? Task {}
-        }
+        guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
         actions.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
@@ -938,12 +934,47 @@ public final class Shipyard {
         }
     }
 
+    /// Runs the action of the remote ping `url` names, as its machine last
+    /// listed it: a Herdr action focuses its tab or pane on that machine
+    /// (`runHerdr(_:on:)`); a link or an app opens on the Mac, as a local
+    /// ping's does. When it works, or the ping has none, the ping is
+    /// marked seen on the Mac (`markRemoteSeen`, which clears any earlier
+    /// failure); when it
+    /// fails, it stays unseen and the failure's reason is recorded on it
+    /// for its row. A ping its machine no longer lists does nothing.
+    private func runAction(ofRemotePing url: URL) -> Task<Void, Never> {
+        guard let ping = remote.pings.first(where: { $0.item.url == url }), let machine = ping.machine else {
+            return Task {}
+        }
+        guard let action = ping.action else {
+            markRemoteSeen([ping])
+            return Task {}
+        }
+        return Task {
+            let outcome: ActionOutcome
+            if case .herdr(let target) = action {
+                outcome = await runHerdr(target, on: machine)
+            } else {
+                outcome = await actions.run(action)
+            }
+            switch outcome {
+            case .done:
+                // The sending clicked, so one replaced meanwhile stays unseen.
+                markRemoteSeen([ping])
+            case .failed(let reason):
+                remote.recordFailure(ping, reason: reason)
+                rebuildMenu(configStore.lastValid)
+            }
+        }
+    }
+
     /// A ping's Herdr action: focuses the tab or pane `target` names
-    /// (`HerdrFocus`), then, once that worked, brings `[herdr] terminal`
-    /// forward through the action port, as an `--app` action would. Without
-    /// a terminal set, only the focus runs. Either failing fails the action.
-    private func runHerdr(_ target: String) async -> ActionOutcome {
-        let focused = await herdr.focus(target)
+    /// (`HerdrFocus`), on the saved machine `machine` for a remote ping,
+    /// then, once that worked, brings `[herdr] terminal` forward through
+    /// the action port, as an `--app` action would. Without a terminal
+    /// set, only the focus runs. Either failing fails the action.
+    private func runHerdr(_ target: String, on machine: String? = nil) async -> ActionOutcome {
+        let focused = await herdr.focus(target, on: machine)
         guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
         return await actions.run(.app(terminal))
     }
@@ -966,6 +997,7 @@ public final class Shipyard {
     }
 
     /// Records `listed` (remote pings as the user saw them) as seen now,
+    /// clearing their actions' failures (`RemoteMachines.clearFailure`),
     /// and lists them again: one replaced since stays unseen.
     /// Each is marked as its machine lists it (before filing, which only
     /// the Mac does), when that's still the sending the user saw.
@@ -979,8 +1011,13 @@ public final class Shipyard {
             return unfiled.isSameSending(as: current) ? current : nil
         }
         guard !sendings.isEmpty else { return }
+        for ping in sendings { remote.clearFailure(ping) }
         appStateStore.update { state in
-            for ping in sendings { state.remotePings.markSeen(ping, at: now) }
+            for ping in sendings {
+                var seen = ping
+                seen.failure = nil
+                state.remotePings.markSeen(seen, at: now)
+            }
         }
         rebuildMenu(configStore.lastValid)
     }

@@ -5,6 +5,13 @@ import Foundation
 /// then bring `[herdr] terminal` forward. Herdr has no command that
 /// focuses a pane by its id, so a pane's tab is looked up (`herdr pane
 /// get`) and focused (`herdr tab focus`); a tab is focused at once.
+///
+/// A remote ping's tab or pane is on its machine, so it's focused through
+/// `herdr --machine <label>`: a pane by its agent (`herdr agent focus`),
+/// or by its tab, as above, when no agent occupies it. The Mac's Herdr
+/// window moves to it only when it already shows that machine; otherwise
+/// the machine's workspace turns red in Herdr's sidebar, and opening it
+/// lands there.
 public struct HerdrFocus: Sendable {
     /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
     public static func knownPaths(home: URL) -> [String] {
@@ -12,10 +19,15 @@ public struct HerdrFocus: Sendable {
     }
 
     private let herdr: HerdrCommand
+    /// `herdr` for a run on a saved machine, timed by `machineTimeout`.
+    private let remote: HerdrCommand
 
     /// How long one `herdr` run may take before it's stopped and the
     /// action fails: Herdr answers at once when it's well.
     public static let defaultTimeout: TimeInterval = 5
+    /// How long one `herdr --machine` run may take: Herdr may first have
+    /// to connect to the machine.
+    public static let defaultMachineTimeout: TimeInterval = 15
 
     public init(
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -23,6 +35,7 @@ public struct HerdrFocus: Sendable {
         isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) },
         runner: any ShellRunning = ProcessShellRunner(),
         timeout: TimeInterval = HerdrFocus.defaultTimeout,
+        machineTimeout: TimeInterval = HerdrFocus.defaultMachineTimeout,
         sleep: @escaping Sleep = systemSleep
     ) {
         herdr = HerdrCommand(
@@ -31,6 +44,14 @@ public struct HerdrFocus: Sendable {
             isExecutable: isExecutable,
             runner: runner,
             timeout: timeout,
+            sleep: sleep
+        )
+        remote = HerdrCommand(
+            home: home,
+            pathEnvironment: pathEnvironment,
+            isExecutable: isExecutable,
+            runner: runner,
+            timeout: machineTimeout,
             sleep: sleep
         )
     }
@@ -55,11 +76,23 @@ public struct HerdrFocus: Sendable {
     /// says how it went: `failed` when `herdr` isn't found or won't run,
     /// when Herdr isn't running or doesn't answer within `timeout`, and
     /// when the tab or pane is gone.
-    public func focus(_ id: String) async -> ActionOutcome {
+    ///
+    /// On the saved machine `machine`, a pane is focused by its agent
+    /// first (`herdr --machine <label> agent focus <pane>`), and by its
+    /// tab only when Herdr finds no agent there; it fails too when the
+    /// machine can't be reached or doesn't answer within `machineTimeout`.
+    public func focus(_ id: String, on machine: String? = nil) async -> ActionOutcome {
         var tab = id
         if !Self.isTab(id) {
-            switch await run(["pane", "get", id], about: id) {
-            case .failure(let reason): return .failed(reason.message)
+            if machine != nil {
+                switch await run(["agent", "focus", id], about: id, on: machine) {
+                case .success: return .done
+                case .failure(let failure) where failure.code != "agent_not_found": return .failed(failure.message)
+                case .failure: break
+                }
+            }
+            switch await run(["pane", "get", id], about: id, on: machine) {
+            case .failure(let failure): return .failed(failure.message)
             case .success(let answer):
                 guard let found = (answer["pane"] as? [String: Any])?["tab_id"] as? String else {
                     return .failed("Herdr didn't say which tab pane \(id) is in")
@@ -67,33 +100,60 @@ public struct HerdrFocus: Sendable {
                 tab = found
             }
         }
-        switch await run(["tab", "focus", tab], about: tab) {
-        case .failure(let reason): return .failed(reason.message)
+        switch await run(["tab", "focus", tab], about: tab, on: machine) {
+        case .failure(let failure): return .failed(failure.message)
         case .success: return .done
         }
     }
 
-    /// Why a `herdr` command failed, as the ping's row says it.
+    /// Why a `herdr` command failed, as the ping's row says it, with
+    /// Herdr's error code when it gave one.
     struct Failure: Error {
         var message: String
+        var code: String?
     }
 
-    /// Runs `herdr` with `arguments` and reads its answer, one JSON object:
-    /// its `result` when it worked, else why not, for the tab or pane `id`.
-    private func run(_ arguments: [String], about id: String) async -> Result<[String: Any], Failure> {
-        switch await herdr.run(arguments) {
+    /// Runs `herdr` with `arguments`, on the saved machine `machine` when
+    /// it's given, and reads its answer, one JSON object: its `result`
+    /// when it worked, else why not, for the tab or pane `id`.
+    private func run(_ arguments: [String], about id: String, on machine: String?) async -> Result<[String: Any], Failure> {
+        switch await (machine == nil ? herdr : remote).run(arguments, on: machine) {
         case .notFound: return .failure(Failure(message: "Couldn't find herdr"))
         case .couldNotRun: return .failure(Failure(message: "Couldn't run herdr"))
-        case .timedOut: return .failure(Failure(message: "Herdr didn't answer"))
+        case .timedOut: return .failure(Failure(message: machine.map { "\($0) didn't answer in time" } ?? "Herdr didn't answer"))
         case .finished(let output):
             return HerdrCommand.answer(output).mapError { error in
-                switch error.code {
-                case "pane_not_found": Failure(message: "Herdr pane \(id) is gone")
-                case "tab_not_found": Failure(message: "Herdr tab \(id) is gone")
-                case "server_not_running": Failure(message: "Herdr isn't running")
-                default: Failure(message: "Herdr couldn't focus \(id)")
-                }
+                Failure(message: Self.reason(error.code, about: id, on: machine, output: output.output), code: error.code)
             }
         }
+    }
+
+    /// What a failed run's row says, from Herdr's error `code` for the tab
+    /// or pane `id`, run on `machine` (if any) with `output`.
+    private static func reason(_ code: String?, about id: String, on machine: String?, output: String) -> String {
+        let on = machine.map { " on \($0)" } ?? ""
+        switch code {
+        case "pane_not_found", "agent_not_found": return "Herdr pane \(id) is gone\(on)"
+        case "tab_not_found": return "Herdr tab \(id) is gone\(on)"
+        case "server_not_running": return "Herdr isn't running\(on)"
+        default:
+            // Without Herdr's JSON error the machine never answered: Herdr
+            // doesn't know its label or it's disabled (which its `error: `
+            // line says), or the connection failed.
+            if let machine, code == nil {
+                return "Couldn't reach \(machine) through Herdr" + (usageError(output).map { ": \($0)" } ?? "")
+            }
+            return "Herdr couldn't focus \(id)\(on)"
+        }
+    }
+
+    /// What Herdr's `error: <why>` line in `output` says, as for a label
+    /// it doesn't know (`unknown machine '<label>'; …`) or a disabled one;
+    /// `nil` when there's none.
+    private static func usageError(_ output: String) -> String? {
+        output.split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { $0.hasPrefix("error: ") }
+            .map { String($0.dropFirst("error: ".count)) }
     }
 }
