@@ -719,6 +719,15 @@ The pings agents send, one JSON file per ping (`<id>.json`) in `~/Library/Applic
 
 The app watches the directory with `ConfigWatcher` (as the "file", inside its parent, so creating it is seen too) and calls `Shipyard.reloadPings()`; the parent also holds `state.json`, so most of those calls find nothing new and change nothing.
 
+### PingList — `ShipyardCore/Pings/PingList.swift` (0.0.6)
+
+The remote ping list: the JSON `shipyard ping list --json` prints on a machine and the Mac's shipyard reads from it through Herdr (#109). Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"0.0.6","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds. `version` is the contract's major version (`PingList.currentVersion`, 1): a field a reader can ignore keeps it, anything else bumps it. Each ping carries what it's sent with (id, instance, title, body, sender, repository, projects, action, sent); `seen` and `failure` stay on the machine that recorded them. Which pings to list (the machine's live ones) is the caller's choice.
+
+| Operation | Returns / rejects |
+|---|---|
+| `PingList.encode(pings, shipyardVersion) -> String` | newest first (by `sent`, then id), at most `maxPings` (100), stopping at the first ping that would take the document over `byteBudget` (48 KiB, well under Herdr's 64 KiB action output); `truncated` when it stops early. Always a whole document |
+| `PingList.decode(text or data) throws(DecodeError) -> PingList` | reads `version` first: another one is `.unsupportedVersion(version, shipyardVersion:)`, whose `message(machine:)` says to update shipyard on that machine; not JSON, or a field missing or mistyped, is `.unreadable(reason)`. Unknown fields are ignored, and so is an action of a kind it doesn't know (the ping reads without one) |
+
 ### ResolvedRepositoriesStore — `ShipyardCore/State/ResolvedRepositoriesStore.swift` (0.0.5)
 
 Each project's repositories as the app last resolved them (`ResolvedRepositories.repositories`, by project name), in `repositories.json` beside `state.json` (`ResolvedRepositoriesStore.defaultDirectory`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.defaultDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one), so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub. The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it. Private format (ADR 0004): `{ "version": 1, "projects": { "<name>": ["owner/name", …] } }`. A plain `struct`, like `PingStore`, since the CLI uses it too. It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists, so a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again. It's left as it is on sign-out; the next account's first resolve replaces it.
@@ -813,6 +822,7 @@ shipyard/
 │   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen, repository, body, sender, action, failure; as an Item; new ids; PingAction, PingIcon
 │   │   ├── HerdrFocus.swift          # a Herdr action: find herdr, focus the tab (a pane's tab via pane get), over ShellRunning
 │   │   ├── PingStore.swift           # one JSON file per ping, atomic writes, safe for the CLI and the app at once
+│   │   ├── PingList.swift            # the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
 │   │   └── PingCommand.swift         # shipyard ping: arguments → a ping filed by its repository or under a project, saved; output and exit status
 │   ├── CLI/
 │   │   ├── ShipyardCLI.swift         # the shipyard command line: help, version, reading config.toml and repositories.json, dispatching to ping; CommandResult, CommandEnvironment
