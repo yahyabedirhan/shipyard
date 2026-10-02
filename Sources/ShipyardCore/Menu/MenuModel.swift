@@ -396,6 +396,10 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// without one.
     public var sender: String? { item.ping?.sender }
 
+    /// The known agent a ping's sender names, whose mark the row shows by
+    /// the sender; `nil` for an unknown sender, none, or any other kind.
+    public var agent: KnownAgent? { sender.flatMap(KnownAgent.init(sender:)) }
+
     /// Why a ping's action failed at its last click, shown on its row
     /// until the next click, ⌥-click or dismiss; `nil` otherwise.
     public var actionError: String? { item.ping?.failure }

@@ -97,6 +97,10 @@ A change in an item that shipyard can notify about, such as `pr.opened` or `run.
 A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent.
 _Avoid_: Notification (that's the macOS banner), message, alert
 
+**Known agent**:
+A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with a mark of shipyard's own (a monogram on a coloured circle), never the agent's logo.
+_Avoid_: Agent icon, logo
+
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
 _Avoid_: Alert, subscription, watch
