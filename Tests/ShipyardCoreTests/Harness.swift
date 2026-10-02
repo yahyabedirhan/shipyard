@@ -147,6 +147,13 @@ struct Harness {
         stub.on("POST", GitHubClient.graphQLURL, answers: answers)
     }
 
+    /// Refreshes, two minutes later, with GitHub answering `answer`.
+    func refresh(answering answer: StubHTTP.Answer) async {
+        graphQL([answer])
+        clock.advance(by: 120)
+        await shipyard.refresh()
+    }
+
     /// Every GraphQL request sent.
     var graphQLRequests: [URLRequest] { stub.requests("POST", GitHubClient.graphQLURL) }
 

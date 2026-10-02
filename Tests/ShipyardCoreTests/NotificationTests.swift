@@ -46,13 +46,6 @@ private func pr(_ number: Int, author: String = "yabepa", type: String = "User",
 
 @MainActor
 private extension Harness {
-    /// Refreshes, two minutes later, with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// What was posted: "project · headline" per notification.
     var titles: [String] { notifier.posted.map(\.title) }
 }

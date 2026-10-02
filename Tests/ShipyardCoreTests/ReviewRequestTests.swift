@@ -49,12 +49,6 @@ private func shopAnswer(
 
 @MainActor
 private extension Harness {
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// The numbers of the rows `project` lists, in ascending order.
     func numbers(in project: String) -> [Int] {
         (section(project)?.rows.map(\.number) ?? []).sorted()

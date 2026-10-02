@@ -56,9 +56,9 @@ public final class Shipyard {
     public private(set) var menu = MenuModel.empty
     /// The groups Show more revealed past their `show-first` cap, until
     /// Show less or the menu closes (`panelClosed()`); never saved.
-    public private(set) var expandedGroups: Set<GroupID> = []
+    private(set) var expandedGroups: Set<GroupID> = []
     /// The last refresh that succeeded; `nil` before one did.
-    public private(set) var snapshot: Snapshot?
+    private(set) var snapshot: Snapshot?
     /// The pings in the ping store, as last read: at start and whenever the
     /// store changes (`reloadPings()`).
     public private(set) var pings: [Ping] = []
