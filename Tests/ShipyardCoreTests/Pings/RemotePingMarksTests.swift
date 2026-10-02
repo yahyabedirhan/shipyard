@@ -137,11 +137,16 @@ struct RemotePingMarksTests {
         harness.clock.advance(by: 30 * 60 - 1)
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Deploy?", "Merge it?"])
+        #expect(harness.notifier.removed.isEmpty)
 
+        // Leaving takes its notification with it, as a local ping's does.
         harness.clock.advance(by: 1)
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Merge it?"])
         #expect(harness.shipyard.menu.attention.pings == 1)
+        #expect(harness.notifier.removed == ["ping.sent \(Ping.url(machine: "netcup-vps", id: "q1").absoluteString) i-q1"])
+        await harness.poll()
+        #expect(harness.notifier.posted.filter { $0.event == .pingSent }.count == 2)
     }
 
     // MARK: Dismiss

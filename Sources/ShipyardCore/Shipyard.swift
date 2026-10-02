@@ -599,7 +599,15 @@ public final class Shipyard {
             var notifications: [PostedNotification] = []
             let listed = listedPings
             appStateStore.update { state in
-                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, pings: listed, state: &state, at: now)
+                notifications = Self.notify(
+                    snapshot: snapshot,
+                    listings: listings,
+                    projects: projects,
+                    machines: Self.machineSettings(configuration),
+                    pings: listed,
+                    state: &state,
+                    at: now
+                )
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
             var built = MenuModel.build(
@@ -641,8 +649,9 @@ public final class Shipyard {
         }
     }
 
-    /// Finds the events in `snapshot`, and the new pings the listings hold,
-    /// and records them in `state`, returning what to post (`select`).
+    /// Finds the events in `snapshot`, and the new pings the listings hold
+    /// (a remote machine's own listing under `machines`' settings), and
+    /// records them in `state`, returning what to post (`select`).
     /// Every fetched item becomes known, listed or not: `snapshot` becomes
     /// the known items, and its sources known, so the next refresh compares
     /// with it, and an item a filter change brings into view later isn't new.
@@ -650,13 +659,14 @@ public final class Shipyard {
         snapshot: Snapshot,
         listings: [String: [Item]],
         projects: [ProjectSettings],
+        machines: [ProjectSettings],
         pings: [Ping],
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
         let events = EventDetector.events(known: state.known, snapshot: snapshot, projects: projects)
-            + EventDetector.pingEvents(listings: listings, projects: projects)
-        let notifications = select(events, listings: listings, projects: projects, viewer: snapshot.viewerLogin, state: &state, at: now)
+            + EventDetector.pingEvents(listings: listings, projects: projects + machines)
+        let notifications = select(events, listings: listings, projects: projects + machines, viewer: snapshot.viewerLogin, state: &state, at: now)
         state.known = state.known.updated(with: snapshot, projects: projects)
         // A ping's record stays while the ping does, so it's never notified again.
         state.notified.prune(present: Array(state.known.items.keys) + pings.map(\.item.id), at: now)
@@ -777,12 +787,17 @@ public final class Shipyard {
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls
     /// this with the notification's `itemURL`. A ping's notification runs
-    /// the ping's action, as its row does. Returns the work still running
-    /// (a ping's action), for tests to await.
+    /// the ping's action, as its row does; a remote ping's goes the way its
+    /// listed row's click does (`open(_:)`), and does nothing once no row
+    /// lists it. Returns the work still running (a ping's action), for
+    /// tests to await.
     @discardableResult
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
-        guard Ping.remote(from: itemURL) == nil else { return Task {} }
+        if Ping.remote(from: itemURL) != nil {
+            let row = menu.sections.lazy.flatMap(\.rows).first { $0.url == itemURL && $0.item.ping != nil }
+            return row.map { open($0) } ?? Task {}
+        }
         actions.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
@@ -861,9 +876,18 @@ public final class Shipyard {
     public func reloadPings() async {
         guard listPings() else { return }
         await removeLeftBanners()
+        await notifyNewPings()
+    }
+
+    /// Posts the `ping.sent` notifications of the listed pings, local and
+    /// remote, not handled before, from the last snapshot, as a refresh
+    /// would: each once per sending, when the rules of a project listing
+    /// it (or, in a machine's own section, the defaults') select it.
+    private func notifyNewPings() async {
         let configuration = configStore.lastValid
-        let projects = configuration.projects.map(configuration.settings(for:))
-        let listings = self.listings(for: projects, in: snapshot, configuration: configuration)
+        let configured = configuration.projects.map(configuration.settings(for:))
+        let listings = self.listings(for: configured, in: snapshot, configuration: configuration)
+        let projects = configured + Self.machineSettings(configuration)
         let events = EventDetector.pingEvents(listings: listings, projects: projects)
         let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
         guard !unhandled.isEmpty else { return }
@@ -994,15 +1018,24 @@ public final class Shipyard {
         )
     }
 
+    /// Each remote machine's settings, for its own section's listing and
+    /// notifications (`Configuration.settings(forMachine:)`).
+    private static func machineSettings(_ configuration: Configuration) -> [ProjectSettings] {
+        configuration.remote.machines.map(configuration.settings(forMachine:))
+    }
+
     /// Follows `[remote] machines` in the last valid configuration: at
     /// start and on every valid change. A changed list keeps what the
-    /// machines still listed know, drops the removed ones' pings, and
-    /// polls at once; no machines stops polling.
+    /// machines still listed know, drops the removed ones' pings (and
+    /// queues their notifications to leave), and polls at once; no
+    /// machines stops polling.
     private func followMachines() {
         let labels = configStore.lastValid.remote.machines
         guard labels != remote.labels else { return }
+        let dropped = Set(remote.labels).subtracting(labels)
         remote.follow(labels)
         pruneRemoteMarks()
+        forgetLeftPings(stored: pings, droppedMachines: dropped)
         rebuildMenu(configStore.lastValid)
         armMachineTimer(after: 0)
     }
@@ -1010,7 +1043,10 @@ public final class Shipyard {
     /// Asks every remote machine for its pings at once, through Herdr
     /// (`RemotePingReader`), and lists each machine's as it answers, so a
     /// slow one never holds up another. A machine that fails keeps its
-    /// last pings and records why. No GitHub request is made. Then the
+    /// last pings and records why. A machine whose pings changed posts its
+    /// new pings' `ping.sent` notifications, once per sending, and takes
+    /// the notifications of the pings it no longer lists out of
+    /// Notification Center. No GitHub request is made. Then the
     /// machine timer comes back in `machinePollInterval`. Its timer calls
     /// this. A call while a poll runs returns at once, and the running poll
     /// goes again when it's done, so a machine added meanwhile is asked.
@@ -1020,8 +1056,12 @@ public final class Shipyard {
             await pollMachinesOnce()
         } while machineGate.finish() && machineGate.begin()
         pruneRemoteMarks()
-        // A seen remote ping may have passed its seen-window since.
-        if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) { rebuildMenu(configStore.lastValid) }
+        // A seen remote ping may have passed its seen-window since, taking its banner.
+        if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) {
+            rebuildMenu(configStore.lastValid)
+            forgetLeftPings(stored: pings)
+            await removeLeftBanners()
+        }
         armMachineTimer(after: Self.machinePollInterval)
     }
 
@@ -1034,7 +1074,11 @@ public final class Shipyard {
             for await (label, result) in group {
                 let before = remote.machine(label)?.pings
                 remote.record(result, for: label, at: clock.now)
-                if remote.machine(label)?.pings != before { rebuildMenu(configStore.lastValid) }
+                guard remote.machine(label)?.pings != before else { continue }
+                rebuildMenu(configStore.lastValid)
+                forgetLeftPings(stored: pings)
+                await removeLeftBanners()
+                await notifyNewPings()
             }
         }
     }
@@ -1079,14 +1123,27 @@ public final class Shipyard {
     /// `removeLeftBanners()`. A ping left when its `ping.sent` record names
     /// no stored ping (withdrawn, dismissed, past its window, or gone while
     /// the app wasn't running), or another instance than the stored one
-    /// (withdrawn and sent anew under its id, however soon).
-    private func forgetLeftPings(stored: [Ping]) {
+    /// (withdrawn and sent anew under its id, however soon). A remote ping
+    /// leaves the same way once it's no longer listed: its machine answered
+    /// a poll without it, it was dismissed, or it was seen and its
+    /// seen-window passed; or when its machine is in `droppedMachines`
+    /// (taken out of the configuration). Before its machine's first
+    /// answer, its record waits.
+    private func forgetLeftPings(stored: [Ping], droppedMachines: Set<String> = []) {
+        let answered = Set(remote.machines.filter { $0.answered != nil }.map(\.label))
+        let configuration = configStore.lastValid
+        let now = clock.now
+        let listedRemote = filedPings(configuration).filter { $0.machine != nil && !Self.hasLeft($0, in: configuration, at: now) }
         let current = Dictionary(
-            stored.map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
+            (stored + listedRemote).map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
             uniquingKeysWith: { first, _ in first }
         )
         let pingRecords = appStateStore.state.notified.records.filter { key, record in
-            guard let url = URL(string: key), Ping.id(from: url) != nil else { return false }
+            guard let url = URL(string: key) else { return false }
+            if Ping.id(from: url) == nil {
+                guard let machine = Ping.remote(from: url)?.machine,
+                      answered.contains(machine) || droppedMachines.contains(machine) else { return false }
+            }
             return record.events.contains { $0 != current[key] }
         }
         guard !pingRecords.isEmpty else { return }
@@ -1112,9 +1169,11 @@ public final class Shipyard {
     /// and each of those projects' `seen-window` has passed since. A
     /// project no longer configured counts with `[defaults.pings]`'s window,
     /// so a ping whose projects are all gone still leaves once it's seen.
+    /// A remote ping filed under none counts with it too (its machine's section).
     private static func hasLeft(_ ping: Ping, in configuration: Configuration, at now: Date) -> Bool {
         guard ping.seen != nil else { return false }
-        let windows = ping.projects.map { name in
+        let names = ping.machine != nil && ping.projects.isEmpty ? [ping.machine ?? ""] : ping.projects
+        let windows = names.map { name in
             configuration.projects.first { $0.name == name }
                 .map { configuration.settings(for: $0).pings.seenWindow }
                 ?? configuration.defaults.pings.seenWindow
