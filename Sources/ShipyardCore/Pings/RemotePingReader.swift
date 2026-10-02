@@ -10,8 +10,10 @@ import Foundation
 ///
 /// 1. `plugin action invoke list --plugin yahyabedirhan.herdr-shipyard`
 ///    starts the action and answers with its log record's `log_id`;
-/// 2. `plugin log list --plugin yahyabedirhan.herdr-shipyard` lists the
-///    plugin's recent records; the one with that `log_id` holds the list
+/// 2. `plugin log list --plugin yahyabedirhan.herdr-shipyard --limit 10`
+///    lists the plugin's newest records (`logLimit`; Herdr lists 50 by
+///    default, each with up to 48 KiB of output, asked for every
+///    `waitInterval`); the one with that `log_id`, just started, holds the list
 ///    on its `stdout` once its `status` is no longer `running`. While it is,
 ///    the reader waits `waitInterval` and asks again, up to `waitAttempts` times.
 ///
@@ -22,6 +24,10 @@ public struct RemotePingReader: Sendable {
     public static let pluginID = "yahyabedirhan.herdr-shipyard"
     /// Its action that lists the machine's pings.
     public static let actionID = "list"
+    /// How many of the plugin's newest command log records a read asks
+    /// for: the one it just started is among them, with room for others
+    /// started meanwhile (another Mac polling the same machine).
+    public static let logLimit = 10
     /// How long one machine's whole read may take.
     public static let defaultTimeout: TimeInterval = 15
 
@@ -100,7 +106,7 @@ public struct RemotePingReader: Sendable {
                 guard (try? await wait(waitInterval)) != nil else { return .failure(Failure("\(label) didn't answer in time")) }
             }
             let listed: [String: Any]
-            switch await run(["plugin", "log", "list", "--plugin", Self.pluginID], on: label) {
+            switch await run(["plugin", "log", "list", "--plugin", Self.pluginID, "--limit", String(Self.logLimit)], on: label) {
             case .failure(let failure): return .failure(failure)
             case .success(let result): listed = result
             }

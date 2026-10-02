@@ -69,12 +69,12 @@ private func eventually(_ condition: () -> Bool) async -> Bool {
 @Suite("Machines that don't answer")
 @MainActor
 struct UnreachableMachinesTests {
-    @Test("a label Herdr has no machine for is one quiet line, with the line Herdr prints read")
+    @Test("a label Herdr has no machine for is one quiet line, with the line Herdr prints read, and no last pings to keep")
     func unknownLabel() async throws {
         let harness = try await Harness.polled("[remote]\nmachines = [\"netcup-vps\", \"typo-vps\"]\n\n" + shop, netcup: [ping("q1", "Deploy?")])
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
         #expect(harness.shipyard.remote.machine("typo-vps")?.failure == "Herdr has no saved machine named typo-vps")
-        #expect(harness.machineLines == ["Herdr has no saved machine named typo-vps. Its last pings stay listed."])
+        #expect(harness.machineLines == ["Herdr has no saved machine named typo-vps."])
         #expect(harness.shipyard.menu.sections.map(\.name) == ["shop", "netcup-vps"])
     }
 

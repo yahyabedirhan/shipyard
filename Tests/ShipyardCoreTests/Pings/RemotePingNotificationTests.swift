@@ -159,7 +159,7 @@ struct RemotePingNotificationTests {
         #expect(harness.pingNotifications.count == 2)
     }
 
-    @Test("a machine that fails keeps its pings' notifications, and doesn't notify them again when it's back")
+    @Test("a machine that fails, or whose list stops early, keeps its pings' notifications, and doesn't notify them again when they're back")
     func failingMachine() async throws {
         let harness = try await Harness.notifying(netcup: [ping("q1", "Deploy?")])
         await harness.poll()
@@ -172,9 +172,20 @@ struct RemotePingNotificationTests {
         await harness.poll()
         #expect(harness.pingNotifications.count == 1)
         #expect(harness.notifier.removed.isEmpty)
+
+        // A list that stops early, before q1.
+        let newer = (0..<PingList.maxPings).map { ping("n\($0)", "Newer \($0)", minutes: Double($0) / 1000) }
+        harness.herdr.setPings(newer + [ping("q1", "Deploy?")], on: "netcup-vps")
+        await harness.poll()
+        #expect(harness.shipyard.remote.machine("netcup-vps")?.truncated == true)
+        #expect(!harness.notifier.removed.contains(notificationID("netcup-vps", "q1", instance: "i-q1")))
+        harness.herdr.setPings([ping("q1", "Deploy?")], on: "netcup-vps")
+        await harness.poll()
+        #expect(harness.pingNotifications.filter { $0.title == "netcup-vps · Deploy?" }.count == 1)
+        #expect(!harness.notifier.removed.contains(notificationID("netcup-vps", "q1", instance: "i-q1")))
     }
 
-    @Test("pings sent while the app wasn't running notify at its first poll; one notified before doesn't again")
+    @Test("pings sent while the app wasn't running notify at its first poll; one notified before doesn't again; ones withdrawn meanwhile take their banners, even when that first answer is empty")
     func sentWhileAway() async throws {
         let first = try await Harness.notifying(netcup: [ping("q1", "Deploy?")])
         await first.poll()
@@ -188,14 +199,30 @@ struct RemotePingNotificationTests {
         await next.poll()
         #expect(next.pingNotifications.map(\.title) == ["netcup-vps · Merge it?"])
         #expect(next.notifier.removed.isEmpty)
+
+        // Quit; meanwhile both are withdrawn.
+        let last = next.relaunched()
+        try await last.startWithMachines()
+        await last.poll()
+        #expect(last.notifier.removed.sorted() == [
+            notificationID("netcup-vps", "q1", instance: "i-q1"),
+            notificationID("netcup-vps", "q2", instance: "i-q2"),
+        ])
     }
 
-    @Test("a machine taken out of the configuration takes its pings' notifications away")
+    @Test("a machine taken out of the configuration takes its pings' notifications away, with no projects to refresh, or while the app wasn't running")
     func machineRemoved() async throws {
         let harness = try await Harness.notifying(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?")])
         await harness.poll()
-        try harness.writeConfig(twoMachines.replacingOccurrences(of: "\"hetzner-vps\", ", with: ""))
+        // Its projects go too, so no refresh runs after.
+        try harness.writeConfig("[remote]\nmachines = [\"netcup-vps\"]\n")
         await harness.shipyard.reloadConfiguration()
         #expect(harness.notifier.removed == [notificationID("hetzner-vps", "a1", instance: "i-a1")])
+
+        // Quit; meanwhile netcup is taken out too.
+        try harness.writeConfig("")
+        let next = harness.relaunched()
+        try await next.startWithMachines(netcup: [ping("q1", "Deploy?")])
+        #expect(next.notifier.removed == [notificationID("netcup-vps", "q1", instance: "i-q1")])
     }
 }

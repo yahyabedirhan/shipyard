@@ -160,7 +160,15 @@ version = 1
 
 ## Development
 
-`make test` runs the tests, and `make release` builds the release zip. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
+`make test` runs the tests, and `make release` builds the release zip. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
+
+A release goes in this order:
+
+1. Bump `ShipyardVersion.current` in [`Sources/ShipyardCore/Version.swift`](Sources/ShipyardCore/Version.swift) and merge it: the `linux cli` workflow fails unless `shipyard --version` matches the release's tag.
+2. Run `make release`, then publish a GitHub release tagged `v<version>` with the zip attached.
+3. Wait for the `linux cli` run to attach the Linux files before announcing the release. Until it does, the herdr-shipyard plugin can't install on a Linux machine, since it downloads them from the latest release.
+
+The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 
 ### Forks: your own OAuth App
 

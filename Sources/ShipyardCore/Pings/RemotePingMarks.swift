@@ -82,11 +82,16 @@ public struct RemotePingMarks: Equatable, Sendable {
     /// Drops the marks of pings no machine lists any more: not in
     /// `listed`, by URL and instance. The marks of the machines in
     /// `unknown` (configured, but not yet heard from since the app
-    /// started) are kept as they are.
-    public mutating func prune(listed: [Ping], keeping unknown: Set<String> = []) {
+    /// started) are kept as they are; so are those the machines in
+    /// `truncated` (whose list stopped early) leave out, which may be
+    /// past its end.
+    public mutating func prune(listed: [Ping], keeping unknown: Set<String> = [], truncated: Set<String> = []) {
         let current = Dictionary(listed.map { ($0.item.id, $0.instance) }, uniquingKeysWith: { first, _ in first })
         marks = marks.filter { url, mark in
-            if let machine = URL(string: url).flatMap(Ping.remote(from:))?.machine, unknown.contains(machine) { return true }
+            if let machine = URL(string: url).flatMap(Ping.remote(from:))?.machine {
+                if unknown.contains(machine) { return true }
+                if truncated.contains(machine) && current[url] == nil { return true }
+            }
             return current[url].map { $0 == mark.instance } ?? false
         }
     }

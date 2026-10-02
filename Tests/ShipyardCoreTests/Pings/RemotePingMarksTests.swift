@@ -194,11 +194,21 @@ struct RemotePingMarksTests {
         #expect(next.needsAttention("netcup-vps") == [false, true])
     }
 
-    @Test("marks for pings no machine lists any more are pruned; a machine that fails keeps its own")
+    @Test("marks for pings no machine lists any more are pruned; a machine that fails keeps its own, and one whose list stops early those past its end")
     func pruned() async throws {
         let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
         harness.shipyard.markAllSeen()
         #expect(harness.marked == ["shipyard://ping/hetzner-vps/a1", "shipyard://ping/netcup-vps/q1", "shipyard://ping/netcup-vps/q2"])
+
+        // netcup's list stops early, before q1 and q2: their marks stay, and they're seen when they're back.
+        let newer = (0..<PingList.maxPings).map { ping("n\($0)", "Newer \($0)", minutes: Double($0) / 1000) }
+        harness.herdr.setPings(newer + [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        await harness.poll()
+        #expect(harness.shipyard.remote.machine("netcup-vps")?.truncated == true)
+        #expect(harness.marked.count == 3)
+        harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        await harness.poll()
+        #expect(harness.needsAttention("netcup-vps") == [false, false])
 
         // netcup stops listing q2; hetzner fails, keeping a1 listed.
         harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1)], on: "netcup-vps")

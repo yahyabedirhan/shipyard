@@ -73,6 +73,10 @@ public final class Shipyard {
     /// their seen-window), still to take out of Notification Center
     /// (`removeLeftBanners()`).
     private var leftBanners: [String] = []
+    /// Whether `[remote] machines` has been followed from a configuration
+    /// read from the file, so a remote ping whose machine it doesn't name
+    /// has left (`forgetLeftPings`).
+    private var followsConfiguredMachines = false
     /// Why the latest refresh failed; `nil` once one succeeds.
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
@@ -108,6 +112,9 @@ public final class Shipyard {
     /// Each project's repositories as last resolved, for the `shipyard` CLI
     /// to file a ping by its repository without calling GitHub.
     public let repositoriesStore: ResolvedRepositoriesStore
+    /// What `repositoriesStore` holds, read once and kept as each refresh
+    /// records it, so listing remote pings doesn't read the file each time.
+    private var resolvedRepositories: [String: [String]]?
     private let tokenStore: any TokenStore
     private let actions: any ActionRunning
     private let herdr: HerdrFocus
@@ -203,7 +210,7 @@ public final class Shipyard {
         // signed in or not, without waiting for GitHub.
         await reloadPings()
         // So do the remote machines' pings, from their first poll.
-        followMachines()
+        await followMachines()
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -379,7 +386,7 @@ public final class Shipyard {
             // New selectors, or `archived` and `forks` changed: look them up now.
             forceResolve = true
             followLaunchAtLogin()
-            followMachines()
+            await followMachines()
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // Projects, filters, `[attention]` and `[menu-bar]` apply at
             // once, even if the refresh below can't run (paused) or fails.
@@ -589,7 +596,9 @@ public final class Shipyard {
             guard current == session else { return }
             // For the CLI; a file that can't be written leaves pings to
             // match the configuration's `owner/name` selectors alone.
-            try? repositoriesStore.record(resolved.mapValues(\.repositories))
+            let repositories = resolved.mapValues(\.repositories)
+            resolvedRepositories = repositories
+            try? repositoriesStore.record(repositories)
             let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
             let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
@@ -989,17 +998,6 @@ public final class Shipyard {
     /// the user's marks leave them (seen, dismissed: `RemotePingMarks`).
     private var listedPings: [Ping] { pings + appStateStore.state.remotePings.apply(to: remote.pings) }
 
-    /// Marks the remote ping `url` names seen, as its machine lists it now:
-    /// the one way a remote ping is seen (a click that worked, ⌥-click,
-    /// Mark all seen). Kept on the Mac, in the app state; a seen ping
-    /// leaves its listing after its project's `seen-window` (the
-    /// defaults' in its machine's section). A URL no machine lists, or a
-    /// local ping's, does nothing.
-    func markSeen(_ url: URL) {
-        guard Ping.remote(from: url) != nil, let ping = remote.pings.first(where: { $0.item.url == url }) else { return }
-        markRemoteSeen([ping])
-    }
-
     /// Records `listed` (remote pings as the user saw them) as seen now,
     /// clearing their actions' failures (`RemoteMachines.clearFailure`),
     /// and lists them again: one replaced since stays unseen.
@@ -1029,12 +1027,14 @@ public final class Shipyard {
     /// Forgets the marks of remote pings no machine lists any more, and
     /// of machines no longer configured. A machine that failed keeps its
     /// last pings, and so their marks; one not heard from since the app
-    /// started keeps its marks from the last run.
+    /// started keeps its marks from the last run; one whose list stopped
+    /// early keeps the marks of the pings past its end.
     private func pruneRemoteMarks() {
         guard !appStateStore.state.remotePings.marks.isEmpty else { return }
         let listed = remote.pings
         let unknown = Set(remote.machines.filter { $0.answered == nil }.map(\.label))
-        appStateStore.update { $0.remotePings.prune(listed: listed, keeping: unknown) }
+        let truncated = Set(remote.machines.filter(\.truncated).map(\.label))
+        appStateStore.update { $0.remotePings.prune(listed: listed, keeping: unknown, truncated: truncated) }
     }
 
     /// The listed pings, the remote ones filed against `configuration` and
@@ -1043,7 +1043,8 @@ public final class Shipyard {
     private func filedPings(_ configuration: Configuration) -> [Ping] {
         let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
         guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
-        let resolved = repositoriesStore.load()
+        let resolved = resolvedRepositories ?? repositoriesStore.load()
+        resolvedRepositories = resolved
         return pings + remotePings.map { PingCommand.filed(remote: $0, configuration: configuration, resolved: resolved) }
     }
 
@@ -1067,17 +1068,23 @@ public final class Shipyard {
 
     /// Follows `[remote] machines` in the last valid configuration: at
     /// start and on every valid change. A changed list keeps what the
-    /// machines still listed know, drops the removed ones' pings (and
-    /// queues their notifications to leave), and polls at once; no
-    /// machines stops polling.
-    private func followMachines() {
+    /// machines still listed know, drops the removed ones' pings, takes
+    /// their notifications out of Notification Center, and polls at once;
+    /// no machines stops polling. The first configuration read from the
+    /// file does so too for the machines taken out while the app wasn't
+    /// running.
+    private func followMachines() async {
         let labels = configStore.lastValid.remote.machines
-        guard labels != remote.labels else { return }
-        let dropped = Set(remote.labels).subtracting(labels)
+        // The defaults standing in for a file broken since launch don't say which machines went.
+        let fromFile = configStore.error == nil
+        guard labels != remote.labels || (fromFile && !followsConfiguredMachines) else { return }
+        if fromFile { followsConfiguredMachines = true }
         remote.follow(labels)
         pruneRemoteMarks()
-        forgetLeftPings(stored: pings, droppedMachines: dropped)
+        forgetLeftPings(stored: pings)
         rebuildMenu(configStore.lastValid)
+        // Here, since a refresh or a poll may not run (signed out, no projects, no machines left).
+        await removeLeftBanners()
         armMachineTimer(after: 0)
     }
 
@@ -1113,10 +1120,13 @@ public final class Shipyard {
                 group.addTask { (label, await reader.list(machine: label)) }
             }
             for await (label, result) in group {
-                let before = remote.machine(label)?.pings
+                let before = remote.machine(label)
                 remote.record(result, for: label, at: clock.now)
                 menu.machineNotices = MachineNotice.notices(remote)
-                guard remote.machine(label)?.pings != before else { continue }
+                let after = remote.machine(label)
+                // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
+                let firstAnswer = before?.answered == nil && after?.answered != nil
+                guard after?.pings != before?.pings || firstAnswer else { continue }
                 rebuildMenu(configStore.lastValid)
                 forgetLeftPings(stored: pings)
                 await removeLeftBanners()
@@ -1168,12 +1178,16 @@ public final class Shipyard {
     /// (withdrawn and sent anew under its id, however soon). A remote ping
     /// leaves the same way once it's no longer listed: its machine answered
     /// a poll without it, it was dismissed, or it was seen and its
-    /// seen-window passed; or when its machine is in `droppedMachines`
-    /// (taken out of the configuration). Before its machine's first
-    /// answer, its record waits.
-    private func forgetLeftPings(stored: [Ping], droppedMachines: Set<String> = []) {
+    /// seen-window passed; or when the configuration no longer names its
+    /// machine, even if it was taken out while the app wasn't running.
+    /// Before its machine's first answer, its record waits, as does one
+    /// past the end of a list that stopped early.
+    private func forgetLeftPings(stored: [Ping]) {
         let answered = Set(remote.machines.filter { $0.answered != nil }.map(\.label))
         let configuration = configStore.lastValid
+        let configured = Set(configuration.remote.machines)
+        let truncated = Set(remote.machines.filter(\.truncated).map(\.label))
+        let listedURLs = Set(remote.pings.map(\.item.id))
         let now = clock.now
         let listedRemote = filedPings(configuration).filter { $0.machine != nil && !Self.hasLeft($0, in: configuration, at: now) }
         let current = Dictionary(
@@ -1183,8 +1197,9 @@ public final class Shipyard {
         let pingRecords = appStateStore.state.notified.records.filter { key, record in
             guard let url = URL(string: key) else { return false }
             if Ping.id(from: url) == nil {
-                guard let machine = Ping.remote(from: url)?.machine,
-                      answered.contains(machine) || droppedMachines.contains(machine) else { return false }
+                guard let machine = Ping.remote(from: url)?.machine else { return false }
+                let removed = followsConfiguredMachines && !configured.contains(machine)
+                guard removed || (answered.contains(machine) && (!truncated.contains(machine) || listedURLs.contains(key))) else { return false }
             }
             return record.events.contains { $0 != current[key] }
         }

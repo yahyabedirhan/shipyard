@@ -58,18 +58,24 @@ private extension Harness {
 struct RemotePingsTests {
     // MARK: Asking a machine
 
-    @Test("each machine is asked through Herdr: the plugin's list action, then its log record")
+    @Test("each machine is asked through Herdr: the plugin's list action, then its log record among the newest few")
     func asksThroughHerdr() async throws {
         let harness = try await Harness.withMachines(netcup: [ping("q1", "Deploy?")])
         await harness.poll()
         for label in ["hetzner-vps", "netcup-vps"] {
             #expect(harness.herdr.runs(on: label) == [
                 ["plugin", "action", "invoke", "list"] + plugin,
-                ["plugin", "log", "list"] + plugin,
+                ["plugin", "log", "list"] + plugin + ["--limit", "10"],
             ])
         }
         // Nothing but `--machine` runs: no ssh, no shell.
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
+
+        // Past the limit, older records go unlisted; the one just started is still found.
+        for _ in 0..<RemotePingReader.logLimit { await harness.poll() }
+        harness.herdr.setPings([ping("q2", "Merge it?")], on: "netcup-vps")
+        await harness.poll()
+        #expect(harness.titles("netcup-vps") == ["Merge it?"])
     }
 
     @Test("a record still running is asked for again until it's done")

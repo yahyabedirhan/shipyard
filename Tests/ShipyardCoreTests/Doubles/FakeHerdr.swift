@@ -13,8 +13,8 @@ import ShipyardCore
 /// It knows saved machines too (`addMachine`): `herdr --machine <label>
 /// plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` starts
 /// a command log record of the machine's pings as `shipyard ping list
-/// --json` prints them, and `… plugin log list --plugin …` lists the
-/// machine's records, as Herdr 0.9.3 does. A record can stay `running` for
+/// --json` prints them, and `… plugin log list --plugin … --limit <n>`
+/// lists the machine's newest `n` records, oldest first, as Herdr 0.9.3 does. A record can stay `running` for
 /// a number of log lists first. A label it doesn't know, and a machine
 /// disabled, are refused with the line Herdr prints (`cli/target.rs` at
 /// commit 65e35a3). A machine's panes and agents (`open(pane:tab:agent:on:)`)
@@ -307,8 +307,10 @@ final class FakeHerdr: ShellRunning {
                 "log": record(log),
             ]
             return json(["id": "cli:plugin", "result": result])
-        case ["plugin", "log", "list", "--plugin", plugin]:
-            let listed = machine.logs.map(record)
+        case ["plugin", "log", "list", "--plugin", plugin, "--limit", arguments.last ?? ""]:
+            // Herdr's newest `--limit` records, oldest first (handle_plugin_log_list).
+            guard let limit = Int(arguments.last ?? "") else { return error("invalid_limit", "invalid --limit value") }
+            let listed = machine.logs.suffix(max(1, min(limit, 200))).map(record)
             for index in machine.logs.indices where machine.logs[index].runningFor > 0 {
                 machine.logs[index].runningFor -= 1
             }

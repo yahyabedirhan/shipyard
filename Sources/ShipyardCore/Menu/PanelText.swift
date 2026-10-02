@@ -270,12 +270,13 @@ public enum PanelText {
     }
 
     /// A remote machine's quiet line (`MachineNotice`): why it couldn't be
-    /// read, its last pings still listed; or that it holds more than it sent.
+    /// read, and that its last pings stay listed when it answered before;
+    /// or that it holds more than it sent.
     public static func machineNotice(_ notice: MachineNotice) -> String {
         switch notice.kind {
-        case .unreachable(let reason):
+        case .unreachable(let reason, let answered):
             let sentence = reason.hasSuffix(".") ? reason : reason + "."
-            return "\(sentence) Its last pings stay listed."
+            return answered ? "\(sentence) Its last pings stay listed." : sentence
         case .truncated(let listed):
             return "\(notice.machine) has more pings than it could send. Showing its newest \(listed)."
         }
