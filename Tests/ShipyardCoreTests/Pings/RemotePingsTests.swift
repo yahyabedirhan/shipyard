@@ -62,11 +62,10 @@ struct RemotePingsTests {
     func asksThroughHerdr() async throws {
         let harness = try await Harness.withMachines(netcup: [ping("q1", "Deploy?")])
         await harness.poll()
+        let invoke: [String] = ["plugin", "action", "invoke", "list"] + plugin
+        let logList: [String] = ["plugin", "log", "list"] + plugin + ["--limit", "10"]
         for label in ["hetzner-vps", "netcup-vps"] {
-            #expect(harness.herdr.runs(on: label) == [
-                ["plugin", "action", "invoke", "list"] + plugin,
-                ["plugin", "log", "list"] + plugin + ["--limit", "10"],
-            ])
+            #expect(harness.herdr.runs(on: label) == [invoke, logList])
         }
         // Nothing but `--machine` runs: no ssh, no shell.
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
