@@ -88,11 +88,13 @@ public enum PanelText {
 
     /// A ping's second line after its number: why its action failed,
     /// while it has; otherwise its sender and its body on one line, each
-    /// when given, or "ping" when neither is: "#3 · claude · Waiting for your input".
+    /// when given, or "ping" when neither is: "#3 · deploy bot · Waiting for
+    /// your input". A known agent isn't named: its logo leads the line.
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
-        let parts = [row.sender, body].compactMap { $0 }
+        let sender = row.agent == nil ? row.sender : nil
+        let parts = [sender, body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
     }
 

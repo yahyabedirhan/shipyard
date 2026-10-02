@@ -180,7 +180,8 @@ struct PingActionTests {
         row = try harness.pingRow("Needs you")
         #expect(row.actionError == nil)
         #expect(row.needsAttention == false)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · claude")
+        // Claude's logo leads the line, so its name isn't repeated.
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · ping")
         #expect(harness.actions.ran == [.app("Claude"), .app("Claude")])
     }
 
@@ -246,9 +247,9 @@ struct PingActionTests {
         #expect(link.sender == "claude")
         #expect(link.agent == .claude)
         #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
-        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · claude · The design doc, ready to read")
+        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · The design doc, ready to read")
         harness.clock.advance(by: 300)
-        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · claude · The design doc, ready to read · 5m")
+        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · The design doc, ready to read · 5m")
         #expect(PanelText.stateLabel(link) == "ping, opens a link")
         #expect(PanelText.rowCard(link, now: harness.clock.now).lines == [
             "The design doc,\nready to read",
@@ -297,13 +298,14 @@ struct PingActionTests {
         #expect(try harness.pingRow("Ready").agent == agent)
     }
 
-    @Test("a sender that only starts like an agent's name, or names no agent, is none", arguments: ["pipeline", "claudette", "deploy bot", "my claude"])
+    @Test("a sender that only starts like an agent's name, or names no agent, is none, and is named in words", arguments: ["pipeline", "claudette", "deploy bot", "my claude"])
     func unknownSender(sender: String) async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try await harness.send("Ready", "--from", sender)
         let row = try harness.pingRow("Ready")
         #expect(row.agent == nil)
         #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(sender)")
     }
 
     // MARK: Grouping

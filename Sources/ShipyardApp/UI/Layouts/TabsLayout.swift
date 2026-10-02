@@ -374,8 +374,8 @@ private struct TabRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 HStack(spacing: 4) {
-                    // A known agent's mark leads a ping's line, which
-                    // names its sender, unless the line says why it failed.
+                    // A known agent's logo leads a ping's line, in place of
+                    // its name, unless the line says why it failed.
                     if row.actionError == nil, let agent = row.agent {
                         AgentMarkView(agent: agent, size: Grid.agentMark)
                     }

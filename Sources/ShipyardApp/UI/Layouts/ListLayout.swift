@@ -308,17 +308,22 @@ private struct ListRow: View {
             if let meta {
                 HStack(spacing: 3) {
                     if let agent = metaAgent {
+                        // The logo stands for the agent's name.
                         AgentMarkView(agent: agent, size: Grid.agentMark)
-                    } else if let symbol = metaSymbol {
-                        Image(systemName: symbol)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(false)
+                            .accessibilityLabel(meta)
+                    } else {
+                        if let symbol = metaSymbol {
+                            Image(systemName: symbol)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                        }
+                        Text(meta)
+                            .font(TypeScale.meta)
+                            .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
-                    Text(meta)
-                        .font(TypeScale.meta)
-                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
                 }
                 .frame(width: Grid.metaColumn, alignment: .leading)
                 .padding(.leading, 6)
@@ -359,8 +364,8 @@ private struct ListRow: View {
         return row.authorKind == .bot ? "cpu" : nil
     }
 
-    /// A known agent's mark before a ping's sender, when the column
-    /// names the sender.
+    /// A known agent's logo, in place of its name, when the column names
+    /// the sender.
     private var metaAgent: KnownAgent? {
         guard row.actionError == nil, !showsRowRepository else { return nil }
         return row.agent
