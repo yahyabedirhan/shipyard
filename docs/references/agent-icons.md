@@ -1,6 +1,24 @@
 # Agent icons
 
-> **Shipyard bundles none of these.** It draws its own neutral mark for each known agent, a monogram in a coloured circle, defined in one table (`KnownAgent`). Decided on #137, 2026-10-03; the research below is why.
+> **Decision (#137, 2026-10-03): shipyard bundles each known agent's real logo.** After the licence check below, the maintainer chose to bundle each agent's real logo for nominative identification of the sender (which agent sent a ping), accepting that Anthropic's, OpenAI's and Google's brand terms ask for approval. The earlier choice, a monogram on a coloured circle of shipyard's own, didn't let them recognise the agents. Each SVG is kept as published in `assets/images/agent-logos/` and converted, unaltered, to the PDF the app bundles (`make agent-logos`); the view fits it to a square with app-icon corners, tints Copilot's one-colour glyph like text, and switches OpenCode to its maker's dark-mode file. Shipyard still has no `LICENSE` file, so the MIT notices below have nowhere to go yet: add them when it gets one.
+
+## Bundled logos
+
+| Agent | Bundled file (`assets/images/agent-logos/`, PDF in `Sources/ShipyardApp/Resources/AgentLogos/`) | Source | Licence or terms |
+|---|---|---|---|
+| Claude | `claude.svg` | Anthropic's own: `https://claude.ai/favicon.svg` (the orange `#D97757` starburst), fetched 2026-10-03 | Anthropic Trademark Guidelines: prior approval, their files, no alterations |
+| Codex | `codex.svg` | no first-party SVG found; [lobehub/lobe-icons](https://github.com/lobehub/lobe-icons) at `79b551cf26aab9ea4ac701fb807160950a5b860f`, `packages/static-svg/icons/codex-color.svg` | MIT (LobeHub's drawing); OpenAI's Marks terms: unaltered official files, revocable |
+| OpenCode | `opencode.svg` (light), `opencode-dark.svg` (dark) | [anomalyco/opencode](https://github.com/anomalyco/opencode) at `108b988a08227df45417f27905a4d6b27ad49b6d`, `packages/identity/mark-light.svg` and `mark.svg` | MIT ("Copyright (c) 2025 opencode"); no brand terms |
+| Cursor | `cursor.svg` | Cursor's own: `https://cursor.com/favicon.svg` (the 2.5D cube app icon), fetched 2026-10-03 | not stated; cursor.com/brand asks only for the name "Cursor" |
+| Pi | `pi.svg` | Pi's own: `https://pi.dev/logo-auto.svg`, fetched 2026-10-03 | not stated (not in the MIT repo) |
+| Gemini | `gemini.svg` | no first-party SVG (the Apache repo has a PNG only); lobe-icons at `79b551cf26aab9ea4ac701fb807160950a5b860f`, `packages/static-svg/icons/gemini-color.svg` | MIT (LobeHub's drawing); Google: product icons need a permission request |
+| GitHub Copilot | `copilot.svg` | [primer/octicons](https://github.com/primer/octicons) at `923a31b34542702800cb90a0fd390e2e60dd92ac`, `icons/copilot-24.svg` | MIT ("Copyright (c) 2026 GitHub Inc."); GitHub logo terms allow showing an integration |
+| Amp | `amp.svg` | Amp's press kit: `https://ampcode.com/app-icon.svg`, fetched 2026-10-03 | not stated |
+| Droid (Factory) | `droid.svg` | Factory's own: `https://factory.com/icon.svg` (the site's schema.org logo), fetched 2026-10-03 | not stated; all rights reserved |
+
+The conversion needs librsvg (`brew install librsvg`): macOS's own SVG renderer drops lobe-icons' compact arc flags and gradients, so its Gemini and Codex come out wrong. Amp's drop shadow is a filter, which rsvg-convert keeps as a small embedded bitmap; the rest stay vector.
+
+[pingdotgg/t3code](https://github.com/pingdotgg/t3code) at `b4d3d51ac99d4306d754afb5c78c49845bfac3c1` (MIT) shows agents the same way: real marks inlined as SVG in `apps/web/src/components/Icons.tsx` (Claude's starburst in `#d97757`, OpenAI's Blossom for Codex, Cursor's cube, Pi, OpenCode), each one-colour glyph given a light and a dark fill (`chat/ProviderInstanceIcon.tsx`).
 
 Checked 2026-10-03. Where each coding agent's icon is published, under what terms, and whether shipyard can bundle a small copy to show next to a ping from that agent.
 

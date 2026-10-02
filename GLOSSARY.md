@@ -98,8 +98,8 @@ A short message an agent sends the user through shipyard, filed under every proj
 _Avoid_: Notification (that's the macOS banner), message, alert
 
 **Known agent**:
-A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with a mark of shipyard's own (a monogram on a coloured circle), never the agent's logo.
-_Avoid_: Agent icon, logo
+A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with that agent's real logo, which the app bundles.
+_Avoid_: Agent icon, monogram
 
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
