@@ -306,7 +306,9 @@ private struct ListRow: View {
             Spacer(minLength: 8)
             if let meta {
                 HStack(spacing: 3) {
-                    if let symbol = metaSymbol {
+                    if let agent = metaAgent {
+                        AgentMarkView(agent: agent, size: 12)
+                    } else if let symbol = metaSymbol {
                         Image(systemName: symbol)
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(.tertiary)
@@ -354,6 +356,13 @@ private struct ListRow: View {
         if row.actionError != nil { return "exclamationmark.triangle.fill" }
         if showsRowRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
+    }
+
+    /// A known agent's mark before a ping's sender, when the column
+    /// names the sender.
+    private var metaAgent: KnownAgent? {
+        guard row.actionError == nil, !showsRowRepository else { return nil }
+        return row.agent
     }
 
     /// Whether the meta column names this row's repository: in a project of

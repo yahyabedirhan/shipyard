@@ -145,6 +145,15 @@ enum Palette {
         }
     }
 
+    /// A known agent's circle, from its mark's hue: muted, and a little
+    /// lighter in dark mode, so its white monogram reads in both.
+    static func agent(_ mark: AgentMark) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(hue: mark.hue, saturation: isDark ? 0.45 : 0.55, brightness: isDark ? 0.62 : 0.56, alpha: 1)
+        })
+    }
+
     /// The check dot: pending amber, passed green, failed red; no dot
     /// when there are no checks.
     static func color(_ checks: ChecksState) -> Color? {

@@ -141,6 +141,28 @@ struct StateSymbol: View {
     }
 }
 
+/// A known agent's mark: its monogram in white on a circle of its hue,
+/// shipyard's own drawing rather than the agent's logo. Decoration: the
+/// sender's name beside it, or the card's words, say who sent the ping.
+struct AgentMarkView: View {
+    let agent: KnownAgent
+    let size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(Palette.agent(agent.mark))
+            .overlay {
+                Text(agent.mark.monogram)
+                    .font(.system(size: size * 0.46, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+            }
+            .frame(width: size, height: size)
+            .accessibilityHidden(true)
+    }
+}
+
 /// A pull request's check dot, cut out of what it sits on like a status
 /// badge; nothing when there are no checks.
 struct CheckDot: View {

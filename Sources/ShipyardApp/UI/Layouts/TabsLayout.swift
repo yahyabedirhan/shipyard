@@ -373,13 +373,20 @@ private struct TabRow: View {
                     .foregroundStyle(row.state.isActive || row.needsAttention ? .primary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                Text(PanelText.rowDetail(row, showingRepository: showsRepository))
-                    .font(TypeScale.meta)
-                    // A ping's failed action reads in red until it's cleared.
-                    .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
-                    .lineLimit(1)
-                    // A long branch or author gives way in the middle.
-                    .truncationMode(.middle)
+                HStack(spacing: 4) {
+                    // A known agent's mark leads a ping's line, which
+                    // names its sender, unless the line says why it failed.
+                    if row.actionError == nil, let agent = row.agent {
+                        AgentMarkView(agent: agent, size: 12)
+                    }
+                    Text(PanelText.rowDetail(row, showingRepository: showsRepository))
+                        .font(TypeScale.meta)
+                        // A ping's failed action reads in red until it's cleared.
+                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
+                        .lineLimit(1)
+                        // A long branch or author gives way in the middle.
+                        .truncationMode(.middle)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(PanelText.age(row.age(at: now)))
