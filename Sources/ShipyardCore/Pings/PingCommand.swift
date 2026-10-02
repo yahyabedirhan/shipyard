@@ -41,12 +41,20 @@ public enum PingCommand {
         argument after --herdr is its id only when it's shaped like one
         (workspace:tab or workspace:pane, as Herdr prints them). An id is 1 to
         64 lowercase letters, digits, - and _, starting with a letter or digit.
-        Everything after -- is the title, even `withdraw` or a word starting
-        with --: shipyard ping -- withdraw
+        Everything after -- is the title, even `withdraw`, `list` or a word
+        starting with --: shipyard ping -- withdraw
 
         `shipyard ping withdraw <id>` takes the ping back: it leaves the menu,
         and its notification leaves Notification Center. It prints the id, or
         fails when no ping has it.
+
+        `shipyard ping list --json` prints this computer's pings as one line
+        of JSON, newest first, for the Mac's shipyard to read through Herdr.
+
+        On Linux, a computer without the app, a ping isn't filed there: it
+        keeps its repository (or --project) as given, and the Mac files it.
+        Sent from a Herdr pane without an action, clicking it focuses that
+        pane. It leaves a day after its sending or its last replace.
 
         """
 
@@ -86,6 +94,11 @@ public enum PingCommand {
         return nil
     }
 
+    /// How long a ping lives on Linux, a machine without the app, from its
+    /// sending or its last replace: no one marks it seen there, so an
+    /// unanswered one would otherwise stay forever.
+    public static let lifetimeWithoutTheApp: TimeInterval = 24 * 60 * 60
+
     /// Sends a ping with `arguments` (those after `ping`), sent at `now`.
     /// Without `--project` it's filed under every project of `configuration`
     /// that watches its repository: one the configuration names as
@@ -96,6 +109,10 @@ public enum PingCommand {
     /// (`PingStore.takeNumber()`). A `--id` already stored replaces that
     /// ping: its sent time and number stay, and it's unseen again with no
     /// failure.
+    ///
+    /// On Linux (`environment.platform`), a machine without the app, it
+    /// isn't filed (`send`), and a ping without an action takes the
+    /// agent's Herdr pane (`HERDR_PANE_ID`) as its action.
     public static func run(
         _ arguments: [String],
         environment: CommandEnvironment,
@@ -110,30 +127,72 @@ public enum PingCommand {
         case .success(let parsed): request = parsed
         case .failure(let error): return .usage("shipyard ping: \(error.message)")
         }
-        let names = configuration.projects.map(\.name)
+        var sending = request
+        // On Linux every ping sent from a Herdr pane records it, so a click
+        // on the Mac can focus it; an action the agent gives wins.
+        if environment.platform == .linux, sending.action == nil,
+           let pane = environment.variables[herdrPaneVariable]?.trimmingCharacters(in: .whitespaces), !pane.isEmpty {
+            sending.action = .herdr(pane)
+        }
+        let terminal: String?
+        if case .herdr = sending.action { terminal = outerTerminal(environment.variables) } else { terminal = nil }
+        return send(
+            sending,
+            terminal: terminal,
+            folder: environment.workingDirectory,
+            git: environment.git,
+            platform: environment.platform,
+            configuration: configuration,
+            resolved: resolved,
+            store: store,
+            now: now,
+            newID: newID
+        )
+    }
+
+    /// Files `request` and saves it, with the terminal a `--herdr` ping was
+    /// sent from (`outerTerminal`), as `run` does once its arguments read:
+    /// under the one `--project` names, else under every project that
+    /// watches its repository (`--repo`, else the `origin` of `folder`;
+    /// none when `folder` is `nil`), then prints its id. An id already
+    /// stored is replaced. With `unfiled`, a ping no project takes is saved
+    /// under none, with the repository it named (if any), instead of being
+    /// refused: Herdr's ping for a blocked agent (`HerdrEvent`) has no one
+    /// to tell about a refusal.
+    ///
+    /// On Linux (`platform`), a machine without the app, it isn't filed:
+    /// `configuration` and `resolved` aren't read, the ping keeps
+    /// `--project` or its repository (`--repo`, else `origin`, else none)
+    /// as given for the Mac to file, and it expires `lifetimeWithoutTheApp`
+    /// after `now`.
+    static func send(
+        _ request: Request,
+        terminal: String? = nil,
+        folder: URL?,
+        git: any GitRemoteLookup,
+        platform: CommandPlatform,
+        configuration: Configuration,
+        resolved: [String: [String]],
+        store: PingStore,
+        now: Date,
+        newID: () -> String = Ping.newID,
+        unfiled: Bool = false
+    ) -> CommandResult {
         let projects: [String]
-        var repository: String?
-        if let project = request.project {
-            guard names.contains(project) else {
-                return .failed("shipyard ping: no project is named `\(project)`; \(listing(names))")
+        let repository: String?
+        var expires: Date?
+        switch platform {
+        case .macOS:
+            switch filing(request, folder: folder, git: git, configuration: configuration, resolved: resolved, unfiled: unfiled) {
+            case .success(let filed): (projects, repository) = filed
+            case .failure(let refused): return refused
             }
-            projects = [project]
-        } else {
-            let slug: String
-            if let named = request.repository {
-                slug = named
-            } else {
-                switch workingRepository(environment) {
-                case .success(let found): slug = found
-                case .failure(let reason): return .failed("shipyard ping: \(reason.message); pass --repo <owner/name> or --project <name>; \(listing(names))")
-                }
-            }
-            let watching = watchers(of: slug, configuration: configuration, resolved: resolved)
-            guard !watching.isEmpty else {
-                return .failed("shipyard ping: no project watches `\(slug)`; pass --project <name> to file it under one; \(listing(names))")
-            }
-            projects = watching.map(\.project)
-            repository = watching[0].spelling
+        case .linux:
+            // No app here to file it against: the Mac files it.
+            projects = request.project.map { [$0] } ?? []
+            repository = request.project != nil ? nil
+                : request.repository ?? folder.flatMap { try? workingRepository(folder: $0, git: git).get() }
+            expires = now.addingTimeInterval(lifetimeWithoutTheApp)
         }
         let id: String
         if let named = request.id {
@@ -160,17 +219,65 @@ public enum PingCommand {
                 body: request.body,
                 sender: request.sender,
                 action: request.action,
-                terminal: request.action.flatMap { action in
-                    if case .herdr = action { return outerTerminal(environment.variables) }
-                    return nil
-                },
+                terminal: terminal,
                 instance: replaced?.instance ?? UUID().uuidString.lowercased(),
-                number: number
+                number: number,
+                expires: expires
             ))
         } catch {
             return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
         return CommandResult(output: "#\(number) \(id)\n")
+    }
+
+    /// The projects `request` is filed under against `configuration`, and
+    /// the repository it's filed by, as `send` says: refused, with the
+    /// projects listed, when nothing takes it and it isn't `unfiled`.
+    private static func filing(
+        _ request: Request,
+        folder: URL?,
+        git: any GitRemoteLookup,
+        configuration: Configuration,
+        resolved: [String: [String]],
+        unfiled: Bool
+    ) -> Result<(projects: [String], repository: String?), CommandResult> {
+        let names = configuration.projects.map(\.name)
+        if let project = request.project {
+            guard names.contains(project) else {
+                return .failure(.failed("shipyard ping: no project is named `\(project)`; \(listing(names))"))
+            }
+            return .success(([project], nil))
+        }
+        var slug = request.repository
+        var noRepository: NoRepository?
+        if slug == nil, let folder {
+            switch workingRepository(folder: folder, git: git) {
+            case .success(let found): slug = found
+            case .failure(let reason): noRepository = reason
+            }
+        }
+        let watching = slug.map { watchers(of: $0, configuration: configuration, resolved: resolved) } ?? []
+        if let first = watching.first {
+            return .success((watching.map(\.project), first.spelling))
+        } else if unfiled {
+            return .success(([], slug))
+        } else if let slug {
+            return .failure(.failed("shipyard ping: no project watches `\(slug)`; pass --project <name> to file it under one; \(listing(names))"))
+        } else {
+            let reason = noRepository?.message ?? "the ping names no repository"
+            return .failure(.failed("shipyard ping: \(reason); pass --repo <owner/name> or --project <name>; \(listing(names))"))
+        }
+    }
+
+    /// `shipyard ping list --json`, with `arguments` those after `list`:
+    /// prints the store's live pings at `now` as the remote ping list
+    /// (`PingList`), newest first and capped, on one line. Only `--json`
+    /// is accepted, so the contract is always asked for by name.
+    public static func list(_ arguments: [String], store: PingStore, now: Date) -> CommandResult {
+        guard arguments == ["--json"] else {
+            return .usage("shipyard ping list: it prints JSON only; run shipyard ping list --json")
+        }
+        return CommandResult(output: PingList.encode(store.all().filter { $0.isLive(at: now) }) + "\n")
     }
 
     /// `shipyard ping withdraw <id>`, with `arguments` those after
@@ -214,16 +321,33 @@ public enum PingCommand {
         var message: String
     }
 
-    /// The repository of the working folder: its git remote `origin`, as `owner/name`.
-    static func workingRepository(_ environment: CommandEnvironment) -> Result<String, NoRepository> {
-        let folder = environment.workingDirectory.path
-        guard let origin = environment.git.origin(in: environment.workingDirectory) else {
+    /// The repository of the working folder `url`: its git remote `origin`, as `owner/name`.
+    static func workingRepository(folder url: URL, git: any GitRemoteLookup) -> Result<String, NoRepository> {
+        let folder = url.path
+        guard let origin = git.origin(in: url) else {
             return .failure(NoRepository(message: "the working folder (\(folder)) isn't a git repository with a remote `origin` to file the ping by"))
         }
         guard let slug = GitRemote.repository(fromURL: origin) else {
             return .failure(NoRepository(message: "the working folder's remote `origin` (\(origin)) doesn't name a repository as owner/name"))
         }
         return .success(slug)
+    }
+
+    /// `ping`, sent on a machine without the app and listed by the Mac
+    /// (`Ping.machine`), filed as `send` files a local one against
+    /// `configuration` and `resolved`: under every project that watches
+    /// its repository, with the repository spelled as the first of them
+    /// knows it. One that names projects (`--project`) keeps them; a name
+    /// the configuration lacks lists it by its machine (`Listing`), as
+    /// does a repository no project watches.
+    public static func filed(remote ping: Ping, configuration: Configuration, resolved: [String: [String]]) -> Ping {
+        guard ping.projects.isEmpty, let slug = ping.repository else { return ping }
+        let watching = watchers(of: slug, configuration: configuration, resolved: resolved)
+        guard let first = watching.first else { return ping }
+        var filed = ping
+        filed.projects = watching.map(\.project)
+        filed.repository = first.spelling
+        return filed
     }
 
     /// The projects that watch `slug`, in the configuration's order, each

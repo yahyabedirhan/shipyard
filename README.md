@@ -73,7 +73,24 @@ shipyard ping "Waiting for your input" --herdr --id shop-question   # brings you
 shipyard ping withdraw shop-question                                # takes it back once you've answered
 ```
 
-A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings stay on your Mac. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.
+A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings never reach GitHub. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.
+
+#### Pings from your other machines
+
+Agents on your other machines can ping you too, when your Mac's Herdr knows those machines as saved machines. Install the [herdr-shipyard](https://github.com/yahyabedirhan/herdr-shipyard) plugin on each one, which puts the same `shipyard` command there:
+
+```sh
+herdr plugin install yahyabedirhan/herdr-shipyard
+```
+
+Then name them in `config.toml` by their Herdr labels:
+
+```toml
+[remote]
+machines = ["hetzner-vps"]
+```
+
+Shipyard asks each machine for its pings through Herdr about every 30 seconds and files them under the projects that watch their repositories, or under the machine's name. Clicking one sent from a Herdr pane takes you to that agent. On those machines the plugin also pings you by itself when Herdr marks an agent blocked, and takes the ping back when the agent goes on. A machine that doesn't answer shows a quiet line and keeps its last pings.
 
 ## Examples
 
@@ -143,7 +160,15 @@ version = 1
 
 ## Development
 
-`make test` runs the tests, and `make release` builds the release zip. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
+`make test` runs the tests, and `make release` builds the release zip. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
+
+A release goes in this order:
+
+1. Bump `ShipyardVersion.current` in [`Sources/ShipyardCore/Version.swift`](Sources/ShipyardCore/Version.swift) and merge it: the `linux cli` workflow fails unless `shipyard --version` matches the release's tag.
+2. Run `make release`, then publish a GitHub release tagged `v<version>` with the zip attached.
+3. Wait for the `linux cli` run to attach the Linux files before announcing the release. Until it does, the herdr-shipyard plugin can't install on a Linux machine, since it downloads them from the latest release.
+
+The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 
 ### Forks: your own OAuth App
 

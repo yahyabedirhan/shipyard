@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command: when a PR is ready, when you need my input, or to bring me back to this pane."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane."
 ---
 
 # shipyard configuration
@@ -72,6 +72,7 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
+| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]` and `[defaults.pings]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
@@ -432,11 +433,30 @@ event = "ping.sent"
 
 To keep a project's pings out of its menu, `pings = { show = false }` in its block; to keep seen pings for a week, `seen-window = "7d"` in `[defaults.pings]`.
 
+**"Show pings from my VPS."** Shipyard reaches another machine only through Herdr, so the machine must already be one of the user's Herdr saved machines; ask for its label when you don't know it, and never write a host or an address. List the label in `[remote] machines` (add to the list when it exists):
+
+```toml
+[remote]
+machines = ["hetzner-vps"]
+```
+
+Then, on that machine, the user (or you, when you run there) installs the herdr-shipyard plugin, once per machine. It puts the `shipyard` command on that machine and pings for its blocked agents (see Sending pings):
+
+```sh
+herdr plugin install yahyabedirhan/herdr-shipyard
+```
+
+The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard asks each machine for its pings about every 30 seconds. A machine it can't reach shows a quiet line in the menu and keeps its last pings until it answers again.
+
 ## Sending pings
 
-A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Pings stay on the user's Mac; nothing reaches GitHub.
+A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Nothing reaches GitHub.
+
+The same command works on the user's Mac and on their other machines that run Herdr with the herdr-shipyard plugin (see On another machine).
 
 Ping when the user should act or would want to know now: a pull request is ready for review, you're blocked waiting on their answer, something they asked for is published, a long task finished or failed. Don't ping for progress along the way, or when the user is talking to you right now. Prefer one ping you replace (same `--id`) over a pile of them, and withdraw a ping once it's no longer true.
+
+**On another machine with the plugin, waiting for input is pinged for you.** On a Linux machine where the herdr-shipyard plugin is installed (`herdr plugin list` shows `yahyabedirhan.herdr-shipyard`), the plugin pings the user by itself as soon as Herdr marks you blocked ("Claude is waiting in <tab>"), and withdraws that ping when you go on or your pane, tab or workspace closes. Don't send a ping there just to say you're waiting for input: it would be a second ping for the same thing. Ping for everything else as usual. On the Mac the plugin does nothing, so there, as on a machine without the plugin, ping yourself when you're waiting.
 
 ### The command
 
@@ -460,14 +480,24 @@ shipyard ping withdraw <id>
 | `--herdr [<id>]` | clicking it focuses a Herdr tab. Alone, your own pane's tab (from `HERDR_PANE_ID`, so only inside Herdr); or a tab or pane id as Herdr prints them, such as `w1:t2` or `w1:p3`. The argument after `--herdr` is its id only when it has that shape |
 | `--repo <owner/name>` | file the ping by this repository instead of the working folder's |
 | `--project <name>` | file it under this one project, by its `name` in `config.toml` |
-| `--` | ends the flags: everything after it is the title, even `withdraw` or a word starting with `--` |
+| `--` | ends the flags: everything after it is the title, even `withdraw`, `list` or a word starting with `--` |
 
 - **One action at most.** With none, clicking the ping only marks it seen. When an action fails (the pane closed, no such app), the ping stays unseen and its row says why.
 - **Where it's filed.** Without `--repo` or `--project`, the repository is the working folder's git remote `origin`, as `owner/name`, and the ping is filed under every project that watches it: one whose `repositories` names it, or brings it in through a group or `owner/*` (as the app last looked them up, so a project just added needs the app to have refreshed once). `--repo` and `--project` don't go together.
-- **Output.** On success it prints the ping's number and its id on one line, such as `#3 k7qm2x`, and exits 0: the number is what the user sees on its row, the id what `--id` and `withdraw` take. A replace keeps the number. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, the id to withdraw is unknown, `config.toml` doesn't read), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
+- **Output.** On success it prints the ping's number and its id on one line, such as `#3 k7qm2x`, and exits 0: the number is what the user sees on its row, the id what `--id` and `withdraw` take. A replace keeps the number. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, or `config.toml` doesn't read, which only the Mac checks; the id to withdraw is unknown), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
 - **Replacing.** Sending an id that's already there replaces that ping: the new title, body, sender, action and projects, unseen again, with no second notification.
 - **Withdrawing.** `shipyard ping withdraw <id>` takes the ping back: it leaves the menu and its notification leaves Notification Center. An id no ping has exits 1; the user may have dismissed it, or it left after being seen, so there's nothing left to do.
+- **Listing.** `shipyard ping list` with `--json` prints the computer's pings as JSON, for shipyard on the user's Mac to read; you don't need it to ping.
 - **Herdr's terminal.** A `--herdr` click focuses the tab in Herdr; the click also brings forward the terminal app the ping was sent from, which the CLI notes by itself. The user can name another with `[herdr] terminal` (see Keys and defaults), which wins.
+
+### On another machine
+
+On a Linux machine (a VPS, say) with the herdr-shipyard plugin installed, `shipyard` is at `~/.local/bin/shipyard` and takes the same flags. The user's Mac asks that machine for its pings through Herdr, when `[remote] machines` names it (see Worked requests). What differs:
+
+- **Filing happens on the Mac.** The machine has no projects, so `shipyard ping` doesn't refuse a repository no project watches: it keeps the ping with its repository (from `origin`, or `--repo`) or its `--project` name, and the Mac files it under the projects that watch it. When the working folder has no `origin`, pass `--repo <owner/name>` or `--project <name>`; with neither, or when no project takes it, the ping lists under the machine's own section in the menu.
+- **Your pane comes with it.** Sent from a Herdr pane with no action, clicking the ping focuses your pane on that machine, so you don't need `--herdr` to be found again.
+- **`--open` and `--app` run on the Mac.** The URL opens in the Mac's browser, and the app is a Mac app; a `localhost` URL on the machine won't open there.
+- **Pings leave after a day.** A ping leaves its machine 24 hours after you sent or last replaced it, seen or not. Replace it (same `--id`) to keep it, or withdraw it once it's no longer true.
 
 ### Worked pings
 
@@ -478,7 +508,7 @@ shipyard ping "PR #57 is ready for review" --body "Adds the order export" --from
   --open https://github.com/my-org/shop/pull/57
 ```
 
-**"Bring me back to this pane when you need me."** From inside Herdr, `--herdr` alone points at your own pane. Give it an id so you can update or withdraw it later:
+**"Bring me back to this pane when you need me."** On another machine with the herdr-shipyard plugin, the plugin already does this when you're blocked; ping there only for what it can't see, such as a choice you want made while you keep working. On the Mac, from inside Herdr, `--herdr` alone points at your own pane. Give it an id so you can update or withdraw it later:
 
 ```sh
 shipyard ping "Waiting for your input" --body "Postgres or SQLite for the cache?" --from "claude · cache" \

@@ -1,6 +1,7 @@
 import Foundation
 
 /// What the panel draws: one section per project, in configuration order,
+/// then one per remote machine with pings of its own (`[remote] machines`),
 /// the attention count and menu bar label, and when the list was last
 /// brought up to date. It's built from the projects' listings (`Listing`
 /// decides which items a project has); every display rule (order, state and
@@ -32,6 +33,9 @@ public struct MenuModel: Equatable, Sendable {
     /// sections' groups carry theirs, and the All tab, arranged when it's
     /// drawn, reads its own from here.
     public var foldedGroups: Set<GroupID>
+    /// One quiet line per remote machine that couldn't be read, or whose
+    /// list stopped early (`MachineNotice.notices`), in configuration order.
+    public var machineNotices: [MachineNotice] = []
 
     public init(
         sections: [MenuSection] = [],
@@ -106,7 +110,10 @@ public struct MenuModel: Equatable, Sendable {
                     repositories: project.repositories.compactMap(\.slug)
                 )
             }
-            var model = MenuModel(sections: sections, layout: configuration.menu.layout)
+            var model = MenuModel(
+                sections: sections + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
+                layout: configuration.menu.layout
+            )
             model.applyAttention(state, configuration: configuration)
             return model
         }
@@ -144,9 +151,44 @@ public struct MenuModel: Equatable, Sendable {
                 repositories: repositories
             )
         }
-        var model = MenuModel(sections: sections, layout: configuration.menu.layout, lastUpdated: snapshot.fetchedAt)
+        var model = MenuModel(
+            sections: sections + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
+            layout: configuration.menu.layout,
+            lastUpdated: snapshot.fetchedAt
+        )
         model.applyAttention(state, configuration: configuration)
         return model
+    }
+
+    /// A section per remote machine whose listing has rows (its pings
+    /// filed under no project), after the projects, in the order of
+    /// `[remote] machines`. It's named after the machine's label, and
+    /// arranged with the defaults.
+    private static func machineSections(
+        _ listings: [String: [Item]],
+        configuration: Configuration,
+        state: AppState,
+        expanded: Set<GroupID>,
+        now: Date
+    ) -> [MenuSection] {
+        configuration.remote.machines.compactMap { label in
+            guard let items = listings[label], !items.isEmpty else { return nil }
+            var section = MenuSection(
+                name: label,
+                groups: Arrangement.groups(
+                    items,
+                    project: label,
+                    settings: configuration.settings(forMachine: label).arrangement,
+                    layout: configuration.menu.layout,
+                    folded: state.collapsedGroups,
+                    expanded: expanded,
+                    now: now
+                ),
+                showsRepository: false
+            )
+            section.machine = label
+            return section
+        }
     }
 
     /// Sets each row's attention flag, each section's count and collapsed
@@ -185,8 +227,15 @@ public struct MenuModel: Equatable, Sendable {
     /// Show less come here, and closing the menu, which caps every group.
     public mutating func applyExpansions(_ expanded: Set<GroupID>, configuration: Configuration) {
         for index in sections.indices {
-            guard let project = configuration.projects.first(where: { $0.name == sections[index].name }) else { continue }
-            let showFirst = configuration.settings(for: project).arrangement.showFirst
+            let settings: ProjectSettings
+            if let machine = sections[index].machine {
+                settings = configuration.settings(forMachine: machine)
+            } else if let project = configuration.projects.first(where: { $0.name == sections[index].name }) {
+                settings = configuration.settings(for: project)
+            } else {
+                continue
+            }
+            let showFirst = settings.arrangement.showFirst
             sections[index].groups = sections[index].groups.map { $0.capped(at: showFirst, expanded: expanded.contains($0.id)) }
         }
     }
@@ -271,6 +320,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's repositories (`owner/name`): the ones it names and,
     /// once fetched, the ones its groups and wildcards resolved to.
     public var repositories: [String]
+    /// The machine's label, for a remote machine's own section (its pings
+    /// filed under no project); `nil` for a project's.
+    public var machine: String?
 
     public var id: String { name }
 
@@ -396,9 +448,12 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// without one.
     public var sender: String? { item.ping?.sender }
 
-    /// The known agent a ping's sender names, whose mark the row shows by
+    /// The known agent a ping's sender names, whose logo the row shows by
     /// the sender; `nil` for an unknown sender, none, or any other kind.
     public var agent: KnownAgent? { sender.flatMap(KnownAgent.init(sender:)) }
+    /// The machine a remote ping came from, by its Herdr label; `nil` for a
+    /// ping sent on this Mac, or any other kind.
+    public var machine: String? { item.ping?.machine }
 
     /// Why a ping's action failed at its last click, shown on its row
     /// until the next click, ⌥-click or dismiss; `nil` otherwise.

@@ -22,7 +22,7 @@ struct PingCommandTests {
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
     /// The agent's working folder, a fake one: `origin` says its remote.
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
-    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
+    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote(), platform: .macOS)
 
     private func ping(
         _ arguments: String...,
@@ -36,7 +36,8 @@ struct PingCommandTests {
             environment: CommandEnvironment(
                 workingDirectory: Self.folder,
                 variables: [:],
-                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:])
+                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:]),
+                platform: .macOS
             ),
             configuration: try Configuration.decode(config).configuration,
             resolved: resolved,

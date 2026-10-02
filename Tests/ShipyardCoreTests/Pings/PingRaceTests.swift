@@ -147,7 +147,7 @@ struct PingRaceTests {
     func numbersSentAtOnce() throws {
         let harness = try Harness(config: shop)
         let (configURL, repositories, store) = (harness.configURL, harness.repositoriesStore, harness.pingStore)
-        let environment = CommandEnvironment(workingDirectory: harness.workingFolder, variables: [:], git: FakeGitRemote())
+        let environment = CommandEnvironment(workingDirectory: harness.workingFolder, variables: [:], git: FakeGitRemote(), platform: .macOS)
         let now = harness.clock.now
         let count = 24
 

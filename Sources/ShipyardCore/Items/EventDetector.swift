@@ -303,7 +303,9 @@ public enum EventDetector {
     /// `NotifiedEvents`, which keys it by the ping's id, with its `instance`
     /// as the occurrence, so it's notified at most once, even when it's
     /// replaced or listed in two projects, and again only when it's sent
-    /// anew under its id.
+    /// anew under its id. A remote ping (`Ping.machine`) is keyed by its
+    /// remote URL, so the same id on two machines stays apart; its machine's
+    /// own listing is passed in `projects` with the machine's settings.
     public static func pingEvents(listings: [String: [Item]], projects: [ProjectSettings]) -> [Event] {
         projects.flatMap { project in
             (listings[project.name] ?? [])

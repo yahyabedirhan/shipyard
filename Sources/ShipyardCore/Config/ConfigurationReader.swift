@@ -84,7 +84,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "herdr", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -138,6 +138,13 @@ final class ConfigurationReader {
             }
         }
 
+        if let remote = table(node, "remote") {
+            warnUnknownKeys(in: remote, known: ["machines"])
+            if let machines = strings(remote, "machines") {
+                config.remote.machines = readMachines(machines, at: remote.path + [.key("machines")])
+            }
+        }
+
         if let attention = table(node, "attention") {
             warnUnknownKeys(in: attention, known: ["unseen", "changed", "review-requested", "checks-failed"])
             if let value = bool(attention, "unseen") { config.attention.unseen = value }
@@ -163,7 +170,32 @@ final class ConfigurationReader {
             config.projects = projects.compactMap { project($0, defaults: config.defaults) }
             rejectDuplicateNames(projects)
         }
+        for label in config.remote.machines where config.projects.contains(where: { $0.name == label }) {
+            error("`\(label)` is both a machine in `[remote] machines` and a project's name; rename the project, since a machine's pings list under its label", at: [.key("remote"), .key("machines")])
+        }
         return config
+    }
+
+    /// `[remote] machines`: Herdr labels, trimmed. A label that's empty,
+    /// starts with `-` (it would read as a flag of `herdr`), holds a
+    /// control character or comes twice is an error.
+    private func readMachines(_ labels: [String], at path: ConfigPath) -> [String] {
+        var machines: [String] = []
+        for raw in labels {
+            let label = raw.trimmingCharacters(in: .whitespaces)
+            if label.isEmpty {
+                error("a machine in `machines` is named by its Herdr label, which can't be empty", at: path)
+            } else if label.hasPrefix("-") {
+                error("`\(label)` isn't a Herdr machine label: a label can't start with `-`", at: path)
+            } else if label.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
+                error("a Herdr machine label can't hold a control character", at: path)
+            } else if machines.contains(label) {
+                error("`\(label)` is listed twice in `machines`", at: path)
+            } else {
+                machines.append(label)
+            }
+        }
+        return machines
     }
 
     private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {

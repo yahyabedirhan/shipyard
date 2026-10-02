@@ -24,19 +24,24 @@ public struct AppState: Equatable, Sendable {
     /// Events already notified or passed over, so none is notified twice.
     /// Kept apart from `attention`: seeing an item says nothing about its events.
     public var notified = NotifiedEvents()
+    /// What the user did to remote pings (seen, dismissed), kept here
+    /// since nothing is written back to a machine.
+    public var remotePings = RemotePingMarks()
 
     public init(
         attention: Attention = Attention(),
         collapsed: Set<String> = [],
         collapsedGroups: Set<GroupID> = [],
         known: KnownItems = KnownItems(),
-        notified: NotifiedEvents = NotifiedEvents()
+        notified: NotifiedEvents = NotifiedEvents(),
+        remotePings: RemotePingMarks = RemotePingMarks()
     ) {
         self.attention = attention
         self.collapsed = collapsed
         self.collapsedGroups = collapsedGroups
         self.known = known
         self.notified = notified
+        self.remotePings = remotePings
     }
 }
 
@@ -51,7 +56,9 @@ public struct AppState: Equatable, Sendable {
 //                                  "reviewRequested": false, "activity": 0, "fingerprint": "…",
 //                                  "present": "2026-09-25T12:00:00Z" } },
 //       "knownProjects": { "job-search": [{ "repository": "o/r", "kind": "pullRequest" }] },
-//       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } }
+//       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } },
+//       "remotePings": { "shipyard://ping/netcup-vps/q1": { "instance": "…", "seen": "2026-09-25T12:00:00Z",
+//                                                         "seenSending": { …the ping… }, "dismissed": false } }
 //     }
 //
 // `known`, `knownProjects` and `notified` came with notification rules.
@@ -63,7 +70,8 @@ public struct AppState: Equatable, Sendable {
 // listed and dropped the first time it isn't. `collapsedGroups` came with
 // subsections; like those, it's optional, dropped when it can't be read, and
 // a fold a newer build wrote (a group key this one doesn't know) is
-// skipped. A `version` above `currentVersion` fails the decode, so the
+// skipped. `remotePings` came with remote pings: optional too, and a mark
+// that can't be read is skipped (that ping needs attention again). A `version` above `currentVersion` fails the decode, so the
 // store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -74,6 +82,7 @@ extension AppState: Codable {
         case known
         case knownProjects
         case notified
+        case remotePings
     }
 
     public init(from decoder: any Decoder) throws {
@@ -101,6 +110,8 @@ extension AppState: Codable {
         )
         let records = (try? container.decodeIfPresent([String: Lossy<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
         notified = NotifiedEvents(records: records.compactMapValues(\.value))
+        let marks = (try? container.decodeIfPresent([String: Lossy<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
+        remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -112,6 +123,7 @@ extension AppState: Codable {
         try container.encode(known.items, forKey: .known)
         try container.encode(known.sources.mapValues { $0.sorted() }, forKey: .knownProjects)
         try container.encode(notified.records, forKey: .notified)
+        try container.encode(remotePings.marks, forKey: .remotePings)
     }
 }
 

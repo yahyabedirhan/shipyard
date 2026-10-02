@@ -101,6 +101,14 @@ _Avoid_: Notification (that's the macOS banner), message, alert
 A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with that agent's real logo, which the app bundles.
 _Avoid_: Agent icon, monogram
 
+**Machine**:
+A computer where agents run in Herdr, known to the Mac's Herdr as a saved machine by its label, such as `netcup-vps`. The user names the machines shipyard asks for pings by those labels. The Mac itself is the local machine.
+_Avoid_: Host, server, remote (on its own)
+
+**Remote ping**:
+A ping sent on a machine other than the Mac. The Mac asks each machine for its pings and lists them beside its own, saying which machine each came from. One that no project takes is listed under its machine's name.
+_Avoid_: Remote notification, synced ping
+
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
 _Avoid_: Alert, subscription, watch

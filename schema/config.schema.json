@@ -115,6 +115,20 @@
         }
       }
     },
+    "remote": {
+      "description": "Your other machines, whose agents' pings the menu lists beside this Mac's. Shipyard asks each one through Herdr's connection to it (herdr --machine), never over SSH of its own.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "machines": {
+          "description": "The machines to ask for their pings, by the labels your Herdr knows them by as saved machines (\"netcup-vps\"): never a host or an address. Each machine's pings list in a section named after it, after the projects. A label can't start with \"-\" or be a project's name.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^\\s*[^\\s-]" },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
     "defaults": {
       "description": "What every project shows and notifies about, unless the project overrides it.",
       "type": "object",
