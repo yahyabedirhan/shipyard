@@ -306,24 +306,20 @@ private struct ListRow: View {
             }
             Spacer(minLength: 8)
             if let meta {
-                HStack(spacing: 3) {
+                // A known agent's logo sits a little apart from its name.
+                HStack(spacing: metaAgent == nil ? 3 : 5) {
                     if let agent = metaAgent {
-                        // The logo stands for the agent's name.
                         AgentMarkView(agent: agent, size: Grid.agentMark)
-                            .accessibilityHidden(false)
-                            .accessibilityLabel(meta)
-                    } else {
-                        if let symbol = metaSymbol {
-                            Image(systemName: symbol)
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                        }
-                        Text(meta)
-                            .font(TypeScale.meta)
-                            .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                    } else if let symbol = metaSymbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
                     }
+                    Text(meta)
+                        .font(TypeScale.meta)
+                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
                 .frame(width: Grid.metaColumn, alignment: .leading)
                 .padding(.leading, 6)
@@ -354,7 +350,7 @@ private struct ListRow: View {
     private var meta: String? {
         if let error = row.actionError { return error }
         if showsRowRepository { return PanelText.repositoryName(row.repository) }
-        if row.kind == .ping { return row.sender }
+        if row.kind == .ping { return PanelText.sender(row) }
         return row.kind == .workflowRun ? nil : row.author
     }
 
@@ -364,8 +360,8 @@ private struct ListRow: View {
         return row.authorKind == .bot ? "cpu" : nil
     }
 
-    /// A known agent's logo, in place of its name, when the column names
-    /// the sender.
+    /// A known agent's logo before its name, when the column names the
+    /// sender.
     private var metaAgent: KnownAgent? {
         guard row.actionError == nil, !showsRowRepository else { return nil }
         return row.agent

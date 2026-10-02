@@ -88,14 +88,22 @@ public enum PanelText {
 
     /// A ping's second line after its number: why its action failed,
     /// while it has; otherwise its sender and its body on one line, each
-    /// when given, or "ping" when neither is: "#3 · deploy bot · Waiting for
-    /// your input". A known agent isn't named: its logo leads the line.
+    /// when given, or "ping" when neither is: "#3 · claude-code · Waiting
+    /// for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
-        let sender = row.agent == nil ? row.sender : nil
-        let parts = [sender, body].compactMap { $0 }
+        let parts = [sender(row), body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
+    }
+
+    /// A ping's sender as its row shows it, in kebab-case: lowercase, each
+    /// run of anything but letters and digits a single dash, none at the
+    /// ends. "Claude Code" is "claude-code"; `nil` when it names none.
+    public static func sender(_ row: MenuRow) -> String? {
+        guard let sender = row.sender else { return nil }
+        let words = sender.lowercased().split { !$0.isLetter && !$0.isNumber }
+        return words.isEmpty ? nil : words.joined(separator: "-")
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".

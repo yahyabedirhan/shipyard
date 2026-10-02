@@ -180,8 +180,7 @@ struct PingActionTests {
         row = try harness.pingRow("Needs you")
         #expect(row.actionError == nil)
         #expect(row.needsAttention == false)
-        // Claude's logo leads the line, so its name isn't repeated.
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · ping")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · claude")
         #expect(harness.actions.ran == [.app("Claude"), .app("Claude")])
     }
 
@@ -247,9 +246,9 @@ struct PingActionTests {
         #expect(link.sender == "claude")
         #expect(link.agent == .claude)
         #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
-        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · The design doc, ready to read")
+        #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · claude · The design doc, ready to read")
         harness.clock.advance(by: 300)
-        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · The design doc, ready to read · 5m")
+        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · claude · The design doc, ready to read · 5m")
         #expect(PanelText.stateLabel(link) == "ping, opens a link")
         #expect(PanelText.rowCard(link, now: harness.clock.now).lines == [
             "The design doc,\nready to read",
@@ -283,19 +282,22 @@ struct PingActionTests {
     }
 
     @Test(
-        "a ping's sender names a known agent, ignoring case, spaces and dashes, and leading words after the agent's name; any other sender is none",
+        "a ping's sender names a known agent, ignoring case, spaces and dashes, and leading words after the agent's name, and is shown in kebab-case",
         arguments: [
-            ("claude", KnownAgent.claude), ("Claude Code", .claude), ("claude-code", .claude), ("CLAUDE", .claude),
-            ("claude: fix totals", .claude), ("codex", .codex), ("Codex CLI", .codex), ("opencode", .opencode),
-            ("OpenCode", .opencode), ("cursor", .cursor), ("cursor-agent", .cursor), ("pi", .pi), ("gemini", .gemini),
-            ("gemini-cli", .gemini), ("copilot", .copilot), ("GitHub Copilot", .copilot), ("amp", .amp), ("droid", .droid),
-            ("Factory Droid", .droid),
-        ] as [(String, KnownAgent?)]
+            ("claude", KnownAgent.claude, "claude"), ("Claude Code", .claude, "claude-code"), ("claude-code", .claude, "claude-code"),
+            ("CLAUDE", .claude, "claude"), ("claude: fix totals", .claude, "claude-fix-totals"), ("codex", .codex, "codex"),
+            ("Codex CLI", .codex, "codex-cli"), ("opencode", .opencode, "opencode"), ("OpenCode", .opencode, "opencode"),
+            ("cursor", .cursor, "cursor"), ("cursor-agent", .cursor, "cursor-agent"), ("pi", .pi, "pi"), ("gemini", .gemini, "gemini"),
+            ("gemini-cli", .gemini, "gemini-cli"), ("copilot", .copilot, "copilot"), ("GitHub Copilot", .copilot, "github-copilot"),
+            ("amp", .amp, "amp"), ("droid", .droid, "droid"), ("Factory Droid", .droid, "factory-droid"),
+        ] as [(String, KnownAgent?, String)]
     )
-    func knownAgent(sender: String, agent: KnownAgent?) async throws {
+    func knownAgent(sender: String, agent: KnownAgent?, shown: String) async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try await harness.send("Ready", "--from", sender)
-        #expect(try harness.pingRow("Ready").agent == agent)
+        let row = try harness.pingRow("Ready")
+        #expect(row.agent == agent)
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(shown)")
     }
 
     @Test("a sender that only starts like an agent's name, or names no agent, is none, and is named in words", arguments: ["pipeline", "claudette", "deploy bot", "my claude"])
@@ -305,7 +307,7 @@ struct PingActionTests {
         let row = try harness.pingRow("Ready")
         #expect(row.agent == nil)
         #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(sender)")
+        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(sender.replacingOccurrences(of: " ", with: "-"))")
     }
 
     // MARK: Grouping
