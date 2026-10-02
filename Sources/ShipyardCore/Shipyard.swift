@@ -916,13 +916,23 @@ public final class Shipyard {
     /// The pings listed: the ping store's, then the remote machines'.
     private var listedPings: [Ping] { pings + remote.pings }
 
+    /// The listed pings, the remote ones filed against `configuration` and
+    /// the repositories last resolved (`PingCommand.filed(remote:)`), as
+    /// the CLI files a local one when it's sent.
+    private func filedPings(_ configuration: Configuration) -> [Ping] {
+        let remotePings = remote.pings
+        guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
+        let resolved = repositoriesStore.load()
+        return pings + remotePings.map { PingCommand.filed(remote: $0, configuration: configuration, resolved: resolved) }
+    }
+
     /// Every project's listing, and each remote machine's own, from
     /// `snapshot` and the listed pings (`Listing.listings`).
     private func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, configuration: Configuration) -> [String: [Item]] {
         Listing.listings(
             for: projects,
             in: snapshot,
-            pings: listedPings,
+            pings: filedPings(configuration),
             machines: configuration.remote.machines.map(configuration.settings(forMachine:)),
             now: clock.now
         )

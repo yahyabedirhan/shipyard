@@ -292,6 +292,23 @@ public enum PingCommand {
         return .success(slug)
     }
 
+    /// `ping`, sent on a machine without the app and listed by the Mac
+    /// (`Ping.machine`), filed as `send` files a local one against
+    /// `configuration` and `resolved`: under every project that watches
+    /// its repository, with the repository spelled as the first of them
+    /// knows it. One that names projects (`--project`) keeps them; a name
+    /// the configuration lacks lists it by its machine (`Listing`), as
+    /// does a repository no project watches.
+    public static func filed(remote ping: Ping, configuration: Configuration, resolved: [String: [String]]) -> Ping {
+        guard ping.projects.isEmpty, let slug = ping.repository else { return ping }
+        let watching = watchers(of: slug, configuration: configuration, resolved: resolved)
+        guard let first = watching.first else { return ping }
+        var filed = ping
+        filed.projects = watching.map(\.project)
+        filed.repository = first.spelling
+        return filed
+    }
+
     /// The projects that watch `slug`, in the configuration's order, each
     /// with the repository spelled as that project knows it (GitHub's
     /// spelling once resolved). Repositories match ignoring case, as
