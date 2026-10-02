@@ -380,9 +380,10 @@ struct HerdrEventTests {
         #expect(harness.pingStore.ping(id: "herdr-w1-p3")?.sender == "codex")
     }
 
-    @Test("the ping's id is herdr- and the pane's id, each character outside the id alphabet a -", arguments: [
+    @Test("the ping's id is herdr- and the pane's id lowercased, each character outside the id alphabet a -", arguments: [
         ("w1:p3", "herdr-w1-p3"),
-        ("W1:P3", "herdr--1--3"),
+        ("wA:p1", "herdr-wa-p1"),
+        ("wB:p1", "herdr-wb-p1"),
         ("ws_2:p10", "herdr-ws_2-p10"),
         (String(repeating: "a", count: 80), "herdr-" + String(repeating: "a", count: 58)),
     ])

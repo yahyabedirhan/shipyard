@@ -99,13 +99,15 @@ public enum HerdrEvent {
         )
     }
 
-    /// The ping a pane's blocked agent sends: `herdr-` and the pane's id,
-    /// each character outside the id alphabet (lowercase letters, digits,
-    /// `-` and `_`) made `-`, cut to an id's 64 characters: `w1:p3` is
-    /// `herdr-w1-p3`.
+    /// The ping a pane's blocked agent sends: `herdr-` and the pane's id
+    /// lowercased, each character still outside the id alphabet (lowercase
+    /// letters, digits, `-` and `_`) made `-`, cut to an id's 64 characters:
+    /// `wA:p3` is `herdr-wa-p3`. Lowercasing keeps panes apart because
+    /// Herdr writes its id numbers in digits and uppercase letters only, so
+    /// two of its ids never differ by case alone.
     static func pingID(pane: String) -> String {
         let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789-_")
-        let safe = String(pane.map { allowed.contains($0) ? $0 : "-" })
+        let safe = String(pane.lowercased().map { allowed.contains($0) ? $0 : "-" })
         return String(("herdr-" + safe).prefix(64))
     }
 

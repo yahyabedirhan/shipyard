@@ -797,7 +797,7 @@ Each project's repositories as the app last resolved them (`ResolvedRepositories
 
 ### HerdrEvent — `ShipyardCore/Pings/HerdrEvent.swift` (0.0.6, #112)
 
-`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. `ShipyardCLI` sends it `HerdrEvent.run(environment, configuration, resolved, store, now)`; `configuration` is a closure, read only for a blocked agent's ping, so a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, each character outside the id alphabet a `-` (`w1:p3` → `herdr-w1-p3`), cut to 64.
+`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. `ShipyardCLI` sends it `HerdrEvent.run(environment, configuration, resolved, store, now)`; `configuration` is a closure, read only for a blocked agent's ping, so a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, lowercased (Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone), each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
 
 | Event | Does |
 |---|---|
