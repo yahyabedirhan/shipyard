@@ -48,7 +48,7 @@ repositories = ["octocat/Spoon-Knife"]
 
 ## `incoming-contributions`
 
-What other people open on the user's repositories, with their own (and their agents') and bots' items hidden, grouped by repository under subheaders, and a second project of the pull requests waiting on their review in any repository. It notifies when someone else opens a pull request or an issue, and on each new review request.
+What other people open on the user's repositories, with their own (and their agents') and bots' items hidden, grouped by repository under subheaders, and a second project of the pull requests waiting on their review in any repository. It notifies when someone else opens a pull request or an issue, on each new review request, and on each ping.
 
 ```toml
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
@@ -74,7 +74,8 @@ authors = { hide = ["me", "bots"] }
 show = true
 authors = { hide = ["me", "bots"] }
 
-# Notify when someone else opens a pull request or an issue.
+# Notify when someone else opens a pull request or an issue, and when
+# one of your agents sends a ping.
 [[defaults.notifications]]
 event = "pr.opened"
 authors = ["others"]
@@ -82,6 +83,9 @@ authors = ["others"]
 [[defaults.notifications]]
 event = "issue.opened"
 authors = ["others"]
+
+[[defaults.notifications]]
+event = "ping.sent"
 
 # Projects: one [[projects]] block each. owned is every repository
 # your account owns, including ones you create later.
@@ -91,7 +95,7 @@ repositories = ["owned"]
 
 # The pull requests waiting on your review, or a team's you're in, in
 # any repository. anywhere lists only those, so this project shows no
-# issues, and it notifies each new request instead.
+# issues, and it notifies each new request (and ping) instead.
 [[projects]]
 name = "Review requests"
 repositories = ["anywhere"]
@@ -99,12 +103,13 @@ pull-requests = { review-requested = true }
 issues = { show = false }
 notifications = [
   { event = "pr.review_requested" },
+  { event = "ping.sent" },
 ]
 ```
 
 ## `review-queue`
 
-Only the pull requests waiting on the user's review, or a team's they're in, in any repository, grouped by repository under subheaders. Each new request notifies.
+Only the pull requests waiting on the user's review, or a team's they're in, in any repository, grouped by repository under subheaders. Each new request notifies, and so does each ping.
 
 ```toml
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
@@ -116,7 +121,7 @@ version = 1
 
 # The pull requests waiting on your review, or a team's you're in, in
 # any repository, grouped by repository under subheaders. Each new
-# request notifies.
+# request notifies, and so does each ping your agents send.
 [[projects]]
 name = "Review queue"
 repositories = ["anywhere"]
@@ -125,5 +130,6 @@ group-by = "repository"
 subsections = true
 notifications = [
   { event = "pr.review_requested" },
+  { event = "ping.sent" },
 ]
 ```

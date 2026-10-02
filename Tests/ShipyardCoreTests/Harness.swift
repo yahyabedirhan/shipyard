@@ -8,7 +8,7 @@ import FoundationNetworking
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
 /// directory and the app state in another; the clock, the refresh timer and
-/// waiting are manual; the URL opener, notifier and login item record what
+/// waiting are manual; the action port, notifier and login item record what
 /// they're asked.
 ///
 /// A scenario writes a configuration, registers answers, drives the
@@ -34,13 +34,19 @@ struct Harness {
     private let ghToken: String?
     let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
     let timer = ManualTimer()
-    let opener = RecordingURLOpener()
+    let actions = RecordingActions()
+    /// The Herdr a ping's `--herdr` action focuses: no tabs until opened.
+    let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
     let loginItem = RecordingLoginItem()
     /// `config.toml` in a fresh temporary directory.
     let configURL: URL
     /// A fresh temporary directory for app state (`state.json`).
     let stateDirectory: URL
+    /// The ping store the CLI and the app share, in `stateDirectory`.
+    let pingStore: PingStore
+    /// The repositories the app last resolved, for the CLI, in `stateDirectory`.
+    let repositoriesStore: ResolvedRepositoriesStore
     let shipyard: Shipyard
 
     var clock: ManualClock { sleeper.clock }
@@ -68,15 +74,20 @@ struct Harness {
         self.store = store
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
+        pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true))
+        repositoriesStore = ResolvedRepositoriesStore(directory: stateDirectory)
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: stateDirectory),
             configStatusStore: ConfigStatusStore(directory: stateDirectory),
+            pingStore: pingStore,
+            repositoriesStore: repositoriesStore,
             tokenStore: store,
-            urlOpener: opener,
+            actions: actions,
             notifier: notifier,
             loginItem: loginItem,
             gh: gh,
+            herdr: herdr.focus,
             transport: stub,
             clock: sleeper.clock,
             timer: timer,
@@ -136,6 +147,13 @@ struct Harness {
         stub.on("POST", GitHubClient.graphQLURL, answers: answers)
     }
 
+    /// Refreshes, two minutes later, with GitHub answering `answer`.
+    func refresh(answering answer: StubHTTP.Answer) async {
+        graphQL([answer])
+        clock.advance(by: 120)
+        await shipyard.refresh()
+    }
+
     /// Every GraphQL request sent.
     var graphQLRequests: [URLRequest] { stub.requests("POST", GitHubClient.graphQLURL) }
 
@@ -149,9 +167,47 @@ struct Harness {
         try Data(text.utf8).write(to: configURL)
     }
 
+    /// The folder the CLI runs in, as an agent's terminal would be.
+    var workingFolder: URL { stateDirectory.deletingLastPathComponent().appendingPathComponent("work", isDirectory: true) }
+
+    /// Runs the `shipyard` CLI with `arguments` (without the program's
+    /// name) against this harness's configuration file, resolved
+    /// repositories and ping store, at the clock's time, as an agent would
+    /// in a terminal: in `workingFolder`, whose git remote `origin` is
+    /// `origin` (`nil`: not a git repository), in the Herdr pane
+    /// `herdrPane` (`HERDR_PANE_ID`; `nil`: not in Herdr).
+    @discardableResult
+    func cli(_ arguments: String..., origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
+        cli(arguments, origin: origin, herdrPane: herdrPane)
+    }
+
+    /// `cli(_:origin:herdrPane:)` with the arguments as a list.
+    @discardableResult
+    func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil) -> CommandResult {
+        ShipyardCLI.run(
+            arguments,
+            environment: CommandEnvironment(
+                workingDirectory: workingFolder,
+                variables: herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:],
+                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
+            ),
+            configURL: configURL,
+            repositories: repositoriesStore,
+            pingStore: pingStore,
+            now: clock.now
+        )
+    }
+
     /// The section named `name` in the current menu.
     func section(_ name: String) -> MenuSection? {
         shipyard.menu.sections.first { $0.name == name }
+    }
+}
+
+extension GroupID {
+    /// The All tab's group of `key`: the All tab has no project.
+    static func allTab(_ key: GroupKey) -> GroupID {
+        GroupID(project: "", key: key)
     }
 }
 

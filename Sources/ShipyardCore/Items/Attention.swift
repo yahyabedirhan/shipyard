@@ -13,6 +13,10 @@ import Foundation
 ///
 /// The rule is keyed on `Item`, so pull requests, issues and workflow runs
 /// share it; `counts` splits by kind.
+///
+/// A ping is the exception: it needs attention until it's seen, whatever
+/// `[attention]` says, and whether it was seen is kept on the ping itself
+/// (in the ping store), not in `seen`.
 public struct Attention: Equatable, Sendable {
     /// The version of an item the user saw, and when shipyard last found the
     /// item on GitHub (for pruning records of items that are gone).
@@ -50,6 +54,7 @@ public struct Attention: Equatable, Sendable {
     /// empty when it doesn't.
     public func reasons(_ item: Item, toggles: Configuration.AttentionToggles) -> [Reason] {
         guard Self.canNeedAttention(item) else { return [] }
+        if let ping = item.ping { return ping.seen == nil ? [.unseen] : [] }
         let seenPrint = seen[item.id]?.fingerprint
         if seenPrint == item.fingerprint { return [] }
         var reasons: [Reason] = []
@@ -73,8 +78,8 @@ public struct Attention: Equatable, Sendable {
     }
 
     /// Whether an item in this state may need attention at all: open ones
-    /// (drafts included) and failed workflow runs. Closed, merged, running
-    /// and succeeded never do.
+    /// (drafts included, pings too) and failed workflow runs. Closed,
+    /// merged, running and succeeded never do.
     static func canNeedAttention(_ item: Item) -> Bool {
         item.state.isOpen || item.state == .failed
     }
@@ -125,29 +130,24 @@ public struct AttentionCounts: Equatable, Sendable {
     public var pullRequests: Int
     public var issues: Int
     public var workflowRuns: Int
+    public var pings: Int
 
-    public init(pullRequests: Int = 0, issues: Int = 0, workflowRuns: Int = 0) {
+    public init(pullRequests: Int = 0, issues: Int = 0, workflowRuns: Int = 0, pings: Int = 0) {
         self.pullRequests = pullRequests
         self.issues = issues
         self.workflowRuns = workflowRuns
+        self.pings = pings
     }
 
     /// The attention count.
-    public var total: Int { pullRequests + issues + workflowRuns }
-
-    public subscript(kind: ItemKind) -> Int {
-        switch kind {
-        case .pullRequest: pullRequests
-        case .issue: issues
-        case .workflowRun: workflowRuns
-        }
-    }
+    public var total: Int { pullRequests + issues + workflowRuns + pings }
 
     mutating func add(_ kind: ItemKind) {
         switch kind {
         case .pullRequest: pullRequests += 1
         case .issue: issues += 1
         case .workflowRun: workflowRuns += 1
+        case .ping: pings += 1
         }
     }
 }

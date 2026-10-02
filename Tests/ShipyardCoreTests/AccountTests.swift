@@ -57,7 +57,7 @@ struct AccountTests {
 
         harness.shipyard.openProfile()
 
-        #expect(harness.opener.opened == [URL(string: "https://github.com/yabepa")!])
+        #expect(harness.actions.opened == [URL(string: "https://github.com/yabepa")!])
     }
 
     @Test("without a known account, opening the profile opens nothing")
@@ -69,7 +69,7 @@ struct AccountTests {
         harness.shipyard.openProfile()
 
         #expect(harness.shipyard.viewer == nil)
-        #expect(harness.opener.opened.isEmpty)
+        #expect(harness.actions.opened.isEmpty)
     }
 
     // MARK: - The avatar

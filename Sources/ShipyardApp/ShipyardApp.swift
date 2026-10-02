@@ -67,14 +67,20 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
+    /// The offer to link the bundled CLI into `~/.local/bin`.
+    let cliLink = CLILink(
+        cli: CLILink.bundledCLI(in: Bundle.main.bundleURL),
+        home: FileManager.default.homeDirectoryForCurrentUser
+    )
     /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
         directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
         transport: URLSessionTransport()
     )
     private let notifier = Notifier()
-    private let opener = WorkspaceURLOpener()
+    private let opener = WorkspaceActions()
     private var configWatcher: ConfigWatcher?
+    private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
 
     init() {
@@ -83,8 +89,10 @@ final class AppServices {
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
+            pingStore: PingStore(directory: PingStore.defaultDirectory),
+            repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
             tokenStore: Keychain(),
-            urlOpener: opener,
+            actions: opener,
             notifier: notifier,
             loginItem: LaunchAtLogin()
         )
@@ -96,11 +104,9 @@ final class AppServices {
     }
 
     /// `~/Library/Application Support/Shipyard/`, where `state.json` and
-    /// `config-status.json` live.
-    static var appSupportDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shipyard", isDirectory: true)
-    }
+    /// `config-status.json` live: the core's one definition, which the CLI
+    /// reads `repositories.json` from, so the two can't disagree.
+    static var appSupportDirectory: URL { ResolvedRepositoriesStore.defaultDirectory }
 
     func start() {
         let shipyard = shipyard
@@ -108,6 +114,12 @@ final class AppServices {
             Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
+        // The `shipyard` CLI writes one file per ping into the store's
+        // directory: watching it as a "file" sees each one arrive.
+        pingWatcher = ConfigWatcher(file: shipyard.pingStore.directory) {
+            Task { await shipyard.reloadPings() }
+        }
+        pingWatcher?.start()
         wake = WakeObserver {
             Task { await shipyard.refresh() }
         }
@@ -130,6 +142,7 @@ final class AppServices {
                 self?.closeMenu()
             },
             markSeen: { shipyard.markSeen($0) },
+            dismiss: { shipyard.dismiss($0) },
             markAllSeen: { shipyard.markAllSeen(project: $0?.name) },
             toggleCollapsed: { shipyard.toggleCollapsed($0.name) },
             toggleGroup: { shipyard.toggleGroup($0.id) },

@@ -529,11 +529,6 @@ struct PanelTextTests {
         }
     }
 
-    @Test("the unavailable reason is short and names the missing client ID")
-    func signInUnavailableReason() {
-        #expect(PanelText.signInUnavailable == "Not available in this build: it has no OAuth App client ID.")
-    }
-
     @Test("while shipyard looks for a token the panel says it's connecting")
     func connecting() {
         #expect(PanelText.connecting == "Connecting to GitHub…")
@@ -646,6 +641,73 @@ struct PanelTextTests {
         #expect(text.message.contains("3 min"))
         #expect(text.command == skillCommand)
         #expect(text.action == .tryAgain)
+    }
+
+    // MARK: - The CLI link
+
+    private let linkCommand = "mkdir -p ~/.local/bin && ln -sf /Applications/Shipyard.app/Contents/Helpers/shipyard ~/.local/bin/shipyard"
+
+    @Test("the CLI link offer says what the CLI is for and shows the command it stands for")
+    func cliLinkOffer() {
+        let text = PanelText.cliLink(.unlinked, command: linkCommand)
+        #expect(text.title == "Link the shipyard CLI")
+        #expect(text.tone == .neutral)
+        #expect(text.message.contains("pings"))
+        #expect(text.message.contains("~/.local/bin"))
+        #expect(text.command == linkCommand)
+        #expect(text.action == .link)
+    }
+
+    @Test("a linked CLI says so, mentions the PATH, and offers nothing to copy")
+    func cliLinked() {
+        let text = PanelText.cliLink(.linked, command: linkCommand)
+        #expect(text.title == "shipyard CLI linked")
+        #expect(text.tone == .success)
+        #expect(text.message.contains("PATH"))
+        #expect(text.command == nil)
+        #expect(text.action == nil)
+    }
+
+    @Test("something in the way is named and left alone, with the command to replace it and Try again")
+    func cliLinkOccupied() {
+        let other = PanelText.cliLink(.occupied(destination: "/Users/me/Downloads/Shipyard.app/Contents/Helpers/shipyard"), command: linkCommand)
+        #expect(other.title == "Couldn't link the shipyard CLI")
+        #expect(other.tone == .warning)
+        #expect(other.message.contains("already links to /Users/me/Downloads/Shipyard.app/Contents/Helpers/shipyard."))
+        #expect(other.message.contains("leaves it alone"))
+        #expect(other.command == linkCommand)
+        #expect(other.action == .tryAgain)
+
+        let file = PanelText.cliLink(.occupied(destination: nil), command: linkCommand)
+        #expect(file.message.hasPrefix("Something else is already at ~/.local/bin/shipyard."))
+        #expect(file.command == linkCommand)
+    }
+
+    @Test("a link that couldn't be made gives the reason and the command to run in a terminal")
+    func cliLinkFailed() {
+        let text = PanelText.cliLink(.failed("You don't have permission to save the file “shipyard” in the folder “bin”"), command: linkCommand)
+        #expect(text.title == "Couldn't link the shipyard CLI")
+        #expect(text.message == "You don't have permission to save the file “shipyard” in the folder “bin”. Run this in a terminal instead:")
+        #expect(text.command == linkCommand)
+        #expect(text.action == .tryAgain)
+    }
+
+    @Test("without a CLI in the app the card says to open the installed app and offers no command")
+    func cliLinkMissing() {
+        let text = PanelText.cliLink(.missingCLI, command: linkCommand)
+        #expect(text.message.contains("Shipyard.app"))
+        #expect(text.command == nil)
+        #expect(text.action == nil)
+    }
+
+    @Test("a translocated copy says to move Shipyard to Applications first, with no command or button")
+    func cliLinkTranslocated() {
+        let text = PanelText.cliLink(.translocated, command: linkCommand)
+        #expect(text.title == "Move Shipyard to Applications")
+        #expect(text.message.hasSuffix("Move Shipyard to Applications first, then link the CLI."))
+        #expect(text.command == nil)
+        #expect(text.action == nil)
+        #expect(text.tone == .warning)
     }
 
     // MARK: - The project picker

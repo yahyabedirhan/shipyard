@@ -103,6 +103,18 @@
         }
       }
     },
+    "herdr": {
+      "description": "How a ping's Herdr action (shipyard ping --herdr) takes you there: clicking it focuses the Herdr tab, then brings this terminal forward.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terminal": {
+          "description": "The terminal app Herdr runs in, by name (\"Ghostty\") or bundle id (\"com.mitchellh.ghostty\"), brought forward after the tab is focused. Unset: only the tab is focused.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "defaults": {
       "description": "What every project shows and notifies about, unless the project overrides it.",
       "type": "object",
@@ -115,10 +127,11 @@
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "pings": { "$ref": "#/definitions/pings" },
         "notifications": {
-          "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone.",
+          "description": "The notification rules for every project that doesn't list its own. Default: a new pull request by anyone, and a new ping.",
           "$ref": "#/definitions/notifications",
-          "default": [{ "event": "pr.opened", "authors": [] }]
+          "default": [{ "event": "pr.opened", "authors": [] }, { "event": "ping.sent", "authors": [] }]
         },
         "archived": { "$ref": "#/definitions/archived" },
         "forks": { "$ref": "#/definitions/forks" }
@@ -133,7 +146,7 @@
   },
   "definitions": {
     "group-by": {
-      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z), or none (one list).",
+      "description": "What a project's items are grouped by, one level: kind (pull requests, then issues, then runs), repository (A to Z), date (Today, Yesterday, This week, This month, Older, by the sort-by date; updated when sorting by title), author (A to Z; pings by who sent them), or none (one list).",
       "type": "string",
       "enum": ["kind", "repository", "date", "author", "none"],
       "default": "kind"
@@ -194,6 +207,7 @@
         "pull-requests": { "$ref": "#/definitions/pull-requests" },
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
+        "pings": { "$ref": "#/definitions/pings" },
         "notifications": {
           "description": "This project's notification rules; replaces [[defaults.notifications]]. An empty list means no notifications for this project.",
           "$ref": "#/definitions/notifications"
@@ -312,6 +326,24 @@
         "authors": { "$ref": "#/definitions/authors" }
       }
     },
+    "pings": {
+      "description": "The pings agents send with the shipyard CLI (shipyard ping), each filed under a project. Pings take no states, authors, drafts or review-requested.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List pings.",
+          "type": "boolean",
+          "default": true
+        },
+        "seen-window": {
+          "description": "How long a seen ping stays listed, counted from when it was seen: a whole number and one unit, s, m, h or d, such as \"30m\" or \"24h\"; \"0\" lets it leave at once. An unseen ping stays until it's seen.",
+          "type": "string",
+          "pattern": "^(0|[0-9]+[smhd])$",
+          "default": "24h"
+        }
+      }
+    },
     "authors": {
       "description": "Whose items this kind lists: those show matches (empty: everyone) minus those hide matches; hide wins. Items left out are never shown, counted or notified. A project's authors merges key by key onto the defaults'.",
       "type": "object",
@@ -362,11 +394,12 @@
             "issue.closed",
             "issue.commented",
             "run.failed",
-            "run.succeeded"
+            "run.succeeded",
+            "ping.sent"
           ]
         },
         "authors": {
-          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping has no author, so a rule with authors never selects one. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
           "anyOf": [
             { "$ref": "#/definitions/author-selectors" },
             {

@@ -123,7 +123,13 @@ struct TabsLayout: View {
                 in: tab,
                 scroll: proxy,
                 left: { side(&$0, content, by: -1) },
-                right: { side(&$0, content, by: 1) }
+                right: { side(&$0, content, by: 1) },
+                dismiss: { place in
+                    // ⌫: removes the highlighted row when it's a ping's.
+                    guard let row = content.row(at: place), row.item.ping != nil else { return false }
+                    withAnimation(Motion.seen) { actions.dismiss(row) }
+                    return true
+                }
             ) { place, markSeenOnly in
                 if let group = content.subsection(at: place) {
                     guard !markSeenOnly else { return false }
@@ -369,7 +375,8 @@ private struct TabRow: View {
                     .truncationMode(.tail)
                 Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                     .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    // A ping's failed action reads in red until it's cleared.
+                    .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
                     .lineLimit(1)
                     // A long branch or author gives way in the middle.
                     .truncationMode(.middle)

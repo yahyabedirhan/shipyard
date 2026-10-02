@@ -141,7 +141,64 @@ struct SkillDocumentTests {
         // project alone, with the default pr.opened rule kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
         #expect(config.settings(for: runs).workflowRuns.finishedWindow == config.defaults.workflowRuns.finishedWindow)
-        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .runFailed)])
+        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent), NotificationRule(event: .runFailed)])
+        // "shipyard doesn't notify me about pings": a file with its own rules adds `ping.sent`
+        #expect(blocks.contains { config in
+            let rules = config?.defaults.notifications ?? []
+            return rules.contains(NotificationRule(event: .pingSent)) && rules.count > 1
+        })
+    }
+
+    @Test("it teaches the ping command as it's built: every flag, the exit codes, and examples that read")
+    func pingCommand() throws {
+        let text = try skill()
+        #expect(!text.contains("there is no CLI"))
+        // Every flag the command's own help lists is named in a code span.
+        let flags = Set(PingCommand.usageText.matches(of: /--[a-z]+/).map { String($0.output) })
+        #expect(flags.isSuperset(of: ["--body", "--from", "--id", "--open", "--app", "--herdr", "--repo", "--project"]))
+        for flag in flags.sorted() where flag != "--help" {
+            #expect(text.contains("`\(flag)"), "`\(flag)` isn't named")
+        }
+        #expect(text.contains("`--`"))
+        #expect(text.contains("shipyard ping withdraw <id>"))
+        #expect(text.contains("`\(PingCommand.herdrPaneVariable)`"))
+        #expect(text.contains("~/.local/bin/shipyard"))
+        #expect(text.contains("**\(PanelText.linkCLI)**"))
+        #expect(text.contains("exit 1") && text.contains("exit 2") && text.contains("exits 0"))
+        #expect(CommandResult.failedStatus == 1 && CommandResult.usageStatus == 2)
+
+        // Every example command reads as the command reads it.
+        var examples: [[String]] = []
+        var inShell = false
+        var pending = ""
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed == "```sh" { inShell = true; continue }
+            if trimmed == "```" { inShell = false; continue }
+            guard inShell else { continue }
+            if trimmed.hasSuffix("\\") { pending += String(trimmed.dropLast()) + " "; continue }
+            let command = pending + trimmed
+            pending = ""
+            guard command.hasPrefix("shipyard ping"), !command.contains("<") else { continue }
+            examples.append(shellWords(command))
+        }
+        #expect(examples.count >= 4)
+        var withdrawn = 0
+        for words in examples {
+            let arguments = Array(words.dropFirst(2))
+            if arguments.first == "withdraw" {
+                withdrawn += 1
+                #expect(arguments.count == 2 && PingCommand.isID(arguments[1]), "\(words)")
+                continue
+            }
+            if case .failure(let error) = PingCommand.Request.parse(arguments, herdrPane: "w1:p3") {
+                Issue.record("\(words) doesn't read: \(error.message)")
+            }
+        }
+        #expect(withdrawn > 0)
+        let actions = examples.compactMap { try? PingCommand.Request.parse(Array($0.dropFirst(2)), herdrPane: "w1:p3").get() }
+        #expect(actions.contains { $0.action == .herdr("w1:p3") && $0.id != nil })
+        #expect(actions.contains { if case .url = $0.action { true } else { false } })
     }
 
     @Test("every key the schema declares is named")
@@ -234,14 +291,19 @@ struct SkillDocumentTests {
             ("[defaults] show-first", "\(c.defaults.arrangement.showFirst)"),
             ("[defaults] archived", "\(c.defaults.archived)"),
             ("[defaults] forks", "\(c.defaults.forks)"),
+            ("pings.show", "\(c.defaults.pings.show)"),
+            // Written in hours, as the configuration header writes it, rather than "1d".
+            ("pings.seen-window", c.defaults.pings.seenWindow == 24 * 3600 ? "\"24h\"" : "?"),
         ]
         for (key, value) in rows {
             #expect(text.contains("| `\(key)` | `\(value)` |"), "no row `\(key)` = `\(value)`")
         }
         #expect(c.defaults.arrangement.subsections == nil)
         #expect(text.contains("| `[defaults] subsections` | unset |"))
-        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: [])])
-        #expect(text.contains("| `notifications` | one rule: `pr.opened`, `authors = []` |"))
+        #expect(c.herdr.terminal == nil)
+        #expect(text.contains("| `[herdr] terminal` | unset |"))
+        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
+        #expect(text.contains("| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` |"))
     }
 
     @Test("every choice, event and author filter is listed")
@@ -301,4 +363,27 @@ struct SkillDocumentTests {
         #expect(text.contains("echo \"taplo exit status: $?\""))
         #expect(SkillInstaller.command.contains("skills add yahyabedirhan/shipyard"))
     }
+}
+
+/// `command` split into words as a shell splits it, for double-quoted words and plain ones.
+private func shellWords(_ command: String) -> [String] {
+    var words: [String] = []
+    var current = ""
+    var quoted = false
+    var started = false
+    for character in command {
+        if character == "\"" {
+            quoted.toggle()
+            started = true
+        } else if character == " ", !quoted {
+            if started { words.append(current) }
+            current = ""
+            started = false
+        } else {
+            current.append(character)
+            started = true
+        }
+    }
+    if started { words.append(current) }
+    return words
 }

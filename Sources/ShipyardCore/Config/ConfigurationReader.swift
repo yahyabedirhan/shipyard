@@ -84,7 +84,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -126,6 +126,18 @@ final class ConfigurationReader {
             }
         }
 
+        if let herdr = table(node, "herdr") {
+            warnUnknownKeys(in: herdr, known: ["terminal"])
+            if let terminal = string(herdr, "terminal") {
+                let app = terminal.trimmingCharacters(in: .whitespaces)
+                if app.isEmpty {
+                    error("`terminal` names your terminal app, by name or bundle id; leave it out to only focus the tab", at: herdr.path + [.key("terminal")])
+                } else {
+                    config.herdr.terminal = app
+                }
+            }
+        }
+
         if let attention = table(node, "attention") {
             warnUnknownKeys(in: attention, known: ["unseen", "changed", "review-requested", "checks-failed"])
             if let value = bool(attention, "unseen") { config.attention.unseen = value }
@@ -135,12 +147,13 @@ final class ConfigurationReader {
         }
 
         if let defaults = table(node, "defaults") {
-            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks"] + Self.arrangementKeys)
+            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "pings", "notifications", "archived", "forks"] + Self.arrangementKeys)
             if let value = bool(defaults, "archived") { config.defaults.archived = value }
             if let value = bool(defaults, "forks") { config.defaults.forks = value }
             config.defaults.pullRequests = pullRequests(defaults).applied(to: config.defaults.pullRequests)
             config.defaults.issues = issues(defaults).applied(to: config.defaults.issues)
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
+            config.defaults.pings = pings(defaults).applied(to: config.defaults.pings)
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
             config.defaults.arrangement = arrangement(defaults).applied(to: config.defaults.arrangement)
         }
@@ -155,7 +168,7 @@ final class ConfigurationReader {
 
     private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
         warnUnknownKeys(in: node, known: [
-            "name", "repositories", "pull-requests", "issues", "workflow-runs", "notifications", "archived", "forks",
+            "name", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notifications", "archived", "forks",
         ] + Self.arrangementKeys)
         let name = string(node, "name")
         let repositories = strings(node, "repositories")
@@ -195,6 +208,7 @@ final class ConfigurationReader {
             pullRequests: pullRequests(node),
             issues: issues(node),
             workflowRuns: workflowRuns(node),
+            pings: pings(node),
             notifications: notifications(node),
             arrangement: arrangement(node),
             archived: bool(node, "archived"),
@@ -267,6 +281,19 @@ final class ConfigurationReader {
             branches: choice(node, "branches", WorkflowRunBranches.self),
             authors: authorFilter(node)
         )
+    }
+
+    /// The filters pull requests, issues or runs take that pings don't: each
+    /// is rejected on its own line rather than ignored, so a wrong edit is caught.
+    static let notPingKeys = ["states", "authors", "drafts", "review-requested"]
+
+    private func pings(_ parent: Node) -> PingOverrides {
+        guard let node = table(parent, "pings") else { return .init() }
+        warnUnknownKeys(in: node, known: ["show", "seen-window"] + Self.notPingKeys)
+        for key in Self.notPingKeys where node.table.contains(key: key) {
+            error("`\(key)` doesn't apply to pings; `pings` takes only `show` and `seen-window`", at: node.path + [.key(key)])
+        }
+        return PingOverrides(show: bool(node, "show"), seenWindow: duration(node, "seen-window"))
     }
 
     /// A kind's `states`: a list of the states that kind takes. Each one it
@@ -626,6 +653,7 @@ private extension ItemKind {
         case .pullRequest: "pull request"
         case .issue: "issue"
         case .workflowRun: "workflow run"
+        case .ping: "ping"
         }
     }
 }

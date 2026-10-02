@@ -61,6 +61,7 @@ struct ListLayout: View {
                 scroll: proxy,
                 left: { fold($0.moveLeft(in: model)) },
                 right: { fold($0.moveRight(in: model)) },
+                dismiss: dismiss,
                 activate: activate
             )
         }
@@ -110,6 +111,13 @@ struct ListLayout: View {
         case nil:
             return false
         }
+    }
+
+    /// ⌫: removes the highlighted row when it's a ping's.
+    private func dismiss(_ place: MenuRowPlace) -> Bool {
+        guard case .item(let row) = model.listTarget(at: place), row.item.ping != nil else { return false }
+        withAnimation(Motion.seen) { actions.dismiss(row) }
+        return true
     }
 
     /// An expanded project's lines, each its own child of the lazy stack:
@@ -279,7 +287,8 @@ private struct ListRow: View {
             AttentionDot(isOn: row.needsAttention)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
-            Text(String(row.number))
+            // A ping has no number; the column stays, so titles line up.
+            Text(row.kind == .ping ? "" : String(row.number))
                 .font(TypeScale.meta)
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: Grid.numberColumn, alignment: .trailing)
@@ -304,7 +313,7 @@ private struct ListRow: View {
                     }
                     Text(meta)
                         .font(TypeScale.meta)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
@@ -330,15 +339,27 @@ private struct ListRow: View {
     }
 
     /// The author, or in a project of several repositories, the repository
-    /// (without its owner); a run names no author.
+    /// (without its owner); a run names no author. A ping names its sender,
+    /// or why its action failed, while it has (the hover card has it whole);
+    /// one filed with `--project` has no repository, so it names its
+    /// sender there too.
     private var meta: String? {
-        if showsRepository { return PanelText.repositoryName(row.repository) }
+        if let error = row.actionError { return error }
+        if showsRowRepository { return PanelText.repositoryName(row.repository) }
+        if row.kind == .ping { return row.sender }
         return row.kind == .workflowRun ? nil : row.author
     }
 
     private var metaSymbol: String? {
-        if showsRepository { return "shippingbox" }
+        if row.actionError != nil { return "exclamationmark.triangle.fill" }
+        if showsRowRepository { return "shippingbox" }
         return row.authorKind == .bot ? "cpu" : nil
+    }
+
+    /// Whether the meta column names this row's repository: in a project of
+    /// several, when the row has one (a ping may not).
+    private var showsRowRepository: Bool {
+        showsRepository && !row.repository.isEmpty
     }
 }
 

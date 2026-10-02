@@ -8,7 +8,7 @@ A macOS menu bar app for seeing and reviewing the pull requests your agents open
 
 ## Why it exists
 
-Coding agents open pull requests and issues and start workflow runs, often several at once across several repositories. Keeping up means checking GitHub page after page. Shipyard lists them in the menu bar, from anyone, and shows one number: how many items are new, changed since you last opened them, waiting on your review, or failing their checks. It can notify you when something happens. What it shows lives in one TOML file that you, or your agents, edit.
+Coding agents open pull requests and issues and start workflow runs, often several at once across several repositories. Keeping up means checking GitHub page after page. Shipyard lists them in the menu bar, from anyone, and shows one number: how many items are new, changed since you last opened them, waiting on your review, or failing their checks. It can notify you when something happens, and your agents can ping you when they need you. What it shows lives in one TOML file that you, or your agents, edit.
 
 ## Install
 
@@ -62,6 +62,18 @@ npx skills add yahyabedirhan/shipyard -g -y
 ```
 
 Then ask in your own words: "Watch this repo in shipyard", "Hide dependabot's pull requests", "Tell me when CI fails on this project", "Switch shipyard to tabs". The agent edits the file, checks it against the schema, and reads shipyard's verdict on the save.
+
+### Pings
+
+Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Link shipyard CLI…**), which puts it at `~/.local/bin/shipyard`.
+
+```sh
+shipyard ping "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57
+shipyard ping "Waiting for your input" --herdr --id shop-question   # brings you back to this Herdr pane
+shipyard ping withdraw shop-question                                # takes it back once you've answered
+```
+
+A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings stay on your Mac. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.
 
 ## Examples
 

@@ -3,7 +3,7 @@
 #
 #   make            build the app (release)
 #   make test       run the tests (swift test)
-#   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), ad-hoc signed
+#   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), with the shipyard CLI, ad-hoc signed
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #   make run        run the executable from .build, without a bundle
@@ -13,6 +13,11 @@
 #   make clean
 
 APP         := Shipyard
+# The `shipyard` command line agents send pings with (ADR 0004). Its
+# product is shipyard-cli: on a case-insensitive disk `shipyard` would be the
+# app's `Shipyard`, which is also why the bundle keeps it in Contents/Helpers,
+# not beside the app in Contents/MacOS.
+CLI         := shipyard-cli
 # The version lives in one place, the core; the bundle is stamped with it.
 VERSION     := $(shell sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/ShipyardCore/Version.swift)
 
@@ -52,6 +57,7 @@ all: build
 
 build:
 	swift build -c release --product $(APP)
+	swift build -c release --product $(CLI)
 
 test:
 	swift test $(TEST_FLAGS)
@@ -61,13 +67,16 @@ run:
 
 bundle: build
 	@rm -rf $(APP_BUNDLE)
-	@mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Resources
+	@mkdir -p $(CONTENTS)/MacOS $(CONTENTS)/Helpers $(CONTENTS)/Resources
 	cp "$$(swift build -c release --show-bin-path)/$(APP)" $(CONTENTS)/MacOS/$(APP)
+	cp "$$(swift build -c release --show-bin-path)/$(CLI)" $(CONTENTS)/Helpers/shipyard
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
 	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
 	@# bundle gives it the stable identity notifications and login items need.
+	@# The CLI is signed first: the bundle's signature seals nested code.
+	codesign --force --sign - --timestamp=none $(CONTENTS)/Helpers/shipyard
 	codesign --force --sign - --timestamp=none $(APP_BUNDLE)
 	codesign --verify --strict $(APP_BUNDLE)
 	@echo "bundled $(APP_BUNDLE) ($(VERSION))"

@@ -1,7 +1,9 @@
 import Foundation
 
 /// Watches the configuration file's directory and calls `onChange` (on the
-/// main actor) once changes have settled for 200 ms.
+/// main actor) once changes have settled for 200 ms. The ping store's
+/// directory is watched the same way, as the "file": a ping written into it
+/// is a write to the directory.
 ///
 /// Editors and agents usually save by writing a new file and renaming it
 /// over the old one, which leaves a watch on the old file's descriptor

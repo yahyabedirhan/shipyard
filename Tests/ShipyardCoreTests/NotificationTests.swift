@@ -46,13 +46,6 @@ private func pr(_ number: Int, author: String = "yabepa", type: String = "User",
 
 @MainActor
 private extension Harness {
-    /// Refreshes, two minutes later, with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// What was posted: "project · headline" per notification.
     var titles: [String] { notifier.posted.map(\.title) }
 }
@@ -295,7 +288,7 @@ struct NotificationTests {
         let posted = try #require(harness.notifier.posted.first)
         harness.shipyard.openNotification(posted.itemURL)
 
-        #expect(harness.opener.opened == [pr(2).url(in: shopRepository)])
+        #expect(harness.actions.opened == [pr(2).url(in: shopRepository)])
         #expect(harness.shipyard.menu.attention.total == 0)
         #expect(harness.section("shop")?.rows.contains { $0.needsAttention } == false)
     }
@@ -310,7 +303,7 @@ struct NotificationTests {
         relaunched.shipyard.appStateStore.load()
         relaunched.shipyard.openNotification(posted.itemURL)
 
-        #expect(relaunched.opener.opened == [posted.itemURL])
+        #expect(relaunched.actions.opened == [posted.itemURL])
         #expect(relaunched.shipyard.appStateStore.state.attention.seen[posted.itemURL.absoluteString] != nil)
     }
 }

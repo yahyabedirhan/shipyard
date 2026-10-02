@@ -144,7 +144,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         show = true
         authors = { hide = ["me", "bots"] }
 
-        # Notify when someone else opens a pull request or an issue.
+        # Notify when someone else opens a pull request or an issue, and when
+        # one of your agents sends a ping.
         [[defaults.notifications]]
         event = "pr.opened"
         authors = ["others"]
@@ -153,6 +154,9 @@ public struct Preset: Hashable, Sendable, Identifiable {
         event = "issue.opened"
         authors = ["others"]
 
+        [[defaults.notifications]]
+        event = "ping.sent"
+
         # Projects: one [[projects]] block each. owned is every repository
         # your account owns, including ones you create later.
 
@@ -160,7 +164,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         # The pull requests waiting on your review, or a team's you're in, in
         # any repository. anywhere lists only those, so this project shows no
-        # issues, and it notifies each new request instead.
+        # issues, and it notifies each new request (and ping) instead.
         [[projects]]
         name = "Review requests"
         repositories = ["anywhere"]
@@ -168,6 +172,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
         issues = { show = false }
         notifications = [
           { event = "pr.review_requested" },
+          { event = "ping.sent" },
         ]
 
         """
@@ -182,7 +187,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         # The pull requests waiting on your review, or a team's you're in, in
         # any repository, grouped by repository under subheaders. Each new
-        # request notifies.
+        # request notifies, and so does each ping your agents send.
         [[projects]]
         name = "Review queue"
         repositories = ["anywhere"]
@@ -191,6 +196,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
         subsections = true
         notifications = [
           { event = "pr.review_requested" },
+          { event = "ping.sent" },
         ]
 
         """

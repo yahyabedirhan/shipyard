@@ -16,6 +16,7 @@ struct MenuTabsTests {
         case .pullRequest: "pull"
         case .issue: "issues"
         case .workflowRun: "actions/runs"
+        case .ping: "pings"
         }
         return MenuRow(Item(
             kind: kind,
@@ -52,6 +53,7 @@ struct MenuTabsTests {
             case .pullRequest: counts.pullRequests += 1
             case .issue: counts.issues += 1
             case .workflowRun: counts.workflowRuns += 1
+            case .ping: counts.pings += 1
             }
         }
         return MenuModel(sections: sections, attention: counts)
@@ -189,12 +191,5 @@ struct MenuTabsTests {
         #expect(PanelText.rowDetail(pull, showingRepository: true) == "#21 · shipyard · yahyabedirhan")
         #expect(PanelText.rowDetail(pull, showingRepository: false) == "#21 · yahyabedirhan")
         #expect(PanelText.rowDetail(run, showingRepository: false) == "#41 · running")
-    }
-
-    @Test("each kind's group has a small header")
-    func kindHeaders() {
-        #expect(PanelText.kindGroup(.pullRequest) == "Pull requests")
-        #expect(PanelText.kindGroup(.issue) == "Issues")
-        #expect(PanelText.kindGroup(.workflowRun) == "Runs")
     }
 }

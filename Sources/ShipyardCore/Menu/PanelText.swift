@@ -76,12 +76,23 @@ public enum PanelText {
     }
 
     private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
-        let repository = showingRepository ? [repositoryName(row.repository)] : []
+        let repository = showingRepository && !row.repository.isEmpty ? [repositoryName(row.repository)] : []
         let subject: [String] = switch row.kind {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
+        case .ping: pingDetail(row)
         }
-        return ["#\(row.number)"] + repository + subject
+        return (row.kind == .ping ? [] : ["#\(row.number)"]) + repository + subject
+    }
+
+    /// A ping's second line, which has no number: why its action failed,
+    /// while it has; otherwise its sender and its body on one line, each
+    /// when given, or "ping" when neither is: "claude · Waiting for your input".
+    private static func pingDetail(_ row: MenuRow) -> [String] {
+        if let failure = row.actionError { return [failure] }
+        let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
+        let parts = [row.sender, body].compactMap { $0 }
+        return parts.isEmpty ? ["ping"] : parts
     }
 
     /// A repository without its owner: "shipyard" for "yahyabedirhan/shipyard".
@@ -101,6 +112,8 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
+    /// A ping row's ✕, and its VoiceOver action: removes the ping now.
+    public static let dismissPing = "Dismiss"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 
@@ -116,12 +129,21 @@ public enum PanelText {
     }
 
     /// What the row's state icon says to VoiceOver: its state and kind,
-    /// "open pull request", "closed issue", "failed workflow run".
+    /// "open pull request", "closed issue", "failed workflow run"; a ping's
+    /// says what clicking it does: "ping, opens a link".
     public static func stateLabel(_ row: MenuRow) -> String {
+        switch row.pingIcon {
+        case .link: return "ping, opens a link"
+        case .app: return "ping, opens an app"
+        case .terminal: return "ping, focuses a Herdr tab"
+        case .noAction: return "ping"
+        case nil: break
+        }
         let kind = switch row.kind {
         case .pullRequest: "pull request"
         case .issue: "issue"
         case .workflowRun: "workflow run"
+        case .ping: "ping"
         }
         return "\(state(row.state)) \(kind)"
     }

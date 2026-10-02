@@ -49,13 +49,6 @@ private func shop(authors: String? = nil) -> String {
 
 @MainActor
 private extension Harness {
-    /// Refreshes, two minutes later, with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// Replaces the configuration and follows it, GitHub answering `answer`.
     func reconfigure(_ config: String, answering answer: StubHTTP.Answer) async throws {
         try writeConfig(config)

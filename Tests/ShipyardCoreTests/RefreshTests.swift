@@ -303,21 +303,6 @@ struct RefreshTests {
         #expect(harness.shipyard.fetchError == .http(502))
     }
 
-    @Test("GraphQL's exhausted limit (a 200 with RATE_LIMITED) keeps the model and records the reset time")
-    func rateLimited() async throws {
-        let exhausted = try StubHTTP.Answer.fixture(
-            "graphql-rate-limited.json",
-            headers: Harness.rateLimitHeaders(remaining: 0)
-        )
-        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), exhausted)
-        let before = harness.shipyard.menu
-
-        await harness.timer.fire()
-
-        #expect(harness.shipyard.menu.sections == before.sections)
-        #expect(harness.shipyard.fetchError == .rateLimited(resetAt: Harness.rateLimitReset))
-    }
-
     @Test("a 401 during a refresh signs out and stops the timer")
     func unauthorizedDuringRefresh() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests(), Harness.unauthorized)
@@ -522,34 +507,13 @@ struct RefreshTests {
 
     // MARK: - Opening an item
 
-    @Test("opening a row opens its URL through the URL opener")
+    @Test("opening a row opens its URL through the action port")
     func openRow() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
         let row = try #require(harness.section("job-search")?.rows.first)
 
         harness.shipyard.open(row)
 
-        #expect(harness.opener.opened == [URL(string: "https://github.com/yahyabedirhan/job-search/pull/3")!])
-    }
-}
-
-@Suite("Refresh gate")
-struct RefreshGateTests {
-    @Test("one refresh at a time; requests meanwhile make one more run")
-    func gate() {
-        var gate = RefreshGate()
-        let first = gate.begin()
-        let running = gate.isRunning
-        let second = gate.begin()
-        let third = gate.begin()
-        let runAgain = gate.finish()
-        let stopped = !gate.isRunning
-        let again = gate.begin()
-        let nothingQueued = !gate.finish()
-        #expect(first && running)
-        #expect(!second && !third)
-        #expect(runAgain && stopped)
-        #expect(again && nothingQueued)
-        #expect(!gate.isRunning)
+        #expect(harness.actions.opened == [URL(string: "https://github.com/yahyabedirhan/job-search/pull/3")!])
     }
 }

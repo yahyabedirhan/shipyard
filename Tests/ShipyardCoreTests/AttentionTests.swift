@@ -39,13 +39,6 @@ private extension Harness {
         try #require(section(project)?.rows.first { $0.number == number })
     }
 
-    /// Refreshes with GitHub answering `answer`.
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// The attention count.
     var count: Int { shipyard.menu.attention.total }
 }
@@ -78,13 +71,13 @@ struct AttentionTests {
 
         harness.shipyard.open(try harness.row(1))
 
-        #expect(harness.opener.opened == [PR(1).url(in: repository)])
+        #expect(harness.actions.opened == [PR(1).url(in: repository)])
         #expect(harness.count == 1)
         #expect(try !harness.row(1).needsAttention)
 
         harness.shipyard.markSeen(try harness.row(2))
 
-        #expect(harness.opener.opened.count == 1)
+        #expect(harness.actions.opened.count == 1)
         #expect(harness.count == 0)
         #expect(harness.section("shop")?.attentionCount == 0)
 
@@ -101,7 +94,7 @@ struct AttentionTests {
 
         harness.shipyard.openRepository(of: eCommerce)
 
-        #expect(harness.opener.opened == [try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend"))])
+        #expect(harness.actions.opened == [try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend"))])
         #expect(harness.count == 6)
     }
 

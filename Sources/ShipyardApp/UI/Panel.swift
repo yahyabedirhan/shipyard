@@ -10,6 +10,8 @@ struct Panel: View {
     let actions: AppServices
     /// The header's "Install agent skill…" shows the install card above the footer.
     @State private var showsSkillInstall = false
+    /// The header's "Link shipyard CLI…" shows the link card above the footer.
+    @State private var showsCLILink = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -23,6 +25,11 @@ struct Panel: View {
                         .padding(Grid.gutter - 4)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                if showsCLILink, shipyard.phase != .needsProjects {
+                    CLILinkCard(link: actions.cliLink) { showsCLILink = false }
+                        .padding(Grid.gutter - 4)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 Hairline()
                 footer(now: context.date)
             }
@@ -31,6 +38,7 @@ struct Panel: View {
         }
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
+        .animation(Motion.banner, value: showsCLILink)
         .onAppear { actions.panelOpened() }
         .onDisappear { actions.panelClosed() }
     }
@@ -88,6 +96,9 @@ struct Panel: View {
             Menu {
                 Button("Open configuration file", action: actions.openConfigurationFile)
                 Button(PanelText.installSkill) { showsSkillInstall = true }
+                    // Onboarding shows the card under the picker already.
+                    .disabled(shipyard.phase == .needsProjects)
+                Button(PanelText.linkCLI) { showsCLILink = true }
                     // Onboarding shows the card under the picker already.
                     .disabled(shipyard.phase == .needsProjects)
                 // Once signed in: while `start()` still asks GitHub, the
@@ -181,13 +192,17 @@ struct Panel: View {
             ConnectView(shipyard: shipyard)
         case .needsProjects:
             // Onboarding's preset step while the file holds nothing but
-            // `version`, else the plain picker; and its offer to install the skill.
+            // `version`, else the plain picker; and its offers to install the
+            // skill and link the CLI.
             if shipyard.presets.isEmpty {
                 ProjectPicker(shipyard: shipyard)
             } else {
                 PresetPicker(shipyard: shipyard)
             }
             SkillInstallCard(installation: actions.skillInstallation)
+                .padding(.horizontal, Grid.gutter)
+                .padding(.bottom, 8)
+            CLILinkCard(link: actions.cliLink)
                 .padding(.horizontal, Grid.gutter)
                 .padding(.bottom, Grid.gutter)
         case .ready:

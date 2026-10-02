@@ -19,6 +19,7 @@ public struct Configuration: Equatable, Sendable {
     public var menu = Menu()
     public var rateLimit = RateLimitSettings()
     public var attention = AttentionToggles()
+    public var herdr = HerdrSettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -38,6 +39,7 @@ public struct Configuration: Equatable, Sendable {
             pullRequests: project.pullRequests.applied(to: defaults.pullRequests),
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
+            pings: project.pings.applied(to: defaults.pings),
             notifications: project.notifications ?? defaults.notifications,
             arrangement: project.arrangement.applied(to: defaults.arrangement),
             archived: project.archived ?? defaults.archived,
@@ -72,6 +74,15 @@ extension Configuration {
         }
     }
 
+    /// `[herdr]`: how a ping's Herdr action (`--herdr`) takes the user there.
+    public struct HerdrSettings: Equatable, Sendable {
+        /// The terminal app Herdr runs in, by name (`Ghostty`) or bundle id,
+        /// brought forward after the tab is focused; `nil` (the default)
+        /// only focuses the tab.
+        public var terminal: String?
+        public init(terminal: String? = nil) { self.terminal = terminal }
+    }
+
     /// `[attention]`: which reasons make an item need attention.
     public struct AttentionToggles: Equatable, Sendable {
         public var unseen = true
@@ -91,8 +102,10 @@ extension Configuration {
         public var pullRequests = PullRequestSettings()
         public var issues = IssueSettings()
         public var workflowRuns = WorkflowRunSettings()
-        /// `[[defaults.notifications]]`; a new pull request in any project by default.
-        public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened)]
+        public var pings = PingSettings()
+        /// `[[defaults.notifications]]`; a new pull request and a new ping
+        /// in any project by default.
+        public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent)]
         /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
         public var arrangement = ArrangementSettings()
         /// Whether repository groups and `owner/*` bring in archived repositories.
@@ -111,6 +124,7 @@ extension Configuration {
         public var pullRequests = PullRequestOverrides()
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
+        public var pings = PingOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
         /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
@@ -125,6 +139,7 @@ extension Configuration {
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
+            pings: PingOverrides = .init(),
             notifications: [NotificationRule]? = nil,
             arrangement: ArrangementOverrides = .init(),
             archived: Bool? = nil,
@@ -135,6 +150,7 @@ extension Configuration {
             self.pullRequests = pullRequests
             self.issues = issues
             self.workflowRuns = workflowRuns
+            self.pings = pings
             self.notifications = notifications
             self.arrangement = arrangement
             self.archived = archived
@@ -215,6 +231,8 @@ public enum EventKind: String, CaseIterable, Sendable {
     case issueCommented = "issue.commented"
     case runFailed = "run.failed"
     case runSucceeded = "run.succeeded"
+    /// An agent sent a new ping (`shipyard ping`).
+    case pingSent = "ping.sent"
 }
 
 /// An event and the authors it covers. Its scope is where it's written:
@@ -235,9 +253,11 @@ public struct NotificationRule: Equatable, Sendable {
     }
 
     /// Whether the rule covers an item's author: any of its selectors
-    /// matches, or it has none.
+    /// matches, or it has none. A ping has no GitHub author, so a rule with
+    /// `authors` never covers one.
     public func covers(_ item: Item, viewer: String?) -> Bool {
-        authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
+        if item.kind == .ping { return authors.isEmpty }
+        return authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
     }
 }
 
@@ -408,6 +428,33 @@ public struct WorkflowRunOverrides: Equatable, Sendable {
     }
 }
 
+/// `pings`: the pings agents send with the `shipyard` CLI. They take no
+/// `states`, `authors`, `drafts` or `review-requested`.
+public struct PingSettings: Equatable, Sendable {
+    public var show = true
+    /// `seen-window`: how long a seen ping stays listed, in seconds, counted
+    /// from when it was seen; 0 lets it leave at once. An unseen ping stays.
+    public var seenWindow: TimeInterval = 86_400
+    public init(show: Bool = true, seenWindow: TimeInterval = 86_400) {
+        self.show = show
+        self.seenWindow = seenWindow
+    }
+}
+
+/// The `pings` keys a table sets; unset keys keep the value below.
+public struct PingOverrides: Equatable, Sendable {
+    public var show: Bool?
+    public var seenWindow: TimeInterval?
+    public init(show: Bool? = nil, seenWindow: TimeInterval? = nil) {
+        self.show = show
+        self.seenWindow = seenWindow
+    }
+
+    public func applied(to base: PingSettings) -> PingSettings {
+        PingSettings(show: show ?? base.show, seenWindow: seenWindow ?? base.seenWindow)
+    }
+}
+
 /// How a project's listed items are grouped, sorted and drawn.
 public struct ArrangementSettings: Equatable, Sendable {
     public var groupBy: GroupBy = .kind
@@ -459,6 +506,7 @@ public struct ProjectSettings: Equatable, Sendable {
     public var pullRequests: PullRequestSettings
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
+    public var pings: PingSettings
     public var notifications: [NotificationRule]
     public var arrangement: ArrangementSettings
     /// Whether groups and `owner/*` bring in archived repositories.
@@ -472,6 +520,7 @@ public struct ProjectSettings: Equatable, Sendable {
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
+        pings: PingSettings = PingSettings(),
         notifications: [NotificationRule],
         arrangement: ArrangementSettings = ArrangementSettings(),
         archived: Bool = false,
@@ -482,6 +531,7 @@ public struct ProjectSettings: Equatable, Sendable {
         self.pullRequests = pullRequests
         self.issues = issues
         self.workflowRuns = workflowRuns
+        self.pings = pings
         self.notifications = notifications
         self.arrangement = arrangement
         self.archived = archived
@@ -513,6 +563,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.show
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
+        case .ping: pings.show
         }
     }
 
@@ -522,6 +573,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.states
         case .issue: issues.states
         case .workflowRun: workflowRuns.states
+        case .ping: Set(StateGroup.all(for: .ping))
         }
     }
 
@@ -531,6 +583,8 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.authors
         case .issue: issues.authors
         case .workflowRun: workflowRuns.authors
+        // A ping has no GitHub author: every one is listed.
+        case .ping: AuthorFilter()
         }
     }
 }
@@ -614,7 +668,7 @@ extension Configuration {
         # layout = "list"
 
         # The number next to the menu bar icon: "total" (items that need your
-        # attention), "per-kind" (pull requests, issues and runs apart) or "none".
+        # attention), "per-kind" (pull requests, issues, runs and pings apart) or "none".
         # [menu-bar]
         # count = "total"
 
@@ -646,13 +700,29 @@ extension Configuration {
         # [defaults.workflow-runs]
         # show = false
 
+        # List the pings your agents send with `shipyard ping` in every
+        # project: set show to false to hide them. A seen ping stays listed
+        # for seen-window, then leaves; an unseen one stays until you see it.
+        # A project can override both.
+        # [defaults.pings]
+        # show = true
+        # seen-window = "24h"
+
         # When to notify, for every project: one block per rule. The list
-        # replaces the default rule below, so keep it to hear of new pull
-        # requests. Other events include "run.failed" and "pr.review_requested";
-        # authors narrows a rule to some authors, as above (empty: everyone).
+        # replaces the default rules below, so keep them to hear of new pull
+        # requests and pings. Other events include "run.failed" and
+        # "pr.review_requested"; authors narrows a rule to some authors, as
+        # above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
         # authors = []
+        # [[defaults.notifications]]
+        # event = "ping.sent"
+        # authors = []
+
+        # Using Herdr? A ping an agent sends with --herdr focuses its tab when
+        # clicked. To bring your terminal forward too, add a [herdr] table and
+        # set terminal in it to the terminal app's name or bundle id, such as "Ghostty".
 
         # The largest share of each hourly GitHub rate limit shipyard may spend,
         # in percent (1 to 50). The limit is shared with your other tools.

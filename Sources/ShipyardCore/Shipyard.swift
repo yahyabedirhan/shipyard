@@ -11,8 +11,9 @@ import Observation
 /// ones the notification rules select, publish the menu model (with which
 /// rows need attention), and ask the rate budget when to run next. What the
 /// user has seen and collapsed, the items it knew and the events it notified
-/// are app state, kept by `appStateStore`. Observable, so the panel redraws
-/// when what it reads changes.
+/// are app state, kept by `appStateStore`. The pings agents send are kept by
+/// `pingStore` and listed with the projects' items, without GitHub.
+/// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
 public final class Shipyard {
@@ -55,9 +56,16 @@ public final class Shipyard {
     public private(set) var menu = MenuModel.empty
     /// The groups Show more revealed past their `show-first` cap, until
     /// Show less or the menu closes (`panelClosed()`); never saved.
-    public private(set) var expandedGroups: Set<GroupID> = []
+    private(set) var expandedGroups: Set<GroupID> = []
     /// The last refresh that succeeded; `nil` before one did.
-    public private(set) var snapshot: Snapshot?
+    private(set) var snapshot: Snapshot?
+    /// The pings in the ping store, as last read: at start and whenever the
+    /// store changes (`reloadPings()`).
+    public private(set) var pings: [Ping] = []
+    /// The notifications of pings that left (withdrawn, dismissed, past
+    /// their seen-window), still to take out of Notification Center
+    /// (`removeLeftBanners()`).
+    private var leftBanners: [String] = []
     /// Why the latest refresh failed; `nil` once one succeeds.
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
@@ -87,8 +95,15 @@ public final class Shipyard {
     /// The verdict on the configuration file after each reload, in
     /// `config-status.json`, for agents that can't see the banner.
     public let configStatusStore: ConfigStatusStore
+    /// The pings agents send with the `shipyard` CLI, which writes to the
+    /// same store.
+    public let pingStore: PingStore
+    /// Each project's repositories as last resolved, for the `shipyard` CLI
+    /// to file a ping by its repository without calling GitHub.
+    public let repositoriesStore: ResolvedRepositoriesStore
     private let tokenStore: any TokenStore
-    private let urlOpener: any URLOpening
+    private let actions: any ActionRunning
+    private let herdr: HerdrFocus
     private let notifier: any Notifying
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
@@ -121,11 +136,14 @@ public final class Shipyard {
         configStore: ConfigStore,
         appStateStore: AppStateStore,
         configStatusStore: ConfigStatusStore,
+        pingStore: PingStore,
+        repositoriesStore: ResolvedRepositoriesStore,
         tokenStore: any TokenStore,
-        urlOpener: any URLOpening,
+        actions: any ActionRunning,
         notifier: any Notifying,
         loginItem: any LoginItem,
         gh: any GhTokenLookup = GhCLI(),
+        herdr: HerdrFocus = HerdrFocus(),
         transport: any HTTPTransport = URLSessionTransport(),
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
@@ -135,8 +153,11 @@ public final class Shipyard {
         self.configStore = configStore
         self.appStateStore = appStateStore
         self.configStatusStore = configStatusStore
+        self.pingStore = pingStore
+        self.repositoriesStore = repositoriesStore
         self.tokenStore = tokenStore
-        self.urlOpener = urlOpener
+        self.actions = actions
+        self.herdr = herdr
         self.notifier = notifier
         self.loginItem = loginItem
         self.clock = clock
@@ -161,6 +182,9 @@ public final class Shipyard {
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
+        // Pings sent while the app wasn't running list and notify now,
+        // signed in or not, without waiting for GitHub.
+        await reloadPings()
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -207,7 +231,7 @@ public final class Shipyard {
     /// while the code shows; otherwise does nothing.
     public func openVerificationPage() {
         guard case .connecting(let code) = phase else { return }
-        urlOpener.open(code.verificationURL)
+        actions.open(code.verificationURL)
     }
 
     private func runDeviceFlow(_ generation: Int) async {
@@ -477,7 +501,9 @@ public final class Shipyard {
 
     /// Fetches every project's items and publishes the menu model. The timer,
     /// ⌘R, waking and a configuration change all come here.
-    /// Does nothing outside `ready`. One refresh runs at a time: a call while
+    /// It lists the pings again first, so a seen ping whose window has
+    /// passed leaves even while signed out; outside `ready` that's all it
+    /// does. One refresh runs at a time: a call while
     /// one runs returns at once and the running one goes again when it's done
     /// (several calls meanwhile make one more run). Afterwards the timer is
     /// armed for the next one, as the rate budget says. While the budget
@@ -486,6 +512,10 @@ public final class Shipyard {
     /// item whose window has passed leaves, and the timer comes back after
     /// the configured interval, or at the end of the pause when that's sooner.
     public func refresh() async {
+        // A seen ping whose seen-window has passed leaves the store too,
+        // and its notification Notification Center, signed in or not.
+        listPings()
+        await removeLeftBanners()
         guard phase.canRefresh else { return }
         guard canRefreshNow else {
             if !gate.isRunning {
@@ -517,7 +547,7 @@ public final class Shipyard {
     /// file that can't be written changes nothing: a missing file still
     /// reads as the defaults with no projects.
     private func createConfigurationIfMissing() {
-        _ = try? configStore.createIfMissing()
+        try? configStore.createIfMissing()
     }
 
     private func performRefresh() async {
@@ -534,6 +564,9 @@ public final class Shipyard {
                 try await self.request { try await $0.repositories(of: lookup, at: now) }
             }
             guard current == session else { return }
+            // For the CLI; a file that can't be written leaves pings to
+            // match the configuration's `owner/name` selectors alone.
+            try? repositoriesStore.record(resolved.mapValues(\.repositories))
             let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
             let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
@@ -542,10 +575,10 @@ public final class Shipyard {
             budget.record(snapshot.rateLimits, at: clock.now)
             // What each project has: the menu, the counts and the
             // notifications below all read these, and nothing else.
-            let listings = Listing.listings(for: projects, in: snapshot, now: clock.now)
+            let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
             var notifications: [PostedNotification] = []
             appStateStore.update { state in
-                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, state: &state, at: now)
+                notifications = Self.notify(snapshot: snapshot, listings: listings, projects: projects, pings: pings, state: &state, at: now)
                 state.attention.prune(present: snapshot.items.values.joined(), at: now)
             }
             var built = MenuModel.build(
@@ -584,21 +617,40 @@ public final class Shipyard {
         }
     }
 
-    /// Finds the events in `snapshot` and records them in `state`, returning
-    /// what to post: each event not handled before, once, in the first
-    /// project (in configuration order) that lists the item and whose rules
-    /// select it. Every event is recorded as handled, notified or not, and
-    /// every fetched item becomes known, listed or not: `snapshot` becomes
+    /// Finds the events in `snapshot`, and the new pings the listings hold,
+    /// and records them in `state`, returning what to post (`select`).
+    /// Every fetched item becomes known, listed or not: `snapshot` becomes
     /// the known items, and its sources known, so the next refresh compares
     /// with it, and an item a filter change brings into view later isn't new.
     private static func notify(
         snapshot: Snapshot,
         listings: [String: [Item]],
         projects: [ProjectSettings],
+        pings: [Ping],
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
         let events = EventDetector.events(known: state.known, snapshot: snapshot, projects: projects)
+            + EventDetector.pingEvents(listings: listings, projects: projects)
+        let notifications = select(events, listings: listings, projects: projects, viewer: snapshot.viewerLogin, state: &state, at: now)
+        state.known = state.known.updated(with: snapshot, projects: projects)
+        // A ping's record stays while the ping does, so it's never notified again.
+        state.notified.prune(present: Array(state.known.items.keys) + pings.map(\.item.id), at: now)
+        return notifications
+    }
+
+    /// Records `events` in `state` and returns what to post: each event not
+    /// handled before, once, in the first project (in configuration order)
+    /// that lists the item and whose rules select it. Every event is
+    /// recorded as handled, notified or not.
+    private static func select(
+        _ events: [Event],
+        listings: [String: [Item]],
+        projects: [ProjectSettings],
+        viewer: String?,
+        state: inout AppState,
+        at now: Date
+    ) -> [PostedNotification] {
         let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         let listed = listings.mapValues { Set($0.map(\.id)) }
         var byID: [String: [Event]] = [:]
@@ -612,13 +664,11 @@ public final class Shipyard {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
             let selected = occurrences.first { event in
                 guard listed[event.project]?.contains(event.item.id) == true, let project = settings[event.project] else { return false }
-                return NotificationRules.shouldNotify(event, settings: project, viewer: snapshot.viewerLogin)
+                return NotificationRules.shouldNotify(event, settings: project, viewer: viewer)
             }
             if let selected { notifications.append(NotificationRules.notification(for: selected)) }
             state.notified.insert(first, at: now)
         }
-        state.known = state.known.updated(with: snapshot, projects: projects)
-        state.notified.prune(present: state.known.items.keys, at: now)
         return notifications
     }
 
@@ -667,10 +717,16 @@ public final class Shipyard {
 
     // MARK: - User actions
 
-    /// Opens the row's item on GitHub in the browser and marks it seen.
-    public func open(_ row: MenuRow) {
-        urlOpener.open(row.url)
+    /// Opens the row's item on GitHub in the browser and marks it seen. A
+    /// ping's row runs the ping's action instead (`runAction(ofPing:)`).
+    /// Returns the work still running (a ping's action), for tests to
+    /// await; the app doesn't wait for it.
+    @discardableResult
+    public func open(_ row: MenuRow) -> Task<Void, Never> {
+        if let ping = row.item.ping { return runAction(ofPing: ping.id) }
+        actions.open(row.url)
         markSeen(row)
+        return Task {}
     }
 
     /// Opens the project's repository on GitHub in the browser (Return on
@@ -678,7 +734,7 @@ public final class Shipyard {
     /// nothing seen.
     public func openRepository(of project: MenuSection) {
         guard let url = project.repositoryURL else { return }
-        urlOpener.open(url)
+        actions.open(url)
     }
 
     /// Opens the signed-in account's profile on GitHub in the browser (a
@@ -686,26 +742,37 @@ public final class Shipyard {
     /// the account is known.
     public func openProfile() {
         guard let viewer else { return }
-        urlOpener.open(viewer.profileURL)
+        actions.open(viewer.profileURL)
     }
 
     /// A notification was clicked: opens its item on GitHub and marks it
     /// seen, the version the last refresh found (or, before one has listed
     /// it, the version known from an earlier run). The app's notifier calls
-    /// this with the notification's `itemURL`.
-    public func openNotification(_ itemURL: URL) {
-        urlOpener.open(itemURL)
+    /// this with the notification's `itemURL`. A ping's notification runs
+    /// the ping's action, as its row does. Returns the work still running
+    /// (a ping's action), for tests to await.
+    @discardableResult
+    public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
+        if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
+        actions.open(itemURL)
         let id = itemURL.absoluteString
         let fingerprint = snapshot?.items.values.joined().first { $0.id == id }?.fingerprint
             ?? appStateStore.state.known.items[id]?.fingerprint
-        guard let fingerprint else { return }
-        let now = clock.now
-        updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
+        if let fingerprint {
+            let now = clock.now
+            updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
+        }
+        return Task {}
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs
-    /// attention again only once it changes.
+    /// attention again only once it changes. A ping's action isn't run,
+    /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
+        if let ping = row.item.ping {
+            markPingsSeen([ping])
+            return
+        }
         updateAppState { $0.attention.markSeen(row.item, at: clock.now) }
     }
 
@@ -718,9 +785,183 @@ public final class Shipyard {
             .filter { Attention.canNeedAttention($0.item) }
         guard !rows.isEmpty else { return }
         let now = clock.now
+        let listed = rows.compactMap(\.item.ping)
+        if !listed.isEmpty { markPingsSeen(listed) }
+        let items = rows.filter { $0.item.ping == nil }.map(\.item)
+        guard !items.isEmpty else { return }
         updateAppState { state in
-            for row in rows { state.attention.markSeen(row.item, at: now) }
+            for item in items { state.attention.markSeen(item, at: now) }
         }
+    }
+
+    /// Removes the row's ping now (the hover ✕, or ⌫ on the selected
+    /// row), seen or not, with any failure on it, and takes its
+    /// notification out of Notification Center. Any other row stays: only
+    /// pings can be dismissed. Returns the removal still running, for tests
+    /// to await; the app doesn't wait for it.
+    @discardableResult
+    public func dismiss(_ row: MenuRow) -> Task<Void, Never> {
+        guard let ping = row.item.ping else { return Task {} }
+        try? pingStore.remove(id: ping.id)
+        listPings()
+        return Task { await removeLeftBanners() }
+    }
+
+    // MARK: - Pings
+
+    /// Reads the ping store again and, when a ping arrived, changed or
+    /// went, lists the pings at once from the last snapshot: no GitHub
+    /// request. A new ping a project lists posts its `ping.sent`
+    /// notification when the project's rules select it; a replaced one
+    /// (same id, same sent time) doesn't again. A ping that went (withdrawn
+    /// with the CLI) takes its notification out of Notification Center.
+    /// The app's watcher on the store calls this.
+    public func reloadPings() async {
+        guard listPings() else { return }
+        await removeLeftBanners()
+        let configuration = configStore.lastValid
+        let projects = configuration.projects.map(configuration.settings(for:))
+        let listings = Listing.listings(for: projects, in: snapshot, pings: pings, now: clock.now)
+        let events = EventDetector.pingEvents(listings: listings, projects: projects)
+        let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
+        guard !unhandled.isEmpty else { return }
+        let now = clock.now
+        let viewer = snapshot?.viewerLogin
+        var notifications: [PostedNotification] = []
+        // Recorded (and saved) before posting, as in a refresh.
+        appStateStore.update { state in
+            notifications = Self.select(unhandled, listings: listings, projects: projects, viewer: viewer, state: &state, at: now)
+        }
+        for notification in notifications {
+            await notifier.post(notification)
+        }
+    }
+
+    /// Runs the action of the ping `id` names, as the store has it now (a
+    /// replace may have changed it), through the action port (a Herdr
+    /// action through `runHerdr`). When it
+    /// works, or the ping has none, the ping is marked seen (and any earlier
+    /// failure cleared); when it fails, the ping stays as it was and the
+    /// failure's reason is recorded on it for its row. Either is written
+    /// only to the sending of the ping that ran: one withdrawn, replaced or
+    /// sent anew while its action ran is left as the CLI wrote it. A ping
+    /// no longer stored does nothing.
+    private func runAction(ofPing id: String) -> Task<Void, Never> {
+        guard let ping = pingStore.ping(id: id) else {
+            listPings()
+            return Task {}
+        }
+        guard let action = ping.action else {
+            markPingsSeen([ping])
+            return Task {}
+        }
+        return Task {
+            let outcome: ActionOutcome
+            if case .herdr(let target) = action {
+                outcome = await runHerdr(target)
+            } else {
+                outcome = await actions.run(action)
+            }
+            switch outcome {
+            case .done:
+                markPingsSeen([ping])
+            case .failed(let reason):
+                try? pingStore.recordFailure(ping, reason: reason)
+                listPings()
+            }
+        }
+    }
+
+    /// A ping's Herdr action: focuses the tab or pane `target` names
+    /// (`HerdrFocus`), then, once that worked, brings `[herdr] terminal`
+    /// forward through the action port, as an `--app` action would. Without
+    /// a terminal set, only the focus runs. Either failing fails the action.
+    private func runHerdr(_ target: String) async -> ActionOutcome {
+        let focused = await herdr.focus(target)
+        guard focused == .done, let terminal = configStore.lastValid.herdr.terminal else { return focused }
+        return await actions.run(.app(terminal))
+    }
+
+    /// Reads the ping store again, removing the seen pings whose
+    /// seen-window has passed, and, when anything changed, lists the
+    /// pings from the last snapshot. Returns whether anything changed.
+    @discardableResult
+    private func listPings() -> Bool {
+        let configuration = configStore.lastValid
+        let now = clock.now
+        let stored = pingStore.all().compactMap { ping -> Ping? in
+            guard Self.hasLeft(ping, in: configuration, at: now) else { return ping }
+            // Removed only as it was read: one the CLI replaced or sent anew
+            // meanwhile is listed as it is now. One that can't be removed
+            // stays stored; no listing shows it.
+            guard (try? pingStore.removeIfUnchanged(ping)) == false else { return nil }
+            return pingStore.ping(id: ping.id)
+        }
+        forgetLeftPings(stored: stored)
+        guard stored != pings else { return false }
+        pings = stored
+        rebuildMenu(configStore.lastValid)
+        return true
+    }
+
+    /// Forgets the pings that left the store, so an id sent again later is
+    /// a new ping that notifies again (a replace, which keeps its
+    /// `instance`, never does), and queues their notifications for
+    /// `removeLeftBanners()`. A ping left when its `ping.sent` record names
+    /// no stored ping (withdrawn, dismissed, past its window, or gone while
+    /// the app wasn't running), or another instance than the stored one
+    /// (withdrawn and sent anew under its id, however soon).
+    private func forgetLeftPings(stored: [Ping]) {
+        let current = Dictionary(
+            stored.map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let pingRecords = appStateStore.state.notified.records.filter { key, record in
+            guard let url = URL(string: key), Ping.id(from: url) != nil else { return false }
+            return record.events.contains { $0 != current[key] }
+        }
+        guard !pingRecords.isEmpty else { return }
+        appStateStore.update { state in
+            for key in pingRecords.keys.sorted() {
+                leftBanners += state.notified.remove(itemID: key) { $0 != current[key] }
+            }
+        }
+    }
+
+    /// Takes the notifications of the pings that left out of Notification
+    /// Center. Before any new notification is posted, since a ping sent
+    /// again with the same id posts under the same notification id.
+    private func removeLeftBanners() async {
+        let banners = leftBanners
+        leftBanners = []
+        for id in banners {
+            await notifier.removeDelivered(id: id)
+        }
+    }
+
+    /// Whether `ping` has left every project it's filed under: it's seen,
+    /// and each of those projects' `seen-window` has passed since. A
+    /// project no longer configured counts with `[defaults.pings]`'s window,
+    /// so a ping whose projects are all gone still leaves once it's seen.
+    private static func hasLeft(_ ping: Ping, in configuration: Configuration, at now: Date) -> Bool {
+        guard ping.seen != nil else { return false }
+        let windows = ping.projects.map { name in
+            configuration.projects.first { $0.name == name }
+                .map { configuration.settings(for: $0).pings.seenWindow }
+                ?? configuration.defaults.pings.seenWindow
+        }
+        return windows.allSatisfy { !ping.isListed(seenWindow: $0, at: now) }
+    }
+
+    /// Records `listed` (the pings as the user saw them) as seen now, in
+    /// the ping store, clearing their actions' failures, and lists them
+    /// again. One withdrawn, replaced or sent anew since is left as it is
+    /// (`PingStore.markSeen(_:at:)`). A store that can't be written leaves
+    /// them as they were.
+    private func markPingsSeen(_ listed: [Ping]) {
+        let now = clock.now
+        for ping in listed { try? pingStore.markSeen(ping, at: now) }
+        listPings()
     }
 
     /// Collapses the project's section, or expands it if it's collapsed.
@@ -777,9 +1018,12 @@ public final class Shipyard {
     /// rate-limit indicator: a project added since shows as not loaded yet,
     /// a removed one disappears. Follows the menu bar rule of `applyAttention`.
     private func rebuildMenu(_ configuration: Configuration) {
-        let listings = snapshot.map { snapshot in
-            Listing.listings(for: configuration.projects.map(configuration.settings(for:)), in: snapshot, now: clock.now)
-        } ?? [:]
+        let listings = Listing.listings(
+            for: configuration.projects.map(configuration.settings(for:)),
+            in: snapshot,
+            pings: pings,
+            now: clock.now
+        )
         var rebuilt = MenuModel.build(
             listings: listings,
             snapshot: snapshot,

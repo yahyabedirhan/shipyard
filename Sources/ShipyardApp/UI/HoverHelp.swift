@@ -461,6 +461,14 @@ private struct FactView: View {
             Text(age == "now" ? "now" : "\(age) ago").foregroundStyle(.secondary)
         case .duration(let time, _):
             Text(time).monospacedDigit().foregroundStyle(.secondary)
+        case .body(let text):
+            // A ping's body, whole: it wraps where other facts cut off.
+            Text(text)
+                .foregroundStyle(.primary.opacity(0.78))
+                .lineLimit(8)
+                .fixedSize(horizontal: false, vertical: true)
+        case .action:
+            Text(PanelText.fact(fact)).foregroundStyle(.secondary).truncationMode(.middle)
         default:
             Text(PanelText.fact(fact)).foregroundStyle(tint ?? .secondary)
         }
@@ -483,6 +491,9 @@ private struct FactView: View {
         case .trigger(let event, _): Self.symbol(event: event)
         case .attempt: "arrow.clockwise"
         case .duration(_, let running): running ? "hourglass" : "timer"
+        case .body: "text.alignleft"
+        case .action(let action): Palette.symbol(action.icon)
+        case .failure: "exclamationmark.triangle.fill"
         }
     }
 
@@ -493,6 +504,7 @@ private struct FactView: View {
         case .review(.reviewRequired): Palette.amber
         case .checks(let state): Palette.color(state)
         case .duration(_, running: true): Palette.amber
+        case .failure: Palette.red
         default: nil
         }
     }

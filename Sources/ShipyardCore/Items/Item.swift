@@ -5,6 +5,9 @@ public enum ItemKind: String, Codable, Equatable, Hashable, Sendable {
     case pullRequest
     case issue
     case workflowRun
+    /// A ping an agent sent through the `shipyard` CLI: kept by shipyard,
+    /// not fetched from GitHub.
+    case ping
 }
 
 /// An item's semantic state. The app maps it to GitHub's colours: open
@@ -64,6 +67,8 @@ public enum StateGroup: String, CaseIterable, Hashable, Sendable {
         case .pullRequest: [.open, .merged, .closed]
         case .issue: [.open, .closed]
         case .workflowRun: [.inProgress, .failed, .succeeded]
+        // A ping is always open; pings take no `states`.
+        case .ping: [.open]
         }
     }
 }
@@ -87,9 +92,11 @@ public enum AuthorKind: String, Equatable, Hashable, Sendable {
     case other
 }
 
-/// One pull request, issue or workflow run in a project's repositories.
+/// One pull request, issue or workflow run in a project's repositories, or
+/// a ping filed under a project.
 public struct Item: Equatable, Hashable, Sendable, Identifiable {
-    /// The item's URL, unique across pull requests, issues and runs.
+    /// The item's URL, unique across pull requests, issues and runs; a
+    /// ping's is `shipyard://ping/<id>`.
     public var id: String { url.absoluteString }
     public var kind: ItemKind
     /// `owner/name`, as the configuration spells it.
@@ -123,6 +130,9 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     /// What only the row's hover card shows. Not part of `fingerprint`, so
     /// it never makes a seen item "changed" on its own.
     public var details: ItemDetails
+    /// The ping this item lists, for kind `ping`: whether it's been seen
+    /// lives there, not in the app state's seen records. `nil` otherwise.
+    public var ping: Ping?
 
     public init(
         kind: ItemKind,
@@ -141,7 +151,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         activity: Int = 0,
         branch: String? = nil,
         avatarURL: URL? = nil,
-        details: ItemDetails = ItemDetails()
+        details: ItemDetails = ItemDetails(),
+        ping: Ping? = nil
     ) {
         self.kind = kind
         self.repository = repository
@@ -160,6 +171,7 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         self.branch = branch
         self.avatarURL = avatarURL
         self.details = details
+        self.ping = ping
     }
 
     /// Everything whose change makes a seen item "changed": state, update

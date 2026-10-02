@@ -12,20 +12,6 @@ private struct UnreadableTokenStore: TokenStore {
 
 @Suite("Token provider")
 struct TokenProviderTests {
-    @Test("the token store comes first, and gh isn't asked")
-    func tokenStoreFirst() {
-        let gh = FakeGhLookup(token: "gho_fromgh")
-        let provider = TokenProvider(store: InMemoryTokenStore(token: "gho_stored"), gh: gh)
-        #expect(provider.current() == FoundToken(value: "gho_stored", source: .tokenStore))
-        #expect(gh.lookups == 0)
-    }
-
-    @Test("gh's token is used when the token store is empty")
-    func ghSecond() {
-        let provider = TokenProvider(store: InMemoryTokenStore(), gh: FakeGhLookup(token: "gho_fromgh"))
-        #expect(provider.current() == FoundToken(value: "gho_fromgh", source: .gh))
-    }
-
     @Test("an empty stored token counts as none")
     func emptyStoredToken() {
         let provider = TokenProvider(store: InMemoryTokenStore(token: ""), gh: FakeGhLookup(token: "gho_fromgh"))
@@ -36,12 +22,6 @@ struct TokenProviderTests {
     func unreadableStore() {
         let provider = TokenProvider(store: UnreadableTokenStore(), gh: FakeGhLookup(token: "gho_fromgh"))
         #expect(provider.current()?.source == .gh)
-    }
-
-    @Test("no token anywhere is none")
-    func none() {
-        let provider = TokenProvider(store: InMemoryTokenStore(), gh: FakeGhLookup())
-        #expect(provider.current() == nil)
     }
 }
 

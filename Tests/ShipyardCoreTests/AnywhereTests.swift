@@ -37,12 +37,6 @@ private func searchAnswer(
 
 @MainActor
 private extension Harness {
-    func refresh(answering answer: StubHTTP.Answer) async {
-        graphQL([answer])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
-
     /// The rows `project` lists, as `owner/name#number`, in ascending order.
     func listed(in project: String) -> [String] {
         (section(project)?.rows.map { "\($0.repository)#\($0.number)" } ?? []).sorted()

@@ -70,9 +70,12 @@ public enum Arrangement {
     static func key(for item: Item, settings: ArrangementSettings, now: Date, calendar: Calendar) -> GroupKey {
         switch settings.groupBy {
         case .kind: .kind(item.kind)
-        case .repository: .repository(item.repository)
+        // A ping with no repository or sender joins its kind's group, last.
+        case .repository: item.repository.isEmpty ? .kind(item.kind) : .repository(item.repository)
         case .date: .date(DateBucket(sortDate(item, settings.sortBy == .created ? .created : .updated), now: now, calendar: calendar))
-        case .author: .author(item.author)
+        // A ping's author is who sent it (`--from`), a label, not a login.
+        case .author where item.kind == .ping: item.ping?.sender.map(GroupKey.sender) ?? .kind(item.kind)
+        case .author: item.author.isEmpty ? .kind(item.kind) : .author(item.author)
         case .none: .ungrouped
         }
     }
@@ -104,18 +107,27 @@ public enum Arrangement {
         return a.offset < b.offset
     }
 
-    /// Kinds in the menu's kind order, dates newest first, repositories and
-    /// authors A to Z ignoring case.
+    /// Kinds in the menu's kind order, dates newest first, repositories,
+    /// authors and senders A to Z ignoring case; senders after authors.
     private static func groupOrder(_ a: GroupKey, _ b: GroupKey) -> Bool {
         switch (a, b) {
         case (.kind(let left), .kind(let right)):
             MenuModel.kindOrder.firstIndex(of: left)! < MenuModel.kindOrder.firstIndex(of: right)!
         case (.date(let left), .date(let right)):
             left.rawValue < right.rawValue
-        case (.repository(let left), .repository(let right)), (.author(let left), .author(let right)):
+        case (.repository(let left), .repository(let right)), (.author(let left), .author(let right)), (.sender(let left), .sender(let right)):
             left.lowercased() == right.lowercased() ? left < right : left.lowercased() < right.lowercased()
+        case (.author, .sender):
+            true
+        case (.sender, .author):
+            false
+        case (.kind, _):
+            // A kind among repositories or authors: pings without one, last.
+            false
+        case (_, .kind):
+            true
         default:
-            // One project's groups all have the same kind of key.
+            // One project's other groups all have the same kind of key.
             false
         }
     }
@@ -129,19 +141,23 @@ public enum GroupKey: Hashable, Sendable {
     case date(DateBucket)
     /// The author's login, without `@`.
     case author(String)
+    /// Who sent a ping (`--from`), under `group-by = "author"`.
+    case sender(String)
     /// The one group of `group-by = "none"`.
     case ungrouped
 }
 
 extension GroupKey {
     /// The key as written in `state.json`: "kind:pullRequest",
-    /// "repository:owner/name", "date:today", "author:login", "ungrouped".
+    /// "repository:owner/name", "date:today", "author:login",
+    /// "sender:label", "ungrouped".
     public var text: String {
         switch self {
         case .kind(let kind): "kind:\(kind.rawValue)"
         case .repository(let repository): "repository:\(repository)"
         case .date(let bucket): "date:\(bucket.name)"
         case .author(let login): "author:\(login)"
+        case .sender(let label): "sender:\(label)"
         case .ungrouped: "ungrouped"
         }
     }
@@ -165,6 +181,8 @@ extension GroupKey {
             self = .date(bucket)
         case "author" where !value.isEmpty:
             self = .author(value)
+        case "sender" where !value.isEmpty:
+            self = .sender(value)
         default:
             return nil
         }
@@ -180,11 +198,6 @@ public struct GroupID: Hashable, Sendable {
     public init(project: String, key: GroupKey) {
         self.project = project
         self.key = key
-    }
-
-    /// The All tab's group of `key`: the All tab has no project.
-    public static func allTab(_ key: GroupKey) -> GroupID {
-        GroupID(project: "", key: key)
     }
 }
 

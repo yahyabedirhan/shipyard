@@ -71,6 +71,19 @@ final class Notifier: NSObject, Notifying {
         }
     }
 
+    /// Takes the notification `id` out of Notification Center (a withdrawn
+    /// or dismissed ping's). Queued behind the deliveries, so one still
+    /// waiting to be posted is posted first, then removed.
+    func removeDelivered(id: String) async {
+        guard let center else { return }
+        let previous = delivery
+        delivery = Task {
+            await previous?.value
+            center.removeDeliveredNotifications(withIdentifiers: [id])
+            Self.log.info("removed notification \(id, privacy: .public)")
+        }
+    }
+
     /// The last queued delivery; the next one waits for it.
     @ObservationIgnored private var delivery: Task<Void, Never>?
 

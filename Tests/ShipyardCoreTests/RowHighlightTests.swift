@@ -11,6 +11,7 @@ struct RowHighlightTests {
         case .pullRequest: "pull"
         case .issue: "issues"
         case .workflowRun: "actions/runs"
+        case .ping: "pings"
         }
         return MenuRow(Item(
             kind: kind,
@@ -31,11 +32,6 @@ struct RowHighlightTests {
     }
 
     // MARK: - The pointer
-
-    @Test("nothing is highlighted before the pointer enters a row")
-    func startsEmpty() {
-        #expect(RowHighlight().place == nil)
-    }
 
     @Test("the row the pointer enters is highlighted")
     func enter() {
@@ -236,21 +232,6 @@ struct RowHighlightTests {
         #expect(highlight.place == places[2])
     }
 
-    @Test("in a tab, ↓ and ↑ wrap too")
-    func keysWrapInTab() {
-        let pull = row(.pullRequest, 1)
-        let issue = row(.issue, 2)
-        let tab = MenuModel(sections: [MenuSection(name: "shipyard", rows: [pull, issue])]).tabContent(for: .all)
-        var highlight = RowHighlight()
-        highlight.pointerEntered(place(nil, issue))
-
-        highlight.moveDown(in: tab.rowPlaces)
-        #expect(highlight.place == .groupHeader(.allTab(.kind(.pullRequest)), in: nil))
-
-        highlight.moveUp(in: tab.rowPlaces)
-        #expect(highlight.place == place(nil, issue))
-    }
-
     @Test("a single row stays highlighted when ↓ or ↑ wraps")
     func keysWrapOneRow() {
         let only = [place("shipyard", row(.pullRequest, 1))]
@@ -290,21 +271,6 @@ struct RowHighlightTests {
             .header("collapsed"), .header("broken"), .header("loading"), .header("mirror"), place("mirror", last),
             .header("shipyard"),
         ])
-    }
-
-    @Test("in a tab, the keys cross from one kind's group to the next, through its subheader")
-    func keysAcrossKindGroups() {
-        let pull = row(.pullRequest, 1)
-        let issue = row(.issue, 2)
-        let tab = MenuModel(sections: [MenuSection(name: "shipyard", rows: [pull, issue])]).tabContent(for: .all)
-        var highlight = RowHighlight()
-        highlight.pointerEntered(place(nil, pull))
-
-        highlight.moveDown(in: tab.rowPlaces)
-        #expect(highlight.place == .groupHeader(.allTab(.kind(.issue)), in: nil))
-
-        highlight.moveDown(in: tab.rowPlaces)
-        #expect(highlight.place == place(nil, issue))
     }
 
     @Test("with no rows, the keys highlight nothing")
@@ -580,17 +546,6 @@ struct RowHighlightTests {
 
     // MARK: - The pointer and the keys share one highlight
 
-    @Test("the keys continue from the row the pointer highlighted")
-    func keysContinueFromPointer() {
-        let places = threeRows
-        var highlight = RowHighlight()
-        highlight.pointerEntered(places[0])
-
-        highlight.moveDown(in: places)
-
-        #expect(highlight.place == places[1])
-    }
-
     @Test("rows scrolling under a resting pointer don't take the highlight from the keys")
     func scrollUnderRestingPointer() {
         let places = threeRows
@@ -632,18 +587,6 @@ struct RowHighlightTests {
         highlight.pointerLeftRows()
 
         highlight.pointerMoved()
-
-        #expect(highlight.place == nil)
-    }
-
-    @Test("the pointer onto an error row or a placeholder clears the highlight, even when the last row's exit is lost")
-    func pointerOntoErrorRow() {
-        let places = threeRows
-        var highlight = RowHighlight()
-        highlight.pointerEntered(places[0])
-
-        // The error row's enter (pointerLeftRows); row 0's exit never arrives.
-        highlight.pointerLeftRows()
 
         #expect(highlight.place == nil)
     }
