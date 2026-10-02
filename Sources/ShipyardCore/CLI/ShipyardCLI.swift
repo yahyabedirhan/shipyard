@@ -32,17 +32,28 @@ public struct CommandResult: Equatable, Sendable {
 }
 
 /// What a command reads from where it runs: the working folder, the
-/// environment variables (`XDG_CONFIG_HOME`, `HERDR_PANE_ID`) and
-/// git, which says the working folder's remote `origin`.
+/// environment variables (`XDG_CONFIG_HOME`, `HERDR_PANE_ID`, the
+/// `HERDR_PLUGIN_EVENT`s), git, which says a folder's remote `origin`, and
+/// how it runs a program (`herdr`) and tells whether one can be run.
 public struct CommandEnvironment: Sendable {
     public var workingDirectory: URL
     public var variables: [String: String]
     public var git: any GitRemoteLookup
+    public var run: GhCLI.Run
+    public var isExecutable: @Sendable (String) -> Bool
 
-    public init(workingDirectory: URL, variables: [String: String], git: any GitRemoteLookup = GitCLI()) {
+    public init(
+        workingDirectory: URL,
+        variables: [String: String],
+        git: any GitRemoteLookup = GitCLI(),
+        run: @escaping GhCLI.Run = GhCLI.runProcess,
+        isExecutable: @escaping @Sendable (String) -> Bool = { FileManager.default.isExecutableFile(atPath: $0) }
+    ) {
         self.workingDirectory = workingDirectory
         self.variables = variables
         self.git = git
+        self.run = run
+        self.isExecutable = isExecutable
     }
 }
 
@@ -61,6 +72,9 @@ public enum ShipyardCLI {
                                 [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
                                 [--repo <owner/name> | --project <name>]
                   shipyard ping withdraw <id>
+          herdr-event
+                  what Herdr's plugin hooks run: pings when an agent is blocked,
+                  and withdraws that ping when it goes on or its pane closes
 
         options:
           --help     show this help (shipyard ping --help for the command's)
@@ -105,6 +119,18 @@ public enum ShipyardCLI {
                 rest,
                 environment: environment,
                 configuration: configuration,
+                resolved: repositories.load(),
+                store: pingStore,
+                now: now
+            )
+        case "herdr-event":
+            guard arguments.count == 1 else {
+                return .usage("shipyard herdr-event: takes no arguments; it reads HERDR_PLUGIN_EVENT and HERDR_PLUGIN_EVENT_JSON")
+            }
+            // Withdrawing needs no projects, so only a blocked agent's ping reads config.toml.
+            return HerdrEvent.run(
+                environment: environment,
+                configuration: { readConfiguration(at: configURL) },
                 resolved: repositories.load(),
                 store: pingStore,
                 now: now

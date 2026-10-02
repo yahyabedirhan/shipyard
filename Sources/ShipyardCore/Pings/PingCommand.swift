@@ -79,6 +79,37 @@ public enum PingCommand {
         case .success(let parsed): request = parsed
         case .failure(let error): return .usage("shipyard ping: \(error.message)")
         }
+        return send(
+            request,
+            folder: environment.workingDirectory,
+            git: environment.git,
+            configuration: configuration,
+            resolved: resolved,
+            store: store,
+            now: now,
+            newID: newID
+        )
+    }
+
+    /// Files `request` and saves it, as `run` does once its arguments read:
+    /// under the one `--project` names, else under every project that
+    /// watches its repository (`--repo`, else the `origin` of `folder`;
+    /// none when `folder` is `nil`), then prints its id. An id already
+    /// stored is replaced. With `unfiled`, a ping no project takes is saved
+    /// under none, with the repository it named (if any), instead of being
+    /// refused: Herdr's ping for a blocked agent (`HerdrEvent`) has no one
+    /// to tell about a refusal.
+    static func send(
+        _ request: Request,
+        folder: URL?,
+        git: any GitRemoteLookup,
+        configuration: Configuration,
+        resolved: [String: [String]],
+        store: PingStore,
+        now: Date,
+        newID: () -> String = Ping.newID,
+        unfiled: Bool = false
+    ) -> CommandResult {
         let names = configuration.projects.map(\.name)
         let projects: [String]
         var repository: String?
@@ -88,21 +119,27 @@ public enum PingCommand {
             }
             projects = [project]
         } else {
-            let slug: String
-            if let named = request.repository {
-                slug = named
-            } else {
-                switch workingRepository(environment) {
+            var slug = request.repository
+            var noRepository: NoRepository?
+            if slug == nil, let folder {
+                switch workingRepository(folder: folder, git: git) {
                 case .success(let found): slug = found
-                case .failure(let reason): return .failed("shipyard ping: \(reason.message); pass --repo <owner/name> or --project <name>; \(listing(names))")
+                case .failure(let reason): noRepository = reason
                 }
             }
-            let watching = watchers(of: slug, configuration: configuration, resolved: resolved)
-            guard !watching.isEmpty else {
+            let watching = slug.map { watchers(of: $0, configuration: configuration, resolved: resolved) } ?? []
+            if let first = watching.first {
+                projects = watching.map(\.project)
+                repository = first.spelling
+            } else if unfiled {
+                projects = []
+                repository = slug
+            } else if let slug {
                 return .failed("shipyard ping: no project watches `\(slug)`; pass --project <name> to file it under one; \(listing(names))")
+            } else {
+                let reason = noRepository?.message ?? "the ping names no repository"
+                return .failed("shipyard ping: \(reason); pass --repo <owner/name> or --project <name>; \(listing(names))")
             }
-            projects = watching.map(\.project)
-            repository = watching[0].spelling
         }
         let id: String
         if let named = request.id {
@@ -175,10 +212,10 @@ public enum PingCommand {
         var message: String
     }
 
-    /// The repository of the working folder: its git remote `origin`, as `owner/name`.
-    static func workingRepository(_ environment: CommandEnvironment) -> Result<String, NoRepository> {
-        let folder = environment.workingDirectory.path
-        guard let origin = environment.git.origin(in: environment.workingDirectory) else {
+    /// The repository of the working folder `url`: its git remote `origin`, as `owner/name`.
+    static func workingRepository(folder url: URL, git: any GitRemoteLookup) -> Result<String, NoRepository> {
+        let folder = url.path
+        guard let origin = git.origin(in: url) else {
             return .failure(NoRepository(message: "the working folder (\(folder)) isn't a git repository with a remote `origin` to file the ping by"))
         }
         guard let slug = GitRemote.repository(fromURL: origin) else {

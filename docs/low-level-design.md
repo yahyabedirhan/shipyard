@@ -209,6 +209,10 @@ ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories 
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
+ShipyardCLI -> HerdrEvent          run(environment, configuration, resolved, store) for herdr-event -> output, exit status
+HerdrEvent -> CommandEnvironment.run  herdr pane get <pane> (tab_id, cwd), herdr tab get <tab> (label)
+HerdrEvent -> PingCommand          send(request herdr-<pane>, folder: the pane's cwd, unfiled) on blocked
+HerdrEvent -> PingStore            remove(id: herdr-<pane>) when the agent goes on or its pane closes
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]; pingEvents(listings, projects) -> a ping.sent per unseen listed ping
 Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification); removeDelivered(id) for a ping that left (#102)
@@ -750,6 +754,20 @@ Each project's repositories as the app last resolved them (`ResolvedRepositories
 
 `PingCommand.Request.parse` reads the arguments after `ShipyardCLI` has checked for `withdraw` as the first one. `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`) or a word starting with `--`, and `--help` after it isn't help.
 
+`PingCommand.send(request, folder, git, configuration, resolved, store, now, newID, unfiled)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path. `folder` is where the repository is looked up (`nil`: nowhere); `unfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
+
+### HerdrEvent — `ShipyardCore/Pings/HerdrEvent.swift` (0.0.6, #112)
+
+`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. `ShipyardCLI` sends it `HerdrEvent.run(environment, configuration, resolved, store, now)`; `configuration` is a closure, read only for a blocked agent's ping, so a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, each character outside the id alphabet a `-` (`w1:p3` → `herdr-w1-p3`), cut to 64.
+
+| Event | Does |
+|---|---|
+| `pane.agent_status_changed`, `blocked` | `herdr pane get <pane>` (its `tab_id` and `cwd`), then `herdr tab get <tab>` (its `label`), through `CommandEnvironment.run` (the synchronous `GhCLI.Run` port; tests answer with `FakeHerdr.command`), with Herdr's own `HERDR_BIN_PATH`, else `herdr` found as `HerdrFocus` finds it. Then `PingCommand.send` with `--id herdr-<pane>`: title "<Agent> is waiting in <tab label>" ("An agent…" without a name; the pane id without a label, or when `herdr` can't say), sender `display_agent` or `agent`, action `.herdr(pane)`, filed by the `origin` of the pane's `cwd` and saved `unfiled` when no project takes it. Blocking again replaces it (one per pane, no second notification); prints the id. Herdr runs each event's hook on its own, so when `pane get` already says the agent went on (another status), the ping isn't sent and any there is withdrawn, as that later event would. A ping saved `unfiled` isn't listed by the Mac's app until remote pings get their machine section |
+| `working`, `idle`, `done`, `unknown`; `pane.closed` | removes `herdr-<pane>` and prints its id; nothing, exit 0, when there's none |
+| any other event or status | nothing, exit 0 |
+
+Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not a JSON object, without `pane_id`, or (for a status change) without `agent_status`: exit 1, one line naming the event; a `config.toml` that doesn't read (blocked only) or a store that can't be written: exit 1. `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
+
 ### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
 
 A thin executable target over `ShipyardCore`: it gathers the arguments, the working folder, the environment (with `GitCLI`), `ConfigStore.defaultURL(environment:)`, `ResolvedRepositoriesStore.defaultDirectory` and `PingStore.defaultDirectory`, calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
@@ -821,6 +839,7 @@ shipyard/
 │   ├── Pings/
 │   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen, repository, body, sender, action, failure; as an Item; new ids; PingAction, PingIcon
 │   │   ├── HerdrFocus.swift          # a Herdr action: find herdr, focus the tab (a pane's tab via pane get), over ShellRunning
+│   │   ├── HerdrEvent.swift          # shipyard herdr-event: a blocked agent's ping herdr-<pane>, sent, replaced and withdrawn
 │   │   ├── PingStore.swift           # one JSON file per ping, atomic writes, safe for the CLI and the app at once
 │   │   ├── PingList.swift            # the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
 │   │   └── PingCommand.swift         # shipyard ping: arguments → a ping filed by its repository or under a project, saved; output and exit status

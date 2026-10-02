@@ -55,7 +55,13 @@ public struct HerdrFocus: Sendable {
 
     /// The first `herdr` found: the known paths, then each `PATH` directory.
     func locate() -> String? {
-        if let known = Self.knownPaths(home: home).first(where: isExecutable) { return known }
+        Self.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
+    }
+
+    /// The first `herdr` found under the home folder `home`: the known
+    /// paths, then each directory of `pathEnvironment`.
+    static func locate(home: URL, pathEnvironment: String?, isExecutable: (String) -> Bool) -> String? {
+        if let known = knownPaths(home: home).first(where: isExecutable) { return known }
         for directory in (pathEnvironment ?? "").split(separator: ":") {
             let candidate = directory.hasSuffix("/") ? "\(directory)herdr" : "\(directory)/herdr"
             if isExecutable(candidate) { return candidate }
