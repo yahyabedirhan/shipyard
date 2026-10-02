@@ -73,7 +73,24 @@ shipyard ping "Waiting for your input" --herdr --id shop-question   # brings you
 shipyard ping withdraw shop-question                                # takes it back once you've answered
 ```
 
-A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings stay on your Mac. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.
+A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings never reach GitHub. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.
+
+#### Pings from your other machines
+
+Agents on your other machines can ping you too, when your Mac's Herdr knows those machines as saved machines. Install the [herdr-shipyard](https://github.com/yahyabedirhan/herdr-shipyard) plugin on each one, which puts the same `shipyard` command there:
+
+```sh
+herdr plugin install yahyabedirhan/herdr-shipyard
+```
+
+Then name them in `config.toml` by their Herdr labels:
+
+```toml
+[remote]
+machines = ["hetzner-vps"]
+```
+
+Shipyard asks each machine for its pings through Herdr about every 30 seconds and files them under the projects that watch their repositories, or under the machine's name. Clicking one sent from a Herdr pane takes you to that agent. On those machines the plugin also pings you by itself when Herdr marks an agent blocked, and takes the ping back when the agent goes on. A machine that doesn't answer shows a quiet line and keeps its last pings.
 
 ## Examples
 
