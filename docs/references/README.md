@@ -11,3 +11,4 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 | [github-repositories.md](github-repositories.md) | Listing and checking repositories for the project picker; listing a repository group's or an owner's repositories (affiliations, `isArchived`, `isFork`, paging) |
 | [macos-end-to-end-testing.md](macos-end-to-end-testing.md) | End-to-end testing options for a SwiftUI menu bar app without Xcode, and what shipyard adopts |
 | [macos-hover-help.md](macos-hover-help.md) | Hover help in the panel instead of native tooltips: packages, native options (popover, a drawn card, inline text), what menu bar apps do, and each call site |
+| [agent-icons.md](agent-icons.md) | Where each coding agent's icon is published and under what terms; why shipyard draws its own marks instead of bundling them |
