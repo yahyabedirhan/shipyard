@@ -30,7 +30,7 @@ private extension Harness {
         let result = cli(["ping", title] + (flags.contains("--project") || flags.contains("--repo") ? [] : ["--project", "shop"]) + flags)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping rows' titles in `project`.

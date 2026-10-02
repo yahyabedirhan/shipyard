@@ -28,7 +28,7 @@ private extension Harness {
     func ping(_ title: String, project: String = "shop") throws -> String {
         let result = cli("ping", title, "--project", project)
         try #require(result.status == 0, "\(result.error)")
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping rows of `project`.
@@ -187,14 +187,14 @@ struct PingsTests {
         #expect(harness.section("shop")?.attentionCount == 1)
     }
 
-    @Test("grouped by repository or author, pings without one sit in a Pings group, last; the row reads \"ping\"")
+    @Test("grouped by repository or author, pings without one sit in a Pings group, last; the row reads \"#1 · ping\"")
     func otherGroupings() async throws {
         let harness = try await Harness.started(config: "[defaults]\ngroup-by = \"repository\"\n" + shop, graphQL: onePullRequest)
         try harness.ping("Ready")
         await harness.shipyard.reloadPings()
         #expect(harness.groupTitles() == ["yahyabedirhan/shop", "Pings"])
         let row = try #require(harness.pingRows().first)
-        #expect(PanelText.rowDetail(row, showingRepository: true) == "ping")
+        #expect(PanelText.rowDetail(row, showingRepository: true) == "#1 · ping")
 
         try harness.writeConfig("[defaults]\ngroup-by = \"author\"\n" + shop)
         await harness.shipyard.reloadConfiguration()
@@ -211,6 +211,32 @@ struct PingsTests {
         await harness.shipyard.reloadPings()
 
         #expect(harness.shipyard.menu == menu)
+    }
+
+    @Test("a ping written before pings were numbered still lists, with no number; numbering starts at 1 beside it")
+    func writtenBeforeNumbers() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let sent = ISO8601DateFormatter().string(from: harness.clock.now)
+        try FileManager.default.createDirectory(at: harness.pingStore.directory, withIntermediateDirectories: true)
+        try Data("""
+            {
+              "id" : "old",
+              "instance" : "first",
+              "projects" : [
+                "shop"
+              ],
+              "sent" : "\(sent)",
+              "title" : "Sent by 0.0.5"
+            }
+            """.utf8).write(to: harness.pingStore.directory.appendingPathComponent("old.json"))
+
+        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id", "new") == CommandResult(output: "#1 new\n"))
+        await harness.shipyard.reloadPings()
+
+        let old = try #require(harness.pingRows().first { $0.title == "Sent by 0.0.5" })
+        #expect(old.number == 0)
+        #expect(PanelText.rowDetail(old, showingRepository: false) == "ping")
+        #expect(harness.pingRows().map(\.number).sorted() == [0, 1])
     }
 
     @Test("a ping file that doesn't read is skipped; the others still list")

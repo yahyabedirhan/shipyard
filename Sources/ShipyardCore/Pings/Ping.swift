@@ -39,6 +39,12 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// even while the app wasn't running, and a replace never is. `nil` for
     /// a ping written before it was kept.
     public var instance: String?
+    /// Its number in its machine's store (`#3`), counted up from 1 as pings
+    /// are sent and never given again (`PingStore.takeNumber()`), and kept
+    /// by a replace. Numbers are per machine, so it's unique only beside
+    /// the machine it came from. `nil` for a ping written before pings were
+    /// numbered, which shows none.
+    public var number: Int?
 
     public init(
         id: String,
@@ -52,7 +58,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         action: PingAction? = nil,
         failure: String? = nil,
         failureDetail: String? = nil,
-        instance: String? = nil
+        instance: String? = nil,
+        number: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -66,6 +73,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.failure = failure
         self.failureDetail = failureDetail
         self.instance = instance
+        self.number = number
     }
 
     /// What its notification says under the title: the body, then
@@ -98,7 +106,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         return now < seen.addingTimeInterval(seenWindow)
     }
 
-    /// The ping as a listed item: kind `ping`, always open, aged from when
+    /// The ping as a listed item: kind `ping`, numbered as its store
+    /// numbered it (0, no number, for one written before), always open, aged from when
     /// it was sent, in the repository it was filed by (if any). Its URL only
     /// names it (`shipyard://ping/<id>`), so it never collides with a GitHub
     /// item's; a click runs its `action` instead. It has no GitHub author:
@@ -107,7 +116,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         Item(
             kind: .ping,
             repository: repository ?? "",
-            number: 0,
+            number: number ?? 0,
             title: title,
             url: Self.url(id: id),
             author: "",

@@ -28,7 +28,7 @@ private extension Harness {
     func ping(_ title: String, project: String = "shop") throws -> String {
         let result = cli("ping", title, "--project", project)
         try #require(result.status == 0, "\(result.error)")
-        return result.output.trimmingCharacters(in: .newlines)
+        return result.pingID
     }
 
     /// The ping rows of `project`.

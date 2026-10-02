@@ -82,12 +82,13 @@ public enum PanelText {
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         case .ping: pingDetail(row)
         }
-        return (row.kind == .ping ? [] : ["#\(row.number)"]) + repository + subject
+        // A ping written before pings were numbered has none (0).
+        return (row.number > 0 ? ["#\(row.number)"] : []) + repository + subject
     }
 
-    /// A ping's second line, which has no number: why its action failed,
+    /// A ping's second line after its number: why its action failed,
     /// while it has; otherwise its sender and its body on one line, each
-    /// when given, or "ping" when neither is: "claude · Waiting for your input".
+    /// when given, or "ping" when neither is: "#3 · claude · Waiting for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
