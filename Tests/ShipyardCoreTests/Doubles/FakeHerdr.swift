@@ -3,7 +3,8 @@ import ShipyardCore
 
 /// A `ShellRunning` standing in for the `herdr` command: a Herdr session
 /// with the tabs and panes it was given, answering `herdr pane get <id>`,
-/// `herdr tab get <id>` and `herdr tab focus <id>` with Herdr's JSON, and
+/// `herdr pane list`, `herdr tab get <id>` and `herdr tab focus <id>` with
+/// Herdr's JSON, and
 /// recording every run. It's installed at `FakeHerdr.path` (one of
 /// `HerdrFocus.knownPaths`) until `installed` is false; `running` false
 /// answers as Herdr does with no server. `command` answers the same way for
@@ -88,6 +89,23 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
+    /// Closes the tab `tab` and the panes in it, as `herdr tab close` does.
+    func close(tab: String) {
+        state.withValue { state in
+            state.tabs[tab] = nil
+            state.panes = state.panes.filter { $0.value != tab }
+        }
+    }
+
+    /// Closes the workspace `workspace` (`w1`): every tab and pane whose id
+    /// starts `w1:`, as `herdr workspace close` does.
+    func close(workspace: String) {
+        state.withValue { state in
+            state.tabs = state.tabs.filter { !$0.key.hasPrefix(workspace + ":") }
+            state.panes = state.panes.filter { !$0.key.hasPrefix(workspace + ":") }
+        }
+    }
+
     /// Whether `path` is this `herdr`, while it's installed.
     var isExecutable: @Sendable (String) -> Bool {
         { [self] path in path == FakeHerdr.path && installed }
@@ -159,6 +177,10 @@ final class FakeHerdr: ShellRunning {
             }
             if arguments.first == "--machine", arguments.count > 1 {
                 return Self.answer(Array(arguments.dropFirst(2)), on: arguments[1], in: &state)
+            }
+            if arguments == ["pane", "list"] {
+                let panes = state.panes.sorted { $0.key < $1.key }.map { #"{"pane_id":"\#($0.key)","tab_id":"\#($0.value)"}"# }
+                return ShellOutput(status: 0, output: #"{"id":"cli:pane:list","result":{"panes":[\#(panes.joined(separator: ","))],"type":"pane_list"}}"# + "\n")
             }
             switch Array(arguments.dropLast()) {
             case ["pane", "get"]:

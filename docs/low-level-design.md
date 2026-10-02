@@ -218,9 +218,9 @@ ShipyardCLI -> PingCommand         run(arguments, environment, configuration, re
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
 ShipyardCLI -> HerdrEvent          run(environment, configuration, resolved, store) for herdr-event -> output, exit status
-HerdrEvent -> CommandEnvironment.run  herdr pane get <pane> (tab_id, cwd), herdr tab get <tab> (label)
+HerdrEvent -> CommandEnvironment.run  herdr pane get <pane> (tab_id, cwd), herdr tab get <tab> (label); herdr pane list (open panes) on a closed tab or workspace
 HerdrEvent -> PingCommand          send(request herdr-<pane>, folder: the pane's cwd, unfiled) on blocked
-HerdrEvent -> PingStore            remove(id: herdr-<pane>) when the agent goes on or its pane closes
+HerdrEvent -> PingStore            remove(id: herdr-<pane>) when the agent goes on or its pane closes (with its tab or workspace too)
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]; pingEvents(listings, projects) -> a ping.sent per unseen listed ping
 Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification); removeDelivered(id) for a ping that left (#102)
@@ -802,9 +802,10 @@ Each project's repositories as the app last resolved them (`ResolvedRepositories
 |---|---|
 | `pane.agent_status_changed`, `blocked` | `herdr pane get <pane>` (its `tab_id` and `cwd`), then `herdr tab get <tab>` (its `label`), through `CommandEnvironment.run` (the synchronous `GhCLI.Run` port; tests answer with `FakeHerdr.command`), with Herdr's own `HERDR_BIN_PATH`, else `herdr` found as `HerdrFocus` finds it. Then `PingCommand.send` with `--id herdr-<pane>`: title "<Agent> is waiting in <tab label>" ("An agent…" without a name; the pane id without a label, or when `herdr` can't say), sender `display_agent` or `agent`, action `.herdr(pane)`, filed by the `origin` of the pane's `cwd` and saved `unfiled` when no project takes it. Blocking again replaces it (one per pane, no second notification); prints the id. Herdr runs each event's hook on its own, so when `pane get` already says the agent went on (another status), the ping isn't sent and any there is withdrawn, as that later event would. A ping saved `unfiled` reaches the Mac as a remote ping and lists in its machine's section |
 | `working`, `idle`, `done`, `unknown`; `pane.closed` | removes `herdr-<pane>` and prints its id; nothing, exit 0, when there's none |
+| `tab.closed`, `workspace.closed` (#112, found in #120) | Herdr 0.9.3 sends no `pane.closed` for the panes a closed tab or workspace takes with it, and these payloads name only the tab or workspace. So, when the store holds any ping this command sent (`herdr-<pane>` whose action is `.herdr(pane)`; a ping an agent sent with `--herdr` is never touched), it runs `herdr pane list` once and removes each one whose pane isn't listed, printing their ids. No such ping: nothing, exit 0, and `herdr` isn't run. When `herdr pane list` can't be run or doesn't read (no server, no `herdr`), nothing is removed, exit 1: the CLI sees only an exit status, so a pane Herdr doesn't know and a Herdr that didn't answer would read the same through `pane get` |
 | any other event or status | nothing, exit 0 |
 
-Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not a JSON object, without `pane_id`, or (for a status change) without `agent_status`: exit 1, one line naming the event; a `config.toml` that doesn't read (blocked only) or a store that can't be written: exit 1. `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
+Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not a JSON object, without `pane_id`, or (for a status change) without `agent_status`: exit 1, one line naming the event; a `config.toml` that doesn't read (blocked only), a store that can't be written, or (for a closed tab or workspace) a `herdr pane list` that didn't answer: exit 1. `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
 
 ### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
 

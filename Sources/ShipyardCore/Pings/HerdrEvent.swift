@@ -12,6 +12,10 @@ import Foundation
 ///   pane, its title saying the agent is waiting in the pane's tab.
 /// - `working`, `idle`, `done` and `unknown`, and `pane.closed`, withdraw
 ///   that ping, doing nothing when there's none.
+/// - `tab.closed` and `workspace.closed`, which Herdr sends without a
+///   `pane.closed` for the panes that went with them, withdraw every
+///   `herdr-<pane>` ping whose pane `herdr pane list` no longer lists. When
+///   Herdr can't list its panes, nothing is withdrawn.
 ///
 /// The tab's label and the pane's working folder (whose `origin` files the
 /// ping, as a ping's working folder does) come from `herdr pane get` and
@@ -28,6 +32,8 @@ public enum HerdrEvent {
 
     static let statusChanged = "pane.agent_status_changed"
     static let paneClosed = "pane.closed"
+    static let tabClosed = "tab.closed"
+    static let workspaceClosed = "workspace.closed"
 
     /// The statuses that mean the agent went on, or isn't known to wait.
     static let resolvedStatuses: Set<String> = ["working", "idle", "done", "unknown"]
@@ -44,6 +50,9 @@ public enum HerdrEvent {
     ) -> CommandResult {
         guard let event = environment.variables[eventVariable], !event.isEmpty else {
             return .usage("shipyard herdr-event: \(eventVariable) isn't set; Herdr's plugin event hooks run this command")
+        }
+        if event == tabClosed || event == workspaceClosed {
+            return withdrawGone(event: event, environment: environment, store: store)
         }
         guard event == statusChanged || event == paneClosed else { return CommandResult() }
         let payload: Payload
@@ -118,6 +127,27 @@ public enum HerdrEvent {
         return CommandResult(output: id + "\n")
     }
 
+    /// Takes back each ping this command sent (`herdr-<pane>`, its action
+    /// that pane) whose pane Herdr no longer lists, printing their ids. The
+    /// payload isn't read: it names the tab or workspace, not its panes.
+    private static func withdrawGone(event: String, environment: CommandEnvironment, store: PingStore) -> CommandResult {
+        let sent = store.all().compactMap { ping -> (id: String, pane: String)? in
+            guard case .herdr(let pane) = ping.action, ping.id == pingID(pane: pane) else { return nil }
+            return (ping.id, pane)
+        }
+        guard !sent.isEmpty else { return CommandResult() }
+        guard let open = PaneLookup(environment: environment).openPanes() else {
+            return .failed("shipyard herdr-event: \(event): herdr pane list didn't answer, so no ping was withdrawn")
+        }
+        var output = ""
+        for ping in sent where !open.contains(ping.pane) {
+            let withdrawn = withdraw(ping.id, store: store)
+            guard withdrawn.status == 0 else { return withdrawn }
+            output += withdrawn.output
+        }
+        return CommandResult(output: output)
+    }
+
     /// What an event's payload says.
     struct Payload: Equatable {
         var pane: String
@@ -184,6 +214,13 @@ public enum HerdrEvent {
                   !label.trimmingCharacters(in: .whitespaces).isEmpty
             else { return Pane(folder: folder, status: status) }
             return Pane(tabLabel: label, folder: folder, status: status)
+        }
+
+        /// The ids of every pane Herdr has open, from `herdr pane list`;
+        /// `nil` when it can't be run or its answer doesn't read.
+        func openPanes() -> Set<String>? {
+            guard let herdr, let panes = result(herdr, ["pane", "list"])?["panes"] as? [[String: Any]] else { return nil }
+            return Set(panes.compactMap { $0["pane_id"] as? String })
         }
 
         /// The `result` of running `herdr` with `arguments`, when it worked.

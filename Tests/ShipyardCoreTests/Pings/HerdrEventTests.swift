@@ -23,6 +23,16 @@ private func paneClosed(_ pane: String = "w1:p3") -> String {
     #"{"event":"pane_closed","data":{"type":"pane_closed","pane_id":"\#(pane)","workspace_id":"w1"}}"#
 }
 
+/// `HERDR_PLUGIN_EVENT_JSON` for `tab.closed`, which names the tab, not its panes.
+private func tabClosed(_ tab: String = "w1:t2") -> String {
+    #"{"event":"tab_closed","data":{"type":"tab_closed","tab_id":"\#(tab)","workspace_id":"w1"}}"#
+}
+
+/// `HERDR_PLUGIN_EVENT_JSON` for `workspace.closed`.
+private func workspaceClosed(_ workspace: String = "w1") -> String {
+    #"{"event":"workspace_closed","data":{"type":"workspace_closed","workspace_id":"\#(workspace)"}}"#
+}
+
 /// The folder the blocked agent works in, in Herdr.
 private let agentFolder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
 
@@ -239,6 +249,69 @@ struct HerdrEventTests {
         #expect(harness.herdrEvent("pane.closed", paneClosed()) == CommandResult(output: "herdr-w1-p3\n"))
 
         #expect(harness.pingStore.all().map(\.id) == ["herdr-w1-p4"])
+    }
+
+    @Test("a closed tab, which Herdr sends no pane.closed for, withdraws the pings of the panes that went with it, and only those")
+    func closedTabWithdraws() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout", folder: agentFolder)
+        harness.herdr.open(pane: "w1:p4", tab: "w1:t2", label: "checkout", folder: agentFolder)
+        harness.herdr.open(pane: "w1:p5", tab: "w1:t3", label: "cart", folder: agentFolder)
+        harness.agent("blocked")
+        harness.agent("blocked", pane: "w1:p4")
+        harness.agent("blocked", pane: "w1:p5")
+        // A ping an agent sent itself, focusing a pane in the tab: not herdr-event's to take back.
+        try harness.pingStore.save(Ping(id: "mine", title: "Look at this", projects: ["shop"], sent: harness.clock.now, action: .herdr("w1:p3")))
+        await harness.shipyard.reloadPings()
+
+        harness.herdr.close(tab: "w1:t2")
+        let result = harness.herdrEvent("tab.closed", tabClosed())
+        await harness.shipyard.reloadPings()
+
+        #expect(result == CommandResult(output: "herdr-w1-p3\nherdr-w1-p4\n"))
+        #expect(harness.herdr.runs.last == ["pane", "list"])
+        #expect(Set(harness.pingStore.all().map(\.id)) == ["herdr-w1-p5", "mine"])
+        #expect(harness.notifier.removed.count == 2)
+    }
+
+    @Test("a closed workspace withdraws the pings of every pane that was in it")
+    func closedWorkspaceWithdraws() throws {
+        let harness = try Harness(config: shop)
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout")
+        harness.herdr.open(pane: "w1:p7", tab: "w1:t4", label: "cart")
+        harness.herdr.open(pane: "w2:p1", tab: "w2:t1", label: "blog")
+        harness.agent("blocked")
+        harness.agent("blocked", pane: "w1:p7")
+        harness.agent("blocked", pane: "w2:p1")
+
+        harness.herdr.close(workspace: "w1")
+        #expect(harness.herdrEvent("workspace.closed", workspaceClosed()) == CommandResult(output: "herdr-w1-p3\nherdr-w1-p7\n"))
+        #expect(harness.pingStore.all().map(\.id) == ["herdr-w2-p1"])
+
+        #expect(harness.herdrEvent("workspace.closed", workspaceClosed()) == CommandResult())
+        #expect(harness.pingStore.all().map(\.id) == ["herdr-w2-p1"])
+    }
+
+    @Test("when Herdr can't list its panes, a closed tab or workspace withdraws nothing, and says so on standard error, exit 1", arguments: ["tab.closed", "workspace.closed"])
+    func closedWithoutHerdr(event: String) throws {
+        let harness = try Harness(config: shop)
+        harness.agent("blocked")
+
+        harness.herdr.running = false
+        let stopped = harness.herdrEvent(event, tabClosed())
+        #expect(stopped == CommandResult(error: "shipyard herdr-event: \(event): herdr pane list didn't answer, so no ping was withdrawn\n", status: 1))
+        harness.herdr.installed = false
+        #expect(harness.herdrEvent(event, tabClosed()).status == 1)
+
+        #expect(harness.pingStore.all().map(\.id) == ["herdr-w1-p3"])
+    }
+
+    @Test("a closed tab or workspace with no herdr-event ping stored runs no herdr, needs no configuration, and exits 0 quietly", arguments: ["tab.closed", "workspace.closed"])
+    func closedWithNothingToWithdraw(event: String) throws {
+        let harness = try Harness(config: shop)
+        try harness.writeConfig("[[projects]\n")
+        #expect(harness.herdrEvent(event, tabClosed()) == CommandResult())
+        #expect(harness.herdr.runs.isEmpty)
     }
 
     @Test("withdrawing with no ping for the pane does nothing, and exits 0 quietly", arguments: ["working", "idle", "done", "unknown"])
