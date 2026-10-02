@@ -132,9 +132,9 @@ enum Palette {
     /// A row's colour, by kind: a pull request open green, draft gray,
     /// merged purple, closed red; an issue open green, closed purple; a
     /// workflow run running amber, succeeded green, failed red; a ping
-    /// the accent blue.
+    /// gray, as a message (its dot and bold title say it's unseen).
     static func color(_ state: ItemState, kind: ItemKind) -> Color {
-        if kind == .ping { return accent }
+        if kind == .ping { return gray }
         return switch state {
         case .open, .succeeded: green
         case .draft: gray
