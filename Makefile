@@ -51,7 +51,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
 endif
 
-.PHONY: all build test bundle install release run icon icon-alternates icon-exploration clean
+.PHONY: all build test bundle install release run icon icon-alternates icon-exploration agent-logos clean
 
 all: build
 
@@ -72,6 +72,9 @@ bundle: build
 	cp "$$(swift build -c release --show-bin-path)/$(CLI)" $(CONTENTS)/Helpers/shipyard
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
 	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
+	@# The app's SwiftPM resources (the agents' logos), where AgentLogoImage
+	@# looks: in Resources, since a bundle at the app's root breaks its signature.
+	cp -R "$$(swift build -c release --show-bin-path)/$(APP)_$(APP)App.bundle" $(CONTENTS)/Resources/
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
 	@# bundle gives it the stable identity notifications and login items need.
@@ -132,6 +135,22 @@ icon-alternates: $(ICON_TOOL)
 # a comparison sheet (with the menu bar item and the badge) in the exploration folder.
 icon-exploration: $(ICON_TOOL)
 	$(ICON_TOOL) --exploration assets/images/app-icon/exploration
+
+# Each known agent's logo, kept as its maker's SVG in assets/images/agent-logos/
+# (sources in docs/references/agent-icons.md), converted to the vector PDF the
+# app bundles: macOS 14 can't be relied on to load SVG. The PDFs are
+# committed, so bundling doesn't need librsvg; run this after changing an SVG
+# (brew install librsvg).
+AGENT_LOGO_SVGS := $(wildcard assets/images/agent-logos/*.svg)
+AGENT_LOGOS     := Sources/ShipyardApp/Resources/AgentLogos
+
+agent-logos:
+	@mkdir -p $(AGENT_LOGOS)
+	@for svg in $(AGENT_LOGO_SVGS); do \
+		pdf=$(AGENT_LOGOS)/$$(basename $$svg .svg).pdf; \
+		rsvg-convert --format pdf --output $$pdf $$svg || exit 1; \
+		echo "drew $$pdf"; \
+	done
 
 clean:
 	rm -rf $(BUILD_DIR) .build
