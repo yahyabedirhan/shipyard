@@ -2,7 +2,7 @@
 
 Checked 2026-10-02 against [Dependency caching reference](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching), [Workflow syntax: `on.push`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore) and the [`actions/cache` README at v6.1.0](https://github.com/actions/cache/blob/v6.1.0/README.md).
 
-The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with `actions/cache/restore@v6` and `actions/cache/save@v6`. Its key is `<runner.os>-<runner.arch>-swift-<hash of swift --version>-<hash of Package.resolved>-<commit>`, and its one restore key is the same without the commit.
+The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with `actions/cache/restore@v6` and `actions/cache/save@v6`. Its key is `<github.workflow>-<github.job>-<runner.os>-<runner.arch>-swift-<toolchain hash>-<hash of Package.resolved>-<commit>`, and its one restore key is the same without the commit. The toolchain hash is of `swift --version` on Linux, and of `swift --version`, `xcodebuild -version` and `xcrun --show-sdk-version` together on macOS, so an Xcode or SDK point release with the same Swift starts a fresh cache.
 
 ## Matching a key
 
@@ -11,6 +11,7 @@ The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with
 - `cache-hit` is `'true'` only for an exact match of `key`; a restore through `restore-keys` gives `'false'`. That is why the workflow saves when `cache-hit` isn't `'true'`: a rerun of the same commit restores its own cache and saves nothing.
 - The cache "version" is a hash of the `path` and the compression tool. A cache made with zstd (the macOS runner) and one made with gzip (the `swift:6.2-noble` container, which has no `zstd`) never match each other, whatever the key.
 - Keys are at most 512 characters.
+- Caches are matched by key across every workflow in the repository, not per workflow. The workflow and job lead the key so another workflow that builds fewer targets can't save a cache this one restores: the Linux job's `.build/ci-sources.txt` would claim files were compiled that weren't, and the job would skip them.
 
 ## Immutability
 
@@ -38,7 +39,7 @@ The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with
 
 ## Triggers
 
-- "If you define neither `tags`/`tags-ignore` or `branches`/`branches-ignore`, the workflow will run for events affecting either branches or tags." Defining only `branches` stops tag pushes, which is why `ci.yml` lists both `branches: ['**']` and `tags: ['**']`.
+- "If you define neither `tags`/`tags-ignore` or `branches`/`branches-ignore`, the workflow will run for events affecting either branches or tags." `ci.yml` gives a bare `push:`, so it runs on every branch push and every tag push; defining only `branches` would stop tag pushes.
 
 ## Security
 
