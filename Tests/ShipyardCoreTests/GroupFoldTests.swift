@@ -226,7 +226,7 @@ struct GroupFoldTests {
     @Test("the All tab's subheaders fold on their own, apart from a project's tab")
     func allTab() async throws {
         let harness = try await Harness.started(config: config("", layout: .tabs), graphQL: answer)
-        let allIssues = GroupID(project: "", key: .kind(.issue))
+        let allIssues = GroupID.allTab(.kind(.issue))
 
         harness.shipyard.toggleGroup(allIssues)
 

@@ -180,9 +180,9 @@ struct RowHighlightTests {
         ])
 
         #expect(menu.tabContent(for: .all).rowPlaces == [
-            .groupHeader(GroupID(project: "", key: .kind(.pullRequest)), in: nil), place(nil, pull),
-            .groupHeader(GroupID(project: "", key: .kind(.issue)), in: nil), place(nil, issue),
-            .groupHeader(GroupID(project: "", key: .kind(.workflowRun)), in: nil), place(nil, run),
+            .groupHeader(.allTab(.kind(.pullRequest)), in: nil), place(nil, pull),
+            .groupHeader(.allTab(.kind(.issue)), in: nil), place(nil, issue),
+            .groupHeader(.allTab(.kind(.workflowRun)), in: nil), place(nil, run),
         ])
     }
 

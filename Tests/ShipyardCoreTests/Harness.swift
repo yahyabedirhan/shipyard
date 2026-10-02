@@ -204,6 +204,13 @@ struct Harness {
     }
 }
 
+extension GroupID {
+    /// The All tab's group of `key`: the All tab has no project.
+    static func allTab(_ key: GroupKey) -> GroupID {
+        GroupID(project: "", key: key)
+    }
+}
+
 /// An ISO 8601 date, for comparing with the fixtures.
 func date(_ text: String) -> Date {
     ISO8601DateFormatter().date(from: text)!

@@ -148,7 +148,7 @@ struct AppStateStoreTests {
             GroupID(project: "shop", key: .date(.thisWeek)),
             GroupID(project: "shop", key: .author("octocat")),
             GroupID(project: "shop", key: .ungrouped),
-            GroupID(project: "", key: .kind(.workflowRun)),
+            .allTab(.kind(.workflowRun)),
         ]
         store.update { $0.collapsedGroups = folds }
 
