@@ -1,8 +1,28 @@
 name: ci
 
+# Every push (a branch or a tag, so a release tag runs the bundle too) and
+# every pull request builds and tests.
 on:
   push:
   pull_request:
+
+# .build is cached between runs (docs/references/github-actions-cache.md). The
+# key is the workflow and job, the OS, the exact toolchain (hashed), the
+# resolved dependencies and the commit; a run restores the newest cache that
+# matches all but the commit. Caches are shared across workflows by key, so the
+# workflow and job keep another workflow's narrower build (and its claim of
+# what it compiled) out of this one's restore. Only pushes save, once the
+# build and the tests pass: a pull request's cache would be scoped to its merge
+# ref and serve no one else.
+#
+# A fresh checkout gives every source a new modification time, so the compiler
+# treats each of the package's own files as changed and recompiles it: a stale
+# cache can't hide a change, and what the cache saves is the dependency and the
+# package resolution. On macOS, -enable-incremental-file-hashing has the
+# compiler compare each file's contents with the restored build instead, so an
+# unchanged file is skipped and a changed one (with what depends on it) still
+# recompiles. Swift 6.2 on Linux doesn't know the flag, so the Linux job keeps
+# unchanged files' timestamps instead (see its step).
 
 jobs:
   core-linux:
@@ -11,22 +31,87 @@ jobs:
     container: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
-      - name: build ShipyardCore
-        run: swift build --target ShipyardCore
+      - name: read the toolchain version
+        id: toolchain
+        run: echo "hash=$(swift --version 2>&1 | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: restore .build
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: .build
+          key: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-swift-${{ steps.toolchain.outputs.hash }}-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-swift-${{ steps.toolchain.outputs.hash }}-${{ hashFiles('Package.resolved') }}-
+      # Swift 6.2 doesn't know -enable-incremental-file-hashing, so this does
+      # its job by hand. .build/ci-sources.txt lists each tracked file's blob
+      # hash as of the build the cache holds. A file whose hash still matches
+      # gets a fixed old time, the one that build saw for it, and the compiler
+      # skips it. A changed or new file keeps its checkout time, which no
+      # cached build has seen, so it recompiles (and once more on the next
+      # run, which gives it the fixed time). With no cache every file gets the
+      # fixed time; a cache without the list leaves every file new.
+      - name: keep unchanged files' timestamps
+        run: |
+          export LC_ALL=C
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          list=.build/ci-sources.txt
+          # 2000-01-01, older than any checkout, so no cached build saw a newer time.
+          fixed_time=946684800
+          if [ -f "$list" ]; then
+            git ls-files -s -z | sort -z | comm -z -12 - <(sort -z "$list") | cut -z -f2- | xargs -0 -r touch -d "@$fixed_time"
+          elif [ ! -d .build ]; then
+            git ls-files -z | xargs -0 -r touch -d "@$fixed_time"
+          fi
+        shell: bash
+      # Builds ShipyardCore, the CLI and the tests on Linux, then runs them.
       - name: test
         run: swift test
+      - name: list the sources this build holds
+        if: github.event_name == 'push' && steps.restore.outputs.cache-hit != 'true'
+        run: git ls-files -s -z > .build/ci-sources.txt
+      - name: save .build
+        if: github.event_name == 'push' && steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build
+          key: ${{ steps.restore.outputs.cache-primary-key }}
 
   macos:
     name: build and test (macos)
     runs-on: macos-latest
+    env:
+      CI_SWIFT_FLAGS: -Xswiftc -enable-incremental-file-hashing
     steps:
       - uses: actions/checkout@v4
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-      - name: build everything
-        run: swift build
-      - name: bundle the app
-        run: make bundle
+      # Xcode and its SDK too, so a point release with the same Swift starts a
+      # fresh cache.
+      - name: read the toolchain version
+        id: toolchain
+        run: echo "hash=$({ swift --version; xcodebuild -version; xcrun --show-sdk-version; } 2>&1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: restore .build
+        id: restore
+        uses: actions/cache/restore@v6
+        with:
+          path: .build
+          key: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-swift-${{ steps.toolchain.outputs.hash }}-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: ${{ github.workflow }}-${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-swift-${{ steps.toolchain.outputs.hash }}-${{ hashFiles('Package.resolved') }}-
+      # One debug build of everything: the app (Shipyard), the CLI
+      # (shipyard-cli) and the test targets.
+      - name: build the app, the cli and the tests
+        run: swift build --build-tests $CI_SWIFT_FLAGS
       - name: test
-        run: make test
+        run: swift test --skip-build $CI_SWIFT_FLAGS
+      # Saved before the bundle, so the cache holds the debug build branches
+      # restore, not the release build only main and tags make.
+      - name: save .build
+        if: github.event_name == 'push' && steps.restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .build
+          key: ${{ steps.restore.outputs.cache-primary-key }}
+      # The release build, bundled and signed, only where a release comes from.
+      - name: bundle the app
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+        run: make bundle

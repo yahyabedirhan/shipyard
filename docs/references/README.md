@@ -6,6 +6,7 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 |---|---|
 | [github-rate-limits.md](github-rate-limits.md) | GraphQL and REST rate limits, query cost, running out, secondary limits, conditional requests |
 | [github-workflow-runs.md](github-workflow-runs.md) | Listing workflow runs over REST |
+| [github-actions-cache.md](github-actions-cache.md) | The `ci` workflow's `.build` cache: key and restore-key matching, which branches can restore which caches, immutability, size and eviction, container jobs, tag triggers |
 | [github-device-flow.md](github-device-flow.md) | Signing in with GitHub's OAuth device flow |
 | [github-search.md](github-search.md) | The review search: `review-requested` and team requests, its 100-result page |
 | [github-repositories.md](github-repositories.md) | Listing and checking repositories for the project picker; listing a repository group's or an owner's repositories (affiliations, `isArchived`, `isFork`, paging) |
