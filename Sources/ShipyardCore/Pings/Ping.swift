@@ -36,6 +36,11 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// even while the app wasn't running, and a replace never is. `nil` for
     /// a ping written before it was kept.
     public var instance: String?
+    /// When it leaves the machine it was sent on, a day after its sending or
+    /// its last replace: set on Linux, where no app sees it seen, so an
+    /// unanswered ping doesn't stay forever. `nil` on the Mac, where it stays
+    /// until seen. Kept on the machine, never listed (`PingList`).
+    public var expires: Date?
 
     public init(
         id: String,
@@ -48,7 +53,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         sender: String? = nil,
         action: PingAction? = nil,
         failure: String? = nil,
-        instance: String? = nil
+        instance: String? = nil,
+        expires: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -61,6 +67,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.action = action
         self.failure = failure
         self.instance = instance
+        self.expires = expires
     }
 
     /// What its notification says under the title: the body, then
@@ -81,6 +88,12 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         theirs.seen = nil
         theirs.failure = nil
         return mine == theirs
+    }
+
+    /// Whether it's still on its machine at `now`: one without an expiry
+    /// always is; one with an expiry until then.
+    public func isLive(at now: Date) -> Bool {
+        expires.map { now < $0 } ?? true
     }
 
     /// Whether it's still listed under a `seen-window` of `seenWindow`

@@ -12,7 +12,8 @@ import Foundation
 /// (a new field) keeps it; one it can't bumps it, and a reader refuses any
 /// version but its own. Each ping carries the fields a ping is sent with
 /// (id, instance, title, body, sender, repository, projects, action, sent);
-/// what a Mac records on it (seen, a failure) stays on that Mac.
+/// what a Mac records on it (seen, a failure) stays on that Mac, and when
+/// it expires stays on the machine.
 public struct PingList: Equatable, Sendable {
     /// The contract version this build writes and reads.
     public static let currentVersion = 1
@@ -68,7 +69,7 @@ public struct PingList: Equatable, Sendable {
     /// The JSON document for `pings`: newest first (by `sent`, then id), at
     /// most `maxPings` and within `byteBudget` bytes, stopping at the first
     /// ping that doesn't fit and setting `truncated` when it stops early.
-    /// Each ping's `seen` and `failure` are left out. One line, no newline.
+    /// Each ping's `seen`, `failure` and `expires` are left out. One line, no newline.
     public static func encode(_ pings: [Ping], shipyardVersion: String = ShipyardVersion.current) -> String {
         let sorted = pings
             .sorted { ($0.sent, $0.id) > ($1.sent, $1.id) }
@@ -76,6 +77,7 @@ public struct PingList: Equatable, Sendable {
                 var ping = ping
                 ping.seen = nil
                 ping.failure = nil
+                ping.expires = nil
                 return ping
             }
         // What the envelope costs with no pings (`false`, the longer of the

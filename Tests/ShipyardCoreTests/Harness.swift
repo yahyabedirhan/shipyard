@@ -182,7 +182,9 @@ struct Harness {
             environment: CommandEnvironment(
                 workingDirectory: workingFolder,
                 variables: herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:],
-                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
+                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:]),
+                // The harness is the Mac's app, so its CLI is the Mac's.
+                platform: .macOS
             ),
             configURL: configURL,
             repositories: repositoriesStore,

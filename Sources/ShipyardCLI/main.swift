@@ -8,11 +8,12 @@ let result = ShipyardCLI.run(
     Array(CommandLine.arguments.dropFirst()),
     environment: CommandEnvironment(
         workingDirectory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
-        variables: environment
+        variables: environment,
+        platform: .current
     ),
     configURL: ConfigStore.defaultURL(environment: environment),
     repositories: ResolvedRepositoriesStore(directory: ResolvedRepositoriesStore.defaultDirectory),
-    pingStore: PingStore(directory: PingStore.defaultDirectory),
+    pingStore: PingStore(directory: PingStore.defaultDirectory(platform: .current, environment: environment)),
     now: Date()
 )
 FileHandle.standardOutput.write(Data(result.output.utf8))

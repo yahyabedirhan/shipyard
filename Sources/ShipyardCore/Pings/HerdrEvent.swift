@@ -81,6 +81,7 @@ public enum HerdrEvent {
             request,
             folder: pane.folder,
             git: environment.git,
+            platform: environment.platform,
             configuration: read,
             resolved: resolved(),
             store: store,

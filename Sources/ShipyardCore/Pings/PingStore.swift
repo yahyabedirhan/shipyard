@@ -1,9 +1,10 @@
 import Foundation
 
 /// Keeps the pings agents send, one JSON file per ping (`<id>.json`) in a
-/// directory of its own: `~/Library/Application Support/Shipyard/Pings/`,
+/// directory of its own: on the Mac `~/Library/Application Support/Shipyard/Pings/`,
 /// apart from `state.json` (app state is what shipyard remembers from use;
-/// pings are data agents send). The format is private (ADR 0004): only the
+/// pings are data agents send); on Linux, a machine without the app,
+/// `~/.local/share/shipyard/pings` (`defaultDirectory(platform:)`). The format is private (ADR 0004): only the
 /// `shipyard` CLI and the app read and write it.
 ///
 /// The CLI and the running app may write at the same time. Each write
@@ -21,6 +22,31 @@ public struct PingStore: Sendable {
     /// `~/Library/Application Support/Shipyard/Pings/`, beside `state.json`.
     public static var defaultDirectory: URL {
         ResolvedRepositoriesStore.defaultDirectory.appendingPathComponent("Pings", isDirectory: true)
+    }
+
+    /// Where the `shipyard` command keeps pings on `platform`: on macOS
+    /// `defaultDirectory`, where the app reads them; on Linux
+    /// `$XDG_DATA_HOME/shipyard/pings`, or `~/.local/share/shipyard/pings`
+    /// when `XDG_DATA_HOME` is unset, empty or not an absolute path.
+    public static func defaultDirectory(
+        platform: CommandPlatform,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) -> URL {
+        switch platform {
+        case .macOS:
+            return defaultDirectory
+        case .linux:
+            let base: URL
+            if let xdg = environment["XDG_DATA_HOME"], xdg.hasPrefix("/") {
+                base = URL(fileURLWithPath: xdg, isDirectory: true)
+            } else {
+                base = home.appendingPathComponent(".local/share", isDirectory: true)
+            }
+            return base
+                .appendingPathComponent("shipyard", isDirectory: true)
+                .appendingPathComponent("pings", isDirectory: true)
+        }
     }
 
     /// Every ping that reads, oldest first (then by id); none when the
@@ -80,6 +106,16 @@ public struct PingStore: Sendable {
         guard stored == ping else { return false }
         try remove(id: ping.id)
         return true
+    }
+
+    /// Removes every ping that has expired by `now` (`Ping.isLive(at:)`),
+    /// each only as it was read (`removeIfUnchanged`), so one replaced
+    /// meanwhile stays. A file that can't be removed is left; readers
+    /// still leave it out by its expiry.
+    public func removeExpired(at now: Date) {
+        for ping in all() where !ping.isLive(at: now) {
+            _ = try? removeIfUnchanged(ping)
+        }
     }
 
     /// Removes ping `id` (a dismiss, or a seen ping whose window has
