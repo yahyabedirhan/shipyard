@@ -192,11 +192,4 @@ struct MenuTabsTests {
         #expect(PanelText.rowDetail(pull, showingRepository: false) == "#21 · yahyabedirhan")
         #expect(PanelText.rowDetail(run, showingRepository: false) == "#41 · running")
     }
-
-    @Test("each kind's group has a small header")
-    func kindHeaders() {
-        #expect(PanelText.kindGroup(.pullRequest) == "Pull requests")
-        #expect(PanelText.kindGroup(.issue) == "Issues")
-        #expect(PanelText.kindGroup(.workflowRun) == "Runs")
-    }
 }
