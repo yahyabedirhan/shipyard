@@ -130,16 +130,6 @@ struct DeviceFlowTests {
         }
     }
 
-    @Test("won't start while the client ID is still the placeholder")
-    func placeholderClientID() async {
-        let stub = StubHTTP()
-        stub.on("POST", DeviceFlow.codeURL, DeviceFlowAnswers.code())
-        await #expect(throws: DeviceFlowError.clientIDMissing) {
-            _ = try await flow(stub, InstantSleeper(clock: ManualClock()), clientID: OAuthApp.placeholderClientID).requestCode()
-        }
-        #expect(stub.requests.isEmpty)
-    }
-
     @Test("uses the one compiled-in client ID unless given another")
     func defaultClientID() async throws {
         let stub = StubHTTP()

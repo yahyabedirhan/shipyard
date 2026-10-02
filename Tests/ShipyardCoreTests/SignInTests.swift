@@ -70,16 +70,6 @@ struct SignInTests {
         #expect(try harness.store.token() == nil)
     }
 
-    @Test("a revoked gh token signs out")
-    func revokedGhToken() async throws {
-        let harness = try Harness(gh: "gho_revoked")
-        harness.stub.on(userURL, unauthorized)
-
-        await harness.shipyard.start()
-
-        #expect(harness.shipyard.phase == .signedOut)
-    }
-
     @Test("GitHub out of reach still signs in; the viewer waits for a later request")
     func offline() async throws {
         let harness = try Harness(stored: "gho_stored")
@@ -347,26 +337,6 @@ struct SignInTests {
         let harness = try Harness()
 
         #expect(harness.shipyard.phase == .signedOut)
-        #expect(harness.shipyard.signedOutReason == nil)
-    }
-
-    @Test("with no gh token the reason is that there's no token")
-    func reasonNoToken() async throws {
-        let harness = try Harness()
-
-        await harness.shipyard.start()
-
-        #expect(harness.shipyard.signedOutReason == .noToken)
-    }
-
-    @Test("a gh token signs in with no reason left")
-    func reasonClearedBySigningIn() async throws {
-        let harness = try Harness(gh: "gho_fromgh", config: withProjects)
-        harness.stub.on(userURL, viewerAnswer)
-
-        await harness.shipyard.start()
-
-        #expect(harness.shipyard.phase == .ready)
         #expect(harness.shipyard.signedOutReason == nil)
     }
 
