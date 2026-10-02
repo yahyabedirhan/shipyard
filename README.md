@@ -143,7 +143,7 @@ version = 1
 
 ## Development
 
-`make test` runs the tests, and `make release` builds the release zip. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
+`make test` runs the tests, and `make release` builds the release zip. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts. The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 
 ### Forks: your own OAuth App
 
