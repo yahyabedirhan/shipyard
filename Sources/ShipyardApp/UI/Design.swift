@@ -26,6 +26,9 @@ enum Grid {
     static let numberColumn: CGFloat = 30
     /// The author's, or the repository's, column.
     static let metaColumn: CGFloat = 74
+    /// A known agent's logo before a ping's sender: big enough for a logo
+    /// to read, small enough to leave the column the sender's name.
+    static let agentMark: CGFloat = 14
     /// The age's column.
     static let ageColumn: CGFloat = 26
     /// How far a row's hover highlight sits in from the panel's edges.
@@ -143,15 +146,6 @@ enum Palette {
         case .running: amber
         case .failed: red
         }
-    }
-
-    /// A known agent's circle, from its mark's hue: muted, and a little
-    /// lighter in dark mode, so its white monogram reads in both.
-    static func agent(_ mark: AgentMark) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return NSColor(hue: mark.hue, saturation: isDark ? 0.45 : 0.55, brightness: isDark ? 0.62 : 0.56, alpha: 1)
-        })
     }
 
     /// The check dot: pending amber, passed green, failed red; no dot

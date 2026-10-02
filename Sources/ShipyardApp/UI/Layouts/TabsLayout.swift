@@ -377,7 +377,7 @@ private struct TabRow: View {
                     // A known agent's mark leads a ping's line, which
                     // names its sender, unless the line says why it failed.
                     if row.actionError == nil, let agent = row.agent {
-                        AgentMarkView(agent: agent, size: 12)
+                        AgentMarkView(agent: agent, size: Grid.agentMark)
                     }
                     Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                         .font(TypeScale.meta)

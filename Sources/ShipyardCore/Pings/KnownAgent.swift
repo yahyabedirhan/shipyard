@@ -1,35 +1,33 @@
 import Foundation
 
 /// A coding agent shipyard recognises in a ping's sender (`--from`), so its
-/// row and hover card can show the agent's mark.
+/// row and hover card can show the agent's logo.
 ///
-/// Shipyard bundles no agent's logo: their makers' terms don't allow it
-/// (`docs/references/agent-icons.md`). Each agent gets a neutral mark of
-/// shipyard's own instead, a two-letter monogram in a circle of its hue,
-/// which imitates no agent's logo or brand colour.
+/// The app bundles each agent's real logo, its maker's own file where there
+/// is one, only to say which agent sent the ping: the maintainer's decision,
+/// made knowing some makers' brand terms ask for approval
+/// (`docs/references/agent-icons.md`).
 public enum KnownAgent: String, CaseIterable, Hashable, Sendable {
     case claude, codex, opencode, cursor, pi, gemini, copilot, amp, droid
 
     /// The one table: each agent's names as a sender may write them
-    /// (lowercase, without spaces or dashes), and its mark. Monograms keep
-    /// the agents that share an initial apart; hues are spread around the
-    /// wheel, away from red, which says a check or a run failed.
-    private var entry: (aliases: Set<String>, mark: AgentMark) {
+    /// (lowercase, without spaces or dashes), and its logo.
+    private var entry: (aliases: Set<String>, logo: AgentLogo) {
         switch self {
-        case .claude: (["claude", "claudecode"], AgentMark(monogram: "Cl", hue: 0.47))
-        case .codex: (["codex", "codexcli", "openaicodex"], AgentMark(monogram: "Cx", hue: 0.62))
-        case .opencode: (["opencode"], AgentMark(monogram: "Oc", hue: 0.33))
-        case .cursor: (["cursor", "cursoragent", "cursorcli"], AgentMark(monogram: "Cu", hue: 0.55))
-        case .pi: (["pi", "piagent", "picodingagent"], AgentMark(monogram: "Pi", hue: 0.08))
-        case .gemini: (["gemini", "geminicli"], AgentMark(monogram: "Ge", hue: 0.15))
-        case .copilot: (["copilot", "copilotcli", "githubcopilot"], AgentMark(monogram: "Co", hue: 0.9))
-        case .amp: (["amp", "ampcode"], AgentMark(monogram: "Am", hue: 0.72))
-        case .droid: (["droid", "factorydroid"], AgentMark(monogram: "Dr", hue: 0.82))
+        case .claude: (["claude", "claudecode"], AgentLogo("claude"))
+        case .codex: (["codex", "codexcli", "openaicodex"], AgentLogo("codex"))
+        case .opencode: (["opencode"], AgentLogo("opencode", look: .lightAndDark))
+        case .cursor: (["cursor", "cursoragent", "cursorcli"], AgentLogo("cursor"))
+        case .pi: (["pi", "piagent", "picodingagent"], AgentLogo("pi"))
+        case .gemini: (["gemini", "geminicli"], AgentLogo("gemini"))
+        case .copilot: (["copilot", "copilotcli", "githubcopilot"], AgentLogo("copilot", look: .template))
+        case .amp: (["amp", "ampcode"], AgentLogo("amp"))
+        case .droid: (["droid", "factorydroid"], AgentLogo("droid"))
         }
     }
 
-    /// The agent's mark.
-    public var mark: AgentMark { entry.mark }
+    /// The agent's logo.
+    public var logo: AgentLogo { entry.logo }
 
     /// The agent a sender names, or `nil`. Case, spaces, dashes and other
     /// punctuation don't count, and words after the agent's name are
@@ -52,16 +50,27 @@ public enum KnownAgent: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-/// How shipyard draws a known agent: its monogram on a circle of its hue.
-public struct AgentMark: Hashable, Sendable {
-    /// Two letters, the first capital: "Cl".
-    public var monogram: String
-    /// Where its colour sits on the colour wheel, from 0 up to 1; the app
-    /// picks the saturation and brightness for light and dark.
-    public var hue: Double
+/// A known agent's logo: which of the app's bundled files it is, and how it
+/// reads in light and dark mode.
+public struct AgentLogo: Hashable, Sendable {
+    /// How a logo reads in light and dark mode.
+    public enum Look: Hashable, Sendable {
+        /// In its own colours, which read in both.
+        case colour
+        /// In its own colours, with its maker's second file for dark mode,
+        /// named `<resource>-dark`.
+        case lightAndDark
+        /// A single dark glyph, tinted like text so it reads in both.
+        case template
+    }
 
-    public init(monogram: String, hue: Double) {
-        self.monogram = monogram
-        self.hue = hue
+    /// The logo's file in the app's `AgentLogos` resources, without its
+    /// extension: "claude".
+    public var resource: String
+    public var look: Look
+
+    public init(_ resource: String, look: Look = .colour) {
+        self.resource = resource
+        self.look = look
     }
 }
