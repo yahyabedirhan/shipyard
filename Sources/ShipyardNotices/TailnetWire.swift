@@ -19,6 +19,13 @@ public enum TailnetWire {
     /// The most a request's body may hold: a notice with the largest image
     /// (`Notice.largestImage`), base64 in its JSON, and room to spare.
     public static let largestBody = 8 << 20
+    /// Why a notice whose click or a button focuses Herdr doesn't go over
+    /// the tailnet: the request names no machine, so the Mac would focus
+    /// its own Herdr, not the sender's. The command refuses it before
+    /// sending, and the app refuses one that arrives anyway.
+    public static let herdrRefusal = "a notice sent over the tailnet can't focus Herdr (--herdr or a herdr button): "
+        + "the Mac would focus its own Herdr, not this machine's; use --open or --app, "
+        + "or leave app-machine out of cli.toml to send it through the Mac's poll"
 
     /// How long to wait for the verdict on a body of `bytes`: `timeout`,
     /// and a second more for each started megabyte past the first, so a

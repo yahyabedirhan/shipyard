@@ -77,7 +77,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("the scheme and port come from cli.toml, as tailscale serve exposes the app's port")
     func schemeAndPort() throws {
-        try write("[notify]\napp-machine = \"my-mac.tail1234.ts.net\"\nscheme = \"https\"\nport = 443\n")
+        try write("[notify]\napp-machine = \"my-mac.tail1234.ts.net\"\napp-scheme = \"https\"\napp-port = 443\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         _ = shipyard(["notify", "Done"], http: http)
@@ -111,7 +111,7 @@ struct TailnetNotifyCommandTests {
         #expect(result == CommandResult(error: "shipyard notify: \(line)\n", status: 1))
     }
 
-    @Test("without app-machine, or without cli.toml, the notice takes the poll route instead, and nothing goes over the tailnet", arguments: [nil, "", "[notify]\nport = 8080\n"])
+    @Test("without app-machine, or without cli.toml, the notice takes the poll route instead, and nothing goes over the tailnet", arguments: [nil, "", "[notify]\napp-port = 8080\n"])
     func unset(text: String?) throws {
         if let text { try write(text) }
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
@@ -135,6 +135,32 @@ struct TailnetNotifyCommandTests {
 
         #expect(result.status == 1)
         #expect(result.error.hasPrefix("shipyard notify: \(settings.url.path) doesn't read (unknown setting `notify.app-machin`"), "\(result.error)")
+        #expect(http.posts.current.isEmpty)
+    }
+
+    @Test("a notice whose click or button focuses Herdr exits 2 with app-machine set, sending nothing: the Mac would focus its own Herdr", arguments: [
+        ["--herdr", "w1:p3"],
+        ["--open", "https://example.com", "--button", "Back=herdr:w1:p3"],
+    ])
+    func herdrRefused(flags: [String]) throws {
+        try write("[notify]\napp-machine = \"my-mac\"\n")
+        let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
+
+        let result = shipyard(["notify", "Done"] + flags, http: http)
+
+        #expect(result == CommandResult(error: "shipyard notify: \(TailnetWire.herdrRefusal)\n", status: 2))
+        #expect(http.posts.current.isEmpty)
+    }
+
+    @Test("without app-machine, a notice that focuses Herdr takes the poll route, which names its machine")
+    func herdrByPoll() throws {
+        let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
+        let poll = RecordingRoute()
+
+        let result = shipyard(["notify", "Done", "--herdr", "w1:p3"], http: http, poll: poll)
+
+        #expect(result == CommandResult(output: PluginNoticeRoute.queuedLine + "\n"))
+        #expect(poll.notices.current.count == 1)
         #expect(http.posts.current.isEmpty)
     }
 

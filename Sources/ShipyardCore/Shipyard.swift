@@ -159,7 +159,7 @@ public final class Shipyard {
     @ObservationIgnored private let notesReader = NotesReader()
     private let notifier: any Notifying
     /// Learns the Mac's own Tailscale login, the one whose notices the
-    /// tailnet listener takes (`show(_:from:)`).
+    /// tailnet listener takes (`receive(_:from:)`).
     private let tailnet: any TailnetIdentity
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
@@ -958,7 +958,10 @@ public final class Shipyard {
     /// when `login` is exactly the Mac's own Tailscale login, looked up now;
     /// then it's answered as one from the Mac (`receive(_:)`): a notice
     /// shown, a withdrawal done. Without a login, with another, or while the
-    /// Mac's own can't be learned, it's refused and nothing changes.
+    /// Mac's own can't be learned, it's refused and nothing changes. A
+    /// notice whose click or a button focuses Herdr is refused too
+    /// (`TailnetWire.herdrRefusal`): the command refuses it before sending,
+    /// and this catches one sent another way.
     public func receive(_ request: NoticeRequest, from login: String?) async -> NoticeVerdict {
         guard let login, !login.isEmpty else { return .refused(NoticeRules.noLogin) }
         switch await tailnet.ownLogin() {
@@ -967,6 +970,8 @@ public final class Shipyard {
         case .success(let own) where own != login:
             return .refused(NoticeRules.otherLogin(login))
         case .success:
+            // The request names no machine, so a Herdr action would focus the Mac's own Herdr.
+            if case .show(let notice) = request, notice.focusesHerdr { return .refused(TailnetWire.herdrRefusal) }
             return await receive(request)
         }
     }

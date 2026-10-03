@@ -79,28 +79,30 @@ struct CLISettingsTests {
     // MARK: - [notify]
 
     @Test("[notify] names the app machine, and the scheme and port its notices go over, http and the listener's default port unless given", arguments: [
-        ("[notify]\napp-machine = \"mac\"\n", NotifySettings(appMachine: "mac", scheme: .http, port: 47420)),
-        ("[notify]\napp-machine = \" my-mac.tail1234.ts.net \"\nscheme = \"https\"\nport = 443\n",
-         NotifySettings(appMachine: "my-mac.tail1234.ts.net", scheme: .https, port: 443)),
+        ("[notify]\napp-machine = \"mac\"\n", NotifySettings(appMachine: "mac", appScheme: .http, appPort: 47420)),
+        ("[notify]\napp-machine = \" my-mac.tail1234.ts.net \"\napp-scheme = \"https\"\napp-port = 443\n",
+         NotifySettings(appMachine: "my-mac.tail1234.ts.net", appScheme: .https, appPort: 443)),
         // Without a machine, scheme and port wait for one.
-        ("[notify]\nport = 8080\n", NotifySettings(appMachine: nil, scheme: .http, port: 8080)),
+        ("[notify]\napp-port = 8080\n", NotifySettings(appMachine: nil, appScheme: .http, appPort: 8080)),
     ])
     func notify(text: String, settings: NotifySettings) throws {
         try write(text)
         #expect(try read().get().notify == settings)
-        #expect(CLISettings.defaults.notify == NotifySettings(appMachine: nil, scheme: .http, port: 47420))
+        #expect(CLISettings.defaults.notify == NotifySettings(appMachine: nil, appScheme: .http, appPort: 47420))
     }
 
     @Test("an app machine, scheme or port that can't make a URL is refused, saying what it takes", arguments: [
         ("app-machine = \"\"", "`notify.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way"),
-        ("app-machine = \"http://mac\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `http://mac`: the scheme and port are settings of their own"),
+        ("app-machine = \"http://mac\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `http://mac`: `app-scheme` and `app-port` are settings of their own"),
         ("app-machine = \"mac:8080\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `mac:8080`"),
         ("app-machine = \"my mac\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `my mac`"),
         ("app-machine = 3", "`notify.app-machine` must be a string"),
-        ("scheme = \"ftp\"", "`notify.scheme` is `http` or `https`, not `ftp`"),
-        ("port = 0", "`notify.port` must be between 1 and 65535 (got 0)"),
-        ("port = 70000", "`notify.port` must be between 1 and 65535 (got 70000)"),
-        ("port = \"80\"", "`notify.port` must be a whole number"),
+        ("app-scheme = \"ftp\"", "`notify.app-scheme` is `http` or `https`, not `ftp`"),
+        ("app-port = 0", "`notify.app-port` must be between 1 and 65535 (got 0)"),
+        ("app-port = 70000", "`notify.app-port` must be between 1 and 65535 (got 70000)"),
+        ("app-port = \"80\"", "`notify.app-port` must be a whole number"),
+        // config.toml's [notify] keys are the app's, never cli.toml's: no setting appears in both files.
+        ("port = 443", "unknown setting `notify.port`; known: `app-machine`, `app-scheme`, `app-port`"),
     ])
     func badNotify(line: String, problem: String) throws {
         try write("[notify]\n\(line)\n")

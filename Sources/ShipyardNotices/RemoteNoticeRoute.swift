@@ -27,8 +27,16 @@ public struct RemoteNoticeRoute: NoticeRoute {
             return .refused(Self.reason(error))
         }
         guard let machine = notify.appMachine else { return poll.deliver(request, environment: environment) }
-        return TailnetNoticeRoute(appMachine: machine, scheme: notify.scheme, port: notify.port, http: http)
+        return TailnetNoticeRoute(appMachine: machine, scheme: notify.appScheme, port: notify.appPort, http: http)
             .deliver(request, environment: environment)
+    }
+
+    /// A notice focusing Herdr is unfit when `app-machine` sends it over
+    /// the tailnet (`TailnetNoticeRoute.unfit(_:)`). A `cli.toml` that
+    /// doesn't read is left for `deliver` to report.
+    public func unfit(_ notice: Notice) -> String? {
+        guard let notify = try? settings.read().notify, let machine = notify.appMachine else { return nil }
+        return TailnetNoticeRoute(appMachine: machine, scheme: notify.appScheme, port: notify.appPort, http: http).unfit(notice)
     }
 
     /// A failed read's line, without the `shipyard: ` it starts with, for
@@ -42,7 +50,7 @@ public struct RemoteNoticeRoute: NoticeRoute {
 
 /// A notice request posted straight to the app on the Mac over the user's
 /// tailnet (ADR 0010): its JSON (`NoticeRequest`, a notice or a withdrawal)
-/// to `<scheme>://<app-machine>:<port>/notify`, which `tailscale serve` on
+/// to `<app-scheme>://<app-machine>:<app-port>/notify`, which `tailscale serve` on
 /// the Mac hands to the app's listener with the sender's login. It waits
 /// for the app's verdict (`TailnetWire.timeout(forBodyOf:)`); nothing is
 /// queued or retried, so a Mac asleep or away is a refusal.
@@ -61,6 +69,13 @@ public struct TailnetNoticeRoute: NoticeRoute {
 
     /// Where the app machine is, without the path: `http://my-mac:47420`.
     var origin: String { "\(scheme.rawValue)://\(appMachine):\(port)" }
+
+    /// A notice whose click or a button focuses Herdr: the request names
+    /// no machine, so the Mac would focus its own Herdr
+    /// (`TailnetWire.herdrRefusal`).
+    public func unfit(_ notice: Notice) -> String? {
+        notice.focusesHerdr ? TailnetWire.herdrRefusal : nil
+    }
 
     public func deliver(_ request: NoticeRequest, environment: CommandEnvironment) -> NoticeVerdict {
         let showing = if case .show = request { true } else { false }

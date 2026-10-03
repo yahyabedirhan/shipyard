@@ -13,7 +13,7 @@ Checked 2026-10-04 against:
 - HTTP servers are reachable with short MagicDNS names, `http://my-node`; HTTPS uses the full `my-node.<tailnet>.ts.net` with a certificate Tailscale provisions.
 - `--bg` runs it in the background, persistently: it resumes after a reboot or `tailscale down`/`up`. Without `--bg` it must be started again by hand.
 - `tailscale serve status` lists what's served; `tailscale serve --http=<port> off` turns one off; `tailscale serve reset` clears everything.
-- The Serve page warns that Serve needs HTTPS certificates enabled for the tailnet (the CLI offers to turn them on). Whether `--http` alone needs them is one of the Tailscale spike's (#188) questions; `cli.toml`'s `scheme` and `port` let its answer be a setting.
+- The Serve page warns that Serve needs HTTPS certificates enabled for the tailnet (the CLI offers to turn them on). Whether `--http` alone needs them is one of the Tailscale spike's (#188) questions; `cli.toml`'s `app-scheme` and `app-port` let its answer be a setting.
 - On macOS's App Store and Standalone variants, Serve can share ports, but not files or folders.
 
 ## Identity headers

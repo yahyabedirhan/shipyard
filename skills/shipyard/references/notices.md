@@ -31,8 +31,8 @@ shipyard notify withdraw <id>
 | `--id <id>` | shows it under this id: a later notice with the same id replaces it in place, and `shipyard notify withdraw <id>` takes it away. 1 to 64 lowercase letters, digits, `-` and `_` |
 | `--open <url>` | clicking it opens the URL (a pull request, a run, an artifact) |
 | `--app <bundle id or name>` | clicking it brings the app forward |
-| `--herdr [<id>]` | clicking it focuses this Herdr tab or pane (`w1:t2`, `w1:p3`), then your terminal; with no id, your own pane (`$HERDR_PANE_ID`), as a ping's `--herdr` |
-| `--button "<label>=<action>"` | a button, up to 3, each with its own action: `open:<url>`, `app:<bundle id or name>`, `herdr:<tab or pane id>`, or `herdr` alone for your own pane |
+| `--herdr [<id>]` | clicking it focuses this Herdr tab or pane (`w1:t2`, `w1:p3`), then your terminal; with no id, your own pane (`$HERDR_PANE_ID`), as a ping's `--herdr`. Not on the tailnet route (see Routes) |
+| `--button "<label>=<action>"` | a button, up to 3, each with its own action: `open:<url>`, `app:<bundle id or name>`, `herdr:<tab or pane id>`, or `herdr` alone for your own pane (no `herdr` button on the tailnet route) |
 | `--` | ends the flags: everything after it is the title, even a word starting with `--` |
 
 - **Where it's filed.** As a ping is: without `--repo` or `--project`, the repository is the working folder's git remote `origin`, and the notice goes under every project that watches it. It's shown once, under the first of those whose rules select `agent.notice`. `--repo` and `--project` don't go together.
@@ -49,6 +49,8 @@ A notice reaches the user's Mac one of three ways. You don't pick one: the machi
 | the Mac | straight to the running shipyard app, which says whether it was shown; shipyard is never started for a notice | `shown` |
 | another machine whose `cli.toml` has `[notify] app-machine` set | over the user's tailnet to the Mac's app, within about a second, which says whether it was shown | `shown` |
 | another machine without `app-machine` | left with the herdr-shipyard plugin, which holds it until the Mac's next poll of the machine, the poll remote pings take | `queued; shown within about 30 seconds if the Mac is awake` |
+
+**No Herdr on the tailnet route.** A notice sent over the tailnet carries no machine, so a `--herdr` click or a `herdr` button would focus the Mac's own Herdr, not your pane: the command refuses it before sending (exit 2), and the Mac refuses one that arrives anyway. There, use `--open` or `--app`; to keep the Herdr action, leave `app-machine` out of the machine's `cli.toml` so the notice takes the poll route, which focuses your pane on your machine as a remote ping's does.
 
 Setting up the tailnet route is in Receive notices from another machine, below. To tell which a machine uses before sending, look for `app-machine` under `[notify]` in its `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`); no file, or no `app-machine` in it, means the poll route.
 
@@ -75,7 +77,7 @@ On the poll route, `queued` isn't `shown`:
     - "the app machine `<name>` answered HTTP <status> without a verdict …": the Mac answered, but not shipyard: the app isn't running, `[notify] listen` isn't `true`, or `tailscale serve` points elsewhere.
     - "… isn't this Mac's Tailscale login …", "the request carried no Tailscale login …" or "shipyard couldn't learn this Mac's Tailscale login …": the identity check refused it (see below).
   - on another machine, "…/cli.toml doesn't read (…)": fix the file it names; nothing is sent either way until it reads.
-- **2**: the arguments don't read, with what's wrong: a missing title, two titles, an unknown option, `--repo` and `--project` together, two click actions, a fourth button, a button without `<label>=<action>`, a level other than `passive` or `active`, an id that isn't one, or an image that can't be read, isn't a PNG, JPEG or GIF, or is over 5 MB.
+- **2**: the arguments don't read, with what's wrong: a missing title, two titles, an unknown option, `--repo` and `--project` together, two click actions, a fourth button, a button without `<label>=<action>`, a level other than `passive` or `active`, an id that isn't one, a `--herdr` click or a `herdr` button on the tailnet route, or an image that can't be read, isn't a PNG, JPEG or GIF, or is over 5 MB.
 
 ## Receive notices from another machine
 
@@ -96,17 +98,17 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
    tailscale serve --bg --http=47420 http://127.0.0.1:47420
    ```
 
-   `tailscale serve status` shows it. Should `--http` not work on the user's tailnet, `--https=443` with the same target serves it over HTTPS instead; then the machine's `cli.toml` says `scheme = "https"` and `port = 443`.
+   `tailscale serve status` shows it. Should `--http` not work on the user's tailnet, `--https=443` with the same target serves it over HTTPS instead; then the machine's `cli.toml` says `app-scheme = "https"` and `app-port = 443`.
 4. **The machine names its Mac** in its own `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`), by the Mac's MagicDNS name, short or full (`tailscale status` on the machine lists it):
 
    ```toml
    [notify]
    app-machine = "my-mac"
-   # scheme = "http"   http or https, as tailscale serve exposes it
-   # port = 47420      the port tailscale serve exposes
+   # app-scheme = "http"   http or https, as tailscale serve exposes it
+   # app-port = 47420      the port tailscale serve exposes
    ```
 
-   `cli.toml` is the command's own file, not the app's: `app-machine`, `scheme` and `port` go there, never in `config.toml`, and an unknown key in it is an error.
+   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notify]` has the Mac's `listen` and `port`), and an unknown key in it is an error.
 5. **A test notice**, from the machine:
 
    ```sh
@@ -115,7 +117,7 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
 
    It prints `shown` once the Mac showed it; otherwise it exits 1 with why (see Exit codes).
 
-From then on `shipyard notify` on that machine takes the same flags as on the Mac. `shipyard notify withdraw <id>` goes the same way. It waits up to 3 seconds for the Mac's answer (a few more for a notice carrying an image), and nothing is queued: a Mac asleep or away means exit 1.
+From then on `shipyard notify` on that machine takes the same flags as on the Mac, except a Herdr click or button (see Routes). `shipyard notify withdraw <id>` goes the same way. It waits up to 3 seconds for the Mac's answer (a few more for a notice carrying an image), and nothing is queued: a Mac asleep or away means exit 1.
 
 ## Worked notices
 
@@ -132,7 +134,7 @@ shipyard notify "Tests running" --body "12 of 40 passed" --project shipyard --id
 shipyard notify "Tests passed" --body "40 of 40" --project shipyard --id shipyard-tests
 ```
 
-**Done, with somewhere to go.** A click opens the pull request, a button brings the user to your pane; the pull request that needs review is still a ping (see Sending pings in [SKILL.md](../SKILL.md)):
+**Done, with somewhere to go.** A click opens the pull request, a button brings the user to your pane; the pull request that needs review is still a ping (see Sending pings in [SKILL.md](../SKILL.md)). The pane button works on the Mac and on the poll route; on the tailnet route, leave it out:
 
 ```sh
 shipyard notify "Done" --from claude --open https://github.com/owner/shop/pull/7 --button "Your pane=herdr:w1:p3" --button "CI=open:https://github.com/owner/shop/actions"

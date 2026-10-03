@@ -20,28 +20,29 @@ public struct CLISettings: Equatable, Sendable {
 
 /// `cli.toml`'s `[notify]` table: where this machine's `shipyard notify`
 /// sends a notice. With `app-machine` set, straight to the app on that Mac
-/// over the user's tailnet, at `<scheme>://<app-machine>:<port>` (ADR
+/// over the user's tailnet, at `<app-scheme>://<app-machine>:<app-port>` (ADR
 /// 0010). A new setting is a property, a key in
 /// `CLISettings.Reader.notifyKeys` and a line in `CLISettings.Reader.notify(_:)`.
 public struct NotifySettings: Equatable, Sendable {
     /// `app-machine`: the Mac running the app, by its MagicDNS name (`my-mac`
     /// or `my-mac.tail1234.ts.net`); none by default.
     public var appMachine: String?
-    /// `scheme`: how the request travels, as `tailscale serve` exposes the
-    /// app's port on the Mac (`--http` or `--https`). `http` by default.
-    public var scheme: Scheme
-    /// `port`: the port `tailscale serve` exposes on the Mac. The app's
-    /// default listening port by default (`NoticePort.default`).
-    public var port: Int
+    /// `app-scheme`: how the request travels, as `tailscale serve` exposes
+    /// the app's port on the Mac (`--http` or `--https`). `http` by default.
+    public var appScheme: Scheme
+    /// `app-port`: the port `tailscale serve` exposes on the Mac. The app's
+    /// default listening port by default (`NoticePort.default`). Not
+    /// `port`, which is `config.toml`'s: no setting appears in both files.
+    public var appPort: Int
 
     public enum Scheme: String, Equatable, Sendable, CaseIterable {
         case http, https
     }
 
-    public init(appMachine: String? = nil, scheme: Scheme = .http, port: Int = NoticePort.default) {
+    public init(appMachine: String? = nil, appScheme: Scheme = .http, appPort: Int = NoticePort.default) {
         self.appMachine = appMachine
-        self.scheme = scheme
-        self.port = port
+        self.appScheme = appScheme
+        self.appPort = appPort
     }
 }
 
@@ -93,7 +94,7 @@ extension CLISettings {
         private(set) var issues: [CLISettingsIssue] = []
 
         static let rootKeys = ["notify"]
-        static let notifyKeys = ["app-machine", "scheme", "port"]
+        static let notifyKeys = ["app-machine", "app-scheme", "app-port"]
 
         func settings(from root: TOMLTable) -> CLISettings {
             rejectUnknownKeys(in: root, path: [], known: Self.rootKeys)
@@ -112,29 +113,29 @@ extension CLISettings {
                 if machine.isEmpty {
                     issue("`notify.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way")
                 } else if machine.contains("://") {
-                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`: the scheme and port are settings of their own")
+                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`: `app-scheme` and `app-port` are settings of their own")
                 } else if !Self.isHostName(machine) {
                     issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`")
                 } else {
                     settings.appMachine = machine
                 }
             }
-            if let raw = string(table, "scheme", path: ["notify"]) {
+            if let raw = string(table, "app-scheme", path: ["notify"]) {
                 if let scheme = NotifySettings.Scheme(rawValue: raw) {
-                    settings.scheme = scheme
+                    settings.appScheme = scheme
                 } else {
-                    issue("`notify.scheme` is `http` or `https`, not `\(raw)`")
+                    issue("`notify.app-scheme` is `http` or `https`, not `\(raw)`")
                 }
             }
-            if table.contains(key: "port") {
-                if let port = try? table.integer(forKey: "port") {
+            if table.contains(key: "app-port") {
+                if let port = try? table.integer(forKey: "app-port") {
                     if NoticePort.range.contains(Int(port)) {
-                        settings.port = Int(port)
+                        settings.appPort = Int(port)
                     } else {
-                        issue("`notify.port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))")
+                        issue("`notify.app-port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))")
                     }
                 } else {
-                    issue("`notify.port` must be a whole number")
+                    issue("`notify.app-port` must be a whole number")
                 }
             }
             return settings

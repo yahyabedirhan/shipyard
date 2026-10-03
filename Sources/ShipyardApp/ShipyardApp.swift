@@ -124,7 +124,7 @@ final class AppServices {
             actions: opener,
             notifier: notifier,
             loginItem: files.loginItem(LaunchAtLogin()),
-            notionTokenStore: Keychain.notion
+            notionTokenStore: files.notionTokenStore(Keychain.notion)
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard

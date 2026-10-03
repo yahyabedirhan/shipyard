@@ -113,7 +113,7 @@ public struct Notice: Codable, Equatable, Sendable {
     public static let largestImage = 5 * 1024 * 1024
 
     /// Whether its click or one of its buttons focuses Herdr.
-    var focusesHerdr: Bool {
+    public var focusesHerdr: Bool {
         ([action] + (buttons ?? []).map(\.action)).contains { if case .herdr = $0 { true } else { false } }
     }
 }
@@ -250,4 +250,14 @@ public protocol NoticeRoute: Sendable {
     /// `environment`, and waits for its verdict. A route that can't reach
     /// the app refuses, saying so; it never starts the app.
     func deliver(_ request: NoticeRequest, environment: CommandEnvironment) -> NoticeVerdict
+
+    /// Why this route can't carry `notice` at all, read from the notice
+    /// alone, before anything is sent: the command exits 2 with it, as for
+    /// arguments that don't read. `nil` when it can (every route but the
+    /// tailnet's, which can't carry a Herdr action).
+    func unfit(_ notice: Notice) -> String?
+}
+
+extension NoticeRoute {
+    public func unfit(_ notice: Notice) -> String? { nil }
 }

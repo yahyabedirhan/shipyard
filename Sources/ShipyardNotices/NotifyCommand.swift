@@ -29,8 +29,9 @@ public enum NoticeCommands {
 /// to take the notice shown under `id` away, over the same route. Exit 0:
 /// done, or queued for the Mac's poll (`PluginNoticeRoute`, which says
 /// so); 1: refused, with why (notices off for the project, no project
-/// takes it, the app not running, the plugin missing or refusing it); 2:
-/// the arguments don't read.
+/// takes it, the app not running, the plugin missing or refusing it, the
+/// Mac unreachable over the tailnet); 2: the arguments don't read, or the
+/// route can't carry the notice (`NoticeRoute.unfit(_:)`).
 public enum NotifyCommand {
     /// What `shipyard notify --help` prints.
     public static let usageText = """
@@ -47,11 +48,18 @@ public enum NotifyCommand {
         Unlike a ping it isn't listed, counted or kept. It's filed under the
         projects that watch the working folder's repository (its git remote
         `origin`), and shown when the user's notification rules select
-        `agent.notice` for one of them. It prints `shown` once the app showed it.
-        On a machine that leaves it with the herdr-shipyard plugin for the Mac's
-        next poll, it prints `queued`: the Mac shows it by the same rules when
-        it arrives, or drops it when it arrives more than ten minutes late. That
-        route carries no image.
+        `agent.notice` for one of them.
+
+        Where it runs decides its route. On the Mac, it goes to the running app,
+        and prints `shown` once the app showed it. On another machine whose
+        cli.toml sets [notify] app-machine (with app-scheme and app-port when
+        tailscale serve needs others), it goes over the tailnet to the app on
+        that Mac, and prints `shown` the same way; a --herdr click or a herdr
+        button can't go that way (the Mac would focus its own Herdr). Otherwise
+        it's left with the herdr-shipyard plugin for the Mac's next poll, and
+        prints `queued`: the Mac shows it by the same rules when it arrives, or
+        drops it when it arrives more than ten minutes late. That route carries
+        no image.
 
           --subtitle <text>    a line between the title and the body
           --body <text>        say more than the title fits
@@ -85,7 +93,10 @@ public enum NotifyCommand {
         Exits 1, with one line saying why, when it isn't shown or queued: notices
         are off for its projects, no project takes it, shipyard isn't running
         (it's never started for a notice), or the herdr-shipyard plugin is
-        missing or refuses it. Exits 2 when the arguments don't read.
+        missing or refuses it. Over the tailnet, also when the Mac can't be
+        reached, doesn't answer in time, or refuses the sender's Tailscale
+        login, or when cli.toml doesn't read. Exits 2 when the arguments don't
+        read, or carry a Herdr action over the tailnet.
 
         """
 
@@ -126,6 +137,7 @@ public enum NotifyCommand {
             notice.terminal = PingCommand.outerTerminal(environment.variables)
             notice.herdrSession = PingCommand.herdrSession(environment.variables)
         }
+        if let why = route.unfit(notice) { return .usage(prefix + why) }
         if notice.project == nil, notice.repository == nil {
             switch GitRemote.workingRepository(folder: environment.workingDirectory, git: environment.git, filing: "notice") {
             case .success(let slug): notice.repository = slug

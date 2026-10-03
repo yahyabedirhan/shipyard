@@ -1,6 +1,8 @@
 import Darwin
 import Foundation
+import os
 import ShipyardControl
+import ShipyardCore
 import ShipyardNotices
 
 /// The app's listener for notices from the user's other machines (ADR
@@ -11,7 +13,10 @@ import ShipyardNotices
 /// Each connection is one request, `POST /notify` with a notice request's
 /// JSON (`TailnetWire`: a notice to show, or a withdrawal), answered with the verdict `respond` gives for it and
 /// its `Tailscale-User-Login`, then closed. It checks only what HTTP
-/// needs; whether the login may post is `Shipyard.receive(_:from:)`'s to say.
+/// needs, and that a login is there at all: a request without one, or with
+/// an empty or doubled one, is refused on its head, before its body is read.
+/// Whether the login may post is `Shipyard.receive(_:from:)`'s to say. At
+/// most `mostConnections` are served at once; one more is answered 503.
 /// A request a web page could send (one with `Origin` or `Sec-Fetch-Site`)
 /// is refused, so a site the user visits can't reach it through the
 /// browser, even by pointing its own name at 127.0.0.1.
@@ -28,6 +33,11 @@ final class NoticeListener: @unchecked Sendable {
 
     private let source: DispatchSourceRead
     private let respond: Respond
+    /// The connections being served now, at most `mostConnections`.
+    private let serving = OSAllocatedUnfairLock(initialState: 0)
+    /// The most connections served at once, so a flood of them can't hold
+    /// every thread; a request past them is refused with 503 at once.
+    static let mostConnections = 8
     private static let queue = DispatchQueue(label: "shipyard.notices", attributes: .concurrent)
     /// How long a connection may wait for each read or write, and how long
     /// it may take to send its whole request, so one that stalls or trickles
@@ -97,6 +107,15 @@ final class NoticeListener: @unchecked Sendable {
             guard connection >= 0 else { return }
             _ = fcntl(connection, F_SETFL, fcntl(connection, F_GETFL) & ~O_NONBLOCK)
             UnixSocket.configure(connection, timeout: Self.connectionTimeout)
+            let admitted = serving.withLock { count in
+                guard count < Self.mostConnections else { return false }
+                count += 1
+                return true
+            }
+            guard admitted else {
+                Self.queue.async { Self.turnAway(connection) }
+                continue
+            }
             Self.queue.async { self.serve(connection) }
         }
     }
@@ -105,11 +124,20 @@ final class NoticeListener: @unchecked Sendable {
     private func serve(_ connection: Int32) {
         let request = Self.read(connection)
         let respond = respond
+        let serving = serving
         Task {
             let (status, verdict) = await Self.answer(request, respond: respond)
             _ = UnixSocket.writeAll(connection, Self.response(status: status, verdict: verdict))
             Darwin.close(connection)
+            serving.withLock { $0 -= 1 }
         }
+    }
+
+    /// Answers a connection past `mostConnections` with 503, unread, and closes it.
+    private static func turnAway(_ connection: Int32) {
+        let busy = NoticeVerdict.refused("shipyard is answering \(mostConnections) other requests; try again in a moment")
+        _ = UnixSocket.writeAll(connection, response(status: 503, verdict: busy))
+        Darwin.close(connection)
     }
 
     // MARK: - HTTP
@@ -166,11 +194,13 @@ final class NoticeListener: @unchecked Sendable {
     static let reasons = [
         200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
         408: "Request Timeout", 411: "Length Required", 413: "Content Too Large", 431: "Request Header Fields Too Large",
+        503: "Service Unavailable",
     ]
 
     /// Reads one request off `connection`: the head up to its blank line,
     /// then the body `Content-Length` says, after a `100 Continue` when the
-    /// client waits for one.
+    /// client waits for one. A head without a login (`parseHead` refuses a
+    /// doubled one) is refused before the body is read.
     static func read(_ connection: Int32) -> Request {
         let deadline = Date().addingTimeInterval(requestDeadline)
         let late = Request.refused(408, "the request took longer than \(Int(requestDeadline)) seconds to arrive")
@@ -186,6 +216,9 @@ final class NoticeListener: @unchecked Sendable {
         }
         guard let headEnd, let head = parseHead(data[..<headEnd.lowerBound]) else {
             return .refused(400, "the request doesn't read as HTTP")
+        }
+        guard let login = head.headers[TailnetWire.loginHeader.lowercased()], !login.isEmpty else {
+            return .refused(403, NoticeRules.noLogin)
         }
         guard head.headers["transfer-encoding"] == nil else {
             return .refused(411, "send the notice with a Content-Length")

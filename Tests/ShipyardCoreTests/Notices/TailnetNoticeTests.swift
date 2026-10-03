@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import ShipyardConfig
 @testable import ShipyardCore
 import ShipyardNotices
@@ -75,6 +76,19 @@ struct TailnetNoticeTests {
 
         #expect(await harness.shipyard.receive(.show(Notice(title: "Two", project: "shop")), from: "me@example.com") != .shown)
         #expect(await harness.shipyard.receive(.show(Notice(title: "Three", project: "shop")), from: "other@example.com") == .shown)
+    }
+
+    @Test("from the right login, a notice whose click or a button focuses Herdr is refused: the tailnet names no machine, so the Mac's own Herdr would be focused", arguments: [
+        Notice(title: "Done", project: "shop", action: .herdr("w1:p3")),
+        Notice(title: "Done", project: "shop", buttons: [NoticeButton(label: "Back", action: .herdr("w1:p3"))]),
+    ])
+    func herdrRefused(notice: Notice) async throws {
+        let harness = try await app()
+
+        let verdict = await harness.shipyard.receive(.show(notice), from: "me@example.com")
+
+        #expect(verdict == .refused(TailnetWire.herdrRefusal))
+        #expect(harness.notifier.posted.isEmpty)
     }
 
     @Test("from the right login, notices off for the project are refused as on the Mac")

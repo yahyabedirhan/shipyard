@@ -90,7 +90,8 @@ struct Harness {
     /// user's own folders), signed in with a stored token: its files where
     /// `AppFiles` puts them, as `AppServices` builds them.
     init(launchedWith environment: [String: String], home: URL) {
-        self.init(files: AppFiles(environment: environment, home: home), store: InMemoryTokenStore(token: "gho_stored"), notion: InMemoryTokenStore(), gh: nil)
+        // The user's own Notion token is in the Keychain, as on the maintainer's Mac.
+        self.init(files: AppFiles(environment: environment, home: home), store: InMemoryTokenStore(token: "gho_stored"), notion: InMemoryTokenStore(token: "ntn_user"), gh: nil)
     }
 
     /// A harness over existing configuration and support folders.
@@ -121,7 +122,7 @@ struct Harness {
             clock: sleeper.clock,
             timer: timer,
             machineTimer: machineTimer,
-            notionTokenStore: notion,
+            notionTokenStore: files.notionTokenStore(notion),
             notesTimer: notesTimer,
             tailnet: tailnet,
             sleep: sleeper.sleep,
