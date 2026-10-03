@@ -160,7 +160,7 @@ version = 1
 
 ## Development
 
-`make test` runs the tests, and `make release` builds the release zip. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
+`make test` runs the tests, and `make release` builds the release zip. With the Command Line Tools alone, the first build compiles the SDK's Swift modules (about 40 s); the `Makefile` keeps them in `~/Library/Caches/shipyard/ModuleCache`, so every other checkout and worktree reuses them. Installing Xcode avoids the cost, since it ships them prebuilt. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
 
 A release goes in this order:
 

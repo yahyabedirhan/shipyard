@@ -50,6 +50,14 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(TESTING_FRAMEWORKS) \
 	-Xlinker -F -Xlinker $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_FRAMEWORKS) \
 	-Xlinker -rpath -Xlinker $(TESTING_LIBRARIES)
+# The Command Line Tools ship no prebuilt SDK modules either, so a new
+# checkout's first build compiles Swift, Foundation, SwiftUI and the rest from
+# their interfaces (about 40 s of a 56 s clean build). One module cache shared
+# by every checkout and worktree pays that once. Its entries are keyed by the
+# compiler, the SDK and the flags, so an update builds new ones, and concurrent
+# builds share it through the compiler's own locks.
+MODULE_CACHE := $(HOME)/Library/Caches/shipyard/ModuleCache
+SWIFT_FLAGS  := -Xswiftc -module-cache-path -Xswiftc $(MODULE_CACHE)
 endif
 
 .PHONY: all build test bundle install release run icon icon-alternates icon-exploration agent-logos clean
@@ -57,14 +65,14 @@ endif
 all: build
 
 build:
-	swift build -c release --product $(APP)
-	swift build -c release --product $(CLI)
+	swift build -c release --product $(APP) $(SWIFT_FLAGS)
+	swift build -c release --product $(CLI) $(SWIFT_FLAGS)
 
 test:
-	swift test $(TEST_FLAGS)
+	swift test $(SWIFT_FLAGS) $(TEST_FLAGS)
 
 run:
-	swift run $(APP)
+	swift run $(APP) $(SWIFT_FLAGS)
 
 bundle: build
 	@rm -rf $(APP_BUNDLE)
