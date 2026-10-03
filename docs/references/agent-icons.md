@@ -1,6 +1,6 @@
 # Agent icons
 
-> **Decision (#137, 2026-10-03): shipyard bundles each known agent's real logo.** After the licence check below, the maintainer chose to bundle each agent's real logo for nominative identification of the sender (which agent sent a ping), accepting that Anthropic's, OpenAI's and Google's brand terms ask for approval. The earlier choice, a monogram on a coloured circle of shipyard's own, didn't let them recognise the agents. Each SVG is kept as published in `assets/images/agent-logos/` and converted, unaltered, to the PDF the app bundles (`make agent-logos`); the view fits it to a square with app-icon corners, tints Copilot's one-colour glyph like text, and switches OpenCode to its maker's dark-mode file. Shipyard still has no `LICENSE` file, so the MIT notices below have nowhere to go yet: add them when it gets one.
+> **Decision (#137, 2026-10-03): shipyard bundles each known agent's real logo.** After the licence check below, the maintainer chose to bundle each agent's real logo for nominative identification of the sender (which agent sent a ping), accepting that Anthropic's, OpenAI's and Google's brand terms ask for approval. The earlier choice, a monogram on a coloured circle of shipyard's own, didn't let them recognise the agents. Each SVG is kept as published in `assets/images/agent-logos/` and converted, unaltered, to the PDF the app bundles (`make agent-logos`); the view fits it to a square with app-icon corners, tints Copilot's one-colour glyph like text, and switches OpenCode to its maker's dark-mode file. Shipyard is MIT-licensed (`LICENSE`), and the bundled logos' sources and MIT notices are in `THIRD-PARTY-NOTICES.md`, which the app bundle carries beside `LICENSE`.
 
 ## Bundled logos
 
@@ -27,7 +27,7 @@ Two rights apply to every icon, and a code licence only answers the first:
 - **Copyright** in the drawing. An MIT or Apache-2.0 repository that contains the file licenses the file.
 - **Trademark** in the mark. Apache-2.0 says so outright (§6: "This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor"); MIT is silent, so it grants none either. Showing a mark only to say which agent sent a ping is nominative use, which trademark law allows without a licence when the mark isn't altered and doesn't imply endorsement. Some brand owners' published terms ask for more than that.
 
-Shipyard itself has **no `LICENSE` file** (checked at `f167e7b`), so any bundled icon's notice has nowhere to go yet. Add the licence before bundling third-party files.
+Shipyard had no `LICENSE` file when this was checked (`f167e7b`); it is MIT-licensed now, and bundled files' notices go in `THIRD-PARTY-NOTICES.md`.
 
 ## Verdicts
 
