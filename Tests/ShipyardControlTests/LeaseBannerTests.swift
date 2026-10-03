@@ -8,13 +8,13 @@ import Testing
 struct LeaseBannerTests {
     @Test("the banner names the agent and its place, the time left and how many wait", arguments: [
         (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop", secondsLeft: 48, waiting: 0),
-         "Claude Code in shop is using shipyard · 48s"),
+         "Claude Code uses shipyard · shop · 48s"),
         (AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 1),
-         "Codex in Herdr pane w1-2 is using shipyard · 5m 00s · 1 waiting"),
+         "Codex uses shipyard · Herdr pane w1-2 · 5m 00s · 1 waiting"),
         (AppStatus.Lease(holder: "an unknown agent", place: "/", secondsLeft: 65, waiting: 3),
-         "An unknown agent in / is using shipyard · 1m 05s · 3 waiting"),
+         "An unknown agent uses shipyard · / · 1m 05s · 3 waiting"),
         (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop/", secondsLeft: 0, waiting: 0),
-         "Claude Code in shop is using shipyard · 0s"),
+         "Claude Code uses shipyard · shop · 0s"),
     ])
     func words(lease: AppStatus.Lease, text: String) {
         let banner = LeaseBanner(lease)

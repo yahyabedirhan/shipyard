@@ -3,7 +3,7 @@ import ShipyardCore
 import SwiftUI
 
 /// The banner topping the panel while an agent holds the lease: the
-/// agent's logo, "Claude Code in shop is using shipyard", the time left and
+/// agent's logo, "Claude Code uses shipyard" over its place, the time left and
 /// how many wait, in `LeaseBanner`'s words, and Stop, which takes shipyard
 /// back. Stop is the banner's only way into the lease.
 struct LeaseBannerView: View {
@@ -15,24 +15,30 @@ struct LeaseBannerView: View {
         let banner = LeaseBanner(lease)
         HStack(spacing: 8) {
             LeaseAgentMark(agent: KnownAgent(sender: banner.agent))
-            Text(banner.headline)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.primary.opacity(0.85))
-                .lineLimit(1)
-                .truncationMode(.middle)
-            HStack(spacing: 4) {
-                Text("·")
-                Text(banner.timeLeft)
-                    .contentTransition(.numericText(countsDown: true))
-                if let waiting = banner.waiting {
-                    Text("·")
-                    Text(waiting)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(banner.title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.primary.opacity(0.85))
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    // The place gives way first, cut in the middle, so the countdown stays whole.
+                    Text(banner.place)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Group {
+                        Text("·")
+                        Text(banner.timeLeft)
+                            .contentTransition(.numericText(countsDown: true))
+                        if let waiting = banner.waiting {
+                            Text("·")
+                            Text(waiting)
+                        }
+                    }
+                    .fixedSize()
                 }
+                .font(TypeScale.meta)
+                .foregroundStyle(.secondary)
             }
-            .font(TypeScale.meta)
-            .foregroundStyle(.secondary)
-            .fixedSize()
-            .layoutPriority(1)
             Spacer(minLength: 0)
             Button(LeaseBanner.stop, action: stop)
                 .buttonStyle(TextButtonStyle(tint: Palette.red))
@@ -44,7 +50,7 @@ struct LeaseBannerView: View {
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.lease.opacity(0.14)))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
-        // One element reading the banner's line, with Stop as its action.
+        // One element reading both lines as one, with Stop as its action.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)
         .accessibilityAction(named: LeaseBanner.stop, stop)

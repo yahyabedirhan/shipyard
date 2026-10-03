@@ -589,7 +589,7 @@ The place is `Herdr pane <HERDR_PANE_ID>` when that's set, else the working fold
 | `current(at:) -> Term?`, `waiting(at:) -> Int`, `status(at:) -> AppStatus.Lease?` | the term held at a time; how many wait in line, their waits not run out; `app status`'s lease, its seconds left rounded up, and the waiters |
 | `Refusal.message(at:timeZone:)` | `inUse` (and `queued`, which the server never sends): "shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue"; `waitedOut`: "waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)"; `stopped`: "the user took shipyard back; ask them before using it again" (#181) |
 | `Term.held(timeZone:)` | "you hold shipyard until <HH:mm:ss>" |
-| `LeaseBanner(status(at: now)!)` (#180) | the banner's words: `agent` (the holder's name, which the app finds a logo for with `KnownAgent(sender:)`), `place` (a folder's last component, `shop`; `Herdr pane <id>` as it is), `headline` ("Claude Code in shop is using shipyard", its first letter capitalised for a process's name), `timeLeft` (`48s` under a minute, `4m 05s` above), `waiting` (`2 waiting`, nil when nobody waits), `text` (all of them joined by ` · `, for VoiceOver); `stop` ("Stop"), its button; `tookBack(from: name)` ("You took shipyard back from Claude Code"), a stopped holder's quiet line, and `allow` ("Allow"), its button (#181) |
+| `LeaseBanner(status(at: now)!)` (#180) | the banner's words: `agent` (the holder's name, which the app finds a logo for with `KnownAgent(sender:)`), `place` (a folder's last component, `shop`; `Herdr pane <id>` as it is), `title` ("Claude Code uses shipyard", the first line, its first letter capitalised for a process's name), `timeLeft` (`48s` under a minute, `4m 05s` above), `waiting` (`2 waiting`, nil when nobody waits), `detail` (the smaller second line: place, time left and waiting joined by ` · `, so a Herdr pane's whole id shows), `text` (title and detail joined by ` · `, for VoiceOver); `stop` ("Stop"), its button; `tookBack(from: name)` ("You took shipyard back from Claude Code"), a stopped holder's quiet line, and `allow` ("Allow"), its button (#181) |
 
 The transitions are for the app to redraw and notify by (the banner, the dot and the lease's notifications build on them); a refusal, or a request that doesn't read, changes nothing.
 
@@ -1020,8 +1020,9 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               <CLILinkCard> (the offer to link the CLI, always shown here, under the skill's)
       banners                 the lease's banner first, in any phase and layout, while an agent holds it (#180,
                               <LeaseBannerView>): the agent's logo (AgentMarkView from KnownAgent(sender:), a generic
-                              terminal mark for an unknown agent), "Claude Code in shop is using shipyard" (one line,
-                              cut in the middle) · the time left · "2 waiting" (LeaseBanner's words), on a yellow tint;
+                              terminal mark for an unknown agent), "Claude Code uses shipyard" over a smaller line, the
+                              place (cut in the middle only when it can't fit) · the time left · "2 waiting"
+                              (LeaseBanner's words, #199), on a yellow tint;
                               a 1 s TimelineView aligned to the lease's end ticks the countdown; it slides in and out
                               as the lease starts and ends; Stop at its end (AppServices.stopLease, #181) ·
                               under it, a gray quiet line per agent the maintainer stopped, while its 5-minute bar
@@ -1821,13 +1822,13 @@ Setup: the app runs, the lease is free. Agent A is Claude Code (`CLAUDE_CODE_SES
 | Step | Call (module) | State after |
 |---|---|---|
 | 1 | 12:00:00, A: `shipyard panel open` → `ControlCommands` → `Holder.find` (Control) | holder `{ key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "/Users/me/shop" }`; `ControlMessage(.panelOpen, holder)` sent at version 2 |
-| 2 | `ControlServer.reply` → `ControlLease.use(by: A, at: 12:00:00)` (App, Control) | free, so taken: A until 12:01:00 (`started`); `LeaseIndicator.lease` set, so the menu bar icon gets its yellow dot and the panel's banner reads "Claude Code in shop is using shipyard · 1m 00s" (#180); a timer set for 12:01:00; `PanelControl.open()`; reply "panel open", exit 0 |
+| 2 | `ControlServer.reply` → `ControlLease.use(by: A, at: 12:00:00)` (App, Control) | free, so taken: A until 12:01:00 (`started`); `LeaseIndicator.lease` set, so the menu bar icon gets its yellow dot and the panel's banner reads "Claude Code uses shipyard" over "shop · 1m 00s" (#180); a timer set for 12:01:00; `PanelControl.open()`; reply "panel open", exit 0 |
 | 3 | 12:00:20, B: `shipyard screenshot /tmp/b.png` → `Holder.find` walks the process table: `shipyard` ← `zsh` ← `codex` (pid 300, started at t) | holder `{ key: "process:300@<t in µs>", name: "codex", place: "Herdr pane w1-2" }` |
 | 4 | `ControlServer.reply` → `use(by: B, at: 12:00:20)` | refused (`ok: false`) with "shipyard is in use by Claude Code in /Users/me/shop until 12:01:00 (40s left); `shipyard control take --wait <seconds>` to queue"; nothing captured; B exits 1 with that line |
 | 5 | B: `shipyard app status` (not leased) | `lease: Claude Code in /Users/me/shop, 40s left, 0 waiting`, exit 0; the lease unchanged |
 | 6 | 12:00:30, A: `shipyard panel fold blog` | renewed: A until 12:01:30 (`renewed`); folded |
 | 7 | 12:01:30, nothing from A since | the timer fires: `settleLease()`, A's lease `ended(.expired)`; the dot and the banner go (#180) |
-| 8 | 12:01:40, B: `shipyard screenshot /tmp/b.png` | B takes it until 12:02:40 (`started`), the dot and B's banner ("Codex in Herdr pane w1-2 is using shipyard") back; the capture hides them, then they return |
+| 8 | 12:01:40, B: `shipyard screenshot /tmp/b.png` | B takes it until 12:02:40 (`started`), the dot and B's banner ("Codex uses shipyard" over "Herdr pane w1-2 · …") back; the capture hides them, then they return |
 
 | Variant | What happens |
 |---|---|
