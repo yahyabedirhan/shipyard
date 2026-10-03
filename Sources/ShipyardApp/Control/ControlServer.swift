@@ -24,12 +24,19 @@ final class ControlServer {
 
     let socket: URL
     private let panel: any PanelControlling
+    private let screenshotter: any Screenshotting
     private let quit: @MainActor () -> Void
     private var listener: Listener?
 
-    init(socket: URL, panel: any PanelControlling, quit: @escaping @MainActor () -> Void) {
+    init(
+        socket: URL,
+        panel: any PanelControlling,
+        screenshotter: any Screenshotting,
+        quit: @escaping @MainActor () -> Void
+    ) {
         self.socket = socket
         self.panel = panel
+        self.screenshotter = screenshotter
         self.quit = quit
     }
 
@@ -64,6 +71,19 @@ final class ControlServer {
             }
         case .panelTab(let name):
             return await steer { () throws(PanelRefusal) in "showing \(try panel.selectTab(name))" }
+        case .screenshot(let path, let appearance, let menuBarIcon):
+            let file = URL(fileURLWithPath: path)
+            let outcome = menuBarIcon
+                ? screenshotter.menuBarIcon(to: file, appearance: appearance)
+                : await screenshotter.capturePanel(to: file, appearance: appearance)
+            switch outcome {
+            case .captured:
+                return Answer(reply: .done(path + "\n"))
+            case .rendered(let why):
+                return Answer(reply: .done(path + "\n", note: "captured by rendering: \(why)\n"))
+            case .failed(let why):
+                return Answer(reply: .refused(why))
+            }
         }
     }
 

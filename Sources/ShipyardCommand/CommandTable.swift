@@ -52,7 +52,7 @@ public struct CommandTable: Sendable {
     /// a pointer to the Mac instead of calling it unknown. Each name joins
     /// when its command exists on the Mac, so the Mac never answers "runs
     /// on the Mac" for a command it lacks.
-    public static let macOnly: Set<String> = ["app", "panel"]
+    public static let macOnly: Set<String> = ["app", "panel", "screenshot"]
 }
 
 /// The `shipyard` command line (ADR 0004), bundled in `Shipyard.app` and

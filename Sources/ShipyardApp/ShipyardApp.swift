@@ -153,9 +153,13 @@ final class AppServices {
     /// Listens on `control.sock` for the `shipyard` command. When it can't,
     /// the app runs on without app control and says why in the log.
     private func startControl() {
+        let screenshotter = Screenshotter(panel: panelControl) { [unowned self] in
+            AnyView(Panel(shipyard: shipyard, actions: self, isSnapshot: true))
+        }
         let server = ControlServer(
             socket: ControlSocket.url(in: Self.files.support),
             panel: panelControl,
+            screenshotter: screenshotter,
             quit: { NSApp.terminate(nil) }
         )
         do {

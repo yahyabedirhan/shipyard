@@ -37,12 +37,29 @@ struct ControlServerTests {
         }
     }
 
+    /// Records each screenshot it's asked for, and answers with `outcome`.
+    final class FakeScreenshotter: Screenshotting {
+        var calls: [String] = []
+        var outcome = ScreenshotOutcome.captured
+
+        func capturePanel(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
+            calls.append("panel \(file.path) \(appearance?.rawValue ?? "as is")")
+            return outcome
+        }
+
+        func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) -> ScreenshotOutcome {
+            calls.append("icon \(file.path) \(appearance?.rawValue ?? "as is")")
+            return outcome
+        }
+    }
+
     /// Whether the server asked the app to quit.
     final class QuitRecorder {
         var quits = 0
     }
 
     let panel = FakePanel()
+    let screenshotter = FakeScreenshotter()
     let quitter = QuitRecorder()
     /// A folder of its own for each test, short enough for a socket's path.
     let folder = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -51,7 +68,7 @@ struct ControlServerTests {
 
     func server(socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock")) -> ControlServer {
         let quitter = quitter
-        return ControlServer(socket: socket, panel: panel, quit: { quitter.quits += 1 })
+        return ControlServer(socket: socket, panel: panel, screenshotter: screenshotter, quit: { quitter.quits += 1 })
     }
 
     // MARK: - Dispatch
@@ -100,6 +117,38 @@ struct ControlServerTests {
 
         #expect(answer == .init(reply: .refused("what exists is named here")))
         #expect(panel.calls.count == 1)
+    }
+
+    @Test("a screenshot asks the screenshotter once: captured prints the path, rendered adds why on standard error, failed refuses", arguments: [
+        (ScreenshotOutcome.captured, ControlReply.done("/tmp/shop.png\n")),
+        (.rendered(why: "ScreenCaptureKit: declined"), .done("/tmp/shop.png\n", note: "captured by rendering: ScreenCaptureKit: declined\n")),
+        (.failed(why: "couldn't write /tmp/shop.png"), .refused("couldn't write /tmp/shop.png")),
+    ])
+    func screenshot(outcome: ScreenshotOutcome, reply: ControlReply) async {
+        screenshotter.outcome = outcome
+        let server = server()
+
+        let shot = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false).encoded())
+        let icon = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: true).encoded())
+
+        #expect(shot == .init(reply: reply))
+        #expect(icon == .init(reply: reply))
+        #expect(screenshotter.calls == ["panel /tmp/shop.png dark", "icon /tmp/shop.png as is"])
+        #expect(panel.calls.isEmpty)
+    }
+
+    @Test("a screenshot without an absolute path, or with an unknown appearance, is refused and nothing is captured", arguments: [
+        (#"{"version":1,"command":"screenshot","path":"shop.png"}"#,
+         "the control command `screenshot` needs an absolute `path`, not `shop.png`"),
+        (#"{"version":1,"command":"screenshot","path":"/tmp/shop.png","appearance":"sepia"}"#,
+         "the control command `screenshot` has no appearance `sepia`; it takes `light` or `dark`"),
+        (#"{"version":1,"command":"screenshot"}"#, "the control command `screenshot` needs its `path`"),
+    ])
+    func screenshotUnreadable(request: String, why: String) async {
+        let answer = await server().reply(to: Data(request.utf8))
+
+        #expect(answer == .init(reply: .refused(why)))
+        #expect(screenshotter.calls.isEmpty)
     }
 
     @Test("a panel request without the field it needs is refused, and the panel isn't asked")

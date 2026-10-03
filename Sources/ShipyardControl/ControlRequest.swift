@@ -31,6 +31,16 @@ public enum ControlRequest: Equatable, Sendable {
     /// `shipyard panel tab <name>`: the tabs layout's selected tab, a
     /// project's name or `All`.
     case panelTab(name: String)
+    /// `shipyard screenshot <file.png> [--appearance light|dark]
+    /// [--menu-bar-icon]`: the panel (or the menu bar icon alone) written
+    /// as a PNG at `path`, absolute since the app runs in another folder;
+    /// in `appearance` when it's set, as the Mac shows it otherwise.
+    case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool)
+
+    /// The appearance `screenshot` draws in.
+    public enum Appearance: String, Equatable, Sendable, CaseIterable {
+        case light, dark
+    }
 
     /// The protocol's version. A request or app of another version is
     /// refused with both numbers, never misread.
@@ -56,6 +66,8 @@ public enum ControlRequest: Equatable, Sendable {
             wire = Wire(command: "panel.showMore", project: project, kind: kind)
         case .panelTab(let name):
             wire = Wire(command: "panel.tab", name: name)
+        case .screenshot(let path, let appearance, let menuBarIcon):
+            wire = Wire(command: "screenshot", path: path, appearance: appearance?.rawValue, menuBarIcon: menuBarIcon)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -83,6 +95,19 @@ public enum ControlRequest: Equatable, Sendable {
         case "panel.showMore":
             return .panelShowMore(project: try wire.field(\.project, "project"), kind: try wire.field(\.kind, "kind"))
         case "panel.tab": return .panelTab(name: try wire.field(\.name, "name"))
+        case "screenshot":
+            let path = try wire.field(\.path, "path")
+            guard path.hasPrefix("/") else {
+                throw .unreadable("the control command `screenshot` needs an absolute `path`, not `\(path)`")
+            }
+            var appearance: Appearance?
+            if let name = wire.appearance {
+                guard let known = Appearance(rawValue: name) else {
+                    throw .unreadable("the control command `screenshot` has no appearance `\(name)`; it takes `light` or `dark`")
+                }
+                appearance = known
+            }
+            return .screenshot(path: path, appearance: appearance, menuBarIcon: wire.menuBarIcon ?? false)
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -95,6 +120,9 @@ public enum ControlRequest: Equatable, Sendable {
         var project: String?
         var kind: String?
         var name: String?
+        var path: String?
+        var appearance: String?
+        var menuBarIcon: Bool?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.

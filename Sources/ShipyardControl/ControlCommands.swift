@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardCommand
 
-/// App control's commands for the Mac's `CommandTable`: `app` and `panel`, asking the
+/// App control's commands for the Mac's `CommandTable`: `app`, `panel` and `screenshot`, asking the
 /// app whose support folder is `support` over `transport`, and launching
 /// it with `launcher`.
 public enum ControlCommands {
@@ -30,6 +30,12 @@ public enum ControlCommands {
                 case .failure(let result): result
                 }
             },
+            CommandTable.Entry(name: "screenshot", help: screenshotHelp) { arguments, environment, _ in
+                switch ScreenshotCommand.parse(arguments, workingDirectory: environment.workingDirectory) {
+                case .success(let request): ControlCommand.run(.send(request), context: context)
+                case .failure(let result): result
+                }
+            },
         ]
     }
 
@@ -43,6 +49,13 @@ public enum ControlCommands {
           panel   steer the app's panel:
                   shipyard panel open | close | fold <project> | unfold <project>
                                  | show-more <project> <kind> | tab <name>
+
+        """
+
+    static let screenshotHelp = """
+          screenshot
+                  save the app's panel, or its menu bar icon, as a PNG:
+                  shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
 
         """
 }
