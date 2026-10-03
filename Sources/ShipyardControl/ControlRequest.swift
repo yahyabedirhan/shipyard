@@ -16,6 +16,21 @@ public enum ControlRequest: Equatable, Sendable {
     case appStatus(json: Bool)
     /// `shipyard app quit`: the app replies, then quits.
     case appQuit
+    /// `shipyard panel open`: the menu bar icon's panel on screen.
+    case panelOpen
+    /// `shipyard panel close`.
+    case panelClose
+    /// `shipyard panel fold <project>`: the project's section collapsed.
+    case panelFold(project: String)
+    /// `shipyard panel unfold <project>`.
+    case panelUnfold(project: String)
+    /// `shipyard panel show-more <project> <kind>`: every row of the
+    /// project's group of that kind, past its `show-first` cap. The kind is
+    /// as the command names it (`pull-requests`); the app checks it.
+    case panelShowMore(project: String, kind: String)
+    /// `shipyard panel tab <name>`: the tabs layout's selected tab, a
+    /// project's name or `All`.
+    case panelTab(name: String)
 
     /// The protocol's version. A request or app of another version is
     /// refused with both numbers, never misread.
@@ -29,6 +44,18 @@ public enum ControlRequest: Equatable, Sendable {
             wire = Wire(command: "app.status", json: json)
         case .appQuit:
             wire = Wire(command: "app.quit")
+        case .panelOpen:
+            wire = Wire(command: "panel.open")
+        case .panelClose:
+            wire = Wire(command: "panel.close")
+        case .panelFold(let project):
+            wire = Wire(command: "panel.fold", project: project)
+        case .panelUnfold(let project):
+            wire = Wire(command: "panel.unfold", project: project)
+        case .panelShowMore(let project, let kind):
+            wire = Wire(command: "panel.showMore", project: project, kind: kind)
+        case .panelTab(let name):
+            wire = Wire(command: "panel.tab", name: name)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -49,6 +76,13 @@ public enum ControlRequest: Equatable, Sendable {
         switch wire.command {
         case "app.status": return .appStatus(json: wire.json ?? false)
         case "app.quit": return .appQuit
+        case "panel.open": return .panelOpen
+        case "panel.close": return .panelClose
+        case "panel.fold": return .panelFold(project: try wire.field(\.project, "project"))
+        case "panel.unfold": return .panelUnfold(project: try wire.field(\.project, "project"))
+        case "panel.showMore":
+            return .panelShowMore(project: try wire.field(\.project, "project"), kind: try wire.field(\.kind, "kind"))
+        case "panel.tab": return .panelTab(name: try wire.field(\.name, "name"))
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -58,6 +92,18 @@ public enum ControlRequest: Equatable, Sendable {
         var version = ControlRequest.version
         var command: String
         var json: Bool?
+        var project: String?
+        var kind: String?
+        var name: String?
+
+        /// The field at `path`, which `command` needs: refused when the
+        /// request leaves it out.
+        func field(_ path: KeyPath<Wire, String?>, _ key: String) throws(ControlProtocolError) -> String {
+            guard let value = self[keyPath: path] else {
+                throw .unreadable("the control command `\(command)` needs its `\(key)`")
+            }
+            return value
+        }
     }
 }
 

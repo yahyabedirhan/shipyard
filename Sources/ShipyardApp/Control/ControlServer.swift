@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import ShipyardControl
+import ShipyardCore
 
 /// App control's server: while the app runs it listens on `control.sock`
 /// in the support folder, the user's own (mode 0600), and answers one JSON
@@ -48,6 +49,30 @@ final class ControlServer {
             return Answer(reply: .done(json ? status.json : status.text))
         case .appQuit:
             return Answer(reply: .done("shipyard quit\n"), quits: true)
+        case .panelOpen:
+            return await steer { () async throws(PanelRefusal) in try await panel.open(); return "panel open" }
+        case .panelClose:
+            return await steer { () async throws(PanelRefusal) in try await panel.close(); return "panel closed" }
+        case .panelFold(let project):
+            return await steer { () throws(PanelRefusal) in try panel.fold(project); return "folded \(project)" }
+        case .panelUnfold(let project):
+            return await steer { () throws(PanelRefusal) in try panel.unfold(project); return "unfolded \(project)" }
+        case .panelShowMore(let project, let kind):
+            return await steer { () throws(PanelRefusal) in
+                try panel.showMore(project, kind: kind)
+                return "showing all \(kind) in \(project)"
+            }
+        case .panelTab(let name):
+            return await steer { () throws(PanelRefusal) in "showing \(try panel.selectTab(name))" }
+        }
+    }
+
+    /// The line `body` returns, done, or its refusal.
+    private func steer(_ body: () async throws(PanelRefusal) -> String) async -> Answer {
+        do throws(PanelRefusal) {
+            return Answer(reply: .done(try await body() + "\n"))
+        } catch {
+            return Answer(reply: .refused(error.reason))
         }
     }
 

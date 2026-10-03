@@ -114,7 +114,7 @@ targets.append(
 targets.append(
     .testTarget(
         name: "ShipyardAppTests",
-        dependencies: ["ShipyardApp", "ShipyardControl"],
+        dependencies: ["ShipyardApp", "ShipyardControl", "ShipyardCore"],
         path: "Tests/ShipyardAppTests"
     )
 )

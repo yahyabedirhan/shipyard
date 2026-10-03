@@ -64,18 +64,34 @@ struct AppCommandTests {
 
     @Test("the status reads as lines, or as one JSON object")
     func statusFormats() {
-        #expect(Self.status.text == """
+        let tabs = AppStatus(
+            version: "0.1.0", panelOpen: false, layout: "tabs", tab: "shop", projects: ["shop", "blog"],
+            folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")]
+        )
+        #expect(tabs.text == """
             shipyard 0.1.0 is running
             panel: closed
             layout: tabs
+            tab: shop
             projects: shop, blog
+            folded: blog
+            showing all: pull-requests in shop
 
             """)
-        #expect(Self.status.json
-            == #"{"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"running":true,"version":"0.1.0"}"# + "\n")
-        let none = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: [])
-        #expect(none.text.contains("panel: open\n"))
-        #expect(none.text.contains("projects: none\n"))
+        #expect(tabs.json == #"{"folded":["blog"],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
+            + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.1.0"}"# + "\n")
+        // The list layout has no tab: no line, and null in the JSON.
+        let list = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: [])
+        #expect(list.text == """
+            shipyard 0.1.0 is running
+            panel: open
+            layout: list
+            projects: none
+            folded: none
+            showing all: none
+
+            """)
+        #expect(list.json.contains(#""tab":null"#))
     }
 
     // MARK: - Not running, refusals and failures

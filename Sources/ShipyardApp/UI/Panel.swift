@@ -223,7 +223,7 @@ struct Panel: View {
         case .list:
             ListLayout(model: shipyard.menu, actions: actions.layoutActions)
         case .tabs:
-            TabsLayout(model: shipyard.menu, actions: actions.layoutActions)
+            TabsLayout(model: shipyard.menu, panel: actions.panelState, actions: actions.layoutActions)
         }
     }
 

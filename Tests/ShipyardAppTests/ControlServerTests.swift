@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 @testable import ShipyardApp
 import ShipyardControl
+import ShipyardCore
 import Testing
 
 /// App control's server: how it answers each request (with a fake panel),
@@ -12,8 +13,28 @@ import Testing
 struct ControlServerTests {
     static let status = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: ["shop"])
 
+    /// Records each call it's asked to make, and refuses all of them with
+    /// `refusal` when it's set.
     final class FakePanel: PanelControlling {
+        var calls: [String] = []
+        var refusal: PanelRefusal?
+
         func status() -> AppStatus { ControlServerTests.status }
+
+        private func record(_ call: String) throws(PanelRefusal) {
+            calls.append(call)
+            if let refusal { throw refusal }
+        }
+
+        func open() async throws(PanelRefusal) { try record("open") }
+        func close() async throws(PanelRefusal) { try record("close") }
+        func fold(_ project: String) throws(PanelRefusal) { try record("fold \(project)") }
+        func unfold(_ project: String) throws(PanelRefusal) { try record("unfold \(project)") }
+        func showMore(_ project: String, kind: String) throws(PanelRefusal) { try record("show-more \(project) \(kind)") }
+        func selectTab(_ name: String) throws(PanelRefusal) -> String {
+            try record("tab \(name)")
+            return name == "all" ? "All" : name
+        }
     }
 
     /// Whether the server asked the app to quit.
@@ -52,6 +73,41 @@ struct ControlServerTests {
 
         #expect(answer == .init(reply: .done("shipyard quit\n"), quits: true))
         #expect(quitter.quits == 0)
+    }
+
+    @Test("each panel request asks the panel once and answers with what it did", arguments: [
+        (ControlRequest.panelOpen, "open", "panel open\n"),
+        (.panelClose, "close", "panel closed\n"),
+        (.panelFold(project: "shop"), "fold shop", "folded shop\n"),
+        (.panelUnfold(project: "shop"), "unfold shop", "unfolded shop\n"),
+        (.panelShowMore(project: "shop", kind: "issues"), "show-more shop issues", "showing all issues in shop\n"),
+        (.panelTab(name: "all"), "tab all", "showing All\n"),
+    ])
+    func panel(request: ControlRequest, call: String, output: String) async {
+        let answer = await server().reply(to: request.encoded())
+
+        #expect(answer == .init(reply: .done(output)))
+        #expect(panel.calls == [call])
+    }
+
+    @Test("a panel request the panel refuses is answered with its reason", arguments: [
+        ControlRequest.panelOpen, .panelFold(project: "shopp"), .panelShowMore(project: "shop", kind: "prs"), .panelTab(name: "x"),
+    ])
+    func panelRefused(request: ControlRequest) async {
+        panel.refusal = PanelRefusal("what exists is named here")
+
+        let answer = await server().reply(to: request.encoded())
+
+        #expect(answer == .init(reply: .refused("what exists is named here")))
+        #expect(panel.calls.count == 1)
+    }
+
+    @Test("a panel request without the field it needs is refused, and the panel isn't asked")
+    func panelMissingField() async {
+        let answer = await server().reply(to: Data(#"{"version":1,"command":"panel.showMore","project":"shop"}"#.utf8))
+
+        #expect(answer == .init(reply: .refused("the control command `panel.showMore` needs its `kind`")))
+        #expect(panel.calls.isEmpty)
     }
 
     @Test("a request of another version, an unknown command or no JSON is refused with a reply that says so", arguments: [
