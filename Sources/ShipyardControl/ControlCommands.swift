@@ -48,7 +48,8 @@ public enum ControlCommands {
                 switch LeaseCommand.parse(arguments) {
                 case .success(let invocation):
                     var context = context(environment)
-                    // `--key` names the holder for this command only.
+                    // `--key` names the holder for this command only, over
+                    // `SHIPYARD_CONTROL_KEY`.
                     if let key = invocation.key { context.client.holder.key = key }
                     return ControlCommand.run(.send(invocation.request), context: context)
                 case .failure(let result):

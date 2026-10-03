@@ -90,16 +90,37 @@ struct HolderTests {
         #expect(sent == [Holder(key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "Herdr pane w1-2")])
     }
 
-    @Test("--key names the holder's key for that command only; its name and place stay the ones worked out")
+    @Test("SHIPYARD_CONTROL_KEY names the key of every command, over the session and the process; the name and place stay the ones worked out", arguments: commands)
+    func keyVariable(arguments: [String]) {
+        let overSession = holders(arguments, variables: ["SHIPYARD_CONTROL_KEY": "my-run", "CLAUDE_CODE_SESSION_ID": "5f1c"])
+        let overProcess = holders(arguments, variables: ["SHIPYARD_CONTROL_KEY": "my-run"])
+
+        #expect(!overSession.isEmpty)
+        #expect(overSession.allSatisfy { $0 == Holder(key: "my-run", name: "Claude Code", place: "/work/shop") })
+        #expect(!overProcess.isEmpty)
+        #expect(overProcess.allSatisfy { $0 == Holder(key: "my-run", name: "claude", place: "/work/shop") })
+    }
+
+    @Test("an empty or blank SHIPYARD_CONTROL_KEY is no key", arguments: ["", "  ", "\t\n"])
+    func blankKeyVariable(value: String) {
+        let sent = holders(["panel", "open"], variables: ["SHIPYARD_CONTROL_KEY": value, "CLAUDE_CODE_SESSION_ID": "5f1c"])
+
+        #expect(sent == [Holder(key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "/work/shop")])
+    }
+
+    @Test("--key names the holder's key for that command only, over SHIPYARD_CONTROL_KEY; its name and place stay the ones worked out")
     func key() {
-        let session = ["CLAUDE_CODE_SESSION_ID": "5f1c"]
+        for (variables, after) in [
+            (["CLAUDE_CODE_SESSION_ID": "5f1c"], "CLAUDE_CODE_SESSION_ID=5f1c"),
+            (["CLAUDE_CODE_SESSION_ID": "5f1c", "SHIPYARD_CONTROL_KEY": "exported"], "exported"),
+        ] {
+            let taken = holders(["control", "take", "--key", "my-run", "--wait", "5"], variables: variables)
+            let released = holders(["control", "release", "--key", "my-run"], variables: variables)
+            let next = holders(["panel", "open"], variables: variables)
 
-        let taken = holders(["control", "take", "--key", "my-run", "--wait", "5"], variables: session)
-        let released = holders(["control", "release", "--key", "my-run"], variables: session)
-        let next = holders(["panel", "open"], variables: session)
-
-        #expect(taken == [Holder(key: "my-run", name: "Claude Code", place: "/work/shop")])
-        #expect(released == taken)
-        #expect(next == [Holder(key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "/work/shop")])
+            #expect(taken == [Holder(key: "my-run", name: "Claude Code", place: "/work/shop")])
+            #expect(released == taken)
+            #expect(next == [Holder(key: after, name: "Claude Code", place: "/work/shop")])
+        }
     }
 }

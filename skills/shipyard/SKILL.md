@@ -605,7 +605,7 @@ Shipyard answers one agent at a time: the one holding its **lease**. Every `app`
 - **A relaunch keeps it.** `app open --demo <folder>`, and the plain `app open` that ends a demo, launch the next app with your lease, until the same end. A separate `app quit` and `app open` leave shipyard free between them.
 - **Look first** with `app status`: `lease: free`, or `lease: <name> in <place>, <n>s left, <k> waiting` (`lease` in the JSON).
 - **Screenshots leave the dot and the banner out**, so they show shipyard as the user normally sees it; `--with-indicator` keeps them, for a picture of the lease itself.
-- `--key <k>` takes or releases as `<k>` in place of you, for that one command only: your `app`, `panel` and `screenshot` commands still go as you. Pass the same key to `release`.
+- **When shipyard can't tell your commands are yours** (each runs as a separate process that isn't a Claude Code session, so your own commands refuse each other as "in use"), export `SHIPYARD_CONTROL_KEY=<k>` for the run, a name of your own: every `app`, `panel`, `screenshot` and `control` command then goes as `<k>`. `--key <k>` does the same for one `control take` or `release` only.
 
 A command shipyard won't run for you exits 1 with one of these lines:
 
@@ -613,7 +613,7 @@ A command shipyard won't run for you exits 1 with one of these lines:
 |---|---|
 | ``shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue`` | Another agent holds it. Queue with `shipyard control take --wait <seconds>`, a wait long enough for its time left: it returns as soon as you hold it. When your task can't wait that long, tell the user who holds shipyard and go on with what doesn't need it. |
 | `waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)` | Your wait ran out. Tell the user who holds shipyard, and queue again only when they say so. |
-| `the user took shipyard back; ask them before using it again` | The user pressed Stop on your banner. Stop your app control there and ask them what they want; use shipyard again only once they say so. They can allow you back at once; otherwise it refuses you for 5 minutes, `control take` included, and waiting that out, retrying or another `--key` goes against their Stop. |
+| `the user took shipyard back; ask them before using it again` | The user pressed Stop on your banner. Stop your app control there and ask them what they want; use shipyard again only once they say so. They can allow you back at once; otherwise it refuses you for 5 minutes, `control take` included, and waiting that out, retrying or another key goes against their Stop. |
 
 ### Exit codes
 

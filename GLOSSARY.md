@@ -150,7 +150,7 @@ The right to use app control, held by one agent at a time. An agent's first app 
 _Avoid_: Lock, mutex, session
 
 **Holder**:
-The agent a lease is held by, or refused to: its key (the agent's session, else its own process), its name and its place (a Herdr pane, else its working folder). The `shipyard` command works it out on every call, so agents never pass it.
+The agent a lease is held by, or refused to: its key (the agent's session, else its own process), its name and its place (a Herdr pane, else its working folder). The `shipyard` command works it out on every call, so agents never pass it; a setup where that key doesn't stay the same names one in `SHIPYARD_CONTROL_KEY`.
 _Avoid_: Owner, client, user
 
 ### Setup

@@ -9,7 +9,7 @@ public enum LeaseCommand {
     public struct Invocation: Equatable, Sendable {
         public var request: ControlRequest
         /// `--key <k>`: the holder key for this command only, in place of
-        /// the one `Holder.find` works out.
+        /// the one `Holder.find` works out (`SHIPYARD_CONTROL_KEY`'s included).
         public var key: String?
 
         public init(_ request: ControlRequest, key: String? = nil) {
@@ -28,8 +28,12 @@ public enum LeaseCommand {
                     line, first come first served, up to that long
           release   give shipyard up, so the next agent in line gets it; does
                     nothing when you don't hold it
-          --key <k> hold or give it up as <k>, in place of the agent shipyard
-                    works out; pass the same key to release
+          --key <k> hold or give it up as <k>, for this command only, in place
+                    of the agent shipyard works out; pass the same key to
+                    release
+
+        To send every app, panel, screenshot and control command as <k>,
+        export SHIPYARD_CONTROL_KEY=<k> for the run; --key still wins.
 
         Each exits 1 when shipyard isn't running; take also when another agent
         holds it, or still holds it once the wait runs out.

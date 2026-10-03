@@ -4,7 +4,7 @@ App control needs a **lease**: one agent at a time holds it. Every `shipyard app
 
 The app enforces it. Every control request carries its **holder**, and the app's control server asks the lease before it does anything. A command from another holder is refused with exit 1, naming the holder, their place and when the lease ends. The rules are a pure value in ShipyardControl (`ControlLease`), given the time on each call, so they build and test on Linux; the app owns the one instance and drives it (ADR 0006).
 
-The `shipyard` command works out the holder on every call, so agents pass nothing. The key is the agent's session id when the agent exports one (Claude Code's `CLAUDE_CODE_SESSION_ID`), otherwise the nearest ancestor of the command that isn't a shell, as its pid plus its start time. Herdr's pane id is the holder's place, never part of its key: another pane could later reuse it.
+The `shipyard` command works out the holder on every call, so agents pass nothing. The key is the agent's session id when the agent exports one (Claude Code's `CLAUDE_CODE_SESSION_ID`), otherwise the nearest ancestor of the command that isn't a shell, as its pid plus its start time. For a setup where neither stays the same across an agent's commands, `SHIPYARD_CONTROL_KEY` in the environment names the key for every command, over both (#178). Herdr's pane id is the holder's place, never part of its key: another pane could later reuse it.
 
 App control arrived in 0.1.0 with nothing to stop two agents using it at once: one folded a project while the other took a screenshot, and each got a result the other spoiled. The maintainer couldn't tell that an agent was in the app at all.
 

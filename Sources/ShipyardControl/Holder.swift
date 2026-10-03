@@ -5,9 +5,10 @@ import Foundation
 
 /// Who sends a control request: the agent the lease is held by or refused
 /// to. Every request carries one, worked out by the `shipyard` command on
-/// each call (`Holder.find`), so agents pass nothing.
+/// each call (`Holder.find`), so agents usually pass nothing.
 public struct Holder: Codable, Hashable, Sendable {
-    /// What tells one agent from another across its commands: its session
+    /// What tells one agent from another across its commands: the key it
+    /// exports (`SHIPYARD_CONTROL_KEY`), else its session
     /// (`CLAUDE_CODE_SESSION_ID=…`), else its process (`process:<pid>@<start>`).
     public var key: String
     /// The agent's name as people read it: `Claude Code`, or its process's
@@ -33,13 +34,28 @@ public struct Holder: Codable, Hashable, Sendable {
     /// the holder is the nearest ancestor that isn't one.
     static let shells: Set<String> = ["sh", "bash", "zsh", "fish", "dash", "ksh", "mksh", "tcsh", "csh", "nu"]
 
+    /// The variable that names the holder's key for every control command
+    /// run with it, for a setup where neither the agent's session nor its
+    /// process stays the same across its commands. A command's `--key`
+    /// still wins; a value that's empty or blank counts as unset.
+    static let keyVariable = "SHIPYARD_CONTROL_KEY"
+
     /// The holder of a command run with `variables` in `workingDirectory`:
     /// the first known session variable that's set, else the nearest
     /// ancestor of this process that isn't a shell, as its pid and start
     /// time, read from `processes`. When even this process can't be read,
-    /// `process:unknown`.
+    /// `process:unknown`. `keyVariable`, when set, replaces the key only.
     public static func find(variables: [String: String], workingDirectory: URL, processes: any ProcessTable) -> Holder {
         let place = variables["HERDR_PANE_ID"].flatMap { $0.isEmpty ? nil : "Herdr pane \($0)" } ?? workingDirectory.path
+        var holder = automatic(variables: variables, place: place, processes: processes)
+        if let key = variables[keyVariable], !key.allSatisfy(\.isWhitespace) {
+            holder.key = key
+        }
+        return holder
+    }
+
+    /// The holder its session, else its process, makes it.
+    private static func automatic(variables: [String: String], place: String, processes: any ProcessTable) -> Holder {
         for (variable, agent) in sessionVariables {
             if let session = variables[variable], !session.isEmpty {
                 return Holder(key: "\(variable)=\(session)", name: agent, place: place)
