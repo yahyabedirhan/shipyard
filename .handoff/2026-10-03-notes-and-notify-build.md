@@ -11,7 +11,7 @@ You are the orchestrator for effort `notes-and-notify`. The thinking session gri
   - **Wave 2:** #193 The rest of a notice's options (after #190); #194 Notices over the tailnet (after #190, #189); #195 Notices on the poll route (after #190, #189, and yahyabedirhan/herdr-shipyard#1); #196 The new-note icon (after #192).
   - **Outside this repository, also yours to build:**
     - yahyabedirhan/herdr-shipyard#1 Hold shipyard notices for the Mac's poll, and a settings copy. It is public, unblocked, and has its own repo and PR.
-    - The maintainer's private workstation repository: #23 Tailscale setup and #24 Notion routes for every harness. Work there in the maintainer's clone (the global instructions name it). Keep its details out of this public repo.
+    - The maintainer's machine setup (Tailscale, and the Notion routes for every harness), tracked privately. The global instructions say where. Keep its details out of this public repo.
 - **The previous handoff,** `.handoff/2026-10-03-notes-and-notify.md`, is the thinking session's brief, now done.
 
 ## How the maintainer wants this run
@@ -19,8 +19,8 @@ You are the orchestrator for effort `notes-and-notify`. The thinking session gri
 - **Fully autonomous. Never ask the maintainer a question.** Decide anything open yourself, in the spec's spirit, and list each such decision in the pull request.
 - **Anything only the maintainer can do** becomes a ticket assigned to them (`--assignee yahyabedirhan`), label `ready-for-human`. Each one has numbered steps, the exact commands, what to report back, and which ticket it unblocks. Add a blocked-by link from the gated ticket. Then tell them through `shipyard ping` (the shipyard skill), and keep working on everything else. Expected ones:
   - **#188, the Tailscale spike:** they run it. The listener build in #194 doesn't wait on it; only its QA does.
-  - **Tailscale on each VPS** (workstation #23): logging in and turning off key expiry in the admin console need them.
-  - **The app's Notion token** (workstation #24): they create the "Shipyard" internal connection, share it with the entry page, and paste the token into the app. Never ask for it in chat and never write it to a file.
+  - **Tailscale on each VPS** (the private machine setup): logging in and turning off key expiry in the admin console need them.
+  - **The app's Notion token** (the private machine setup): they create the "Shipyard" internal connection, share it with the entry page, and paste the token into the app. Never ask for it in chat and never write it to a file.
   - **OAuth logins** for Codex and opencode's Notion MCP on each machine, if they need a browser.
   - **QA tickets** for the visual features, per AGENTS.md's QA section.
 - Ask before merging any pull request (global rule). Delivering the effort's PR via `/to-pr` is the end of the build.
@@ -36,7 +36,7 @@ You are the orchestrator for effort `notes-and-notify`. The thinking session gri
   - `ntn api` with a body: use `-d "$(cat file)" < /dev/null`. `-d @file` with stdin attached hangs.
   - `ntn pages trash` needs `--yes`.
   - The scratch spike page is in the notes workspace's trash.
-- **Tailscale on the Mac:** the Standalone variant, 1.102.4, with the CLI at `/usr/local/bin/tailscale`. The macOS firewall is currently off. Neither VPS has Tailscale yet.
+- **Tailscale on the Mac:** installed, with its CLI at `/usr/local/bin/tailscale`. The private machine setup records the rest.
 - **Privacy:** no machine labels, home paths, workspace names, or private repo names in public issues, PRs or docs. Public shipyard tickets say only that the maintainer's machine setup "is tracked privately".
 
 ## Can you reach the thinking session?
@@ -49,7 +49,7 @@ It runs in Herdr and could be prompted, but you don't need it: everything is in 
 - `implement` and `tdd`, for each ticket's builder.
 - `shipyard`: the ping commands to reach the maintainer, and the app-control rules.
 - `herdr`: herdr-shipyard work and the remote machines.
-- `writing-for-agents` and `maintain-environment`: the skill references and the workstation's instructions.
+- `writing-for-agents` and `maintain-environment`: the skill references and the private machine setup's instructions.
 - `domain-modeling`: the glossary entries and the three ADRs.
 - `low-level-design`: the module design updates.
 - `code-review` before the PR, then `to-pr`.
