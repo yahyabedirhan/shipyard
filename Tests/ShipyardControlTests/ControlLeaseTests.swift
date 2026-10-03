@@ -22,6 +22,7 @@ struct ControlLeaseTests {
         case .failure(.queued(let term)): "queued behind \(name(term.holder)) until \(Int(term.ends.timeIntervalSince1970))"
         case .failure(.waitedOut(let seconds, let term)):
             "waited \(seconds)s: \(name(term.holder)) until \(Int(term.ends.timeIntervalSince1970))"
+        case .failure(.stopped): "refused: stopped"
         }
         return answer + read(decision.transitions)
     }
@@ -82,6 +83,10 @@ struct ControlLeaseTests {
         case giveUp(Int)
         /// The app settles the lease when its end comes.
         case settle
+        /// The maintainer's Stop, on whoever holds the lease.
+        case stop
+        /// The maintainer's Allow, on this holder's bar.
+        case allow
     }
 
     @Test("take holds to the cap, release frees it, and takes that wait queue first come, first served", arguments: [
@@ -123,21 +128,53 @@ struct ControlLeaseTests {
           "waited 20s: a until 60", "done (ended a released, started b)"]),
     ] as [([(TimeInterval, Holder, Step)], [String])])
     func takes(steps: [(TimeInterval, Holder, Step)], expected: [String]) {
-        var lease = ControlLease()
+        #expect(Self.run(steps) == expected)
+    }
 
-        let seen = steps.map { seconds, holder, step in
+    @Test("stop ends the holder's lease and bars it for five minutes, allow lifts the bar, and the next waiter gets the lease", arguments: [
+        // Stop ends the lease; the stopped holder's requests, take and a take that would wait are refused, and nobody else's.
+        ([(0.0, a, Step.take), (10, a, .stop), (20, a, .use), (30, a, .take), (40, a, .wait(100)), (50, b, .use)],
+         ["a until 300 (started a)", "done (ended a stopped)", "refused: stopped", "refused: stopped", "refused: stopped",
+          "b until 110 (started b)"]),
+        // The bar lasts five minutes from the stop, then the holder takes the lease like anyone.
+        ([(0, a, .use), (10, a, .stop), (309, a, .use), (310, a, .use)],
+         ["a until 60 (started a)", "done (ended a stopped)", "refused: stopped", "a until 370 (started a)"]),
+        // Allow lifts the bar at once.
+        ([(0, a, .use), (10, a, .stop), (20, a, .allow), (30, a, .use)],
+         ["a until 60 (started a)", "done (ended a stopped)", "done", "a until 90 (started a)"]),
+        // Allow lifts only that holder's bar.
+        ([(0, a, .use), (10, a, .stop), (20, b, .allow), (30, a, .use)],
+         ["a until 60 (started a)", "done (ended a stopped)", "done", "refused: stopped"]),
+        // The next waiter gets the lease as usual, held to its cap; the stopped holder can't queue behind it.
+        ([(0, a, .take), (10, b, .wait(100)), (20, a, .stop), (30, a, .wait(100)), (40, b, .stop), (50, c, .use)],
+         ["a until 300 (started a)", "queued behind a until 300", "done (ended a stopped, started b)", "refused: stopped",
+          "done (ended b stopped)", "c until 110 (started c)"]),
+        // Stop after the lease ran out ends nothing and bars nobody.
+        ([(0, a, .use), (60, a, .stop), (70, a, .use)], ["a until 60 (started a)", "done (ended a expired)", "a until 130 (started a)"]),
+    ] as [([(TimeInterval, Holder, Step)], [String])])
+    func stops(steps: [(TimeInterval, Holder, Step)], expected: [String]) {
+        #expect(Self.run(steps) == expected)
+    }
+
+    /// What each step got, from a lease free at the start.
+    static func run(_ steps: [(TimeInterval, Holder, Step)]) -> [String] {
+        var lease = ControlLease()
+        return steps.map { seconds, holder, step in
             let now = Self.at(seconds)
-            return switch step {
-            case .use: Self.read(lease.use(by: holder, at: now))
-            case .take: Self.read(lease.take(by: holder, at: now))
-            case .wait(let wait): Self.read(lease.take(by: holder, at: now, waitingUntil: now.addingTimeInterval(TimeInterval(wait))))
-            case .release: "done" + Self.read(lease.release(by: holder, at: now))
-            case .giveUp(let waited): Self.read(lease.giveUp(by: holder, waited: waited, at: now))
-            case .settle: "done" + Self.read(lease.settle(at: now))
+            switch step {
+            case .use: return Self.read(lease.use(by: holder, at: now))
+            case .take: return Self.read(lease.take(by: holder, at: now))
+            case .wait(let wait):
+                return Self.read(lease.take(by: holder, at: now, waitingUntil: now.addingTimeInterval(TimeInterval(wait))))
+            case .release: return "done" + Self.read(lease.release(by: holder, at: now))
+            case .giveUp(let waited): return Self.read(lease.giveUp(by: holder, waited: waited, at: now))
+            case .settle: return "done" + Self.read(lease.settle(at: now))
+            case .stop: return "done" + Self.read(lease.stop(at: now))
+            case .allow:
+                lease.allow(holder.key, at: now)
+                return "done"
             }
         }
-
-        #expect(seen == expected)
     }
 
     @Test("a holder is the same across requests by key, and its latest name and place are kept")
@@ -188,6 +225,31 @@ struct ControlLeaseTests {
         guard case .failure(let refusal) = waited.answer else { Issue.record("not refused"); return }
         #expect(refusal.message(at: Self.at(40), timeZone: utc)
             == "waited 30s; shipyard is still in use by codex in Herdr pane w1-2 until 00:05:00 (260s left)")
+    }
+
+    @Test("the stop's refusal tells the agent to ask the user; the stopped holders are listed until their bars end, and the next end is the earliest")
+    func stopped() throws {
+        var lease = ControlLease()
+        _ = lease.take(by: Self.a, at: Self.at(0))
+        _ = lease.stop(at: Self.at(10))
+        _ = lease.use(by: Self.b, at: Self.at(20))
+        _ = lease.stop(at: Self.at(30))
+        _ = lease.use(by: Self.c, at: Self.at(40))
+
+        let refused = lease.use(by: Self.a, at: Self.at(50))
+
+        guard case .failure(let refusal) = refused.answer else { Issue.record("not refused"); return }
+        #expect(refusal.message(at: Self.at(50), timeZone: try #require(TimeZone(identifier: "UTC")))
+            == "the user took shipyard back; ask them before using it again")
+        // The latest stopped first; each listed until its bar ends. The lease's end comes before either bar's.
+        #expect(lease.stopped(at: Self.at(50)).map(\.holder) == [Self.b, Self.a])
+        #expect(lease.nextEnd(after: Self.at(50)) == Self.at(100))
+        _ = lease.release(by: Self.c, at: Self.at(60))
+        #expect(lease.nextEnd(after: Self.at(60)) == Self.at(310))
+        #expect(lease.stopped(at: Self.at(310)).map(\.holder) == [Self.b])
+        #expect(lease.nextEnd(after: Self.at(310)) == Self.at(330))
+        #expect(lease.stopped(at: Self.at(330)).isEmpty)
+        #expect(lease.nextEnd(after: Self.at(330)) == nil)
     }
 
     @Test("app status reports the held lease's holder, place, whole seconds left and waiters, and nothing once it's free")

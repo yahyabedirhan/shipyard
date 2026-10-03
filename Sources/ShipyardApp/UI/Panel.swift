@@ -178,14 +178,28 @@ struct Panel: View {
         return items
     }
 
-    /// The lease's banner first, in every phase and layout, then the others.
+    /// The lease's banner first, in every phase and layout, then a quiet
+    /// line for each agent the maintainer stopped, then the others. A
+    /// stopped agent's line stays under the next holder's banner, so Allow
+    /// is there for the whole bar.
     private var banners: some View {
         let items = bannerItems
-        let leaseEnds = actions.leaseIndicator.shownEnd(at: Date())
+        let now = Date()
+        let leaseEnds = actions.leaseIndicator.shownEnd(at: now)
+        let stopped = actions.leaseIndicator.stopped(at: now)
         return VStack(spacing: 6) {
             if let leaseEnds {
                 leaseBanner(ends: leaseEnds)
                     .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            ForEach(stopped, id: \.holder.key) { bar in
+                Banner(
+                    symbol: "hand.raised.fill",
+                    text: LeaseBanner.tookBack(from: bar.holder.name),
+                    tint: Palette.gray,
+                    action: (LeaseBanner.allow, { actions.allowLeaseHolder(bar.holder.key) })
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
             ForEach(items) { item in
                 Banner(symbol: item.symbol, text: item.text, tint: item.tint, action: item.action)
@@ -193,9 +207,10 @@ struct Panel: View {
             }
         }
         .padding(.horizontal, 8)
-        .padding(.bottom, items.isEmpty && leaseEnds == nil ? 0 : 8)
+        .padding(.bottom, items.isEmpty && leaseEnds == nil && stopped.isEmpty ? 0 : 8)
         .animation(Motion.banner, value: items.map(\.id))
         .animation(Motion.banner, value: leaseEnds == nil)
+        .animation(Motion.banner, value: stopped.map(\.holder.key))
     }
 
     /// While an agent holds the lease: its banner, the countdown ticking
@@ -205,7 +220,7 @@ struct Panel: View {
         // Whole seconds before the end: never later than now, since the cap counts from when it was taken.
         TimelineView(.periodic(from: ends.addingTimeInterval(-ControlLease.cap), by: 1)) { context in
             if let lease = actions.leaseIndicator.shown(at: context.date) {
-                LeaseBannerView(lease: lease)
+                LeaseBannerView(lease: lease, stop: actions.stopLease)
             }
         }
     }

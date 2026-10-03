@@ -146,7 +146,7 @@ The app running on a folder of example configuration and state, so that screensh
 _Avoid_: Sandbox, test mode, fixture
 
 **Lease**:
-The right to use app control, held by one agent at a time. An agent's first app control command takes it and each later one renews it. It ends by itself a minute after the holder's last command, and five minutes after it was taken at most. The app refuses another agent's command while it's held. `shipyard control take` holds it to the five minutes on purpose, `release` gives it up, and a `take --wait` waits in line for it, first come, first served. Asking for the app's status needs no lease.
+The right to use app control, held by one agent at a time. An agent's first app control command takes it and each later one renews it. It ends by itself a minute after the holder's last command, and five minutes after it was taken at most. The app refuses another agent's command while it's held. `shipyard control take` holds it to the five minutes on purpose, `release` gives it up, and a `take --wait` waits in line for it, first come, first served. The maintainer can stop it from the panel, which keeps that agent out for five minutes unless they allow it back. Asking for the app's status needs no lease.
 _Avoid_: Lock, mutex, session
 
 **Holder**:

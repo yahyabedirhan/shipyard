@@ -4,10 +4,12 @@ import SwiftUI
 
 /// The banner topping the panel while an agent holds the lease: the
 /// agent's logo, "Claude Code in shop is using shipyard", the time left and
-/// how many wait, in `LeaseBanner`'s words. It says what's happening and
-/// changes nothing: the maintainer's clicks never touch the lease.
+/// how many wait, in `LeaseBanner`'s words, and Stop, which takes shipyard
+/// back. Stop is the banner's only way into the lease.
 struct LeaseBannerView: View {
     let lease: AppStatus.Lease
+    /// Takes shipyard back from the holder (`ControlServer.stopLease`).
+    let stop: () -> Void
 
     var body: some View {
         let banner = LeaseBanner(lease)
@@ -32,15 +34,20 @@ struct LeaseBannerView: View {
             .fixedSize()
             .layoutPriority(1)
             Spacer(minLength: 0)
-            // The place for the banner's Stop button.
+            Button(LeaseBanner.stop, action: stop)
+                .buttonStyle(TextButtonStyle(tint: Palette.red))
+                .fixedSize()
+                .layoutPriority(1)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.lease.opacity(0.14)))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
+        // One element reading the banner's line, with Stop as its action.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)
+        .accessibilityAction(named: LeaseBanner.stop, stop)
     }
 }
 

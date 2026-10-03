@@ -6,8 +6,9 @@ import ShipyardControl
 /// icon and the banner topping the panel, both drawn while an agent holds
 /// it. The control server, which owns the lease, writes each change here,
 /// and settles it when it runs out, so the dot and the banner follow its
-/// start and end with no request and no refresh. The maintainer's clicks
-/// never touch the lease: the views only read it.
+/// start and end with no request and no refresh. Of the maintainer's
+/// clicks, only the banner's Stop and a quiet line's Allow reach the lease,
+/// through `AppServices` to the control server; the views only read it.
 @MainActor
 @Observable
 final class LeaseIndicator {
@@ -27,5 +28,11 @@ final class LeaseIndicator {
     /// ticks by; nil when none is drawn.
     func shownEnd(at now: Date) -> Date? {
         isHiddenForCapture ? nil : lease.current(at: now)?.ends
+    }
+
+    /// The holders the maintainer stopped, still barred at `now`, a quiet
+    /// line each under the banner; none while a capture hides the indicator.
+    func stopped(at now: Date) -> [ControlLease.Bar] {
+        isHiddenForCapture ? [] : lease.stopped(at: now)
     }
 }

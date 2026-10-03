@@ -8,7 +8,8 @@ import Foundation
 /// `control take` holds it to the cap on purpose and `control release`
 /// gives it up. A `take` that may wait queues behind the holder, first
 /// come, first served, and the first waiter whose wait hasn't run out gets
-/// the lease when it frees.
+/// the lease when it frees. The maintainer's Stop ends the lease and bars
+/// its holder for `bar`, unless they allow it back sooner.
 ///
 /// A pure value, given the time on each call: the app owns the one
 /// instance and drives it, and its answers and transitions are all it
@@ -18,6 +19,8 @@ public struct ControlLease: Equatable, Sendable {
     public static let renewal: TimeInterval = 60
     /// How long after it was taken the lease ends, however it's renewed.
     public static let cap: TimeInterval = 5 * 60
+    /// How long a holder the maintainer stopped is refused, unless allowed back.
+    public static let bar: TimeInterval = 5 * 60
 
     /// A lease held: by whom, when it was taken and when it ends.
     public struct Term: Equatable, Sendable {
@@ -61,6 +64,8 @@ public struct ControlLease: Equatable, Sendable {
         case capped
         /// Its holder gave it up (`control release`).
         case released
+        /// The maintainer took shipyard back (the banner's Stop).
+        case stopped
     }
 
     /// Why a request isn't granted.
@@ -73,10 +78,15 @@ public struct ControlLease: Equatable, Sendable {
         /// The `take` waited its `seconds` in line, and another holder still
         /// has the lease.
         case waitedOut(seconds: Int, Term)
+        /// The maintainer stopped this holder, and its bar hasn't ended or
+        /// been lifted.
+        case stopped
 
         /// The refusal as the agent reads it, its times in `timeZone`.
         public func message(at now: Date, timeZone: TimeZone) -> String {
             switch self {
+            case .stopped:
+                return "the user took shipyard back; ask them before using it again"
             case .inUse(let term), .queued(let term):
                 return "shipyard is in use by \(term.holder.name) in \(term.holder.place) until \(clock(term.ends, timeZone)) "
                     + "(\(term.secondsLeft(at: now))s left); `shipyard control take --wait <seconds>` to queue"
@@ -116,6 +126,14 @@ public struct ControlLease: Equatable, Sendable {
     /// The `take`s waiting for the lease, first come first: one place per
     /// holder key.
     private var queue: [Waiter] = []
+    /// The holders the maintainer stopped, the latest first: one per holder key.
+    private var bars: [Bar] = []
+
+    /// A holder the maintainer stopped, refused until `until`.
+    public struct Bar: Equatable, Sendable {
+        public var holder: Holder
+        public var until: Date
+    }
 
     public init() {}
 
@@ -155,12 +173,14 @@ public struct ControlLease: Equatable, Sendable {
         queue.filter { now < $0.until }.count
     }
 
-    /// Ends a lease that has run out by `now`, then hands a free lease to
-    /// the first waiter whose wait hasn't run out, as a `take` does: the
-    /// transitions, none when nothing changed. The app also calls it when
-    /// the lease's end comes, so a waiter gets it without another request.
+    /// Lifts the bars that have ended by `now`, ends a lease that has run
+    /// out by then, and hands a free lease to the first waiter whose wait
+    /// hasn't run out, as a `take` does: the transitions, none when nothing
+    /// changed. The app also calls it at `nextEnd(after:)`, so a waiter gets
+    /// the lease, and a bar ends, without another request.
     public mutating func settle(at now: Date) -> [Transition] {
         var transitions: [Transition] = []
+        bars.removeAll { now >= $0.until }
         if let term, now >= term.ends {
             self.term = nil
             transitions.append(.ended(term.holder, term.ends >= term.capped ? .capped : .expired))
@@ -177,9 +197,12 @@ public struct ControlLease: Equatable, Sendable {
 
     /// A leased request from `holder` at `now`: granted when `holder` holds
     /// the lease (renewing it to `renewal` from now, never past the cap),
-    /// or when it's free (taking it); refused while another holds it.
+    /// or when it's free (taking it); refused while another holds it, or
+    /// while `holder` is barred.
     public mutating func use(by holder: Holder, at now: Date) -> Decision {
         var transitions = settle(at: now)
+        // A barred holder never holds the lease: Stop ended it.
+        guard !isBarred(holder) else { return Decision(answer: .failure(.stopped), transitions: transitions) }
         if var term {
             guard term.holder.key == holder.key else {
                 return Decision(answer: .failure(.inUse(term)), transitions: transitions)
@@ -202,9 +225,11 @@ public struct ControlLease: Equatable, Sendable {
     /// While another holds it, the `take` waits in line until `deadline`
     /// (`queued`: a holder already in line keeps its place and waits until
     /// the later deadline), or is refused at once without a deadline after
-    /// `now`.
+    /// `now`. A barred holder is refused at once, wait or not, so it never
+    /// joins the line.
     public mutating func take(by holder: Holder, at now: Date, waitingUntil deadline: Date? = nil) -> Decision {
         var transitions = settle(at: now)
+        guard !isBarred(holder) else { return Decision(answer: .failure(.stopped), transitions: transitions) }
         guard var term else {
             let term = Term(holder: holder, taken: now, ends: now.addingTimeInterval(Self.cap))
             self.term = term
@@ -238,6 +263,46 @@ public struct ControlLease: Equatable, Sendable {
         guard let term, term.holder.key == holder.key else { return transitions }
         self.term = nil
         return transitions + [.ended(term.holder, .released)] + settle(at: now)
+    }
+
+    // MARK: - The maintainer taking shipyard back
+
+    /// The maintainer's Stop at `now`: the lease ends (`stopped`), its
+    /// holder is barred for `bar`, and the first waiter gets the lease as
+    /// on a release. While the lease is free it changes nothing. The
+    /// holder is never in the line (its own `take` renews, never queues),
+    /// so there's no place there to drop.
+    public mutating func stop(at now: Date) -> [Transition] {
+        let transitions = settle(at: now)
+        guard let term else { return transitions }
+        self.term = nil
+        bars.removeAll { $0.holder.key == term.holder.key }
+        bars.insert(Bar(holder: term.holder, until: now.addingTimeInterval(Self.bar)), at: 0)
+        return transitions + [.ended(term.holder, .stopped)] + settle(at: now)
+    }
+
+    /// The maintainer's Allow at `now`: the bar on the holder with `key`
+    /// is lifted, so its next request is decided as anyone's.
+    public mutating func allow(_ key: String, at now: Date) {
+        bars.removeAll { $0.holder.key == key || now >= $0.until }
+    }
+
+    /// The holders the maintainer stopped whose bars haven't ended at
+    /// `now`, the latest first: the panel's quiet lines.
+    public func stopped(at now: Date) -> [Bar] {
+        bars.filter { now < $0.until }
+    }
+
+    /// When the lease, or a bar, next ends after `now`: the time for the
+    /// app to settle at, so both end with no request. Nil when there's
+    /// neither.
+    public func nextEnd(after now: Date) -> Date? {
+        ([current(at: now)?.ends].compactMap { $0 } + stopped(at: now).map(\.until)).min()
+    }
+
+    /// Whether `holder` is barred: settled first, so a bar listed is in force.
+    private func isBarred(_ holder: Holder) -> Bool {
+        bars.contains { $0.holder.key == holder.key }
     }
 
     /// The end of a `take` from `holder` that waited `seconds` in line, at

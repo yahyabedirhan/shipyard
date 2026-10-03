@@ -23,6 +23,17 @@ struct LeaseBannerTests {
         #expect(banner.agent == lease.holder)
     }
 
+    @Test("after Stop, the quiet line names the agent taken back from")
+    func tookBack() {
+        var lease = ControlLease()
+        _ = lease.use(by: Holder(key: "process:300@800250000", name: "codex", place: "Herdr pane w1-2"), at: Date(timeIntervalSince1970: 0))
+        _ = lease.stop(at: Date(timeIntervalSince1970: 10))
+
+        let lines = lease.stopped(at: Date(timeIntervalSince1970: 20)).map { LeaseBanner.tookBack(from: $0.holder.name) }
+
+        #expect(lines == ["You took shipyard back from codex"])
+    }
+
     @Test("the countdown ticks with the time the banner is made at, from the lease the app holds")
     func countdown() {
         var lease = ControlLease()

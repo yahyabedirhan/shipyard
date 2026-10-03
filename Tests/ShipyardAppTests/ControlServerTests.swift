@@ -460,6 +460,69 @@ struct ControlServerTests {
         #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 0))
     }
 
+    // MARK: - Stop and Allow
+
+    @Test("after Stop, the stopped agent's leased requests and take are refused with the stop's words and nothing done, until allowed back")
+    func stopped() async {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent())
+        clock.now = Date(timeIntervalSince1970: 10)
+        server.stopLease()
+        clock.now = Date(timeIntervalSince1970: 20)
+
+        var answers: [ControlServer.Answer] = []
+        for request in [
+            ControlRequest.panelOpen, .panelTab(name: "All"), .appQuit,
+            .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false, withIndicator: false),
+            .controlTake(waitSeconds: nil), .controlTake(waitSeconds: 30),
+        ] {
+            answers.append(await server.reply(to: request.sent()))
+        }
+        let quietLines = indicator.stopped(at: clock.now).map(\.holder)
+        server.allow(Self.agent.key)
+        let back = await server.reply(to: ControlRequest.panelOpen.sent())
+
+        #expect(answers == Array(repeating: ControlServer.Answer(reply: .refused("the user took shipyard back; ask them before using it again")), count: 6))
+        #expect(quietLines == [Self.agent])
+        #expect(back == .init(reply: .done("panel open\n")))
+        #expect(panel.calls == ["open"])
+        #expect(screenshotter.calls.isEmpty)
+        #expect(quitter.quits == 0)
+        #expect(indicator.stopped(at: clock.now).isEmpty)
+        #expect(recorder.notices == [
+            .started(agent: "Claude Code", place: "/work"),
+            .ended(agent: "Claude Code", reason: .stopped),
+            .started(agent: "Claude Code", place: "/work"),
+        ])
+    }
+
+    @Test("Stop hands the lease to the first waiting take, answered at once; the banner shows it over the stopped agent's quiet line until the bar ends")
+    func stopHandsOver() async throws {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent())
+        let waiting = Task { await server.reply(to: ControlRequest.controlTake(waitSeconds: 120).sent(by: Self.other)) }
+        for _ in 0..<200 where server.lease.waiting(at: clock.now) != 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        clock.now = Date(timeIntervalSince1970: 10)
+        server.stopLease()
+        let granted = await waiting.value
+
+        #expect(granted == .init(reply: .done("you hold shipyard until 00:05:10\n")))
+        #expect(indicator.shown(at: clock.now)?.holder == "codex")
+        #expect(indicator.stopped(at: clock.now).map(\.holder) == [Self.agent])
+        #expect(recorder.notices == [
+            .started(agent: "Claude Code", place: "/work"),
+            .ended(agent: "Claude Code", reason: .stopped),
+            .started(agent: "codex", place: "Herdr pane w1-2"),
+        ])
+        // The bar and the waiter's cap end together, with no request: the timer settles both.
+        clock.now = Date(timeIntervalSince1970: 310)
+        server.settleLease()
+        #expect(indicator.lease == ControlLease())
+    }
+
     // MARK: - The socket
 
     @Test("over the socket, a take waiting in line keeps its connection while others are answered, and gets the lease on release")

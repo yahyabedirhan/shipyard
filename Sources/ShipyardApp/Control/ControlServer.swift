@@ -207,11 +207,27 @@ final class ControlServer {
         }
     }
 
+    // MARK: - The maintainer taking shipyard back
+
+    /// The banner's Stop: the holder's lease ends and it's barred
+    /// (`ControlLease.stop`), and the first waiter in line gets the lease,
+    /// its `take` answered as the lease changes. The maintainer's only way
+    /// into the lease, with `allow`.
+    func stopLease() {
+        apply(lease.stop(at: now()))
+    }
+
+    /// A quiet line's Allow: the bar on the holder with `key` is lifted.
+    func allow(_ key: String) {
+        lease.allow(key, at: now())
+    }
+
     // MARK: - The lease's end
 
     /// Ends the lease if it has run out by now, handing it to the first
-    /// waiter in line. A timer calls it at the lease's end, so the dot and
-    /// the banner go, and the waiter gets it, with no request.
+    /// waiter in line, and lifts the bars that have ended. A timer calls it
+    /// at the next of those ends, so the dot, the banner and a quiet line
+    /// go, and the waiter gets the lease, with no request.
     func settleLease() {
         apply(lease.settle(at: now()))
     }
@@ -225,20 +241,22 @@ final class ControlServer {
 
     /// The one place a change to the lease is applied: it's shown as it is
     /// now, a holder that got it from the line has its waiting `take`s
-    /// answered, and its end is looked out for, the timer set for the last
-    /// change replaced by one for this one.
+    /// answered, and its next end (the lease's or a bar's) is looked out
+    /// for, the timer set for the last change replaced by one for this one.
     private func leaseChanged() {
         if indicator.lease != lease { indicator.lease = lease }
         settling?.cancel()
         settling = nil
         let time = now()
-        guard let term = lease.current(at: time) else { return }
-        for (ticket, waiter) in waiters where waiter.holder.key == term.holder.key {
-            waiters[ticket] = nil
-            waiter.timeout?.cancel()
-            waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+        if let term = lease.current(at: time) {
+            for (ticket, waiter) in waiters where waiter.holder.key == term.holder.key {
+                waiters[ticket] = nil
+                waiter.timeout?.cancel()
+                waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+            }
         }
-        let left = term.ends.timeIntervalSince(time)
+        guard let next = lease.nextEnd(after: time) else { return }
+        let left = next.timeIntervalSince(time)
         settling = Task { [weak self] in
             // A wake before the end settles nothing, and sets the timer again.
             try? await Task.sleep(for: .seconds(left))

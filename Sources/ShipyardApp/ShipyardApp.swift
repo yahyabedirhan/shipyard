@@ -272,6 +272,16 @@ final class AppServices {
         notifier.openSettings()
     }
 
+    /// The lease banner's Stop: takes shipyard back from the agent holding it.
+    func stopLease() {
+        controlServer?.stopLease()
+    }
+
+    /// A quiet line's Allow: lets the agent with holder `key` back before its bar ends.
+    func allowLeaseHolder(_ key: String) {
+        controlServer?.allow(key)
+    }
+
     /// Opens `config.toml` in the user's editor, creating it with its
     /// commented header first when it's missing.
     func openConfigurationFile() {

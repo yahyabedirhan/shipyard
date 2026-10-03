@@ -32,4 +32,17 @@ public struct LeaseBanner: Equatable, Sendable {
     public var text: String {
         ([headline, timeLeft] + (waiting.map { [$0] } ?? [])).joined(separator: " · ")
     }
+
+    /// The banner's button, which takes shipyard back from the holder.
+    public static let stop = "Stop"
+
+    /// The quiet line while a holder the maintainer stopped is barred,
+    /// "You took shipyard back from Claude Code", the agent's name as its
+    /// requests gave it; `allow`, its button, lets it back.
+    public static func tookBack(from agent: String) -> String {
+        "You took shipyard back from \(agent)"
+    }
+
+    /// The quiet line's button, which lets the stopped holder back.
+    public static let allow = "Allow"
 }
