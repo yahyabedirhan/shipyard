@@ -124,6 +124,11 @@ final class AppServices {
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
         notifier.onOpen = { [weak self] url in
+            // A lease's notification opens the panel, where the banner shows who holds shipyard.
+            guard url != ControlNotice.panelURL else {
+                MenuBarWindow.open()
+                return
+            }
             shipyard.openNotification(url)
             self?.closeMenu()
         }
@@ -164,6 +169,7 @@ final class AppServices {
     /// Listens on `control.sock` for the `shipyard` command. When it can't,
     /// the app runs on without app control and says why in the log.
     private func startControl() {
+        let shipyard = shipyard
         let screenshotter = Screenshotter(panel: panelControl, indicator: leaseIndicator) { [unowned self] in
             AnyView(Panel(shipyard: shipyard, actions: self, isSnapshot: true))
         }
@@ -174,6 +180,11 @@ final class AppServices {
             // A relaunch through `shipyard app open` hands its holder's lease over.
             lease: ControlLease(environment: ProcessInfo.processInfo.environment, at: Date()),
             indicator: leaseIndicator,
+            // A lease that starts or ends notifies, when the top-level rules say so.
+            transitioned: { transition in
+                guard let notice = ControlNotice(transition) else { return }
+                Task { await shipyard.notify(notice) }
+            },
             quit: { NSApp.terminate(nil) }
         )
         do {

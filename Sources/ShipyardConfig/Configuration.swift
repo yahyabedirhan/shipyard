@@ -121,8 +121,14 @@ extension Configuration {
         public var workflowRuns = WorkflowRunSettings()
         public var pings = PingSettings()
         /// `[[defaults.notifications]]`; a new pull request and a new ping
-        /// in any project by default.
-        public var notifications: [NotificationRule] = [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent)]
+        /// in any project, and an agent starting and ending a lease on app
+        /// control, by default.
+        public var notifications: [NotificationRule] = [
+            NotificationRule(event: .prOpened),
+            NotificationRule(event: .pingSent),
+            NotificationRule(event: .controlStarted),
+            NotificationRule(event: .controlEnded),
+        ]
         /// `group-by`, `subsections`, `sort-by` and `show-first`, written straight under `[defaults]`.
         public var arrangement = ArrangementSettings()
         /// Whether repository groups and `owner/*` bring in archived repositories.
@@ -250,6 +256,19 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
     /// An agent sent a new ping (`shipyard ping`).
     case pingSent = "ping.sent"
+    /// An agent took app control's lease: it's using shipyard.
+    case controlStarted = "control.started"
+    /// The lease ended: the agent released it, it ran out, or the user
+    /// stopped it.
+    case controlEnded = "control.ended"
+
+    /// Whether it's an app control event rather than an item's: only the
+    /// top-level rules decide it (`[[defaults.notifications]]`, or the
+    /// built-in list), never a project's own list, and a rule's `authors`
+    /// doesn't apply to it.
+    public var isControl: Bool {
+        self == .controlStarted || self == .controlEnded
+    }
 }
 
 /// An event and the authors it covers. Its scope is where it's written:
@@ -708,15 +727,20 @@ extension Configuration {
 
         # When to notify, for every project: one block per rule. The list
         # replaces the default rules below, so keep them to hear of new pull
-        # requests and pings. Other events include "run.failed" and
-        # "pr.review_requested"; authors narrows a rule to some authors, as
-        # above (empty: everyone).
+        # requests and pings, and of an agent starting and ending its turn
+        # with the app (control.started, control.ended). Other events include
+        # "run.failed" and "pr.review_requested"; authors narrows a rule to
+        # some authors, as above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
         # authors = []
         # [[defaults.notifications]]
         # event = "ping.sent"
         # authors = []
+        # [[defaults.notifications]]
+        # event = "control.started"
+        # [[defaults.notifications]]
+        # event = "control.ended"
 
         # Using Herdr? A ping an agent sends with --herdr focuses its tab when
         # clicked. To bring your terminal forward too, add a [herdr] table and

@@ -827,6 +827,8 @@ public final class Shipyard {
     /// tests to await.
     @discardableResult
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
+        // A lease notification's click opens the panel, which the app does.
+        guard itemURL != ControlNotice.panelURL else { return Task {} }
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
         guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
         actions.open(itemURL)
@@ -838,6 +840,15 @@ public final class Shipyard {
             updateAppState { $0.attention.markSeen(id: id, fingerprint: fingerprint, at: now) }
         }
         return Task {}
+    }
+
+    /// Posts app control's `notice` (a lease that started or ended) when the
+    /// last valid configuration's top-level rules select it
+    /// (`NotificationRules.shouldNotify(_:configuration:)`). Nothing is
+    /// recorded: the app hands over each start and end once.
+    public func notify(_ notice: ControlNotice) async {
+        guard NotificationRules.shouldNotify(notice, configuration: configStore.lastValid) else { return }
+        await notifier.post(NotificationRules.notification(for: notice, at: clock.now))
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs

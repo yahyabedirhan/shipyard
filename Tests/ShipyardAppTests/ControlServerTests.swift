@@ -58,6 +58,12 @@ struct ControlServerTests {
         var quits = 0
     }
 
+    /// The lease's notices, as the app makes them from the transitions the
+    /// server tells: what it would hand the notifier, in order.
+    final class NoticeRecorder {
+        var notices: [ControlNotice] = []
+    }
+
     /// The time the server decides the lease at, moved by the test.
     final class Clock {
         var now = Date(timeIntervalSince1970: 0)
@@ -93,16 +99,26 @@ struct ControlServerTests {
         }
     }
 
-    func server(socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock")) -> ControlServer {
+    let recorder = NoticeRecorder()
+
+    func server(
+        socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock"),
+        lease: ControlLease = ControlLease()
+    ) -> ControlServer {
         let quitter = quitter
         let clock = clock
+        let recorder = recorder
         return ControlServer(
             socket: socket,
             panel: panel,
             screenshotter: screenshotter,
+            lease: lease,
             indicator: indicator,
             now: { clock.now },
             timeZone: TimeZone(identifier: "UTC")!,
+            transitioned: { transition in
+                if let notice = ControlNotice(transition) { recorder.notices.append(notice) }
+            },
             quit: { quitter.quits += 1 }
         )
     }
@@ -302,6 +318,73 @@ struct ControlServerTests {
         indicator.isHiddenForCapture = true
         #expect(indicator.shown(at: clock.now) == nil)
         #expect(server.lease.current(at: clock.now)?.holder == Self.other)
+    }
+
+    @Test("each lease makes one start and one end notice: renewals and refusals make none, and an end comes by the timer or by the next request")
+    func noticesPerLease() async {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 30)
+        _ = await server.reply(to: ControlRequest.panelFold(project: "shop").sent())
+        clock.now = Date(timeIntervalSince1970: 40)
+        _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
+        _ = await server.reply(to: ControlRequest.appStatus(json: false).sent(by: Self.other))
+        // The renewal at 30 moved its end to 90, where the timer settles it.
+        clock.now = Date(timeIntervalSince1970: 90)
+        server.settleLease()
+        clock.now = Date(timeIntervalSince1970: 100)
+        _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
+        // Ended with no timer: the next request settles it before it takes the lease.
+        clock.now = Date(timeIntervalSince1970: 170)
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+
+        #expect(recorder.notices == [
+            .started(agent: "Claude Code", place: "/work"),
+            .ended(agent: "Claude Code", reason: .ranOut),
+            .started(agent: "codex", place: "Herdr pane w1-2"),
+            .ended(agent: "codex", reason: .ranOut),
+            .started(agent: "Claude Code", place: "/work"),
+        ])
+    }
+
+    @Test("take, a second take and a waiter's place in line make one start; release makes the end, and the waiter's start")
+    func noticesOnTakeAndRelease() async throws {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent())
+        clock.now = Date(timeIntervalSince1970: 10)
+        _ = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent())
+        let waiting = Task { await server.reply(to: ControlRequest.controlTake(waitSeconds: 120).sent(by: Self.other)) }
+        for _ in 0..<200 where server.lease.waiting(at: clock.now) != 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let beforeRelease = recorder.notices
+
+        _ = await server.reply(to: ControlRequest.controlRelease.sent())
+        _ = await waiting.value
+
+        #expect(beforeRelease == [.started(agent: "Claude Code", place: "/work")])
+        #expect(recorder.notices == [
+            .started(agent: "Claude Code", place: "/work"),
+            .ended(agent: "Claude Code", reason: .released),
+            .started(agent: "codex", place: "Herdr pane w1-2"),
+        ])
+    }
+
+    @Test("a lease a relaunch handed over makes no start notice; its end, at the original cap, makes one")
+    func handedOverLeaseNotices() async {
+        clock.now = Date(timeIntervalSince1970: 1000)
+        let term = ControlLease.Term(holder: Self.agent, taken: Date(timeIntervalSince1970: 750), ends: Date(timeIntervalSince1970: 1030))
+        let server = server(lease: ControlLease(environment: ControlLease.handover(term), at: clock.now))
+        #expect(recorder.notices.isEmpty)
+
+        clock.now = Date(timeIntervalSince1970: 1010)
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        #expect(recorder.notices.isEmpty)
+        // Renewed to 1070, but capped at 750 + 5 minutes.
+        clock.now = Date(timeIntervalSince1970: 1050)
+        server.settleLease()
+
+        #expect(recorder.notices == [.ended(agent: "Claude Code", reason: .ranOut)])
     }
 
     @Test("status is never refused, takes no lease, and reports the lease as lines and as JSON")

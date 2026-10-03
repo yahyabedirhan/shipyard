@@ -45,6 +45,16 @@ private func pr(_ number: Int, author: String = "yabepa", type: String = "User",
     return pullRequest
 }
 
+/// `[[defaults.notifications]]` blocks for `events`, each with `authors` when given.
+private func rules(_ events: [String], authors: String? = nil) -> String {
+    events.map { "[[defaults.notifications]]\nevent = \"\($0)\"\n" + (authors.map { "authors = \($0)\n" } ?? "") + "\n" }.joined()
+}
+
+/// shop with its own notification list, naming `events`.
+private func shopNotifying(_ events: [String]) -> String {
+    shop + "notifications = [" + events.map { "{ event = \"\($0)\" }" }.joined(separator: ", ") + "]\n"
+}
+
 @MainActor
 private extension Harness {
     /// What was posted: "project · headline" per notification.
@@ -306,5 +316,55 @@ struct NotificationTests {
 
         #expect(relaunched.actions.opened == [posted.itemURL])
         #expect(relaunched.shipyard.appStateStore.state.attention.seen[posted.itemURL.absoluteString] != nil)
+    }
+
+    // MARK: - App control's lease
+
+    @Test("a lease's start and end notify under the top-level rules only: the built-in list, or a written one that names them", arguments: [
+        // The built-in list holds both, whatever a project lists for itself.
+        (shop, ["Claude Code is using shipyard", "Claude Code is done with shipyard"]),
+        (shopNotifying(["pr.merged"]), ["Claude Code is using shipyard", "Claude Code is done with shipyard"]),
+        // A written list replaces it: what it leaves out is silent.
+        (rules(["pr.opened", "ping.sent"]) + shop, []),
+        (rules(["control.started"]) + shop, ["Claude Code is using shipyard"]),
+        // A rule's authors don't apply to a lease.
+        (rules(["control.ended"], authors: #"["bots"]"#) + shop, ["Claude Code is done with shipyard"]),
+        // A project's own list doesn't count, even when it names them.
+        (rules(["pr.opened"]) + shopNotifying(["control.started", "control.ended"]), []),
+    ])
+    func leaseNotifications(config: String, titles: [String]) async throws {
+        let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
+
+        await harness.shipyard.notify(.started(agent: "Claude Code", place: "/work"))
+        harness.clock.advance(by: 30)
+        await harness.shipyard.notify(.ended(agent: "Claude Code", reason: .ranOut))
+
+        #expect(harness.titles == titles)
+    }
+
+    @Test("a lease's notification names the agent, says where it runs or why it's done, and its click opens nothing on GitHub")
+    func leaseNotificationWords() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: shopAnswer(pr(1)))
+
+        await harness.shipyard.notify(.started(agent: "codex", place: "Herdr pane w1-2"))
+        for reason in [ControlNotice.Reason.released, .ranOut, .stopped] {
+            harness.clock.advance(by: 1)
+            await harness.shipyard.notify(.ended(agent: "Claude Code", reason: reason))
+        }
+
+        let posted = harness.notifier.posted
+        #expect(posted.map(\.event) == [.controlStarted, .controlEnded, .controlEnded, .controlEnded])
+        #expect(posted.map(\.title) == [
+            "Codex is using shipyard", "Claude Code is done with shipyard",
+            "Claude Code is done with shipyard", "Claude Code is done with shipyard",
+        ])
+        #expect(posted.map(\.body) == ["Herdr pane w1-2", "released", "its lease ran out", "you stopped it"])
+        #expect(Set(posted.map(\.id)).count == 4)
+        #expect(posted.allSatisfy { $0.itemURL == ControlNotice.panelURL && $0.project.isEmpty })
+
+        // The app opens the panel for it; the core opens and marks nothing.
+        await harness.shipyard.openNotification(ControlNotice.panelURL).value
+        #expect(harness.actions.opened.isEmpty)
+        #expect(harness.actions.ran.isEmpty)
     }
 }

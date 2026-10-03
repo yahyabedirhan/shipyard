@@ -366,9 +366,8 @@ struct ConfigSchemaTests {
         #expect(try defaults.table(forKey: "issues").bool(forKey: "show") == false)
         #expect(try defaults.table(forKey: "workflow-runs").bool(forKey: "show") == false)
         let rules = try defaults.array(forKey: "notifications")
-        #expect(rules.count == 2)
-        #expect(try rules.table(atIndex: 0).string(forKey: "event") == "pr.opened")
-        #expect(try rules.table(atIndex: 1).string(forKey: "event") == "ping.sent")
+        #expect(try (0..<rules.count).map { try rules.table(atIndex: $0).string(forKey: "event") }
+            == ["pr.opened", "ping.sent", "control.started", "control.ended"])
     }
 
     @Test("a new file's schema line points at the published schema")

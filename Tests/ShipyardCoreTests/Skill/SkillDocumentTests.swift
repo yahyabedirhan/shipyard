@@ -345,8 +345,8 @@ struct SkillDocumentTests {
         #expect(text.contains("| `[defaults] subsections` | unset |"))
         #expect(c.herdr.terminal == nil)
         #expect(text.contains("| `[herdr] terminal` | unset |"))
-        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
-        #expect(text.contains("| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` |"))
+        #expect(c.defaults.notifications == [.prOpened, .pingSent, .controlStarted, .controlEnded].map { NotificationRule(event: $0) })
+        #expect(text.contains("| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` |"))
     }
 
     @Test("every choice, event and author filter is listed")

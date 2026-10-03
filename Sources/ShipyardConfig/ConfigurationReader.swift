@@ -241,7 +241,7 @@ final class ConfigurationReader {
             issues: issues(node),
             workflowRuns: workflowRuns(node),
             pings: pings(node),
-            notifications: notifications(node),
+            notifications: notifications(node, inProject: true),
             arrangement: arrangement(node),
             archived: bool(node, "archived"),
             forks: bool(node, "forks")
@@ -371,7 +371,11 @@ final class ConfigurationReader {
         ))
     }
 
-    private func notifications(_ parent: Node) -> [NotificationRule]? {
+    /// A `notifications` list: `[[defaults.notifications]]`, or a
+    /// project's own when `inProject`. An app control event
+    /// (`EventKind.isControl`) in a project's list, or with `authors`, is
+    /// read but warned about: neither applies to it.
+    private func notifications(_ parent: Node, inProject: Bool = false) -> [NotificationRule]? {
         guard let rules = tables(parent, "notifications") else { return nil }
         return rules.compactMap { node in
             warnUnknownKeys(in: node, known: ["event", "authors"])
@@ -381,7 +385,26 @@ final class ConfigurationReader {
                 return nil
             }
             guard let event = choice(node, "event", EventKind.self, noun: "event") else { return nil }
+            if event.isControl { warnControlRule(event, at: node, inProject: inProject, authors: authors ?? []) }
             return NotificationRule(event: event, authors: authors ?? [])
+        }
+    }
+
+    /// The warning on a rule for an app control event: in a project's own
+    /// list it's ignored, since only the top-level rules decide control
+    /// events; otherwise its `authors` are, since no item's author sends one.
+    private func warnControlRule(_ event: EventKind, at node: Node, inProject: Bool, authors: [AuthorSelector]) {
+        let name = "`\(event.rawValue)`"
+        if inProject {
+            warnings.append(ConfigIssue(
+                line: map.line(for: node.path + [.key("event")], value: event.rawValue),
+                message: "\(name) is decided by `[[defaults.notifications]]` only; a project's rule for it is ignored"
+            ))
+        } else if !authors.isEmpty {
+            warnings.append(ConfigIssue(
+                line: map.line(for: node.path + [.key("authors")]),
+                message: "`authors` doesn't apply to \(name), which no item's author sends; it's ignored"
+            ))
         }
     }
 

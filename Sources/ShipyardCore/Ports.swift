@@ -25,7 +25,8 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
     /// event twice.
     public var id: String
     public var event: EventKind
-    /// The project the event was notified for.
+    /// The project the event was notified for; empty for one about no
+    /// project (app control's, `ControlNotice`).
     public var project: String
     /// The title text, for example "New PR #107".
     public var headline: String
@@ -46,8 +47,9 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
         self.itemURL = itemURL
     }
 
-    /// The notification's title: "e-commerce · New PR #107".
-    public var title: String { "\(project) · \(headline)" }
+    /// The notification's title: "e-commerce · New PR #107", or the
+    /// headline alone when it's about no project.
+    public var title: String { project.isEmpty ? headline : "\(project) · \(headline)" }
     /// The notification's body: the item's title (a ping's body and sender).
     public var body: String { itemTitle }
 }

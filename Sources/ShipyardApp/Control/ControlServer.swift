@@ -36,6 +36,9 @@ final class ControlServer {
     }
     /// The dot and the banner, which follow the lease.
     let indicator: LeaseIndicator
+    /// Told each change in who holds the lease, in order: the app posts
+    /// the lease's notifications from them. A relaunch's handover isn't one.
+    private let transitioned: @MainActor (ControlLease.Transition) -> Void
     /// Ends the lease once it runs out, when no request comes to.
     private var settling: Task<Void, Never>?
     /// The `take`s waiting in line, each holding its connection open until
@@ -61,6 +64,7 @@ final class ControlServer {
         indicator: LeaseIndicator,
         now: @escaping @MainActor () -> Date = { Date() },
         timeZone: TimeZone = .current,
+        transitioned: @escaping @MainActor (ControlLease.Transition) -> Void = { _ in },
         quit: @escaping @MainActor () -> Void
     ) {
         self.socket = socket
@@ -70,6 +74,7 @@ final class ControlServer {
         self.indicator = indicator
         self.now = now
         self.timeZone = timeZone
+        self.transitioned = transitioned
         self.quit = quit
         // `didSet` doesn't run in `init`: a lease a relaunch handed over is
         // shown, and its end looked out for, from the start.
@@ -94,7 +99,9 @@ final class ControlServer {
         var granted: ControlLease.Term?
         if message.request.isLeased {
             let time = now()
-            switch lease.use(by: message.holder, at: time).answer {
+            let decision = lease.use(by: message.holder, at: time)
+            apply(decision.transitions)
+            switch decision.answer {
             case .success(let term): granted = term
             case .failure(let refusal): return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
             }
@@ -104,7 +111,7 @@ final class ControlServer {
             return await take(by: message.holder, waiting: seconds)
         case .controlRelease:
             // The next waiter's take is answered as the lease changes (`leaseChanged`).
-            _ = lease.release(by: message.holder, at: now())
+            apply(lease.release(by: message.holder, at: now()))
             return Answer(reply: .done("released shipyard\n"))
         case .appStatus(let json):
             let status = status()
@@ -161,6 +168,7 @@ final class ControlServer {
     private func take(by holder: Holder, waiting seconds: Int?) async -> Answer {
         let time = now()
         let decision = lease.take(by: holder, at: time, waitingUntil: seconds.map { time.addingTimeInterval(TimeInterval($0)) })
+        apply(decision.transitions)
         switch decision.answer {
         case .success(let term):
             return Answer(reply: .done(term.held(timeZone: timeZone) + "\n"))
@@ -189,7 +197,9 @@ final class ControlServer {
         guard let waiter = waiters.removeValue(forKey: ticket) else { return }
         // Never before the deadline the take was given, whatever the clock says.
         let time = max(now(), deadline)
-        switch lease.giveUp(by: waiter.holder, waited: waiter.seconds, at: time).answer {
+        let decision = lease.giveUp(by: waiter.holder, waited: waiter.seconds, at: time)
+        apply(decision.transitions)
+        switch decision.answer {
         case .success(let term):
             waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
         case .failure(let refusal):
@@ -203,7 +213,14 @@ final class ControlServer {
     /// waiter in line. A timer calls it at the lease's end, so the dot and
     /// the banner go, and the waiter gets it, with no request.
     func settleLease() {
-        _ = lease.settle(at: now())
+        apply(lease.settle(at: now()))
+    }
+
+    /// Tells `transitioned` each change in who holds the lease, in order,
+    /// as the lease reported it: every call that changes the lease hands
+    /// its transitions here.
+    private func apply(_ transitions: [ControlLease.Transition]) {
+        for transition in transitions { transitioned(transition) }
     }
 
     /// The one place a change to the lease is applied: it's shown as it is
