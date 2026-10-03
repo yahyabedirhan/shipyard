@@ -401,4 +401,66 @@ struct ShipyardCLITests {
         #expect(filed.status == 0, "\(filed.error)")
         #expect(harness.pingStore.all().map(\.projects) == [["elsewhere"]])
     }
+
+    @Test("a ping only projects that hide pings would list is refused, naming them, and stores nothing; one any project shows is filed under all of them")
+    func pingNoProjectShows() throws {
+        let harness = try Harness(config: """
+            [defaults.pings]
+            show = false
+
+            [[projects]]
+            name = "shop"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "store"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "blog"
+            repositories = ["yahyabedirhan/blog", "yahyabedirhan/shop"]
+            pings = { show = true }
+
+            [[projects]]
+            name = "docs"
+            repositories = ["yahyabedirhan/docs"]
+
+            """)
+
+        let hidden = harness.cli("ping", "Ready", "--repo", "yahyabedirhan/docs")
+        #expect(hidden.status == 1)
+        #expect(hidden.output.isEmpty)
+        #expect(hidden.error == "shipyard ping: no project shows the ping: `docs` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+
+        let named = harness.cli("ping", "Ready", "--project", "shop")
+        #expect(named.error == "shipyard ping: no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+        #expect(harness.pingStore.all().isEmpty)
+
+        let shown = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+        #expect(shown.status == 0)
+        #expect(harness.pingStore.all().map(\.projects) == [["shop", "store", "blog"]])
+    }
+
+    @Test("when every project hides pings, the refusal names each that would list it and says none shows them")
+    func noProjectShowsPings() throws {
+        let harness = try Harness(config: """
+            [defaults.pings]
+            show = false
+
+            [[projects]]
+            name = "shop"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "store"
+            repositories = ["yahyabedirhan/shop"]
+
+            """)
+
+        let result = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+
+        #expect(result.status == 1)
+        #expect(result.error == "shipyard ping: no project shows the ping: `shop`, `store` hide pings (pings.show = false); no project shows pings\n")
+        #expect(harness.pingStore.all().isEmpty)
+    }
 }

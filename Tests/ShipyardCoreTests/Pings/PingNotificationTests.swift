@@ -188,7 +188,9 @@ struct PingNotificationTests {
     @Test("a ping the project doesn't list isn't notified")
     func hiddenNotNotified() async throws {
         let harness = try await Harness.started(config: "[defaults.pings]\nshow = false\n" + shop, graphQL: onePullRequest)
-        try harness.ping("Hidden")
+        // The CLI refuses a ping no project shows, so this one was filed
+        // before the project hid pings.
+        try harness.pingStore.save(Ping(id: "k7qm2x", title: "Hidden", projects: ["shop"], sent: harness.clock.now))
 
         await harness.shipyard.reloadPings()
         await harness.refreshLater()

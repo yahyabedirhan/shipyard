@@ -183,7 +183,7 @@ struct HerdrEventTests {
         #expect(ping.sender == nil)
     }
 
-    @Test("a pane whose repository no project watches, or with no configuration at all, still gets its ping, under no project")
+    @Test("a pane whose repository no project watches, or with no configuration at all, still gets its ping, under no project; one only projects hiding pings watch, under them")
     func unfiled() throws {
         let unwatched = try Harness(config: shop)
         unwatched.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "blog", folder: agentFolder)
@@ -198,6 +198,14 @@ struct HerdrEventTests {
         #expect(unconfigured.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.projects == [])
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.repository == nil)
+
+        // A refusal would reach no one, so a ping only projects hiding pings
+        // would list is filed under them, hidden as they ask, and the hook
+        // still succeeds.
+        let hidden = try Harness(config: shop + "pings = { show = false }\n")
+        hidden.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout", folder: agentFolder)
+        #expect(hidden.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
+        #expect(hidden.pingStore.ping(id: "herdr-w1-p3")?.projects == ["shop"])
     }
 
     @Test("blocking again replaces the pane's ping: one ping, its new title, aged from the new block, unseen again, and no second notification")

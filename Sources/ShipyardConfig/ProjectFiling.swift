@@ -6,7 +6,8 @@ import ShipyardPings
 /// `config.toml` that watch its repository, one the configuration names as
 /// `owner/name` or one in the project's list as the app last resolved it,
 /// or under the one `--project` names; one nothing takes is refused, with
-/// the projects listed. The configuration is read only when a ping is
+/// the projects listed, as is one every project it goes under hides
+/// (`pings.show = false`). The configuration is read only when a ping is
 /// filed, so `withdraw` and `list` never read it; a file that doesn't read
 /// fails the ping with its first problem, since the CLI has no last valid
 /// configuration to fall back on. A ping stays until seen, with no default
@@ -45,7 +46,7 @@ public struct ProjectFiling: PingFiling {
             guard names.contains(project) else {
                 return .failure(.failed("shipyard ping: no project is named `\(project)`; \(Self.listing(names))"))
             }
-            return .success(Filing(projects: [project], repository: nil))
+            return shown(Filing(projects: [project], repository: nil), configuration: configuration, whenNoProject: whenNoProject)
         case .none(let why):
             guard whenNoProject == .keepUnfiled else {
                 return .failure(.failed("shipyard ping: \(why); pass --repo <owner/name> or --project <name>; \(Self.listing(names))"))
@@ -56,12 +57,30 @@ public struct ProjectFiling: PingFiling {
         }
         let watching = Self.watchers(of: slug, configuration: configuration, resolved: resolved())
         if let first = watching.first {
-            return .success(Filing(projects: watching.map(\.project), repository: first.spelling))
+            return shown(Filing(projects: watching.map(\.project), repository: first.spelling), configuration: configuration, whenNoProject: whenNoProject)
         }
         guard whenNoProject == .keepUnfiled else {
             return .failure(.failed("shipyard ping: no project watches `\(slug)`; pass --project <name> to file it under one; \(Self.listing(names))"))
         }
         return .success(Filing(projects: [], repository: slug))
+    }
+
+    /// `filing`, unless every project it's under hides pings
+    /// (`pings.show = false`) and a ping no project takes is refused: the
+    /// agent would believe a ping the user never sees reached them, so it's
+    /// refused, naming those projects and the ones that show pings. A ping
+    /// that's kept unfiled instead (`herdr-event`'s) is filed as it is,
+    /// hidden as the configuration asks, since a refusal would reach no one.
+    private func shown(_ filing: Filing, configuration: Configuration, whenNoProject: NoProject) -> Result<Filing, CommandResult> {
+        guard whenNoProject == .refuse else { return .success(filing) }
+        let showing = configuration.projects.filter { configuration.settings(for: $0).pings.show }.map(\.name)
+        let hiding = filing.projects.filter { !showing.contains($0) }
+        guard hiding.count == filing.projects.count else { return .success(filing) }
+        let named = hiding.map { "`\($0)`" }.joined(separator: ", ")
+        let hide = hiding.count == 1 ? "hides" : "hide"
+        let wayOut = showing.isEmpty ? "no project shows pings"
+            : "pass --project <name> to file it under one that shows them; the projects that show pings are " + showing.map { "`\($0)`" }.joined(separator: ", ")
+        return .failure(.failed("shipyard ping: no project shows the ping: \(named) \(hide) pings (pings.show = false); \(wayOut)"))
     }
 
     public func expiry(sentAt sent: Date) -> Date? { nil }
