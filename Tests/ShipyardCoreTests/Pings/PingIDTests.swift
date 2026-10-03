@@ -48,9 +48,6 @@ private extension Harness {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
 
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
-
     /// Refreshes with GitHub answering `onePullRequest` again.
     func refreshAgain() async {
         graphQL([onePullRequest])

@@ -6,6 +6,7 @@ import ShipyardConfig
 import FoundationNetworking
 #endif
 @testable import ShipyardCore
+import Testing
 
 /// The main test seam: a real `Shipyard` driven end to end over in-memory
 /// ports. The network is `StubHTTP` answering from recorded GitHub
@@ -217,9 +218,11 @@ struct Harness {
         )
     }
 
-    /// The commands the Mac's `shipyard` has, as its `main.swift` assembles
-    /// them, over this harness's configuration file, resolved repositories
-    /// and ping store: the harness is the Mac's app, so its CLI is the Mac's.
+    /// The pings' commands the Mac's `shipyard` has, as its `main.swift`
+    /// assembles them, over this harness's configuration file, resolved
+    /// repositories and ping store: the harness is the Mac's app, so its CLI
+    /// is the Mac's. The Mac's `app` and `panel` commands talk to a running
+    /// app over its socket; `ShipyardControlTests` drives them.
     var macCommands: CommandTable {
         .commands(filing: macFiling, store: pingStore)
     }
@@ -236,6 +239,62 @@ struct Harness {
     }
 }
 
+// MARK: - Pings
+
+extension Harness {
+    /// The pings' notifications posted so far, local and remote.
+    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
+
+    /// The titles of the rows in the section `name` (a project or a machine).
+    func titles(_ name: String) -> [String] {
+        section(name)?.rows.map(\.title) ?? []
+    }
+
+    /// Signs in with GitHub answering `answer`, saves `hetzner-vps` and
+    /// `netcup-vps` in this harness's Herdr, listing `hetzner` and `netcup`,
+    /// and starts; then, when `polled`, polls the machines once. Only the
+    /// machines `[remote] machines` names are asked.
+    func startWithMachines(graphQL answer: StubHTTP.Answer, hetzner: [Ping] = [], netcup: [Ping] = [], polled: Bool = false) async {
+        stub.on(Harness.userURL, Harness.viewerAnswer)
+        graphQL([answer])
+        herdr.addMachine("hetzner-vps", pings: hetzner)
+        herdr.addMachine("netcup-vps", pings: netcup)
+        await shipyard.start()
+        if polled { await poll() }
+    }
+
+    /// Fires the machine timer, which must be armed, and waits for the poll.
+    func poll(sourceLocation: SourceLocation = #_sourceLocation) async {
+        let fired = await machineTimer.fire()
+        #expect(fired, "the machine timer wasn't armed", sourceLocation: sourceLocation)
+    }
+}
+
+/// A ping as a machine's `shipyard ping list --json` lists it, sent
+/// `minutes` before the harness's now, as the sending `instance` (`i-<id>`
+/// by default).
+func remotePing(
+    _ id: String,
+    _ title: String,
+    minutes: Double = 5,
+    projects: [String] = [],
+    repository: String? = nil,
+    sender: String? = nil,
+    action: PingAction? = nil,
+    instance: String? = nil
+) -> Ping {
+    Ping(
+        id: id,
+        title: title,
+        projects: projects,
+        sent: Harness.now.addingTimeInterval(-minutes * 60),
+        repository: repository,
+        sender: sender,
+        action: action,
+        instance: instance ?? "i-\(id)"
+    )
+}
+
 extension GroupID {
     /// The All tab's group of `key`: the All tab has no project.
     static func allTab(_ key: GroupKey) -> GroupID {
@@ -244,9 +303,9 @@ extension GroupID {
 }
 
 extension CommandTable {
-    /// A `shipyard` build's commands as its `main.swift` assembles them:
-    /// the pings' commands over `filing` (`Unfiled` on a machine without the
-    /// app, `ProjectFiling` on the Mac) and `store`.
+    /// A `shipyard` build's pings' commands as its `main.swift` assembles
+    /// them, over `filing` (`Unfiled` on a machine without the app,
+    /// `ProjectFiling` on the Mac) and `store`.
     static func commands(filing: any PingFiling, store: PingStore) -> CommandTable {
         var table = CommandTable()
         table.add(PingCommands.entries(filing: filing, store: store))

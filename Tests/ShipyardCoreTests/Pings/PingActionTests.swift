@@ -36,9 +36,6 @@ private extension Harness {
     func pingRow(_ title: String) throws -> MenuRow {
         try #require(section("shop")?.rows.first { $0.kind == .ping && $0.title == title })
     }
-
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
 }
 
 /// `--open`, `--app`, `--body` and `--from` through the CLI, and what

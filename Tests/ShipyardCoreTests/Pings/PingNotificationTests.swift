@@ -37,16 +37,6 @@ private extension Harness {
     func pingRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
-
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
-
-    /// Refreshes, two minutes later, with GitHub answering as before.
-    func refreshLater() async {
-        graphQL([onePullRequest])
-        clock.advance(by: 120)
-        await shipyard.refresh()
-    }
 }
 
 /// A new ping posts a notification through the notification rules, as the
@@ -106,7 +96,7 @@ struct PingNotificationTests {
         await harness.shipyard.reloadPings()
         #expect(harness.pingNotifications.count == 1)
 
-        await harness.refreshLater()
+        await harness.refresh(answering: onePullRequest)
         try harness.ping("Another one", project: "blog")
         await harness.shipyard.reloadPings()
         #expect(harness.pingNotifications.map(\.title) == ["shop · Waiting for your input", "blog · Another one"])
@@ -116,7 +106,7 @@ struct PingNotificationTests {
         replaced.title = "Still waiting, 10 min"
         try harness.pingStore.save(replaced)
         await harness.shipyard.reloadPings()
-        await harness.refreshLater()
+        await harness.refresh(answering: onePullRequest)
         #expect(harness.pingNotifications.count == 2)
 
         let relaunched = harness.relaunched()
@@ -187,7 +177,7 @@ struct PingNotificationTests {
         try harness.pingStore.save(Ping(id: "k7qm2x", title: "Hidden", projects: ["shop"], sent: harness.clock.now))
 
         await harness.shipyard.reloadPings()
-        await harness.refreshLater()
+        await harness.refresh(answering: onePullRequest)
 
         #expect(harness.pingNotifications.isEmpty)
     }

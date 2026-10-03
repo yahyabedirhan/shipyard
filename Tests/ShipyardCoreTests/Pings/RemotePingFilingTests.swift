@@ -28,32 +28,14 @@ private let bothRepositories = PullRequestsResponse.answer([
     PullRequestsResponse("yahyabedirhan/blog", []),
 ])
 
-/// A ping as a machine without the app lists it: filed under no project
-/// yet, with the repository or the `--project` name it was sent with.
-private func ping(_ id: String, _ title: String, repository: String? = nil, project: String? = nil, sender: String? = nil) -> Ping {
-    Ping(
-        id: id,
-        title: title,
-        projects: project.map { [$0] } ?? [],
-        sent: Harness.now.addingTimeInterval(-5 * 60),
-        repository: repository,
-        sender: sender,
-        instance: "i-\(id)"
-    )
-}
-
 @MainActor
 private extension Harness {
     /// A harness signed in with `config`, whose Herdr has saved
-    /// `netcup-vps` listing `pings`, started and polled once.
+    /// `netcup-vps` (the one machine `config` names) listing `pings`,
+    /// started and polled once.
     static func polled(_ config: String = shopAndBlog, graphQL: StubHTTP.Answer = bothRepositories, pings: [Ping]) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
-        harness.graphQL([graphQL])
-        harness.herdr.addMachine("netcup-vps", pings: pings)
-        await harness.shipyard.start()
-        let fired = await harness.machineTimer.fire()
-        #expect(fired, "the machine timer wasn't armed")
+        await harness.startWithMachines(graphQL: graphQL, netcup: pings, polled: true)
         return harness
     }
 
@@ -72,7 +54,7 @@ private extension Harness {
 struct RemotePingFilingTests {
     @Test("a remote ping lists under every project that watches its repository, matched ignoring case, and counts once")
     func byRepository() async throws {
-        let harness = try await Harness.polled(pings: [ping("q1", "Deploy?", repository: "YahyaBedirhan/SHOP")])
+        let harness = try await Harness.polled(pings: [remotePing("q1", "Deploy?", repository: "YahyaBedirhan/SHOP")])
 
         for project in ["shop", "everything"] {
             #expect(harness.pingTitles(project) == ["Deploy?"], "\(project)")
@@ -105,7 +87,7 @@ struct RemotePingFilingTests {
             answers: [RepositoryListResponse.page([Listed("yahyabedirhan/shop")])]
         )
         harness.graphQL([PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", [])])])
-        harness.herdr.addMachine("netcup-vps", pings: [ping("q1", "Ready", repository: "yahyabedirhan/Shop")])
+        harness.herdr.addMachine("netcup-vps", pings: [remotePing("q1", "Ready", repository: "yahyabedirhan/Shop")])
         await harness.shipyard.start()
         await harness.machineTimer.fire()
 
@@ -115,7 +97,7 @@ struct RemotePingFilingTests {
 
     @Test("a repository no project watches lists the remote ping under its machine")
     func unwatchedRepository() async throws {
-        let harness = try await Harness.polled(pings: [ping("q1", "Elsewhere", repository: "someone/else")])
+        let harness = try await Harness.polled(pings: [remotePing("q1", "Elsewhere", repository: "someone/else")])
 
         #expect(harness.pingTitles("netcup-vps") == ["Elsewhere"])
         for project in ["shop", "everything", "blog"] {
@@ -126,8 +108,8 @@ struct RemotePingFilingTests {
     @Test("a --project name the configuration has files the remote ping there; one it doesn't lists it under its machine")
     func byProjectName() async throws {
         let harness = try await Harness.polled(pings: [
-            ping("q1", "For the blog", project: "blog"),
-            ping("q2", "For a typo", project: "blgo"),
+            remotePing("q1", "For the blog", projects: ["blog"]),
+            remotePing("q2", "For a typo", projects: ["blgo"]),
         ])
 
         #expect(harness.pingTitles("blog") == ["For the blog"])
@@ -141,7 +123,7 @@ struct RemotePingFilingTests {
             of: "name = \"everything\"\n",
             with: "name = \"everything\"\npings.show = false\n"
         )
-        let harness = try await Harness.polled(config, pings: [ping("q1", "Deploy?", repository: "yahyabedirhan/shop")])
+        let harness = try await Harness.polled(config, pings: [remotePing("q1", "Deploy?", repository: "yahyabedirhan/shop")])
 
         #expect(harness.pingTitles("shop") == ["Deploy?"])
         #expect(harness.pingTitles("everything").isEmpty)
@@ -152,7 +134,7 @@ struct RemotePingFilingTests {
     func groupedByRepository() async throws {
         let harness = try await Harness.polled(
             "[defaults]\ngroup-by = \"repository\"\n\n" + shopAndBlog,
-            pings: [ping("q1", "Deploy?", repository: "YahyaBedirhan/Shop")]
+            pings: [remotePing("q1", "Deploy?", repository: "YahyaBedirhan/Shop")]
         )
 
         let groups = try #require(harness.section("shop")?.groups)
@@ -164,7 +146,7 @@ struct RemotePingFilingTests {
     func groupedBySender() async throws {
         let harness = try await Harness.polled(
             "[defaults]\ngroup-by = \"author\"\n\n" + shopAndBlog,
-            pings: [ping("q1", "Deploy?", repository: "yahyabedirhan/shop", sender: "claude")]
+            pings: [remotePing("q1", "Deploy?", repository: "yahyabedirhan/shop", sender: "claude")]
         )
 
         let groups = try #require(harness.section("shop")?.groups)

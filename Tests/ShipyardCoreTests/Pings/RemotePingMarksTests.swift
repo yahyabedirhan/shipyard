@@ -14,12 +14,6 @@ private let twoMachines = "[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
-/// A ping as a machine's `shipyard` lists it, sent `minutes` before the
-/// harness's now, as the sending `instance` (its own by default).
-private func ping(_ id: String, _ title: String, minutes: Double = 5, repository: String? = nil, instance: String? = nil) -> Ping {
-    Ping(id: id, title: title, projects: [], sent: Harness.now.addingTimeInterval(-minutes * 60), repository: repository, instance: instance ?? "i-\(id)")
-}
-
 @MainActor
 private extension Harness {
     /// A harness signed in with `config`, whose Herdr has saved
@@ -27,21 +21,8 @@ private extension Harness {
     /// started and polled once.
     static func polled(_ config: String = twoMachines, hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        try await harness.startPolled(hetzner: hetzner, netcup: netcup)
+        await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup, polled: true)
         return harness
-    }
-
-    func startPolled(hetzner: [Ping] = [], netcup: [Ping] = []) async throws {
-        stub.on(Harness.userURL, Harness.viewerAnswer)
-        graphQL([onePullRequest])
-        herdr.addMachine("hetzner-vps", pings: hetzner)
-        herdr.addMachine("netcup-vps", pings: netcup)
-        await shipyard.start()
-        await poll()
-    }
-
-    func titles(_ name: String) -> [String] {
-        section(name)?.rows.map(\.title) ?? []
     }
 
     func row(_ machine: String, _ title: String) throws -> MenuRow {
@@ -50,11 +31,6 @@ private extension Harness {
 
     func needsAttention(_ machine: String) -> [Bool] {
         section(machine)?.rows.map(\.needsAttention) ?? []
-    }
-
-    func poll(sourceLocation: SourceLocation = #_sourceLocation) async {
-        let fired = await machineTimer.fire()
-        #expect(fired, "the machine timer wasn't armed", sourceLocation: sourceLocation)
     }
 
     /// The URLs of the remote pings with a mark in the app state.
@@ -72,7 +48,7 @@ struct RemotePingMarksTests {
 
     @Test("⌥-click marks a remote ping seen: it stops needing attention, on that machine only, and stays seen across polls")
     func markSeen() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("q1", "From hetzner")], netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 9)])
+        let harness = try await Harness.polled(hetzner: [remotePing("q1", "From hetzner")], netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 9)])
         #expect(harness.shipyard.menu.attention.pings == 3)
 
         harness.shipyard.markSeen(try harness.row("netcup-vps", "Deploy?"))
@@ -89,8 +65,8 @@ struct RemotePingMarksTests {
     @Test("a remote ping filed under a project is seen and dismissed from that project's section, and stays so across polls")
     func filedUnderProject() async throws {
         let harness = try await Harness.polled(netcup: [
-            ping("q1", "Deploy?", minutes: 1, repository: "yahyabedirhan/shop"),
-            ping("q2", "Merge it?", minutes: 2, repository: "yahyabedirhan/shop"),
+            remotePing("q1", "Deploy?", minutes: 1, repository: "yahyabedirhan/shop"),
+            remotePing("q2", "Merge it?", minutes: 2, repository: "yahyabedirhan/shop"),
         ])
         let pingRows = { harness.section("shop")?.rows.filter { $0.kind == .ping } ?? [] }
         #expect(pingRows().map(\.title) == ["Deploy?", "Merge it?"])
@@ -105,7 +81,7 @@ struct RemotePingMarksTests {
 
     @Test("Mark all seen marks remote pings too, every machine's, or only the section named")
     func markAllSeen() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)])
         harness.shipyard.markAllSeen(project: "netcup-vps")
         #expect(harness.needsAttention("netcup-vps") == [false, false])
         #expect(harness.needsAttention("hetzner-vps") == [true])
@@ -117,11 +93,11 @@ struct RemotePingMarksTests {
 
     @Test("a replaced remote ping needs attention again; one sent anew under its id does too")
     func replaceIsUnseen() async throws {
-        let harness = try await Harness.polled(netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
+        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)])
         harness.shipyard.markAllSeen()
 
         // q1 replaced (same instance, new title), q2 withdrawn and sent anew.
-        harness.herdr.setPings([ping("q1", "Deploy now?", minutes: 1), ping("q2", "Merge it?", minutes: 2, instance: "again")], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy now?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2, instance: "again")], on: "netcup-vps")
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Deploy now?", "Merge it?"])
         #expect(harness.needsAttention("netcup-vps") == [true, true])
@@ -131,7 +107,7 @@ struct RemotePingMarksTests {
 
     @Test("a seen remote ping leaves after the defaults' seen-window, from when it was seen")
     func seenWindow() async throws {
-        let harness = try await Harness.polled("[defaults.pings]\nseen-window = \"30m\"\n\n" + twoMachines, netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
+        let harness = try await Harness.polled("[defaults.pings]\nseen-window = \"30m\"\n\n" + twoMachines, netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)])
         harness.clock.advance(by: 3600)
         harness.shipyard.markSeen(try harness.row("netcup-vps", "Deploy?"))
 
@@ -154,21 +130,21 @@ struct RemotePingMarksTests {
 
     @Test("✕ hides a remote ping until its machine stops listing that instance, replaced or not")
     func dismiss() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("q1", "From hetzner")], netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
+        let harness = try await Harness.polled(hetzner: [remotePing("q1", "From hetzner")], netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)])
         await harness.shipyard.dismiss(try harness.row("netcup-vps", "Deploy?")).value
         #expect(harness.titles("netcup-vps") == ["Merge it?"])
         #expect(harness.titles("hetzner-vps") == ["From hetzner"])
         #expect(harness.shipyard.menu.attention.pings == 2)
 
         // Replaced: still hidden.
-        harness.herdr.setPings([ping("q1", "Deploy now?", minutes: 1), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy now?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Merge it?"])
 
         // Withdrawn, then sent anew under its id: shown.
-        harness.herdr.setPings([ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
         await harness.poll()
-        harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1, instance: "again"), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy?", minutes: 1, instance: "again"), remotePing("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Deploy?", "Merge it?"])
         #expect(harness.needsAttention("netcup-vps") == [true, true])
@@ -178,7 +154,7 @@ struct RemotePingMarksTests {
 
     @Test("seen and dismissed are kept across a restart, even before the machines answer")
     func keptAcrossRestart() async throws {
-        let pings = [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2), ping("q3", "Ship it?", minutes: 3)]
+        let pings = [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2), remotePing("q3", "Ship it?", minutes: 3)]
         let harness = try await Harness.polled(netcup: pings)
         harness.shipyard.markSeen(try harness.row("netcup-vps", "Deploy?"))
         await harness.shipyard.dismiss(try harness.row("netcup-vps", "Merge it?")).value
@@ -197,29 +173,29 @@ struct RemotePingMarksTests {
 
     @Test("marks for pings no machine lists any more are pruned; a machine that fails keeps its own, and one whose list stops early those past its end")
     func pruned() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)])
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)])
         harness.shipyard.markAllSeen()
         #expect(harness.marked == ["shipyard://ping/hetzner-vps/a1", "shipyard://ping/netcup-vps/q1", "shipyard://ping/netcup-vps/q2"])
 
         // netcup's list stops early, before q1 and q2: their marks stay, and they're seen when they're back.
-        let newer = (0..<PingList.maxPings).map { ping("n\($0)", "Newer \($0)", minutes: Double($0) / 1000) }
-        harness.herdr.setPings(newer + [ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        let newer = (0..<PingList.maxPings).map { remotePing("n\($0)", "Newer \($0)", minutes: Double($0) / 1000) }
+        harness.herdr.setPings(newer + [remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
         await harness.poll()
         #expect(harness.shipyard.remote.machine("netcup-vps")?.truncated == true)
         #expect(harness.marked.count == 3)
-        harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1), ping("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy?", minutes: 1), remotePing("q2", "Merge it?", minutes: 2)], on: "netcup-vps")
         await harness.poll()
         #expect(harness.needsAttention("netcup-vps") == [false, false])
 
         // netcup stops listing q2; hetzner fails, keeping a1 listed.
-        harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1)], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy?", minutes: 1)], on: "netcup-vps")
         harness.herdr.setListOutput("not json", on: "hetzner-vps")
         await harness.poll()
         #expect(harness.shipyard.remote.machine("hetzner-vps")?.failure != nil)
         #expect(harness.marked == ["shipyard://ping/hetzner-vps/a1", "shipyard://ping/netcup-vps/q1"])
 
         // q1 sent anew: the old instance's mark goes.
-        harness.herdr.setPings([ping("q1", "Deploy?", minutes: 1, instance: "again")], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy?", minutes: 1, instance: "again")], on: "netcup-vps")
         await harness.poll()
         #expect(harness.marked == ["shipyard://ping/hetzner-vps/a1"])
 

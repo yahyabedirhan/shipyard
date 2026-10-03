@@ -37,9 +37,6 @@ private func replaced(_ ping: Ping, title: String) -> Ping {
 private extension Harness {
     /// The ping rows of `shop`.
     var pingRows: [MenuRow] { section("shop")?.rows.filter { $0.kind == .ping } ?? [] }
-
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
 }
 
 /// The CLI and the app write the same ping store at once. The app reads a
