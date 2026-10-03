@@ -1,9 +1,9 @@
 name: linux cli
 
 # Static Linux builds of the `shipyard` command, for the herdr-shipyard plugin
-# to install on machines without the app. Releasing stays the maintainer's:
-# `make release` and the GitHub release are made by hand as before, and when
-# that release is published this workflow attaches the Linux files to it.
+# to install on machines without the app. Releases follow the Releases
+# section of AGENTS.md, which waits on this workflow: when a release is
+# published, it attaches the Linux files to it.
 #
 #   release published   build, check, and upload to that release
 #   workflow_dispatch   build and check, kept as workflow artifacts only

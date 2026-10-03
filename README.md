@@ -164,11 +164,7 @@ version = 1
 
 `make test` runs the tests, and `make release` builds the release zip. With the Command Line Tools alone, the first build compiles the SDK's Swift modules (about 40 s); the `Makefile` keeps them in `~/Library/Caches/shipyard/ModuleCache`, so every other checkout and worktree reuses them. Installing Xcode avoids the cost, since it ships them prebuilt. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
 
-A release goes in this order:
-
-1. Bump `ShipyardVersion.current` in [`Sources/ShipyardCore/Version.swift`](Sources/ShipyardCore/Version.swift) and merge it: the `linux cli` workflow fails unless `shipyard --version` matches the release's tag.
-2. Run `make release`, then publish a GitHub release tagged `v<version>` with the zip attached.
-3. Wait for the `linux cli` run to attach the Linux files before announcing the release. Until it does, the herdr-shipyard plugin can't install on a Linux machine, since it downloads them from the latest release.
+Releases follow the steps in the Releases section of [`AGENTS.md`](AGENTS.md), and each one gets an entry in [`CHANGELOG.md`](CHANGELOG.md).
 
 The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 

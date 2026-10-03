@@ -28,6 +28,34 @@ type(scope): what changed
 - Keep the whole message lowercase, including company and product names. The `Co-Authored-By` trailer keeps its standard spelling.
 - Never add a `Claude-Session:` trailer or any other session link to a commit message. The `Co-Authored-By` line from the session's attribution rule is the only trailer.
 
+## Releases
+
+When the maintainer says "release", cut it end to end, in this order. Each step is done before the next starts.
+
+1. **Version.** List the commits since the last tag (`git describe --tags --abbrev=0`, then `git log <tag>..origin/main`). Any `feat` raises the middle number and resets the patch; otherwise raise the patch. Tell the maintainer the version before anything else, so they can stop you.
+2. **Bump, merged first.** One pull request changes `ShipyardVersion.current`, the version `VersionTests` pins and the README's "describes <version>" line together, and adds the release's dated entry at the top of `CHANGELOG.md`, in the shape of the entries below it. Once its checks are green, ask the maintainer to merge it: "release" starts the work, and merging still needs their yes. The `linux cli` workflow fails a release whose tag doesn't match `shipyard --version`, so nothing is tagged before this merge.
+3. **Build and publish.** On `main` at the merged bump, `make release` runs the tests, bundles the app and zips it to `build/Shipyard-<version>-macos.zip`. Publish it with `gh release create v<version> <zip> --target <bump's merge commit> --title "shipyard <version>" --notes-file <notes>`, the notes source under `.scratch/`. Write the notes from the pull requests merged since the last tag, in the previous release's shape (`gh release view <previous tag>`): the logo line, the title, a summary paragraph, Highlights, Install with the Gatekeeper steps, Known limitations, and "Full change list:" with the pull request numbers.
+4. **Linux build.** Publishing starts the `linux cli` run. Wait on it (`gh run list --workflow linux-cli.yml --event release`, then `gh run watch <id> --exit-status`) and check that the release now lists `shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files. The herdr-shipyard plugin downloads them from the latest release, so when the run fails, stop and report it with every machine left as it was.
+5. **Machines.** Carry the release to the machines (below), the Mac's app included.
+6. **Report.** Comment on the bump's pull request: the release's link, the Linux run, and each machine's checked versions or what failed there.
+
+Efforts are named for what they do (`clean-slate`), never a version: a version belongs to a release, and an effort may ship in any of them.
+
+### Carrying Changes To The Machines
+
+After a release, and after any merge that changes `skills/shipyard/` without one, bring every machine it applies to up to date: the Mac, then each machine in the maintainer's `[remote] machines`. Read their labels from the maintainer's `config.toml` (the **shipyard** skill knows where it lives); machine labels and paths stay out of this repository. A skill-only change runs only the skill steps.
+
+- **The Mac:** in a checkout at the tag `v<version>`, `make install` replaces the app. `/Applications/Shipyard.app/Contents/Helpers/shipyard --version` prints `shipyard <version>`. Then `npx skills update shipyard -g`.
+- **Each remote machine,** through its saved Herdr machine (the **herdr** skill), never plain SSH:
+  1. Open a workspace of its own with `herdr --machine <label> workspace create --no-focus`, and run the rest in its first pane.
+  2. When `herdr plugin list` shows herdr-shipyard as a local link (`source: local`), `herdr plugin unlink <its id>` first, so GitHub's copy replaces it.
+  3. `herdr plugin install yahyabedirhan/herdr-shipyard -y` reinstalls the plugin, which fetches the release's Linux `shipyard`.
+  4. `npx skills update shipyard -g` updates the skill. A PromptScript failure it prints is harmless.
+  5. Check: `shipyard --version` prints `shipyard <version>`, and the installed skill's `SKILL.md` matches `skills/shipyard/SKILL.md` on `main`.
+  6. Close the workspace with `herdr --machine <label> workspace close <id>`.
+
+A machine Herdr can't reach (`herdr machine status`) is reported with the rest and left for the maintainer; go on with the others.
+
 ## Folder Layout
 
 ```text
