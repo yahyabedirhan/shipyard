@@ -1,7 +1,10 @@
 name: ci
 
-# Every push (a branch or a tag, so a release tag runs the bundle too) and
-# every pull request builds and tests.
+# Every push (a branch or a tag, so a release tag runs the bundle too) builds
+# and tests, and so does a pull request from a fork, whose pushes don't run
+# here. A pull request from a branch of this repository skips both jobs: the
+# push run has already tested its head commit, and its checks show on the pull
+# request. Only push runs save the cache, so the push run is the one kept.
 on:
   push:
   pull_request:
@@ -27,6 +30,7 @@ on:
 jobs:
   core-linux:
     name: core tests (ubuntu, swift 6)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     container: swift:6.2-noble
     steps:
@@ -77,6 +81,7 @@ jobs:
 
   macos:
     name: build and test (macos)
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: macos-latest
     env:
       CI_SWIFT_FLAGS: -Xswiftc -enable-incremental-file-hashing
