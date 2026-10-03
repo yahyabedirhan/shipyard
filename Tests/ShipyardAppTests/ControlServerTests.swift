@@ -72,6 +72,10 @@ struct ControlServerTests {
     /// The agent the tests' requests come from, and another one.
     nonisolated static let agent = Holder(key: "CLAUDE_CODE_SESSION_ID=agent", name: "Claude Code", place: "/work")
     nonisolated static let other = Holder(key: "process:300@800250000", name: "codex", place: "Herdr pane w1-2")
+    /// A lease `holder` took at `taken` seconds, held to its cap, as a `take` grants it.
+    nonisolated static func term(_ holder: Holder, taken: TimeInterval) -> ControlLease.Term {
+        ControlLease.Term(holder: holder, taken: Date(timeIntervalSince1970: taken), ends: Date(timeIntervalSince1970: taken + ControlLease.cap))
+    }
     /// `agent` as it reads in a request on the wire.
     nonisolated static let agentWire = #""holder":{"key":"CLAUDE_CODE_SESSION_ID=agent","name":"Claude Code","place":"\/work"}"#
 
@@ -419,7 +423,7 @@ struct ControlServerTests {
         let stillHeld = server.lease.current(at: clock.now)?.holder
         let released = await server.reply(to: ControlRequest.controlRelease.sent())
 
-        #expect(taken == .init(reply: .done("you hold shipyard until 00:05:00\n")))
+        #expect(taken == .init(reply: .done("you hold shipyard until 00:05:00\n"), granted: Self.term(Self.agent, taken: 0)))
         #expect(refused == .init(reply: .refused(
             "shipyard is in use by Claude Code in /work until 00:05:00 (290s left); `shipyard control take --wait <seconds>` to queue"
         )))
@@ -458,7 +462,7 @@ struct ControlServerTests {
         let granted = await waiting.value
 
         #expect(line?.waiting == 1)
-        #expect(granted == .init(reply: .done("you hold shipyard until 00:06:00\n")))
+        #expect(granted == .init(reply: .done("you hold shipyard until 00:06:00\n"), granted: Self.term(Self.other, taken: 60)))
         #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 0))
     }
 
@@ -511,7 +515,7 @@ struct ControlServerTests {
         server.stopLease()
         let granted = await waiting.value
 
-        #expect(granted == .init(reply: .done("you hold shipyard until 00:05:10\n")))
+        #expect(granted == .init(reply: .done("you hold shipyard until 00:05:10\n"), granted: Self.term(Self.other, taken: 10)))
         #expect(indicator.shown(at: clock.now)?.holder == "codex")
         #expect(indicator.stopped(at: clock.now).map(\.holder) == [Self.agent])
         #expect(recorder.notices == [
@@ -553,6 +557,47 @@ struct ControlServerTests {
         #expect(released == .success(.done("released shipyard\n")))
         #expect(granted == .success(.done("you hold shipyard until 00:05:12\n")))
         #expect(server.lease.current(at: clock.now)?.holder == Self.other)
+    }
+
+    @Test("over the socket, a waiting take whose client has gone gives back the lease it's granted, and the next waiter gets it")
+    func goneWaiter() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let server = server(socket: socket)
+        try server.start()
+        defer { server.stop() }
+        let holder = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
+        let third = Holder(key: "process:400@900250000", name: "amp", place: "/blog")
+        let next = ControlClient(socket: socket, holder: third, transport: UnixSocketTransport())
+        _ = await Self.sending { holder.send(.controlTake(waitSeconds: nil)) }
+
+        // A take that waits in line, sent as the `shipyard` command sends it,
+        // whose client then goes (stopped, or its harness's timeout) before the lease is free.
+        let gone = UnixSocket.make()
+        try #require(UnixSocket.connectSocket(gone, to: try #require(UnixSocket.address(socket.path))) == 0)
+        _ = UnixSocket.writeAll(gone, ControlRequest.controlTake(waitSeconds: 30).sent(by: Self.other))
+        UnixSocket.finishWriting(gone)
+        for _ in 0..<200 where server.lease.waiting(at: clock.now) != 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        close(gone)
+        // Another take waits behind it, its client still there.
+        let waiting = Task { await Self.sending { next.send(.controlTake(waitSeconds: 30)) } }
+        for _ in 0..<200 where server.lease.waiting(at: clock.now) != 2 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        clock.now = Date(timeIntervalSince1970: 12)
+        _ = await Self.sending { holder.send(.controlRelease) }
+        let granted = await waiting.value
+
+        #expect(granted == .success(.done("you hold shipyard until 00:05:12\n")))
+        #expect(server.lease.current(at: clock.now)?.holder == third)
+        #expect(recorder.notices == [
+            .started(agent: "Claude Code", place: "/work"),
+            .ended(agent: "Claude Code", reason: .released),
+            .started(agent: "codex", place: "Herdr pane w1-2"),
+            .ended(agent: "codex", reason: .released),
+            .started(agent: "amp", place: "/blog"),
+        ])
     }
 
     @Test("the socket replaces a leftover file, is the user's own, answers the client, and is gone after stop")

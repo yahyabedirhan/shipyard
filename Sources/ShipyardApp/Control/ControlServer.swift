@@ -8,13 +8,17 @@ import ShipyardCore
 /// request per connection with one reply. Each request is read off the main
 /// actor, answered on it (`reply(to:)`), and the reply written back before
 /// the connection closes. Every refusal is a reply, so the `shipyard`
-/// command always has a line to print.
+/// command always has a line to print. A `take`'s reply granting the lease
+/// that can't be written (its client gone) gives the lease up at once.
 @MainActor
 final class ControlServer {
-    /// A reply, and whether the app quits once it's written.
+    /// A reply, whether the app quits once it's written, and the lease a
+    /// `control take`'s reply grants, released when the reply can't be
+    /// written (`undelivered`).
     struct Answer: Equatable {
         var reply: ControlReply
         var quits = false
+        var granted: ControlLease.Term?
     }
 
     /// Why the server couldn't start listening.
@@ -171,7 +175,7 @@ final class ControlServer {
         apply(decision.transitions)
         switch decision.answer {
         case .success(let term):
-            return Answer(reply: .done(term.held(timeZone: timeZone) + "\n"))
+            return held(term)
         case .failure(.queued):
             break
         case .failure(let refusal):
@@ -201,10 +205,28 @@ final class ControlServer {
         apply(decision.transitions)
         switch decision.answer {
         case .success(let term):
-            waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+            waiter.answer.resume(returning: held(term))
         case .failure(let refusal):
             waiter.answer.resume(returning: Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone))))
         }
+    }
+
+    /// A `take`'s answer holding the lease to `term`'s end, which it grants.
+    private func held(_ term: ControlLease.Term) -> Answer {
+        Answer(reply: .done(term.held(timeZone: timeZone) + "\n"), granted: term)
+    }
+
+    /// A `take`'s reply that granted the lease couldn't be written: its
+    /// client has gone (stopped, or cut off by its harness's timeout while
+    /// it waited in line), so nobody knows they hold it. The lease is given
+    /// up for that holder at once (`released`), and the next waiter gets it
+    /// as usual, rather than it sitting unused until it runs out. A lease
+    /// that has moved on meanwhile (another holder's, or a new one) is left
+    /// alone.
+    func undelivered(_ answer: Answer) {
+        guard let granted = answer.granted, let term = lease.current(at: now()),
+              term.holder.key == granted.holder.key, term.taken == granted.taken else { return }
+        apply(lease.release(by: granted.holder, at: now()))
     }
 
     // MARK: - The maintainer taking shipyard back
@@ -252,7 +274,7 @@ final class ControlServer {
             for (ticket, waiter) in waiters where waiter.holder.key == term.holder.key {
                 waiters[ticket] = nil
                 waiter.timeout?.cancel()
-                waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+                waiter.answer.resume(returning: held(term))
             }
         }
         guard let next = lease.nextEnd(after: time) else { return }
@@ -284,6 +306,8 @@ final class ControlServer {
         guard listener == nil else { return }
         let listener = try Listener.open(at: socket) { [weak self] data in
             await self?.reply(to: data) ?? Answer(reply: .refused("shipyard is quitting"))
+        } undelivered: { [weak self] answer in
+            self?.undelivered(answer)
         } quit: { [weak self] in
             self?.quit()
         }
@@ -308,22 +332,29 @@ final class ControlServer {
 
 /// The listening socket's POSIX side, off the main actor: accepts each
 /// connection on its own queue, reads the request to its end, has the
-/// server answer it, writes the reply and closes.
+/// server answer it, writes the reply and closes. A reply granting the
+/// lease that can't be written goes back to the server (`undelivered`).
 private final class Listener: @unchecked Sendable {
     typealias Respond = @Sendable (Data) async -> ControlServer.Answer
+    typealias Undelivered = @MainActor @Sendable (ControlServer.Answer) -> Void
 
     private let path: String
     private let source: DispatchSourceRead
     private let respond: Respond
+    private let undelivered: Undelivered
     private let quit: @MainActor @Sendable () -> Void
     private static let queue = DispatchQueue(label: "shipyard.control", attributes: .concurrent)
     /// How long a connection may take to send its request or read the
     /// reply, so a client that stalls never holds a thread.
     private static let connectionTimeout: TimeInterval = 5
 
-    private init(path: String, descriptor: Int32, respond: @escaping Respond, quit: @escaping @MainActor @Sendable () -> Void) {
+    private init(
+        path: String, descriptor: Int32, respond: @escaping Respond, undelivered: @escaping Undelivered,
+        quit: @escaping @MainActor @Sendable () -> Void
+    ) {
         self.path = path
         self.respond = respond
+        self.undelivered = undelivered
         self.quit = quit
         source = DispatchSource.makeReadSource(fileDescriptor: descriptor, queue: Self.queue)
         source.setEventHandler { [weak self] in self?.acceptAll(descriptor) }
@@ -334,6 +365,7 @@ private final class Listener: @unchecked Sendable {
     static func open(
         at socket: URL,
         respond: @escaping Respond,
+        undelivered: @escaping Undelivered,
         quit: @escaping @MainActor @Sendable () -> Void
     ) throws(ControlServer.Failure) -> Listener {
         let path = socket.path
@@ -357,7 +389,7 @@ private final class Listener: @unchecked Sendable {
             unlink(path)
             throw .init(description: "couldn't listen on \(path): \(why)")
         }
-        return Listener(path: path, descriptor: descriptor, respond: respond, quit: quit)
+        return Listener(path: path, descriptor: descriptor, respond: respond, undelivered: undelivered, quit: quit)
     }
 
     /// Whether something accepts a connection at `address`.
@@ -386,18 +418,22 @@ private final class Listener: @unchecked Sendable {
     }
 
     /// Answers one connection. One that sends nothing, such as another
-    /// app's look at whether this one listens, gets no reply.
+    /// app's look at whether this one listens, gets no reply. The client
+    /// half-closes once it has sent, so its hanging up shows only when the
+    /// reply can't be written (`EPIPE`): a granted lease then goes back.
     private func serve(_ connection: Int32) {
         guard case .data(let request) = UnixSocket.readToEnd(connection), !request.isEmpty else {
             Darwin.close(connection)
             return
         }
         let respond = respond
+        let undelivered = undelivered
         let quit = quit
         Task {
             let answer = await respond(request)
-            _ = UnixSocket.writeAll(connection, answer.reply.encoded())
+            let delivered = UnixSocket.writeAll(connection, answer.reply.encoded())
             Darwin.close(connection)
+            if !delivered, answer.granted != nil { await undelivered(answer) }
             if answer.quits { await quit() }
         }
     }

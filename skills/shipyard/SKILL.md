@@ -611,7 +611,7 @@ A command shipyard won't run for you exits 1 with one of these lines:
 
 | Refusal | What to do |
 |---|---|
-| ``shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue`` | Another agent holds it. Queue with `shipyard control take --wait <seconds>`, a wait long enough for its time left: it returns as soon as you hold it. When your task can't wait that long, tell the user who holds shipyard and go on with what doesn't need it. |
+| ``shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue`` | Another agent holds it. Queue with `shipyard control take --wait <seconds>`, a wait long enough for its time left: it returns as soon as you hold it. Give the command a timeout longer than the wait plus 15 seconds; cut off sooner, it loses your turn. When your task can't wait that long, tell the user who holds shipyard and go on with what doesn't need it. |
 | `waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)` | Your wait ran out. Tell the user who holds shipyard, and queue again only when they say so. |
 | `the user took shipyard back; ask them before using it again` | The user pressed Stop on your banner. Stop your app control there and ask them what they want; use shipyard again only once they say so. They can allow you back at once; otherwise it refuses you for 5 minutes, `control take` included, and waiting that out, retrying or another key goes against their Stop. |
 
@@ -687,10 +687,10 @@ shipyard screenshot shop-dark.png --appearance dark
 shipyard screenshot icon.png --menu-bar-icon --appearance light
 ```
 
-**"Screenshot the panel in both appearances."** A run of steps: hold shipyard for it, waiting up to two minutes for an agent that holds it, and release it at the end:
+**"Screenshot the panel in both appearances."** A run of steps: hold shipyard for it, waiting up to a minute for an agent that holds it, and release it at the end:
 
 ```sh
-shipyard control take --wait 120
+shipyard control take --wait 60
 shipyard screenshot panel-light.png --appearance light
 shipyard screenshot panel-dark.png --appearance dark
 shipyard panel close
