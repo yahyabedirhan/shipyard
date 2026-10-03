@@ -9,7 +9,7 @@ Shipyard lists the pull requests (and, when turned on, issues and workflow runs)
 
 Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration.
 
-On the Mac, agents can also open, steer and screenshot the running app with `shipyard app`, `panel` and `screenshot`, on the user's data or a demo's. See Driving the app, at the end.
+On the Mac, agents can also open, steer and screenshot the running app with `shipyard app`, `panel` and `screenshot`, on the user's data or a demo's, one agent at a time. See Driving the app, at the end.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
@@ -97,7 +97,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `pings.seen-window` | `"24h"` | a window: how long a seen ping stays listed, counted from when it was seen; an unseen ping stays until it's seen. A seen ping leaves within one refresh of its window passing, and is deleted |
-| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` | a list of rules (below) |
+| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
 
@@ -136,7 +136,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 - A project's `pull-requests`, `issues`, `workflow-runs` and `pings` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
-- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, and `ping.sent`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them.
+- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, `ping.sent`, `control.started` and `control.ended`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them. Likewise, without `control.started` and `control.ended` it gets none when an agent starts or stops using the app.
 
 ## Which repositories: repository selectors
 
@@ -198,6 +198,8 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `issue.commented` | an issue got comments |
 | `run.failed` | a workflow run finished failed (also timed out or failed to start) |
 | `run.succeeded` | a workflow run finished successfully |
+| `control.started` | an agent started using the shipyard app (`shipyard app`, `panel` or `screenshot`): "Claude Code is using shipyard", over where it runs. Decided by `[[defaults.notifications]]` (or the built-in defaults) only: a project's own list and a rule's `authors` don't apply to it, and the app warns about either. Clicking it opens the panel, whose banner names the agent |
+| `control.ended` | that agent is done with the app: "Claude Code is done with shipyard", over why (released, its lease ran out, you stopped it). Decided as `control.started` is |
 | `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification does what clicking the ping does: runs its action (opens its link or app, or focuses its Herdr tab) and marks it seen. Pings have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
@@ -548,12 +550,13 @@ shipyard ping "Claude is asking for permission" --app Claude --project shop
 
 ## Driving the app
 
-On the user's Mac, three more commands open, steer and photograph the running app, so you can see what shipyard shows, check a change, or attach a screenshot: `shipyard app`, `shipyard panel` and `shipyard screenshot`. They talk to the app directly; they need no Accessibility or Screen Recording permission, and they never change `config.toml`. The command is found as in Sending pings (`~/.local/bin/shipyard`).
+On the user's Mac, three more commands open, steer and photograph the running app, so you can see what shipyard shows, check a change, or attach a screenshot: `shipyard app`, `shipyard panel` and `shipyard screenshot`. They talk to the app directly; they need no Accessibility or Screen Recording permission, and they never change `config.toml`. One agent at a time holds them, and `shipyard control` holds shipyard for a run: see Taking turns. The command is found as in Sending pings (`~/.local/bin/shipyard`).
 
 ```sh
 shipyard app open [--demo <folder>] | quit | status [--json]
 shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
-shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
+shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
+shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 ```
 
 | Command | What it does | Prints on success |
@@ -570,11 +573,16 @@ shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
 | `screenshot <file.png>` | saves the panel as it looks, opening it when it's closed; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
+| `--with-indicator` | keeps the yellow dot and the banner that show an agent is using shipyard; a screenshot leaves them out otherwise | |
+| `control take` | holds shipyard for a run, until 5 minutes after you took it (see Taking turns) | `you hold shipyard until <HH:mm:ss>` |
+| `control take --wait <seconds>` | while another agent holds shipyard, waits in line up to that long (3600 at most), first come, first served | the same, once you hold it |
+| `control release` | gives shipyard up for the next agent; does nothing when you don't hold it | `released shipyard` |
 
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
 
 ```text
-shipyard 0.1.0 is running
+shipyard 0.2.0 is running
+lease: free
 panel: closed
 layout: tabs
 tab: All
@@ -583,14 +591,34 @@ folded: none
 showing all: pull-requests in shop
 ```
 
-With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`) and `demo` (the demo folder, `null` otherwise); read it rather than the lines when you act on it.
+With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
 
 What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. The panel stays open after a screenshot; close it when you're done.
+
+### Taking turns
+
+Shipyard answers one agent at a time: the one holding its **lease**. Every `app`, `panel` and `screenshot` command needs it, except `app status`, which reports it. You never name yourself: `shipyard` knows you by your Claude Code session (`CLAUDE_CODE_SESSION_ID`), else by the agent process that runs it, so every command you run counts as you. Sub-agents of one Claude Code session share its session id, so they share one lease: it never makes one wait for another, so take turns between them yourself. The user sees your name and your folder (or Herdr pane) as a yellow dot on the menu bar icon and a banner on the panel, and gets a notification when you start and when you're done.
+
+- **A quick check needs nothing more.** Your first command takes the lease and each one after renews it. It ends a minute after your last command, and 5 minutes after you took it at most; then your next command takes a new one, unless another agent was waiting.
+- **Hold it for a run.** Before steps with work between them (a build, then several screenshots), `shipyard control take` holds it until 5 minutes after you took it, whatever the gaps. Taking it again doesn't move that end; a run past it takes a new lease, as above.
+- **Release it at the end of every run**, after a demo's closing `app open` too: `shipyard control release`, so the next agent and the user needn't wait for it to run out.
+- **A relaunch keeps it.** `app open --demo <folder>`, and the plain `app open` that ends a demo, launch the next app with your lease, until the same end. A separate `app quit` and `app open` leave shipyard free between them.
+- **Look first** with `app status`: `lease: free`, or `lease: <name> in <place>, <n>s left, <k> waiting` (`lease` in the JSON).
+- **Screenshots leave the dot and the banner out**, so they show shipyard as the user normally sees it; `--with-indicator` keeps them, for a picture of the lease itself.
+- **When shipyard can't tell your commands are yours** (each runs as a separate process that isn't a Claude Code session, so your own commands refuse each other as "in use"), export `SHIPYARD_CONTROL_KEY=<k>` for the run, a name of your own: every `app`, `panel`, `screenshot` and `control` command then goes as `<k>`. `--key <k>` does the same for one `control take` or `release` only.
+
+A command shipyard won't run for you exits 1 with one of these lines:
+
+| Refusal | What to do |
+|---|---|
+| ``shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue`` | Another agent holds it. Queue with `shipyard control take --wait <seconds>`, a wait long enough for its time left: it returns as soon as you hold it. Give the command a timeout longer than the wait plus 15 seconds; cut off sooner, it loses your turn. When your task can't wait that long, tell the user who holds shipyard and go on with what doesn't need it. |
+| `waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)` | Your wait ran out. Tell the user who holds shipyard, and queue again only when they say so. |
+| `the user took shipyard back; ask them before using it again` | The user pressed Stop on your banner. Stop your app control there and ask them what they want; use shipyard again only once they say so. They can allow you back at once; otherwise it refuses you for 5 minutes, `control take` included, and waiting that out, retrying or another key goes against their Stop. |
 
 ### Exit codes
 
 - **0**: done. A screenshot is still exit 0 when the app couldn't capture its window and drew the panel itself instead: it writes that picture, prints the path, and says so on standard error, `captured by rendering: <why>`. Look at such a picture before you rely on it.
-- **1**: refused, with one line on standard error saying why. Shipyard isn't running (``shipyard isn't running; `shipyard app open` ``), or didn't answer within 10 seconds of launching. No project, kind or tab has that name; the line lists the ones that exist, such as ``no project is named `shopp`; the projects are `shop`, `blog` ``, so try again with one of them. `tab` in the list layout (``the menu uses the list layout; tabs need `[menu] layout = "tabs"` ``). `show-more` on a project not grouped by kind. A screenshot nothing could be written for, such as one into a folder that doesn't exist.
+- **1**: refused, with one line on standard error saying why. Another agent holds shipyard, or the user took it back (see Taking turns). Shipyard isn't running (``shipyard isn't running; `shipyard app open` ``), or didn't answer within 10 seconds of launching. No project, kind or tab has that name; the line lists the ones that exist, such as ``no project is named `shopp`; the projects are `shop`, `blog` ``, so try again with one of them. `tab` in the list layout (``the menu uses the list layout; tabs need `[menu] layout = "tabs"` ``). `show-more` on a project not grouped by kind. A screenshot nothing could be written for, such as one into a folder that doesn't exist.
 - **2**: the arguments don't read (a missing name, an unknown subcommand or option, a path that isn't `.png`, a `--demo` folder that doesn't exist); the line comes with the usage. On a machine other than the Mac, every one of these commands is exit 2 too: ``shipyard: `shipyard app` runs on the Mac, where the app is``.
 
 ### Demo runs
@@ -619,7 +647,7 @@ What a command changes, it changes as the user's own click would. A fold is reme
 shipyard app status --json || shipyard app open
 ```
 
-**"Restart shipyard."** Quit it, then open it again; `open` returns once it answers:
+**"Restart shipyard."** Quit it, then open it again; `open` returns once it answers. Shipyard is free between the two, so another agent may take it there:
 
 ```sh
 shipyard app quit
@@ -659,6 +687,22 @@ shipyard screenshot shop-dark.png --appearance dark
 shipyard screenshot icon.png --menu-bar-icon --appearance light
 ```
 
+**"Screenshot the panel in both appearances."** A run of steps: hold shipyard for it, waiting up to a minute for an agent that holds it, and release it at the end:
+
+```sh
+shipyard control take --wait 60
+shipyard screenshot panel-light.png --appearance light
+shipyard screenshot panel-dark.png --appearance dark
+shipyard panel close
+shipyard control release
+```
+
+**"Show what the user sees while you work."** The banner and the dot are yours while you hold shipyard; keep them in the picture:
+
+```sh
+shipyard screenshot lease.png --with-indicator
+```
+
 **"Screenshot shipyard with example data."** Write a demo configuration naming public repositories, run the demo, capture it, then bring the user's app back:
 
 ```sh
@@ -673,4 +717,5 @@ TOML
 shipyard app open --demo ~/shipyard-demo
 shipyard screenshot ~/shipyard-demo/panel.png
 shipyard app open
+shipyard control release
 ```

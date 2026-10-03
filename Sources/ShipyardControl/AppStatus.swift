@@ -3,7 +3,7 @@ import Foundation
 /// What `shipyard app status` reports about the running app: its version,
 /// the demo folder in a demo run, whether the panel is open, the menu's
 /// layout and the selected tab, the projects in the configuration's order,
-/// which of them are folded and which groups Show more opened. The app
+/// which of them are folded, which groups Show more opened, and the lease. The app
 /// fills it; how it reads, as lines or as `--json`, is decided here, so the
 /// format is one contract.
 public struct AppStatus: Codable, Equatable, Sendable {
@@ -16,6 +16,24 @@ public struct AppStatus: Codable, Equatable, Sendable {
         public init(project: String, kind: String) {
             self.project = project
             self.kind = kind
+        }
+    }
+
+    /// The lease (`ControlLease`) as `app status` reports it: who holds
+    /// app control, where they run, how long is left and how many wait.
+    public struct Lease: Codable, Equatable, Sendable {
+        /// The holder's name (`Claude Code`).
+        public var holder: String
+        /// Where the holder runs: `Herdr pane <id>`, or its working folder.
+        public var place: String
+        public var secondsLeft: Int
+        public var waiting: Int
+
+        public init(holder: String, place: String, secondsLeft: Int, waiting: Int) {
+            self.holder = holder
+            self.place = place
+            self.secondsLeft = secondsLeft
+            self.waiting = waiting
         }
     }
 
@@ -37,6 +55,9 @@ public struct AppStatus: Codable, Equatable, Sendable {
     /// The folder a demo run (`app open --demo`) reads, or nil for the
     /// user's own app (`null` in the JSON, never left out).
     public var demo: String?
+    /// The lease, or nil when it's free (`null` in the JSON, never left
+    /// out). The app's control server fills it.
+    public var lease: Lease?
 
     public init(
         version: String,
@@ -46,7 +67,8 @@ public struct AppStatus: Codable, Equatable, Sendable {
         projects: [String],
         folded: [String] = [],
         showingAll: [Group] = [],
-        demo: String? = nil
+        demo: String? = nil,
+        lease: Lease? = nil
     ) {
         self.version = version
         self.panelOpen = panelOpen
@@ -56,13 +78,15 @@ public struct AppStatus: Codable, Equatable, Sendable {
         self.folded = folded
         self.showingAll = showingAll
         self.demo = demo
+        self.lease = lease
     }
 
     /// The status as lines, for a person; `demo` only in a demo run, `tab`
     /// only in the tabs layout:
     ///
-    ///     shipyard 0.1.0 is running
+    ///     shipyard 0.2.0 is running
     ///     demo: /Users/me/demo
+    ///     lease: Claude Code in /Users/me/shop, 48s left, 0 waiting
     ///     panel: closed
     ///     layout: tabs
     ///     tab: All
@@ -72,6 +96,11 @@ public struct AppStatus: Codable, Equatable, Sendable {
     public var text: String {
         var lines = ["shipyard \(version) is running"]
         if let demo { lines.append("demo: \(demo)") }
+        if let lease {
+            lines.append("lease: \(lease.holder) in \(lease.place), \(lease.secondsLeft)s left, \(lease.waiting) waiting")
+        } else {
+            lines.append("lease: free")
+        }
         lines += [
             "panel: \(panelOpen ? "open" : "closed")",
             "layout: \(layout)",
@@ -89,8 +118,8 @@ public struct AppStatus: Codable, Equatable, Sendable {
         names.isEmpty ? "none" : names.joined(separator: ", ")
     }
 
-    /// The status as one JSON object on one line, keys sorted; `tab` and
-    /// `demo` are `null` when there's none, never left out.
+    /// The status as one JSON object on one line, keys sorted; `tab`,
+    /// `demo` and `lease` are `null` when there's none, never left out.
     public var json: String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -98,7 +127,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case running, version, panelOpen, layout, tab, projects, folded, showingAll, demo
+        case running, version, panelOpen, layout, tab, projects, folded, showingAll, demo, lease
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -112,5 +141,6 @@ public struct AppStatus: Codable, Equatable, Sendable {
         try container.encode(folded, forKey: .folded)
         try container.encode(showingAll, forKey: .showingAll)
         try container.encode(demo, forKey: .demo)
+        try container.encode(lease, forKey: .lease)
     }
 }

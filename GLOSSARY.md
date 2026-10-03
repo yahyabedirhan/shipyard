@@ -145,6 +145,14 @@ _Avoid_: Snapshot. To capture is the act; the screenshot is the image.
 The app running on a folder of example configuration and state, so that screenshots show example data. The user's own configuration and app state are left untouched, and opening the app normally brings them back.
 _Avoid_: Sandbox, test mode, fixture
 
+**Lease**:
+The right to use app control, held by one agent at a time. An agent's first app control command takes it and each later one renews it. It ends by itself a minute after the holder's last command, and five minutes after it was taken at most. The app refuses another agent's command while it's held. `shipyard control take` holds it to the five minutes on purpose, `release` gives it up, and a `take --wait` waits in line for it, first come, first served. The maintainer can stop it from the panel, which keeps that agent out for five minutes unless they allow it back. Asking for the app's status needs no lease.
+_Avoid_: Lock, mutex, session
+
+**Holder**:
+The agent a lease is held by, or refused to: its key (the agent's session, else its own process), its name and its place (a Herdr pane, else its working folder). The `shipyard` command works it out on every call, so agents never pass it; a setup where that key doesn't stay the same names one in `SHIPYARD_CONTROL_KEY`.
+_Avoid_: Owner, client, user
+
 ### Setup
 
 **Onboarding**:

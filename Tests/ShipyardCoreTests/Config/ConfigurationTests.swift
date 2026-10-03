@@ -163,7 +163,10 @@ struct ConfigurationDecodingTests {
         #expect(config.defaults.pings == PingSettings(show: true, seenWindow: 86_400))
         #expect(config.herdr.terminal == nil)
         #expect(config.remote.machines == [])
-        #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
+        #expect(config.defaults.notifications == [
+            NotificationRule(event: .prOpened), NotificationRule(event: .pingSent),
+            NotificationRule(event: .controlStarted), NotificationRule(event: .controlEnded),
+        ])
         #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))
         #expect(!config.defaults.archived)
         #expect(config.defaults.forks)
@@ -265,7 +268,7 @@ struct ConfigurationDecodingTests {
         }
     }
 
-    @Test("every event and author selector decodes")
+    @Test("every event and author selector decodes; authors on an app control event are read with a warning, since none applies")
     func everyEvent() throws {
         let selectors: [AuthorSelector] = AuthorSelector.groups + [.login("octocat"), .login("dependabot[bot]")]
         for event in EventKind.allCases {
@@ -273,10 +276,36 @@ struct ConfigurationDecodingTests {
                 let list = authors.map { "\"\($0)\"" }.joined(separator: ", ")
                 let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
                 let result = try #require(decoded(text))
-                #expect(result.warnings.isEmpty)
+                let warned = event.isControl && !authors.isEmpty
+                #expect(result.warnings == (warned ? [ConfigIssue(
+                    line: 3,
+                    message: "`authors` doesn't apply to `\(event.rawValue)`, which no item's author sends; it's ignored"
+                )] : []), "\(event.rawValue) with authors [\(list)]")
                 #expect(result.configuration.defaults.notifications == [NotificationRule(event: event, authors: authors)])
             }
         }
+    }
+
+    @Test("an app control event in a project's own list is read with a warning: only the top-level rules decide it")
+    func controlEventInProject() throws {
+        let result = try #require(decoded("""
+            [[projects]]
+            name = "a"
+            repositories = ["o/a"]
+            notifications = [
+              { event = "pr.opened" },
+              { event = "control.started", authors = ["me"] },
+              { event = "control.ended" },
+            ]
+            """))
+        #expect(result.configuration.projects.first?.notifications == [
+            NotificationRule(event: .prOpened), NotificationRule(event: .controlStarted, authors: [.me]), NotificationRule(event: .controlEnded),
+        ])
+        let ignored = "is decided by `[[defaults.notifications]]` only; a project's rule for it is ignored"
+        #expect(result.warnings == [
+            ConfigIssue(line: 6, message: "`control.started` \(ignored)"),
+            ConfigIssue(line: 7, message: "`control.ended` \(ignored)"),
+        ])
     }
 
     @Test("projects and notification rules may be written inline or as blocks")

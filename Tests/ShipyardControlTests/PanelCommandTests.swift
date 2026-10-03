@@ -20,6 +20,7 @@ struct PanelCommandTests {
             support: URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true),
             launcher: RecordingLauncher(),
             transport: transport,
+            processes: FakeProcessTable.agent,
             pause: { _ in }
         ))
         return ShipyardCLI.run(
@@ -31,13 +32,13 @@ struct PanelCommandTests {
     }
 
     @Test("each command sends its one request and prints the app's reply", arguments: [
-        (["open"], ControlRequest.panelOpen, #"{"command":"panel.open","version":1}"#),
-        (["close"], .panelClose, #"{"command":"panel.close","version":1}"#),
-        (["fold", "shop"], .panelFold(project: "shop"), #"{"command":"panel.fold","project":"shop","version":1}"#),
-        (["unfold", "my shop"], .panelUnfold(project: "my shop"), #"{"command":"panel.unfold","project":"my shop","version":1}"#),
+        (["open"], ControlRequest.panelOpen, #"{"command":"panel.open",\#(FakeProcessTable.wire()),"version":2}"#),
+        (["close"], .panelClose, #"{"command":"panel.close",\#(FakeProcessTable.wire()),"version":2}"#),
+        (["fold", "shop"], .panelFold(project: "shop"), #"{"command":"panel.fold",\#(FakeProcessTable.wire()),"project":"shop","version":2}"#),
+        (["unfold", "my shop"], .panelUnfold(project: "my shop"), #"{"command":"panel.unfold",\#(FakeProcessTable.wire()),"project":"my shop","version":2}"#),
         (["show-more", "shop", "pull-requests"], .panelShowMore(project: "shop", kind: "pull-requests"),
-         #"{"command":"panel.showMore","kind":"pull-requests","project":"shop","version":1}"#),
-        (["tab", "All"], .panelTab(name: "All"), #"{"command":"panel.tab","name":"All","version":1}"#),
+         #"{"command":"panel.showMore",\#(FakeProcessTable.wire()),"kind":"pull-requests","project":"shop","version":2}"#),
+        (["tab", "All"], .panelTab(name: "All"), #"{"command":"panel.tab",\#(FakeProcessTable.wire()),"name":"All","version":2}"#),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("done\n"))

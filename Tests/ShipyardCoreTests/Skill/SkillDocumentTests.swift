@@ -197,7 +197,7 @@ struct SkillDocumentTests {
         let text = try skill()
         let flowing = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         // The synopsis is the commands' own, word for word.
-        for usage in [ControlCommand.usageText, PanelCommand.usageText, ScreenshotCommand.usageText] {
+        for usage in [ControlCommand.usageText, PanelCommand.usageText, ScreenshotCommand.usageText, LeaseCommand.usageText] {
             let synopsis = usage.components(separatedBy: "\n\n")[0]
                 .replacingOccurrences(of: "usage: ", with: "")
                 .split(whereSeparator: \.isWhitespace).joined(separator: " ")
@@ -210,6 +210,18 @@ struct SkillDocumentTests {
         ] {
             #expect(text.contains(line), "`\(line)` isn't quoted")
         }
+        // The lease's refusals, in the lease's own words, its times and counts as placeholders.
+        let now = Date(timeIntervalSince1970: 0)
+        let term = ControlLease.Term(
+            holder: Holder(key: "k", name: "<name>", place: "<place>"), taken: now, ends: now.addingTimeInterval(48)
+        )
+        for refusal in [ControlLease.Refusal.inUse(term), .waitedOut(seconds: 30, term), .stopped] {
+            let line = refusal.message(at: now, timeZone: TimeZone(identifier: "UTC")!)
+                .replacing(/\d\d:\d\d:\d\d/, with: "<HH:mm:ss>")
+                .replacing(/\d+s/, with: "<n>s")
+            #expect(text.contains(line), "`\(line)` isn't quoted")
+        }
+        #expect(text.contains("`you hold shipyard until <HH:mm:ss>`") && text.contains("`released shipyard`"))
         #expect(text.contains("<folder>/shipyard/config.toml"))
         #expect(text.contains("**0**") && text.contains("**1**") && text.contains("**2**"))
 
@@ -219,7 +231,7 @@ struct SkillDocumentTests {
         defer { try? FileManager.default.removeItem(at: demo) }
         let environment = CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: [:])
         var taught: Set<String> = []
-        for command in ["app", "panel", "screenshot"] {
+        for command in ["app", "panel", "screenshot", "control"] {
             for words in shellExamples(in: text, command: command) {
                 var arguments = Array(words.dropFirst(2))
                 // A demo folder must exist to read; the example's own is made by its block.
@@ -227,11 +239,12 @@ struct SkillDocumentTests {
                 let reads = switch command {
                 case "app": (try? ControlCommand.parse(arguments, environment: environment).get()) != nil
                 case "panel": (try? PanelCommand.parse(arguments).get()) != nil
+                case "control": (try? LeaseCommand.parse(arguments).get()) != nil
                 default: (try? ScreenshotCommand.parse(arguments, workingDirectory: environment.workingDirectory).get()) != nil
                 }
                 #expect(reads, "\(words) doesn't read")
                 taught.insert(command == "screenshot" ? command : "\(command) \(arguments.first ?? "")")
-                for option in ["--demo", "--json", "--appearance", "--menu-bar-icon"] where arguments.contains(option) {
+                for option in ["--demo", "--json", "--appearance", "--menu-bar-icon", "--with-indicator", "--wait"] where arguments.contains(option) {
                     taught.insert("\(command) \(option)")
                 }
             }
@@ -239,7 +252,8 @@ struct SkillDocumentTests {
         let every: Set<String> = [
             "app open", "app --demo", "app quit", "app status", "app --json",
             "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel tab",
-            "screenshot", "screenshot --appearance", "screenshot --menu-bar-icon",
+            "screenshot", "screenshot --appearance", "screenshot --menu-bar-icon", "screenshot --with-indicator",
+            "control take", "control --wait", "control release",
         ]
         #expect(every.subtracting(taught).isEmpty, "no example for \(every.subtracting(taught).sorted())")
     }
@@ -345,8 +359,8 @@ struct SkillDocumentTests {
         #expect(text.contains("| `[defaults] subsections` | unset |"))
         #expect(c.herdr.terminal == nil)
         #expect(text.contains("| `[herdr] terminal` | unset |"))
-        #expect(c.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
-        #expect(text.contains("| `notifications` | two rules: `pr.opened` and `ping.sent`, each `authors = []` |"))
+        #expect(c.defaults.notifications == [.prOpened, .pingSent, .controlStarted, .controlEnded].map { NotificationRule(event: $0) })
+        #expect(text.contains("| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` |"))
     }
 
     @Test("every choice, event and author filter is listed")

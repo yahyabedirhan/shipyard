@@ -10,7 +10,16 @@ import Testing
 @Suite("The app command")
 struct AppCommandTests {
     static let support = URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true)
-    static let status = AppStatus(version: "0.1.0", panelOpen: false, layout: "tabs", projects: ["shop", "blog"])
+    static let status = AppStatus(version: "0.2.0", panelOpen: false, layout: "tabs", projects: ["shop", "blog"])
+    /// The lease an app hands back when it quits: held by the tests' agent
+    /// (`FakeProcessTable.agent` in `/work`), taken at 1000, ending at 1060.
+    static let held = ControlLease.Term(
+        holder: Holder(key: "process:300@800250000", name: "claude", place: "/work"),
+        taken: Date(timeIntervalSince1970: 1000),
+        ends: Date(timeIntervalSince1970: 1060)
+    )
+    /// `held` as a relaunch hands it over in the launched app's environment.
+    static let handover = #"{"ends":1060,"holder":{"key":"process:300@800250000","name":"claude","place":"/work"},"taken":1000}"#
 
     /// Waits recorded, never slept.
     let pauses = Locked<[TimeInterval]>([])
@@ -33,6 +42,7 @@ struct AppCommandTests {
             support: support,
             launcher: launcher,
             transport: transport,
+            processes: FakeProcessTable.agent,
             pause: { seconds in pauses.withValue { $0.append(seconds) } }
         ))
         return ShipyardCLI.run(
@@ -53,7 +63,8 @@ struct AppCommandTests {
 
         #expect(result == CommandResult(output: Self.status.text))
         let exchange = try #require(app.exchanges.current.only)
-        #expect(String(decoding: exchange.request, as: UTF8.self) == #"{"command":"app.status","json":false,"version":1}"#)
+        #expect(String(decoding: exchange.request, as: UTF8.self)
+            == #"{"command":"app.status",\#(FakeProcessTable.wire()),"json":false,"version":2}"#)
         #expect(exchange.socket.path == "/Users/agent/Library/Application Support/Shipyard/control.sock")
         #expect(exchange.timeout == 15)
     }
@@ -68,14 +79,16 @@ struct AppCommandTests {
         #expect(app.requests == [.appStatus(json: true)])
     }
 
-    @Test("the status reads as lines, or as one JSON object")
+    @Test("the status reads as lines, or as one JSON object, with the lease's holder, place, time left and waiters")
     func statusFormats() {
         let tabs = AppStatus(
-            version: "0.1.0", panelOpen: false, layout: "tabs", tab: "shop", projects: ["shop", "blog"],
-            folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")]
+            version: "0.2.0", panelOpen: false, layout: "tabs", tab: "shop", projects: ["shop", "blog"],
+            folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")],
+            lease: .init(holder: "Claude Code", place: "Herdr pane w1-2", secondsLeft: 48, waiting: 1)
         )
         #expect(tabs.text == """
-            shipyard 0.1.0 is running
+            shipyard 0.2.0 is running
+            lease: Claude Code in Herdr pane w1-2, 48s left, 1 waiting
             panel: closed
             layout: tabs
             tab: shop
@@ -84,12 +97,15 @@ struct AppCommandTests {
             showing all: pull-requests in shop
 
             """)
-        #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
-            + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.1.0"}"# + "\n")
-        // The list layout has no tab: no line, and null in the JSON.
-        let list = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: [])
+        #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","#
+            + #""lease":{"holder":"Claude Code","place":"Herdr pane w1-2","secondsLeft":48,"waiting":1},"#
+            + #""panelOpen":false,"projects":["shop","blog"],"#
+            + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.2.0"}"# + "\n")
+        // The list layout has no tab: no line, and null in the JSON. A free lease is `free`, and null.
+        let list = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: [])
         #expect(list.text == """
-            shipyard 0.1.0 is running
+            shipyard 0.2.0 is running
+            lease: free
             panel: open
             layout: list
             projects: none
@@ -98,6 +114,7 @@ struct AppCommandTests {
 
             """)
         #expect(list.json.contains(#""tab":null"#))
+        #expect(list.json.contains(#""lease":null"#))
     }
 
     @Test("a demo run's status names its folder, as a line and in the JSON")
@@ -106,8 +123,9 @@ struct AppCommandTests {
         demo.demo = "/Users/agent/demo"
 
         #expect(demo.text == """
-            shipyard 0.1.0 is running
+            shipyard 0.2.0 is running
             demo: /Users/agent/demo
+            lease: free
             panel: closed
             layout: tabs
             projects: shop, blog
@@ -116,8 +134,8 @@ struct AppCommandTests {
 
             """)
         #expect(demo.json
-            == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
-            + #""running":true,"showingAll":[],"tab":null,"version":"0.1.0"}"# + "\n")
+            == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","lease":null,"panelOpen":false,"projects":["shop","blog"],"#
+            + #""running":true,"showingAll":[],"tab":null,"version":"0.2.0"}"# + "\n")
     }
 
     // MARK: - Not running, refusals and failures
@@ -155,7 +173,7 @@ struct AppCommandTests {
 
     // MARK: - Open
 
-    @Test("open when the app runs launches nothing and prints its status")
+    @Test("open when the app runs launches nothing, and prints its status through the leased app.open, which renews the lease")
     func openWhenRunning() {
         let launcher = RecordingLauncher()
         let app = FakeTransport(reply: .done(Self.status.text))
@@ -164,6 +182,8 @@ struct AppCommandTests {
 
         #expect(result == CommandResult(output: Self.status.text))
         #expect(launcher.launches.current.isEmpty)
+        #expect(app.requests == [.appOpen])
+        #expect(ControlRequest.appOpen.isLeased)
     }
 
     @Test("open launches the app by bundle id, then looks every quarter second, briefly each time, until it answers")
@@ -182,7 +202,7 @@ struct AppCommandTests {
 
         #expect(result == CommandResult(output: Self.status.text))
         #expect(launcher.launches.current == [.init(bundleID: "com.yahyabedirhan.shipyard", environment: [:])])
-        #expect(app.requests == Array(repeating: .appStatus(json: false), count: 4))
+        #expect(app.requests == [.appOpen] + Array(repeating: .appStatus(json: false), count: 3))
         #expect(app.exchanges.current.map(\.timeout) == [15, 1, 1, 1])
         #expect(pauses.current == [0.25, 0.25, 0.25])
     }
@@ -226,7 +246,9 @@ struct AppCommandTests {
     /// The user's app at `support`'s socket, running until it's asked to
     /// quit (or from the start when `normalRuns` is false, never), and the
     /// demo's at `demo`'s, running once `launcher` launched it with an
-    /// environment, and until it's asked to quit.
+    /// environment, and until it's asked to quit. Each quit hands back the
+    /// agent's lease: `held` from the user's app, and from the demo's
+    /// `held` renewed to 1120.
     func apps(support: URL, demo: URL, launcher: RecordingLauncher) -> FakeTransport {
         let normal = ControlSocket.url(in: support)
         let demoSocket = ControlSocket.url(in: demo.appendingPathComponent("support", isDirectory: true))
@@ -246,14 +268,20 @@ struct AppCommandTests {
                 return .failure(.notRunning)
             }
             if request == .appQuit {
-                if socket == normal { normalRunning.withValue { $0 = false } } else { demoQuit.withValue { $0 = true } }
-                return .success(ControlReply.done("shipyard quit\n").encoded())
+                var lease = Self.held
+                if socket == normal {
+                    normalRunning.withValue { $0 = false }
+                } else {
+                    demoQuit.withValue { $0 = true }
+                    lease.ends = Date(timeIntervalSince1970: 1120)
+                }
+                return .success(ControlReply(ok: true, output: "shipyard quit\n", lease: lease).encoded())
             }
             return .success(ControlReply.done(text).encoded())
         }
     }
 
-    @Test("open --demo quits the running app, points the command at the demo, launches it on the folder and waits for it there")
+    @Test("open --demo quits the running app, points the command at the demo, launches it on the folder with the lease handed over, and waits for it there")
     func openDemo() throws {
         try inFolders { support, demo in
             let launcher = RecordingLauncher()
@@ -269,6 +297,7 @@ struct AppCommandTests {
                 "XDG_CONFIG_HOME": demo.path,
                 "SHIPYARD_SUPPORT_DIR": demoSupport.path,
                 "GH_CONFIG_DIR": "/Users/agent/.config/gh",
+                "SHIPYARD_CONTROL_LEASE": Self.handover,
             ])])
             // The user's app was asked to quit before the launch, and the launched one asked at the demo's socket.
             #expect(app.requests.contains(.appQuit))
@@ -299,7 +328,7 @@ struct AppCommandTests {
         }
     }
 
-    @Test("plain open while a demo runs quits it, removes the pointer and launches the user's app")
+    @Test("plain open while a demo runs quits it, removes the pointer and launches the user's app with the demo's lease handed over")
     func openAfterDemo() throws {
         try inFolders { support, demo in
             let launcher = RecordingLauncher()
@@ -313,7 +342,10 @@ struct AppCommandTests {
 
             let result = shipyard(["app", "open"], transport: app, launcher: launcher, support: support)
 
-            #expect(launcher.launches.current.map(\.environment).last == [:])
+            // No demo variables; the lease as the demo's quit renewed it.
+            #expect(launcher.launches.current.map(\.environment).last == [
+                "SHIPYARD_CONTROL_LEASE": Self.handover.replacingOccurrences(of: #""ends":1060"#, with: #""ends":1120"#),
+            ])
             #expect(DemoPointer.recorded(in: support) == nil)
             let files = try FileManager.default.contentsOfDirectory(atPath: support.path)
             #expect(files.isEmpty)
@@ -322,6 +354,28 @@ struct AppCommandTests {
             // The fake's user app stays quit, so the wait at the user's socket runs out.
             #expect(result == CommandResult(error: "shipyard didn't answer within 10 seconds of launching\n", status: 1))
             #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: support))
+        }
+    }
+
+    @Test("while another agent holds the lease, quit, open and open --demo are refused with its line, exit 1, and nothing is launched",
+          arguments: [["app", "quit"], ["app", "open"], ["app", "open", "--demo"]])
+    func refusedToNonHolder(arguments: [String]) throws {
+        try inFolders { support, demo in
+            let launcher = RecordingLauncher()
+            let inUse = "shipyard is in use by codex in Herdr pane w1-2 until 12:01:00 (48s left); `shipyard control take --wait <seconds>` to queue"
+            // The app answers its free status, and refuses every leased request.
+            let app = FakeTransport { request, _ in
+                request.isLeased
+                    ? .success(ControlReply.refused(inUse).encoded())
+                    : .success(ControlReply.done(Self.status.text).encoded())
+            }
+            let arguments = arguments.last == "--demo" ? arguments + [demo.path] : arguments
+
+            let result = shipyard(arguments, transport: app, launcher: launcher, support: support)
+
+            #expect(result == CommandResult(error: inUse + "\n", status: 1))
+            #expect(launcher.launches.current.isEmpty)
+            #expect(DemoPointer.recorded(in: support) == nil)
         }
     }
 

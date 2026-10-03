@@ -80,6 +80,8 @@ struct PresetTextTests {
             NotificationRule(event: .prOpened, authors: [.others]),
             NotificationRule(event: .issueOpened, authors: [.others]),
             NotificationRule(event: .pingSent),
+            NotificationRule(event: .controlStarted),
+            NotificationRule(event: .controlEnded),
         ])
 
         let reviews = config.settings(for: config.projects[1])

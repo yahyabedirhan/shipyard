@@ -74,8 +74,9 @@ authors = { hide = ["me", "bots"] }
 show = true
 authors = { hide = ["me", "bots"] }
 
-# Notify when someone else opens a pull request or an issue, and when
-# one of your agents sends a ping.
+# Notify when someone else opens a pull request or an issue, when
+# one of your agents sends a ping, and when an agent starts and
+# stops using the shipyard app.
 [[defaults.notifications]]
 event = "pr.opened"
 authors = ["others"]
@@ -86,6 +87,12 @@ authors = ["others"]
 
 [[defaults.notifications]]
 event = "ping.sent"
+
+[[defaults.notifications]]
+event = "control.started"
+
+[[defaults.notifications]]
+event = "control.ended"
 
 # Projects: one [[projects]] block each. owned is every repository
 # your account owns, including ones you create later.

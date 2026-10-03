@@ -16,25 +16,30 @@ enum ScreenshotOutcome: Equatable {
     case failed(why: String)
 }
 
-/// What the control server asks for a `shipyard screenshot`.
+/// What the control server asks for a `shipyard screenshot`. Both leave
+/// the lease's dot and banner out unless `withIndicator` keeps them.
 @MainActor
 protocol Screenshotting: AnyObject {
     /// The panel, opened when it's closed, written as a PNG at `file`, in
     /// `appearance` when it's set (and back to the app's own afterwards).
-    func capturePanel(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome
+    func capturePanel(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome
     /// The menu bar icon alone, as the menu bar draws it in `appearance`
     /// (the Mac's when nil), written as a PNG at `file`. The real menu bar
     /// strip can't be captured, so this is always rendered.
-    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome
+    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome
 }
 
 /// Captures the panel's window through ScreenCaptureKit, limited to this
 /// process's own windows (`SCShareableContent.currentProcess`, macOS
 /// 14.4), which needs no Screen Recording permission. When that fails or
-/// is refused, it renders a fresh panel itself, off screen.
+/// is refused, it renders a fresh panel itself, off screen. Unless asked
+/// to keep them, it hides the lease's dot and banner for the capture
+/// (`LeaseIndicator.hideForCapture()`) and shows them again afterwards
+/// (`showAfterCapture()`), once no other capture still hides them.
 @MainActor
 final class Screenshotter: Screenshotting {
     private let panel: any PanelControlling
+    private let indicator: LeaseIndicator
     /// A panel to render when the window can't be captured, one that
     /// doesn't count as the panel being open.
     private let freshPanel: @MainActor () -> AnyView
@@ -42,15 +47,21 @@ final class Screenshotter: Screenshotting {
     /// appearance, before it's captured.
     private static let settle = Duration.milliseconds(350)
 
-    init(panel: any PanelControlling, freshPanel: @escaping @MainActor () -> AnyView) {
+    init(panel: any PanelControlling, indicator: LeaseIndicator, freshPanel: @escaping @MainActor () -> AnyView) {
         self.panel = panel
+        self.indicator = indicator
         self.freshPanel = freshPanel
     }
 
-    func capturePanel(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
+    func capturePanel(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
         let previous = NSApp.appearance
         if let appearance { NSApp.appearance = ScreenshotImage.appearance(appearance) }
         defer { NSApp.appearance = previous }
+        // Counted, not saved and restored: overlapping captures each end
+        // their own hiding. One asking for the indicator while another
+        // hides it captures without the banner.
+        if !withIndicator { Self.withoutAnimation { indicator.hideForCapture() } }
+        defer { if !withIndicator { Self.withoutAnimation { indicator.showAfterCapture() } } }
 
         let image: CGImage
         let captureFailure: String?
@@ -71,12 +82,23 @@ final class Screenshotter: Screenshotting {
         return Self.write(image, to: file, as: captureFailure.map { .rendered(why: $0) } ?? .captured)
     }
 
-    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
+    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
         let drawing = appearance.map(ScreenshotImage.appearance) ?? NSApp.effectiveAppearance
-        guard let image = await ScreenshotImage.menuBarIcon(appearance: drawing) else {
+        // Rendered, not captured: the live icon keeps its dot meanwhile,
+        // and another capture hiding the indicator doesn't drop it here.
+        let dot = withIndicator && indicator.lease.status(at: Date()) != nil
+        guard let image = await ScreenshotImage.menuBarIcon(appearance: drawing, leaseDot: dot) else {
             return .failed(why: "couldn't render the menu bar icon")
         }
         return Self.write(image, to: file, as: .captured)
+    }
+
+    /// Runs `change` with the panel's animations off, so the banner is gone
+    /// (or back) at once rather than sliding while the panel is captured.
+    private static func withoutAnimation(_ change: () -> Void) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction, change)
     }
 
     /// `outcome` once `image` is written at `file`; failed, naming the
@@ -215,15 +237,23 @@ enum ScreenshotImage {
     }
 
     /// The menu bar icon at the menu bar's size, tinted as the menu bar
-    /// tints its template image in `appearance`: dark in light, white in dark.
-    static func menuBarIcon(appearance: NSAppearance?) async -> CGImage? {
+    /// tints its template image in `appearance`: dark in light, white in
+    /// dark; with the lease's yellow dot beside it when `leaseDot` asks.
+    static func menuBarIcon(appearance: NSAppearance?, leaseDot: Bool = false) async -> CGImage? {
         let isDark = appearance?.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let side = SailboatImage.menuBarSide
-        let icon = Image(nsImage: SailboatImage.menuBar(side: side))
-            .renderingMode(.template)
-            .foregroundStyle(isDark ? Color.white : Color.black)
-            .frame(width: side, height: side)
-        return await render(AnyView(icon), appearance: appearance, opaque: false)
+        let icon: AnyView
+        if leaseDot {
+            // In its own colours, the sailboat tinted for the appearance it's drawn in.
+            let image = LeaseDot.image(on: .sailboat)
+            icon = AnyView(Image(nsImage: image).frame(width: image.size.width, height: image.size.height))
+        } else {
+            icon = AnyView(Image(nsImage: SailboatImage.menuBar(side: side))
+                .renderingMode(.template)
+                .foregroundStyle(isDark ? Color.white : Color.black)
+                .frame(width: side, height: side))
+        }
+        return await render(icon, appearance: appearance, opaque: false)
     }
 
     /// `image` written as a PNG at `file`, replacing what's there.

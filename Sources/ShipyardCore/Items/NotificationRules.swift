@@ -18,6 +18,30 @@ public enum NotificationRules {
         }
     }
 
+    /// Whether app control's `notice` is notified: only the top-level rules
+    /// decide it (`[[defaults.notifications]]`, or the built-in list when
+    /// the file has none). A project's own list never does, and a rule's
+    /// `authors` don't apply, since no item's author sends it.
+    public static func shouldNotify(_ notice: ControlNotice, configuration: Configuration) -> Bool {
+        configuration.defaults.notifications.contains { $0.event == notice.event }
+    }
+
+    /// What to post for `notice` at `now`: titled "Claude Code is using
+    /// shipyard" over its place, or "… is done with shipyard" over why. It
+    /// belongs to no project, and clicking it opens the panel
+    /// (`ControlNotice.panelURL`).
+    public static func notification(for notice: ControlNotice, at now: Date) -> PostedNotification {
+        PostedNotification(
+            // Unique per lease change, so one never replaces another.
+            id: "\(notice.event.rawValue) \(Int64((now.timeIntervalSince1970 * 1000).rounded()))",
+            event: notice.event,
+            project: "",
+            headline: notice.headline,
+            itemTitle: notice.body,
+            itemURL: ControlNotice.panelURL
+        )
+    }
+
     /// What to post for `event`, in the project it's notified for. A
     /// ping's is titled with the project and its title, over its body and sender.
     public static func notification(for event: Event) -> PostedNotification {

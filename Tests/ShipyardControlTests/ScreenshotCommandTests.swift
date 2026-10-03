@@ -19,6 +19,7 @@ struct ScreenshotCommandTests {
             support: URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true),
             launcher: RecordingLauncher(),
             transport: transport,
+            processes: FakeProcessTable.agent,
             pause: { _ in }
         ))
         return ShipyardCLI.run(
@@ -29,13 +30,19 @@ struct ScreenshotCommandTests {
         )
     }
 
-    @Test("the request names an absolute path, the appearance and whether it's the menu bar icon", arguments: [
-        (["/tmp/x.png"], ControlRequest.screenshot(path: "/tmp/x.png", appearance: nil, menuBarIcon: false),
-         #"{"command":"screenshot","menuBarIcon":false,"path":"\/tmp\/x.png","version":1}"#),
-        (["shots/x.PNG", "--appearance", "dark"], .screenshot(path: "/work/shop/shots/x.PNG", appearance: .dark, menuBarIcon: false),
-         #"{"appearance":"dark","command":"screenshot","menuBarIcon":false,"path":"\/work\/shop\/shots\/x.PNG","version":1}"#),
-        (["--menu-bar-icon", "--appearance", "light", "../icon.png"], .screenshot(path: "/work/icon.png", appearance: .light, menuBarIcon: true),
-         #"{"appearance":"light","command":"screenshot","menuBarIcon":true,"path":"\/work\/icon.png","version":1}"#),
+    @Test("the request names an absolute path, the appearance, whether it's the menu bar icon and whether the indicator stays", arguments: [
+        (["/tmp/x.png"], ControlRequest.screenshot(path: "/tmp/x.png", appearance: nil, menuBarIcon: false, withIndicator: false),
+         #"{"command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":false,"path":"\/tmp\/x.png","version":2,"withIndicator":false}"#),
+        (["shots/x.PNG", "--appearance", "dark"],
+         .screenshot(path: "/work/shop/shots/x.PNG", appearance: .dark, menuBarIcon: false, withIndicator: false),
+         #"{"appearance":"dark","command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":false,"path":"\/work\/shop\/shots\/x.PNG","version":2,"withIndicator":false}"#),
+        (["--menu-bar-icon", "--appearance", "light", "../icon.png"],
+         .screenshot(path: "/work/icon.png", appearance: .light, menuBarIcon: true, withIndicator: false),
+         #"{"appearance":"light","command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":true,"path":"\/work\/icon.png","version":2,"withIndicator":false}"#),
+        (["/tmp/x.png", "--with-indicator"], .screenshot(path: "/tmp/x.png", appearance: nil, menuBarIcon: false, withIndicator: true),
+         #"{"command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":false,"path":"\/tmp\/x.png","version":2,"withIndicator":true}"#),
+        (["--with-indicator", "--menu-bar-icon", "/tmp/i.png"], .screenshot(path: "/tmp/i.png", appearance: nil, menuBarIcon: true, withIndicator: true),
+         #"{"command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":true,"path":"\/tmp\/i.png","version":2,"withIndicator":true}"#),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("/tmp/x.png\n"))
@@ -89,7 +96,9 @@ struct ScreenshotCommandTests {
         let app = FakeTransport(reply: .done(""))
 
         #expect(shipyard("screenshot", "--help", transport: app) == CommandResult(output: ScreenshotCommand.usageText))
-        #expect(shipyard("--help", transport: app).output.contains("shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]"))
+        let help = shipyard("--help", transport: app).output
+        #expect(help.contains("shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]\n"))
+        #expect(help.contains("[--with-indicator]"))
         #expect(app.exchanges.current.isEmpty)
     }
 
