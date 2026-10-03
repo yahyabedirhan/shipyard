@@ -204,11 +204,13 @@ struct ControlServerTests {
         #expect(panel.calls.isEmpty)
     }
 
-    @Test("a request of another version, without a holder, of an unknown command or not JSON is refused with a reply that says so", arguments: [
+    @Test("a request of another version, without a holder, of an unknown command, with a negative wait or not JSON is refused with a reply that says so", arguments: [
         (#"{"version":1,"command":"panel.open"}"#,
          "the shipyard command speaks control version 1 and the app version 2: reinstall shipyard so both come from one build"),
         (#"{"version":2,"command":"panel.open"}"#, "the control command `panel.open` needs its `holder`"),
         (#"{"version":2,"command":"app.spin",\#(ControlServerTests.agentWire)}"#, "the app doesn't know the control command `app.spin`"),
+        (#"{"version":2,"command":"control.take",\#(ControlServerTests.agentWire),"waitSeconds":-1}"#,
+         "the control command `control.take` needs a `waitSeconds` of 0 or more, not -1"),
         ("status please", "the request isn't a control request"),
     ])
     func refused(request: String, why: String) async {
@@ -307,7 +309,89 @@ struct ControlServerTests {
         #expect(text.reply.output.contains("lease: Claude Code in /work, 48s left, 0 waiting\n"))
     }
 
+    @Test("take holds the lease to the cap and says until when; release frees it, and from anyone else changes nothing")
+    func takeAndRelease() async {
+        let server = server()
+
+        let taken = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent())
+        clock.now = Date(timeIntervalSince1970: 10)
+        let refused = await server.reply(to: ControlRequest.controlTake(waitSeconds: nil).sent(by: Self.other))
+        let notTheirs = await server.reply(to: ControlRequest.controlRelease.sent(by: Self.other))
+        let stillHeld = server.lease.current(at: clock.now)?.holder
+        let released = await server.reply(to: ControlRequest.controlRelease.sent())
+
+        #expect(taken == .init(reply: .done("you hold shipyard until 00:05:00\n")))
+        #expect(refused == .init(reply: .refused(
+            "shipyard is in use by Claude Code in /work until 00:05:00 (290s left); `shipyard control take --wait <seconds>` to queue"
+        )))
+        #expect(notTheirs == .init(reply: .done("released shipyard\n")))
+        #expect(stillHeld == Self.agent)
+        #expect(released == .init(reply: .done("released shipyard\n")))
+        #expect(server.lease.current(at: clock.now) == nil)
+        #expect(panel.calls.isEmpty)
+    }
+
+    @Test("a take whose wait runs out is refused with who still holds the lease, and leaves the line")
+    func waitRunsOut() async {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+
+        let waited = await server.reply(to: ControlRequest.controlTake(waitSeconds: 1).sent(by: Self.other))
+
+        #expect(waited == .init(reply: .refused("waited 1s; shipyard is still in use by Claude Code in /work until 00:01:00 (59s left)")))
+        #expect(server.lease.status(at: clock.now)?.waiting == 0)
+        #expect(server.lease.current(at: clock.now)?.holder == Self.agent)
+    }
+
+    @Test("when the lease runs out with no request, the first waiting take gets it; the dot and the banner show the line, then the waiter")
+    func waiterGetsTheLeaseAtItsEnd() async throws {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        let waiting = Task { await server.reply(to: ControlRequest.controlTake(waitSeconds: 120).sent(by: Self.other)) }
+        for _ in 0..<200 where server.lease.waiting(at: clock.now) != 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let line = indicator.shown(at: clock.now)
+
+        // Its end comes with no request: the server's timer settles it.
+        clock.now = Date(timeIntervalSince1970: 60)
+        server.settleLease()
+        let granted = await waiting.value
+
+        #expect(line?.waiting == 1)
+        #expect(granted == .init(reply: .done("you hold shipyard until 00:06:00\n")))
+        #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 0))
+    }
+
     // MARK: - The socket
+
+    @Test("over the socket, a take waiting in line keeps its connection while others are answered, and gets the lease on release")
+    func waitingTake() async throws {
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let server = server(socket: socket)
+        try server.start()
+        defer { server.stop() }
+        let holder = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
+        let waiter = ControlClient(socket: socket, holder: Self.other, transport: UnixSocketTransport())
+
+        let taken = await Task.detached { holder.send(.controlTake(waitSeconds: nil)) }.value
+        #expect(taken == .success(.done("you hold shipyard until 00:05:00\n")))
+        // The clients block while they wait, so they run off the main actor the server answers on.
+        let waiting = Task.detached { waiter.send(.controlTake(waitSeconds: 30)) }
+        for _ in 0..<200 where server.lease.status(at: clock.now)?.waiting != 1 {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let status = await Task.detached { holder.send(.appStatus(json: false)) }.value
+        clock.now = Date(timeIntervalSince1970: 12)
+        let released = await Task.detached { holder.send(.controlRelease) }.value
+        let granted = await waiting.value
+
+        guard case .success(let reply) = status else { Issue.record("no status: \(status)"); return }
+        #expect(reply.output.contains("lease: Claude Code in /work, 300s left, 1 waiting\n"))
+        #expect(released == .success(.done("released shipyard\n")))
+        #expect(granted == .success(.done("you hold shipyard until 00:05:12\n")))
+        #expect(server.lease.current(at: clock.now)?.holder == Self.other)
+    }
 
     @Test("the socket replaces a leftover file, is the user's own, answers the client, and is gone after stop")
     func socket() async throws {

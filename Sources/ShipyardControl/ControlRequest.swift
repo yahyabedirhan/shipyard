@@ -36,6 +36,13 @@ public enum ControlRequest: Equatable, Sendable {
     /// it otherwise. The lease's dot and banner are left out of it unless
     /// `withIndicator` keeps them.
     case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
+    /// `shipyard control take [--wait <seconds>]`: the lease held until its
+    /// cap. While another agent holds it, refused at once, or with
+    /// `waitSeconds`, answered once it's this agent's or the wait runs out.
+    case controlTake(waitSeconds: Int?)
+    /// `shipyard control release`: the lease given up, when this agent
+    /// holds it.
+    case controlRelease
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -47,11 +54,22 @@ public enum ControlRequest: Equatable, Sendable {
     /// on every request.
     public static let version = 2
 
-    /// Whether the request needs the lease (`ControlLease`). Only
-    /// `app.status` doesn't: it changes nothing, and reports the lease.
+    /// Whether the request needs the lease (`ControlLease`) before it's
+    /// answered. `app.status` doesn't: it changes nothing, and reports the
+    /// lease. Nor do `control.take` and `control.release`, which are the
+    /// lease's own requests.
     public var isLeased: Bool {
-        if case .appStatus = self { return false }
-        return true
+        switch self {
+        case .appStatus, .controlTake, .controlRelease: false
+        default: true
+        }
+    }
+
+    /// How long the app may keep the request before it answers, past the
+    /// client's usual timeout: a `take`'s wait in line.
+    public var wait: TimeInterval {
+        if case .controlTake(let seconds?) = self { return TimeInterval(seconds) }
+        return 0
     }
 }
 
@@ -99,6 +117,10 @@ public struct ControlMessage: Equatable, Sendable {
                 command: "screenshot", path: path, appearance: appearance?.rawValue,
                 menuBarIcon: menuBarIcon, withIndicator: withIndicator
             )
+        case .controlTake(let waitSeconds):
+            wire = Wire(command: "control.take", waitSeconds: waitSeconds)
+        case .controlRelease:
+            wire = Wire(command: "control.release")
         }
         wire.holder = holder
         let encoder = JSONEncoder()
@@ -153,6 +175,12 @@ public struct ControlMessage: Equatable, Sendable {
                 path: path, appearance: appearance,
                 menuBarIcon: wire.menuBarIcon ?? false, withIndicator: wire.withIndicator ?? false
             )
+        case "control.take":
+            if let seconds = wire.waitSeconds, seconds < 0 {
+                throw .unreadable("the control command `control.take` needs a `waitSeconds` of 0 or more, not \(seconds)")
+            }
+            return .controlTake(waitSeconds: wire.waitSeconds)
+        case "control.release": return .controlRelease
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -172,6 +200,7 @@ public struct ControlMessage: Equatable, Sendable {
         var appearance: String?
         var menuBarIcon: Bool?
         var withIndicator: Bool?
+        var waitSeconds: Int?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.

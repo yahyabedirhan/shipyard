@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardCommand
 
-/// App control's commands for the Mac's `CommandTable`: `app`, `panel` and `screenshot`, asking the
+/// App control's commands for the Mac's `CommandTable`: `app`, `panel`, `screenshot` and `control`, asking the
 /// app whose support folder is `support` over `transport`, and launching
 /// it with `launcher`. Each request is sent as the holder `Holder.find`
 /// works out from the command's environment and `processes`.
@@ -44,6 +44,17 @@ public enum ControlCommands {
                 case .failure(let result): result
                 }
             },
+            CommandTable.Entry(name: "control", help: controlHelp) { arguments, environment, _ in
+                switch LeaseCommand.parse(arguments) {
+                case .success(let invocation):
+                    var context = context(environment)
+                    // `--key` names the holder for this command only.
+                    if let key = invocation.key { context.client.holder.key = key }
+                    return ControlCommand.run(.send(invocation.request), context: context)
+                case .failure(let result):
+                    return result
+                }
+            },
         ]
     }
 
@@ -65,6 +76,12 @@ public enum ControlCommands {
                   save the app's panel, or its menu bar icon, as a PNG:
                   shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
                                       [--with-indicator]
+
+        """
+
+    static let controlHelp = """
+          control hold shipyard for a run of app control steps, or give it up:
+                  shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 
         """
 }

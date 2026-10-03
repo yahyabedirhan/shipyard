@@ -38,6 +38,7 @@ struct HolderTests {
     static let commands = [
         ["app", "status"], ["app", "status", "--json"], ["app", "open"], ["panel", "open"], ["panel", "fold", "shop"],
         ["screenshot", "/tmp/x.png"], ["screenshot", "/tmp/i.png", "--menu-bar-icon"],
+        ["control", "take"], ["control", "take", "--wait", "30"], ["control", "release"],
     ]
 
     @Test("in a Claude Code session, every command is sent as that session, whatever process runs it", arguments: commands)
@@ -87,5 +88,18 @@ struct HolderTests {
         let sent = holders(["panel", "open"], variables: ["HERDR_PANE_ID": "w1-2", "CLAUDE_CODE_SESSION_ID": "5f1c"])
 
         #expect(sent == [Holder(key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "Herdr pane w1-2")])
+    }
+
+    @Test("--key names the holder's key for that command only; its name and place stay the ones worked out")
+    func key() {
+        let session = ["CLAUDE_CODE_SESSION_ID": "5f1c"]
+
+        let taken = holders(["control", "take", "--key", "my-run", "--wait", "5"], variables: session)
+        let released = holders(["control", "release", "--key", "my-run"], variables: session)
+        let next = holders(["panel", "open"], variables: session)
+
+        #expect(taken == [Holder(key: "my-run", name: "Claude Code", place: "/work/shop")])
+        #expect(released == taken)
+        #expect(next == [Holder(key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "/work/shop")])
     }
 }

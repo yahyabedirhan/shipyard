@@ -62,7 +62,7 @@ public struct ControlClient: Sendable {
     public var holder: Holder
     public var transport: any ControlTransport
     /// How long to wait for the reply. A screenshot may render the panel,
-    /// so it's generous.
+    /// so it's generous; a `take` that waits in line adds its wait.
     public var timeout: TimeInterval
 
     public static let defaultTimeout: TimeInterval = 15
@@ -85,6 +85,7 @@ public struct ControlClient: Sendable {
 
     public func send(_ request: ControlRequest) -> Result<ControlReply, Failure> {
         let data: Data
+        let timeout = timeout + request.wait
         do throws(ControlTransportFailure) {
             data = try transport.exchange(ControlMessage(request, holder: holder).encoded(), socket: socket, timeout: timeout)
         } catch {

@@ -38,7 +38,20 @@ final class ControlServer {
     let indicator: LeaseIndicator
     /// Ends the lease once it runs out, when no request comes to.
     private var settling: Task<Void, Never>?
+    /// The `take`s waiting in line, each holding its connection open until
+    /// it gets the lease or its wait runs out.
+    private var waiters: [UUID: Waiter] = [:]
     private var listener: Listener?
+
+    /// A `take` waiting in line: who sent it, how long it waits, and how it
+    /// gets its answer.
+    private struct Waiter {
+        var holder: Holder
+        var seconds: Int
+        var answer: CheckedContinuation<Answer, Never>
+        /// Ends the wait when it runs out; cancelled once it's answered.
+        var timeout: Task<Void, Never>?
+    }
 
     init(
         socket: URL,
@@ -68,7 +81,9 @@ final class ControlServer {
     /// The answer to one request as the client sent it. A leased request
     /// asks the lease first: refused for anyone but its holder, with
     /// nothing done. A quit hands the lease back in its reply, for a
-    /// relaunch to pass on.
+    /// relaunch to pass on. A `take` that waits in line is answered once it
+    /// gets the lease or its wait runs out, other requests answered
+    /// meanwhile.
     func reply(to data: Data) async -> Answer {
         let message: ControlMessage
         do throws(ControlProtocolError) {
@@ -85,6 +100,12 @@ final class ControlServer {
             }
         }
         switch message.request {
+        case .controlTake(let seconds):
+            return await take(by: message.holder, waiting: seconds)
+        case .controlRelease:
+            // The next waiter's take is answered as the lease changes (`leaseChanged`).
+            _ = lease.release(by: message.holder, at: now())
+            return Answer(reply: .done("released shipyard\n"))
         case .appStatus(let json):
             let status = status()
             return Answer(reply: .done(json ? status.json : status.text))
@@ -130,22 +151,76 @@ final class ControlServer {
         return status
     }
 
+    // MARK: - Taking turns
+
+    /// `control take`: held to the cap at once when the lease is the
+    /// holder's or free. While another holds it, refused at once without a
+    /// wait; with one, the take waits in line, suspended so the main actor
+    /// answers other requests (the holder's release among them), until
+    /// `leaseChanged` finds the lease handed to it or its wait runs out.
+    private func take(by holder: Holder, waiting seconds: Int?) async -> Answer {
+        let time = now()
+        let decision = lease.take(by: holder, at: time, waitingUntil: seconds.map { time.addingTimeInterval(TimeInterval($0)) })
+        switch decision.answer {
+        case .success(let term):
+            return Answer(reply: .done(term.held(timeZone: timeZone) + "\n"))
+        case .failure(.queued):
+            break
+        case .failure(let refusal):
+            return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
+        }
+        // Queued only with a wait after now.
+        let seconds = seconds ?? 0
+        let deadline = time.addingTimeInterval(TimeInterval(seconds))
+        let ticket = UUID()
+        return await withCheckedContinuation { continuation in
+            let timeout = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .seconds(seconds)) } catch { return }
+                self?.waitRanOut(ticket, deadline: deadline)
+            }
+            waiters[ticket] = Waiter(holder: holder, seconds: seconds, answer: continuation, timeout: timeout)
+        }
+    }
+
+    /// A waiting `take`'s wait ran out (unless it was answered already): it
+    /// leaves the line, refused with who still holds the lease, or holding
+    /// it should it be free by now.
+    private func waitRanOut(_ ticket: UUID, deadline: Date) {
+        guard let waiter = waiters.removeValue(forKey: ticket) else { return }
+        // Never before the deadline the take was given, whatever the clock says.
+        let time = max(now(), deadline)
+        switch lease.giveUp(by: waiter.holder, waited: waiter.seconds, at: time).answer {
+        case .success(let term):
+            waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+        case .failure(let refusal):
+            waiter.answer.resume(returning: Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone))))
+        }
+    }
+
     // MARK: - The lease's end
 
-    /// Ends the lease if it has run out by now. A timer calls it at the
-    /// lease's end, so the dot and the banner go with no request.
+    /// Ends the lease if it has run out by now, handing it to the first
+    /// waiter in line. A timer calls it at the lease's end, so the dot and
+    /// the banner go, and the waiter gets it, with no request.
     func settleLease() {
         _ = lease.settle(at: now())
     }
 
-    /// Shows the lease as it is now, and looks out for its end: the timer
-    /// set for the last change is replaced by one for this one.
+    /// The one place a change to the lease is applied: it's shown as it is
+    /// now, a holder that got it from the line has its waiting `take`s
+    /// answered, and its end is looked out for, the timer set for the last
+    /// change replaced by one for this one.
     private func leaseChanged() {
         if indicator.lease != lease { indicator.lease = lease }
         settling?.cancel()
         settling = nil
         let time = now()
         guard let term = lease.current(at: time) else { return }
+        for (ticket, waiter) in waiters where waiter.holder.key == term.holder.key {
+            waiters[ticket] = nil
+            waiter.timeout?.cancel()
+            waiter.answer.resume(returning: Answer(reply: .done(term.held(timeZone: timeZone) + "\n")))
+        }
         let left = term.ends.timeIntervalSince(time)
         settling = Task { [weak self] in
             // A wake before the end settles nothing, and sets the timer again.
@@ -187,6 +262,12 @@ final class ControlServer {
         listener = nil
         settling?.cancel()
         settling = nil
+        // A take waiting in line hears why, rather than a dropped connection.
+        for waiter in waiters.values {
+            waiter.timeout?.cancel()
+            waiter.answer.resume(returning: Answer(reply: .refused("shipyard is quitting")))
+        }
+        waiters = [:]
     }
 }
 
