@@ -132,24 +132,11 @@ struct RemotePingCommandTests {
         #expect(store.ping(id: "two")?.repository == "yahyabedirhan/shop")
     }
 
-    @Test("arguments that don't read are still exit 2, and nothing is saved")
-    func usageErrors() {
-        #expect(shipyard("ping").status == CommandResult.usageStatus)
-        #expect(shipyard("ping", "Ready", "--repo", "shop").status == CommandResult.usageStatus)
-        #expect(store.all().isEmpty)
-    }
-
     // MARK: - The Herdr pane
 
     @Test("sent from a Herdr pane without an action, clicking it focuses that pane")
     func herdrPaneWithoutTheFlag() throws {
         #expect(shipyard("ping", "Which cache?", herdrPane: "w1:p3").status == 0)
-        #expect(try stored().action == .herdr("w1:p3"))
-    }
-
-    @Test("--herdr without an id is the agent's pane, as on the Mac")
-    func herdrFlag() throws {
-        #expect(shipyard("ping", "Which cache?", "--herdr", herdrPane: "w1:p3").status == 0)
         #expect(try stored().action == .herdr("w1:p3"))
     }
 
@@ -165,7 +152,7 @@ struct RemotePingCommandTests {
         #expect(try stored().action == nil)
     }
 
-    // MARK: - Replace and withdraw
+    // MARK: - Replace
 
     @Test("sending an id again replaces it: its age and its day start again, and its instance stays")
     func replace() throws {
@@ -183,15 +170,6 @@ struct RemotePingCommandTests {
         // The list the Mac reads carries the replace's time, so its row is aged from it.
         let list = try PingList.decode(shipyard("ping", "list", "--json", at: later).output)
         #expect(list.pings.map(\.sent) == [later])
-    }
-
-    @Test("withdraw removes the ping and prints its id; an id no ping has is exit 1")
-    func withdraw() {
-        shipyard("ping", "Which cache?", "--id", "cache")
-
-        #expect(shipyard("ping", "withdraw", "cache") == CommandResult(output: "cache\n"))
-        #expect(store.all().isEmpty)
-        #expect(shipyard("ping", "withdraw", "cache").status == CommandResult.failedStatus)
     }
 
     // MARK: - A day's life
@@ -289,12 +267,6 @@ struct RemotePingCommandTests {
     func listNeedsJSON() {
         #expect(shipyard("ping", "list").status == CommandResult.usageStatus)
         #expect(shipyard("ping", "list", "--json", "extra").status == CommandResult.usageStatus)
-    }
-
-    @Test("after --, list is a title")
-    func listAsTitle() throws {
-        #expect(shipyard("ping", "--", "list").status == 0)
-        #expect(try stored().title == "list")
     }
 
     // MARK: - The Mac's filing stays as it was

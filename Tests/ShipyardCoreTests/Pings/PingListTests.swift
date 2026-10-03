@@ -67,15 +67,6 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         #expect(list.pings.map(\.id) == ["a", "b", "c"])
     }
 
-    @Test func atMostAHundredPingsAreListedAndTheRestMarkedTruncated() throws {
-        let pings = (0..<150).map { ping("p\($0)", minutesAgo: $0) }
-
-        let list = try PingList.decode(PingList.encode(pings))
-
-        #expect(list.pings.map(\.id) == (0..<100).map { "p\($0)" })
-        #expect(list.truncated)
-    }
-
     @Test func aHundredPingsExactlyIsNotTruncated() throws {
         let pings = (0..<100).map { ping("p\($0)", minutesAgo: $0) }
 

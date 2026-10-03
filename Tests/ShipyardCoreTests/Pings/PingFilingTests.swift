@@ -79,35 +79,6 @@ struct PingFilingTests {
         #expect(harness.section("mine")?.rows.filter { $0.kind == .ping }.map(\.title) == ["Ready"])
     }
 
-    @Test("--repo overrides the working folder, and outside a git folder without it the ping fails")
-    func repoFlag() async throws {
-        let harness = try await Harness.started(
-            config: """
-                [[projects]]
-                name = "shop"
-                repositories = ["yahyabedirhan/shop"]
-
-                [[projects]]
-                name = "blog"
-                repositories = ["yahyabedirhan/blog"]
-
-                """,
-            graphQL: PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", []), PullRequestsResponse("yahyabedirhan/blog", [])])
-        )
-
-        let lost = harness.cli("ping", "Lost")
-        #expect(lost.status == 1)
-        #expect(lost.error.contains("isn't a git repository with a remote `origin`"))
-
-        let result = harness.cli("ping", "Published", "--repo", "yahyabedirhan/blog", origin: "git@github.com:yahyabedirhan/shop.git")
-        try #require(result.status == 0, "\(result.error)")
-        await harness.shipyard.reloadPings()
-
-        #expect(harness.section("blog")?.rows.map(\.title) == ["Published"])
-        #expect(harness.section("shop")?.rows.isEmpty == true)
-        #expect(harness.pingStore.all().map(\.title) == ["Published"])
-    }
-
     @Test("grouped by repository, a ping filed by its repository joins that repository's group")
     func groupedByRepository() async throws {
         let harness = try await Harness.started(

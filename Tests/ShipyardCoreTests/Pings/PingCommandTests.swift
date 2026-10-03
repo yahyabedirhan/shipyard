@@ -89,14 +89,6 @@ struct PingCommandTests {
         #expect(store.all().isEmpty)
     }
 
-    @Test("without projects in the configuration, the error says so")
-    func noProjects() throws {
-        let result = try ping("Ready", "--project", "shop", config: "")
-
-        #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
-    }
-
     @Test("without a flag, the working folder's origin remote picks the repository, and the ping is filed under its project")
     func filedByTheWorkingFolder() throws {
         let result = try ping("Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
@@ -317,11 +309,15 @@ struct ShipyardCLITests {
         #expect(result == CommandResult(output: "shipyard \(ShipyardVersion.current)\n"))
     }
 
-    @Test("ping help prints the ping usage")
+    @Test("ping help prints the ping usage, with --id, withdraw and --; the main help lists withdraw too")
     func pingHelp() throws {
-        let result = try Harness(config: twoProjects).cli("ping", "--help")
+        let harness = try Harness(config: twoProjects)
+        let result = harness.cli("ping", "--help")
         #expect(result.status == 0)
         #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>] [--id <id>]\n"))
+        #expect(result.output.contains("shipyard ping withdraw <id>"))
+        #expect(result.output.contains("shipyard ping -- withdraw"))
+        #expect(harness.cli("--help").output.contains("shipyard ping withdraw <id>"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")

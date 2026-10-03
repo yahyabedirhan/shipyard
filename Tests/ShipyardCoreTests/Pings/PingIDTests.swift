@@ -311,15 +311,17 @@ struct PingIDTests {
 
     // MARK: --
 
-    @Test("after --, everything is the title: withdraw, or a word starting with --")
+    @Test("after --, everything is the title: withdraw, list, or a word starting with --")
     func endOfOptions() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
 
         try await harness.send("--project", "shop", "--id", "word", "--", "withdraw")
+        try await harness.send("--project", "shop", "--id", "listing", "--", "list")
         try await harness.send("--project", "shop", "--id", "flag", "--", "--help")
         try await harness.send("--project", "shop", "--id", "dashes", "--", "--")
 
         #expect(harness.pingStore.ping(id: "word")?.title == "withdraw")
+        #expect(harness.pingStore.ping(id: "listing")?.title == "list")
         #expect(harness.pingStore.ping(id: "flag")?.title == "--help")
         // Only the first -- ends the flags; a second is the title.
         #expect(harness.pingStore.ping(id: "dashes")?.title == "--")
@@ -333,16 +335,5 @@ struct PingIDTests {
 
         #expect(result.status == 2)
         #expect(result.error == "shipyard ping: one title only; quote it: shipyard ping \"-- --id\"\n")
-    }
-
-    @Test("the help shows --id, withdraw and --")
-    func help() throws {
-        let harness = try Harness(config: shopAndBlog)
-
-        let ping = harness.cli("ping", "--help").output
-        #expect(ping.contains("[--id <id>]"))
-        #expect(ping.contains("shipyard ping withdraw <id>"))
-        #expect(ping.contains("shipyard ping -- withdraw"))
-        #expect(harness.cli("--help").output.contains("shipyard ping withdraw <id>"))
     }
 }
