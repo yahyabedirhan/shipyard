@@ -124,8 +124,12 @@ _Avoid_: Alert, subscription, watch
 ### Settings and state
 
 **Configuration**:
-The user's choice of what shipyard shows and when it notifies: projects, item kinds, windows, refresh interval, notification rules. It lives in one file that the user and their agents edit.
+The user's choice of what the app shows and when it notifies: projects, item kinds, windows, refresh interval, notification rules. It lives in one file on the Mac, `config.toml`, that the user and their agents edit, and only the app acts on it.
 _Avoid_: Settings, preferences, state
+
+**CLI settings**:
+What the `shipyard` command does on the machine it runs on, such as which Mac it sends notices to. They live in `cli.toml` on every machine, beside `config.toml` on the Mac, and only the command reads them. No setting is in both files. A missing file means the defaults; one that doesn't read stops the command that needs it.
+_Avoid_: Configuration (the app's), CLI config, preferences
 
 **App state**:
 What shipyard remembers on its own from how the user uses it, such as collapsed sections and which items have been seen. Never written to the configuration.

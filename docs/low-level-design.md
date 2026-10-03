@@ -2,11 +2,12 @@
 
 Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003). Terms are the ones in `GLOSSARY.md`; the configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`; facts about GitHub's API are in `docs/references/`. The module split agreed for 0.1.0 (effort `clean-slate`, spec #160) is ADR 0006 and [Modules and what each build links](#modules-and-what-each-build-links). When the code and this document disagree, fix one of them in the same change.
 
-**For a newcomer, in one screen.** Shipyard is one Swift package that builds the menu bar app (`Shipyard.app`) and the `shipyard` command agents use. Its code is split into six modules by concern (ADR 0006): what any command needs (ShipyardCommand), the agent's side of pings (ShipyardPings), reading `config.toml` (ShipyardConfig), the client side of app control (ShipyardControl), the app's rules (ShipyardCore) and the macOS app itself (ShipyardApp). Each build links only what it uses:
+**For a newcomer, in one screen.** Shipyard is one Swift package that builds the menu bar app (`Shipyard.app`) and the `shipyard` command agents use. Its code is split into seven modules by concern (ADR 0006): what any command needs (ShipyardCommand), the agent's side of pings (ShipyardPings), reading the command's own `cli.toml` (ShipyardCLISettings, ADR 0008), reading the app's `config.toml` (ShipyardConfig), the client side of app control (ShipyardControl), the app's rules (ShipyardCore) and the macOS app itself (ShipyardApp). Each build links only what it uses:
 
 ```text
 ShipyardCommand   foundation: CommandResult, CommandEnvironment, CommandTable, ShipyardVersion, GitRemote, HerdrCommand, RecordStore, SupportFolder
 ShipyardPings     agent side: Ping, PingStore, PingCommand, PingList, HerdrEvent, PingFiling + Unfiled
+ShipyardCLISettings  agent side: CLISettings (cli.toml: [notify]), CLISettingsFile (where it is, reading it)
 ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, WindowDuration, LayoutSetting, ConfigStore,
                   ResolvedRepositoriesStore, ProjectFiling (implements PingFiling)
 ShipyardControl   ControlRequest, ControlReply, ControlCommand and PanelCommand (argument parsing), ControlClient (socket), AppLauncher,
@@ -15,8 +16,8 @@ ShipyardCore      the app's rules only (GitHub, items, menu, state and AppFiles,
                   plus the Mac's side of pings: RemotePingReader, RemoteMachines, RemotePingMarks, PingNumbers, KnownAgent, HerdrFocus
 ShipyardApp       the Apple-framework layer, plus Control/: ControlServer, LeaseIndicator, PanelControl, PanelState, Screenshotter
 
-shipyard on Linux  → Command + Pings                       (files nothing: Unfiled)
-shipyard on macOS  → Command + Pings + Config + Control    (files by project: ProjectFiling; never Core)
+shipyard on Linux  → Command + Pings + CLISettings                       (files nothing: Unfiled)
+shipyard on macOS  → Command + Pings + CLISettings + Config + Control    (files by project: ProjectFiling; never Core)
 Shipyard.app       → everything
 ```
 
@@ -70,7 +71,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | R8 | An open item **needs attention** when it is unseen, changed since seen (commits, comments, reviews, checks, review request), requests the user's review, or has failed checks. Closed items never do. |
 | R9 | Send macOS notifications for **events** matched by **notification rules** (event + scope + author selectors, F2). Default: `pr.opened`, any author, all projects; since 0.0.5 `ping.sent` too (N7); since 0.2.0 app control's `control.started` and `control.ended`, which only the top-level rules decide (L9). |
 | R10 | Refresh on an interval (default 120 s), when the Mac wakes, when the configuration changes, and on ⌘R. Opening the panel doesn't refresh: it shows the last fetched data and spends no GitHub request. |
-| R11 | Read everything the user controls from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
+| R11 | Read everything the user controls in the app from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`), and the `shipyard` command's own settings from `cli.toml` (beside it on the Mac, in the same XDG folder elsewhere; ADR 0008, #189), apply edits live, and publish a JSON Schema for it (referenced by `#:schema`, checked with `taplo check`). |
 | R12 | Keep app state (seen, known items, collapsed sections, notified) in `~/Library/Application Support/Shipyard/state.json`, never in the configuration. |
 | R11a | After every reload, record the verdict on the configuration file (accepted, or each problem with its line and the banner's text) in `~/Library/Application Support/Shipyard/config-status.json`, with when it was checked and the file's modification time, so an agent can confirm the app took its edit without seeing the banner (#48). |
 | R13 | Onboarding: connect GitHub by reusing `gh`'s token silently, or with **Sign in with GitHub** (the device flow, the token in the login Keychain, S1); then, whenever there are no projects, choose a **preset** and pick repositories (P2), which writes the configuration. |
@@ -292,6 +293,7 @@ Shipyard -> ConfigLocation         record(configStore.url, in: the resolved stor
 CLILink -> LinkFileSystem          fileExists(app's CLI), entry(~/.local/bin/shipyard) -> none | link(destination) | other; createDirectory, createSymbolicLink on Link
 ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories as last resolved
 ShipyardCLI -> ConfigLocation      current(environment, support) -> the config.toml the app recorded, else its own lookup (#126)
+ShipyardCLI -> CLISettingsFile     beside(config:) on the Mac, withoutTheApp(environment:) elsewhere: where cli.toml is (#189); read() by the commands that need a setting
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
@@ -401,13 +403,14 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
 |---|---|---|---|
 | **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder` | Foundation only | every build |
 | **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
+| **ShipyardCLISettings** | The command's own settings, `cli.toml` (ADR 0008, #189): `CLISettings` (its tables; `[notify]`, `NotifySettings`, which the notice commands fill in), `CLISettingsIssue` and `CLISettingsError`, and `CLISettingsFile` (where it is on each kind of machine, and `read()`) | Command, TOMLDecoder | every build |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
 | **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlMessage` (a request with its holder, 0.2.0), `ControlReply`, `ControlLease` (the lease's rules, which the app's server drives, 0.2.0), `Holder` with the `ProcessTable` port and `SystemProcessTable` (0.2.0), `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand`, `PanelCommand`, `ScreenshotCommand` and `LeaseCommand` (parsing `app`, `panel`, `screenshot` and `control` into an invocation, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (the wire types and the socket calls) |
 | **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config | the app |
 | **ShipyardApp** | The Apple-framework layer, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter` | everything | the app |
 
 ```text
-                 ShipyardCommand
+                 ShipyardCommand ◀── ShipyardCLISettings (and TOMLDecoder)
               ▲        ▲         ▲
               │        │         │
        ShipyardPings   │   ShipyardControl
@@ -420,12 +423,12 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
               └──── ShipyardApp ─┘   (the app depends on all five)
 ```
 
-Core doesn't import Control: only the app's side of control (the server, the panel control) needs its types, and they live in the app (#166). No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core.
+Core doesn't import Control: only the app's side of control (the server, the panel control) needs its types, and they live in the app (#166). No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core. CLISettings depends on Command alone; nothing on the app's side imports it, since the app never reads `cli.toml` (ADR 0008).
 
 **What each build links.** `Package.swift` declares the four new library targets on every platform, so their tests run on Linux, and declares the executable's extra dependencies only when the manifest is read on macOS, each still conditioned on it:
 
 ```swift
-var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings"]
+var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings"]
 #if os(macOS)
 cliDependencies += [
     .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
@@ -433,18 +436,18 @@ cliDependencies += [
 ]
 #endif
 .executableTarget(name: "ShipyardCLI", dependencies: cliDependencies)   // product shipyard-cli, bundled as Contents/Helpers/shipyard
-// ShipyardApp stays declared only on macOS; the four libraries build everywhere.
+// ShipyardApp stays declared only on macOS; the libraries build everywhere.
 ```
 
-A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default build system since Swift 6.4, drops the conditioned target from a Linux link but still links the package products below it, so the Linux `shipyard` built by 6.4 (the release's static binaries included) carried TOMLDecoder, while 6.2's native build system left it out. Declaring the dependency only in a macOS manifest gives both build systems nothing to link; the condition stays for the native build system should a Mac ever build for Linux.
+A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default build system since Swift 6.4, drops the conditioned target from a Linux link but still links the package products below it, so the Linux `shipyard` built by 6.4 (the release's static binaries included) carried TOMLDecoder, while 6.2's native build system left it out. Declaring the dependency only in a macOS manifest gives both build systems nothing to link; the condition stays for the native build system should a Mac ever build for Linux. Since #189 the Linux build links TOMLDecoder on purpose, through ShipyardCLISettings, which both builds depend on unconditionally; it still never links Config.
 
 | Build | Links | Filing | Commands in its table |
 |---|---|---|---|
-| `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings | `Unfiled` | `ping`, `herdr-event`; `app`, `panel`, `screenshot` and `control` answer exit 2, "runs on the Mac" |
-| `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel` (#167), `screenshot` (#169) |
+| `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings, CLISettings (with TOMLDecoder) | `Unfiled` | `ping`, `herdr-event`; `app`, `panel`, `screenshot` and `control` answer exit 2, "runs on the Mac" |
+| `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, CLISettings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel` (#167), `screenshot` (#169) |
 | `Shipyard.app` | everything | `ProjectFiling` for remote pings | (not a command line) |
 
-**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job (every push) checks the Mac's debug `shipyard-cli` the same way, after the tests: `nm` must find `14ShipyardConfig` and `15ShipyardControl` and no `12ShipyardCore` (#165, #166).
+**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig` or `15ShipyardControl` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). `11TOMLDecoder` was on that list until #189 made it ShipyardCLISettings' dependency. They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job (every push) checks the Mac's debug `shipyard-cli` the same way, after the tests: `nm` must find `14ShipyardConfig` and `15ShipyardControl` and no `12ShipyardCore` (#165, #166).
 
 **What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
 
@@ -1203,18 +1206,34 @@ Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothi
 var table = CommandTable()
 #if os(macOS)
 let support = SupportFolder.app(environment: environment)
+let configURL = ConfigLocation.current(environment: environment, support: support)
+let settings = CLISettingsFile.beside(config: configURL)   // cli.toml (#189), for the commands that read it
 table.add(PingCommands.entries(
-    filing: ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: support),
+    filing: ProjectFiling(configURL: configURL,
                           repositories: ResolvedRepositoriesStore(directory: support)),
     store: PingStore(directory: PingStore.appDirectory(in: support))))
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 #else
+let settings = CLISettingsFile.withoutTheApp(environment: environment)   // cli.toml (#189)
 table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
 #endif
 let result = ShipyardCLI.run(arguments, table: table, environment: commandEnvironment, now: Date())
 ```
 
-The `#if` is compile time and decides which modules are linked; nothing after it asks the platform.
+The `#if` is compile time and decides which modules are linked; nothing after it asks the platform. `settings` is where this build's `cli.toml` is; the commands that need a setting take it with their entries, as the ping entries take a filing, and no command takes it yet (#189 built the file before its first setting).
+
+### CLISettings and CLISettingsFile — `ShipyardCLISettings/` (#189)
+
+The command's own settings file, `cli.toml` (ADR 0008). The app never reads it; `config.toml` stays the app's, and no setting is in both.
+
+| | |
+|---|---|
+| Where | `CLISettingsFile.beside(config:)` on the Mac: `cli.toml` in the folder of the `config.toml` the app reads (`ConfigLocation.current`, so a recorded `XDG_CONFIG_HOME` moves both). `CLISettingsFile.withoutTheApp(environment:home:)` elsewhere: `$XDG_CONFIG_HOME/shipyard/cli.toml` when it's absolute, else `~/.config/shipyard/cli.toml`. `main.swift` picks one per build |
+| `read() throws(CommandResult) -> CLISettings` | read when a command that needs a setting runs, never at startup, so a broken file stops only those commands. No file: `CLISettings.defaults`. A file that doesn't read: `.failed("shipyard: <path> doesn't read (<issues>); fix it, then try again")`, exit 1: a file that can't be read, isn't UTF-8, isn't TOML (its line from TOMLDecoder), a table of the wrong type, or any key or table it doesn't know. An unknown key is an error, not a warning as in `config.toml`: a typo would otherwise quietly fall back to the default |
+| `CLISettings.decode(text) throws(CLISettingsError)` | the parse, every issue collected (`CLISettingsIssue`: an optional line and a message, "line 3: …") |
+| `CLISettings` | `notify: NotifySettings`, `[notify]`. It holds no key yet: a notice setting (`app-machine`, the Mac another machine sends notices to) is a property on `NotifySettings`, its key in `Reader.notifyKeys` and its read in `Reader.notify(_:)` |
+
+Tests: `CLISettingsTests` (`Tests/ShipyardCoreTests/CLISettings/`), the owner test of the file's contract: both places (the XDG cases, and the Mac's beside a recorded `config.toml`), a missing, empty or comment-only file and an empty `[notify]` as the defaults, and a table of files that don't read (invalid TOML, an unknown key in `[notify]`, an unknown table, `notify` not a table, not UTF-8), each exit 1 with the path and the problem. The commands that read it test their own behaviour with a file missing, set or malformed.
 
 ### CLILink — `ShipyardCore/CLI/CLILink.swift` (0.0.5)
 
@@ -1236,9 +1255,9 @@ The layout since 0.1.0 (ADR 0006). `(0.1.0)` marks a file 0.1.0 added and `(move
 
 ```text
 shipyard/
-├── Package.swift                     # SwiftPM: libraries ShipyardCommand, ShipyardPings, ShipyardConfig, ShipyardControl, ShipyardCore; ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`: Command + Pings, plus Config + Control on macOS only); ShipyardApp (`Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder (Config's)
-├── .github/workflows/ci.yml          # libraries, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; fails when the Linux CLI holds a ShipyardCore, ShipyardConfig, ShipyardControl or TOMLDecoder symbol, and when the Mac CLI holds a ShipyardCore one; .build cached between runs (docs/references/github-actions-cache.md)
-├── .github/workflows/linux-cli.yml   # the static Linux `shipyard` binaries for a release; fails when its debug build holds a ShipyardCore, ShipyardConfig, ShipyardControl or TOMLDecoder symbol
+├── Package.swift                     # SwiftPM: libraries ShipyardCommand, ShipyardPings, ShipyardCLISettings, ShipyardConfig, ShipyardControl, ShipyardCore; ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`: Command + Pings + CLISettings, plus Config + Control on macOS only); ShipyardApp (`Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder (CLISettings' and Config's)
+├── .github/workflows/ci.yml          # libraries, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; fails when the Linux CLI holds a ShipyardCore, ShipyardConfig or ShipyardControl symbol, and when the Mac CLI holds a ShipyardCore one; .build cached between runs (docs/references/github-actions-cache.md)
+├── .github/workflows/linux-cli.yml   # the static Linux `shipyard` binaries for a release; fails when its debug build holds a ShipyardCore, ShipyardConfig or ShipyardControl symbol
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon, the app's resource bundle in Contents/Resources, and the CLI as Contents/Helpers/shipyard), ad-hoc sign, zip, install, redraw the icon, convert the agents' logos (`make agent-logos`, rsvg-convert)
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (olive-khaki, shipyard's logo, is the app's; origami, sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` and `Logo.swift` (`make icon-exploration` redraws the options the logo was chosen from)
@@ -1246,7 +1265,7 @@ shipyard/
 ├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
 ├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
-├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules; 0007: app control is leased, enforced by the app
+├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules; 0007: app control is leased, enforced by the app; 0008: configuration has two files, config.toml the app's and cli.toml the command's
 ├── assets/images/<topic>/           # the README's logo (logo/), by relative path; the app icon's comparison sheets (app-icon/, with exploration/ from `make icon-exploration`); the known agents' logos as published (agent-logos/*.svg), the sources `make agent-logos` converts
 ├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (0.1.0/, and the presets one in shipyard-0.0.2/), by relative path
 ├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
@@ -1269,6 +1288,9 @@ shipyard/
 │   ├── PingList.swift                # (moved) the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
 │   ├── HerdrEvent.swift              # (moved) shipyard herdr-event: a blocked agent's ping herdr-<pane>, sent, replaced and withdrawn
 │   └── PingCommands.swift            # (0.1.0) the `ping` and `herdr-event` entries for the CommandTable, over a filing and a store
+├── Sources/ShipyardCLISettings/      # (#189) the command's own cli.toml; Command and TOMLDecoder
+│   ├── CLISettings.swift             # its tables ([notify]), the reader: unknown keys and tables are errors; CLISettingsIssue, CLISettingsError
+│   └── CLISettingsFile.swift         # where it is (beside config.toml on the Mac, the XDG config folder elsewhere); read(): defaults, or exit 1 with what's wrong
 ├── Sources/ShipyardConfig/           # (0.1.0) reading config.toml; Command, Pings and TOMLDecoder
 │   ├── Configuration.swift           # (moved) file model, defaults, per-project merge, append text; EventKind, MenuLayout, NewProject
 │   ├── Kinds.swift                   # (moved from Items/Item.swift) ItemKind, StateGroup: the configuration's vocabulary
@@ -1408,7 +1430,7 @@ shipyard/
 │           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
 ├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport, launcher and process table (AppCommandTests, PanelCommandTests, ScreenshotCommandTests, HolderTests, LeaseCommandTests, Doubles); the lease's rules (ControlLeaseTests, 0.2.0) and its banner's words (LeaseBannerTests, 0.2.0)
-├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping and config suites stay here
+├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping, config and cli.toml (CLISettings/) suites stay here
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + support folders built through AppFiles (or the app as launched with an environment), fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
 │   ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes

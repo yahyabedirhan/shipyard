@@ -4,6 +4,8 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 ## Unreleased
 
+- **`cli.toml`, the `shipyard` command's own settings.** Every machine's `shipyard` reads its own settings file, `cli.toml`: beside `config.toml` on the Mac, and `~/.config/shipyard/cli.toml` (honouring `XDG_CONFIG_HOME`) on a machine without the app. `config.toml` stays the app's, and no setting is in both. A missing file means the defaults; one that doesn't read, an unknown key included, stops the command that needs it with exit 1 and what's wrong. Its first table, `[notify]`, is for notices. ADR 0008 records the split, and the Linux `shipyard` now links TOMLDecoder to read it: [#189](https://github.com/yahyabedirhan/shipyard/issues/189) "cli.toml: the CLI's own settings file".
+
 ## 0.2.0 (2026-10-03)
 
 One agent at a time holds app control, and you see which: a lease the app enforces, a dot and a banner while an agent holds it, turns agents take on purpose, Stop to take shipyard back, and a notification when an agent starts and stops. It builds [#176](https://github.com/yahyabedirhan/shipyard/issues/176) "The agent lease: one agent at a time holds app control, and the maintainer sees it", in the agent-lease pull request; ADR 0007 records the design. [Release](https://github.com/yahyabedirhan/shipyard/releases/tag/v0.2.0).

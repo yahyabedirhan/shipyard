@@ -3,7 +3,8 @@ import PackageDescription
 
 // Modules follow concerns, and each build links only what it uses (ADR 0006):
 // ShipyardCommand is the foundation any command needs on any machine,
-// ShipyardPings the agent's side of pings, ShipyardConfig reading
+// ShipyardPings the agent's side of pings, ShipyardCLISettings reading the
+// command's own cli.toml (ADR 0008), ShipyardConfig reading the app's
 // config.toml (and filing pings by it), ShipyardControl the client side of
 // app control (its AppKit launcher compiled only where AppKit exists),
 // ShipyardCore the app's rules. The
@@ -20,6 +21,14 @@ var targets: [Target] = [
         name: "ShipyardPings",
         dependencies: ["ShipyardCommand"],
         path: "Sources/ShipyardPings"
+    ),
+    .target(
+        name: "ShipyardCLISettings",
+        dependencies: [
+            "ShipyardCommand",
+            .product(name: "TOMLDecoder", package: "TOMLDecoder"),
+        ],
+        path: "Sources/ShipyardCLISettings"
     ),
     .target(
         name: "ShipyardConfig",
@@ -45,6 +54,7 @@ var targets: [Target] = [
         dependencies: [
             "ShipyardCommand",
             "ShipyardPings",
+            "ShipyardCLISettings",
             "ShipyardConfig",
             "ShipyardControl",
             "ShipyardCore",
@@ -64,19 +74,21 @@ var targets: [Target] = [
 ]
 
 // The `shipyard` command line agents send pings with (ADR 0004). On a machine
-// without the app it links Command and Pings only (ADR 0005, 0006); on macOS
-// Config too, for the filing that reads config.toml, and Control, for the
-// `app` command, and never the core. CI checks both builds link nothing else.
+// without the app it links Command, Pings and CLISettings only (ADR 0005,
+// 0006, 0008), so TOMLDecoder through CLISettings; on macOS Config too, for
+// the filing that reads config.toml, and Control, for the `app` command, and
+// never the core. CI checks both builds link nothing else.
 //
 // The Mac's dependencies are declared only when the manifest is read on
 // macOS, not just conditioned on it: Swift Build, the default build system
 // since Swift 6.4, honours the condition for ShipyardConfig itself but still
-// links the package products below it (TOMLDecoder) into a Linux build. The
+// links the package products below it into a Linux build (TOMLDecoder, before
+// CLISettings brought it in on purpose). The
 // conditions stay for the native build system, should a Mac build for Linux.
 // Its product is `shipyard-cli`, not `shipyard`, because on a case-insensitive
 // disk that would be the app's `Shipyard` executable; `make bundle` puts it in
 // the app as `Contents/Helpers/shipyard`.
-var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings"]
+var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings"]
 #if os(macOS)
 cliDependencies += [
     .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
@@ -94,6 +106,7 @@ targets.append(
 var products: [Product] = [
     .library(name: "ShipyardCommand", targets: ["ShipyardCommand"]),
     .library(name: "ShipyardPings", targets: ["ShipyardPings"]),
+    .library(name: "ShipyardCLISettings", targets: ["ShipyardCLISettings"]),
     .library(name: "ShipyardConfig", targets: ["ShipyardConfig"]),
     .library(name: "ShipyardControl", targets: ["ShipyardControl"]),
     .library(name: "ShipyardCore", targets: ["ShipyardCore"]),
