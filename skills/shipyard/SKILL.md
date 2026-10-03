@@ -1,13 +1,13 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app`, `panel` and `screenshot`, on my data or a demo's. And use for my notes, kept in Notion per shipyard project: to take a note I dictate, find one by its number, or list, tidy or archive them."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. Use `shipyard notify` on my Mac to post a status notice (tests running, done) that needs nothing from me. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app`, `panel` and `screenshot`, on my data or a demo's. And use for my notes, kept in Notion per shipyard project: to take a note I dictate, find one by its number, or list, tidy or archive them."
 ---
 
 # shipyard configuration
 
 Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface for settings: there is no settings window, and no command changes it. The app applies every save live.
 
-Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration.
+Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration. For a status update that needs nothing from the user, they post a **notice** with `shipyard notify` instead: a notification that isn't kept. See Ping or notice?.
 
 On the Mac, agents can also open, steer and screenshot the running app with `shipyard app`, `panel` and `screenshot`, on the user's data or a demo's, one agent at a time. See Driving the app, at the end.
 
@@ -100,7 +100,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `pings.seen-window` | `"24h"` | a window: how long a seen ping stays listed, counted from when it was seen; an unseen ping stays until it's seen. A seen ping leaves within one refresh of its window passing, and is deleted |
 | `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page, matched by the project's exact name. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads them every minute and when the menu opens, once the user gave it their Notion token (the settings menu's Connect Notion). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
-| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
+| `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
 
@@ -139,7 +139,7 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 - A project's `pull-requests`, `issues`, `workflow-runs`, `pings` and `notes` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
-- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, `ping.sent`, `control.started` and `control.ended`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them. Likewise, without `control.started` and `control.ended` it gets none when an agent starts or stops using the app.
+- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, `ping.sent`, `agent.notice`, `control.started` and `control.ended`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them. A project whose rules leave out `agent.notice` refuses agents' notices, so `shipyard notify` exits 1 there; add `{ event = "agent.notice" }` to see them. Likewise, without `control.started` and `control.ended` it gets none when an agent starts or stops using the app.
 
 ## Which repositories: repository selectors
 
@@ -204,6 +204,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `control.started` | an agent started using the shipyard app (`shipyard app`, `panel` or `screenshot`): "Claude Code is using shipyard", over where it runs. Decided by `[[defaults.notifications]]` (or the built-in defaults) only: a project's own list and a rule's `authors` don't apply to it, and the app warns about either. Clicking it opens the panel, whose banner names the agent |
 | `control.ended` | that agent is done with the app: "Claude Code is done with shipyard", over why (released, its lease ran out, you stopped it). Decided as `control.started` is |
 | `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification does what clicking the ping does: runs its action (opens its link or app, or focuses its Herdr tab) and marks it seen. Pings have no author, so a rule with `authors` never selects one |
+| `agent.notice` | an agent posted a notice with `shipyard notify`: titled with the project and the notice's title, over its body and sender. Each notice is its own notification, never listed or kept. A project whose rules leave it out refuses the notice, and the agent is told. Notices have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
 
@@ -413,7 +414,7 @@ To show issues in every project instead, set it once in the defaults:
 show = true
 ```
 
-**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the defaults `pr.opened` and `ping.sent` beside `run.failed`:
+**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the defaults `pr.opened`, `ping.sent` and `agent.notice` beside `run.failed`:
 
 ```toml
 [[projects]]
@@ -423,6 +424,7 @@ workflow-runs = { show = true }
 notifications = [
   { event = "pr.opened" },
   { event = "ping.sent" },
+  { event = "agent.notice" },
   { event = "run.failed" },
 ]
 ```
@@ -456,6 +458,18 @@ herdr plugin install yahyabedirhan/herdr-shipyard
 The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard asks each machine for its pings about every 30 seconds. A machine it can't reach shows a quiet line in the menu and keeps its last pings until it answers again.
 
 Tell the user one known limit of Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it's already showing that machine. When it shows the Mac or another machine, the click looks like it did nothing (the ping is still marked seen); they switch Herdr to that machine themselves to see the pane. Herdr has no command yet that switches an open window to a saved machine, so no setting changes this.
+
+## Ping or notice?
+
+Shipyard carries two kinds of message from you to the user. Pick by what the user has to do:
+
+| | Ping (`shipyard ping`) | Notice (`shipyard notify`) |
+|---|---|---|
+| For | something the user should act on or would want to know now: a pull request ready for review, a question you're blocked on, a long task finished or failed | a status update that needs nothing from them: "orchestration started", "tests running", "deployed to staging" |
+| What the user sees | a row in the menu that needs attention until clicked, and a notification (`ping.sent`) | a notification only (`agent.notice`): never listed, counted or kept |
+| What you learn | its id; it waits for the user | exit 0 only when the app showed it; exit 1 with why when it wasn't shown |
+
+When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. Notices run on the Mac today, through the running app. [references/notices.md](references/notices.md) has the command, its flags, the exit codes and worked examples.
 
 ## Sending pings
 

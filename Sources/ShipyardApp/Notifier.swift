@@ -56,6 +56,15 @@ final class Notifier: NSObject, Notifying {
         permission = Self.permission(await center.notificationSettings().authorizationStatus)
     }
 
+    /// Whether a notification posted now could show: not when the user
+    /// turned shipyard's notifications off, read afresh. Run outside a
+    /// `.app` bundle, nothing shows.
+    func canShow() async -> Bool {
+        guard center != nil else { return false }
+        await checkPermission()
+        return permission != .denied
+    }
+
     /// Queues the notification and returns at once: the first one waits
     /// for the user to answer the permission prompt, which must not hold up
     /// the refresh that posted it. Notifications are delivered in order.

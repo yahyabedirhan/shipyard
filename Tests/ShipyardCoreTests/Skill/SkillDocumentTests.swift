@@ -3,6 +3,7 @@ import Foundation
 @testable import ShipyardConfig
 @testable import ShipyardControl
 @testable import ShipyardCore
+@testable import ShipyardNotices
 @testable import ShipyardPings
 import Testing
 
@@ -12,6 +13,7 @@ import Testing
 
 private let skillURL = repositoryRoot.appendingPathComponent("skills/shipyard/SKILL.md")
 private let presetsURL = repositoryRoot.appendingPathComponent("skills/shipyard/presets.md")
+private let noticesURL = repositoryRoot.appendingPathComponent("skills/shipyard/references/notices.md")
 
 private func skill() throws -> String {
     try String(contentsOf: skillURL, encoding: .utf8)
@@ -142,10 +144,10 @@ struct SkillDocumentTests {
         // "switch the menu to tabs"
         #expect(blocks.contains { $0?.menu.layout == .tabs })
         // "show CI runs for this project and tell me when they fail": runs on for that
-        // project alone, with the default pr.opened rule kept beside run.failed
+        // project alone, with the default project rules kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
         #expect(config.settings(for: runs).workflowRuns.finishedWindow == config.defaults.workflowRuns.finishedWindow)
-        #expect(runs.notifications == [NotificationRule(event: .prOpened), NotificationRule(event: .pingSent), NotificationRule(event: .runFailed)])
+        #expect(runs.notifications == [.prOpened, .pingSent, .agentNotice, .runFailed].map { NotificationRule(event: $0) })
         // "shipyard doesn't notify me about pings": a file with its own rules adds `ping.sent`
         #expect(blocks.contains { config in
             let rules = config?.defaults.notifications ?? []
@@ -359,8 +361,10 @@ struct SkillDocumentTests {
         #expect(text.contains("| `[defaults] subsections` | unset |"))
         #expect(c.herdr.terminal == nil)
         #expect(text.contains("| `[herdr] terminal` | unset |"))
-        #expect(c.defaults.notifications == [.prOpened, .pingSent, .controlStarted, .controlEnded].map { NotificationRule(event: $0) })
-        #expect(text.contains("| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` |"))
+        #expect(c.defaults.notifications == [.prOpened, .pingSent, .agentNotice, .controlStarted, .controlEnded].map { NotificationRule(event: $0) })
+        #expect(text.contains(
+            "| `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` |"
+        ))
     }
 
     @Test("every choice, event and author filter is listed")
@@ -400,6 +404,30 @@ struct SkillDocumentTests {
         #expect(text.contains("[presets.md](presets.md)"))
         for preset in Preset.all {
             #expect(text.contains("`\(preset.name)`"), "the skill doesn't name `\(preset.name)`")
+        }
+    }
+
+    @Test("its notices reference teaches the notify command as it's built: the synopsis, every flag, the refusals, and examples that read")
+    func notifyCommand() throws {
+        let page = try String(contentsOf: noticesURL, encoding: .utf8)
+        #expect(try skill().contains("[references/notices.md](references/notices.md)"))
+        let flowing = page.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        let synopsis = NotifyCommand.usageText.components(separatedBy: "\n\n")[0]
+            .replacingOccurrences(of: "usage: ", with: "")
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        #expect(flowing.contains(synopsis), "`\(synopsis)` isn't taught")
+        for flag in Set(NotifyCommand.usageText.matches(of: /--[a-z]+/).map { String($0.output) }) {
+            #expect(page.contains("`\(flag)"), "`\(flag)` isn't named")
+        }
+        #expect(page.contains(ControlNoticeRoute.notRunning))
+        #expect(page.contains("notices are off for project `<name>`"))
+        #expect(page.contains("**0**") && page.contains("**1**") && page.contains("**2**"))
+        let examples = shellExamples(in: page, command: "notify")
+        #expect(examples.count >= 3)
+        for words in examples {
+            if case .failure(let error) = NotifyCommand.parse(Array(words.dropFirst(2))) {
+                Issue.record("\(words) doesn't read: \(error.message)")
+            }
         }
     }
 

@@ -63,6 +63,11 @@ public protocol Notifying: Sendable {
     /// Notification Center, as when its ping is withdrawn or dismissed. One
     /// that was never posted, or is gone already, is no error.
     func removeDelivered(id: String) async
+    /// Whether a notification posted now could show: false when the user
+    /// turned shipyard's notifications off. Never asked yet counts as
+    /// could, since the first post asks. An agent's notice asks it first,
+    /// so its verdict is never `shown` for a notice macOS would drop.
+    func canShow() async -> Bool
 }
 
 /// Tells the core what time it is, so tests can fix and move time.

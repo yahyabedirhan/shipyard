@@ -3,6 +3,7 @@ import Foundation
 @testable import ShipyardApp
 import ShipyardControl
 import ShipyardCore
+import ShipyardNotices
 import Testing
 
 /// App control's server: how it answers each request (with a fake panel),
@@ -228,6 +229,39 @@ struct ControlServerTests {
 
         #expect(answer == .init(reply: .refused(why)))
         #expect(screenshotter.calls.isEmpty)
+    }
+
+    @Test("a notice isn't leased: from any agent while another holds the lease, it's handed to the app and answered with its verdict")
+    func notice() async {
+        let handed = NoticeLog()
+        let server = ControlServer(
+            socket: URL(fileURLWithPath: "/nonexistent/control.sock"),
+            panel: panel,
+            screenshotter: screenshotter,
+            indicator: indicator,
+            now: { [clock] in clock.now },
+            notices: { notice in
+                handed.notices.append(notice)
+                return notice.title == "Done" ? .shown : .refused("notices are off for project `shop`")
+            },
+            quit: {}
+        )
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+
+        let shown = await server.reply(to: ControlRequest.notify(Notice(title: "Done", project: "shop")).sent(by: Self.other))
+        let refused = await server.reply(to: ControlRequest.notify(Notice(title: "Tests running", repository: "o/shop")).sent(by: Self.other))
+        let unreadable = await server.reply(to: Data(#"{"version":2,"command":"notify",\#(ControlServerTests.agentWire)}"#.utf8))
+
+        #expect(shown == .init(reply: .done("")))
+        #expect(refused == .init(reply: .refused("notices are off for project `shop`")))
+        #expect(unreadable == .init(reply: .refused("the control command `notify` needs its `notice`")))
+        #expect(handed.notices == [Notice(title: "Done", project: "shop"), Notice(title: "Tests running", repository: "o/shop")])
+        #expect(server.lease.current(at: clock.now)?.holder == Self.agent)
+    }
+
+    /// The notices the server handed the app, in order.
+    final class NoticeLog {
+        var notices: [Notice] = []
     }
 
     @Test("a panel request without the field it needs is refused, and the panel isn't asked")

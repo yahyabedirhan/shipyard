@@ -3,8 +3,9 @@ import PackageDescription
 
 // Modules follow concerns, and each build links only what it uses (ADR 0006):
 // ShipyardCommand is the foundation any command needs on any machine,
-// ShipyardPings the agent's side of pings, ShipyardCLISettings reading the
-// command's own cli.toml (ADR 0008), ShipyardConfig reading the app's
+// ShipyardPings the agent's side of pings, ShipyardNotices the agent's
+// side of notices, ShipyardCLISettings reading the command's own cli.toml
+// (ADR 0008), ShipyardConfig reading the app's
 // config.toml (and filing pings by it), ShipyardControl the client side of
 // app control (its AppKit launcher compiled only where AppKit exists),
 // ShipyardCore the app's rules. The
@@ -31,6 +32,11 @@ var targets: [Target] = [
         path: "Sources/ShipyardCLISettings"
     ),
     .target(
+        name: "ShipyardNotices",
+        dependencies: ["ShipyardCommand"],
+        path: "Sources/ShipyardNotices"
+    ),
+    .target(
         name: "ShipyardConfig",
         dependencies: [
             "ShipyardCommand",
@@ -41,12 +47,12 @@ var targets: [Target] = [
     ),
     .target(
         name: "ShipyardControl",
-        dependencies: ["ShipyardCommand"],
+        dependencies: ["ShipyardCommand", "ShipyardNotices"],
         path: "Sources/ShipyardControl"
     ),
     .target(
         name: "ShipyardCore",
-        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardConfig"],
+        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardNotices", "ShipyardConfig"],
         path: "Sources/ShipyardCore"
     ),
     .testTarget(
@@ -55,6 +61,7 @@ var targets: [Target] = [
             "ShipyardCommand",
             "ShipyardPings",
             "ShipyardCLISettings",
+            "ShipyardNotices",
             "ShipyardConfig",
             "ShipyardControl",
             "ShipyardCore",
@@ -68,7 +75,7 @@ var targets: [Target] = [
     // format and exit codes, with a fake transport and launcher.
     .testTarget(
         name: "ShipyardControlTests",
-        dependencies: ["ShipyardCommand", "ShipyardControl"],
+        dependencies: ["ShipyardCommand", "ShipyardNotices", "ShipyardControl"],
         path: "Tests/ShipyardControlTests"
     ),
 ]
@@ -76,8 +83,10 @@ var targets: [Target] = [
 // The `shipyard` command line agents send pings with (ADR 0004). On a machine
 // without the app it links Command, Pings and CLISettings only (ADR 0005,
 // 0006, 0008), so TOMLDecoder through CLISettings; on macOS Config too, for
-// the filing that reads config.toml, and Control, for the `app` command, and
-// never the core. CI checks both builds link nothing else.
+// the filing that reads config.toml, Control, for the `app` command, and
+// Notices, for `notify` (which reaches the app through Control's socket, so
+// only the Mac has it until another route lands), and never the core. CI
+// checks both builds link nothing else.
 //
 // The Mac's dependencies are declared only when the manifest is read on
 // macOS, not just conditioned on it: Swift Build, the default build system
@@ -91,6 +100,7 @@ var targets: [Target] = [
 var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings"]
 #if os(macOS)
 cliDependencies += [
+    .target(name: "ShipyardNotices", condition: .when(platforms: [.macOS])),
     .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
     .target(name: "ShipyardControl", condition: .when(platforms: [.macOS])),
 ]
@@ -107,6 +117,7 @@ var products: [Product] = [
     .library(name: "ShipyardCommand", targets: ["ShipyardCommand"]),
     .library(name: "ShipyardPings", targets: ["ShipyardPings"]),
     .library(name: "ShipyardCLISettings", targets: ["ShipyardCLISettings"]),
+    .library(name: "ShipyardNotices", targets: ["ShipyardNotices"]),
     .library(name: "ShipyardConfig", targets: ["ShipyardConfig"]),
     .library(name: "ShipyardControl", targets: ["ShipyardControl"]),
     .library(name: "ShipyardCore", targets: ["ShipyardCore"]),
@@ -117,7 +128,7 @@ var products: [Product] = [
 targets.append(
     .executableTarget(
         name: "ShipyardApp",
-        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardConfig", "ShipyardControl", "ShipyardCore"],
+        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardNotices", "ShipyardConfig", "ShipyardControl", "ShipyardCore"],
         path: "Sources/ShipyardApp",
         // The known agents' logos (`make agent-logos`), read by `AgentLogoImage`.
         resources: [.copy("Resources/AgentLogos")]
@@ -128,7 +139,7 @@ targets.append(
 targets.append(
     .testTarget(
         name: "ShipyardAppTests",
-        dependencies: ["ShipyardApp", "ShipyardControl", "ShipyardCore"],
+        dependencies: ["ShipyardApp", "ShipyardNotices", "ShipyardControl", "ShipyardCore"],
         path: "Tests/ShipyardAppTests"
     )
 )

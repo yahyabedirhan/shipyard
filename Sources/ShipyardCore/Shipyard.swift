@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import ShipyardCommand
 import ShipyardConfig
+import ShipyardNotices
 import ShipyardPings
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
@@ -868,6 +869,8 @@ public final class Shipyard {
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         // A lease notification's click opens the panel, which the app does.
         guard itemURL != ControlNotice.panelURL else { return Task {} }
+        // An agent's notice has nothing to open.
+        guard itemURL != NoticeRules.clickURL else { return Task {} }
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
         guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
         actions.open(itemURL)
@@ -888,6 +891,25 @@ public final class Shipyard {
     public func notify(_ notice: ControlNotice) async {
         guard NotificationRules.shouldNotify(notice, configuration: configStore.lastValid) else { return }
         await notifier.post(NotificationRules.notification(for: notice, at: clock.now))
+    }
+
+    /// Shows an agent's `notice` (`shipyard notify`) when the last valid
+    /// configuration files it under a project whose rules select
+    /// `agent.notice` (`NoticeRules`), and says what came of it: the
+    /// verdict the agent's command exits by. Nothing is stored, counted or
+    /// listed; each notice is its own notification, never replacing another.
+    public func show(_ notice: Notice) async -> NoticeVerdict {
+        let resolved = resolvedRepositories ?? repositoriesStore.load()
+        resolvedRepositories = resolved
+        switch NoticeRules.project(for: notice, configuration: configStore.lastValid, resolved: resolved) {
+        case .failure(let refusal):
+            return .refused(refusal.message)
+        case .success(let project):
+            guard await notifier.canShow() else { return .refused(NoticeRules.notificationsOff) }
+            let id = "\(EventKind.agentNotice.rawValue) \(UUID().uuidString.lowercased())"
+            await notifier.post(NoticeRules.notification(for: notice, project: project, id: id))
+            return .shown
+        }
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs

@@ -168,7 +168,7 @@ struct ConfigurationDecodingTests {
         #expect(config.herdr.terminal == nil)
         #expect(config.remote.machines == [])
         #expect(config.defaults.notifications == [
-            NotificationRule(event: .prOpened), NotificationRule(event: .pingSent),
+            NotificationRule(event: .prOpened), NotificationRule(event: .pingSent), NotificationRule(event: .agentNotice),
             NotificationRule(event: .controlStarted), NotificationRule(event: .controlEnded),
         ])
         #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))

@@ -144,11 +144,12 @@
         "pings": { "$ref": "#/definitions/pings" },
         "notes": { "$ref": "#/definitions/notes" },
         "notifications": {
-          "description": "The notification rules for every project that doesn't list its own, and the only rules for app control's control.started and control.ended. Default: a new pull request by anyone, a new ping, and an agent starting and ending its lease on the app.",
+          "description": "The notification rules for every project that doesn't list its own, and the only rules for app control's control.started and control.ended. Default: a new pull request by anyone, a new ping, an agent's notice, and an agent starting and ending its lease on the app.",
           "$ref": "#/definitions/notifications",
           "default": [
             { "event": "pr.opened", "authors": [] },
             { "event": "ping.sent", "authors": [] },
+            { "event": "agent.notice", "authors": [] },
             { "event": "control.started", "authors": [] },
             { "event": "control.ended", "authors": [] }
           ]
@@ -413,7 +414,7 @@
       "required": ["event"],
       "properties": {
         "event": {
-          "description": "The change to notify about. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
+          "description": "The change to notify about. agent.notice is an agent's notice (shipyard notify), refused for a project whose rules leave it out. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
           "type": "string",
           "enum": [
             "pr.opened",
@@ -429,12 +430,13 @@
             "run.failed",
             "run.succeeded",
             "ping.sent",
+            "agent.notice",
             "control.started",
             "control.ended"
           ]
         },
         "authors": {
-          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping or a notice has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
           "anyOf": [
             { "$ref": "#/definitions/author-selectors" },
             {

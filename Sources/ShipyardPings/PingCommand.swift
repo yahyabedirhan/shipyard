@@ -223,7 +223,7 @@ public enum PingCommand {
         if let project = request.project { return .project(project) }
         if let repository = request.repository { return .repository(repository) }
         guard let folder else { return .none(why: "the ping names no repository") }
-        switch workingRepository(folder: folder, git: git) {
+        switch GitRemote.workingRepository(folder: folder, git: git, filing: "ping") {
         case .success(let slug): return .repository(slug)
         case .failure(let reason): return .none(why: reason.message)
         }
@@ -274,23 +274,6 @@ public enum PingCommand {
     /// What's wrong with an id that isn't one, for the error line.
     static func idRule(_ id: String) -> String {
         "an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`"
-    }
-
-    /// Why the working folder names no repository, as the error line says it.
-    struct NoRepository: Error, Equatable {
-        var message: String
-    }
-
-    /// The repository of the working folder `url`: its git remote `origin`, as `owner/name`.
-    static func workingRepository(folder url: URL, git: any GitRemoteLookup) -> Result<String, NoRepository> {
-        let folder = url.path
-        guard let origin = git.origin(in: url) else {
-            return .failure(NoRepository(message: "the working folder (\(folder)) isn't a git repository with a remote `origin` to file the ping by"))
-        }
-        guard let slug = GitRemote.repository(fromURL: origin) else {
-            return .failure(NoRepository(message: "the working folder's remote `origin` (\(origin)) doesn't name a repository as owner/name"))
-        }
-        return .success(slug)
     }
 
     /// A ping's arguments, read.

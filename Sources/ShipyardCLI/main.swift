@@ -5,16 +5,17 @@ import ShipyardPings
 #if os(macOS)
 import ShipyardConfig
 import ShipyardControl
+import ShipyardNotices
 #endif
 
 // `shipyard`: assembles this build's commands and prints what
 // `ShipyardCLI.run` returns. The `#if` is decided at compile time, and so
 // is what the build links (ADR 0006): on a machine without the app pings
 // are kept as sent (`Unfiled`), on the Mac they're filed against
-// config.toml, and the Mac's build controls the app (`app`). Each build
-// also picks where its own settings file, cli.toml, is (ADR 0008): beside
-// that config.toml on the Mac, in the XDG config folder elsewhere. Nothing
-// after it asks the platform.
+// config.toml, and the Mac's build controls the app (`app`) and hands it
+// notices (`notify`). Each build also picks where its own settings file,
+// cli.toml, is (ADR 0008): beside that config.toml on the Mac, in the XDG
+// config folder elsewhere. Nothing after it asks the platform.
 let environment = ProcessInfo.processInfo.environment
 var table = CommandTable()
 #if os(macOS)
@@ -34,6 +35,9 @@ table.add(PingCommands.entries(
     ),
     store: PingStore(directory: PingStore.appDirectory(in: support))
 ))
+// A notice goes to the running app over its socket, which files it and
+// says whether it was shown.
+table.add(NoticeCommands.entries(route: ControlNoticeRoute(support: support)))
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 #else
 // The commands that read cli.toml take it with their entries.

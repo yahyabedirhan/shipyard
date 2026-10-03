@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import ShipyardControl
 import ShipyardCore
+import ShipyardNotices
 
 /// App control's server: while the app runs it listens on `control.sock`
 /// in the support folder, the user's own (mode 0600), and answers one JSON
@@ -43,6 +44,9 @@ final class ControlServer {
     /// Told each change in who holds the lease, in order: the app posts
     /// the lease's notifications from them. A relaunch's handover isn't one.
     private let transitioned: @MainActor (ControlLease.Transition) -> Void
+    /// Shows an agent's notice (`shipyard notify`) and says what came of
+    /// it: the app hands it to `Shipyard.show(_:)`.
+    private let notices: @MainActor (Notice) async -> NoticeVerdict
     /// Ends the lease once it runs out, when no request comes to.
     private var settling: Task<Void, Never>?
     /// The `take`s waiting in line, each holding its connection open until
@@ -69,6 +73,7 @@ final class ControlServer {
         now: @escaping @MainActor () -> Date = { Date() },
         timeZone: TimeZone = .current,
         transitioned: @escaping @MainActor (ControlLease.Transition) -> Void = { _ in },
+        notices: @escaping @MainActor (Notice) async -> NoticeVerdict = { _ in .refused("this app doesn't show notices") },
         quit: @escaping @MainActor () -> Void
     ) {
         self.socket = socket
@@ -79,6 +84,7 @@ final class ControlServer {
         self.now = now
         self.timeZone = timeZone
         self.transitioned = transitioned
+        self.notices = notices
         self.quit = quit
         // `didSet` doesn't run in `init`: a lease a relaunch handed over is
         // shown, and its end looked out for, from the start.
@@ -151,6 +157,11 @@ final class ControlServer {
                 return Answer(reply: .done(path + "\n", note: "captured by rendering: \(why)\n"))
             case .failed(let why):
                 return Answer(reply: .refused(why))
+            }
+        case .notify(let notice):
+            switch await notices(notice) {
+            case .shown: return Answer(reply: .done(""))
+            case .refused(let why): return Answer(reply: .refused(why))
             }
         }
     }

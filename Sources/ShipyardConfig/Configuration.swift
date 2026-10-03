@@ -123,12 +123,13 @@ extension Configuration {
         public var pings = PingSettings()
         /// `[defaults.notes]`: the user's notes in Notion, listed per project.
         public var notes = NoteSettings()
-        /// `[[defaults.notifications]]`; a new pull request and a new ping
-        /// in any project, and an agent starting and ending a lease on app
-        /// control, by default.
+        /// `[[defaults.notifications]]`; a new pull request, a new ping and
+        /// an agent's notice in any project, and an agent starting and
+        /// ending a lease on app control, by default.
         public var notifications: [NotificationRule] = [
             NotificationRule(event: .prOpened),
             NotificationRule(event: .pingSent),
+            NotificationRule(event: .agentNotice),
             NotificationRule(event: .controlStarted),
             NotificationRule(event: .controlEnded),
         ]
@@ -262,6 +263,8 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
     /// An agent sent a new ping (`shipyard ping`).
     case pingSent = "ping.sent"
+    /// An agent posted a notice (`shipyard notify`): shown, never listed.
+    case agentNotice = "agent.notice"
     /// An agent took app control's lease: it's using shipyard.
     case controlStarted = "control.started"
     /// The lease ended: the agent released it, it ran out, or the user
@@ -762,16 +765,19 @@ extension Configuration {
 
         # When to notify, for every project: one block per rule. The list
         # replaces the default rules below, so keep them to hear of new pull
-        # requests and pings, and of an agent starting and ending its turn
-        # with the app (control.started, control.ended). Other events include
-        # "run.failed" and "pr.review_requested"; authors narrows a rule to
-        # some authors, as above (empty: everyone).
+        # requests and pings, to see your agents' notices (agent.notice), and
+        # to hear of an agent starting and ending its turn with the app
+        # (control.started, control.ended). Other events include "run.failed"
+        # and "pr.review_requested"; authors narrows a rule to some authors,
+        # as above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
         # authors = []
         # [[defaults.notifications]]
         # event = "ping.sent"
         # authors = []
+        # [[defaults.notifications]]
+        # event = "agent.notice"
         # [[defaults.notifications]]
         # event = "control.started"
         # [[defaults.notifications]]

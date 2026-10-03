@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardNotices
 
 /// What the `shipyard` command asks of the running app: one request per
 /// connection over `control.sock`, sent as a `ControlMessage` with its
@@ -44,6 +45,11 @@ public enum ControlRequest: Equatable, Sendable {
     /// `shipyard control release`: the lease given up, when this agent
     /// holds it.
     case controlRelease
+    /// `shipyard notify "<title>" …`: an agent's notice, shown when the
+    /// user's rules select it for its project, answered with the app's
+    /// verdict. Not leased: any agent may post one while another drives
+    /// the app.
+    case notify(Notice)
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -65,7 +71,7 @@ public enum ControlRequest: Equatable, Sendable {
     /// lease's own requests.
     public var isLeased: Bool {
         switch self {
-        case .appStatus, .controlTake, .controlRelease: false
+        case .appStatus, .controlTake, .controlRelease, .notify: false
         default: true
         }
     }
@@ -126,6 +132,8 @@ public struct ControlMessage: Equatable, Sendable {
             wire = Wire(command: "control.take", waitSeconds: waitSeconds)
         case .controlRelease:
             wire = Wire(command: "control.release")
+        case .notify(let notice):
+            wire = Wire(command: "notify", notice: notice)
         }
         wire.holder = holder
         let encoder = JSONEncoder()
@@ -188,6 +196,9 @@ public struct ControlMessage: Equatable, Sendable {
             }
             return .controlTake(waitSeconds: wire.waitSeconds)
         case "control.release": return .controlRelease
+        case "notify":
+            guard let notice = wire.notice else { throw .unreadable("the control command `notify` needs its `notice`") }
+            return .notify(notice)
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -208,6 +219,8 @@ public struct ControlMessage: Equatable, Sendable {
         var menuBarIcon: Bool?
         var withIndicator: Bool?
         var waitSeconds: Int?
+        /// `notify`'s notice, as one object in its own shape (`Notice`).
+        var notice: Notice?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.
