@@ -4,7 +4,7 @@ You are the orchestrator for effort `clean-slate`. Build every ticket and delive
 
 ## Where things are
 
-- **Worktree:** `~/.treehouse/shipyard-1e47e3/1/shipyard`, leased with treehouse (holder `clean-slate`, lease id `2c74ebe6e6d2d8e3bd4db1faedd77ffe`), on branch `effort/clean-slate`, cut from `main` at `66679d8`.
+- **Worktree:** leased with treehouse (holder `clean-slate`), on branch `effort/clean-slate`, cut from `main` at `66679d8`.
 - **Spec:** #160 "Spec: clean-slate, every open issue finished, app control, modules by concern and the 0.1.0 release". Every decision is recorded there. Read it first.
 - **Tickets:** the spec's sub-issues, all labelled `effort:clean-slate`, with GitHub's native blocked-by edges. Work the frontier: `gh api repos/yahyabedirhan/shipyard/issues/160/sub_issues`, then each issue's `issue_dependencies_summary`.
   - **New:** #161–#171.
@@ -41,9 +41,9 @@ The design's test of extensibility is a future "Notes" feature: one new `Shipyar
 ## Facts the repository doesn't show
 
 - **`make test` is the local test gate.** The maintainer's Mac has only the Command Line Tools, no Xcode, and `make test` passes there (905 tests in 97 suites on `main` at 66679d8), because the Makefile's `TEST_FLAGS` point Swift at the Testing framework the Command Line Tools ship. Never set `TEST_FLAGS` on the command line: that replaces those flags and the build fails with "no such module 'Testing'". CI (`ci.yml`, Ubuntu and macOS) runs the full suite again on every push. Say in the pull request which checks ran where.
-- **The VPSes don't install herdr-shipyard from GitHub.** `hetzner-vps` and `netcup-vps` (the maintainer's `[remote] machines`) run it as a local link (`source: local`) to a clone at `~/Developer/yahyabedirhan/herdr-shipyard`, with a locally built `shipyard` that reports 0.0.3. Switching them to `herdr plugin install yahyabedirhan/herdr-shipyard` is part of #147. Check whether `herdr plugin unlink` is needed first.
+- **The VPSes don't install herdr-shipyard from GitHub.** The maintainer's two `[remote] machines` run it as a local link (`source: local`) to a local clone of herdr-shipyard, with a locally built `shipyard` that reports 0.0.3. Switching them to `herdr plugin install yahyabedirhan/herdr-shipyard` is part of #147. Check whether `herdr plugin unlink` is needed first.
 - **The shipyard skill copies match `main`** (`npx skills`, global, Claude Code and Codex) on the Mac and both VPSes as of 2026-10-03, after PR #158. The PromptScript failure during install is expected and harmless.
-- **The Hetzner Herdr server was restarted on 2026-10-03.** It had been running an older 0.9.3 build than its installed binary, which made `herdr machine status` report it incompatible. If that error comes back, it needs the same `herdr server stop` on that machine, which only the maintainer can run (no SSH without asking).
+- **One remote machine's Herdr server was restarted on 2026-10-03.** It had been running an older 0.9.3 build than its installed binary, which made `herdr machine status` report it incompatible. If that error comes back, it needs the same `herdr server stop` on that machine, which only the maintainer can run (no SSH without asking).
 - **Reach remote machines through their saved Herdr machine:** open a new workspace there (`herdr --machine <label> workspace create --no-focus`), run commands in its first pane, and close the workspace afterwards. Never use plain SSH.
 - **The installed app was rebuilt from `main` on 2026-10-03** with `make install`, so it runs the ping code while reporting 0.0.3.
 - **Releasing:**

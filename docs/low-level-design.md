@@ -360,9 +360,9 @@ Where each rule lives:
 
 ### Modules and what each build links
 
-Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
+Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built for 0.1.0 by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core) and #166–#169 (Control and the app's side of it). The class sections after this one and the [folder tree](#folder-tree) name each file where it is.
 
-**Where it stands after #166–#169.** ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so. Control holds `app open [--demo <folder>] | quit | status` (#166, #168), `panel open | close | fold | unfold | show-more | tab` (#167) and `screenshot` (#169). Since #168 `SupportFolder.app(environment:)` honours `SHIPYARD_SUPPORT_DIR`, the app builds every store on `AppFiles`, and `app open --demo` launches a demo run. `CommandTable.macOnly` holds `app`, `panel` and `screenshot`: each Mac-only command adds its name when it exists on the Mac. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
+**What 0.1.0 built.** ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so. Control holds `app open [--demo <folder>] | quit | status` (#166, #168), `panel open | close | fold | unfold | show-more | tab` (#167) and `screenshot` (#169). Since #168 `SupportFolder.app(environment:)` honours `SHIPYARD_SUPPORT_DIR`, the app builds every store on `AppFiles`, and `app open --demo` launches a demo run. `CommandTable.macOnly` holds `app`, `panel` and `screenshot`: each Mac-only command adds its name when it exists on the Mac. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
 
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
@@ -371,7 +371,7 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
 | **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand`, `PanelCommand` and `ScreenshotCommand` (parsing `app`, `panel`, `screenshot` into an invocation, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (the wire types and the socket calls) |
 | **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config | the app |
-| **ShipyardApp** | The Apple-framework layer it has today, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter` | everything | the app |
+| **ShipyardApp** | The Apple-framework layer, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter` | everything | the app |
 
 ```text
                  ShipyardCommand
@@ -415,7 +415,7 @@ A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default b
 
 **What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
 
-| Today | After | Why |
+| Before 0.1.0 | Since 0.1.0 | Why |
 |---|---|---|
 | `CommandResult`, `CommandEnvironment` in `CLI/ShipyardCLI.swift` | Command | every command returns and reads them |
 | `CommandEnvironment.platform`, `CommandPlatform` | removed | the filing and the table replace every platform check (M3) |
@@ -496,9 +496,9 @@ reply    {"ok":true,"output":"folded shop\n","error":""}                  one JS
 | `panel.fold`, `panel.unfold` (`project`) | `shipyard panel fold <project>`, `unfold <project>` | `folded <project>`, `unfolded <project>`, also when it already was |
 | `panel.showMore` (`project`, `kind`) | `shipyard panel show-more <project> <kind>` (`pull-requests`, `issues`, `workflow-runs`, `pings`) | `showing all <kind> in <project>`, also for a group under its cap; until the panel closes, as Show more |
 | `panel.tab` (`name`) | `shipyard panel tab <name>` (a project's name, or `All` in any case unless a project has that name) | `showing <title>` (`All`, or the project's name) |
+| `screenshot` (`path`, `appearance`, `menuBarIcon`) | `shipyard screenshot <file.png> [--appearance light\|dark] [--menu-bar-icon]` | the absolute path written; `error` holds the fallback's note when the panel was rendered ("captured by rendering: <why>"). The app refuses a `path` that isn't absolute and an `appearance` other than `light` or `dark` as unreadable |
 
 A request missing a field its command needs (`project`, `kind`, `name`) is refused as unreadable, "the control command `panel.showMore` needs its `kind`". The client checks only the arguments' shape (`PanelCommand.parse`: a missing or extra argument, an unknown subcommand: exit 2 with the panel usage); whether a project, kind or tab exists is the app's to say, exit 1.
-| `screenshot` (`path`, `appearance`, `menuBarIcon`) | `shipyard screenshot <file.png> [--appearance light\|dark] [--menu-bar-icon]` | the absolute path written; `error` holds the fallback's note when the panel was rendered ("captured by rendering: <why>"). The app refuses a `path` that isn't absolute and an `appearance` other than `light` or `dark` as unreadable |
 
 `app open [--demo <folder>]` isn't a request: the app may not be running.
 
@@ -1134,13 +1134,13 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 
 ### Folder tree
 
-The target layout for 0.1.0 (ADR 0006). `(0.1.0)` marks a new file and `(moved)` one that changes module; #164–#169 build them.
+The layout since 0.1.0 (ADR 0006). `(0.1.0)` marks a file 0.1.0 added and `(moved)` one it moved to another module; #164–#169 built them.
 
 ```text
 shipyard/
 ├── Package.swift                     # SwiftPM: libraries ShipyardCommand, ShipyardPings, ShipyardConfig, ShipyardControl, ShipyardCore; ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`: Command + Pings, plus Config + Control on macOS only); ShipyardApp (`Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder (Config's)
-├── .github/workflows/ci.yml          # libraries, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; fails when the Mac CLI holds a ShipyardCore symbol; .build cached between runs (docs/references/github-actions-cache.md)
-├── .github/workflows/linux-cli.yml   # the static Linux `shipyard` binaries for a release; fails when one holds a ShipyardCore, ShipyardConfig or ShipyardControl symbol
+├── .github/workflows/ci.yml          # libraries, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; fails when the Linux CLI holds a ShipyardCore, ShipyardConfig, ShipyardControl or TOMLDecoder symbol, and when the Mac CLI holds a ShipyardCore one; .build cached between runs (docs/references/github-actions-cache.md)
+├── .github/workflows/linux-cli.yml   # the static Linux `shipyard` binaries for a release; fails when its debug build holds a ShipyardCore, ShipyardConfig, ShipyardControl or TOMLDecoder symbol
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon, the app's resource bundle in Contents/Resources, and the CLI as Contents/Helpers/shipyard), ad-hoc sign, zip, install, redraw the icon, convert the agents' logos (`make agent-logos`, rsvg-convert)
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (olive-khaki, shipyard's logo, is the app's; origami, sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` and `Logo.swift` (`make icon-exploration` redraws the options the logo was chosen from)
@@ -1195,11 +1195,11 @@ shipyard/
 │   ├── ControlClient.swift           # one request per connection over ControlTransport (UnixSocketTransport), 15 s timeout
 │   ├── AppLauncher.swift             # AppLaunching port; WorkspaceLauncher: NSWorkspace.openApplication by bundle id, in the background, with a demo's environment
 │   └── ControlCommands.swift         # the `app`, `panel` and `screenshot` entries for the CommandTable
-├── Sources/ShipyardCore/             # the app's rules; Command, Pings, Config, Control, Foundation, FoundationNetworking and Observation, so agents can build and test it on a Linux VPS
+├── Sources/ShipyardCore/             # the app's rules; Command, Pings, Config (not Control), Foundation, FoundationNetworking and Observation, so agents can build and test it on a Linux VPS
 │   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
 │   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
 │   ├── RefreshScheduler.swift        # RefreshGate (one at a time, queues one more) + RefreshTimer port and its Task-based timer
-│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, Sleep, ActionRunning, LoginItem
+│   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, ActionRunning, LoginItem
 │   ├── Config/
 │   │   ├── Selectors+Items.swift     # (moved out of Config's files) NotificationRule.covers, AuthorSelector.matches, AuthorFilter.includes an author or an Item
 │   │   ├── ConfigStore+Preset.swift  # (moved) writePreset: the third writer
@@ -1300,7 +1300,7 @@ shipyard/
 │           ├── ConnectView.swift     # why signed out, Sign in with GitHub (the code, Cancel), the gh way (gh auth login, Connect with gh, install hint)
 │           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
-├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher (AppCommandTests, PanelCommandTests, Doubles)
+├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher (AppCommandTests, PanelCommandTests, ScreenshotCommandTests, Doubles)
 ├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping and config suites stay here
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + support folders built through AppFiles (or the app as launched with an environment), fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
@@ -1673,8 +1673,8 @@ Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Ap
 | Step | Call (module) | State after |
 |---|---|---|
 | 1 | `shipyard app open --demo ~/demo` → `ControlCommand.parse` (Control) | `open(demo: Demo(folder: /Users/me/demo, ghConfig: ~/.config/gh))`: a folder, and `demo/support/control.sock` fits a socket's address |
-| 2 | `ControlCommand.run` → `app.status`, then `app.quit`, to the user's socket; looks until nothing answers | the user's app has quit and removed its socket |
-| 3 | `DemoPointer.record(~/demo/support, in: ~/Library/Application Support/Shipyard)` | `demo.json` in the user's support folder: the only file the run writes outside `~/demo` |
+| 2 | `DemoPointer.record(~/demo/support, in: ~/Library/Application Support/Shipyard)` | `demo.json` in the user's support folder: the only file the run writes outside `~/demo`; written first, so nothing is quit when it can't be |
+| 3 | `ControlCommand.run` → `app.status`, then `app.quit`, to the user's socket; looks until nothing answers | the user's app has quit and removed its socket |
 | 4 | `WorkspaceLauncher.launch(environment: XDG_CONFIG_HOME, SHIPYARD_SUPPORT_DIR, GH_CONFIG_DIR)` (Control, AppKit) | Launch Services starts `Shipyard.app` with those variables |
 | 5 | `AppServices` (App) → `AppFiles(environment:)` (Core) | `config = ~/demo/shipyard/config.toml`, `support = ~/demo/support`, `demo = ~/demo`; every store, `Avatar/` and the `ControlServer` on them |
 | 6 | `Shipyard.start()` (Core): token from the Keychain or `gh auth token` (with the user's `GH_CONFIG_DIR`), refresh | `state.json`, `config-status.json`, `repositories.json`, `config-location.json` written under `~/demo/support` |

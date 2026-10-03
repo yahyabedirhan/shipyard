@@ -114,7 +114,7 @@ Deciding which projects a ping is listed under: those that watch its repository,
 _Avoid_: Routing, sorting, assigning
 
 **Unfiled ping**:
-A ping kept as the agent sent it, under no project. Every ping on a machine without the app is one until the Mac files it. A remote ping the Mac can't file lists under its machine's name.
+A ping kept as the agent sent it: its repository, or the project it named, unchecked. Every ping on a machine without the app is one until the Mac files it. A remote ping the Mac can't file lists under its machine's name.
 _Avoid_: Orphan ping, unassigned ping
 
 **Notification rule**:
@@ -139,7 +139,7 @@ _Avoid_: Automation, remote control, scripting
 
 **Screenshot**:
 An image of the panel as it really looks, which the app captures on an agent's request. When the screen can't be captured, the app draws the panel itself and says so.
-_Avoid_: Capture, snapshot
+_Avoid_: Snapshot. To capture is the act; the screenshot is the image.
 
 **Demo run**:
 The app running on a folder of example configuration and state, so that screenshots show example data. The user's own configuration and app state are left untouched, and opening the app normally brings them back.

@@ -601,6 +601,7 @@ What a command changes, it changes as the user's own click would. A fold is reme
 - **Plain `shipyard app open` brings the user's app back**: it quits the demo and launches the user's own. Always end a demo with it, so the user is left with their shipyard running.
 - **It reads GitHub as the signed-in user**, so name public repositories in a demo's configuration: what it shows ends up in screenshots. Signing out from a demo's panel would sign the user out too.
 - **Pings you send meanwhile go to the user's app**, not the demo, and show there once it's back.
+- **Put the folder in the user's home**, such as `~/shipyard-demo`, never in a shared folder like `/tmp`: another account on the Mac could create that folder first and answer your `panel` and `screenshot` commands in the demo's place.
 - **Keep the folder's path short**: the run refuses one whose path is too long for its socket, saying `use a folder with a shorter path`.
 
 ### What it can't do
@@ -661,15 +662,15 @@ shipyard screenshot icon.png --menu-bar-icon --appearance light
 **"Screenshot shipyard with example data."** Write a demo configuration naming public repositories, run the demo, capture it, then bring the user's app back:
 
 ```sh
-mkdir -p /tmp/shipyard-demo/shipyard
-cat > /tmp/shipyard-demo/shipyard/config.toml <<'TOML'
+mkdir -p ~/shipyard-demo/shipyard
+cat > ~/shipyard-demo/shipyard/config.toml <<'TOML'
 version = 1
 
 [[projects]]
 name = "swift"
 repositories = ["swiftlang/swift"]
 TOML
-shipyard app open --demo /tmp/shipyard-demo
-shipyard screenshot /tmp/shipyard-demo/panel.png
+shipyard app open --demo ~/shipyard-demo
+shipyard screenshot ~/shipyard-demo/panel.png
 shipyard app open
 ```

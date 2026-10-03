@@ -15,7 +15,7 @@ ADR 0004 made `shipyard` a general command line with room for more commands, and
 
 ## Consequences
 
-- Dependencies run one way: Command ← Pings, Config, Control. Pings ← Config, so ProjectFiling can implement PingFiling. All of them ← Core ← App. A module on the agent's side importing Core is a design change, not a shortcut.
+- Dependencies run one way: Command ← Pings, Config, Control. Pings ← Config, so ProjectFiling can implement PingFiling. Core depends on Command, Pings and Config (not Control: only the app's side of control uses its types); App depends on all of them. A module on the agent's side importing Core is a design change, not a shortcut.
 - `Package.swift` makes Config and Control dependencies of the `shipyard` executable on macOS only. The executable's `main.swift` picks the filing and assembles the command table at compile time.
 - CI fails if the Linux `shipyard` links Config, Control or Core, and if the Mac `shipyard` links Core.
 - A type that both sides use moves down to the lowest module that needs it. Code that matches an item or reads the menu stays in Core, as an extension, even when the type it extends lives lower down: the item kinds and state groups belong to Config, while matching an `Item` against them belongs to Core.
