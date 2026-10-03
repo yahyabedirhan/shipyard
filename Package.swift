@@ -46,6 +46,7 @@ var targets: [Target] = [
             "ShipyardCommand",
             "ShipyardPings",
             "ShipyardConfig",
+            "ShipyardControl",
             "ShipyardCore",
             .product(name: "TOMLDecoder", package: "TOMLDecoder"),
         ],

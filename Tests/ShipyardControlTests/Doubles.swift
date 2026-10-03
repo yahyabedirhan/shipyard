@@ -30,10 +30,16 @@ final class FakeTransport: ControlTransport {
     }
 
     let exchanges = Locked<[Exchange]>([])
-    private let answer: @Sendable (ControlRequest, Int) -> Result<Data, ControlTransportFailure>
+    private let answer: @Sendable (ControlRequest, URL, Int) -> Result<Data, ControlTransportFailure>
 
     /// `answer` gets each request and how many came before it.
-    init(answer: @escaping @Sendable (_ request: ControlRequest, _ index: Int) -> Result<Data, ControlTransportFailure>) {
+    convenience init(answer: @escaping @Sendable (_ request: ControlRequest, _ index: Int) -> Result<Data, ControlTransportFailure>) {
+        self.init { request, _, index in answer(request, index) }
+    }
+
+    /// `answer` gets each request, the socket it was sent to and how many
+    /// came before it: apps at several sockets.
+    init(answer: @escaping @Sendable (_ request: ControlRequest, _ socket: URL, _ index: Int) -> Result<Data, ControlTransportFailure>) {
         self.answer = answer
     }
 
@@ -52,7 +58,7 @@ final class FakeTransport: ControlTransport {
         }
         // A request the CLI sent always reads; a test that fails here broke the encoding.
         let decoded = try! ControlRequest.decode(request)
-        return try answer(decoded, index).get()
+        return try answer(decoded, socket, index).get()
     }
 
     /// The requests sent, decoded.

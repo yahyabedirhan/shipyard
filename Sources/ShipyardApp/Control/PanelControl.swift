@@ -35,12 +35,15 @@ protocol PanelControlling: AnyObject {
 final class PanelControl: PanelControlling {
     private let shipyard: Shipyard
     private let state: PanelState
+    /// The folder a demo run reads (`AppFiles.demo`), nil for the user's own app.
+    private let demo: URL?
     /// How long `open` and `close` wait for the panel to appear or go.
     private static let wait = Duration.seconds(2)
 
-    init(shipyard: Shipyard, state: PanelState) {
+    init(shipyard: Shipyard, state: PanelState, demo: URL?) {
         self.shipyard = shipyard
         self.state = state
+        self.demo = demo
     }
 
     func status() -> AppStatus {
@@ -54,7 +57,8 @@ final class PanelControl: PanelControlling {
             tab: menu.layout == .tabs ? PanelText.tabTitle(menu.resolved(state.selectedTab)) : nil,
             projects: configuration.projects.map(\.name),
             folded: menu.collapsedProjects,
-            showingAll: menu.kindGroupsShowingAll.map { AppStatus.Group(project: $0.project, kind: $0.kind.commandName) }
+            showingAll: menu.kindGroupsShowingAll.map { AppStatus.Group(project: $0.project, kind: $0.kind.commandName) },
+            demo: demo?.path
         )
     }
 

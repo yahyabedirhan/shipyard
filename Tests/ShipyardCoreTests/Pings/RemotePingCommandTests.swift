@@ -62,7 +62,7 @@ struct RemotePingCommandTests {
         #expect(PingStore.directoryWithoutTheApp(environment: [:], home: home).path == "/home/agent/.local/share/shipyard/pings")
         #expect(PingStore.directoryWithoutTheApp(environment: ["XDG_DATA_HOME": ""], home: home).path == "/home/agent/.local/share/shipyard/pings")
         #expect(PingStore.directoryWithoutTheApp(environment: ["XDG_DATA_HOME": "data"], home: home).path == "/home/agent/.local/share/shipyard/pings")
-        #expect(PingStore.appDirectory == SupportFolder.app.appendingPathComponent("Pings", isDirectory: true))
+        #expect(PingStore.appDirectory(in: URL(fileURLWithPath: "/support", isDirectory: true)).path == "/support/Pings")
     }
 
     @Test("a ping is one file in the store, as on the Mac")

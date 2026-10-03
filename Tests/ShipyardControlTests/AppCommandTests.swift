@@ -3,7 +3,7 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard app open | quit | status` as an agent runs it, through
+/// `shipyard app open [--demo <folder>] | quit | status` as an agent runs it, through
 /// `ShipyardCLI.run` with the Mac's table, an in-memory app at the end of
 /// the socket and a recording launcher: what each command sends, prints and
 /// exits with.
@@ -20,11 +20,17 @@ struct AppCommandTests {
         shipyard(arguments, transport: transport, launcher: launcher)
     }
 
-    func shipyard(_ arguments: [String], transport: FakeTransport, launcher: RecordingLauncher = RecordingLauncher()) -> CommandResult {
+    func shipyard(
+        _ arguments: [String],
+        transport: FakeTransport,
+        launcher: RecordingLauncher = RecordingLauncher(),
+        support: URL = Self.support,
+        variables: [String: String] = [:]
+    ) -> CommandResult {
         var table = CommandTable()
         let pauses = pauses
         table.add(ControlCommands.entries(
-            support: Self.support,
+            support: support,
             launcher: launcher,
             transport: transport,
             pause: { seconds in pauses.withValue { $0.append(seconds) } }
@@ -32,7 +38,7 @@ struct AppCommandTests {
         return ShipyardCLI.run(
             arguments,
             table: table,
-            environment: CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: [:]),
+            environment: CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: variables),
             now: Date(timeIntervalSince1970: 0)
         )
     }
@@ -78,7 +84,7 @@ struct AppCommandTests {
             showing all: pull-requests in shop
 
             """)
-        #expect(tabs.json == #"{"folded":["blog"],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
+        #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
             + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.1.0"}"# + "\n")
         // The list layout has no tab: no line, and null in the JSON.
         let list = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: [])
@@ -92,6 +98,26 @@ struct AppCommandTests {
 
             """)
         #expect(list.json.contains(#""tab":null"#))
+    }
+
+    @Test("a demo run's status names its folder, as a line and in the JSON")
+    func demoStatus() {
+        var demo = Self.status
+        demo.demo = "/Users/agent/demo"
+
+        #expect(demo.text == """
+            shipyard 0.1.0 is running
+            demo: /Users/agent/demo
+            panel: closed
+            layout: tabs
+            projects: shop, blog
+            folded: none
+            showing all: none
+
+            """)
+        #expect(demo.json
+            == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
+            + #""running":true,"showingAll":[],"tab":null,"version":"0.1.0"}"# + "\n")
     }
 
     // MARK: - Not running, refusals and failures
@@ -182,6 +208,172 @@ struct AppCommandTests {
         #expect(pauses.current.isEmpty)
     }
 
+    // MARK: - Demo
+
+    /// A support folder and a demo folder of their own, short enough for a
+    /// socket's path, removed when `body` returns.
+    func inFolders(_ body: (_ support: URL, _ demo: URL) throws -> Void) throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("sy-\(UUID().uuidString.prefix(8))", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let support = root.appendingPathComponent("support", isDirectory: true)
+        let demo = root.appendingPathComponent("demo", isDirectory: true)
+        try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: demo.appendingPathComponent("shipyard"), withIntermediateDirectories: true)
+        try body(support.standardizedFileURL, demo.standardizedFileURL)
+    }
+
+    /// The user's app at `support`'s socket, running until it's asked to
+    /// quit (or from the start when `normalRuns` is false, never), and the
+    /// demo's at `demo`'s, running once `launcher` launched it with an
+    /// environment, and until it's asked to quit.
+    func apps(support: URL, demo: URL, launcher: RecordingLauncher) -> FakeTransport {
+        let normal = ControlSocket.url(in: support)
+        let demoSocket = ControlSocket.url(in: demo.appendingPathComponent("support", isDirectory: true))
+        let normalRunning = Locked(true)
+        let demoQuit = Locked(false)
+        var demoStatus = Self.status
+        demoStatus.demo = demo.path
+        let demoText = demoStatus.text
+        return FakeTransport { request, socket, _ in
+            let text: String
+            switch socket {
+            case normal where normalRunning.current:
+                text = Self.status.text
+            case demoSocket where launcher.launches.current.contains(where: { !$0.environment.isEmpty }) && !demoQuit.current:
+                text = demoText
+            default:
+                return .failure(.notRunning)
+            }
+            if request == .appQuit {
+                if socket == normal { normalRunning.withValue { $0 = false } } else { demoQuit.withValue { $0 = true } }
+                return .success(ControlReply.done("shipyard quit\n").encoded())
+            }
+            return .success(ControlReply.done(text).encoded())
+        }
+    }
+
+    @Test("open --demo quits the running app, points the command at the demo, launches it on the folder and waits for it there")
+    func openDemo() throws {
+        try inFolders { support, demo in
+            let launcher = RecordingLauncher()
+            let app = apps(support: support, demo: demo, launcher: launcher)
+            let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
+
+            let result = shipyard(["app", "open", "--demo", demo.path], transport: app, launcher: launcher,
+                                  support: support, variables: ["HOME": "/Users/agent"])
+
+            #expect(result.status == 0, "\(result)")
+            #expect(result.output.contains("demo: \(demo.path)\n"))
+            #expect(launcher.launches.current == [.init(bundleID: "com.yahyabedirhan.shipyard", environment: [
+                "XDG_CONFIG_HOME": demo.path,
+                "SHIPYARD_SUPPORT_DIR": demoSupport.path,
+                "GH_CONFIG_DIR": "/Users/agent/.config/gh",
+            ])])
+            // The user's app was asked to quit before the launch, and the launched one asked at the demo's socket.
+            #expect(app.requests.contains(.appQuit))
+            #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: demoSupport))
+            #expect(DemoPointer.recorded(in: support) == demoSupport)
+            // The pointer is the only file in the user's support folder.
+            let files = try FileManager.default.contentsOfDirectory(atPath: support.path)
+            #expect(files == [DemoPointer.fileName])
+        }
+    }
+
+    @Test("while a demo runs, every command reaches it; once its socket is gone, the user's app again")
+    func demoIsFound() throws {
+        try inFolders { support, demo in
+            let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
+            try DemoPointer.record(demoSupport, in: support)
+            try FileManager.default.createDirectory(at: demoSupport, withIntermediateDirectories: true)
+            try Data().write(to: ControlSocket.url(in: demoSupport))
+            let app = FakeTransport(reply: .done(Self.status.text))
+
+            _ = shipyard(["app", "status"], transport: app, support: support)
+            #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: demoSupport))
+
+            // The demo quit from its own menu: its socket is gone, the pointer left behind.
+            try FileManager.default.removeItem(at: ControlSocket.url(in: demoSupport))
+            _ = shipyard(["app", "status"], transport: app, support: support)
+            #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: support))
+        }
+    }
+
+    @Test("plain open while a demo runs quits it, removes the pointer and launches the user's app")
+    func openAfterDemo() throws {
+        try inFolders { support, demo in
+            let launcher = RecordingLauncher()
+            let app = apps(support: support, demo: demo, launcher: launcher)
+            let opened = shipyard(["app", "open", "--demo", demo.path], transport: app, launcher: launcher, support: support)
+            try #require(opened.status == 0, "\(opened)")
+            let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
+            // The demo app listens.
+            try FileManager.default.createDirectory(at: demoSupport, withIntermediateDirectories: true)
+            try Data().write(to: ControlSocket.url(in: demoSupport))
+
+            let result = shipyard(["app", "open"], transport: app, launcher: launcher, support: support)
+
+            #expect(launcher.launches.current.map(\.environment).last == [:])
+            #expect(DemoPointer.recorded(in: support) == nil)
+            let files = try FileManager.default.contentsOfDirectory(atPath: support.path)
+            #expect(files.isEmpty)
+            // The user's app quit for the demo, then the demo for the user's app.
+            #expect(app.requests.filter { $0 == .appQuit }.count == 2)
+            // The fake's user app stays quit, so the wait at the user's socket runs out.
+            #expect(result == CommandResult(error: "shipyard didn't answer within 10 seconds of launching\n", status: 1))
+            #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: support))
+        }
+    }
+
+    @Test("open --demo that can't launch exits 1 and leaves no pointer")
+    func openDemoFails() throws {
+        try inFolders { support, demo in
+            let launcher = RecordingLauncher(failure: AppLaunchFailure("no app with the bundle id com.yahyabedirhan.shipyard is installed"))
+
+            let result = shipyard(["app", "open", "--demo", demo.path], transport: .nothingListens, launcher: launcher, support: support)
+
+            #expect(result.status == 1)
+            #expect(DemoPointer.recorded(in: support) == nil)
+        }
+    }
+
+    @Test("the demo app reads gh's folder as the agent's shell does, since moving XDG_CONFIG_HOME would move it", arguments: [
+        (["GH_CONFIG_DIR": "/cfg/gh", "XDG_CONFIG_HOME": "/xdg"], "/cfg/gh"),
+        (["XDG_CONFIG_HOME": "/xdg", "HOME": "/Users/agent"], "/xdg/gh"),
+        (["GH_CONFIG_DIR": "", "HOME": "/Users/agent"], "/Users/agent/.config/gh"),
+        (["XDG_CONFIG_HOME": "rel", "HOME": "/Users/agent"], "/work/rel/gh"),
+    ])
+    func demoGhConfig(variables: [String: String], expected: String) throws {
+        try inFolders { support, demo in
+            let launcher = RecordingLauncher()
+
+            _ = shipyard(["app", "open", "--demo", demo.path], transport: apps(support: support, demo: demo, launcher: launcher),
+                         launcher: launcher, support: support, variables: variables)
+
+            #expect(launcher.launches.current.first?.environment["GH_CONFIG_DIR"] == expected)
+        }
+    }
+
+    @Test("a demo folder that's missing, a file or too deep for a socket exits 2 and sends nothing")
+    func demoMisread() throws {
+        try inFolders { support, demo in
+            let app = FakeTransport(reply: .done(""))
+            let file = demo.appendingPathComponent("shipyard/config.toml")
+            try Data().write(to: file)
+            let deep = demo.appendingPathComponent(String(repeating: "d", count: 100), isDirectory: true)
+            try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+
+            let missing = shipyard(["app", "open", "--demo", "/nonexistent"], transport: app, support: support)
+            #expect(missing == CommandResult(error: "shipyard app open: no folder at /nonexistent\n" + ControlCommand.usageText, status: 2))
+            #expect(shipyard(["app", "open", "--demo", file.path], transport: app, support: support).status == 2)
+            let tooDeep = shipyard(["app", "open", "--demo", deep.path], transport: app, support: support)
+            #expect(tooDeep.status == 2)
+            #expect(tooDeep.error.contains("use a folder with a shorter path"))
+            #expect(app.exchanges.current.isEmpty)
+            #expect(DemoPointer.recorded(in: support) == nil)
+        }
+    }
+
     // MARK: - Quit
 
     @Test("quit asks the app to quit, then returns once nothing answers, looking with a short timeout")
@@ -218,6 +410,8 @@ struct AppCommandTests {
         (["app", "status", "--json", "now"], "shipyard app status: unexpected `now`\n"),
         (["app", "quit", "now"], "shipyard app quit: unexpected `now`\n"),
         (["app", "open", "--fast"], "shipyard app open: unexpected `--fast`\n"),
+        (["app", "open", "--demo"], "shipyard app open: --demo needs a folder\n"),
+        (["app", "open", "--demo", "/tmp", "now"], "shipyard app open: unexpected `now`\n"),
     ])
     func misread(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
@@ -234,7 +428,7 @@ struct AppCommandTests {
 
         #expect(shipyard("app", "--help", transport: app) == CommandResult(output: ControlCommand.usageText))
         #expect(shipyard("app", "status", "-h", transport: app) == CommandResult(output: ControlCommand.usageText))
-        #expect(shipyard("--help", transport: app).output.contains("shipyard app open | quit | status [--json]"))
+        #expect(shipyard("--help", transport: app).output.contains("shipyard app open [--demo <folder>] | quit | status [--json]"))
         #expect(app.exchanges.current.isEmpty)
     }
 

@@ -3,7 +3,7 @@ import ShipyardCommand
 
 /// Keeps the pings agents send, one JSON file per ping (`<id>.json`) in a
 /// directory of its own (a `RecordStore`): on the Mac
-/// `~/Library/Application Support/Shipyard/Pings/` (`appDirectory`), apart
+/// `Pings/` in the app's support folder (`appDirectory(in:)`), apart
 /// from `state.json` (app state is what shipyard remembers from use; pings
 /// are data agents send); on a machine without the app
 /// `~/.local/share/shipyard/pings` (`directoryWithoutTheApp`). The format
@@ -36,9 +36,10 @@ public struct PingStore: Sendable {
         PingStore(directory: directory, now: { now })
     }
 
-    /// `~/Library/Application Support/Shipyard/Pings/`, beside `state.json`.
-    public static var appDirectory: URL {
-        SupportFolder.app.appendingPathComponent("Pings", isDirectory: true)
+    /// `Pings/` in the app's support folder `support`
+    /// (`SupportFolder.app`), beside `state.json`.
+    public static func appDirectory(in support: URL) -> URL {
+        support.appendingPathComponent("Pings", isDirectory: true)
     }
 
     /// Where the `shipyard` command keeps pings on a machine without the

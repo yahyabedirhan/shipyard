@@ -10,9 +10,9 @@ ShipyardPings     agent side: Ping, PingStore, PingCommand, PingList, HerdrEvent
 ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, WindowDuration, LayoutSetting, ConfigStore,
                   ResolvedRepositoriesStore, ProjectFiling (implements PingFiling)
 ShipyardControl   ControlRequest, ControlReply, ControlCommand and PanelCommand (argument parsing), ControlClient (socket), AppLauncher
-ShipyardCore      the app's rules only (GitHub, items, menu, state, onboarding, Presets, ConfigStatus, CLILink, Skill/),
+ShipyardCore      the app's rules only (GitHub, items, menu, state and AppFiles, onboarding, Presets, ConfigStatus, CLILink, Skill/),
                   plus the Mac's side of pings: RemotePingReader, RemoteMachines, RemotePingMarks, PingNumbers, KnownAgent, HerdrFocus
-ShipyardApp       the Apple-framework layer, plus Control/: ControlServer, PanelControl, PanelState, Screenshotter, DemoLaunch
+ShipyardApp       the Apple-framework layer, plus Control/: ControlServer, PanelControl, PanelState, Screenshotter
 
 shipyard on Linux  → Command + Pings                       (files nothing: Unfiled)
 shipyard on macOS  → Command + Pings + Config + Control    (files by project: ProjectFiling; never Core)
@@ -141,7 +141,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | C2 | `shipyard app open` launches the app by bundle id in the background and returns once `status` answers. After about 10 seconds without an answer, it exits 1. `app quit` quits the app. `app status [--json]` prints whether the app is running, its version, whether the panel is open, its layout, its projects and, in a demo run, the demo folder (#166, #168). |
 | C3 | `shipyard panel open \| close \| fold <project> \| unfold <project> \| show-more <project> <kind> \| tab <name>` steers the panel. Folding and Show more go through the orchestrator's own operations, and the selected tab is panel state the app owns (#167). |
 | C4 | `shipyard screenshot <file.png> [--appearance light\|dark]` opens the panel when it's closed, captures the app's own window through ScreenCaptureKit, writes the PNG and prints its path. When capture fails or is refused, the app renders the panel itself, writes that image instead and says so on standard error, still exit 0. When both fail, it exits 1. `--menu-bar-icon` renders the menu bar icon on its own (#169). |
-| C5 | `shipyard app open --demo <folder>` quits the running app and relaunches it with `XDG_CONFIG_HOME=<folder>` (so it reads `<folder>/shipyard/config.toml`) and `SHIPYARD_SUPPORT_DIR=<folder>/support`. Every store, the avatar and the socket live under the override, and the user's own `config.toml` and `state.json` stay byte for byte as they were. Plain `app open` brings the normal app back (#168). |
+| C5 | `shipyard app open --demo <folder>` quits the running app and relaunches it with `XDG_CONFIG_HOME=<folder>` (so it reads `<folder>/shipyard/config.toml`), `SHIPYARD_SUPPORT_DIR=<folder>/support` and `GH_CONFIG_DIR` (the GitHub CLI's folder as the agent's shell finds it, which moving `XDG_CONFIG_HOME` would otherwise move into the demo, signing it out). Every store, the avatar and the socket live under the override, the login item (the bundle's, so the user's) is left alone whatever the demo's `launch-at-login` says, and the user's own `config.toml` and `state.json` stay byte for byte as they were. It leaves one file outside the folder, a pointer (`demo.json`) in the user's support folder, so later `shipyard` commands reach the demo with no variable. Pings an agent sends meanwhile, from a shell without `SHIPYARD_SUPPORT_DIR`, are filed against the user's `config.toml` into their own store, which the demo doesn't show; the user's app lists them when it's back. Plain `app open` quits the demo, removes the pointer and brings the normal app back (#168). |
 | C6 | Exit codes follow N1: 0 done; 1 refused (the app isn't running, "shipyard isn't running; `shipyard app open`"; an unknown project, kind or tab, with the valid names listed; `tab` in the list layout; both captures failed); 2 for arguments that don't read. |
 
 ### Rules and completion
@@ -245,7 +245,8 @@ Nouns from the requirements, sorted:
 | Control server (0.1.0) | **Entity** (`ControlServer`, in App): listens on `control.sock` while the app runs, and answers each request through `PanelControlling` and `Screenshotting` |
 | Panel control and panel state (0.1.0) | **Port** (`PanelControlling`) and **entity** (`PanelState`, in App): whether the panel is open and which tab it shows; opens and closes it, and folds and shows more through `Shipyard` |
 | Screenshotter (0.1.0) | **Port** (`Screenshotting`) and its implementation (in App): captures the app's own window, or renders the panel, to a PNG |
-| Demo run (0.1.0) | Field: the app was launched with `SHIPYARD_SUPPORT_DIR`; `DemoLaunch` reads it at launch and `status` reports it |
+| App files (0.1.0) | **Value** (`AppFiles`, in Core): where the app reads and writes, decided once from its launch environment: `config.toml`, the support folder, and the demo folder when it was launched with `SHIPYARD_SUPPORT_DIR` (a **demo run**), which `status` reports; in a demo run `loginItem(_:)` gives a login item that changes nothing (#168) |
+| Demo pointer (0.1.0) | **Value** (`DemoPointer`, in Control): `demo.json` in the user's support folder, naming a demo run's support folder; written by `app open --demo`, removed by plain `app open`, followed by `ControlSocket.locate` (#168) |
 
 Relationships:
 
@@ -361,16 +362,16 @@ Where each rule lives:
 
 Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
 
-**Where it stands after #166 and #167.** ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so. Control holds `app open | quit | status` (#166) and `panel open | close | fold | unfold | show-more | tab` (#167); `screenshot` (#169) adds its request, and `app open --demo` (#168) its launch. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. `CommandTable.macOnly` holds `app` and `panel`: each Mac-only command adds its name when it exists on the Mac. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
+**Where it stands after #166, #167 and #168.** ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so. Control holds `app open [--demo <folder>] | quit | status` (#166, #168) and `panel open | close | fold | unfold | show-more | tab` (#167); `screenshot` (#169) adds its request. Since #168 `SupportFolder.app(environment:)` honours `SHIPYARD_SUPPORT_DIR`, the app builds every store on `AppFiles`, and `app open --demo` launches a demo run. `CommandTable.macOnly` holds `app` and `panel`: each Mac-only command adds its name when it exists on the Mac. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
 
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
 | **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder` | Foundation only | every build |
 | **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
-| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it), `ControlCommand` (parsing `app`, `panel`, `screenshot` into an invocation, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (the wire types and the socket calls) |
-| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config | the app |
-| **ShipyardApp** | The Apple-framework layer it has today, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter`, `DemoLaunch` | everything | the app |
+| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand` (parsing `app`, `panel`, `screenshot` into an invocation, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (the wire types and the socket calls) |
+| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config | the app |
+| **ShipyardApp** | The Apple-framework layer it has today, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter` | everything | the app |
 
 ```text
                  ShipyardCommand
@@ -424,7 +425,7 @@ A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default b
 | `Sleep` and `systemSleep` in `Ports.swift` | Command (`Sleep.swift`) | `HerdrCommand` races its timeout with it (#164: not in the agreed list; the nearest fit) |
 | `ConfigurationReader.isRepositorySlug` | `GitRemote.isRepositorySlug` in Command | `--repo` is parsed by the ping command, which can't see Config |
 | one-file-per-ping code in `PingStore` | `RecordStore` in Command, `PingStore` over it | the next agent-side store (notes) reuses it |
-| `ResolvedRepositoriesStore.defaultDirectory` (the support folder) and the XDG folder in `PingStore.defaultDirectory(platform:)` | `SupportFolder.app` and `SupportFolder.withoutTheApp` in Command; `PingStore.appDirectory` and `PingStore.directoryWithoutTheApp` build on them | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; the demo launch makes `app` honour `SHIPYARD_SUPPORT_DIR` (C5) |
+| `ResolvedRepositoriesStore.defaultDirectory` (the support folder) and the XDG folder in `PingStore.defaultDirectory(platform:)` | `SupportFolder.app` and `SupportFolder.withoutTheApp` in Command; `PingStore.appDirectory` and `PingStore.directoryWithoutTheApp` build on them | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; `app(environment:)` honours `SHIPYARD_SUPPORT_DIR` since the demo launch (C5, #168) |
 | `PingStore.removeExpired` called by `ShipyardCLI` on Linux | `PingStore` drops expired pings as it reads, at its `now` (each command reads it `at` its own time) | M4: a property of the store, not an `if` |
 | `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config | it reads the configuration |
 | `PingCommand.send(…, platform:, unfiled:)` | `send(…, filing:, whenNoProject:)` | the platform becomes the filing; `unfiled` becomes `.keepUnfiled` |
@@ -476,7 +477,7 @@ Tests: the CLI tests that were parameterised by platform are parameterised by fi
 
 `RecordStore<Record: Codable & Equatable & Sendable>(directory:)` keeps one `<id>.json` per record, ISO 8601 dates: `all()` (every file that reads, skipping the rest, in no order), `record(id:)`, `save(record, id:)` (creating the directory, replacing the file atomically), `remove(id:)`, and `removeIfUnchanged(record, id:) -> Bool`. `PingStore` keeps its operations (§ PingStore) and delegates the files, adding the ping rules: oldest first, same-sending writes, and dropping a ping past its `expires` from `all()` and `ping(id:)` (removing its file through `removeIfUnchanged`). It reads expiry against `now`, a clock it's built with (the real time by default); `at(date)` is the same store reading as at `date`, which `PingCommands` gives each run, so a command's `now` decides.
 
-`SupportFolder`: `app` is `~/Library/Application Support/Shipyard`; the demo launch makes it `app(environment:home:)`, `SHIPYARD_SUPPORT_DIR` when it's set and absolute. `withoutTheApp(environment:home:)` is `$XDG_DATA_HOME/shipyard` when it's absolute, else `~/.local/share/shipyard`. The app's stores, `PingStore` on the Mac, `ResolvedRepositoriesStore`, the avatar cache and later `ControlSocket` all build on `app`, so the CLI and the app (a demo run included) can't disagree.
+`SupportFolder`: `app(environment:)` is `SHIPYARD_SUPPORT_DIR` when it's set and absolute (`overrideVariable`), else `~/Library/Application Support/Shipyard` (#168). `withoutTheApp(environment:home:)` is `$XDG_DATA_HOME/shipyard` when it's absolute, else `~/.local/share/shipyard`. The app's stores (through `AppFiles`), `PingStore.appDirectory(in:)` on the Mac, `ResolvedRepositoriesStore`, `ConfigLocation`, the avatar cache and `ControlSocket` all build on `app`, so the CLI and the app (a demo run included) can't disagree. The `shipyard` command reads it from its own environment: an agent's shell has no `SHIPYARD_SUPPORT_DIR`, so during a demo run it files pings into the user's own store, against the `config.toml` the user's app recorded, and reaches the demo app through `DemoPointer`. Tests: the override's table in `DemoRunTests` (`Tests/ShipyardCoreTests/State/`).
 
 ### App control: the client — `ShipyardControl/` (0.1.0, #166–#169)
 
@@ -489,7 +490,7 @@ reply    {"ok":true,"output":"folded shop\n","error":""}                  one JS
 
 | `ControlRequest` | From | Reply's `output` |
 |---|---|---|
-| `app.status` (`json: Bool`) | `shipyard app status [--json]` | `AppStatus` as lines (`shipyard 0.1.0 is running`, `panel: closed`, `layout: tabs`, `tab: All` in the tabs layout only, `projects: shop, blog`, `folded: none`, `showing all: pull-requests in shop`), or as one JSON object on one line, keys sorted: `folded` (the collapsed projects), `layout`, `panelOpen`, `projects`, `running` (always true), `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`, the groups by kind Show more opened), `tab` (the selected tab's title, `null` in the list layout), `version`; #168 adds `demo` (the folder or null) |
+| `app.status` (`json: Bool`) | `shipyard app status [--json]` | `AppStatus` as lines (`shipyard 0.1.0 is running`, `demo: <folder>` in a demo run only, `panel: closed`, `layout: tabs`, `tab: All` in the tabs layout only, `projects: shop, blog`, `folded: none`, `showing all: pull-requests in shop`), or as one JSON object on one line, keys sorted: `demo` (the demo folder, `null` outside a demo; #168), `folded` (the collapsed projects), `layout`, `panelOpen`, `projects`, `running` (always true), `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`, the groups by kind Show more opened), `tab` (the selected tab's title, `null` in the list layout), `version` |
 | `app.quit` | `shipyard app quit` | `shipyard quit`; the app replies, then terminates and removes the socket. The CLI prints it once nothing answers on the socket (a look every quarter second, each with a 1 s timeout, up to 10 s; still answering: exit 1), so a following `app open` launches a new app instead of finding the old one |
 | `panel.open`, `panel.close` | `shipyard panel open`, `close` | `panel open`, `panel closed`, once the panel's appearing (or disappearing) set `PanelState.isOpen`; not within 2 s: refused, "the panel didn't open within 2 seconds; click shipyard's menu bar icon" (or close). Already so: done at once |
 | `panel.fold`, `panel.unfold` (`project`) | `shipyard panel fold <project>`, `unfold <project>` | `folded <project>`, `unfolded <project>`, also when it already was |
@@ -499,19 +500,24 @@ reply    {"ok":true,"output":"folded shop\n","error":""}                  one JS
 A request missing a field its command needs (`project`, `kind`, `name`) is refused as unreadable, "the control command `panel.showMore` needs its `kind`". The client checks only the arguments' shape (`PanelCommand.parse`: a missing or extra argument, an unknown subcommand: exit 2 with the panel usage); whether a project, kind or tab exists is the app's to say, exit 1.
 | `screenshot` (`path`, `appearance`, `menuBarIcon`) | `shipyard screenshot <file.png> [--appearance light\|dark] [--menu-bar-icon]` | the absolute path written; `error` holds the fallback's note when the panel was rendered |
 
-`app open [--demo <folder>]` isn't a request: the app may not be running. `ControlCommand` first sends `app.status`: when the app answers (or is there but fails to), that's the result and nothing is launched. #168 adds: it sends `app.quit` when the app answers and a demo is asked for (or when a demo runs and plain `open` is asked for). Otherwise `AppLaunching.launch(bundleID: "com.yahyabedirhan.shipyard", environment:)` starts it through `NSWorkspace.openApplication` with `activates = false` (and, for a demo, `XDG_CONFIG_HOME` and `SHIPYARD_SUPPORT_DIR`), waiting up to 10 s for Launch Services. It then sends `app.status` every quarter second for up to 10 seconds, against the socket `ControlSocket.locate` finds, each look waiting 1 s at most, since a starting app may accept a connection before it can answer (a look that times out is looked at again). Answered: exit 0 with the status. Never answered: exit 1, "shipyard didn't answer within 10 seconds of launching". The launch failing: exit 1 with Launch Services' reason.
+`app open [--demo <folder>]` isn't a request: the app may not be running.
+
+- **Plain `open`.** When a `DemoPointer` is in the support folder, the demo app it names is quit (when it answers, waiting until it's gone, as `app quit` does) and the pointer removed. Then `ControlCommand` sends `app.status` to the user's own socket: when the app answers (or is there but fails to), that's the result and nothing is launched.
+- **`open --demo <folder>`.** `DemoPointer.record(<folder>/support)` writes the pointer first (when it can't, exit 1 with nothing quit). Then whatever answers, at the socket `ControlSocket.locate` found and at the user's own, is quit the same way, and the launch below has the demo's environment (C5). A quit that fails, a launch that fails, or a demo that never answers removes the pointer again.
+
+Otherwise `AppLaunching.launch(bundleID: "com.yahyabedirhan.shipyard", environment:)` starts it through `NSWorkspace.openApplication` with `activates = false` (for a demo, `OpenConfiguration.environment` holds `XDG_CONFIG_HOME`, `SHIPYARD_SUPPORT_DIR` and `GH_CONFIG_DIR`), waiting up to 10 s for Launch Services. It first waits up to 5 s for a copy of the app still running to end: one just asked to quit removes its socket before its process ends, and Launch Services would hand that process back instead of starting one with the new environment. It then sends `app.status` every quarter second for up to 10 seconds, to the socket the launched app listens on (the user's, or `<folder>/support/control.sock`), each look waiting 1 s at most, since a starting app may accept a connection before it can answer (a look that times out is looked at again). Answered: exit 0 with the status. Never answered: exit 1, "shipyard didn't answer within 10 seconds of launching". The launch failing: exit 1 with Launch Services' reason. A quit the app refuses, or one it still answers after: exit 1 with that line, nothing launched.
 
 | Operation | Returns / rejects |
 |---|---|
-| `ControlCommand.parse(arguments) -> Result<Invocation, CommandResult>` (the arguments after `app`; `PanelCommand.parse(arguments) -> Result<ControlRequest, CommandResult>` those after `panel`; `screenshot` adds its own) | an `Invocation`: `open` (#168 adds its demo folder), `quit`, or `send(ControlRequest)`; `--help` or `-h`: the usage on standard output, exit 0 | no subcommand, an unknown one, an extra argument; later a relative or non-`.png` screenshot path (made absolute against the working folder first), an `--appearance` other than `light` or `dark`, a `--demo` folder that doesn't exist: exit 2 with the line and the usage; nothing sent |
-| `ControlCommand.run(invocation, context:) -> CommandResult` (`Context`: the client, the launcher and the pause between looks) | a reply's `ok`: exit 0, `output` to standard output, `error` (a note) to standard error | `ok: false`: exit 1 with `error`; `notRunning` (no socket, or the connection refused): exit 1, "shipyard isn't running; `shipyard app open`"; no reply within the timeout: exit 1, "shipyard didn't answer within 15 seconds"; a reply that doesn't read: exit 1, "couldn't ask shipyard: the app's reply doesn't read; is the app from the same build as this shipyard (<version>)?". A request of another `version` is the app's to refuse, naming both versions (`ControlServer.reply`) |
+| `ControlCommand.parse(arguments, environment:) -> Result<Invocation, CommandResult>` (the arguments after `app`, and the command's environment for a demo folder's working folder and `gh` folder; `PanelCommand.parse(arguments) -> Result<ControlRequest, CommandResult>` those after `panel`; `screenshot` adds its own) | an `Invocation`: `open(demo:)` (a `Demo`: the folder, made absolute against the working folder, and the `gh` folder from the command's environment: `GH_CONFIG_DIR`, else `$XDG_CONFIG_HOME/gh`, else `$HOME/.config/gh`), `quit`, or `send(ControlRequest)`; `--help` or `-h`: the usage on standard output, exit 0 | no subcommand, an unknown one, an extra argument; `--demo` without a folder, a `--demo` path that isn't a folder, or one whose `support/control.sock` path is longer than a socket's address holds (103 bytes on macOS); later a relative or non-`.png` screenshot path (made absolute against the working folder first), an `--appearance` other than `light` or `dark`: exit 2 with the line and the usage; nothing sent |
+| `ControlCommand.run(invocation, context:) -> CommandResult` (`Context`: the normal support folder, where the demo pointer goes; the client at the socket `locate` found; the launcher and the pause between looks) | a reply's `ok`: exit 0, `output` to standard output, `error` (a note) to standard error | `ok: false`: exit 1 with `error`; `notRunning` (no socket, or the connection refused): exit 1, "shipyard isn't running; `shipyard app open`"; no reply within the timeout: exit 1, "shipyard didn't answer within 15 seconds"; a reply that doesn't read: exit 1, "couldn't ask shipyard: the app's reply doesn't read; is the app from the same build as this shipyard (<version>)?". A request of another `version` is the app's to refuse, naming both versions (`ControlServer.reply`) |
 | `ControlClient.send(request) -> Result<ControlReply, ControlClient.Failure>` | connects to the socket `ControlSocket.locate(support:)` found, through `ControlTransport` (`UnixSocketTransport`; tests pass an in-memory one), writes the request, half-closes, reads the reply to its end, with a 15 s timeout on each read and write (a screenshot may render) | `notRunning`, `timedOut(seconds)`, `failed(why)` (the connection, or a reply that doesn't read) |
 
-`ControlSocket.url(in: support)` is where the app listens; `ControlSocket.locate(support:)` is where every client command looks, `app open`'s wait included. Today they're the same file. A demo run (#168) changes only `locate`: `app open --demo` writes a pointer in the normal support folder naming the demo's, and `locate` follows it, so later commands find the demo's socket without an environment variable.
+`ControlSocket.url(in: support)` is where the app listens; `ControlSocket.locate(support:)` is where every client command looks. Outside a demo they're the same file. `app open --demo` writes `DemoPointer` (`demo.json`, `{ "support": "<folder>/support", "version": 1 }`) in the normal support folder, and `locate` follows it while the demo's socket file is there, so later commands (`app status`, `panel`, `screenshot`) find the demo's socket without an environment variable (#168). Once that socket is gone (the demo quit from its own menu, say) `locate` is the normal socket again, so a user's app started meanwhile is still found; the stale pointer goes with the next plain `app open`. The pointer reads fail-safe, like `ConfigLocation`: a missing file, one that doesn't read, a newer version or a relative path is no demo.
 
 Every write on the socket, the client's and the server's, passes `MSG_NOSIGNAL` (`UnixSocket.writeAll`): a peer that already closed fails the write instead of raising `SIGPIPE`, which would end the process. `SO_NOSIGPIPE` isn't enough on macOS, which refuses it on an accepted socket whose peer has already closed.
 
-Tests: the parsing, the wire format, the status's two forms and the exit codes run through `ShipyardCLI.run` with a fake transport and a recording launcher (`Tests/ShipyardControlTests/AppCommandTests.swift` and `PanelCommandTests.swift`, which run on Linux too, since only the real launcher needs AppKit), as does a build without Control refusing `app` and `panel`.
+Tests: the parsing, the wire format, the status's two forms and the exit codes run through `ShipyardCLI.run` with a fake transport and a recording launcher (`Tests/ShipyardControlTests/AppCommandTests.swift` and `PanelCommandTests.swift`, which run on Linux too, since only the real launcher needs AppKit), as does a build without Control refusing `app` and `panel`. The demo's launch, pointer and lookup are in `AppCommandTests`, in temporary folders; the demo run end to end, from `app open --demo` to the app's files under the override and the user's left byte for byte, is the Harness scenario `DemoRunTests` (#168).
 
 **Known limit:** a Unix socket's path is at most 103 bytes on macOS (the address holds 104 with the closing zero). `UnixSocketTransport` and the server refuse a longer one with a line naming the path, so a demo folder nested deep needs a shorter path.
 
@@ -524,7 +530,7 @@ Tests: the parsing, the wire format, the status's two forms and the exit codes r
 | `PanelControl: PanelControlling` | nothing of its own: `PanelState`, `Shipyard` and `MenuBarWindow` | `status() -> AppStatus` from the last valid configuration (layout, projects), the menu (the selected tab resolved, `MenuModel.collapsedProjects`, `kindGroupsShowingAll`) and `ShipyardVersion`; `open()`, `close()` (async: through `MenuBarWindow`, then waiting up to 2 s, a look every 50 ms, for `PanelState.isOpen` to follow; refused when it doesn't); `fold(project)`, `unfold(project)` (`Shipyard.setCollapsed`, which calls `toggleCollapsed` only when it differs); `showMore(project, kind)` (`Shipyard.showMore(_:kind:)`, which calls `showMore(group)` on the project's group of that kind); `selectTab(name) -> title` (`MenuModel.tab(named:)`, then `PanelState.select`, animated). Each refuses with a `PanelRefusal` naming what exists: "no project is named `shopp`; the projects are `shop`, `blog`", "no kind is named `prs`; the kinds are `pull-requests`, `issues`, `workflow-runs`, `pings`", "`shop` lists no workflow-runs; its kinds are `pull-requests`, `issues`", "`blog` lists no group by kind; show-more needs `group-by = \"kind\"`, the default", "no tab is named `x`; the tabs are `All`, `shop`, `blog`", or `tab` in the list layout ("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`"). The names are the menu's sections, so a remote machine's own section counts as a project |
 | `MenuBarWindow` (`ShipyardApp/MenuBarWindow.swift`) | nothing: opens and closes the `MenuBarExtra` window as a click on the icon does, on the next turn of the main loop. On macOS 26 and earlier through the status item's button (on while presented); on macOS 27 the expanded-interface session is cancelled to close, and opening clicks the button, best effort (its target is nil there, so `open` may be refused after its wait). Private selectors are called only when they take no argument and return an object | `open()`, `close()`; `AppServices.closeMenu()` closes through it |
 | `Screenshotter: Screenshotting` | capturing the panel's window | `capture(to:appearance:)`: sets the panel's appearance, opens it when closed and waits for a layout pass, then captures with `SCScreenshotManager` filtered to this process's panel window (`SCShareableContent` limited to the current process), which needs no Screen Recording permission. When that fails or is refused, it renders `Panel` with `ImageRenderer` at the screen's scale and returns `rendered(why)`. `--menu-bar-icon` renders `SailboatImage` alone. Hover cards and the menu bar strip are never captured |
-| `DemoLaunch` | knowing a demo run | `current(environment) -> URL?`: the support folder when `SHIPYARD_SUPPORT_DIR` is set; `AppServices` builds every store on `SupportFolder.app`, and `status` reports the folder |
+| `AppServices` (in `ShipyardApp.swift`) | building the app on `AppFiles(environment:)` (#168) | every store, the avatar cache and the control server's socket on its paths, and the login item through `files.loginItem(LaunchAtLogin())`; `PanelControl` gets its `demo` for `status` |
 
 ### Shipyard (orchestrator) — `ShipyardCore/Shipyard.swift`
 
@@ -860,7 +866,7 @@ Pure: `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, asked on
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
-One JSON file, `state.json`, in a directory the app provides (`~/Library/Application Support/Shipyard/`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks` and `pingNumbers: PingNumbers?` (N14).
+One JSON file, `state.json`, in a directory the app provides (its support folder, `AppFiles.support`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks` and `pingNumbers: PingNumbers?` (N14).
 
 ```json
 {
@@ -1093,34 +1099,19 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else. As built by #126 and #166 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
-
-```swift
-var table = CommandTable()
-#if os(macOS)
-table.add(PingCommands.entries(
-    filing: ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: SupportFolder.app),
-                          repositories: ResolvedRepositoriesStore(directory: SupportFolder.app)),
-    store: PingStore(directory: PingStore.appDirectory)))
-table.add(ControlCommands.entries(support: SupportFolder.app, launcher: WorkspaceLauncher()))
-#else
-table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
-#endif
-```
-
-The target, once the demo launch lands:
+Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else. As built by #126, #166 and #168 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
 
 ```swift
 var table = CommandTable()
 #if os(macOS)
 let support = SupportFolder.app(environment: environment)
-let filing = ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: support),
-                           resolved: ResolvedRepositoriesStore(directory: support))
-table.add(PingCommands.entries(filing: filing, store: PingStore(directory: support.appendingPathComponent("Pings"))))
+table.add(PingCommands.entries(
+    filing: ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: support),
+                          repositories: ResolvedRepositoriesStore(directory: support)),
+    store: PingStore(directory: PingStore.appDirectory(in: support))))
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 #else
-let filing = Unfiled()
-table.add(PingCommands.entries(filing: filing, store: PingStore(directory: SupportFolder.withoutTheApp(environment: environment).appendingPathComponent("pings"))))
+table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
 #endif
 let result = ShipyardCLI.run(arguments, table: table, environment: commandEnvironment, now: Date())
 ```
@@ -1195,8 +1186,8 @@ shipyard/
 ├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command (AppKit only for the real launcher)
 │   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*; screenshot later), versioned JSON; ControlProtocolError
 │   ├── ControlReply.swift            # { ok, output, error }
-│   ├── AppStatus.swift               # what app status reports (panel open, layout, tab, projects, folded, showing all): as lines, or one JSON object
-│   ├── ControlSocket.swift           # control.sock in the support folder (url(in:)); where clients look for it (locate(support:))
+│   ├── AppStatus.swift               # what app status reports (demo folder, panel open, layout, tab, projects, folded, showing all): as lines, or one JSON object
+│   ├── ControlSocket.swift           # control.sock in the support folder (url(in:)); where clients look for it (locate(support:)), following DemoPointer (demo.json) to a demo run's
 │   ├── UnixSocket.swift              # the POSIX calls both ends make (package): address, timeouts, MSG_NOSIGNAL writes, reading to the end; the 103-byte path limit
 │   ├── ControlCommand.swift          # app (later screenshot) arguments → an invocation; a reply → CommandResult; app open's launch and wait, app quit's wait
 │   ├── PanelCommand.swift            # (#167) panel arguments → a ControlRequest; the panel usage
@@ -1243,7 +1234,8 @@ shipyard/
 │   ├── CLI/
 │   │   └── CLILink.swift             # links ~/.local/bin/shipyard to the app's CLI, or says what's in the way (LinkFileSystem port, FileManagerLinkFileSystem)
 │   ├── State/
-│   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers; tolerant, versioned
+│   │   ├── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers; tolerant, versioned
+│   │   └── AppFiles.swift            # (0.1.0) where the app reads and writes, from its launch environment: config.toml, the support folder, the demo folder in a demo run (which leaves the login item alone)
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections of groups, from listings; semantic state colours, label
 │   │   ├── MachineNotice.swift       # pure: one quiet line per remote machine that failed or sent a truncated list
@@ -1270,7 +1262,7 @@ shipyard/
 │       └── SkillInstallation.swift   # one install as the panel shows it: running, result, timeout, cancel
 ├── Sources/ShipyardCLI/main.swift    # the `shipyard` executable: assembles the build's CommandTable (Unfiled on Linux; ProjectFiling and app control on macOS), prints ShipyardCLI.run's result
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
-│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below (every store on SupportFolder.app), starts the control server, routes notification clicks, holds the panel's actions and closes the menu after opening something
+│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below (every store, the avatar and the socket on AppFiles from the launch environment), starts the control server, routes notification clicks, holds the panel's actions and closes the menu after opening something
 │   ├── MenuBarWindow.swift           # (#167) opens and closes the MenuBarExtra window as a click on the icon does: the status item's button up to macOS 26, the expanded-interface session on 27 (opening best effort)
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration(); watches the ping store's directory alone (init(folder:)), calling reloadPings()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
@@ -1280,10 +1272,9 @@ shipyard/
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   ├── Control/                      # (0.1.0) the app's side of app control
 │   │   ├── ControlServer.swift       # control.sock (0600, removed at quit): one request per connection, reply(to:) dispatches over PanelControlling (and Screenshotting, #169)
-│   │   ├── PanelControl.swift        # PanelControlling: status (#166); open and close the panel through MenuBarWindow, waiting for PanelState, fold, Show more, tab (#167)
+│   │   ├── PanelControl.swift        # PanelControlling: status (#166), with the demo folder (#168); open and close the panel through MenuBarWindow, waiting for PanelState, fold, Show more, tab (#167)
 │   │   ├── PanelState.swift          # (#167) @Observable: isOpen, selectedTab and which way it moved, owned by AppServices
-│   │   ├── Screenshotter.swift       # Screenshotting: ScreenCaptureKit on this process's panel window, else ImageRenderer of Panel; the menu bar icon alone
-│   │   └── DemoLaunch.swift          # a demo run: the folder SHIPYARD_SUPPORT_DIR names, for status
+│   │   └── Screenshotter.swift       # Screenshotting: ScreenCaptureKit on this process's panel window, else ImageRenderer of Panel; the menu bar icon alone
 │   ├── Brand/
 │   │   ├── Sailboat.swift            # shipyard's sailboat, one CGPath (CoreGraphics only): make-icon.swift compiles this file, so the app icon, the menu bar item and the badge draw one figure (#80)
 │   │   ├── Logo.swift                # the logo (CoreGraphics only, compiled into make-icon.swift too): the icon's squircle, khaki green gradient, sheen, cream figure colour and the figure's size against the body
@@ -1310,7 +1301,7 @@ shipyard/
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
 ├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher (AppCommandTests, PanelCommandTests, Doubles)
 ├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping and config suites stay here
-│   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
+│   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + support folders built through AppFiles (or the app as launched with an environment), fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
 │   ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
 │   ├── PanelSteeringTests.swift      # (#167) shipyard panel's fold, unfold, show-more and tab by name through the orchestrator, and their refusals' words
@@ -1670,6 +1661,33 @@ Setup: `[menu] layout = "list"`, the app running.
 | `shipyard panel fold shopp` | `PanelControl.fold`: "no project is named `shopp`; the projects are `shop`, `blog`", exit 1 |
 | `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "shipyard: `shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
 | `shipyard ping "x" --repo yahyabedirhan/shop` on the Mac when `shop` sets `pings = { show = false }` | `ProjectFiling` refuses: every project the ping lands in hides pings, exit 1; nothing written (#127) |
+
+### Trace 12: a demo run (0.1.0, #168)
+
+Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Application Support/Shipyard/`. An agent has `~/demo/shipyard/config.toml`, naming only public repositories, and wants screenshots of it.
+
+| Step | Call (module) | State after |
+|---|---|---|
+| 1 | `shipyard app open --demo ~/demo` → `ControlCommand.parse` (Control) | `open(demo: Demo(folder: /Users/me/demo, ghConfig: ~/.config/gh))`: a folder, and `demo/support/control.sock` fits a socket's address |
+| 2 | `ControlCommand.run` → `app.status`, then `app.quit`, to the user's socket; looks until nothing answers | the user's app has quit and removed its socket |
+| 3 | `DemoPointer.record(~/demo/support, in: ~/Library/Application Support/Shipyard)` | `demo.json` in the user's support folder: the only file the run writes outside `~/demo` |
+| 4 | `WorkspaceLauncher.launch(environment: XDG_CONFIG_HOME, SHIPYARD_SUPPORT_DIR, GH_CONFIG_DIR)` (Control, AppKit) | Launch Services starts `Shipyard.app` with those variables |
+| 5 | `AppServices` (App) → `AppFiles(environment:)` (Core) | `config = ~/demo/shipyard/config.toml`, `support = ~/demo/support`, `demo = ~/demo`; every store, `Avatar/` and the `ControlServer` on them |
+| 6 | `Shipyard.start()` (Core): token from the Keychain or `gh auth token` (with the user's `GH_CONFIG_DIR`), refresh | `state.json`, `config-status.json`, `repositories.json`, `config-location.json` written under `~/demo/support` |
+| 7 | the CLI's looks at `~/demo/support/control.sock` → `app.status` | prints the status with `demo: /Users/me/demo`, exit 0 |
+| 8 | `shipyard screenshot /tmp/demo.png` → `ControlSocket.locate` follows `demo.json` | captured from the demo app (Trace 10) |
+| 9 | `shipyard app open` → the pointer names `~/demo/support`: `app.quit` there, wait, `DemoPointer.remove`, then `app.status` at the user's socket: nothing → launch with no variables, wait | the user's app back on their own files; `demo.json` gone; their `config.toml` and `state.json` byte for byte as before step 1 |
+
+| Variant | What happens |
+|---|---|
+| an agent's `shipyard ping` during the demo (no `SHIPYARD_SUPPORT_DIR` in its shell) | filed against the `config.toml` the user's app recorded, into the user's `Pings/`; the demo doesn't list it; the user's app does at step 9 |
+| the demo quit from its own menu | its socket is gone, so `locate` is the user's socket again: `app status` says shipyard isn't running, or finds a user's app started from Finder |
+| the launch fails, or the demo never answers | exit 1, and the pointer is removed again |
+
+Known limits of a demo run:
+- **The token is shared.** The demo reads the user's Keychain token and `gh`, as it must to read GitHub, so signing in or out from the demo's panel changes the user's token too. Agents don't click, so only a person can do this.
+- **A crashed demo can hide the user's app.** `locate` follows the pointer while the demo's socket file exists. A demo that crashed leaves the file, so `app status` says shipyard isn't running even while a user's app started from Finder runs. The next plain `app open` removes the pointer and finds it.
+- **An app without app control isn't quit.** `app open --demo` quits only an app that answers on a socket. A user's app whose control server couldn't start (it logs why) keeps running: Launch Services hands it back without the demo's environment, the demo never answers, and the command exits 1 with the pointer removed.
 
 ### Trace 3: agents drain the limit (rejection by budget)
 

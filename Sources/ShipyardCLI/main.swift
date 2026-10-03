@@ -16,16 +16,19 @@ let environment = ProcessInfo.processInfo.environment
 var table = CommandTable()
 #if os(macOS)
 // The config.toml the app recorded it reads, whatever this shell's
-// `XDG_CONFIG_HOME`; the command's own lookup before the app has run.
-let support = SupportFolder.app
+// `XDG_CONFIG_HOME`; the command's own lookup before the app has run. A
+// demo run doesn't move it: without `SHIPYARD_SUPPORT_DIR` pings are filed
+// against the user's own config.toml into their own store, and `app` finds
+// the demo through the pointer `app open --demo` leaves (`ControlSocket.locate`).
+let support = SupportFolder.app(environment: environment)
 table.add(PingCommands.entries(
     filing: ProjectFiling(
         configURL: ConfigLocation.current(environment: environment, support: support),
         repositories: ResolvedRepositoriesStore(directory: support)
     ),
-    store: PingStore(directory: PingStore.appDirectory)
+    store: PingStore(directory: PingStore.appDirectory(in: support))
 ))
-table.add(ControlCommands.entries(support: SupportFolder.app, launcher: WorkspaceLauncher()))
+table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 #else
 table.add(PingCommands.entries(
     filing: Unfiled(),

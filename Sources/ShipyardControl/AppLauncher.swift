@@ -33,12 +33,25 @@ public enum ShipyardBundle {
 public struct WorkspaceLauncher: AppLaunching {
     /// How long to wait for Launch Services to say the app started.
     var timeout: TimeInterval = 10
+    /// How long to wait for a quitting copy of the app to end before
+    /// launching. `app open` only launches once nothing answers on the
+    /// socket, so a copy still there is quitting, or runs without app
+    /// control (then it's brought back as it is, after this wait).
+    var quitGrace: TimeInterval = 5
 
     public init() {}
 
     public func launch(bundleID: String, environment: [String: String]) throws(AppLaunchFailure) {
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             throw AppLaunchFailure("no app with the bundle id \(bundleID) is installed")
+        }
+        // An app just asked to quit removes its socket before its process
+        // ends; Launch Services would hand that process back instead of
+        // starting one with this environment, so let it finish first.
+        let deadline = Date().addingTimeInterval(quitGrace)
+        while Date() < deadline,
+              NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).contains(where: { !$0.isTerminated }) {
+            Thread.sleep(forTimeInterval: 0.1)
         }
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.activates = false

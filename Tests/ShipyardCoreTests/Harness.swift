@@ -10,7 +10,8 @@ import FoundationNetworking
 /// The main test seam: a real `Shipyard` driven end to end over in-memory
 /// ports. The network is `StubHTTP` answering from recorded GitHub
 /// responses (`Fixtures/`); the configuration lives in a temporary
-/// directory and the app state in another; the clock, the refresh timer and
+/// directory and the support folder (app state, pings, resolved
+/// repositories) in another, each store where the app puts it (`AppFiles`); the clock, the refresh timer and
 /// waiting are manual; the action port, notifier and login item record what
 /// they're asked.
 ///
@@ -45,10 +46,13 @@ struct Harness {
     let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
     let loginItem = RecordingLoginItem()
+    /// Where this app reads and writes, as the app decides it.
+    let files: AppFiles
     /// `config.toml` in a fresh temporary directory.
-    let configURL: URL
-    /// A fresh temporary directory for app state (`state.json`).
-    let stateDirectory: URL
+    nonisolated var configURL: URL { files.config }
+    /// The support folder, a fresh temporary directory: app state
+    /// (`state.json`), pings, resolved repositories.
+    nonisolated var stateDirectory: URL { files.support }
     /// The ping store the CLI and the app share, in `stateDirectory`.
     let pingStore: PingStore
     /// The repositories the app last resolved, for the CLI, in `stateDirectory`.
@@ -70,30 +74,36 @@ struct Harness {
         try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         if let config { try Data(config.utf8).write(to: configURL) }
-        self.init(configURL: configURL, stateDirectory: stateDirectory, store: InMemoryTokenStore(token: stored), gh: ghToken, clientID: clientID)
+        self.init(files: AppFiles(config: configURL, support: stateDirectory), store: InMemoryTokenStore(token: stored), gh: ghToken, clientID: clientID)
     }
 
-    /// A harness over existing configuration and app-state directories.
-    private init(configURL: URL, stateDirectory: URL, store: InMemoryTokenStore, gh ghToken: String?, clientID: String = "test-client-id") {
-        self.configURL = configURL
-        self.stateDirectory = stateDirectory
+    /// The app as launched with `environment` (with `home` for the
+    /// user's own folders), signed in with a stored token: its files where
+    /// `AppFiles` puts them, as `AppServices` builds them.
+    init(launchedWith environment: [String: String], home: URL) {
+        self.init(files: AppFiles(environment: environment, home: home), store: InMemoryTokenStore(token: "gho_stored"), gh: nil)
+    }
+
+    /// A harness over existing configuration and support folders.
+    private init(files: AppFiles, store: InMemoryTokenStore, gh ghToken: String?, clientID: String = "test-client-id") {
+        self.files = files
         self.store = store
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
         let clock = sleeper.clock
         // Read at the harness's time, so a ping's expiry counts from its clock.
-        pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true), now: { clock.now })
-        repositoriesStore = ResolvedRepositoriesStore(directory: stateDirectory)
+        pingStore = PingStore(directory: files.pings, now: { clock.now })
+        repositoriesStore = ResolvedRepositoriesStore(directory: files.support)
         shipyard = Shipyard(
-            configStore: ConfigStore(url: configURL),
-            appStateStore: AppStateStore(directory: stateDirectory),
-            configStatusStore: ConfigStatusStore(directory: stateDirectory),
+            configStore: ConfigStore(url: files.config),
+            appStateStore: AppStateStore(directory: files.support),
+            configStatusStore: ConfigStatusStore(directory: files.support),
             pingStore: pingStore,
             repositoriesStore: repositoriesStore,
             tokenStore: store,
             actions: actions,
             notifier: notifier,
-            loginItem: loginItem,
+            loginItem: files.loginItem(loginItem),
             gh: gh,
             herdr: herdr.focus,
             remote: herdr.remote,
@@ -121,7 +131,7 @@ struct Harness {
     /// the same configuration file, app-state directory and token store,
     /// with the clock where this one's is, not started yet.
     func relaunched() -> Harness {
-        let next = Harness(configURL: configURL, stateDirectory: stateDirectory, store: store, gh: ghToken)
+        let next = Harness(files: files, store: store, gh: ghToken)
         next.clock.set(clock.now)
         return next
     }

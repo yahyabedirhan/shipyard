@@ -12,13 +12,14 @@ public enum ControlCommands {
         pause: @escaping @Sendable (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
     ) -> [CommandTable.Entry] {
         let context = ControlCommand.Context(
+            support: support,
             client: ControlClient(socket: ControlSocket.locate(support: support), transport: transport),
             launcher: launcher,
             pause: pause
         )
         return [
-            CommandTable.Entry(name: "app", help: appHelp) { arguments, _, _ in
-                switch ControlCommand.parse(arguments) {
+            CommandTable.Entry(name: "app", help: appHelp) { arguments, environment, _ in
+                switch ControlCommand.parse(arguments, environment: environment) {
                 case .success(let invocation): ControlCommand.run(invocation, context: context)
                 case .failure(let result): result
                 }
@@ -34,7 +35,7 @@ public enum ControlCommands {
 
     static let appHelp = """
           app     open, quit or ask the Mac's shipyard app:
-                  shipyard app open | quit | status [--json]
+                  shipyard app open [--demo <folder>] | quit | status [--json]
 
         """
 

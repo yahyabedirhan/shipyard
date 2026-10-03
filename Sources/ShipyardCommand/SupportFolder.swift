@@ -3,11 +3,25 @@ import Foundation
 /// Where shipyard keeps what it writes: the one definition of each folder,
 /// so the `shipyard` command and the app can't disagree.
 public enum SupportFolder {
-    /// `~/Library/Application Support/Shipyard/`, the app's: `state.json`,
-    /// `repositories.json`, the avatar and, on the Mac, the ping store.
-    public static var app: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shipyard", isDirectory: true)
+    /// The variable that moves the app's support folder elsewhere, as
+    /// `shipyard app open --demo` launches the app with.
+    public static let overrideVariable = "SHIPYARD_SUPPORT_DIR"
+
+    /// The app's folder: `state.json`, `config-status.json`,
+    /// `repositories.json`, `config-location.json`, the avatar, the socket
+    /// and, on the Mac, the ping store. `SHIPYARD_SUPPORT_DIR` when it's an
+    /// absolute path, else `~/Library/Application Support/Shipyard/`.
+    public static func app(environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        moved(environment: environment)
+            ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("Shipyard", isDirectory: true)
+    }
+
+    /// The folder `SHIPYARD_SUPPORT_DIR` moves the app's to, when it's an
+    /// absolute path: what makes a run a demo run.
+    public static func moved(environment: [String: String]) -> URL? {
+        guard let override = environment[overrideVariable], override.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: override, isDirectory: true)
     }
 
     /// The folder the `shipyard` command keeps its data in on a machine

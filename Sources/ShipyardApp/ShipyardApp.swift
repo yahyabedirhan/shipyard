@@ -84,7 +84,7 @@ final class AppServices {
     )
     /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
-        directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
+        directory: AppServices.files.avatars,
         transport: URLSessionTransport()
     )
     private let notifier = Notifier()
@@ -101,19 +101,19 @@ final class AppServices {
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
     init() {
-        let configURL = ConfigStore.defaultURL()
+        let files = Self.files
         shipyard = Shipyard(
-            configStore: ConfigStore(url: configURL),
-            appStateStore: AppStateStore(directory: Self.appSupportDirectory),
-            configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
-            pingStore: PingStore(directory: PingStore.appDirectory),
-            repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
+            configStore: ConfigStore(url: files.config),
+            appStateStore: AppStateStore(directory: files.support),
+            configStatusStore: ConfigStatusStore(directory: files.support),
+            pingStore: PingStore(directory: files.pings),
+            repositoriesStore: ResolvedRepositoriesStore(directory: files.support),
             tokenStore: Keychain(),
             actions: opener,
             notifier: notifier,
-            loginItem: LaunchAtLogin()
+            loginItem: files.loginItem(LaunchAtLogin())
         )
-        panelControl = PanelControl(shipyard: shipyard, state: panelState)
+        panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
         notifier.onOpen = { [weak self] url in
             shipyard.openNotification(url)
@@ -121,10 +121,11 @@ final class AppServices {
         }
     }
 
-    /// `~/Library/Application Support/Shipyard/`, where `state.json` and
-    /// `config-status.json` live: `SupportFolder`'s one definition, which the CLI
-    /// reads `repositories.json` from, so the two can't disagree.
-    static var appSupportDirectory: URL { SupportFolder.app }
+    /// Where the app reads and writes: `config.toml` and the support folder
+    /// (`SupportFolder`'s one definition, which the CLI reads
+    /// `repositories.json` from, so the two can't disagree), both moved
+    /// into a demo's folder in a demo run.
+    static let files = AppFiles(environment: ProcessInfo.processInfo.environment)
 
     func start() {
         let shipyard = shipyard
@@ -153,7 +154,7 @@ final class AppServices {
     /// the app runs on without app control and says why in the log.
     private func startControl() {
         let server = ControlServer(
-            socket: ControlSocket.url(in: Self.appSupportDirectory),
+            socket: ControlSocket.url(in: Self.files.support),
             panel: panelControl,
             quit: { NSApp.terminate(nil) }
         )
