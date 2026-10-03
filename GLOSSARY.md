@@ -26,6 +26,10 @@ _Avoid_: History, retention
 One GitHub Actions run in a project's repositories. It's shown while it runs and for a short window after it finishes.
 _Avoid_: Action, job, build, CI
 
+**Note**:
+The user's own note (an idea, a reminder, a "not now" thought), kept in Notion under its project, with a title, labels, and a number unique in the project that is never given twice. Open until it's archived. An agent writes one only for the user, in the user's words.
+_Avoid_: Idea, memo, issue (an issue is GitHub's)
+
 ### What a project lists
 
 **Repository selector**:

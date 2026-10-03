@@ -1265,7 +1265,7 @@ shipyard/
 ├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
 ├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
-├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules; 0007: app control is leased, enforced by the app; 0008: configuration has two files, config.toml the app's and cli.toml the command's
+├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules; 0007: app control is leased, enforced by the app; 0008: configuration has two files, config.toml the app's and cli.toml the command's; 0009: notes live in Notion, shipyard only lists and starts them
 ├── assets/images/<topic>/           # the README's logo (logo/), by relative path; the app icon's comparison sheets (app-icon/, with exploration/ from `make icon-exploration`); the known agents' logos as published (agent-logos/*.svg), the sources `make agent-logos` converts
 ├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (0.1.0/, and the presets one in shipyard-0.0.2/), by relative path
 ├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
