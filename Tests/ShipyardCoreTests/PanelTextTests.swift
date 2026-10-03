@@ -26,6 +26,9 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(0) == nil)
         #expect(PanelText.attentionSummary(1) == "1 needs attention")
         #expect(PanelText.attentionSummary(10) == "10 need attention")
+        // A count badge says its number to VoiceOver in the same words.
+        #expect(PanelText.attentionCount(1) == "1 needs attention")
+        #expect(PanelText.attentionCount(7) == "7 need attention")
     }
 
     @Test("the layout button's hover help and VoiceOver label name the current layout and the next one")
@@ -191,6 +194,10 @@ struct PanelTextTests {
             [.review(.approved), .checks(.passed)],
             [.comments(3), .reviews(1), .updated("5m")],
         ])
+        // Beside its clock icon, the update reads as just the age.
+        #expect(PanelText.updatedAge("5m") == "5m ago")
+        #expect(PanelText.updatedAge("now") == "now")
+        #expect(PanelText.fact(.updated("now")) == "updated now")
         #expect(card.reasons == [])
         #expect(card.attention == nil)
     }
@@ -295,8 +302,10 @@ struct PanelTextTests {
         #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: true) == "Expand shipyard")
     }
 
-    @Test("a row's action, attention dot and check dot have words for VoiceOver and the hover help")
+    @Test("a row's action, attention dot and check dot, and the copy icon, have words for VoiceOver and the hover help")
     func rowWords() {
+        #expect(PanelText.copy == "Copy")
+        #expect(PanelText.copied == "Copied")
         #expect(PanelText.markRowSeen == "Mark seen")
         #expect(PanelText.needsAttention == "Needs attention")
         #expect(PanelText.checks(.none) == nil)

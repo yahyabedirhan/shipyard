@@ -51,11 +51,8 @@ enum Logo {
     /// Maps `Sailboat.path` onto a body filling `body`: centred, and sized
     /// against the body as the icon sizes it. `yDown` for top-left-origin drawing.
     static func figureTransform(inBody body: CGRect, small: Bool = false, yDown: Bool = false) -> CGAffineTransform {
-        let b = Sailboat.bounds
         let scale = (small ? smallFigureScale : figureScale) * body.width / iconBody
-        return CGAffineTransform(translationX: body.midX, y: body.midY)
-            .scaledBy(x: scale, y: yDown ? -scale : scale)
-            .translatedBy(x: -b.midX, y: -b.midY)
+        return Sailboat.transform(centredAt: CGPoint(x: body.midX, y: body.midY), scale: scale, yDown: yDown)
     }
 
     static func figurePath(inBody body: CGRect, small: Bool = false, yDown: Bool = false) -> CGPath {

@@ -22,10 +22,18 @@ enum Sailboat {
     static func path(in rect: CGRect, yDown: Bool = false) -> CGPath {
         let b = bounds
         let scale = min(rect.width / b.width, rect.height / b.height)
-        var t = CGAffineTransform(translationX: rect.midX, y: rect.midY)
-        t = t.scaledBy(x: scale, y: yDown ? -scale : scale)
-        t = t.translatedBy(x: -b.midX, y: -b.midY)
+        var t = transform(centredAt: CGPoint(x: rect.midX, y: rect.midY), scale: scale, yDown: yDown)
         return path.copy(using: &t)!
+    }
+
+    /// Maps the figure onto a drawing: its centre to `centre`, scaled by
+    /// `scale`, flipped by `yDown` for top-left-origin drawing. The one
+    /// centre-and-scale step behind `path(in:yDown:)` and the logo's figure.
+    static func transform(centredAt centre: CGPoint, scale: CGFloat, yDown: Bool = false) -> CGAffineTransform {
+        let b = bounds
+        return CGAffineTransform(translationX: centre.x, y: centre.y)
+            .scaledBy(x: scale, y: yDown ? -scale : scale)
+            .translatedBy(x: -b.midX, y: -b.midY)
     }
 
     // MARK: - Drawing

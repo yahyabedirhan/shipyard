@@ -78,7 +78,7 @@ struct CountBadge: View {
         .animation(Motion.tint, value: muted)
         .animation(Motion.count, value: count)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(count) need attention")
+        .accessibilityLabel(PanelText.attentionCount(count))
     }
 
     private var number: some View {
@@ -380,8 +380,8 @@ struct CopyButton: View {
 
     let text: String
     /// VoiceOver's label before and after copying.
-    var label = "Copy"
-    var copiedLabel = "Copied"
+    var label = PanelText.copy
+    var copiedLabel = PanelText.copied
     /// The word beside the icon before and after copying; none without it.
     var title: String? = nil
     var copiedTitle: String? = nil

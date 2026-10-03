@@ -170,8 +170,8 @@ extension PanelText {
             code: code.userCode,
             message: "Copy the code, open \(page) and paste it there. Shipyard connects once you approve.",
             copyCode: "Copy code",
-            copyTitle: "Copy",
-            copied: "Copied",
+            copyTitle: PanelText.copy,
+            copied: PanelText.copied,
             openButton: "Copy code and open GitHub",
             waiting: "Waiting for approval · the code expires at \(clockTime(code.expiresAt, locale: locale, timeZone: timeZone))"
         )

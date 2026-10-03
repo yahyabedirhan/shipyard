@@ -45,11 +45,13 @@ public enum PanelText {
 
     /// Next to the heading: "3 need attention"; `nil` when nothing does.
     public static func attentionSummary(_ count: Int) -> String? {
-        switch count {
-        case ..<1: nil
-        case 1: "1 needs attention"
-        default: "\(count) need attention"
-        }
+        count < 1 ? nil : attentionCount(count)
+    }
+
+    /// How many need attention, in words: "1 needs attention", "3 need
+    /// attention". Also a count badge's VoiceOver label.
+    public static func attentionCount(_ count: Int) -> String {
+        count == 1 ? "1 needs attention" : "\(count) need attention"
     }
 
     /// A row's age: "now" under a minute, then "5m", "3h", "2d".
@@ -136,6 +138,10 @@ public enum PanelText {
     public static let dismissPing = "Dismiss"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
+    /// The copy icon's VoiceOver label (and its word, where it has one)
+    /// before a copy, and after it.
+    public static let copy = "Copy"
+    public static let copied = "Copied"
 
     /// What a pull request's check dot means, for VoiceOver and the row's
     /// hover help; `nil` with no checks.
@@ -204,11 +210,7 @@ public enum PanelText {
     /// All, "2 need attention" on a project's tab, and "All caught up" in
     /// place of the count when nothing needs attention.
     public static func tabSummary(attention: Int, projects: Int, tab: MenuTab) -> String {
-        let count = switch attention {
-        case 0: "All caught up"
-        case 1: "1 needs attention"
-        default: "\(attention) need attention"
-        }
+        let count = attention == 0 ? "All caught up" : attentionCount(attention)
         guard tab == .all else { return count }
         return "\(count) · \(projects) \(projects == 1 ? "project" : "projects")"
     }

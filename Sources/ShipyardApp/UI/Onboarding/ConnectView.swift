@@ -10,9 +10,9 @@ import SwiftUI
 /// already, then a divider and Sign in with GitHub under a line of its
 /// own. Connect with gh looks for a token once more (`start()`). A build
 /// without an OAuth App client ID shows Sign in with GitHub disabled, with
-/// why (or not at all when `gh` is signed in), and `gh` leads. While the device flow
-/// waits (`connecting`) it shows the code (a click on it, or on its copy
-/// icon, copies it), a button that copies it and opens
+/// why (or not at all when `gh` is signed in), and `gh` leads. While the
+/// device flow waits (`connecting`) it shows the code (a click on it, or on
+/// its copy icon, copies it), a button that copies it and opens
 /// github.com/login/device, and Cancel. The words come from
 /// `PanelText.connect` and `PanelText.deviceCode`; `gh` in them is set in
 /// code font on a chip (`CodeText`).
