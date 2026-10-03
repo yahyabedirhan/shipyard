@@ -8,7 +8,7 @@ import ShipyardPings
 /// `herdr pane list`, `herdr tab get <id>` and `herdr tab focus <id>` with
 /// Herdr's JSON, and
 /// recording every run. It's installed at `FakeHerdr.path` (one of
-/// `HerdrCommand.knownPaths`) until `installed` is false; `running` false
+/// the paths `HerdrCommand.locate` looks in first) until `installed` is false; `running` false
 /// answers as Herdr does with no server. `command` answers the same way for
 /// the `shipyard` command, which runs programs synchronously.
 ///

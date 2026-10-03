@@ -341,6 +341,12 @@ struct HerdrEventTests {
     func nothingToWithdraw(status: String) throws {
         let harness = try Harness(config: shop)
         #expect(harness.agent(status) == CommandResult())
+        #expect(harness.herdr.runs.isEmpty)
+    }
+
+    @Test("a closed pane with no ping does nothing, and exits 0 quietly")
+    func closedPaneWithNothingToWithdraw() throws {
+        let harness = try Harness(config: shop)
         #expect(harness.herdrEvent("pane.closed", paneClosed()) == CommandResult())
         #expect(harness.herdr.runs.isEmpty)
     }

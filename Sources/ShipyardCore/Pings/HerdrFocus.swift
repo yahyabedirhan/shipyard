@@ -17,11 +17,6 @@ import ShipyardCommand
 /// the machine's workspace turns red in Herdr's sidebar, and opening it
 /// lands there.
 public struct HerdrFocus: Sendable {
-    /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
-    public static func knownPaths(home: URL) -> [String] {
-        HerdrCommand.knownPaths(home: home)
-    }
-
     private let herdr: HerdrCommand
     /// `herdr` for a run on a saved machine, timed by `machineTimeout`.
     private let remote: HerdrCommand
@@ -63,11 +58,6 @@ public struct HerdrFocus: Sendable {
     /// Whether `id` is a tab's id (`w1:t2`); any other is taken for a pane's.
     static func isTab(_ id: String) -> Bool {
         id.range(of: ":t[0-9]+$", options: .regularExpression) != nil
-    }
-
-    /// The first `herdr` found: the known paths, then each `PATH` directory.
-    func locate() -> String? {
-        herdr.locate()
     }
 
     /// Focuses the tab `id` names, or the tab of the pane it names, and

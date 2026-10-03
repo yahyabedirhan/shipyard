@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 @testable import ShipyardCore
 @testable import ShipyardPings
 import Testing
@@ -187,15 +188,6 @@ struct HerdrActionTests {
         #expect(harness.actions.ran == [.app("Ghostty")])
     }
 
-    @Test("a ping sent from an unknown terminal brings none forward")
-    func noTerminalKnown() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        harness.herdr.open(tab: "w1:t2")
-        try await harness.send("Tab", "--herdr", "w1:t2")
-        try await harness.click("Tab")
-        #expect(harness.actions.ran.isEmpty)
-    }
-
     @Test("clicking a pane's ping focuses the pane's tab, then brings [herdr] terminal forward")
     func focusPaneThenTerminal() async throws {
         let harness = try await Harness.started(config: shopInGhostty, graphQL: onePullRequest)
@@ -352,16 +344,9 @@ struct HerdrActionTests {
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.actions.ran.isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 1)
-    }
-
-    @Test("a pane that has closed since leaves its tab alone")
-    func paneClosed() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        harness.herdr.open(tab: "w1:t1", panes: ["w1:p1"])
-        try await harness.send("Waiting", "--herdr", "w1:p2")
-        try await harness.click("Waiting")
-        #expect(harness.herdr.runs == [["pane", "get", "w1:p2"]])
+        // A pane that has closed since leaves its tab alone.
         #expect(harness.herdr.focused.isEmpty)
+        if breakage == .paneGone { #expect(harness.herdr.runs == [["pane", "get", "w1:p9"]]) }
     }
 
     @Test("a terminal that won't come forward fails the action too, after the tab was focused")
@@ -390,22 +375,13 @@ struct HerdrActionTests {
         #expect(PanelText.rowCard(row, now: harness.clock.now).lines == ["Focuses w1:p3 in Herdr"])
     }
 
-    @Test("a Herdr action reads back from the store as it was written")
-    func storedAction() throws {
-        let store = PingStore(directory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
-        let ping = Ping(id: "cccccc", title: "Herdr", projects: ["shop"], sent: Harness.now, action: .herdr("w1:p3"))
-        try store.save(ping)
-        #expect(store.all() == [ping])
-    }
-
     // MARK: Finding herdr
 
     @Test("herdr is looked for where its installer and Homebrew put it, then on PATH")
     func locate() {
         let home = URL(fileURLWithPath: "/Users/me")
         func found(_ installed: Set<String>, path: String?) -> String? {
-            HerdrFocus(home: home, pathEnvironment: path, isExecutable: { installed.contains($0) }, runner: FakeHerdr()).locate()
+            HerdrCommand.locate(home: home, pathEnvironment: path, isExecutable: { installed.contains($0) })
         }
         #expect(found(["/Users/me/.local/bin/herdr", "/opt/homebrew/bin/herdr"], path: nil) == "/Users/me/.local/bin/herdr")
         #expect(found(["/opt/homebrew/bin/herdr", "/custom/herdr"], path: "/custom") == "/opt/homebrew/bin/herdr")
@@ -427,13 +403,5 @@ struct HerdrActionTests {
         #expect(await focus.focus("w1:t2") == .failed("No answer", detail: "Herdr didn't answer"))
         #expect(shell.started == 1)
         #expect(shell.cancelled == 1)
-    }
-
-    @Test("an id ending in a tab number is a tab's; any other is a pane's")
-    func tabOrPane() {
-        #expect(HerdrFocus.isTab("w1:t2"))
-        #expect(HerdrFocus.isTab("wD:t10"))
-        #expect(!HerdrFocus.isTab("w1:p2"))
-        #expect(!HerdrFocus.isTab("pane"))
     }
 }

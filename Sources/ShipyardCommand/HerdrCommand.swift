@@ -13,7 +13,7 @@ import Foundation
 /// then on `PATH`, as `gh` is. Each run races `timeout`.
 public struct HerdrCommand: Sendable {
     /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
-    public static func knownPaths(home: URL) -> [String] {
+    private static func knownPaths(home: URL) -> [String] {
         [
             home.appendingPathComponent(".local/bin/herdr").path,
             "/opt/homebrew/bin/herdr",

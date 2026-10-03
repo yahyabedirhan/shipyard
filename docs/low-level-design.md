@@ -1019,7 +1019,7 @@ The remote ping list: the JSON `shipyard ping list --json` prints on a machine a
 
 ### HerdrCommand — `ShipyardCommand/HerdrCommand.swift` (0.0.6, #111)
 
-Runs `herdr` for the app, directly (no shell) behind `ShellRunning`: `knownPaths(home:)` and `locate(home:pathEnvironment:isExecutable:)` find it (`~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`), and `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`. `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`. `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say. Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
+Runs `herdr` for the app, directly (no shell) behind `ShellRunning`: `locate(home:pathEnvironment:isExecutable:)` finds it (`~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`), and `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`. `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`. `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say. Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
 
 ### HerdrFocus on a machine — `ShipyardCore/Pings/HerdrFocus.swift` (0.0.6, #117)
 
