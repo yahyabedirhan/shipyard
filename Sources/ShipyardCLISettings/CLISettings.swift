@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import TOMLDecoder
 
 /// The `shipyard` command's own settings, read from `cli.toml` on every
@@ -17,12 +18,31 @@ public struct CLISettings: Equatable, Sendable {
     public static let defaults = CLISettings()
 }
 
-/// `cli.toml`'s `[notify]` table. It holds no setting yet: the notice
-/// commands add theirs here (`app-machine`, the Mac another machine sends
-/// notices to), each one a property, a key in `CLISettings.Reader.notifyKeys`
-/// and a line in `CLISettings.Reader.notify(_:)`.
+/// `cli.toml`'s `[notify]` table: where this machine's `shipyard notify`
+/// sends a notice. With `app-machine` set, straight to the app on that Mac
+/// over the user's tailnet, at `<scheme>://<app-machine>:<port>` (ADR
+/// 0010). A new setting is a property, a key in
+/// `CLISettings.Reader.notifyKeys` and a line in `CLISettings.Reader.notify(_:)`.
 public struct NotifySettings: Equatable, Sendable {
-    public init() {}
+    /// `app-machine`: the Mac running the app, by its MagicDNS name (`my-mac`
+    /// or `my-mac.tail1234.ts.net`); none by default.
+    public var appMachine: String?
+    /// `scheme`: how the request travels, as `tailscale serve` exposes the
+    /// app's port on the Mac (`--http` or `--https`). `http` by default.
+    public var scheme: Scheme
+    /// `port`: the port `tailscale serve` exposes on the Mac. The app's
+    /// default listening port by default (`NoticePort.default`).
+    public var port: Int
+
+    public enum Scheme: String, Equatable, Sendable, CaseIterable {
+        case http, https
+    }
+
+    public init(appMachine: String? = nil, scheme: Scheme = .http, port: Int = NoticePort.default) {
+        self.appMachine = appMachine
+        self.scheme = scheme
+        self.port = port
+    }
 }
 
 /// One thing wrong with `cli.toml`: "line 3: unknown setting `notify.app-machin`".
@@ -73,7 +93,7 @@ extension CLISettings {
         private(set) var issues: [CLISettingsIssue] = []
 
         static let rootKeys = ["notify"]
-        static let notifyKeys: [String] = []
+        static let notifyKeys = ["app-machine", "scheme", "port"]
 
         func settings(from root: TOMLTable) -> CLISettings {
             rejectUnknownKeys(in: root, path: [], known: Self.rootKeys)
@@ -86,7 +106,59 @@ extension CLISettings {
 
         func notify(_ table: TOMLTable) -> NotifySettings {
             rejectUnknownKeys(in: table, path: ["notify"], known: Self.notifyKeys)
-            return NotifySettings()
+            var settings = NotifySettings()
+            if let raw = string(table, "app-machine", path: ["notify"]) {
+                let machine = raw.trimmingCharacters(in: .whitespaces)
+                if machine.isEmpty {
+                    issue("`notify.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way")
+                } else if machine.contains("://") {
+                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`: the scheme and port are settings of their own")
+                } else if !Self.isHostName(machine) {
+                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`")
+                } else {
+                    settings.appMachine = machine
+                }
+            }
+            if let raw = string(table, "scheme", path: ["notify"]) {
+                if let scheme = NotifySettings.Scheme(rawValue: raw) {
+                    settings.scheme = scheme
+                } else {
+                    issue("`notify.scheme` is `http` or `https`, not `\(raw)`")
+                }
+            }
+            if table.contains(key: "port") {
+                if let port = try? table.integer(forKey: "port") {
+                    if NoticePort.range.contains(Int(port)) {
+                        settings.port = Int(port)
+                    } else {
+                        issue("`notify.port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))")
+                    }
+                } else {
+                    issue("`notify.port` must be a whole number")
+                }
+            }
+            return settings
+        }
+
+        /// A name a URL can hold as its host, nothing more: letters,
+        /// digits, `-` and `.` (a MagicDNS name, short or full, or an IPv4
+        /// address).
+        static func isHostName(_ text: String) -> Bool {
+            let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.")
+            return !text.hasPrefix("-") && !text.hasPrefix(".") && text.unicodeScalars.allSatisfy(allowed.contains)
+        }
+
+        private func string(_ table: TOMLTable, _ key: String, path: [String]) -> String? {
+            guard table.contains(key: key) else { return nil }
+            guard let value = try? table.string(forKey: key) else {
+                issue("`\((path + [key]).joined(separator: "."))` must be a string")
+                return nil
+            }
+            return value
+        }
+
+        private func issue(_ message: String) {
+            issues.append(CLISettingsIssue(line: nil, message: message))
         }
 
         private func table(_ parent: TOMLTable, _ key: String, path: [String]) -> TOMLTable? {

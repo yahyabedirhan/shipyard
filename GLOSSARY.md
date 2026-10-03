@@ -105,6 +105,10 @@ _Avoid_: Notification (that's the macOS banner), message, alert
 An agent's disposable status message, such as "tests running" or "done", posted with `shipyard notify`. Filed like a ping, it's shown as a notification when its project's rules select `agent.notice`, and never kept, counted or listed. The agent learns whether it was shown. It is not a ping, which waits for the user, and not a notification, the macOS banner it may cause.
 _Avoid_: Ping, notification, status ping, toast
 
+**App machine**:
+The Mac running the app, as another machine's `shipyard` names it: `[notify] app-machine` in that machine's `cli.toml`, by the Mac's MagicDNS name. A notice from that machine goes straight to the app machine over the user's tailnet, where the app takes it only from the Mac's own Tailscale login (ADR 0010). A machine without one leaves its notices for the Mac's poll.
+_Avoid_: Host, server, target Mac
+
 **Known agent**:
 A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with that agent's real logo, which the app bundles.
 _Avoid_: Agent icon, monogram

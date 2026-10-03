@@ -4,7 +4,8 @@ import PackageDescription
 // Modules follow concerns, and each build links only what it uses (ADR 0006):
 // ShipyardCommand is the foundation any command needs on any machine,
 // ShipyardPings the agent's side of pings, ShipyardNotices the agent's
-// side of notices, ShipyardCLISettings reading the command's own cli.toml
+// side of notices (and their route over the tailnet, which reads
+// cli.toml), ShipyardCLISettings reading the command's own cli.toml
 // (ADR 0008), ShipyardConfig reading the app's
 // config.toml (and filing pings by it), ShipyardControl the client side of
 // app control (its AppKit launcher compiled only where AppKit exists),
@@ -33,8 +34,9 @@ var targets: [Target] = [
     ),
     .target(
         name: "ShipyardNotices",
-        // A notice's click and buttons are a ping's actions (`PingAction`).
-        dependencies: ["ShipyardCommand", "ShipyardPings"],
+        // A notice's click and buttons are a ping's actions (`PingAction`);
+        // another machine's route reads cli.toml.
+        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings"],
         path: "Sources/ShipyardNotices"
     ),
     .target(
@@ -82,12 +84,12 @@ var targets: [Target] = [
 ]
 
 // The `shipyard` command line agents send pings with (ADR 0004). On a machine
-// without the app it links Command, Pings and CLISettings only (ADR 0005,
-// 0006, 0008), so TOMLDecoder through CLISettings; on macOS Config too, for
-// the filing that reads config.toml, Control, for the `app` command, and
-// Notices, for `notify` (which reaches the app through Control's socket, so
-// only the Mac has it until another route lands), and never the core. CI
-// checks both builds link nothing else.
+// without the app it links Command, Pings, CLISettings and Notices only (ADR
+// 0005, 0006, 0008, 0010), so TOMLDecoder through CLISettings and
+// FoundationNetworking through Notices' tailnet route; on macOS Config too,
+// for the filing that reads config.toml, and Control, for the `app` command
+// and `notify`'s route over the socket, and never the core. CI checks both
+// builds link nothing else.
 //
 // The Mac's dependencies are declared only when the manifest is read on
 // macOS, not just conditioned on it: Swift Build, the default build system
@@ -98,10 +100,9 @@ var targets: [Target] = [
 // Its product is `shipyard-cli`, not `shipyard`, because on a case-insensitive
 // disk that would be the app's `Shipyard` executable; `make bundle` puts it in
 // the app as `Contents/Helpers/shipyard`.
-var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings"]
+var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings", "ShipyardCLISettings", "ShipyardNotices"]
 #if os(macOS)
 cliDependencies += [
-    .target(name: "ShipyardNotices", condition: .when(platforms: [.macOS])),
     .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
     .target(name: "ShipyardControl", condition: .when(platforms: [.macOS])),
 ]
@@ -140,7 +141,7 @@ targets.append(
 targets.append(
     .testTarget(
         name: "ShipyardAppTests",
-        dependencies: ["ShipyardApp", "ShipyardNotices", "ShipyardControl", "ShipyardCore"],
+        dependencies: ["ShipyardApp", "ShipyardCommand", "ShipyardCLISettings", "ShipyardNotices", "ShipyardControl", "ShipyardCore"],
         path: "Tests/ShipyardAppTests"
     )
 )

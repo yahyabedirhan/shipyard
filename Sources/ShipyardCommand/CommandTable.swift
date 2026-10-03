@@ -51,10 +51,9 @@ public struct CommandTable: Sendable {
     /// links (ShipyardControl). A build without one of them refuses it with
     /// a pointer to the Mac instead of calling it unknown. Each name joins
     /// when its command exists on the Mac, so the Mac never answers "runs
-    /// on the Mac" for a command it lacks. `notify` is here only while the
-    /// Mac's socket is its one route; it leaves once a build without the
-    /// app has a route of its own.
-    public static let macOnly: Set<String> = ["app", "panel", "screenshot", "control", "notify"]
+    /// on the Mac" for a command it lacks. `notify` isn't one: every build
+    /// has a route for it.
+    public static let macOnly: Set<String> = ["app", "panel", "screenshot", "control"]
 }
 
 /// The `shipyard` command line (ADR 0004), bundled in `Shipyard.app` and

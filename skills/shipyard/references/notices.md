@@ -50,7 +50,7 @@ A notice reaches the user's Mac one of three ways. You don't pick one: the machi
 | another machine whose `cli.toml` has `[notify] app-machine` set | over the user's tailnet to the Mac's app, within about a second, which says whether it was shown | `shown` |
 | another machine without `app-machine` | left with the herdr-shipyard plugin, which holds it until the Mac's next poll of the machine, the poll remote pings take | `queued; shown within about 30 seconds if the Mac is awake` |
 
-To tell which a machine uses before sending, look for `app-machine` under `[notify]` in its `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`); no file, or no `app-machine` in it, means the poll route.
+Setting up the tailnet route is in Receive notices from another machine, below. To tell which a machine uses before sending, look for `app-machine` under `[notify]` in its `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`); no file, or no `app-machine` in it, means the poll route.
 
 On the poll route, `queued` isn't `shown`:
 
@@ -70,7 +70,52 @@ On the poll route, `queued` isn't `shown`:
   - no project takes it: `no project is named …` or `no project watches …`, listing the projects. Pass `--project <name>`, or leave it.
   - the working folder has no `origin`: pass `--repo <owner/name>` or `--project <name>`.
   - on the poll route, the herdr-shipyard plugin is missing ("… isn't the herdr-shipyard plugin's link …"), too old to hold notices ("… can't hold notices; update it …"), or didn't queue this one ("the herdr-shipyard plugin didn't queue this notice: …", such as a notice too large). Tell the user the line if it mattered; installing or updating the plugin is theirs to do.
+  - on the tailnet route:
+    - "couldn't reach the app machine `<name>` …" or "the app machine `<name>` didn't answer within <n> seconds …": the Mac is asleep, away or off the tailnet. Nothing is queued or retried.
+    - "the app machine `<name>` answered HTTP <status> without a verdict …": the Mac answered, but not shipyard: the app isn't running, `[notify] listen` isn't `true`, or `tailscale serve` points elsewhere.
+    - "… isn't this Mac's Tailscale login …", "the request carried no Tailscale login …" or "shipyard couldn't learn this Mac's Tailscale login …": the identity check refused it (see below).
+  - on another machine, "…/cli.toml doesn't read (…)": fix the file it names; nothing is sent either way until it reads.
 - **2**: the arguments don't read, with what's wrong: a missing title, two titles, an unknown option, `--repo` and `--project` together, two click actions, a fourth button, a button without `<label>=<action>`, a level other than `passive` or `active`, an id that isn't one, or an image that can't be read, isn't a PNG, JPEG or GIF, or is over 5 MB.
+
+## Receive notices from another machine
+
+A notice from another machine goes straight to the Mac over the user's tailnet (Tailscale) and shows within about a second. Nothing is opened to the internet: the app listens on the Mac's 127.0.0.1 only, `tailscale serve` exposes that port to the user's own tailnet, and the app takes a notice only when Tailscale says it came from the Mac's own Tailscale login. Shipyard never installs or configures Tailscale; the user (or you, when asked) runs these steps once.
+
+1. **Both machines on the tailnet as the user.** The Mac and the other machine are logged in to Tailscale as the same user, as the user's own devices: not tagged (a tagged device's requests carry no login, so they're refused), and with key expiry turned off in the admin console so they stay on.
+2. **The Mac listens.** In `config.toml`:
+
+   ```toml
+   [notify]
+   listen = true
+   # port = 47420   the default; change it here and in the two steps below together
+   ```
+
+3. **Tailscale exposes the port on the Mac**, in the background, so it survives a restart:
+
+   ```sh
+   tailscale serve --bg --http=47420 http://127.0.0.1:47420
+   ```
+
+   `tailscale serve status` shows it. Should `--http` not work on the user's tailnet, `--https=443` with the same target serves it over HTTPS instead; then the machine's `cli.toml` says `scheme = "https"` and `port = 443`.
+4. **The machine names its Mac** in its own `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`), by the Mac's MagicDNS name, short or full (`tailscale status` on the machine lists it):
+
+   ```toml
+   [notify]
+   app-machine = "my-mac"
+   # scheme = "http"   http or https, as tailscale serve exposes it
+   # port = 47420      the port tailscale serve exposes
+   ```
+
+   `cli.toml` is the command's own file, not the app's: `app-machine`, `scheme` and `port` go there, never in `config.toml`, and an unknown key in it is an error.
+5. **A test notice**, from the machine:
+
+   ```sh
+   shipyard notify "Hello from the VPS" --project shipyard
+   ```
+
+   It prints `shown` once the Mac showed it; otherwise it exits 1 with why (see Exit codes).
+
+From then on `shipyard notify` on that machine takes the same flags as on the Mac. `shipyard notify withdraw <id>` goes the same way. It waits up to 3 seconds for the Mac's answer (a few more for a notice carrying an image), and nothing is queued: a Mac asleep or away means exit 1.
 
 ## Worked notices
 

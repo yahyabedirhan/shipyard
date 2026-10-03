@@ -77,6 +77,8 @@ Tables:
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
+| `[notify] listen` | `false` | whether the app takes notices (`shipyard notify`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
+| `[notify] port` | `47420` | the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
@@ -459,6 +461,15 @@ The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard
 
 Tell the user one known limit of Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it's already showing that machine. When it shows the Mac or another machine, the click looks like it did nothing (the ping is still marked seen); they switch Herdr to that machine themselves to see the pane. Herdr has no command yet that switches an open window to a saved machine, so no setting changes this.
 
+**"Let my VPS's notices reach me."** Notices from another machine travel over the user's tailnet, so the Mac and the machine must both be on it, logged in as the user. Turn the listener on in `config.toml`:
+
+```toml
+[notify]
+listen = true
+```
+
+The rest happens outside `config.toml`, on the Mac (`tailscale serve`) and in the machine's own `cli.toml` (`app-machine`): [references/notices.md](references/notices.md), "Receive notices from another machine", has each step and a test notice.
+
 ## Ping or notice?
 
 Shipyard carries two kinds of message from you to the user. Pick by what the user has to do:
@@ -469,7 +480,7 @@ Shipyard carries two kinds of message from you to the user. Pick by what the use
 | What the user sees | a row in the menu that needs attention until clicked, and a notification (`ping.sent`) | a notification only (`agent.notice`): never listed, counted or kept |
 | What you learn | its id; it waits for the user | exit 0 when the app showed it, or when it was queued for the Mac's poll (it says `queued`); exit 1 with why when it wasn't shown |
 
-When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. It works on the Mac and on the user's other machines running Herdr. [references/notices.md](references/notices.md) has the command, its flags, its routes, the exit codes and worked examples.
+When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. It works on the Mac and on the user's other machines running Herdr, and from those straight over the user's tailnet once they've set that up. [references/notices.md](references/notices.md) has the command, its flags, its routes, the exit codes and worked examples.
 
 ## Sending pings
 

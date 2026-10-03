@@ -1,19 +1,20 @@
 import Foundation
 import ShipyardCLISettings
 import ShipyardCommand
+import ShipyardNotices
 import ShipyardPings
 #if os(macOS)
 import ShipyardConfig
 import ShipyardControl
-import ShipyardNotices
 #endif
 
 // `shipyard`: assembles this build's commands and prints what
 // `ShipyardCLI.run` returns. The `#if` is decided at compile time, and so
 // is what the build links (ADR 0006): on a machine without the app pings
 // are kept as sent (`Unfiled`), on the Mac they're filed against
-// config.toml, and the Mac's build controls the app (`app`) and hands it
-// notices (`notify`). Each build also picks where its own settings file,
+// config.toml, and the Mac's build controls the app (`app`). Both hand
+// notices to the app (`notify`): the Mac's over its socket, another
+// machine's as its cli.toml says (ADR 0010). Each build also picks where its own settings file,
 // cli.toml, is (ADR 0008): beside that config.toml on the Mac, in the XDG
 // config folder elsewhere. Nothing after it asks the platform.
 let environment = ProcessInfo.processInfo.environment
@@ -46,6 +47,9 @@ table.add(PingCommands.entries(
     filing: Unfiled(),
     store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))
 ))
+// A notice goes over the tailnet to the Mac cli.toml names, or else to the
+// herdr-shipyard plugin for the Mac's poll (RemoteNoticeRoute decides).
+table.add(NoticeCommands.entries(route: RemoteNoticeRoute(settings: settings)))
 #endif
 let result = ShipyardCLI.run(
     Array(CommandLine.arguments.dropFirst()),

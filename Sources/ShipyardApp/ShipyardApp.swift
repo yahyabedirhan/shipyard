@@ -107,6 +107,9 @@ final class AppServices {
     /// written by the control server.
     let leaseIndicator = LeaseIndicator()
     private var controlServer: ControlServer?
+    /// The listener for notices from other machines, while `[notify]
+    /// listen = true`; `nil` otherwise, so nothing listens unasked.
+    private var noticeListener: NoticeListener?
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
     init() {
@@ -144,8 +147,11 @@ final class AppServices {
 
     func start() {
         let shipyard = shipyard
-        configWatcher = ConfigWatcher(file: shipyard.configStore.url) {
-            Task { await shipyard.reloadConfiguration() }
+        configWatcher = ConfigWatcher(file: shipyard.configStore.url) { [weak self] in
+            Task {
+                await shipyard.reloadConfiguration()
+                self?.followNoticeListening()
+            }
         }
         configWatcher?.start()
         // The `shipyard` CLI writes one file per ping into the store's
@@ -163,9 +169,32 @@ final class AppServices {
         }
         // Before a click that launched the app is handled (it's queued
         // behind this), `start()` has loaded the app state it marks seen in.
-        Task { await shipyard.start() }
+        Task {
+            await shipyard.start()
+            followNoticeListening()
+        }
         Task { await notifier.checkPermission() }
         startControl()
+    }
+
+    /// Listens for notices from other machines when, and on the port, the
+    /// configuration says (`Shipyard.noticeListenerPort`), and stops when it
+    /// no longer does (ADR 0010). When the port can't be listened on, the
+    /// app runs on without it and says why in the log.
+    private func followNoticeListening() {
+        let wanted = shipyard.noticeListenerPort
+        guard noticeListener?.port != wanted else { return }
+        noticeListener?.close()
+        noticeListener = nil
+        guard let port = wanted else { return }
+        let shipyard = shipyard
+        do {
+            noticeListener = try NoticeListener.start(port: port) { request, login in
+                await shipyard.receive(request, from: login)
+            }
+        } catch {
+            Self.log.error("notices from other machines are off: \(error.description, privacy: .public)")
+        }
     }
 
     /// Listens on `control.sock` for the `shipyard` command. When it can't,
@@ -204,6 +233,8 @@ final class AppServices {
     func stop() {
         controlServer?.stop()
         controlServer = nil
+        noticeListener?.close()
+        noticeListener = nil
     }
 
     // MARK: - Layout actions

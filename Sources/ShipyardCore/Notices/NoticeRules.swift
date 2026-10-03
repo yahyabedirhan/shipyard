@@ -42,6 +42,23 @@ public enum NoticeRules {
         now.timeIntervalSince(queued.sent) <= maxQueuedAge
     }
 
+    /// Why a notice from the tailnet without a login isn't shown: it didn't
+    /// come through `tailscale serve`, or came from a tagged device.
+    public static let noLogin = "the request carried no Tailscale login, so shipyard refused it; "
+        + "send it through tailscale serve from one of your own untagged machines"
+
+    /// Why a notice from the tailnet sent by `login` isn't shown: it isn't
+    /// the Mac's own. The Mac's login isn't named, to someone else least of all.
+    public static func otherLogin(_ login: String) -> String {
+        "`\(login)` isn't this Mac's Tailscale login, so shipyard refused it; it takes only your own machines' notices"
+    }
+
+    /// Why no notice from the tailnet is shown while the Mac's own login
+    /// can't be learned.
+    public static func ownLoginUnknown(_ reason: String) -> String {
+        "shipyard couldn't learn this Mac's Tailscale login (\(reason)), so it takes no notices from other machines"
+    }
+
     /// The project `notice` is shown under, or why it isn't shown, filed
     /// against `configuration` and `resolved` (each project's repositories
     /// as last resolved, by name).

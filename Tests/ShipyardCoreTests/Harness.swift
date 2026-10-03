@@ -51,6 +51,9 @@ struct Harness {
     /// machines are asked through: no tabs or machines until added.
     let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
+    /// The Mac's own Tailscale login, as the tailnet listener checks it:
+    /// none until a scenario sets one.
+    let tailnet = FakeTailnet()
     let loginItem = RecordingLoginItem()
     /// Where this app reads and writes, as the app decides it.
     let files: AppFiles
@@ -120,6 +123,7 @@ struct Harness {
             machineTimer: machineTimer,
             notionTokenStore: notion,
             notesTimer: notesTimer,
+            tailnet: tailnet,
             sleep: sleeper.sleep,
             oauthClientID: clientID
         )

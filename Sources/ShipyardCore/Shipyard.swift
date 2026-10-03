@@ -158,6 +158,9 @@ public final class Shipyard {
     /// Finds each project's notes database, remembering what it found.
     @ObservationIgnored private let notesReader = NotesReader()
     private let notifier: any Notifying
+    /// Learns the Mac's own Tailscale login, the one whose notices the
+    /// tailnet listener takes (`show(_:from:)`).
+    private let tailnet: any TailnetIdentity
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
     private let clock: any WallClock
@@ -204,6 +207,7 @@ public final class Shipyard {
         machineTimer: any RefreshTimer = TaskRefreshTimer(),
         notionTokenStore: (any TokenStore)? = nil,
         notesTimer: any RefreshTimer = TaskRefreshTimer(),
+        tailnet: any TailnetIdentity = TailscaleCLI(),
         sleep: @escaping Sleep = systemSleep,
         oauthClientID: String = OAuthApp.clientID
     ) {
@@ -220,6 +224,7 @@ public final class Shipyard {
         self.notionTokenStore = notionTokenStore
         self.notesTimer = notesTimer
         self.notifier = notifier
+        self.tailnet = tailnet
         self.loginItem = loginItem
         self.clock = clock
         self.timer = timer
@@ -942,6 +947,33 @@ public final class Shipyard {
     public func withdrawNotice(id: String) async -> NoticeVerdict {
         await notifier.removeDelivered(id: NoticeRules.notificationID(id))
         return .shown
+    }
+
+    /// Answers a notice request from another machine, which the app's
+    /// tailnet listener received with `login`, the `Tailscale-User-Login`
+    /// that `tailscale serve` put on the request (ADR 0010). It's taken only
+    /// when `login` is exactly the Mac's own Tailscale login, looked up now;
+    /// then it's answered as one from the Mac (`receive(_:)`): a notice
+    /// shown, a withdrawal done. Without a login, with another, or while the
+    /// Mac's own can't be learned, it's refused and nothing changes.
+    public func receive(_ request: NoticeRequest, from login: String?) async -> NoticeVerdict {
+        guard let login, !login.isEmpty else { return .refused(NoticeRules.noLogin) }
+        switch await tailnet.ownLogin() {
+        case .failure(let unknown):
+            return .refused(NoticeRules.ownLoginUnknown(unknown.reason))
+        case .success(let own) where own != login:
+            return .refused(NoticeRules.otherLogin(login))
+        case .success:
+            return await receive(request)
+        }
+    }
+
+    /// The port on 127.0.0.1 the app listens on for notices from other
+    /// machines, as the last valid configuration's `[notify]` says; `nil`
+    /// unless `listen = true`, so nothing listens unless the user asked.
+    public var noticeListenerPort: Int? {
+        let notify = configStore.lastValid.notify
+        return notify.listen ? notify.port : nil
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs

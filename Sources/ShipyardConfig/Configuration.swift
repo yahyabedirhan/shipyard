@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// Everything the user controls, read from `config.toml` (ADR 0001).
 ///
@@ -21,6 +22,7 @@ public struct Configuration: Equatable, Sendable {
     public var attention = AttentionToggles()
     public var herdr = HerdrSettings()
     public var remote = RemoteSettings()
+    public var notify = NotifySettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -99,6 +101,20 @@ extension Configuration {
         /// never a host or an address.
         public var machines: [String]
         public init(machines: [String] = []) { self.machines = machines }
+    }
+
+    /// `[notify]`: whether the app listens for notices from the user's
+    /// other machines (ADR 0010). Off by default: nothing listens unless
+    /// the user turns it on. On, it listens on 127.0.0.1 only, at `port`,
+    /// which `tailscale serve` exposes to the tailnet.
+    public struct NotifySettings: Equatable, Sendable {
+        public var listen: Bool
+        /// The port on 127.0.0.1; `NoticePort.default` by default.
+        public var port: Int
+        public init(listen: Bool = false, port: Int = NoticePort.default) {
+            self.listen = listen
+            self.port = port
+        }
     }
 
     /// `[attention]`: which reasons make an item need attention.

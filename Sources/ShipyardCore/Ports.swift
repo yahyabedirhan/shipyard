@@ -118,6 +118,21 @@ public protocol Notifying: Sendable {
     func canShow() async -> Bool
 }
 
+/// Learns the Mac's own Tailscale login, the one login whose notices the
+/// app takes from the tailnet (ADR 0010). The seam between the core and
+/// asking Tailscale, so tests use a fake; the app's is `TailscaleCLI`.
+public protocol TailnetIdentity: Sendable {
+    /// The login, such as `me@example.com`, or why it can't be learned now.
+    func ownLogin() async -> Result<String, TailnetLoginUnknown>
+}
+
+/// Why the Mac's own Tailscale login can't be learned: "Tailscale is
+/// stopped". While it can't, every notice from the tailnet is refused.
+public struct TailnetLoginUnknown: Error, Equatable, Sendable {
+    public var reason: String
+    public init(_ reason: String) { self.reason = reason }
+}
+
 /// Tells the core what time it is, so tests can fix and move time.
 /// (Not named `Clock`, which the standard library already uses.)
 public protocol WallClock: Sendable {

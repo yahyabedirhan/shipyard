@@ -76,6 +76,39 @@ struct CLISettingsTests {
         #expect(failure.error.hasSuffix("; fix it, then try again\n"))
     }
 
+    // MARK: - [notify]
+
+    @Test("[notify] names the app machine, and the scheme and port its notices go over, http and the listener's default port unless given", arguments: [
+        ("[notify]\napp-machine = \"mac\"\n", NotifySettings(appMachine: "mac", scheme: .http, port: 47420)),
+        ("[notify]\napp-machine = \" my-mac.tail1234.ts.net \"\nscheme = \"https\"\nport = 443\n",
+         NotifySettings(appMachine: "my-mac.tail1234.ts.net", scheme: .https, port: 443)),
+        // Without a machine, scheme and port wait for one.
+        ("[notify]\nport = 8080\n", NotifySettings(appMachine: nil, scheme: .http, port: 8080)),
+    ])
+    func notify(text: String, settings: NotifySettings) throws {
+        try write(text)
+        #expect(try read().get().notify == settings)
+        #expect(CLISettings.defaults.notify == NotifySettings(appMachine: nil, scheme: .http, port: 47420))
+    }
+
+    @Test("an app machine, scheme or port that can't make a URL is refused, saying what it takes", arguments: [
+        ("app-machine = \"\"", "`notify.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way"),
+        ("app-machine = \"http://mac\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `http://mac`: the scheme and port are settings of their own"),
+        ("app-machine = \"mac:8080\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `mac:8080`"),
+        ("app-machine = \"my mac\"", "`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `my mac`"),
+        ("app-machine = 3", "`notify.app-machine` must be a string"),
+        ("scheme = \"ftp\"", "`notify.scheme` is `http` or `https`, not `ftp`"),
+        ("port = 0", "`notify.port` must be between 1 and 65535 (got 0)"),
+        ("port = 70000", "`notify.port` must be between 1 and 65535 (got 70000)"),
+        ("port = \"80\"", "`notify.port` must be a whole number"),
+    ])
+    func badNotify(line: String, problem: String) throws {
+        try write("[notify]\n\(line)\n")
+        let failure = try #require(read().failure)
+        #expect(failure.status == CommandResult.failedStatus)
+        #expect(failure.error.contains(problem), "\(failure.error)")
+    }
+
     @Test("a file that isn't UTF-8 text is refused too")
     func notText() throws {
         try write(Data([0xFF, 0xFE, 0x00]))

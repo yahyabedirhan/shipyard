@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import TOMLDecoder
 
 extension Configuration {
@@ -84,7 +85,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notify", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -142,6 +143,18 @@ final class ConfigurationReader {
             warnUnknownKeys(in: remote, known: ["machines"])
             if let machines = strings(remote, "machines") {
                 config.remote.machines = readMachines(machines, at: remote.path + [.key("machines")])
+            }
+        }
+
+        if let notify = table(node, "notify") {
+            warnUnknownKeys(in: notify, known: ["listen", "port"])
+            if let value = bool(notify, "listen") { config.notify.listen = value }
+            if let port = int(notify, "port") {
+                if NoticePort.range.contains(port) {
+                    config.notify.port = port
+                } else {
+                    error("`port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))", at: notify.path + [.key("port")])
+                }
             }
         }
 
