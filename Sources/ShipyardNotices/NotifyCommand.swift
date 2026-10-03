@@ -23,9 +23,10 @@ public enum NoticeCommands {
 /// `shipyard notify`: reads its arguments into a `Notice`, filed by the
 /// one project `--project` names or by its repository (`--repo`, else the
 /// working folder's `origin`), hands it to the app over a `NoticeRoute`
-/// and says what came of it. Exit 0: shown; 1: refused, with why (notices
-/// off for the project, no project takes it, the app not running); 2: the
-/// arguments don't read. Nothing is stored.
+/// and says what came of it. Exit 0: shown, or queued for the Mac's poll
+/// (`PluginNoticeRoute`, which says so); 1: refused, with why (notices off
+/// for the project, no project takes it, the app not running, the plugin
+/// missing or refusing it); 2: the arguments don't read.
 public enum NotifyCommand {
     /// What `shipyard notify --help` prints.
     public static let usageText = """
@@ -38,6 +39,9 @@ public enum NotifyCommand {
         projects that watch the working folder's repository (its git remote
         `origin`), and shown when the user's notification rules select
         `agent.notice` for one of them. It prints `shown` once the app showed it.
+        On a machine that leaves it with the herdr-shipyard plugin for the Mac's
+        next poll, it prints `queued`: the Mac shows it by the same rules when
+        it arrives, or drops it when it arrives more than ten minutes late.
 
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
@@ -46,9 +50,10 @@ public enum NotifyCommand {
 
         Everything after -- is the title, even a word starting with --.
 
-        Exits 1, with one line saying why, when it isn't shown: notices are off
-        for its projects, no project takes it, or shipyard isn't running (it's
-        never started for a notice). Exits 2 when the arguments don't read.
+        Exits 1, with one line saying why, when it isn't shown or queued: notices
+        are off for its projects, no project takes it, shipyard isn't running
+        (it's never started for a notice), or the herdr-shipyard plugin is
+        missing or refuses it. Exits 2 when the arguments don't read.
 
         """
 
@@ -76,6 +81,7 @@ public enum NotifyCommand {
         }
         switch route.deliver(notice, environment: environment) {
         case .shown: return CommandResult(output: "shown\n")
+        case .queued: return CommandResult(output: PluginNoticeRoute.queuedLine + "\n")
         case .refused(let why): return .failed(prefix + why)
         }
     }

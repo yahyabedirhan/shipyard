@@ -160,7 +160,8 @@ final class ControlServer {
             }
         case .notify(let notice):
             switch await notices(notice) {
-            case .shown: return Answer(reply: .done(""))
+            // The app shows a notice or refuses it; it never queues one.
+            case .shown, .queued: return Answer(reply: .done(""))
             case .refused(let why): return Answer(reply: .refused(why))
             }
         }

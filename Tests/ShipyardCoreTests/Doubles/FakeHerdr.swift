@@ -1,6 +1,7 @@
 import Foundation
 import ShipyardCommand
 import ShipyardCore
+import ShipyardNotices
 import ShipyardPings
 
 /// A `ShellRunning` standing in for the `herdr` command: a Herdr session
@@ -22,7 +23,10 @@ import ShipyardPings
 /// a command log record of the machine's pings as `shipyard ping list
 /// --json` prints them, and `… plugin log list --plugin … --limit <n>`
 /// lists the machine's newest `n` records, oldest first, as Herdr 0.9.3 does. A record can stay `running` for
-/// a number of log lists first. A label it doesn't know, and a machine
+/// a number of log lists first. The plugin holds notices too (`queue`), as
+/// its `notices.sh` does: the `notices` action lists them, and
+/// `notices-read` removes what that listing handed out; a plugin from
+/// before notices (`withoutNotices`) has neither action. A label it doesn't know, and a machine
 /// disabled, are refused with the line Herdr prints (`cli/target.rs` at
 /// commit 65e35a3). A machine's panes and agents (`open(pane:tab:agent:on:)`)
 /// answer `agent focus`, `pane get` and `tab focus` through `--machine`,
@@ -84,10 +88,17 @@ final class FakeHerdr: ShellRunning {
         var agents: Set<String> = []
         /// How Herdr reaches it.
         var reach = Reach.up
+        /// The notices its plugin holds, oldest first, as stored.
+        var notices: [String] = []
+        /// What the last `notices` listing handed out, for `notices-read`.
+        var handed: [String] = []
+        /// Whether its plugin has the `notices` and `notices-read` actions.
+        var holdsNotices = true
     }
 
     private struct Log {
         var id: String
+        var action = RemotePingReader.actionID
         var stdout: String
         var runningFor: Int
         var started: Int
@@ -200,6 +211,28 @@ final class FakeHerdr: ShellRunning {
             state.machines[label]?.tabs.insert(tab)
             if agent { state.machines[label]?.agents.insert(pane) }
         }
+    }
+
+    /// Leaves `notice` with the plugin on the machine `label`, as
+    /// `notices.sh add` stores it, after the ones already there.
+    func queue(_ notice: QueuedNotice, on label: String) {
+        queue(String(decoding: notice.encoded(), as: UTF8.self), on: label)
+    }
+
+    /// Leaves `json` with the plugin on the machine `label`, as is.
+    func queue(_ json: String, on label: String) {
+        state.withValue { $0.machines[label]?.notices.append(json) }
+    }
+
+    /// The notices the plugin on the machine `label` still holds.
+    func queued(on label: String) -> [String] {
+        state.current.machines[label]?.notices ?? []
+    }
+
+    /// Makes the plugin on the machine `label` one from before notices:
+    /// Herdr knows no `notices` or `notices-read` action there.
+    func withoutNotices(on label: String) {
+        state.withValue { $0.machines[label]?.holdsNotices = false }
     }
 
     /// How Herdr reaches the machine `label` from now on.
@@ -349,13 +382,31 @@ final class FakeHerdr: ShellRunning {
             let tab = arguments[2]
             guard machine.tabs.contains(tab) else { return error("tab_not_found", "tab \(tab) not found") }
             return json(["id": "cli:tab:focus", "result": ["type": "ok"]])
-        case ["plugin", "action", "invoke", RemotePingReader.actionID, "--plugin", plugin]:
-            let log = Log(id: "plugin-log-\(state.nextLog)", stdout: machine.output, runningFor: machine.runningFor, started: 1_790_966_526_794 + state.nextLog)
+        case ["plugin", "action", "invoke", arguments.count > 3 ? arguments[3] : "", "--plugin", plugin]:
+            let action = arguments[3]
+            let stdout: String
+            switch action {
+            case RemotePingReader.actionID:
+                stdout = machine.output
+            case RemotePingReader.noticesActionID where machine.holdsNotices:
+                // As `notices.sh list` prints them, remembering what it handed out.
+                machine.handed = machine.notices
+                stdout = #"{"version":1,"truncated":false,"notices":["# + machine.notices.joined(separator: ",") + "]}\n"
+            case RemotePingReader.noticesReadActionID where machine.holdsNotices:
+                // As `notices.sh read` removes them.
+                let removed = machine.notices.filter { machine.handed.contains($0) }.count
+                machine.notices.removeAll { machine.handed.contains($0) }
+                machine.handed = []
+                stdout = #"{"version":1,"removed":\#(removed)}"# + "\n"
+            default:
+                return error("plugin_action_not_found", "plugin action \(action) not found for plugin \(plugin)")
+            }
+            let log = Log(id: "plugin-log-\(state.nextLog)", action: action, stdout: stdout, runningFor: machine.runningFor, started: 1_790_966_526_794 + state.nextLog)
             state.nextLog += 1
             machine.logs.append(log)
             let result: [String: Any] = [
                 "type": "plugin_action_invoked",
-                "action": ["action_id": RemotePingReader.actionID, "plugin_id": plugin],
+                "action": ["action_id": action, "plugin_id": plugin],
                 "context": [:] as [String: Any],
                 "log": record(log),
             ]
@@ -378,8 +429,8 @@ final class FakeHerdr: ShellRunning {
         var record: [String: Any] = [
             "log_id": log.id,
             "plugin_id": RemotePingReader.pluginID,
-            "action_id": RemotePingReader.actionID,
-            "command": ["sh", "list.sh"],
+            "action_id": log.action,
+            "command": ["sh", "\(log.action).sh"],
             "started_unix_ms": log.started,
             "status": log.runningFor > 0 ? "running" : "succeeded",
         ]

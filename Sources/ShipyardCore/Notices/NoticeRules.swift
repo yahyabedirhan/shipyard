@@ -20,6 +20,18 @@ public enum NoticeRules {
     public static let notificationsOff =
         "shipyard's notifications are off in System Settings, so this notice wasn't shown"
 
+    /// How long a notice may wait on another machine for the Mac's poll
+    /// (`RemotePingReader.takeNotices`): one older than this when it
+    /// arrives is dropped, so stale status never shows.
+    public static let maxQueuedAge: TimeInterval = 10 * 60
+
+    /// Whether `queued`, arriving at `now`, waited no longer than
+    /// `maxQueuedAge` since it was sent. One sent "later" than `now` (the
+    /// machine's clock ahead of the Mac's) is fresh.
+    public static func isFresh(_ queued: QueuedNotice, at now: Date) -> Bool {
+        now.timeIntervalSince(queued.sent) <= maxQueuedAge
+    }
+
     /// The project `notice` is shown under, or why it isn't shown, filed
     /// against `configuration` and `resolved` (each project's repositories
     /// as last resolved, by name).

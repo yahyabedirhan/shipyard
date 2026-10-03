@@ -467,9 +467,9 @@ Shipyard carries two kinds of message from you to the user. Pick by what the use
 |---|---|---|
 | For | something the user should act on or would want to know now: a pull request ready for review, a question you're blocked on, a long task finished or failed | a status update that needs nothing from them: "orchestration started", "tests running", "deployed to staging" |
 | What the user sees | a row in the menu that needs attention until clicked, and a notification (`ping.sent`) | a notification only (`agent.notice`): never listed, counted or kept |
-| What you learn | its id; it waits for the user | exit 0 only when the app showed it; exit 1 with why when it wasn't shown |
+| What you learn | its id; it waits for the user | exit 0 when the app showed it, or when it was queued for the Mac's poll (it says `queued`); exit 1 with why when it wasn't shown |
 
-When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. Notices run on the Mac today, through the running app. [references/notices.md](references/notices.md) has the command, its flags, the exit codes and worked examples.
+When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. It works on the Mac and on the user's other machines running Herdr. [references/notices.md](references/notices.md) has the command, its flags, its routes, the exit codes and worked examples.
 
 ## Sending pings
 

@@ -44,6 +44,10 @@ public struct Notice: Codable, Equatable, Sendable {
 public enum NoticeVerdict: Equatable, Sendable {
     /// The app posted it.
     case shown
+    /// It waits on this machine for the Mac's next poll of it, which
+    /// shows it by the same rules, or drops it when it's waited too long.
+    /// Only a route that can't reach the app at once says this.
+    case queued
     /// It wasn't shown: why, in one line, such as "notices are off for
     /// project `shop`" or "shipyard isn't running, so this notice wasn't shown".
     case refused(String)
@@ -51,7 +55,9 @@ public enum NoticeVerdict: Equatable, Sendable {
 
 /// How a notice reaches the app that shows it, and comes back with its
 /// verdict. Each build gives `NoticeCommands` the route it has: on the Mac,
-/// the running app's control socket.
+/// the running app's control socket; on another machine without a faster
+/// way, the herdr-shipyard plugin, which holds it for the Mac's poll
+/// (`PluginNoticeRoute`).
 public protocol NoticeRoute: Sendable {
     /// Hands `notice` to the app, sent by the command run in `environment`,
     /// and waits for its verdict. A route that can't reach the app refuses,

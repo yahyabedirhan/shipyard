@@ -1244,7 +1244,9 @@ public final class Shipyard {
     /// last pings and records why. A machine whose pings changed posts its
     /// new pings' `ping.sent` notifications, once per sending, and takes
     /// the notifications of the pings it no longer lists out of
-    /// Notification Center. No GitHub request is made. Then the
+    /// Notification Center. A machine that answered then hands over the
+    /// notices its agents left for the Mac, shown by the user's rules
+    /// unless they waited too long. No GitHub request is made. Then the
     /// machine timer comes back in `machinePollInterval`. Its timer calls
     /// this. A call while a poll runs returns at once, and the running poll
     /// goes again when it's done, so a machine added meanwhile is asked.
@@ -1264,25 +1266,57 @@ public final class Shipyard {
         armMachineTimer(after: Self.machinePollInterval)
     }
 
+    /// What one machine answered a poll: its pings, or the notices taken off it.
+    private enum MachineAnswer: Sendable {
+        case pings(String, Result<PingList, RemotePingReader.Failure>)
+        case notices([QueuedNotice])
+    }
+
+    /// One poll: each machine's pings, listed as they come, and once a
+    /// machine's pings are in, the notices waiting on it, shown as they
+    /// come (`showQueued`). A machine whose pings couldn't be read isn't
+    /// asked for its notices.
     private func pollMachinesOnce() async {
         let reader = remoteReader
-        await withTaskGroup(of: (String, Result<PingList, RemotePingReader.Failure>).self) { group in
+        await withTaskGroup(of: MachineAnswer.self) { group in
             for label in remote.labels {
-                group.addTask { (label, await reader.list(machine: label)) }
+                group.addTask { .pings(label, await reader.list(machine: label)) }
             }
-            for await (label, result) in group {
-                let before = remote.machine(label)
-                remote.record(result, for: label, at: clock.now)
-                menu.machineNotices = MachineNotice.notices(remote)
-                let after = remote.machine(label)
-                // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
-                let firstAnswer = before?.answered == nil && after?.answered != nil
-                guard after?.pings != before?.pings || firstAnswer else { continue }
-                rebuildMenu(configStore.lastValid)
-                forgetLeftPings(stored: pings)
-                await removeLeftBanners()
-                await notifyNewPings()
+            while let answer = await group.next() {
+                switch answer {
+                case .pings(let label, let result):
+                    await record(result, for: label)
+                    guard case .success = result else { continue }
+                    group.addTask { .notices(await reader.takeNotices(machine: label)) }
+                case .notices(let queued):
+                    await showQueued(queued)
+                }
             }
+        }
+    }
+
+    /// Records the pings the machine `label` listed, or why it couldn't,
+    /// and lists them and notifies the new ones when they changed.
+    private func record(_ result: Result<PingList, RemotePingReader.Failure>, for label: String) async {
+        let before = remote.machine(label)
+        remote.record(result, for: label, at: clock.now)
+        menu.machineNotices = MachineNotice.notices(remote)
+        let after = remote.machine(label)
+        // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
+        let firstAnswer = before?.answered == nil && after?.answered != nil
+        guard after?.pings != before?.pings || firstAnswer else { return }
+        rebuildMenu(configStore.lastValid)
+        forgetLeftPings(stored: pings)
+        await removeLeftBanners()
+        await notifyNewPings()
+    }
+
+    /// Shows the notices taken off a machine, oldest first, each by the
+    /// same rules as any notice (`show`), and drops one that waited longer
+    /// than `NoticeRules.maxQueuedAge`. Nobody waits for their verdicts.
+    private func showQueued(_ queued: [QueuedNotice]) async {
+        for notice in queued where NoticeRules.isFresh(notice, at: clock.now) {
+            _ = await show(notice.notice)
         }
     }
 
