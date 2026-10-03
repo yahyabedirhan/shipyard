@@ -1150,7 +1150,7 @@ shipyard/
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
 ├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules
 ├── assets/images/<topic>/           # the README's logo (logo/), by relative path; the app icon's comparison sheets (app-icon/, with exploration/ from `make icon-exploration`); the known agents' logos as published (agent-logos/*.svg), the sources `make agent-logos` converts
-├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (shipyard-0.0.2/), by relative path
+├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (0.1.0/, and the presets one in shipyard-0.0.2/), by relative path
 ├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
 │   ├── CommandResult.swift           # (moved) output, error text, exit status: 0 done, 1 refused, 2 usage
 │   ├── CommandEnvironment.swift      # (moved) working folder, variables, the git lookup and program-run ports; no platform

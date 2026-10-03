@@ -114,7 +114,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+<img src="assets/screenshots/0.1.0/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 
 The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
 
@@ -132,7 +132,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
+<img src="assets/screenshots/0.1.0/tabs.png" width="400" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
 
 Grouped by date, three rows a group:
 
@@ -150,7 +150,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
+<img src="assets/screenshots/0.1.0/date.png" width="400" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
 
 A file with no projects (or no file at all): the panel asks how you'll use shipyard, offers the three presets, and offers the agent skill:
 
