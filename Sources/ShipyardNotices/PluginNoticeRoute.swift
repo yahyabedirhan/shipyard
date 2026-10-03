@@ -11,13 +11,22 @@ import ShipyardCommand
 /// The plugin's `shipyard` is linked at `~/.local/bin/shipyard`; the
 /// plugin's folder is that link's target less `bin/shipyard`, and its
 /// `scripts/notices.sh add <id>` stores the notice (`QueuedNotice`) given
-/// on standard input: exit 0 stored, 1 too large, 2 misused.
+/// on standard input: exit 0 stored, 1 too large, 2 misused. A notice is
+/// stored under its `--id` when it has one, so a replace sent before the
+/// Mac's poll overwrites the one waiting, and `notices.sh remove <id>`
+/// takes a waiting one away for `shipyard notify withdraw <id>`. A notice's
+/// image isn't carried on this route: the plugin's listing is too small
+/// for one, so it's dropped before the notice is stored.
 public struct PluginNoticeRoute: NoticeRoute {
     private let home: URL
     private let now: @Sendable () -> Date
 
     /// What the agent reads once the notice is queued.
     public static let queuedLine = "queued; shown within about 30 seconds if the Mac is awake"
+
+    /// What the agent reads once a withdrawal took the notice out of the
+    /// queue: one the Mac already collected isn't reached from here.
+    public static let withdrawnLine = "withdrawn if it was still waiting; one the Mac already showed stays"
 
     /// The plugin's link, under the home folder.
     static let linkPath = ".local/bin/shipyard"
@@ -37,22 +46,30 @@ public struct PluginNoticeRoute: NoticeRoute {
         self.now = now
     }
 
-    public func deliver(_ notice: Notice, environment: CommandEnvironment) -> NoticeVerdict {
+    public func deliver(_ request: NoticeRequest, environment: CommandEnvironment) -> NoticeVerdict {
         let script: URL
         switch locateScript() {
         case .success(let found): script = found
         case .failure(let refusal): return .refused(refusal.message)
         }
-        let queued = QueuedNotice(id: UUID().uuidString.lowercased(), sent: now(), notice: notice)
-        guard let ran = Self.run(script: script, arguments: ["add", queued.id], input: queued.encoded()) else {
-            return .refused("couldn't run the herdr-shipyard plugin's \(script.path), so this notice wasn't queued")
+        let arguments: [String], input: Data, failing: String
+        switch request {
+        case .show(var notice):
+            notice.image = nil
+            let queued = QueuedNotice(id: notice.id ?? UUID().uuidString.lowercased(), sent: now(), notice: notice)
+            (arguments, input, failing) = (["add", queued.id], queued.encoded(), "queue this notice")
+        case .withdraw(let id):
+            (arguments, input, failing) = (["remove", id], Data(), "withdraw the notice")
+        }
+        guard let ran = Self.run(script: script, arguments: arguments, input: input) else {
+            return .refused("couldn't run the herdr-shipyard plugin's \(script.path), so it didn't \(failing)")
         }
         switch ran.status {
         case 0:
             return .queued
         default:
             let said = Self.lastLine(ran.error).map { ": \($0)" } ?? " (exit \(ran.status))"
-            return .refused("the herdr-shipyard plugin didn't queue this notice\(said)")
+            return .refused("the herdr-shipyard plugin didn't \(failing)\(said)")
         }
     }
 

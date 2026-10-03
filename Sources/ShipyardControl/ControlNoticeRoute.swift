@@ -2,7 +2,7 @@ import Foundation
 import ShipyardCommand
 import ShipyardNotices
 
-/// The Mac's way for a notice to reach the app: the running app's control
+/// The Mac's way for a notice, or its withdrawal, to reach the app: the running app's control
 /// socket (`ControlRequest.notify`), as the holder `Holder.find` works out,
 /// waiting for its verdict. It never launches the app: with the app not
 /// running the notice is refused, so the agent knows nobody saw it.
@@ -26,24 +26,30 @@ public struct ControlNoticeRoute: NoticeRoute {
         self.processes = processes
     }
 
-    public func deliver(_ notice: Notice, environment: CommandEnvironment) -> NoticeVerdict {
+    /// The withdrawal that couldn't be handed over, in words.
+    public static let notRunningToWithdraw = "shipyard isn't running, so the notice wasn't withdrawn"
+
+    public func deliver(_ request: NoticeRequest, environment: CommandEnvironment) -> NoticeVerdict {
+        let showing = if case .show = request { true } else { false }
         let client = ControlClient(
             socket: ControlSocket.locate(support: support),
             holder: Holder.find(variables: environment.variables, workingDirectory: environment.workingDirectory, processes: processes),
             transport: transport,
             timeout: Self.timeout
         )
-        switch client.send(.notify(notice)) {
+        switch client.send(.notify(request)) {
         case .success(let reply) where reply.ok:
             return .shown
         case .success(let reply):
             return .refused(reply.error.isEmpty ? "shipyard refused the notice without saying why" : reply.error)
         case .failure(.notRunning):
-            return .refused(Self.notRunning)
+            return .refused(showing ? Self.notRunning : Self.notRunningToWithdraw)
         case .failure(.timedOut(let seconds)):
-            return .refused("shipyard didn't answer within \(Int(seconds)) seconds, so this notice may not have been shown")
+            let outcome = showing ? "this notice may not have been shown" : "the notice may not have been withdrawn"
+            return .refused("shipyard didn't answer within \(Int(seconds)) seconds, so \(outcome)")
         case .failure(.failed(let why)):
-            return .refused("couldn't reach shipyard, so this notice wasn't shown: \(why)")
+            let outcome = showing ? "this notice wasn't shown" : "the notice wasn't withdrawn"
+            return .refused("couldn't reach shipyard, so \(outcome): \(why)")
         }
     }
 }

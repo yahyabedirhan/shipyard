@@ -47,9 +47,10 @@ public enum ControlRequest: Equatable, Sendable {
     case controlRelease
     /// `shipyard notify "<title>" …`: an agent's notice, shown when the
     /// user's rules select it for its project, answered with the app's
-    /// verdict. Not leased: any agent may post one while another drives
-    /// the app.
-    case notify(Notice)
+    /// verdict; or `shipyard notify withdraw <id>`, the notice shown under
+    /// that id taken away. Not leased: any agent may post one while
+    /// another drives the app.
+    case notify(NoticeRequest)
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -64,6 +65,10 @@ public enum ControlRequest: Equatable, Sendable {
     /// The longest wait in line a `take` asks for, in seconds: an hour. It
     /// keeps the client's timeout and the app's sleep within range.
     public static let longestWait = 3600
+
+    /// The most bytes the app reads of one request: 8 MB, room for a
+    /// notice's image (`Notice.largestImage`, base64 in its JSON).
+    public static let largestMessage = 8 << 20
 
     /// Whether the request needs the lease (`ControlLease`) before it's
     /// answered. `app.status` doesn't: it changes nothing, and reports the
@@ -219,8 +224,9 @@ public struct ControlMessage: Equatable, Sendable {
         var menuBarIcon: Bool?
         var withIndicator: Bool?
         var waitSeconds: Int?
-        /// `notify`'s notice, as one object in its own shape (`Notice`).
-        var notice: Notice?
+        /// `notify`'s request, as one object in its own shape
+        /// (`NoticeRequest`): the notice's, or `{"withdraw":"<id>"}`.
+        var notice: NoticeRequest?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.

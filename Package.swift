@@ -33,7 +33,8 @@ var targets: [Target] = [
     ),
     .target(
         name: "ShipyardNotices",
-        dependencies: ["ShipyardCommand"],
+        // A notice's click and buttons are a ping's actions (`PingAction`).
+        dependencies: ["ShipyardCommand", "ShipyardPings"],
         path: "Sources/ShipyardNotices"
     ),
     .target(
@@ -75,7 +76,7 @@ var targets: [Target] = [
     // format and exit codes, with a fake transport and launcher.
     .testTarget(
         name: "ShipyardControlTests",
-        dependencies: ["ShipyardCommand", "ShipyardNotices", "ShipyardControl"],
+        dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardNotices", "ShipyardControl"],
         path: "Tests/ShipyardControlTests"
     ),
 ]

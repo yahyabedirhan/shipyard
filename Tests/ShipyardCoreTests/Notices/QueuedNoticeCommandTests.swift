@@ -150,11 +150,46 @@ struct QueuedNoticeCommandTests {
             == .failed("shipyard notify: the herdr-shipyard plugin at \(home.plugin.path) can't hold notices; update it (herdr plugin install yahyabedirhan/herdr-shipyard)"))
     }
 
+    @Test("a notice with an id is queued under it, so a replace overwrites the one waiting, and its image is left behind, too large for the plugin's listing")
+    func idAndImage() throws {
+        let home = try Home()
+        defer { home.remove() }
+        let image = home.root.appendingPathComponent("chart.png")
+        try Data([0x89, 0x50]).write(to: image)
+
+        let result = shipyard(["notify", "Tests 3/10", "--project", "shop", "--id", "tests", "--image", image.path, "--subtitle", "checkout"], home: home)
+
+        #expect(result == CommandResult(output: "queued; shown within about 30 seconds if the Mac is awake\n"))
+        #expect(home.arguments == "add\ntests\n")
+        let stored = try JSONDecoder.iso8601.decode(QueuedNotice.self, from: try #require(home.input))
+        #expect(stored == QueuedNotice(id: "tests", sent: Self.sent, notice: Notice(title: "Tests 3/10", project: "shop", subtitle: "checkout", id: "tests")))
+    }
+
+    @Test("withdraw <id> removes the notice waiting under the id with notices.sh remove, and says one the Mac showed stays")
+    func withdraw() throws {
+        let home = try Home()
+        defer { home.remove() }
+
+        let result = shipyard(["notify", "withdraw", "tests"], home: home)
+
+        #expect(result == CommandResult(output: "withdrawn if it was still waiting; one the Mac already showed stays\n"))
+        #expect(home.arguments == "remove\ntests\n")
+    }
+
     @Test("arguments that don't read exit 2 before the plugin is asked")
     func usage() throws {
         let home = try Home()
         defer { home.remove() }
         #expect(shipyard(["notify"], home: home).status == CommandResult.usageStatus)
         #expect(home.arguments == nil)
+    }
+}
+
+private extension JSONDecoder {
+    /// Reads `sent` as the plugin stores it, ISO 8601.
+    static var iso8601: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }

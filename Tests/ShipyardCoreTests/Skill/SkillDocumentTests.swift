@@ -425,6 +425,10 @@ struct SkillDocumentTests {
         let examples = shellExamples(in: page, command: "notify")
         #expect(examples.count >= 3)
         for words in examples {
+            if words.count > 2, words[2] == "withdraw" {
+                #expect(words.count == 4 && PingCommand.isID(words[3]), "\(words) doesn't read")
+                continue
+            }
             if case .failure(let error) = NotifyCommand.parse(Array(words.dropFirst(2))) {
                 Issue.record("\(words) doesn't read: \(error.message)")
             }

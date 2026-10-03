@@ -187,8 +187,9 @@ final class AppServices {
                 guard let notice = ControlNotice(transition) else { return }
                 Task { await shipyard.notify(notice) }
             },
-            // An agent's notice is shown when its project's rules say so.
-            notices: { notice in await shipyard.show(notice) },
+            // An agent's notice is shown when its project's rules say so,
+            // or withdrawn.
+            notices: { request in await shipyard.receive(request) },
             quit: { NSApp.terminate(nil) }
         )
         do {

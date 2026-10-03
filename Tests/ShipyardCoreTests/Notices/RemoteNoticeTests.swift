@@ -155,4 +155,26 @@ struct RemoteNoticeTests {
         await harness.poll()
         #expect(harness.noticeTitles == ["shop · Done"])
     }
+
+    @Test("a Herdr click or button on a notice from a machine focuses the pane on that machine, as a remote ping's click does; a link opens on the Mac")
+    func herdrOnItsMachine() async throws {
+        let harness = try await Harness.withMachines()
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "netcup-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "hetzner-vps")
+        let link = URL(string: "https://example.com/run/1")!
+        var waiting = queued("Done")
+        waiting.notice.action = .herdr("w1:p3")
+        waiting.notice.buttons = [NoticeButton(label: "Run", action: .url(link))]
+        harness.herdr.queue(waiting, on: "netcup-vps")
+        await harness.poll()
+        let posted = try #require(harness.notifier.posted.first { $0.event == .agentNotice })
+
+        await harness.shipyard.openNotification(posted.itemURL).value
+        await harness.shipyard.openNotification(try #require(posted.buttons.first).url).value
+
+        #expect(harness.herdr.runs(on: "netcup-vps").filter { $0.first != "plugin" } == [["agent", "focus", "w1:p3"]])
+        #expect(harness.herdr.runs(on: "hetzner-vps").filter { $0.first != "plugin" }.isEmpty)
+        #expect(harness.herdr.focused.isEmpty)
+        #expect(harness.actions.ran.last == .url(link))
+    }
 }

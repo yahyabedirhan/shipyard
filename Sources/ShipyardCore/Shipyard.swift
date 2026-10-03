@@ -878,8 +878,8 @@ public final class Shipyard {
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         // A lease notification's click opens the panel, which the app does.
         guard itemURL != ControlNotice.panelURL else { return Task {} }
-        // An agent's notice has nothing to open.
-        guard itemURL != NoticeRules.clickURL else { return Task {} }
+        // An agent's notice runs the action its click or button carries, if any.
+        guard !NoticeRules.isNoticeURL(itemURL) else { return runAction(ofNotice: NoticeRules.click(from: itemURL)) }
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
         guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
         actions.open(itemURL)
@@ -902,12 +902,27 @@ public final class Shipyard {
         await notifier.post(NotificationRules.notification(for: notice, at: clock.now))
     }
 
+    /// Answers an agent's notice request (`shipyard notify`) with the
+    /// verdict its command exits by: a notice is shown (`show(_:)`), a
+    /// withdrawal done (`withdrawNotice(id:)`).
+    public func receive(_ request: NoticeRequest) async -> NoticeVerdict {
+        switch request {
+        case .show(let notice): return await show(notice)
+        case .withdraw(let id): return await withdrawNotice(id: id)
+        }
+    }
+
     /// Shows an agent's `notice` (`shipyard notify`) when the last valid
     /// configuration files it under a project whose rules select
     /// `agent.notice` (`NoticeRules`), and says what came of it: the
     /// verdict the agent's command exits by. Nothing is stored, counted or
-    /// listed; each notice is its own notification, never replacing another.
-    public func show(_ notice: Notice) async -> NoticeVerdict {
+    /// listed. A notice with an `id` is posted under it
+    /// (`NoticeRules.notificationID`), replacing one still shown under it;
+    /// one without is its own notification, never replacing another.
+    /// A notice taken off a remote machine names it (`machine`, its Herdr
+    /// label), so a Herdr click or button focuses the pane there, as a
+    /// remote ping's does.
+    public func show(_ notice: Notice, from machine: String? = nil) async -> NoticeVerdict {
         let resolved = resolvedRepositories ?? repositoriesStore.load()
         resolvedRepositories = resolved
         switch NoticeRules.project(for: notice, configuration: configStore.lastValid, resolved: resolved) {
@@ -915,10 +930,18 @@ public final class Shipyard {
             return .refused(refusal.message)
         case .success(let project):
             guard await notifier.canShow() else { return .refused(NoticeRules.notificationsOff) }
-            let id = "\(EventKind.agentNotice.rawValue) \(UUID().uuidString.lowercased())"
-            await notifier.post(NoticeRules.notification(for: notice, project: project, id: id))
+            let id = NoticeRules.notificationID(notice.id ?? UUID().uuidString.lowercased())
+            await notifier.post(NoticeRules.notification(for: notice, project: project, id: id, machine: machine))
             return .shown
         }
+    }
+
+    /// Takes the notice shown under `id` (its `--id`) out of Notification
+    /// Center (`shipyard notify withdraw <id>`). Nothing is kept of a
+    /// notice, so one gone already, or never shown, is no error: always `.shown`.
+    public func withdrawNotice(id: String) async -> NoticeVerdict {
+        await notifier.removeDelivered(id: NoticeRules.notificationID(id))
+        return .shown
     }
 
     /// Marks the row's item seen without opening it (⌥-click): it needs
@@ -1084,6 +1107,25 @@ public final class Shipyard {
             case .failed(let reason, let detail):
                 remote.recordFailure(ping, reason: reason, detail: detail)
                 rebuildMenu(configStore.lastValid)
+            }
+        }
+    }
+
+    /// Runs what a notice's click or button carries (`NoticeRules.Click`),
+    /// as a ping's click runs its action: a Herdr one focuses its tab or
+    /// pane in the session it was sent from, then brings the terminal
+    /// forward; one from a remote machine focuses it there, as a remote
+    /// ping's does. A notice isn't kept, so how it went is only logged by the
+    /// app's action port; `nil` (a notice without an action) does nothing.
+    private func runAction(ofNotice click: NoticeRules.Click?) -> Task<Void, Never> {
+        guard let click else { return Task {} }
+        return Task {
+            if case .herdr(let target) = click.action, let machine = click.machine {
+                _ = await runHerdr(target, on: machine)
+            } else if case .herdr(let target) = click.action {
+                _ = await runHerdr(target, inSession: click.herdrSession, sentFrom: click.terminal)
+            } else {
+                _ = await actions.run(click.action)
             }
         }
     }
@@ -1269,7 +1311,7 @@ public final class Shipyard {
     /// What one machine answered a poll: its pings, or the notices taken off it.
     private enum MachineAnswer: Sendable {
         case pings(String, Result<PingList, RemotePingReader.Failure>)
-        case notices([QueuedNotice])
+        case notices(String, [QueuedNotice])
     }
 
     /// One poll: each machine's pings, listed as they come, and once a
@@ -1287,9 +1329,9 @@ public final class Shipyard {
                 case .pings(let label, let result):
                     await record(result, for: label)
                     guard case .success = result else { continue }
-                    group.addTask { .notices(await reader.takeNotices(machine: label)) }
-                case .notices(let queued):
-                    await showQueued(queued)
+                    group.addTask { .notices(label, await reader.takeNotices(machine: label)) }
+                case .notices(let label, let queued):
+                    await showQueued(queued, from: label)
                 }
             }
         }
@@ -1314,9 +1356,9 @@ public final class Shipyard {
     /// Shows the notices taken off a machine, oldest first, each by the
     /// same rules as any notice (`show`), and drops one that waited longer
     /// than `NoticeRules.maxQueuedAge`. Nobody waits for their verdicts.
-    private func showQueued(_ queued: [QueuedNotice]) async {
+    private func showQueued(_ queued: [QueuedNotice], from machine: String) async {
         for notice in queued where NoticeRules.isFresh(notice, at: clock.now) {
-            _ = await show(notice.notice)
+            _ = await show(notice.notice, from: machine)
         }
     }
 

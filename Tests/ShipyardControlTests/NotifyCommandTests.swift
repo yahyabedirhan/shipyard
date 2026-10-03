@@ -20,11 +20,14 @@ struct NotifyCommandTests {
         func origin(in folder: URL) -> String? { origin }
     }
 
-    /// Runs `shipyard <arguments>` in the Mac's build, in a checkout whose
-    /// `origin` is `origin`, against `transport`.
+    /// Runs `shipyard <arguments>` in the Mac's build, in a checkout at
+    /// `folder` whose `origin` is `origin`, with the environment
+    /// `variables`, against `transport`.
     func shipyard(
         _ arguments: [String],
         origin: String? = "git@github.com:owner/shop.git",
+        folder: URL = Self.folder,
+        variables: [String: String] = [:],
         transport: FakeTransport,
         launcher: RecordingLauncher = RecordingLauncher()
     ) -> CommandResult {
@@ -39,7 +42,7 @@ struct NotifyCommandTests {
         return ShipyardCLI.run(
             arguments,
             table: table,
-            environment: CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: Git(origin: origin)),
+            environment: CommandEnvironment(workingDirectory: folder, variables: variables, git: Git(origin: origin)),
             now: Date(timeIntervalSince1970: 0)
         )
     }
@@ -70,7 +73,7 @@ struct NotifyCommandTests {
 
         if let notice {
             #expect(result == CommandResult(output: "shown\n"))
-            #expect(app.requests == [.notify(notice)])
+            #expect(app.requests == [.notify(.show(notice))])
         } else {
             // After --, a flag's word is the title, and the checkout files it.
             #expect(result.status == 1)
@@ -125,7 +128,7 @@ struct NotifyCommandTests {
         ([], "give the notice a title: shipyard notify \"<title>\" [options] (shipyard notify --help lists them)"),
         (["  "], "give the notice a title: shipyard notify \"<title>\" [options] (shipyard notify --help lists them)"),
         (["Tests", "running"], "one title only; quote it: shipyard notify \"Tests running\""),
-        (["Done", "--sound", "none"], "unknown option `--sound`"),
+        (["Done", "--loud"], "unknown option `--loud`"),
         (["Done", "--body"], "`--body` needs a value"),
         (["Done", "--repo", "shop"], "`--repo` takes a repository as owner/name, not `shop`"),
         (["Done", "--project", ""], "`--project` takes a project's name"),
