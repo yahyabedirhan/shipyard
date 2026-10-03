@@ -104,12 +104,31 @@ struct ControlServerTests {
         #expect(json == .init(reply: .done(Self.status.json)))
     }
 
-    @Test("quit answers, and quits once the reply is written")
+    @Test("quit answers with the lease it renewed, for a relaunch to hand over, and quits once the reply is written")
     func quit() async {
-        let answer = await server().reply(to: ControlRequest.appQuit.sent())
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 20)
 
-        #expect(answer == .init(reply: .done("shipyard quit\n"), quits: true))
+        let answer = await server.reply(to: ControlRequest.appQuit.sent())
+
+        let lease = ControlLease.Term(holder: Self.agent, taken: Date(timeIntervalSince1970: 0), ends: Date(timeIntervalSince1970: 80))
+        #expect(answer == .init(reply: ControlReply(ok: true, output: "shipyard quit\n", lease: lease), quits: true))
         #expect(quitter.quits == 0)
+    }
+
+    @Test("open, against the running app, is leased: it renews the lease and answers with the status as lines")
+    func open() async {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 30)
+
+        let answer = await server.reply(to: ControlRequest.appOpen.sent())
+
+        var held = Self.status
+        held.lease = AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 60, waiting: 0)
+        #expect(answer == .init(reply: .done(held.text)))
+        #expect(server.lease.current(at: clock.now)?.ends == Date(timeIntervalSince1970: 90))
     }
 
     @Test("each panel request asks the panel once and answers with what it did", arguments: [
@@ -200,7 +219,7 @@ struct ControlServerTests {
     // MARK: - The lease
 
     @Test("a leased request from another holder is refused, naming the holder, with nothing done", arguments: [
-        ControlRequest.appQuit, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
+        ControlRequest.appQuit, .appOpen, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
         .panelShowMore(project: "shop", kind: "issues"), .panelTab(name: "All"),
         .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false),
         .screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: true),
@@ -287,7 +306,8 @@ struct ControlServerTests {
             "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard control take --wait <seconds>` to queue"
         )))
         let quit = await Task.detached { client.send(.appQuit) }.value
-        #expect(quit == .success(.done("shipyard quit\n")))
+        let lease = ControlLease.Term(holder: Self.agent, taken: Date(timeIntervalSince1970: 0), ends: Date(timeIntervalSince1970: 60))
+        #expect(quit == .success(ControlReply(ok: true, output: "shipyard quit\n", lease: lease)))
         for _ in 0..<200 where quitter.quits == 0 {
             try await Task.sleep(nanoseconds: 10_000_000)
         }

@@ -84,6 +84,31 @@ public struct ControlLease: Equatable, Sendable {
 
     public init() {}
 
+    /// The lease an app launched with `environment` starts with at `now`:
+    /// the one a relaunch handed over in `handoverVariable`, keeping when
+    /// it was taken and so its cap, and posting no transition; free when
+    /// there's none, it doesn't read, or it has already ended.
+    public init(environment: [String: String], at now: Date) {
+        guard let json = environment[Self.handoverVariable],
+              var term = try? JSONDecoder().decode(Term.self, from: Data(json.utf8)) else { return }
+        term.ends = min(term.ends, term.capped)
+        guard now < term.ends else { return }
+        self.term = term
+    }
+
+    /// The launch environment's variable a relaunch hands the lease over in.
+    public static let handoverVariable = "SHIPYARD_CONTROL_LEASE"
+
+    /// What a relaunch adds to the launched app's environment to hand
+    /// `term` over: `handoverVariable`, as one small JSON object,
+    /// `{"ends":<seconds since 1970>,"holder":{…},"taken":<seconds since 1970>}`.
+    public static func handover(_ term: Term) -> [String: String] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        // Encoding strings and numbers can't fail.
+        return [handoverVariable: String(decoding: try! encoder.encode(term), as: UTF8.self)]
+    }
+
     /// The lease held at `now`, or nil when it's free.
     public func current(at now: Date) -> Term? {
         guard let term, now < term.ends else { return nil }
@@ -125,5 +150,27 @@ public struct ControlLease: Equatable, Sendable {
         current(at: now).map {
             AppStatus.Lease(holder: $0.holder.name, place: $0.holder.place, secondsLeft: $0.secondsLeft(at: now), waiting: 0)
         }
+    }
+}
+
+/// A term as it goes in the quit's reply and the relaunch's environment:
+/// its times as seconds since 1970, whatever the coder's date strategy.
+extension ControlLease.Term: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case holder, taken, ends
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        holder = try container.decode(Holder.self, forKey: .holder)
+        taken = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .taken))
+        ends = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .ends))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(holder, forKey: .holder)
+        try container.encode(taken.timeIntervalSince1970, forKey: .taken)
+        try container.encode(ends.timeIntervalSince1970, forKey: .ends)
     }
 }

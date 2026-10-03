@@ -102,4 +102,50 @@ struct ControlLeaseTests {
         #expect(lease.status(at: Self.at(12.5)) == AppStatus.Lease(holder: "Claude Code", place: "/work/shop", secondsLeft: 48, waiting: 0))
         #expect(lease.status(at: Self.at(60)) == nil)
     }
+
+    // MARK: - A relaunch's handover
+
+    /// The handover's JSON for `a`'s lease, taken at `taken` and ending at `ends`.
+    static func handover(taken: TimeInterval, ends: TimeInterval) -> String {
+        ControlLease.handover(ControlLease.Term(holder: a, taken: at(taken), ends: at(ends)))[ControlLease.handoverVariable] ?? ""
+    }
+
+    @Test("a relaunch hands the lease over as one small JSON object in SHIPYARD_CONTROL_LEASE")
+    func handoverForm() {
+        let term = ControlLease.Term(holder: Self.a, taken: Self.at(0), ends: Self.at(70.5))
+
+        #expect(ControlLease.handover(term) == ["SHIPYARD_CONTROL_LEASE":
+            #"{"ends":70.5,"holder":{"key":"CLAUDE_CODE_SESSION_ID=a","name":"Claude Code","place":"/work/shop"},"taken":0}"#])
+    }
+
+    @Test("an app launched with a handed-over lease holds it: it refuses another holder and keeps the original cap")
+    func handedOver() {
+        // Taken at 0 by the app that quit and renewed to 280; the launched app reads it at 250.
+        var lease = ControlLease(environment: [ControlLease.handoverVariable: Self.handover(taken: 0, ends: 280)], at: Self.at(250))
+
+        #expect(lease.current(at: Self.at(250)) == ControlLease.Term(holder: Self.a, taken: Self.at(0), ends: Self.at(280)))
+        let seen = [(260.0, Self.b), (270, Self.a), (300, Self.b)].map { seconds, holder in
+            Self.read(lease.use(by: holder, at: Self.at(seconds)))
+        }
+        // The handover posts nothing, so the first transition is a renewal; the cap is 5 minutes from the first take.
+        #expect(seen == ["refused: a until 280", "a until 300 (renewed a)", "b until 360 (ended a capped, started b)"])
+    }
+
+    @Test("a handover that has ended, whose end past its cap has passed, or that doesn't read leaves the launched app's lease free",
+          arguments: [
+              (ControlLeaseTests.handover(taken: 0, ends: 60), 60.0),
+              (ControlLeaseTests.handover(taken: 0, ends: 900), 300),
+              (#"{"holder":{"key":"k","name":"n","place":"p"}}"#, 0),
+              ("", 0),
+          ] as [(String, TimeInterval)])
+    func handoverIgnored(json: String, seconds: TimeInterval) {
+        let lease = ControlLease(environment: [ControlLease.handoverVariable: json], at: Self.at(seconds))
+
+        #expect(lease == ControlLease())
+    }
+
+    @Test("an app launched without a handover starts free")
+    func noHandover() {
+        #expect(ControlLease(environment: [:], at: Self.at(0)) == ControlLease())
+    }
 }

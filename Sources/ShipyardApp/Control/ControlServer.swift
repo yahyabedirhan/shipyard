@@ -30,13 +30,14 @@ final class ControlServer {
     private let now: @MainActor () -> Date
     private let timeZone: TimeZone
     /// App control's lease: who may send leased requests, and until when.
-    private(set) var lease = ControlLease()
+    private(set) var lease: ControlLease
     private var listener: Listener?
 
     init(
         socket: URL,
         panel: any PanelControlling,
         screenshotter: any Screenshotting,
+        lease: ControlLease = ControlLease(),
         now: @escaping @MainActor () -> Date = { Date() },
         timeZone: TimeZone = .current,
         quit: @escaping @MainActor () -> Void
@@ -44,6 +45,7 @@ final class ControlServer {
         self.socket = socket
         self.panel = panel
         self.screenshotter = screenshotter
+        self.lease = lease
         self.now = now
         self.timeZone = timeZone
         self.quit = quit
@@ -53,7 +55,8 @@ final class ControlServer {
 
     /// The answer to one request as the client sent it. A leased request
     /// asks the lease first: refused for anyone but its holder, with
-    /// nothing done.
+    /// nothing done. A quit hands the lease back in its reply, for a
+    /// relaunch to pass on.
     func reply(to data: Data) async -> Answer {
         let message: ControlMessage
         do throws(ControlProtocolError) {
@@ -61,19 +64,22 @@ final class ControlServer {
         } catch {
             return Answer(reply: .refused(error.message))
         }
+        var granted: ControlLease.Term?
         if message.request.isLeased {
             let time = now()
-            if case .failure(let refusal) = lease.use(by: message.holder, at: time).answer {
-                return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
+            switch lease.use(by: message.holder, at: time).answer {
+            case .success(let term): granted = term
+            case .failure(let refusal): return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
             }
         }
         switch message.request {
         case .appStatus(let json):
-            var status = panel.status()
-            status.lease = lease.status(at: now())
+            let status = status()
             return Answer(reply: .done(json ? status.json : status.text))
+        case .appOpen:
+            return Answer(reply: .done(status().text))
         case .appQuit:
-            return Answer(reply: .done("shipyard quit\n"), quits: true)
+            return Answer(reply: ControlReply(ok: true, output: "shipyard quit\n", lease: granted), quits: true)
         case .panelOpen:
             return await steer { () async throws(PanelRefusal) in try await panel.open(); return "panel open" }
         case .panelClose:
@@ -103,6 +109,13 @@ final class ControlServer {
                 return Answer(reply: .refused(why))
             }
         }
+    }
+
+    /// The panel's status, with the lease as it is now.
+    private func status() -> AppStatus {
+        var status = panel.status()
+        status.lease = lease.status(at: now())
+        return status
     }
 
     /// The line `body` returns, done, or its refusal.

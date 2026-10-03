@@ -8,7 +8,11 @@ public enum ControlRequest: Equatable, Sendable {
     /// `shipyard app status [--json]`: the status as lines, or as one JSON
     /// object (`AppStatus`).
     case appStatus(json: Bool)
-    /// `shipyard app quit`: the app replies, then quits.
+    /// `shipyard app open` while the app runs: its status as lines, and,
+    /// unlike `app.status`, leased, so the opener's lease is renewed.
+    case appOpen
+    /// `shipyard app quit`: the app replies with the lease the quit
+    /// renewed, then quits.
     case appQuit
     /// `shipyard panel open`: the menu bar icon's panel on screen.
     case panelOpen
@@ -72,6 +76,8 @@ public struct ControlMessage: Equatable, Sendable {
         switch request {
         case .appStatus(let json):
             wire = Wire(command: "app.status", json: json)
+        case .appOpen:
+            wire = Wire(command: "app.open")
         case .appQuit:
             wire = Wire(command: "app.quit")
         case .panelOpen:
@@ -117,6 +123,7 @@ public struct ControlMessage: Equatable, Sendable {
     private static func request(_ wire: Wire) throws(ControlProtocolError) -> ControlRequest {
         switch wire.command {
         case "app.status": return .appStatus(json: wire.json ?? false)
+        case "app.open": return .appOpen
         case "app.quit": return .appQuit
         case "panel.open": return .panelOpen
         case "panel.close": return .panelClose

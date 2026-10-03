@@ -163,6 +163,8 @@ final class AppServices {
             socket: ControlSocket.url(in: Self.files.support),
             panel: panelControl,
             screenshotter: screenshotter,
+            // A relaunch through `shipyard app open` hands its holder's lease over.
+            lease: ControlLease(environment: ProcessInfo.processInfo.environment, at: Date()),
             quit: { NSApp.terminate(nil) }
         )
         do {

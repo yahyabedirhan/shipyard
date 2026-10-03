@@ -5,6 +5,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 ## Unreleased
 
 - **The agent lease.** App control is leased to one agent at a time. An agent's first `shipyard app`, `panel` or `screenshot` command takes the lease and each later one renews it, until a minute after its last command and five minutes after it was taken at most. The app refuses another agent's command with exit 1, naming who holds shipyard, where, and when the lease ends. The `shipyard` command works out who the agent is on every call (its Claude Code session, else its own process), so agents pass nothing. `shipyard app status` needs no lease and reports it, as a `lease:` line and a `lease` object in `--json` (`null` when free). The control protocol is at version 2, so a `shipyard` and an app from different builds are told to reinstall: [#177](https://github.com/yahyabedirhan/shipyard/issues/177) "The lease refuses a second agent".
+- **A relaunch keeps the lease.** `shipyard app open`, `app open --demo` and `app quit` need the lease, and `app open` against the running app renews it. When `app open` quits an app to launch another (a demo, or yours back), the launched app starts with the agent's lease, until the same end, so no other agent takes shipyard in the gap: [#179](https://github.com/yahyabedirhan/shipyard/issues/179) "A relaunch keeps the holder's lease".
 
 ## 0.1.0 (2026-10-03)
 

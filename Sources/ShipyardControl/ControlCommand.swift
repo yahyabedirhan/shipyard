@@ -200,39 +200,47 @@ public enum ControlCommand {
         case .open(nil):
             return open(context)
         case .quit:
-            return quit(context.client, context)
+            switch quit(context.client, context) {
+            case .success(let reply): return CommandResult(output: reply.output, error: reply.error)
+            case .failure(let result): return result
+            }
         }
     }
 
-    /// The normal app's status when it runs. Otherwise it's launched, then
-    /// asked for its status every quarter second until it answers, or exit
-    /// 1 after about 10 seconds. A demo left running is quit first, and its
-    /// pointer removed.
+    /// The normal app's status when it runs, renewing the lease (`app.open`
+    /// is leased). Otherwise it's launched, then asked for its status every
+    /// quarter second until it answers, or exit 1 after about 10 seconds. A
+    /// demo left running is quit first, its pointer removed, and its lease
+    /// handed over to the app launched.
     private static func open(_ context: Context) -> CommandResult {
         let normal = context.client(at: ControlSocket.url(in: context.support))
+        var handover: ControlLease.Term?
         if let demo = DemoPointer.recorded(in: context.support) {
-            if let refused = quitIfRunning(context.client(at: ControlSocket.url(in: demo)), context) { return refused }
+            switch quitIfRunning(context.client(at: ControlSocket.url(in: demo)), context) {
+            case .success(let lease): handover = lease
+            case .failure(let refused): return refused
+            }
             do {
                 try DemoPointer.remove(in: context.support)
             } catch {
                 return .failed("shipyard app open: couldn't remove \(DemoPointer.url(in: context.support).path): \(error.localizedDescription)")
             }
         }
-        switch normal.send(.appStatus(json: false)) {
+        switch normal.send(.appOpen) {
         case .failure(.notRunning):
             break
         case let answer:
             // It runs (or is there but failing): no second launch.
             return result(of: answer)
         }
-        return launch(environment: [:], answeringAt: normal, context)
+        return launch(environment: [:], handing: handover, answeringAt: normal, context)
     }
 
     /// Points the command at the demo's support folder, quits whatever app
     /// answers (the normal one, or a demo the pointer named), launches the
-    /// app on the demo, and waits for it as `open` does. The pointer is
-    /// written first, so nothing is quit when it can't be, and removed again
-    /// when no demo comes to run.
+    /// app on the demo with the quit app's lease handed over, and waits for
+    /// it as `open` does. The pointer is written first, so nothing is quit
+    /// when it can't be, and removed again when no demo comes to run.
     private static func openDemo(_ demo: Demo, _ context: Context) -> CommandResult {
         let normal = ControlSocket.url(in: context.support)
         do {
@@ -241,11 +249,19 @@ public enum ControlCommand {
             return .failed("shipyard app open: couldn't write \(DemoPointer.url(in: context.support).path): \(error.localizedDescription)")
         }
         var result: CommandResult?
+        var handover: ControlLease.Term?
         for socket in Set([context.client.socket, normal]).sorted(by: { $0.path < $1.path }) where result == nil {
-            result = quitIfRunning(context.client(at: socket), context)
+            switch quitIfRunning(context.client(at: socket), context) {
+            case .success(let lease): handover = lease ?? handover
+            case .failure(let refused): result = refused
+            }
         }
-        let outcome = result
-            ?? launch(environment: demo.environment, answeringAt: context.client(at: ControlSocket.url(in: demo.support)), context)
+        let outcome = result ?? launch(
+            environment: demo.environment,
+            handing: handover,
+            answeringAt: context.client(at: ControlSocket.url(in: demo.support)),
+            context
+        )
         if outcome.status != 0 {
             // No demo runs: later commands look for the normal app again.
             try? DemoPointer.remove(in: context.support)
@@ -253,19 +269,25 @@ public enum ControlCommand {
         return outcome
     }
 
-    /// Quits the app answering `client`, waiting until it's gone; nil when
-    /// it's gone or never ran, else what to exit with.
-    private static func quitIfRunning(_ client: ControlClient, _ context: Context) -> CommandResult? {
-        if case .failure(.notRunning) = client.send(.appStatus(json: false)) { return nil }
-        let result = quit(client, context)
-        return result.status == 0 ? nil : result
+    /// Quits the app answering `client`, waiting until it's gone: the lease
+    /// its quit handed back (nil when it never ran), else what to exit
+    /// with.
+    private static func quitIfRunning(_ client: ControlClient, _ context: Context) -> Result<ControlLease.Term?, CommandResult> {
+        if case .failure(.notRunning) = client.send(.appStatus(json: false)) { return .success(nil) }
+        return quit(client, context).map(\.lease)
     }
 
-    /// Launches the app with `environment`, then asks `client` for its
-    /// status every quarter second until it answers, or exit 1 after about
-    /// 10 seconds.
-    private static func launch(environment: [String: String], answeringAt client: ControlClient, _ context: Context) -> CommandResult {
+    /// Launches the app with `environment`, and `handover` handed over in
+    /// it when there's one, then asks `client` for its status every quarter
+    /// second until it answers, or exit 1 after about 10 seconds.
+    private static func launch(
+        environment: [String: String],
+        handing handover: ControlLease.Term?,
+        answeringAt client: ControlClient,
+        _ context: Context
+    ) -> CommandResult {
         let status = ControlRequest.appStatus(json: false)
+        let environment = handover.map { environment.merging(ControlLease.handover($0)) { _, lease in lease } } ?? environment
         do throws(AppLaunchFailure) {
             try context.launcher.launch(bundleID: ShipyardBundle.identifier, environment: environment)
         } catch {
@@ -289,19 +311,20 @@ public enum ControlCommand {
 
     /// Asks the app to quit; once it said it will, waits until nothing
     /// answers on the socket, so a following `app open` launches a new app
-    /// instead of finding the old one.
-    private static func quit(_ client: ControlClient, _ context: Context) -> CommandResult {
+    /// instead of finding the old one. The quit's reply, with the lease it
+    /// renewed, else what to exit with.
+    private static func quit(_ client: ControlClient, _ context: Context) -> Result<ControlReply, CommandResult> {
         let answer = client.send(.appQuit)
-        guard case .success(let reply) = answer, reply.ok else { return result(of: answer) }
+        guard case .success(let reply) = answer, reply.ok else { return .failure(result(of: answer)) }
         var look = client
         look.timeout = lookTimeout
         for _ in 0..<looks {
             if case .failure(.notRunning) = look.send(.appStatus(json: false)) {
-                return CommandResult(output: reply.output, error: reply.error)
+                return .success(reply)
             }
             context.pause(interval)
         }
-        return .failed("shipyard said it would quit, but it still answers after \(Int(wait)) seconds")
+        return .failure(.failed("shipyard said it would quit, but it still answers after \(Int(wait)) seconds"))
     }
 
     private static var looks: Int { Int(wait / interval) }
