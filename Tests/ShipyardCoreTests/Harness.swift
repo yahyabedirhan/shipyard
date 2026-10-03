@@ -220,10 +220,9 @@ extension GroupID {
 }
 
 extension CommandResult {
-    /// The id a `shipyard ping` that worked printed, from its line
-    /// `#<number> <id>`.
+    /// The id a `shipyard ping` that worked printed, its only line.
     var pingID: String {
-        output.trimmingCharacters(in: .newlines).split(separator: " ").last.map(String.init) ?? ""
+        output.trimmingCharacters(in: .newlines)
     }
 }
 

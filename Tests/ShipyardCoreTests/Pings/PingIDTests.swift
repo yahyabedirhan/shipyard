@@ -97,7 +97,7 @@ struct PingIDTests {
 
         #expect(harness.cli("ping", "Ready", "--project", "shop", "--id").error == "shipyard ping: `--id` needs a value\n")
         let long = String(repeating: "a", count: 64)
-        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id", long) == CommandResult(output: "#1 " + long + "\n"))
+        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id", long) == CommandResult(output: long + "\n"))
     }
 
     @Test("without --id, a generated id is printed and names the ping")
@@ -273,32 +273,6 @@ struct PingIDTests {
 
         #expect(relaunched.notifier.removed == [first.id])
         #expect(relaunched.pingNotifications.map(\.title) == ["shop · Waiting again"])
-    }
-
-    // MARK: Numbers
-
-    @Test("each new ping takes the store's next number, printed before its id and shown on its row; a replace keeps it; a withdrawn number never comes back, even once every ping has left, and its id sent again takes a new one")
-    func numbers() async throws {
-        let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
-
-        #expect(harness.cli("ping", "Waiting for your input", "--project", "shop", "--id", "input") == CommandResult(output: "#1 input\n"))
-        #expect(harness.cli("ping", "Deployed", "--project", "blog", "--id", "deploy") == CommandResult(output: "#2 deploy\n"))
-        #expect(harness.cli("ping", "Still waiting", "--project", "shop", "--id", "input") == CommandResult(output: "#1 input\n"))
-        await harness.shipyard.reloadPings()
-
-        let row = try #require(harness.pingRows().first)
-        #expect(row.title == "Still waiting")
-        #expect(row.number == 1)
-        #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · ping")
-        #expect(harness.pingRows("blog").map(\.number) == [2])
-
-        try await harness.withdraw("deploy")
-        try await harness.withdraw("input")
-        #expect(harness.pingStore.all().isEmpty)
-
-        #expect(harness.cli("ping", "Waiting again", "--project", "shop", "--id", "input") == CommandResult(output: "#3 input\n"))
-        let generated = harness.cli("ping", "Published", "--project", "blog")
-        #expect(generated.output == "#4 \(generated.pingID)\n")
     }
 
     // MARK: Dismissing and leaving

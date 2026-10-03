@@ -27,6 +27,10 @@ public struct AppState: Equatable, Sendable {
     /// What the user did to remote pings (seen, dismissed), kept here
     /// since nothing is written back to a machine.
     public var remotePings = RemotePingMarks()
+    /// The numbers the Mac gave pings, per section. `nil` until it first
+    /// numbers them, on the first start of a build that numbers: the pings
+    /// already there are then numbered oldest sent first.
+    public var pingNumbers: PingNumbers?
 
     public init(
         attention: Attention = Attention(),
@@ -34,7 +38,8 @@ public struct AppState: Equatable, Sendable {
         collapsedGroups: Set<GroupID> = [],
         known: KnownItems = KnownItems(),
         notified: NotifiedEvents = NotifiedEvents(),
-        remotePings: RemotePingMarks = RemotePingMarks()
+        remotePings: RemotePingMarks = RemotePingMarks(),
+        pingNumbers: PingNumbers? = nil
     ) {
         self.attention = attention
         self.collapsed = collapsed
@@ -42,6 +47,7 @@ public struct AppState: Equatable, Sendable {
         self.known = known
         self.notified = notified
         self.remotePings = remotePings
+        self.pingNumbers = pingNumbers
     }
 }
 
@@ -58,7 +64,8 @@ public struct AppState: Equatable, Sendable {
 //       "knownProjects": { "job-search": [{ "repository": "o/r", "kind": "pullRequest" }] },
 //       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } },
 //       "remotePings": { "shipyard://ping/netcup-vps/q1": { "instance": "…", "seen": "2026-09-25T12:00:00Z",
-//                                                         "seenSending": { …the ping… }, "dismissed": false } }
+//                                                         "seenSending": { …the ping… }, "dismissed": false } },
+//       "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } }
 //     }
 //
 // `known`, `knownProjects` and `notified` came with notification rules.
@@ -71,7 +78,12 @@ public struct AppState: Equatable, Sendable {
 // subsections; like those, it's optional, dropped when it can't be read, and
 // a fold a newer build wrote (a group key this one doesn't know) is
 // skipped. `remotePings` came with remote pings: optional too, and a mark
-// that can't be read is skipped (that ping needs attention again). A `version` above `currentVersion` fails the decode, so the
+// that can't be read is skipped (that ping needs attention again).
+// `pingNumbers` came with the Mac numbering pings: optional, and missing
+// until it first numbers them. It's written as its sections, by name; a
+// section that can't be read is dropped, and the pings it lists then are
+// numbered again from 1 there, and a `pingNumbers` that can't be read at
+// all is dropped as a whole. A `version` above `currentVersion` fails the decode, so the
 // store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -83,6 +95,7 @@ extension AppState: Codable {
         case knownProjects
         case notified
         case remotePings
+        case pingNumbers
     }
 
     public init(from decoder: any Decoder) throws {
@@ -112,6 +125,8 @@ extension AppState: Codable {
         notified = NotifiedEvents(records: records.compactMapValues(\.value))
         let marks = (try? container.decodeIfPresent([String: Lossy<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
         remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
+        let sequences = try? container.decodeIfPresent([String: Lossy<PingNumbers.Sequence>].self, forKey: .pingNumbers)
+        pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -124,6 +139,7 @@ extension AppState: Codable {
         try container.encode(known.sources.mapValues { $0.sorted() }, forKey: .knownProjects)
         try container.encode(notified.records, forKey: .notified)
         try container.encode(remotePings.marks, forKey: .remotePings)
+        try container.encodeIfPresent(pingNumbers?.sections, forKey: .pingNumbers)
     }
 }
 

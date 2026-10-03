@@ -213,32 +213,6 @@ struct PingsTests {
         #expect(harness.shipyard.menu == menu)
     }
 
-    @Test("a ping written before pings were numbered still lists, with no number; numbering starts at 1 beside it")
-    func writtenBeforeNumbers() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        let sent = ISO8601DateFormatter().string(from: harness.clock.now)
-        try FileManager.default.createDirectory(at: harness.pingStore.directory, withIntermediateDirectories: true)
-        try Data("""
-            {
-              "id" : "old",
-              "instance" : "first",
-              "projects" : [
-                "shop"
-              ],
-              "sent" : "\(sent)",
-              "title" : "Sent by 0.0.5"
-            }
-            """.utf8).write(to: harness.pingStore.directory.appendingPathComponent("old.json"))
-
-        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id", "new") == CommandResult(output: "#1 new\n"))
-        await harness.shipyard.reloadPings()
-
-        let old = try #require(harness.pingRows().first { $0.title == "Sent by 0.0.5" })
-        #expect(old.number == 0)
-        #expect(PanelText.rowDetail(old, showingRepository: false) == "ping")
-        #expect(harness.pingRows().map(\.number).sorted() == [0, 1])
-    }
-
     @Test("a ping file that doesn't read is skipped; the others still list")
     func unreadableFile() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)

@@ -113,13 +113,14 @@ struct RemotePingsTests {
         #expect(harness.section("shop")?.rows.map(\.kind) == [.pullRequest])
     }
 
-    @Test("a remote ping's row names its machine")
+    @Test("a remote ping's row names its machine, after its number")
     func rowNamesMachine() async throws {
         let harness = try await Harness.withMachines(netcup: [ping("q1", "Deploy?", sender: "claude"), ping("q2", "Merge it?", minutes: 9)])
         await harness.poll()
         let rows = try #require(harness.section("netcup-vps")?.rows)
         #expect(rows.map(\.machine) == ["netcup-vps", "netcup-vps"])
-        #expect(rows.map { PanelText.rowDetail($0, showingRepository: false) } == ["netcup-vps · claude", "netcup-vps"])
+        // Numbered on the Mac, the older first.
+        #expect(rows.map { PanelText.rowDetail($0, showingRepository: false) } == ["#2 · netcup-vps · claude", "#1 · netcup-vps"])
         #expect(rows.map(PanelText.pingMeta) == ["netcup-vps · claude", "netcup-vps"])
     }
 

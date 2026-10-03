@@ -135,6 +135,18 @@ struct AppStateStoreTests {
         try Data(older.utf8).write(to: store.url)
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.known.items["https://github.com/o/r/pull/1"]?.present == .distantPast)
+
+        // A ping-number section this build can't read drops alone; the others keep their numbers.
+        let numbers = """
+            {
+              "version": 1,
+              "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 3 } },
+                               "blog": { "last": "many" } }
+            }
+            """
+        try Data(numbers.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.pingNumbers == PingNumbers(sections: ["shop": .init(last: 3, pings: ["shipyard://ping/k7qm2x": 3])]))
     }
 
     @Test("folded subsections read back, a fold this build can't read is skipped, and a file without them loads")

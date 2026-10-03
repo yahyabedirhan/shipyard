@@ -58,12 +58,12 @@ struct PingCommandTests {
         }
     }
 
-    @Test("a ping with --project is stored under it, numbered, and its number and id printed")
+    @Test("a ping with --project is stored under it, and only its id printed: the Mac numbers it")
     func sendsAPing() throws {
         let result = try ping("Ready for review", "--project", "shop")
 
-        #expect(result == CommandResult(output: "#1 k7qm2x\n"))
-        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, number: 1)])
+        #expect(result == CommandResult(output: "k7qm2x\n"))
+        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now)])
     }
 
     @Test("the flags can come before the title")
@@ -94,8 +94,8 @@ struct PingCommandTests {
     func filedByTheWorkingFolder() throws {
         let result = try ping("Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
 
-        #expect(result == CommandResult(output: "#1 k7qm2x\n"))
-        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, repository: "yahyabedirhan/shop", number: 1)])
+        #expect(result == CommandResult(output: "k7qm2x\n"))
+        #expect(storedWithoutInstance == [Ping(id: "k7qm2x", title: "Ready for review", projects: ["shop"], sent: Harness.now, repository: "yahyabedirhan/shop")])
     }
 
     @Test("a repository two projects watch files the ping under both, matching its name ignoring case, spelled as the configuration does")
@@ -277,7 +277,7 @@ struct PingCommandTests {
             now: Harness.now,
             newID: { drawn.next()! }
         )
-        #expect(result.output == "#1 bbbbbb\n")
+        #expect(result.output == "bbbbbb\n")
         #expect(store.all().map(\.title) == ["Earlier", "Ready"])
     }
 }
