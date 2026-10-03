@@ -25,7 +25,8 @@ public enum LeaseCommand {
                     agents' app, panel and screenshot commands are refused
                     meanwhile; prints "you hold shipyard until <HH:mm:ss>"
                     --wait <seconds>: while another agent holds it, wait in
-                    line, first come first served, up to that long
+                    line, first come first served, up to that long (0 to
+                    3600)
           release   give shipyard up, so the next agent in line gets it; does
                     nothing when you don't hold it
           --key <k> hold or give it up as <k>, for this command only, in place
@@ -74,8 +75,10 @@ public enum LeaseCommand {
         guard subcommand == "take" else { return .success(Invocation(.controlRelease, key: values["--key"])) }
         var wait: Int?
         if let seconds = values["--wait"] {
-            guard let whole = Int(seconds), whole >= 0 else {
-                return .failure(misread("shipyard control take: --wait takes whole seconds, not `\(seconds)`"))
+            guard let whole = Int(seconds), (0...ControlRequest.longestWait).contains(whole) else {
+                return .failure(misread(
+                    "shipyard control take: --wait takes whole seconds from 0 to \(ControlRequest.longestWait), not `\(seconds)`"
+                ))
             }
             wait = whole
         }

@@ -575,7 +575,7 @@ shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
 | `--with-indicator` | keeps the yellow dot and the banner that show an agent is using shipyard; a screenshot leaves them out otherwise | |
 | `control take` | holds shipyard for a run, until 5 minutes after you took it (see Taking turns) | `you hold shipyard until <HH:mm:ss>` |
-| `control take --wait <seconds>` | while another agent holds shipyard, waits in line up to that long, first come, first served | the same, once you hold it |
+| `control take --wait <seconds>` | while another agent holds shipyard, waits in line up to that long (3600 at most), first come, first served | the same, once you hold it |
 | `control release` | gives shipyard up for the next agent; does nothing when you don't hold it | `released shipyard` |
 
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:

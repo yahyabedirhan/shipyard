@@ -234,13 +234,15 @@ struct ControlServerTests {
         #expect(panel.calls.isEmpty)
     }
 
-    @Test("a request of another version, without a holder, of an unknown command, with a negative wait or not JSON is refused with a reply that says so", arguments: [
+    @Test("a request of another version, without a holder, of an unknown command, with a wait outside 0 to 3600 or not JSON is refused with a reply that says so", arguments: [
         (#"{"version":1,"command":"panel.open"}"#,
          "the shipyard command speaks control version 1 and the app version 2: reinstall shipyard so both come from one build"),
         (#"{"version":2,"command":"panel.open"}"#, "the control command `panel.open` needs its `holder`"),
         (#"{"version":2,"command":"app.spin",\#(ControlServerTests.agentWire)}"#, "the app doesn't know the control command `app.spin`"),
         (#"{"version":2,"command":"control.take",\#(ControlServerTests.agentWire),"waitSeconds":-1}"#,
-         "the control command `control.take` needs a `waitSeconds` of 0 or more, not -1"),
+         "the control command `control.take` needs a `waitSeconds` from 0 to 3600, not -1"),
+        (#"{"version":2,"command":"control.take",\#(ControlServerTests.agentWire),"waitSeconds":9223372036854775807}"#,
+         "the control command `control.take` needs a `waitSeconds` from 0 to 3600, not 9223372036854775807"),
         ("status please", "the request isn't a control request"),
     ])
     func refused(request: String, why: String) async {

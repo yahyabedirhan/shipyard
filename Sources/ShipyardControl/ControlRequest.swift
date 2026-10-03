@@ -38,7 +38,8 @@ public enum ControlRequest: Equatable, Sendable {
     case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
     /// `shipyard control take [--wait <seconds>]`: the lease held until its
     /// cap. While another agent holds it, refused at once, or with
-    /// `waitSeconds`, answered once it's this agent's or the wait runs out.
+    /// `waitSeconds` (0 to `longestWait`), answered once it's this agent's
+    /// or the wait runs out.
     case controlTake(waitSeconds: Int?)
     /// `shipyard control release`: the lease given up, when this agent
     /// holds it.
@@ -53,6 +54,10 @@ public enum ControlRequest: Equatable, Sendable {
     /// refused with both numbers, never misread. Version 2 put the holder
     /// on every request.
     public static let version = 2
+
+    /// The longest wait in line a `take` asks for, in seconds: an hour. It
+    /// keeps the client's timeout and the app's sleep within range.
+    public static let longestWait = 3600
 
     /// Whether the request needs the lease (`ControlLease`) before it's
     /// answered. `app.status` doesn't: it changes nothing, and reports the
@@ -176,8 +181,10 @@ public struct ControlMessage: Equatable, Sendable {
                 menuBarIcon: wire.menuBarIcon ?? false, withIndicator: wire.withIndicator ?? false
             )
         case "control.take":
-            if let seconds = wire.waitSeconds, seconds < 0 {
-                throw .unreadable("the control command `control.take` needs a `waitSeconds` of 0 or more, not \(seconds)")
+            if let seconds = wire.waitSeconds, !(0...ControlRequest.longestWait).contains(seconds) {
+                throw .unreadable(
+                    "the control command `control.take` needs a `waitSeconds` from 0 to \(ControlRequest.longestWait), not \(seconds)"
+                )
             }
             return .controlTake(waitSeconds: wire.waitSeconds)
         case "control.release": return .controlRelease
