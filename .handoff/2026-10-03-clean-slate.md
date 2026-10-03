@@ -58,6 +58,13 @@ The design's test of extensibility is a future "Notes" feature: one new `Shipyar
 - **App control:** agents may use `shipyard app`, `panel` and `screenshot` once built; clicking and Accessibility stay off limits. If a permission rule blocks launching the app, say so and leave the launch to the maintainer rather than working around it.
 - **Notify the maintainer** with `shipyard ping` when the pull request is ready and when a question blocks you (see the shipyard skill).
 
+## The maintainer's answers during the build (2026-10-03)
+
+- **Real-app checks:** agents may install branch builds over `/Applications/Shipyard.app` and quit or relaunch the running app (demo runs, screenshots), always ending with the normal app on the maintainer's own config. `config.toml` and `state.json` are checked byte-identical with `cmp`.
+- **Screen capture:** the maintainer allows Screen Recording for Shipyard if macOS asks. A grant to an ad-hoc signed build may not survive a reinstall; if a capture prompts again, say so and use the fallback until they allow it.
+- **Merge and release are pre-approved:** once the effort's pull request is green and its branch review is clean, merge it, push the 0.0.5–0.0.7 tags, cut 0.1.0 by the Releases section and update the machines, then report. This replaces the "ask once green" line under Permissions to expect.
+- **#147's "a blocked pane pings by itself" on each VPS** goes into "QA: 0.1.0" for the maintainer instead of being run by an agent.
+
 ## Suggested skills
 
 - `orchestrate-effort` and `orchestrating`: you are the orchestrator.
