@@ -79,7 +79,7 @@ public enum Listing {
     /// its remote pings filed under none of `projects`. A section with no
     /// ping is left out. Where `listings` lists them, and what the Mac
     /// numbers them in (`PingNumbers`).
-    public static func sections(of pings: [Ping], projects: [String], machines: [String]) -> [String: [Ping]] {
+    static func sections(of pings: [Ping], projects: [String], machines: [String]) -> [String: [Ping]] {
         var sections: [String: [Ping]] = [:]
         let names = Set(projects)
         for project in projects {

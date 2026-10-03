@@ -80,8 +80,10 @@ public struct AppState: Equatable, Sendable {
 // skipped. `remotePings` came with remote pings: optional too, and a mark
 // that can't be read is skipped (that ping needs attention again).
 // `pingNumbers` came with the Mac numbering pings: optional, and missing
-// until it first numbers them; one that can't be read is dropped, and the
-// pings listed then are numbered again from 1. A `version` above `currentVersion` fails the decode, so the
+// until it first numbers them. It's written as its sections, by name; a
+// section that can't be read is dropped, and the pings it lists then are
+// numbered again from 1 there, and a `pingNumbers` that can't be read at
+// all is dropped as a whole. A `version` above `currentVersion` fails the decode, so the
 // store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -123,7 +125,8 @@ extension AppState: Codable {
         notified = NotifiedEvents(records: records.compactMapValues(\.value))
         let marks = (try? container.decodeIfPresent([String: Lossy<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
         remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
-        pingNumbers = try? container.decodeIfPresent(PingNumbers.self, forKey: .pingNumbers)
+        let sequences = try? container.decodeIfPresent([String: Lossy<PingNumbers.Sequence>].self, forKey: .pingNumbers)
+        pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -136,7 +139,7 @@ extension AppState: Codable {
         try container.encode(known.sources.mapValues { $0.sorted() }, forKey: .knownProjects)
         try container.encode(notified.records, forKey: .notified)
         try container.encode(remotePings.marks, forKey: .remotePings)
-        try container.encodeIfPresent(pingNumbers, forKey: .pingNumbers)
+        try container.encodeIfPresent(pingNumbers?.sections, forKey: .pingNumbers)
     }
 }
 

@@ -17,27 +17,31 @@ private let shopAndBlog = """
 
     """
 
-/// `shop`, and one remote machine.
-private let shopAndMachine = "[remote]\nmachines = [\"netcup-vps\"]\n\n" + """
+/// `shop` alone.
+private let shopOnly = """
     [[projects]]
     name = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
 
+/// `shop`, and one remote machine.
+private let shopAndMachine = "[remote]\nmachines = [\"netcup-vps\"]\n\n" + shopOnly
+
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
 /// A machine's `shipyard ping list --json` holding `pings`, each given as
 /// (id, title, projects, minutes before the harness's now) and listed with
-/// the `number` its own store gave it, which the Mac ignores.
-private func listed(_ pings: [(id: String, title: String, projects: [String], minutes: Double)]) -> String {
+/// the `number` its own store gave it, which the Mac ignores; `truncated`
+/// when the list stopped early.
+private func listed(_ pings: [(id: String, title: String, projects: [String], minutes: Double)], truncated: Bool = false) -> String {
     let formatter = ISO8601DateFormatter()
     let entries = pings.enumerated().map { index, ping in
         let projects = ping.projects.map { "\"\($0)\"" }.joined(separator: ",")
         let sent = formatter.string(from: Harness.now.addingTimeInterval(-ping.minutes * 60))
         return #"{"id":"\#(ping.id)","instance":"i-\#(ping.id)","number":\#(index + 7),"projects":[\#(projects)],"sent":"\#(sent)","title":"\#(ping.title)"}"#
     }
-    return #"{"pings":[\#(entries.joined(separator: ","))],"shipyardVersion":"0.0.6","truncated":false,"version":1}"#
+    return #"{"pings":[\#(entries.joined(separator: ","))],"shipyardVersion":"0.0.6","truncated":\#(truncated),"version":1}"#
 }
 
 @MainActor
@@ -125,7 +129,7 @@ struct PingNumberTests {
         #expect(relaunched.numbers("blog") == ["Posted": 1])
     }
 
-    @Test("pings already there when the Mac first numbers are numbered per project, oldest sent first, local and remote alike; a number a machine or an older store gave is ignored")
+    @Test("pings already there when the Mac first numbers are numbered per project, oldest sent first, local and remote alike, even after a launch with the file broken; a number a machine or an older store gave is ignored")
     func firstLaunch() async throws {
         let harness = try Harness(stored: "gho_stored", config: shopAndMachine)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
@@ -139,7 +143,11 @@ struct PingNumberTests {
             (id: "q3", title: "Unfiled", projects: [], minutes: 4),
         ]), on: "netcup-vps")
 
+        // Launched with the file broken, the defaults stand in: they don't say which machines to wait for, so nothing is numbered.
+        try harness.writeConfig("[[projects]\n")
         await harness.shipyard.start()
+        try harness.writeConfig(shopAndMachine)
+        await harness.shipyard.reloadConfiguration()
         // Before the machine answers, nothing is numbered yet: its pings may be older.
         #expect(harness.numbers("shop") == ["Sent a minute ago": 0, "Sent three minutes ago": 0])
         await harness.machineTimer.fire()
@@ -153,7 +161,7 @@ struct PingNumberTests {
         #expect(harness.numbers("netcup-vps") == ["Unfiled": 1])
     }
 
-    @Test("a remote ping takes its number at the first poll that lists it, after the pings already numbered; a machine's own section counts on its own; one that leaves never gives its number back, and one sent again is new")
+    @Test("a remote ping takes its number at the first poll that lists it, after the pings already numbered; a machine's own section counts on its own; one that leaves never gives its number back, and one sent again is new; one past the end of a list that stopped early keeps its number; a machine taken out of the configuration retires its pings' numbers")
     func remote() async throws {
         let harness = try Harness(stored: "gho_stored", config: shopAndMachine)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
@@ -199,5 +207,27 @@ struct PingNumberTests {
         await relaunched.machineTimer.fire()
         #expect(relaunched.numbers("shop") == ["Local": 1, "Ship it?": 3])
         #expect(relaunched.numbers("netcup-vps") == ["Deploy?": 2])
+
+        // The list stops early, before "Ship it?": its number waits, and shows again when the whole list comes back.
+        relaunched.herdr.setListOutput(listed([
+            (id: "q2", title: "Deploy?", projects: [], minutes: 1),
+        ], truncated: true), on: "netcup-vps")
+        await relaunched.machineTimer.fire()
+        #expect(relaunched.shipyard.remote.machine("netcup-vps")?.truncated == true)
+        #expect(relaunched.numbers("shop") == ["Local": 1])
+        relaunched.herdr.setListOutput(latest, on: "netcup-vps")
+        await relaunched.machineTimer.fire()
+        #expect(relaunched.numbers("shop") == ["Local": 1, "Ship it?": 3])
+
+        // Taken out of `[remote] machines`, the machine's pings give up their numbers: added back, they're new,
+        // "Merge it?" too, since its dismissal went with the machine.
+        try relaunched.writeConfig(shopOnly)
+        await relaunched.shipyard.reloadConfiguration()
+        #expect(relaunched.numbers("shop") == ["Local": 1])
+        try relaunched.writeConfig(shopAndMachine)
+        await relaunched.shipyard.reloadConfiguration()
+        await relaunched.machineTimer.fire()
+        #expect(relaunched.numbers("shop") == ["Local": 1, "Merge it?": 4, "Ship it?": 5])
+        #expect(relaunched.numbers("netcup-vps") == ["Deploy?": 3])
     }
 }

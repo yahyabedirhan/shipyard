@@ -12,7 +12,7 @@ import Foundation
 /// `seen-window`, dismissed, or filed elsewhere), its number there is
 /// retired: each section remembers the last number it gave, so one never
 /// comes back, even once every ping has left.
-public struct PingNumbers: Codable, Equatable, Sendable {
+public struct PingNumbers: Equatable, Sendable {
     /// One section's sequence.
     public struct Sequence: Codable, Equatable, Sendable {
         /// The last number given; 0 before any.
