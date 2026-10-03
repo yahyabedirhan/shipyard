@@ -40,6 +40,7 @@ The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with
 ## Triggers
 
 - "If you define neither `tags`/`tags-ignore` or `branches`/`branches-ignore`, the workflow will run for events affecting either branches or tags." `ci.yml` gives a bare `push:`, so it runs on every branch push and every tag push; defining only `branches` would stop tag pushes.
+- A push to a branch with an open pull request fires both `push` and `pull_request` for the same commit. `ci.yml` keeps the `push` run, the only one that saves a cache, and skips its jobs on a `pull_request` whose `github.event.pull_request.head.repo.full_name` is this repository; a fork's pull request still runs, since its pushes don't trigger this repository's workflows. The pull request shows the push run's checks, because checks belong to the head commit, plus the skipped `pull_request` jobs. A skipped job counts as passing for a required status check, so if `main` ever requires checks, require the `push` ones by name. The cost is that a same-repository pull request is tested at its head commit, not at its merge with the base.
 
 ## Security
 
