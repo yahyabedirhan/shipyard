@@ -92,6 +92,8 @@ machines = ["hetzner-vps"]
 
 Shipyard asks each machine for its pings through Herdr about every 30 seconds and files them under the projects that watch their repositories, or under the machine's name. Clicking one sent from a Herdr pane takes you to that agent. On those machines the plugin also pings you by itself when Herdr marks an agent blocked, and takes the ping back when the agent goes on. A machine that doesn't answer shows a quiet line and keeps its last pings.
 
+One known limit, with Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but your Mac's Herdr window only moves there when it's already showing that machine. When it's showing your Mac or another machine, nothing visible happens and the ping is marked seen; switch Herdr to that machine yourself to see the pane. Herdr has no command yet that switches an open window to a saved machine, so shipyard can't do it for you.
+
 ## Examples
 
 Each configuration below produced the screenshot under it, trimmed to the lines that matter. The first three watch two repositories as one project, with issues turned on.

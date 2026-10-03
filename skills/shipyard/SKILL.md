@@ -448,6 +448,8 @@ herdr plugin install yahyabedirhan/herdr-shipyard
 
 The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard asks each machine for its pings about every 30 seconds. A machine it can't reach shows a quiet line in the menu and keeps its last pings until it answers again.
 
+Tell the user one known limit of Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it's already showing that machine. When it shows the Mac or another machine, the click looks like it did nothing (the ping is still marked seen); they switch Herdr to that machine themselves to see the pane. Herdr has no command yet that switches an open window to a saved machine, so no setting changes this.
+
 ## Sending pings
 
 A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Nothing reaches GitHub.
