@@ -49,6 +49,19 @@ public struct PingStore: Sendable {
         }
     }
 
+    /// The folder the app watches to see a ping sent, replaced or
+    /// withdrawn: `directory` itself, whose entries change with every one
+    /// and with nothing else (`state.json` is saved in its parent). While
+    /// `directory` doesn't exist yet, its nearest existing ancestor, so
+    /// creating it is seen; the watch is opened again after each change.
+    public var watchedDirectory: URL {
+        var candidate = directory.standardizedFileURL
+        while !FileManager.default.fileExists(atPath: candidate.path), candidate.path != "/" {
+            candidate.deleteLastPathComponent()
+        }
+        return candidate
+    }
+
     /// Every ping that reads, oldest first (then by id); none when the
     /// directory doesn't exist yet.
     public func all() -> [Ping] {

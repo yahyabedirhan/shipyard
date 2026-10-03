@@ -82,12 +82,24 @@ struct PingsTests {
     func sentWhileRunning() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         let requests = harness.graphQLRequests.count
+        // Before the first ping the store's directory doesn't exist, so the
+        // watch is on the folder it will be created in.
+        #expect(harness.pingStore.watchedDirectory.standardizedFileURL == harness.stateDirectory.standardizedFileURL)
 
-        try harness.ping("Waiting for your input")
+        let id = try harness.ping("Waiting for your input")
         await harness.shipyard.reloadPings()
 
         #expect(harness.pingRows().map(\.title) == ["Waiting for your input"])
         #expect(harness.graphQLRequests.count == requests)
+        // From then on the watch is on the pings alone: the ping's file is
+        // in the watched directory, and saving app state writes elsewhere.
+        let watched = harness.pingStore.watchedDirectory
+        #expect(watched.standardizedFileURL == harness.pingStore.directory.standardizedFileURL)
+        let entries = { try FileManager.default.contentsOfDirectory(atPath: watched.path).sorted() }
+        #expect(try entries() == ["\(id).json"])
+        harness.shipyard.markAllSeen(project: nil)
+        #expect(try entries() == ["\(id).json"])
+        #expect(harness.stateURL.deletingLastPathComponent().standardizedFileURL != watched.standardizedFileURL)
     }
 
     @Test("pings show even before GitHub has answered")

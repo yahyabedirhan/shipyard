@@ -757,7 +757,7 @@ On Linux, a machine without the app (0.0.6, #110), the CLI keeps its pings in `$
 | `removeIfUnchanged(ping) throws -> Bool` | removes the ping only while the store holds it exactly as `ping` (read again just before), for a seen ping past its window: one replaced, sent anew or seen again since stays; whether it's gone |
 | `remove(id:) throws` | deletes the ping's file, its failure with it; an unknown id changes nothing (#103) |
 
-The app watches the directory with `ConfigWatcher` (as the "file", inside its parent, so creating it is seen too) and calls `Shipyard.reloadPings()`; the parent also holds `state.json`, so most of those calls find nothing new and change nothing.
+The app watches `PingStore.watchedDirectory` with `ConfigWatcher(folder:)` and calls `Shipyard.reloadPings()`: the directory alone, whose entries change with every ping sent, replaced or withdrawn, so a save to `state.json` in its parent doesn't reload pings (#128). Until the directory exists the watch is on its nearest existing ancestor, so creating it is seen; the watch reopens after each change.
 
 ### PingList — `ShipyardCore/Pings/PingList.swift` (0.0.6)
 
@@ -952,7 +952,7 @@ shipyard/
 ├── Sources/ShipyardCLI/main.swift    # the `shipyard` executable: gathers arguments, environment and paths, prints ShipyardCLI.run's result
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
 │   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below, routes notification clicks, holds the panel's actions and closes the menu after opening something
-│   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration(); watches the ping store's directory too, calling reloadPings()
+│   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration(); watches the ping store's directory alone (init(folder:)), calling reloadPings()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # ActionRunning on NSWorkspace (open a URL, launch or bring forward an app by bundle id or name); opens config.toml in its editor (TextEdit when none)
 │   ├── Keychain.swift                # TokenStore on the login keychain: the app's token store since 0.0.2 (S1)

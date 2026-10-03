@@ -115,8 +115,9 @@ final class AppServices {
         }
         configWatcher?.start()
         // The `shipyard` CLI writes one file per ping into the store's
-        // directory: watching it as a "file" sees each one arrive.
-        pingWatcher = ConfigWatcher(file: shipyard.pingStore.directory) {
+        // directory: watching that folder alone sees each one arrive, and
+        // not the app's own saves to `state.json` beside it.
+        pingWatcher = ConfigWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
             Task { await shipyard.reloadPings() }
         }
         pingWatcher?.start()
