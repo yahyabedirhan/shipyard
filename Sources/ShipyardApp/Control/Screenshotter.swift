@@ -25,18 +25,17 @@ protocol Screenshotting: AnyObject {
     /// The menu bar icon alone, as the menu bar draws it in `appearance`
     /// (the Mac's when nil), written as a PNG at `file`. The real menu bar
     /// strip can't be captured, so this is always rendered.
-    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) -> ScreenshotOutcome
+    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome
 }
 
 /// Captures the panel's window through ScreenCaptureKit, limited to this
 /// process's own windows (`SCShareableContent.currentProcess`, macOS
 /// 14.4), which needs no Screen Recording permission. When that fails or
-/// is refused, it renders the panel itself: the open window's view as
-/// AppKit draws it, or a fresh panel when the window isn't there.
+/// is refused, it renders a fresh panel itself, off screen.
 @MainActor
 final class Screenshotter: Screenshotting {
     private let panel: any PanelControlling
-    /// A panel to render when its window can't be drawn from, one that
+    /// A panel to render when the window can't be captured, one that
     /// doesn't count as the panel being open.
     private let freshPanel: @MainActor () -> AnyView
     /// How long the panel gets to finish appearing, or redrawing in a new
@@ -59,12 +58,10 @@ final class Screenshotter: Screenshotting {
             image = try await capture()
             captureFailure = nil
         } catch let failure {
-            // Rendered with the appearance asked for, or the app's as it is now.
-            let drawing = NSApp.effectiveAppearance
-            if let window = Self.panelWindow(), let view = window.contentView,
-               let drawn = ScreenshotImage.render(view, appearance: drawing) {
-                image = drawn
-            } else if let drawn = ScreenshotImage.render(freshPanel(), appearance: drawing) {
+            // A panel of its own, in the appearance asked for (or the app's
+            // as it is now): the open window's view drawn alone loses its
+            // vibrant colours and symbols, a fresh panel keeps them.
+            if let drawn = await ScreenshotImage.render(freshPanel(), appearance: NSApp.effectiveAppearance, opaque: true) {
                 image = drawn
             } else {
                 return .failed(why: "couldn't capture the panel (\(failure.why)) or render it")
@@ -74,9 +71,9 @@ final class Screenshotter: Screenshotting {
         return Self.write(image, to: file, as: captureFailure.map { .rendered(why: $0) } ?? .captured)
     }
 
-    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) -> ScreenshotOutcome {
+    func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
         let drawing = appearance.map(ScreenshotImage.appearance) ?? NSApp.effectiveAppearance
-        guard let image = ScreenshotImage.menuBarIcon(appearance: drawing) else {
+        guard let image = await ScreenshotImage.menuBarIcon(appearance: drawing) else {
             return .failed(why: "couldn't render the menu bar icon")
         }
         return Self.write(image, to: file, as: .captured)
@@ -101,7 +98,7 @@ final class Screenshotter: Screenshotting {
             throw ScreenshotFailure(error.reason)
         }
         try? await Task.sleep(for: Self.settle)
-        guard let window = Self.panelWindow() else { throw ScreenshotFailure("the panel's window isn't on screen") }
+        guard let window = MenuBarWindow.panelWindow else { throw ScreenshotFailure("the panel's window isn't on screen") }
         guard #available(macOS 14.4, *) else {
             throw ScreenshotFailure("capturing the app's own window without Screen Recording needs macOS 14.4")
         }
@@ -131,20 +128,6 @@ final class Screenshotter: Screenshotting {
             throw ScreenshotFailure("ScreenCaptureKit: \(error.localizedDescription)")
         }
     }
-
-    /// The menu bar icon's panel window while it's on screen: SwiftUI's
-    /// `MenuBarExtra` window, else the largest visible window that isn't
-    /// the status bar's own.
-    private static func panelWindow() -> NSWindow? {
-        let candidates = NSApp.windows.filter { window in
-            window.isVisible && !window.responds(to: NSSelectorFromString("statusItem"))
-                && window.frame.width > 0 && window.frame.height > 0
-        }
-        if let extra = candidates.first(where: { String(describing: type(of: $0)).contains("MenuBarExtra") }) {
-            return extra
-        }
-        return candidates.max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
-    }
 }
 
 /// Why a screenshot step didn't work, as one line.
@@ -167,8 +150,11 @@ enum ScreenshotImage {
     }
 
     /// `view` as AppKit draws it in `appearance`, at the main screen's
-    /// scale; nil when it has no size.
-    static func render(_ view: NSView, appearance: NSAppearance?) -> CGImage? {
+    /// scale; nil when it has no size. `opaque` lays it on the window
+    /// background colour: a panel's own background is the window's
+    /// material, which a view drawn alone leaves transparent (and white
+    /// text on it unreadable).
+    static func render(_ view: NSView, appearance: NSAppearance?, opaque: Bool) -> CGImage? {
         let previous = view.appearance
         defer { view.appearance = previous }
         view.appearance = appearance
@@ -176,10 +162,9 @@ enum ScreenshotImage {
         let bounds = view.bounds
         guard bounds.width > 0, bounds.height > 0 else { return nil }
         let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let width = Int((bounds.width * scale).rounded()), height = Int((bounds.height * scale).rounded())
         guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: Int((bounds.width * scale).rounded()),
-            pixelsHigh: Int((bounds.height * scale).rounded()),
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
         ) else { return nil }
@@ -187,33 +172,58 @@ enum ScreenshotImage {
         var image: CGImage?
         (appearance ?? NSAppearance.currentDrawing()).performAsCurrentDrawingAppearance {
             view.cacheDisplay(in: bounds, to: bitmap)
-            image = bitmap.cgImage
+            guard let drawn = bitmap.cgImage else { return }
+            guard opaque else { image = drawn; return }
+            guard let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return }
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            context.setFillColor(NSColor.windowBackgroundColor.cgColor)
+            context.fill(rect)
+            context.draw(drawn, in: rect)
+            image = context.makeImage()
         }
         return image
     }
 
     /// A SwiftUI view rendered at its own size (at most `maxHeight` points
-    /// tall) in `appearance`, through a hosting view as a window would
-    /// draw it, so AppKit-backed controls are drawn too.
-    static func render(_ view: AnyView, appearance: NSAppearance?, maxHeight: CGFloat = 900) -> CGImage? {
+    /// tall) in `appearance`. It's laid out in a window of its own, off
+    /// screen and invisible, for a moment, so views that measure
+    /// themselves (the panel's lists) settle before it's drawn.
+    static func render(_ view: AnyView, appearance: NSAppearance?, opaque: Bool, maxHeight: CGFloat = 900) async -> CGImage? {
         let host = NSHostingView(rootView: view)
-        host.appearance = appearance
-        let fitting = host.fittingSize
-        guard fitting.width > 0, fitting.height > 0 else { return nil }
-        host.frame = CGRect(origin: .zero, size: CGSize(width: fitting.width, height: min(fitting.height, maxHeight)))
-        return render(host, appearance: appearance)
+        let window = NSWindow(
+            contentRect: CGRect(x: -20_000, y: -20_000, width: 1, height: 1),
+            styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.ignoresMouseEvents = true
+        window.appearance = appearance
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        // Each pass fits the window to what the view now asks for.
+        for _ in 0..<3 {
+            let fitting = host.fittingSize
+            window.setContentSize(CGSize(width: fitting.width, height: min(fitting.height, maxHeight)))
+            host.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return render(host, appearance: appearance, opaque: opaque)
     }
 
     /// The menu bar icon at the menu bar's size, tinted as the menu bar
     /// tints its template image in `appearance`: dark in light, white in dark.
-    static func menuBarIcon(appearance: NSAppearance?) -> CGImage? {
+    static func menuBarIcon(appearance: NSAppearance?) async -> CGImage? {
         let isDark = appearance?.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let side = SailboatImage.menuBarSide
         let icon = Image(nsImage: SailboatImage.menuBar(side: side))
             .renderingMode(.template)
             .foregroundStyle(isDark ? Color.white : Color.black)
             .frame(width: side, height: side)
-        return render(AnyView(icon), appearance: appearance)
+        return await render(AnyView(icon), appearance: appearance, opaque: false)
     }
 
     /// `image` written as a PNG at `file`, replacing what's there.

@@ -74,7 +74,7 @@ final class ControlServer {
         case .screenshot(let path, let appearance, let menuBarIcon):
             let file = URL(fileURLWithPath: path)
             let outcome = menuBarIcon
-                ? screenshotter.menuBarIcon(to: file, appearance: appearance)
+                ? await screenshotter.menuBarIcon(to: file, appearance: appearance)
                 : await screenshotter.capturePanel(to: file, appearance: appearance)
             switch outcome {
             case .captured:

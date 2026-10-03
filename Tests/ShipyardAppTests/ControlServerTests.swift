@@ -47,7 +47,7 @@ struct ControlServerTests {
             return outcome
         }
 
-        func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) -> ScreenshotOutcome {
+        func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
             calls.append("icon \(file.path) \(appearance?.rawValue ?? "as is")")
             return outcome
         }

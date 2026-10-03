@@ -21,9 +21,9 @@ Checked 2026-10-03 for issue #169, against the sources listed at the end. The qu
 
 ## First real capture
 
-<!-- The orchestrator fills this in from the first `shipyard screenshot` on the maintainer's Mac. -->
-
-- **First real capture on the maintainer's Mac:** _TO FILL IN: date, macOS version, build (commit), `shipyard screenshot /tmp/x.png` captured or rendered (and the stderr note if rendered), whether a permission prompt appeared, light and dark results._
+- **First real capture on the maintainer's Mac:** 2026-10-03, macOS 26.5.1, the branch build after integration `8d61595` plus its fix. `shipyard screenshot /tmp/sy-shots/final-captured.png` with the panel closed beforehand opened the panel and captured it through ScreenCaptureKit: the path on standard output, nothing on standard error, exit 0. No permission prompt appeared, and none has since, over a dozen captures with the panel closed and open, in light and dark. The Screen Recording grant an earlier build had doesn't come into it: the build was ad-hoc signed anew.
+- **The first attempt didn't capture,** for a reason of shipyard's own, not ScreenCaptureKit's: the window lookup skipped every window that answers `statusItem`, and on macOS 26 the `MenuBarExtra` panel window (`MenuBarExtraWindow`, level 101) answers it as the status bar's window (`NSStatusBarWindow`, level 25) does. It now tells them apart by level.
+- **A light capture over a dark desktop is greyish.** `desktopIndependentWindow` gives the window as composited on screen, and the panel's light material takes its tint from what's behind it. The rendered fallback shows the canonical light look.
 
 ## Sources
 
