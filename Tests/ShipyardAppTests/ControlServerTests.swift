@@ -79,6 +79,20 @@ struct ControlServerTests {
         .appendingPathComponent("shipyard-\(UUID().uuidString.prefix(8))", isDirectory: true)
     var socket: URL { ControlSocket.url(in: folder) }
 
+    /// A `shipyard` command's exchange, as it runs in its own process: on a
+    /// thread of its own, since `send` blocks until the app answers. On
+    /// Swift's cooperative pool (`Task.detached`) each blocked send holds one
+    /// of its few threads, and with the suites running in parallel, and a
+    /// `take` waiting in line for seconds, they left none for the server's
+    /// own tasks to answer with: every exchange timed out.
+    nonisolated static func sending(
+        _ send: @escaping @Sendable () -> Result<ControlReply, ControlClient.Failure>
+    ) async -> Result<ControlReply, ControlClient.Failure> {
+        await withCheckedContinuation { continuation in
+            Thread.detachNewThread { continuation.resume(returning: send()) }
+        }
+    }
+
     func server(socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock")) -> ControlServer {
         let quitter = quitter
         let clock = clock
@@ -374,16 +388,16 @@ struct ControlServerTests {
         let holder = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
         let waiter = ControlClient(socket: socket, holder: Self.other, transport: UnixSocketTransport())
 
-        let taken = await Task.detached { holder.send(.controlTake(waitSeconds: nil)) }.value
+        let taken = await Self.sending { holder.send(.controlTake(waitSeconds: nil)) }
         #expect(taken == .success(.done("you hold shipyard until 00:05:00\n")))
-        // The clients block while they wait, so they run off the main actor the server answers on.
-        let waiting = Task.detached { waiter.send(.controlTake(waitSeconds: 30)) }
+        // The waiting client blocks its own thread (`sending`) until the lease is handed over.
+        let waiting = Task { await Self.sending { waiter.send(.controlTake(waitSeconds: 30)) } }
         for _ in 0..<200 where server.lease.status(at: clock.now)?.waiting != 1 {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
-        let status = await Task.detached { holder.send(.appStatus(json: false)) }.value
+        let status = await Self.sending { holder.send(.appStatus(json: false)) }
         clock.now = Date(timeIntervalSince1970: 12)
-        let released = await Task.detached { holder.send(.controlRelease) }.value
+        let released = await Self.sending { holder.send(.controlRelease) }
         let granted = await waiting.value
 
         guard case .success(let reply) = status else { Issue.record("no status: \(status)"); return }
@@ -409,17 +423,17 @@ struct ControlServerTests {
         #expect(info.st_mode & S_IFMT == S_IFSOCK)
         #expect(info.st_mode & 0o777 == 0o600)
 
-        // The client blocks while it waits, so it runs off the main actor the server answers on.
-        let status = await Task.detached { client.send(.appStatus(json: true)) }.value
+        // The client blocks while it waits, so it runs on a thread of its own (`sending`).
+        let status = await Self.sending { client.send(.appStatus(json: true)) }
         #expect(status == .success(.done(Self.status.json)))
-        let opened = await Task.detached { client.send(.panelOpen) }.value
+        let opened = await Self.sending { client.send(.panelOpen) }
         #expect(opened == .success(.done("panel open\n")))
         // Another agent's quit is refused over the socket, and the app stays.
-        let refused = await Task.detached { another.send(.appQuit) }.value
+        let refused = await Self.sending { another.send(.appQuit) }
         #expect(refused == .success(.refused(
             "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard control take --wait <seconds>` to queue"
         )))
-        let quit = await Task.detached { client.send(.appQuit) }.value
+        let quit = await Self.sending { client.send(.appQuit) }
         let lease = ControlLease.Term(holder: Self.agent, taken: Date(timeIntervalSince1970: 0), ends: Date(timeIntervalSince1970: 60))
         #expect(quit == .success(ControlReply(ok: true, output: "shipyard quit\n", lease: lease)))
         for _ in 0..<200 where quitter.quits == 0 {
@@ -429,7 +443,7 @@ struct ControlServerTests {
 
         server.stop()
         #expect(!FileManager.default.fileExists(atPath: socket.path))
-        let after = await Task.detached { client.send(.appStatus(json: false)) }.value
+        let after = await Self.sending { client.send(.appStatus(json: false)) }
         #expect(after == .failure(.notRunning))
     }
 
@@ -448,7 +462,7 @@ struct ControlServerTests {
         try await Task.sleep(nanoseconds: 50_000_000)
 
         let client = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
-        let status = await Task.detached { client.send(.appStatus(json: false)) }.value
+        let status = await Self.sending { client.send(.appStatus(json: false)) }
         #expect(status == .success(.done(Self.status.text)))
     }
 
