@@ -11,7 +11,7 @@ import Testing
 @Suite("The control server")
 @MainActor
 struct ControlServerTests {
-    static let status = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: ["shop"])
+    static let status = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: ["shop"])
 
     /// Records each call it's asked to make, and refuses all of them with
     /// `refusal` when it's set.

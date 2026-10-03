@@ -84,7 +84,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     /// The status as lines, for a person; `demo` only in a demo run, `tab`
     /// only in the tabs layout:
     ///
-    ///     shipyard 0.1.0 is running
+    ///     shipyard 0.2.0 is running
     ///     demo: /Users/me/demo
     ///     lease: Claude Code in /Users/me/shop, 48s left, 0 waiting
     ///     panel: closed

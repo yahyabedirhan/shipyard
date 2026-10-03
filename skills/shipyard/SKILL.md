@@ -581,7 +581,7 @@ shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
 
 ```text
-shipyard 0.1.0 is running
+shipyard 0.2.0 is running
 lease: free
 panel: closed
 layout: tabs
