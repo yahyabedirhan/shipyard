@@ -109,6 +109,14 @@ _Avoid_: Host, server, remote (on its own)
 A ping sent on a machine other than the Mac. The Mac asks each machine for its pings and lists them beside its own, saying which machine each came from. One that no project takes is listed under its machine's name.
 _Avoid_: Remote notification, synced ping
 
+**Filing**:
+Deciding which projects a ping is listed under: those that watch its repository, or the one project the agent names. The Mac files pings. A machine without the app keeps each one unfiled, as the agent sent it, and the Mac files it when it reads that machine's pings.
+_Avoid_: Routing, sorting, assigning
+
+**Unfiled ping**:
+A ping kept as the agent sent it, under no project. Every ping on a machine without the app is one until the Mac files it. A remote ping the Mac can't file lists under its machine's name.
+_Avoid_: Orphan ping, unassigned ping
+
 **Notification rule**:
 An event, a scope (all projects or one project) and an optional author filter that together decide whether a macOS notification is sent.
 _Avoid_: Alert, subscription, watch
@@ -122,6 +130,20 @@ _Avoid_: Settings, preferences, state
 **App state**:
 What shipyard remembers on its own from how the user uses it, such as collapsed sections and which items have been seen. Never written to the configuration.
 _Avoid_: Configuration, cache
+
+### Agents and the app
+
+**App control**:
+The commands an agent on the Mac uses to open, quit and ask about the running app, open and steer its panel, and capture it, without clicking. It never changes the configuration: switching the layout is still an edit to the file.
+_Avoid_: Automation, remote control, scripting
+
+**Screenshot**:
+An image of the panel as it really looks, which the app captures on an agent's request. When the screen can't be captured, the app draws the panel itself and says so.
+_Avoid_: Capture, snapshot
+
+**Demo run**:
+The app running on a folder of example configuration and state, so that screenshots show example data. The user's own configuration and app state are left untouched, and opening the app normally brings them back.
+_Avoid_: Sandbox, test mode, fixture
 
 ### Setup
 

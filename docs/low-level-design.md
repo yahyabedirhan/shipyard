@@ -1,12 +1,31 @@
 # Shipyard: low-level design
 
-Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003). Terms are the ones in `GLOSSARY.md`; the configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`; facts about GitHub's API are in `docs/references/`. When the code and this document disagree, fix one of them in the same change.
+Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003). Terms are the ones in `GLOSSARY.md`; the configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`; facts about GitHub's API are in `docs/references/`. The module split agreed for 0.1.0 (effort `clean-slate`, spec #160) is ADR 0006 and [Modules and what each build links](#modules-and-what-each-build-links). When the code and this document disagree, fix one of them in the same change.
 
-**For a newcomer, in one screen.** Shipyard is one Swift executable. `Shipyard` (the orchestrator) owns the app's lifecycle and runs a **refresh**. A refresh reads the **configuration**, fetches every project's items from GitHub, compares the result with what it saw last time to find **events**, sends the notifications the **rules** allow, and publishes a **menu model** the SwiftUI panel draws. Everything the app remembers about the user (seen items, collapsed sections, the last items it knew) is **app state**, kept apart from the configuration.
+**For a newcomer, in one screen.** Shipyard is one Swift package that builds the menu bar app (`Shipyard.app`) and the `shipyard` command agents use. Its code is split into six modules by concern (ADR 0006): what any command needs (ShipyardCommand), the agent's side of pings (ShipyardPings), reading `config.toml` (ShipyardConfig), the client side of app control (ShipyardControl), the app's rules (ShipyardCore) and the macOS app itself (ShipyardApp). Each build links only what it uses:
+
+```text
+ShipyardCommand   foundation: CommandResult, CommandEnvironment, CommandTable, ShipyardVersion, GitRemote, HerdrCommand, RecordStore, SupportFolder
+ShipyardPings     agent side: Ping, PingStore, PingCommand, PingList, HerdrEvent, PingFiling + Unfiled
+ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, WindowDuration, LayoutSetting, ConfigStore,
+                  ResolvedRepositoriesStore, ProjectFiling (implements PingFiling)
+ShipyardControl   ControlRequest, ControlReply, ControlCommand (argument parsing), ControlClient (socket), AppLauncher
+ShipyardCore      the app's rules only (GitHub, items, menu, state, onboarding, Presets, ConfigStatus, CLILink, Skill/),
+                  plus the Mac's side of pings: RemotePingReader, RemoteMachines, RemotePingMarks, PingNumbers, KnownAgent, HerdrFocus
+ShipyardApp       the Apple-framework layer, plus Control/: ControlServer, PanelControl, Screenshotter, DemoLaunch
+
+shipyard on Linux  → Command + Pings                       (files nothing: Unfiled)
+shipyard on macOS  → Command + Pings + Config + Control    (files by project: ProjectFiling; never Core)
+Shipyard.app       → everything
+```
+
+Inside the app, `Shipyard` (the orchestrator) owns the app's lifecycle and runs a **refresh**. A refresh reads the **configuration**, fetches every project's items from GitHub, compares the result with what it saw last time to find **events**, sends the notifications the **rules** allow, and publishes a **menu model** the SwiftUI panel draws. Everything the app remembers about the user (seen items, collapsed sections, the last items it knew) is **app state**, kept apart from the configuration.
 
 Since 0.0.2 a refresh also **resolves** each project's repository selectors (groups such as `owned`, and wildcards such as `owner/*`) into repositories, fetches them in batches with one **review search** (the open PRs waiting on the user, teams included), and then works from each project's **listing**: the items its filters keep. The menu, the counts and the notifications all read the listing, and an **arrangement** groups, sorts and caps it for the panel.
 
 Since 0.0.5 agents also send the user **pings** with the `shipyard` command line, a second executable bundled in the app (ADR 0004). The **ping command** files a ping under the projects that watch the repository of the agent's working folder (or `--repo`, or the one `--project` names), matching against the configuration and the repository lists the app last resolved, and writes it to the **ping store**, one file per ping in Application Support, which the app watches; a ping is listed as a fourth kind of item beside the fetched ones, with no GitHub request.
+
+Since 0.1.0 agents also steer and capture the app with **app control**: `shipyard app`, `panel` and `screenshot` on the Mac send one JSON request over a Unix socket in the app's support folder, and the app's **control server** answers it (Trace 10).
 
 ```text
 agent ──▶ shipyard ping (CLI) ──▶ PingCommand ──▶ PingStore (Pings/<id>.json) ──watched──▶ Shipyard.reloadPings()
@@ -109,6 +128,22 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | N14 | The Mac numbers pings, one sequence per section, like issues in a repository (#153, replacing #136's per-machine numbers): each project counts from `#1`, and so does each machine's own section of unfiled pings. A ping takes its section's next number the first time the Mac lists it there (a local ping when it's saved or first read, a remote ping at the first poll that lists it), never in `sent` order, so a number never changes once given; a ping filed under two projects has each one's number. A replace keeps it, since a ping is known by its URL. A number is never given again: when a ping leaves a section (withdrawn, expired, seen past its `seen-window`, dismissed, filed elsewhere), its number there is retired and the section's next ping takes the next one up, across restarts. The pings already there the first time this build numbers (after every configured machine answered or failed) are numbered per project, oldest `sent` first. The row shows the number in its number column and `PanelText.rowDetail` leads with `#<number>`, as for issues and pull requests. The ping store doesn't number: `shipyard ping` prints only the id, and a `number` an older store or a machine's list still holds is ignored (`PingList` stays at version 1). |
 | N15 | A ping whose sender names a known agent shows that agent's real logo: as its hover card's avatar (20 pt), and before the sender in the list's meta column (leading the tabs' second line) at 14 pt, a small gap apart. The sender reads in kebab-case ("Claude Code" is `claude-code`), cut short with … when it doesn't fit. The app bundles each logo, its maker's own file where there is one, as a vector PDF converted from the SVG (`make agent-logos`), for nominative identification of the sender: the maintainer's decision, accepting that Anthropic's, OpenAI's and Google's brand terms ask for approval (`docs/references/agent-icons.md`). A one-colour glyph (Copilot) is tinted like text, and a logo with its maker's dark-mode file (OpenCode) switches to it, so each reads in light and dark mode. One table, `KnownAgent`, maps senders to agents, ignoring case and punctuation and allowing words after the agent's name ("Claude Code", "claude-code", "cursor-agent", "claude: fix totals"). An unknown sender, or none, keeps the plain look: no mark on the row, the avatar's empty placeholder in the card (#137). |
 
+**Added in 0.1.0** (effort `clean-slate`, spec #160; the modules are ADR 0006, and Traces 8–11 follow them):
+
+| # | Requirement |
+|---|---|
+| M1 | The `shipyard` executable on Linux is built from ShipyardCommand and ShipyardPings only. CI fails if it links ShipyardConfig, ShipyardControl or ShipyardCore (#164). |
+| M2 | The `shipyard` executable on macOS links ShipyardConfig and ShipyardControl too, never ShipyardCore. CI fails if it links Core (#165). |
+| M3 | Where a ping is filed is decided by one interface, `PingFiling`. Its `Unfiled` implementation is for a machine without the app, and its `ProjectFiling` implementation is for the Mac. The executable picks one when it starts, and no ping code asks the platform. Refusals, exit codes and messages stay exactly as in N1, N6 and N12 (#164, #165). |
+| M4 | Expiry is the store's rule: a ping whose `expires` has passed is gone wherever it's read. Only `Unfiled` sets `expires`, so the Mac's pings never expire (#164). |
+| M5 | The command table lists only the commands the build links. On Linux, `shipyard app`, `panel` and `screenshot` exit 2 with "`shipyard <command>` runs on the Mac, where the app is" (#166). |
+| C1 | While the app runs, it listens on `control.sock` in its support folder. The socket is the user's own (mode 0600) and is removed at quit. Each connection carries one JSON request and gets one reply, `{ "ok", "output", "error" }` (#166). |
+| C2 | `shipyard app open` launches the app by bundle id in the background and returns once `status` answers. After about 10 seconds without an answer, it exits 1. `app quit` quits the app. `app status [--json]` prints whether the app is running, its version, whether the panel is open, its layout, its projects and, in a demo run, the demo folder (#166, #168). |
+| C3 | `shipyard panel open \| close \| fold <project> \| unfold <project> \| show-more <project> <kind> \| tab <name>` steers the panel. Folding and Show more go through the orchestrator's own operations, and the selected tab is panel state the app owns (#167). |
+| C4 | `shipyard screenshot <file.png> [--appearance light\|dark]` opens the panel when it's closed, captures the app's own window through ScreenCaptureKit, writes the PNG and prints its path. When capture fails or is refused, the app renders the panel itself, writes that image instead and says so on standard error, still exit 0. When both fail, it exits 1. `--menu-bar-icon` renders the menu bar icon on its own (#169). |
+| C5 | `shipyard app open --demo <folder>` quits the running app and relaunches it with `XDG_CONFIG_HOME=<folder>` (so it reads `<folder>/shipyard/config.toml`) and `SHIPYARD_SUPPORT_DIR=<folder>/support`. Every store, the avatar and the socket live under the override, and the user's own `config.toml` and `state.json` stay byte for byte as they were. Plain `app open` brings the normal app back (#168). |
+| C6 | Exit codes follow N1: 0 done; 1 refused (the app isn't running, "shipyard isn't running; `shipyard app open`"; an unknown project, kind or tab, with the valid names listed; `tab` in the list layout; both captures failed); 2 for arguments that don't read. |
+
 ### Rules and completion
 
 - The app writes the configuration in three targeted ways only (ADR 0001): the project picker appends projects (R13), the layout button sets `[menu] layout`, and onboarding writes a preset (P2), only to a file whose only live key is `version` (the app's own commented header). Every other change comes from the user or their agents editing the file.
@@ -144,7 +179,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Excluded | Why |
 |---|---|
 | Reviewing inside the app (diff, comments), merge/close actions | Agreed: click-through to GitHub for now. |
-| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's menu only has "Open configuration file". The `shipyard` CLI (0.0.5) sends pings only (ADR 0004). |
+| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's menu only has "Open configuration file". The `shipyard` CLI sends pings (0.0.5, ADR 0004) and, since 0.1.0, controls the app, but never edits the configuration. |
 | GitLab, GitHub Enterprise, several accounts | Nobody asked; the GraphQL host is one constant if GHE comes up. |
 | Telling agent PRs from hand-written ones | Agreed: not reliable today (see Extensibility). |
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
@@ -159,6 +194,9 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | More than one action per ping, buttons on its notification, or a shell command as an action | Spec #96: one clear action, and nothing a ping runs beyond opening, activating or focusing |
 | Pings filed under no project, a maximum age for unseen pings, a sender inferred from Herdr | Spec #96: a ping is always filed, stays until seen, and says only what the agent passes |
 | Syncing pings between machines, writing back to a machine (seen and dismiss stay on the Mac) | ADR 0005 (0.0.6): the Mac reads remote pings through Herdr and never writes to a machine; it supersedes 0.0.5's "pings from other machines" |
+| Clicking, hovering or typing in the panel through app control; capturing the real menu bar strip or a hover card | Spec #160: app control steers the panel through the app's own operations, and ScreenCaptureKit captures only the app's own window |
+| Controlling the app on another machine; switching the layout through app control | Spec #160: control is a socket only the Mac's user can reach, and the layout stays a `config.toml` edit (ADR 0001) |
+| Notes | Spec #160: named only to test the design's extensibility (§5) |
 
 ---
 
@@ -197,6 +235,17 @@ Nouns from the requirements, sorted:
 | Arrangement, group | **Entity** (pure) and its **value**: grouping, sorting and the cap; a group's key, title, rows, count, fold |
 | Preset | **Value**: a name, a summary, its configuration text and what onboarding asks for |
 | Group fold, Show more | Fields: `collapsedGroups` in app state; `expandedGroups` in `Shipyard`'s memory, cleared when the panel closes |
+| Filing (0.1.0) | **Interface** (`PingFiling`, in Pings) with two implementations: `Unfiled` (Pings), which keeps a ping as sent, with an expiry and the agent's pane as its default action; and `ProjectFiling` (Config), which files against the configuration and the last resolved repositories, or refuses |
+| Command table (0.1.0) | **Value** (`CommandTable`, in Command): the commands a build links, by name, with their help lines; `main.swift` assembles it |
+| Record store (0.1.0) | **Entity** (store, `RecordStore`, in Command): one JSON file per record in a folder, replaced atomically; `PingStore` is built on it |
+| Support folder (0.1.0) | **Value** (`SupportFolder`, in Command): where the app's files live (`~/Library/Application Support/Shipyard`, or `SHIPYARD_SUPPORT_DIR`), and the XDG data folder on a machine without the app; the one definition the CLI and the app share |
+| Control request and reply (0.1.0) | **Values** (`ControlRequest`, `ControlReply`, in Control): what an agent asks of the app and its answer, `{ ok, output, error }` |
+| Control client (0.1.0) | **Entity** (`ControlClient`, in Control, over the `ControlTransport` port): sends one request over `control.sock` and reads the reply |
+| App launcher (0.1.0) | **Port** (`AppLaunching`, in Control): launches the app by bundle id in the background, with a demo run's environment |
+| Control server (0.1.0) | **Entity** (`ControlServer`, in App): listens on `control.sock` while the app runs, and answers each request through `PanelControlling` and `Screenshotting` |
+| Panel control and panel state (0.1.0) | **Port** (`PanelControlling`) and **entity** (`PanelState`, in App): whether the panel is open and which tab it shows; opens and closes it, and folds and shows more through `Shipyard` |
+| Screenshotter (0.1.0) | **Port** (`Screenshotting`) and its implementation (in App): captures the app's own window, or renders the panel, to a PNG |
+| Demo run (0.1.0) | Field: the app was launched with `SHIPYARD_SUPPORT_DIR`; `DemoLaunch` reads it at launch and `status` reports it |
 
 Relationships:
 
@@ -244,6 +293,25 @@ Snapshot  has  [Project -> [Item]], reviewRequested: Set<ItemID>, the search's P
 Configuration has [Project], Defaults, [NotificationRule]
 ```
 
+Since 0.1.0 (ADR 0006) the command line is assembled per build, and filing and app control sit behind interfaces:
+
+```text
+main.swift -> CommandTable                 add(PingCommands.entries(filing:, store:)); on macOS also add(ControlCommands.entries(support:))
+ShipyardCLI -> CommandTable                run(arguments, environment, now) -> CommandResult: help, --version, the named entry, or exit 2
+PingCommand -> PingFiling                  file(target, whenNoProject:) -> Filing | refusal; expiry(sentAt:); defaultAction(environment)
+Unfiled -.implements.-> PingFiling         files as sent, never refuses; a day's expiry; the agent's pane as the default action
+ProjectFiling -.implements.-> PingFiling   reads ConfigStore (lazily) + ResolvedRepositoriesStore; refuses as N1, N6, #127
+Shipyard -> ProjectFiling                  filed(remote: ping) for each remote ping it lists (#115)
+PingStore -> RecordStore                   all, record(id), save, remove(id), removeIfUnchanged; drops expired pings as it reads
+ControlCommand -> ControlClient            send(ControlRequest) -> ControlReply | notRunning
+ControlCommand -> AppLaunching             launch(bundleID, environment) for app open (and --demo), then polls status
+ControlClient -> ControlTransport          one connection to SupportFolder/control.sock: write the request, read the reply
+ControlServer -> PanelControlling          status, open, close, fold(project), unfold(project), showMore(project, kind), selectTab(name)
+ControlServer -> Screenshotting            capture(to: file, appearance) -> captured | rendered(why) | failed(why)
+PanelControl -> Shipyard                   toggleCollapsed(project), showMore(group), menu (the projects, tabs and layout)
+PanelControl -> PanelState                 isOpen, selectedTab (the tabs layout reads and sets it)
+```
+
 Where each rule lives:
 
 | Rule | Owner |
@@ -273,11 +341,170 @@ Where each rule lives:
 | What each remote machine last listed, and why its last poll failed | `RemoteMachines`, in `Shipyard.remote` |
 | Which section a remote ping lists in | `Listing.sections(of:projects:machines:)`, which `Listing.listings(…, machines:)` lists from |
 | A ping's number in its section; the last number each section gave | `PingNumbers`, in `AppState.pingNumbers`, given and retired by `Shipyard.numberPings` each time it lists (N14) |
-| Which projects a remote ping is filed under | `PingCommand.filed(remote:configuration:resolved:)`, the local ping's rule, applied by `Shipyard` against the last valid configuration and `ResolvedRepositoriesStore` each time it lists (#115) |
+| Which projects a remote ping is filed under | `PingCommand.filed(remote:configuration:resolved:)`, the local ping's rule, applied by `Shipyard` against the last valid configuration and `ResolvedRepositoriesStore` each time it lists (#115); since 0.1.0 `ProjectFiling.filed(remote:)` |
+| Whether a sent ping is filed, kept unfiled or refused; whether it expires; its default action (0.1.0) | the build's `PingFiling`: `Unfiled` or `ProjectFiling` |
+| Whether a ping has expired | `PingStore` (as it reads), by the ping's `expires` |
+| Which commands a build has | `CommandTable`, assembled in `main.swift` |
+| How control arguments read; what a reply's exit status is | `ControlCommand` |
+| Whether a control request can be done (project, kind or tab known; the layout has tabs) | `ControlServer`, asking `PanelControlling` |
+| Which tab the panel shows; whether it's open | `PanelState` |
+| Whether a screenshot was captured or rendered | `Screenshotter` |
 
 ---
 
 ## 3. Class design
+
+### Modules and what each build links
+
+Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
+
+| Module | Owns | Depends on | Linked by |
+|---|---|---|---|
+| **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `RecordStore`, `SupportFolder` | Foundation only | every build |
+| **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
+| **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
+| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `ControlSocket` (the socket's path), `ControlCommand` (parsing `app`, `panel`, `screenshot` into a request, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport`, `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (for the request and reply types) |
+| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config, Control | the app |
+| **ShipyardApp** | The Apple-framework layer it has today, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter`, `DemoLaunch` | everything | the app |
+
+```text
+                 ShipyardCommand
+              ▲        ▲         ▲
+              │        │         │
+       ShipyardPings   │   ShipyardControl
+              ▲        │         ▲
+              │        │         │
+         ShipyardConfig┘         │
+              ▲                  │
+              └──── ShipyardCore ┘   (Core depends on all four)
+                         ▲
+                    ShipyardApp
+```
+
+No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core.
+
+**What each build links.** `Package.swift` declares the four new library targets on every platform, so their tests run on Linux, and makes the executable's extra dependencies conditional:
+
+```swift
+.executableTarget(
+    name: "ShipyardCLI",                           // product shipyard-cli, bundled as Contents/Helpers/shipyard
+    dependencies: [
+        "ShipyardCommand", "ShipyardPings",
+        .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
+        .target(name: "ShipyardControl", condition: .when(platforms: [.macOS])),
+    ]
+)
+// ShipyardApp stays declared only on macOS; the four libraries build everywhere.
+```
+
+| Build | Links | Filing | Commands in its table |
+|---|---|---|---|
+| `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings | `Unfiled` | `ping`, `herdr-event`; `app`, `panel`, `screenshot` answer exit 2, "runs on the Mac" |
+| `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel`, `screenshot` |
+| `Shipyard.app` | everything | `ProjectFiling` for remote pings | (not a command line) |
+
+**The link checks.** `linux-cli.yml` fails when the built Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig` or `15ShipyardControl` (Swift's mangled module names) (#164). `ci.yml`'s macOS job does the same for `12ShipyardCore` in `shipyard-cli` (#165).
+
+**What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
+
+| Today | After | Why |
+|---|---|---|
+| `CommandResult`, `CommandEnvironment` in `CLI/ShipyardCLI.swift` | Command | every command returns and reads them |
+| `CommandEnvironment.platform`, `CommandPlatform` | removed | the filing and the table replace every platform check (M3) |
+| the `switch` in `ShipyardCLI.run` | `CommandTable` in Command; `ShipyardCLI.run` routes over it | each module registers its own commands |
+| `ShellRunning`, `ProcessShellRunner` in `Skill/SkillInstaller.swift` | Command (`Shell.swift`) | `HerdrCommand` runs over it, and the skill installer still uses it from Core |
+| `GhCLI.Run` and `CommandOutput` in `GitHub/Auth/TokenProvider.swift` | Command (`ProgramRunning.swift`), `GhCLI` keeps using it | `HerdrEvent` runs `herdr` through `CommandEnvironment.run` |
+| `ConfigurationReader.isRepositorySlug` | `GitRemote.isRepositorySlug` in Command | `--repo` is parsed by the ping command, which can't see Config |
+| one-file-per-ping code in `PingStore` | `RecordStore` in Command, `PingStore` over it | the next agent-side store (notes) reuses it |
+| `ResolvedRepositoriesStore.defaultDirectory` (the support folder) | `SupportFolder` in Command | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; it honours `SHIPYARD_SUPPORT_DIR` (C5) |
+| `PingStore.removeExpired` called by `ShipyardCLI` on Linux | `PingStore` drops expired pings as it reads | M4: a property of the store, not an `if` |
+| `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config | it reads the configuration |
+| `PingCommand.send(…, platform:, unfiled:)` | `send(…, filing:, whenNoProject:)` | the platform becomes the filing; `unfiled` becomes `.keepUnfiled` |
+| `Ping.item`, `PingIcon` in `Pings/Ping.swift` | Core, `Items/Ping+Item.swift` | `Item` and the row's icon are the app's |
+| `ItemKind`, `StateGroup` in `Items/Item.swift` | Config, `Config/Kinds.swift` | the configuration's vocabulary |
+| `NotificationRule.covers(item)`, `AuthorSelector.matches(item)`, `AuthorFilter.includes(item)` | Core, `Config/Selectors+Items.swift` | matching an `Item` is the app's |
+| `ConfigStore.writePreset` | Core, `Config/ConfigStore+Preset.swift` | presets are the app's |
+| `KnownAgent`, `HerdrFocus` and the remote ping files in `Pings/` | stay in Core's `Pings/` | the Mac's side of pings |
+
+### PingFiling, Unfiled and ProjectFiling — `ShipyardPings/PingFiling.swift`, `ShipyardConfig/ProjectFiling.swift` (0.1.0, #164, #165)
+
+The one place the two `shipyard` builds differ. `PingCommand` and `HerdrEvent` take `any PingFiling` and never ask the platform.
+
+```swift
+public protocol PingFiling: Sendable {
+    /// Where a ping goes, or the refusal the command returns (exit 1).
+    func file(_ target: FilingTarget, whenNoProject: NoProject) -> Result<Filing, CommandResult>
+    /// When a ping sent or replaced at `sent` stops being live; nil: never.
+    func expiry(sentAt sent: Date) -> Date?
+    /// The action a ping gets when the agent gives none; nil: none.
+    func defaultAction(_ environment: CommandEnvironment) -> PingAction?
+}
+public enum FilingTarget { case project(String), repository(String), none }  // --project, --repo or origin, neither
+public enum NoProject { case refuse, keepUnfiled }                          // ping refuses; herdr-event keeps it unfiled
+public struct Filing { public var projects: [String]; public var repository: String? }
+```
+
+| | `Unfiled` (Pings) | `ProjectFiling` (Config) |
+|---|---|---|
+| Built from | nothing | `configURL` (from `ConfigLocation`, #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `resolved: ResolvedRepositoriesStore` |
+| `.project(name)` | `[name]`, no repository | `[name]` when the configuration names it; else exit 1 listing the projects (N1) |
+| `.repository(slug)` | `[]` with the repository | every project whose `owner/name` selectors or resolved list include it, ignoring case, spelled as the first one spells it; none: exit 1 listing the projects (N6), or `[]` with `.keepUnfiled` |
+| `.none` (no `origin`) | `[]` | exit 1 with `--repo`/`--project` as the way out (N6), or `[]` with `.keepUnfiled` |
+| every filed project hides pings (`pings.show = false`) | — | exit 1 (#127) |
+| `expiry(sentAt:)` | `sent + PingCommand.lifetimeWithoutTheApp` (a day) | `nil` |
+| `defaultAction` | `.herdr(HERDR_PANE_ID)` when set | `nil` |
+| also | — | `filed(remote: Ping) -> Ping`, which `Shipyard` applies to each remote ping against the last valid configuration (#115) |
+
+Tests: the CLI tests that are parameterised by platform today become parameterised by filing, each case run through `ShipyardCLI.run` with the table `main.swift` would build (#164).
+
+### CommandTable and RecordStore — `ShipyardCommand/` (0.1.0, #164)
+
+`CommandTable` holds `Command` entries: `name`, `summary` (its line in `shipyard --help`), `usage`, and `run(arguments, environment, now) -> CommandResult`. `add(_:)` rejects a name already there. `ShipyardCLI.run(arguments, table:, environment:, now:)` answers `--help`/`-h`/`help` with the usage built from the table, `--version` with `shipyard <ShipyardVersion.current>`, and a name in `CommandTable.macOnly` (`app`, `panel`, `screenshot`) that the table lacks with exit 2, "`shipyard <name>` runs on the Mac, where the app is". Any other unknown name is exit 2 with the usage. A command's own `--help` is the entry's business, as `ping`'s is today.
+
+`RecordStore<Record: Codable>(directory:)` keeps one `<id>.json` per record: `all()` (every file that reads, skipping the rest), `record(id:)`, `save(record, id:)` (creating the directory, replacing the file atomically), `remove(id:)`, and `removeIfUnchanged(record, id:) -> Bool`. `PingStore` keeps its operations (§ PingStore) and delegates the files, adding the ping rules: same-sending writes, and dropping a ping past its `expires` from `all()` and `ping(id:)` (removing its file through `removeIfUnchanged`).
+
+`SupportFolder`: `app(environment:home:)` is `SHIPYARD_SUPPORT_DIR` when it's set and absolute, else `~/Library/Application Support/Shipyard`; `withoutTheApp(environment:home:)` is `$XDG_DATA_HOME/shipyard`, else `~/.local/share/shipyard`. The app's stores, `PingStore` on the Mac, `ResolvedRepositoriesStore`, the avatar cache and `ControlSocket` all build on `app`, so the CLI and the app (a demo run included) can't disagree.
+
+### App control: the client — `ShipyardControl/` (0.1.0, #166–#169)
+
+The wire format is a public contract, like `PingList`, between the `shipyard` of one build and the app of the same build. It's versioned, so a CLI and an app from different builds say so instead of misreading each other.
+
+```text
+request  {"version":1,"command":"panel.fold","project":"shop"}            one JSON object, then the client half-closes
+reply    {"ok":true,"output":"folded shop\n","error":""}                  one JSON object, then the server closes
+```
+
+| `ControlRequest` | From | Reply's `output` |
+|---|---|---|
+| `app.status` (`json: Bool`) | `shipyard app status [--json]` | the status as lines, or as one JSON object: `running`, `version`, `panelOpen`, `layout`, `projects`, `demo` (the folder or null) |
+| `app.quit` | `shipyard app quit` | `quitting`; the app replies, then terminates and removes the socket |
+| `panel.open`, `panel.close` | `shipyard panel open`, `close` | `panel open`, `panel closed` |
+| `panel.fold`, `panel.unfold` (`project`) | `shipyard panel fold <project>`, `unfold <project>` | `folded <project>`, `unfolded <project>` |
+| `panel.showMore` (`project`, `kind`) | `shipyard panel show-more <project> <kind>` (`pull-requests`, `issues`, `workflow-runs`, `pings`) | `showing all <kind> in <project>` |
+| `panel.tab` (`name`) | `shipyard panel tab <name>` (a project's name, or `All`) | `showing <name>` |
+| `screenshot` (`path`, `appearance`, `menuBarIcon`) | `shipyard screenshot <file.png> [--appearance light\|dark] [--menu-bar-icon]` | the absolute path written; `error` holds the fallback's note when the panel was rendered |
+
+`app open [--demo <folder>]` isn't a request: the app may not be running. `ControlCommand` sends `app.quit` when the app answers and a demo is asked for (or when a demo runs and plain `open` is asked for). Then `AppLaunching.launch(bundleID: "com.yahyabedirhan.shipyard", environment:)` starts it through `NSWorkspace.openApplication` with `activates = false` and, for a demo, `XDG_CONFIG_HOME` and `SHIPYARD_SUPPORT_DIR`. It then sends `app.status` every quarter second for up to 10 seconds, against the socket under the demo's support folder for a demo. Answered: exit 0 with the status. Never answered: exit 1.
+
+| Operation | Returns / rejects |
+|---|---|
+| `ControlCommand.parse(command, arguments) -> Result<Invocation, CommandResult>` | an `Invocation` (`open(demo:)` or a `ControlRequest`) | a missing or extra argument, an unknown subcommand, a relative or non-`.png` screenshot path (made absolute against the working folder first), an `--appearance` other than `light` or `dark`, a `--demo` folder that doesn't exist: exit 2 |
+| `ControlCommand.run(invocation, client, launcher, support) -> CommandResult` | a reply's `ok`: exit 0, `output` to standard output, `error` (a note) to standard error | `ok: false`: exit 1 with `error`; `notRunning` (no socket, or the connection refused): exit 1, "shipyard isn't running; `shipyard app open`"; a reply that doesn't read, or another `version`: exit 1 naming both versions |
+| `ControlClient.send(request) -> Result<ControlReply, ControlClient.Failure>` | connects to `ControlSocket.url(support:)` through `ControlTransport` (`UnixSocketTransport`; tests pass an in-memory one), with a 15 s read timeout (a screenshot may render) | `notRunning`, `timedOut`, `unreadable` |
+
+Tests: the parsing, the encoding and the exit codes run through `ShipyardCLI.run` with a fake transport and a fake launcher (`Tests/ShipyardControlTests`, which runs on Linux too, since only the real launcher needs AppKit).
+
+**Known limit:** a Unix socket's path is at most 104 bytes on macOS. `ControlSocket` refuses a longer one with a line naming the path, so a demo folder nested deep needs a shorter path.
+
+### App control: the app's side — `ShipyardApp/Control/` (0.1.0, #166–#169)
+
+| Type | Owns | Operations |
+|---|---|---|
+| `ControlServer` | the listening socket: created at launch in `SupportFolder.app`, a stale file from a crash replaced, `chmod 0600` before `listen`, removed at quit; one request per connection, read on a background queue, answered on the main actor | `reply(to request) async -> ControlReply`: the dispatch, tested in `ShipyardAppTests` with a fake `PanelControlling` and `Screenshotting` |
+| `PanelState` (`@Observable`, main actor) | `isOpen`, `selectedTab` (moved out of `TabsLayout`'s private `@State`, so a click and a command set the same value; `MenuTabs`' fallback to All still applies) | read and set by the panel's views and `PanelControl` |
+| `PanelControl: PanelControlling` | opening and closing the `MenuBarExtra` window: on macOS 26 and earlier through the status item's button, as the existing close does; on macOS 27 through the expanded-interface session, best effort | `status() -> AppStatus`; `open()`, `close()`; `fold(project)`, `unfold(project)` (through `Shipyard.toggleCollapsed`, only when the fold differs); `showMore(project, kind)` (through `Shipyard.showMore` on the project's group of that kind); `selectTab(name)`. Each refuses with the valid names: an unknown project, kind or tab, or `tab` in the list layout ("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`") |
+| `Screenshotter: Screenshotting` | capturing the panel's window | `capture(to:appearance:)`: sets the panel's appearance, opens it when closed and waits for a layout pass, then captures with `SCScreenshotManager` filtered to this process's panel window (`SCShareableContent` limited to the current process), which needs no Screen Recording permission. When that fails or is refused, it renders `Panel` with `ImageRenderer` at the screen's scale and returns `rendered(why)`. `--menu-bar-icon` renders `SailboatImage` alone. Hover cards and the menu bar strip are never captured |
+| `DemoLaunch` | knowing a demo run | `current(environment) -> URL?`: the support folder when `SHIPYARD_SUPPORT_DIR` is set; `AppServices` builds every store on `SupportFolder.app`, and `status` reports the folder |
 
 ### Shipyard (orchestrator) — `ShipyardCore/Shipyard.swift`
 
@@ -825,6 +1052,8 @@ Each project's repositories as the app last resolved them (`ResolvedRepositories
 
 **On a machine without the app (0.0.6, #110).** `CommandEnvironment.platform` (`CommandPlatform`: `macOS` or `linux`; `main.swift` passes `.current`, tests name it) decides. The rule is the platform alone: on Linux there's no app to file a ping for, so the CLI reads no `config.toml` and no `repositories.json` for `ping` or `herdr-event`, and `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it. `run` gives a ping without an action the agent's pane (`HERDR_PANE_ID`) as `.herdr(pane)`, so a click can focus it; an action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win. The ping gets `expires`, a day from its sending or its replace, and `ShipyardCLI` calls `removeExpired(at: now)` before `ping` and `herdr-event`, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. On macOS nothing changes from 0.0.5.
 
+**0.1.0 replaces the platform with the filing (#164, ADR 0006).** The behaviour above stays, but `CommandPlatform` goes: `Unfiled` gives the as-sent filing, the day's expiry and the pane as the default action, `PingStore` drops expired pings as it reads, and the Linux build never links the code that reads `config.toml` ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)).
+
 ### HerdrEvent — `ShipyardCore/Pings/HerdrEvent.swift` (0.0.6, #112)
 
 `shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. `ShipyardCLI` sends it `HerdrEvent.run(environment, configuration, resolved, store, now)`; `configuration` is a closure, read only for a blocked agent's ping, so a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, lowercased (Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone), each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
@@ -842,6 +1071,25 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 A thin executable target over `ShipyardCore`: it gathers the arguments, the working folder, the environment (with `GitCLI`), `ConfigStore.defaultURL(environment:)`, `ResolvedRepositoriesStore.defaultDirectory` and `PingStore.defaultDirectory(platform: .current, environment:)`, with `CommandPlatform.current`, calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
+Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else:
+
+```swift
+var table = CommandTable()
+#if os(macOS)
+let support = SupportFolder.app(environment: environment)
+let filing = ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: support),
+                           resolved: ResolvedRepositoriesStore(directory: support))
+table.add(PingCommands.entries(filing: filing, store: PingStore(directory: support.appendingPathComponent("Pings"))))
+table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
+#else
+let filing = Unfiled()
+table.add(PingCommands.entries(filing: filing, store: PingStore(directory: SupportFolder.withoutTheApp(environment: environment).appendingPathComponent("pings"))))
+#endif
+let result = ShipyardCLI.run(arguments, table: table, environment: commandEnvironment, now: Date())
+```
+
+The `#if` is compile time and decides which modules are linked; nothing after it asks the platform.
+
 ### CLILink — `ShipyardCore/CLI/CLILink.swift` (0.0.5)
 
 Puts the CLI on the user's PATH (N10). `CLILink(cli:home:fileSystem:)` is `@MainActor @Observable` and holds `state`: `unlinked`, `linked`, `occupied(destination:)` (a link elsewhere, or `nil` for a file or folder), `failed(reason)` (the system's words), `missingCLI`, or `translocated`: the CLI's path is under `/AppTranslocation/` (`isTranslocated`), macOS running a downloaded copy from a temporary path, so it links nothing and the card says to move Shipyard to Applications first, with no command or button. A link whose destination is gone (an older copy moved or deleted) isn't this app's, so it reads as `occupied`, with the command that replaces it. It looks through the `LinkFileSystem` port: `fileExists(at:)` (following links, for the app's CLI), `entry(at:)` (`none`, `link(destination:)` as written, or `other`, without following the link), `createDirectory(at:)` and `createSymbolicLink(at:to:)`. `FileManagerLinkFileSystem` is the real one; it's Foundation alone, so it lives in the core and the tests run it in a temporary folder (a wrapper that refuses the link stands for no permission). A link counts as this app's when its destination, resolved against `~/.local/bin` when relative, is `cli`'s path. `check()` looks again; `makeLink()` makes the folder and the link only when the state is `unlinked`, otherwise it just says what's there, and after a failure it looks once more so something that appeared meanwhile reads as occupied rather than a failure. `command` is what the card offers to copy: `mkdir -p ~/.local/bin && ln -sf <cli> ~/.local/bin/shipyard`, the CLI's path single-quoted when it isn't plain, which replaces whatever is there, since running it is the user's choice. `CLILink.bundledCLI(in:)` is `Contents/Helpers/shipyard` in a bundle. Linking is instant, so there's no running state, timeout or cancel, unlike the skill install.
@@ -858,10 +1106,13 @@ The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` look
 
 ### Folder tree
 
+The target layout for 0.1.0 (ADR 0006). `(0.1.0)` marks a new file and `(moved)` one that changes module; #164–#169 build them.
+
 ```text
 shipyard/
-├── Package.swift                     # SwiftPM: ShipyardCore (library) + ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`) + ShipyardApp (macOS app target, `Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder
-├── .github/workflows/ci.yml          # core, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; .build cached between runs (docs/references/github-actions-cache.md)
+├── Package.swift                     # SwiftPM: libraries ShipyardCommand, ShipyardPings, ShipyardConfig, ShipyardControl, ShipyardCore; ShipyardCLI (the `shipyard` CLI, product `shipyard-cli`: Command + Pings, plus Config + Control on macOS only); ShipyardApp (`Shipyard` executable, declared only on macOS) + tests; one dependency: TOMLDecoder (Config's)
+├── .github/workflows/ci.yml          # libraries, CLI and tests built and run on Ubuntu (Swift 6.2); app, CLI and tests built once and run on macOS, bundled only on main and tags; fails when the Mac CLI holds a ShipyardCore symbol; .build cached between runs (docs/references/github-actions-cache.md)
+├── .github/workflows/linux-cli.yml   # the static Linux `shipyard` binaries for a release; fails when one holds a ShipyardCore, ShipyardConfig or ShipyardControl symbol
 ├── Makefile                          # build, test (finds the Testing framework under Command Line Tools), bundle .app (with the icon, the app's resource bundle in Contents/Resources, and the CLI as Contents/Helpers/shipyard), ad-hoc sign, zip, install, redraw the icon, convert the agents' logos (`make agent-logos`, rsvg-convert)
 ├── Packaging/Info.plist              # LSUIElement (no Dock icon), bundle id, version, CFBundleIconFile
 ├── Packaging/Icon/                   # make-icon.swift draws the app icon's variants (olive-khaki, shipyard's logo, is the app's; origami, sailboat, night and sunset are alternates); `make icon` packs AppIcon.icns from `ICON`, `make icon-alternates` packs alternates/ with previews, all committed; README.md says how to switch; the Makefile compiles it with `Sources/ShipyardApp/Brand/Sailboat.swift` and `Logo.swift` (`make icon-exploration` redraws the options the logo was chosen from)
@@ -869,24 +1120,58 @@ shipyard/
 ├── skills/shipyard/SKILL.md          # teaches agents the config file (selectors, groups, filters, arrangement); installed by `npx skills add`
 ├── skills/shipyard/presets.md        # the three presets, equal to the app's (tested)
 ├── docs/configuration.md            # for maintainers: how configuration works in the code, the checklist for adding a setting
+├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules
 ├── assets/images/<topic>/           # the README's logo (logo/), by relative path; the app icon's comparison sheets (app-icon/, with exploration/ from `make icon-exploration`); the known agents' logos as published (agent-logos/*.svg), the sources `make agent-logos` converts
 ├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (shipyard-0.0.2/), by relative path
-├── Sources/ShipyardCore/             # Foundation, FoundationNetworking, Observation and TOMLDecoder only, so agents can build and test it on a Linux VPS
+├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
+│   ├── CommandResult.swift           # (moved) output, error text, exit status: 0 done, 1 refused, 2 usage
+│   ├── CommandEnvironment.swift      # (moved) working folder, variables, the git lookup and program-run ports; no platform
+│   ├── CommandTable.swift            # (0.1.0) the build's commands by name, their help lines; ShipyardCLI.run routes over it; the Mac-only names' exit 2
+│   ├── ProgramRunning.swift          # (moved from GhCLI.Run) run a program synchronously, CommandOutput
+│   ├── Shell.swift                   # (moved from SkillInstaller) ShellRunning port, ProcessShellRunner (cancellable, kills the process tree)
+│   ├── Version.swift                 # (moved) ShipyardVersion.current: the one place the version is recorded
+│   ├── GitRemote.swift               # (moved) the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name, isRepositorySlug
+│   ├── HerdrCommand.swift            # (moved) runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
+│   ├── RecordStore.swift             # (0.1.0) one JSON file per record in a folder, atomic replace, remove if unchanged
+│   └── SupportFolder.swift           # (0.1.0) the app's support folder (SHIPYARD_SUPPORT_DIR overrides it) and the XDG data folder without the app
+├── Sources/ShipyardPings/            # (0.1.0) the agent's side of pings; Command only
+│   ├── Ping.swift                    # (moved) a ping: id, instance, title, projects, sent, seen, repository, body, sender, action, terminal, failure, expires; new ids; PingAction
+│   ├── PingStore.swift               # (moved) pings over RecordStore: same-sending writes, expired pings dropped as read
+│   ├── PingCommand.swift             # (moved) shipyard ping: arguments → a ping filed through PingFiling, saved; withdraw; list --json
+│   ├── PingFiling.swift              # (0.1.0) the PingFiling interface, FilingTarget, NoProject, Filing; Unfiled (as sent, a day's expiry, the pane as default action)
+│   ├── PingList.swift                # (moved) the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
+│   ├── HerdrEvent.swift              # (moved) shipyard herdr-event: a blocked agent's ping herdr-<pane>, sent, replaced and withdrawn
+│   └── PingCommands.swift            # (0.1.0) the `ping` and `herdr-event` entries for the CommandTable, over a filing and a store
+├── Sources/ShipyardConfig/           # (0.1.0) reading config.toml; Command, Pings and TOMLDecoder
+│   ├── Configuration.swift           # (moved) file model, defaults, per-project merge, append text; EventKind, MenuLayout, NewProject
+│   ├── Kinds.swift                   # (moved from Items/Item.swift) ItemKind, StateGroup: the configuration's vocabulary
+│   ├── ConfigurationReader.swift     # (moved) decode + validation: typed reads, errors, unknown-key warnings, suggestions
+│   ├── TOMLSourceMap.swift           # (moved) key path → line, for validation messages
+│   ├── Selectors.swift               # (moved) AuthorSelector, AuthorFilter, RepositorySelector: parse, the hints (ADR 0002); matching items is Core's
+│   ├── WindowDuration.swift          # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
+│   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
+│   ├── ConfigStore.swift             # (moved) path, reload, last-valid fallback, append projects, set the layout
+│   ├── ConfigLocation.swift          # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
+│   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
+│   └── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
+├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command (AppKit only for the real launcher)
+│   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), versioned JSON
+│   ├── ControlReply.swift            # { ok, output, error }
+│   ├── ControlSocket.swift           # control.sock in SupportFolder.app; the 104-byte path limit
+│   ├── ControlCommand.swift          # app, panel, screenshot arguments → an invocation; a reply → CommandResult; app open's launch and wait
+│   ├── ControlClient.swift           # one request per connection over ControlTransport (UnixSocketTransport), read timeout
+│   ├── AppLauncher.swift             # AppLaunching port; WorkspaceLauncher: NSWorkspace.openApplication by bundle id, in the background, with a demo's environment
+│   └── ControlCommands.swift         # the `app`, `panel` and `screenshot` entries for the CommandTable
+├── Sources/ShipyardCore/             # the app's rules; Command, Pings, Config, Control, Foundation, FoundationNetworking and Observation, so agents can build and test it on a Linux VPS
 │   ├── Shipyard.swift                # orchestrator: phase, refresh pipeline, user actions (@Observable)
 │   ├── Lifecycle.swift               # Phase (signedOut, connecting, needsProjects, ready) and its transitions
-│   ├── Version.swift                 # ShipyardVersion.current: the one place the version is recorded
 │   ├── RefreshScheduler.swift        # RefreshGate (one at a time, queues one more) + RefreshTimer port and its Task-based timer
 │   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, Sleep, ActionRunning, LoginItem
 │   ├── Config/
-│   │   ├── Configuration.swift       # file model, defaults, per-project merge, append text
-│   │   ├── ConfigurationReader.swift # decode + validation: typed reads, errors, unknown-key warnings, suggestions
-│   │   ├── TOMLSourceMap.swift       # key path → line, for validation messages
-│   │   ├── Selectors.swift           # AuthorSelector, AuthorFilter, RepositorySelector: parse, match, the hints (ADR 0002)
-│   │   ├── WindowDuration.swift      # closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
+│   │   ├── Selectors+Items.swift     # (moved out of Config's files) NotificationRule.covers, AuthorSelector.matches, AuthorFilter.includes an Item
+│   │   ├── ConfigStore+Preset.swift  # (moved) writePreset: the third writer
 │   │   ├── Presets.swift             # the three presets: names, what they ask for, their file text
-│   │   ├── PresetSetting.swift       # the third writer: a preset into a file whose only live key is version
-│   │   ├── LayoutSetting.swift       # the layout button's edit: set [menu] layout in the text, every other line kept
-│   │   ├── ConfigStore.swift         # path, reload, last-valid fallback, append projects, set the layout, write a preset
+│   │   ├── PresetSetting.swift       # the third writer's text: a preset into a file whose only live key is version
 │   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
@@ -901,31 +1186,23 @@ shipyard/
 │   │       ├── TokenProvider.swift   # TokenStore → gh → none; GhCLI finds and runs gh
 │   │       └── DeviceFlow.swift      # OAuth device flow
 │   ├── Items/
-│   │   ├── Item.swift                # Item, StateGroup, Snapshot, RepositoryError, RateLimit, fingerprint
+│   │   ├── Item.swift                # Item, Snapshot, RepositoryError, RateLimit, fingerprint
+│   │   ├── Ping+Item.swift           # (moved) a ping as an Item; PingIcon
 │   │   ├── Listing.swift             # the one filter: what a project lists (ADR 0003)
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
 │   │   └── NotificationRules.swift   # event + project settings → notify?; what to post; NotifiedEvents
-│   ├── Pings/
-│   │   ├── Ping.swift                # a ping: id, title, projects, sent, seen, repository, body, sender, action, terminal, failure (short and whole), expires; as an Item; new ids; PingAction, PingIcon
+│   ├── Pings/                        # the Mac's side of pings
 │   │   ├── KnownAgent.swift          # the one table of known agents: a sender (any case, spelling) → agent, and its logo (AgentLogo: the bundled file and how it reads in light and dark), #137
-│   │   ├── HerdrCommand.swift        # runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
 │   │   ├── HerdrFocus.swift          # a Herdr action: focus the tab (a pane's tab via pane get), or on a machine the agent first, through HerdrCommand
 │   │   ├── RemotePingReader.swift    # asks a machine for its pings: plugin action invoke list, then plugin log list for its log_id
 │   │   ├── RemoteMachines.swift      # each remote machine's last pings, truncated, latest failure
 │   │   ├── RemotePingMarks.swift     # remote pings seen and dismissed on the Mac, by URL and instance, pruned when no machine lists them
-│   │   ├── PingNumbers.swift         # the numbers the Mac gives pings: one sequence per project or machine section, by URL, never reused (N14)
-│   │   ├── HerdrEvent.swift          # shipyard herdr-event: a blocked agent's ping herdr-<pane>, sent, replaced and withdrawn
-│   │   ├── PingStore.swift           # one JSON file per ping, atomic writes, safe for the CLI and the app at once
-│   │   ├── PingList.swift            # the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
-│   │   └── PingCommand.swift         # shipyard ping: arguments → a ping filed by its repository or under a project, saved; output and exit status
+│   │   └── PingNumbers.swift         # the numbers the Mac gives pings: one sequence per project or machine section, by URL, never reused (N14)
 │   ├── CLI/
-│   │   ├── ShipyardCLI.swift         # the shipyard command line: help, version, reading config.toml and repositories.json, dispatching to ping; CommandResult, CommandEnvironment
-│   │   ├── CLILink.swift             # links ~/.local/bin/shipyard to the app's CLI, or says what's in the way (LinkFileSystem port, FileManagerLinkFileSystem)
-│   │   └── GitRemote.swift           # the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name
+│   │   └── CLILink.swift             # links ~/.local/bin/shipyard to the app's CLI, or says what's in the way (LinkFileSystem port, FileManagerLinkFileSystem)
 │   ├── State/
-│   │   ├── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers; tolerant, versioned
-│   │   └── ResolvedRepositoriesStore.swift # repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
+│   │   └── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers; tolerant, versioned
 │   ├── Menu/
 │   │   ├── MenuModel.swift           # pure: sections of groups, from listings; semantic state colours, label
 │   │   ├── MachineNotice.swift       # pure: one quiet line per remote machine that failed or sent a truncated list
@@ -947,17 +1224,22 @@ shipyard/
 │   │   ├── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
 │   │   └── PresetChoice.swift        # pure: the chosen preset and what it still needs before Add
 │   └── Skill/
-│       ├── SkillInstaller.swift      # runs npx skills add in the login shell (ShellRunning port, cancellable), SkillInstallResult
+│       ├── SkillInstaller.swift      # runs npx skills add in the login shell (over Command's ShellRunning, cancellable), SkillInstallResult
 │       └── SkillInstallation.swift   # one install as the panel shows it: running, result, timeout, cancel
-├── Sources/ShipyardCLI/main.swift    # the `shipyard` executable: gathers arguments, environment and paths, prints ShipyardCLI.run's result
+├── Sources/ShipyardCLI/main.swift    # the `shipyard` executable: assembles the build's CommandTable (Unfiled on Linux; ProjectFiling and app control on macOS), prints ShipyardCLI.run's result
 ├── Sources/ShipyardApp/              # macOS app (module ShipyardApp, executable Shipyard): thin Apple-framework layer over ShipyardCore
-│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below, routes notification clicks, holds the panel's actions and closes the menu after opening something
+│   ├── ShipyardApp.swift             # @main, MenuBarExtra wiring; AppServices builds the core with the adapters below (every store on SupportFolder.app), starts the control server, routes notification clicks, holds the panel's actions and closes the menu after opening something
 │   ├── ConfigWatcher.swift           # watches the config directory (and file), calls Shipyard.reloadConfiguration(); watches the ping store's directory alone (init(folder:)), calling reloadPings()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # ActionRunning on NSWorkspace (open a URL, launch or bring forward an app by bundle id or name); opens config.toml in its editor (TextEdit when none)
 │   ├── Keychain.swift                # TokenStore on the login keychain: the app's token store since 0.0.2 (S1)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
+│   ├── Control/                      # (0.1.0) the app's side of app control
+│   │   ├── ControlServer.swift       # control.sock (0600, removed at quit): one request per connection, reply(to:) dispatches over PanelControlling and Screenshotting
+│   │   ├── PanelControl.swift        # PanelControlling: open and close the panel (status item up to macOS 26, expanded session on 27), fold, Show more, tab, status; PanelState (isOpen, selectedTab)
+│   │   ├── Screenshotter.swift       # Screenshotting: ScreenCaptureKit on this process's panel window, else ImageRenderer of Panel; the menu bar icon alone
+│   │   └── DemoLaunch.swift          # a demo run: the folder SHIPYARD_SUPPORT_DIR names, for status
 │   ├── Brand/
 │   │   ├── Sailboat.swift            # shipyard's sailboat, one CGPath (CoreGraphics only): make-icon.swift compiles this file, so the app icon, the menu bar item and the badge draw one figure (#80)
 │   │   ├── Logo.swift                # the logo (CoreGraphics only, compiled into make-icon.swift too): the icon's squircle, khaki green gradient, sheen, cream figure colour and the figure's size against the body
@@ -977,25 +1259,26 @@ shipyard/
 │       ├── Layouts/
 │       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, dismiss a ping, mark all seen, collapse, fold a subsection, Show more or less
 │       │   ├── ListLayout.swift      # [menu] layout = "list": pinned project headers, one line per item
-│       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows as its arrangement groups them, All by kind
+│       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows as its arrangement groups them, All by kind; the selected tab is PanelState's
 │       └── Onboarding/
 │           ├── ConnectView.swift     # why signed out, Sign in with GitHub (the code, Cancel), the gh way (gh auth login, Connect with gh, install hint)
 │           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
-├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module
+├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher
+├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping and config suites stay here
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
 │   ├── WorkflowRunsResponse.swift    # builds a REST runs answer (with ETag, or a 304), for scenarios that change runs between refreshes
 │   ├── CLI/                          # CLILink in a temporary folder: linking, a link already there, something in the way, no permission, the command run by a shell
-│   ├── Pings/                        # the ping command and the CLI as functions; filing by repository; pings end to end: CLI → store → Shipyard → menu
+│   ├── Pings/                        # the ping command and the CLI as functions, parameterised by filing (Unfiled, ProjectFiling); pings end to end: CLI → store → Shipyard → menu
 │   ├── Onboarding/                   # ProjectChoices: choosing, typing, naming, grouping; PresetChoice: each preset's next step
 │   ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
 │   ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
 │   └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake git remote (a fake working folder), fake shell, hanging shell, instant sleeper
-└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours
+└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control and screenshotter (0.1.0)
 ```
 
-Shipyard is a macOS app and only ships for macOS. The package has two targets so that the implementation agents, which run on a Linux VPS, can build and test everything holding a rule without a Mac; Linux is a development environment, not a platform shipyard supports, except for the `shipyard` command: since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr, keeping pings in the XDG data directory and filing none (PingCommand and ShipyardCLI). `ShipyardCore` imports only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder, all of which exist on Linux (Observation ships with the Swift toolchain; the rule keeps Apple-only frameworks out); the rules live there: configuration, the GitHub client, attention, events, notification rules, the rate budget, the menu model, and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, and the SwiftUI views. Tests target `ShipyardCore`, so they run on the VPS; the app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`.
+Shipyard is a macOS app and only ships for macOS. Linux is a development environment, where agents build and test every library, and a platform only for the `shipyard` command: since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005). Since 0.1.0 the package follows concerns (ADR 0006): the four libraries on the agent's side (Command, Pings, Config, Control) and `ShipyardCore` build on Linux, importing only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder (Config's), with AppKit only behind `#if canImport(AppKit)` in Control's launcher. Each build links what it uses (the table in [Modules and what each build links](#modules-and-what-each-build-links)). `ShipyardCore` holds the app's rules: the GitHub client, attention, events, notification rules, the rate budget, the menu model and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, the control server, the screenshotter and the SwiftUI views. Tests target the libraries, so they run on the VPS. The app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`, and the control server's dispatch.
 
 ---
 
@@ -1225,6 +1508,117 @@ Setup: `[remote] machines = ["hetzner-vps", "netcup-vps"]` beside project `shop`
 | ⌥-click on "Deploy?" | `markSeen(row)` → `AppState.remotePings` marks that sending seen; count **−1**; after `[defaults.pings] seen-window` a poll leaves it out (#118) |
 | ✕ or ⌫ on "Deploy?" | `dismiss(row)` → marked dismissed: hidden, replaced or not, until `netcup-vps` stops listing that instance; then the mark is pruned (#118) |
 
+### PingCommand.send through a filing (0.1.0, #164)
+
+```text
+send(request, folder, git, filing, store, now, newID, whenNoProject):
+    target = request.project.map(.project)
+          ?? request.repository.map(.repository)                    // --repo
+          ?? folder.flatMap(GitRemote.workingRepository).map(.repository)
+          ?? .none
+    filing.file(target, whenNoProject) → failure: return it (exit 1), nothing written
+    action = request.action ?? filing.defaultAction(environment)    // Unfiled: the agent's pane
+    stored = store.ping(id)                                         // an expired one reads as none (M4)
+    ping   = stored.replaced(by: request, filing, action)           // keeps sent and instance, clears seen and failure
+          ?? Ping(id ?? newID(), request, filing, action, sent: now, instance: UUID())
+    ping.expires = filing.expiry(sentAt: now)                       // a replace starts the day again
+    store.save(ping) → failure: exit 1
+    return id (exit 0)
+```
+
+No `if` names a platform. `withdraw` and `list` never call the filing, so `ProjectFiling` never reads `config.toml` for them.
+
+### ControlServer.reply(to:) (0.1.0, #166–#169)
+
+```text
+reply(to data):
+    request = ControlRequest.decode(data) → unreadable or another version: { ok: false, error: "… version …" }
+    switch request:
+      app.status       → { ok, output: status.text or status.json }      // PanelControl.status(): running, version, panelOpen, layout, projects, demo
+      app.quit         → { ok, output: "quitting" }, then NSApp.terminate after the reply is written
+      panel.open/close → panel.open() / panel.close()
+      panel.fold(p)    → panel.fold(p)         → unknown p: { ok: false, error: "no project is named `p`; the projects are …" }
+      panel.showMore   → panel.showMore(p, k)  → unknown p or k: refused with the valid names
+      panel.tab(n)     → panel.selectTab(n)    → list layout or unknown n: refused
+      screenshot       → screenshotter.capture(to, appearance)
+                           captured(path)      → { ok, output: path }
+                           rendered(path, why) → { ok, output: path, error: "captured by rendering: why" }
+                           failed(why)         → { ok: false, error: why }
+```
+
+Every refusal is a reply, never a dropped connection, so the client always has a line to print.
+
+### Trace 8: a local ping through the modules (0.1.0, #165)
+
+Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an agent in a clone of `yahyabedirhan/shop`. The CLI is the macOS build (Command, Pings, Config, Control).
+
+| Step | Call (module) | State after |
+|---|---|---|
+| 1 | `main.swift` (ShipyardCLI) builds the table: `PingCommands.entries(filing: ProjectFiling(…), store: PingStore(SupportFolder.app/Pings))` and `ControlCommands.entries(…)` | nothing read yet; `ProjectFiling` holds the path from `ConfigLocation` (#126) and the resolved store |
+| 2 | `ShipyardCLI.run(["ping", "Tests pass", "--from", "claude"])` → `CommandTable` (Command) → the `ping` entry (Pings) | `PingCommand.Request.parse`: title, sender, no action |
+| 3 | `GitRemote.workingRepository` (Command) | `yahyabedirhan/shop`; target `.repository("yahyabedirhan/shop")` |
+| 4 | `ProjectFiling.file(target, .refuse)` (Config) → `ConfigStore`'s reader on the recorded path, `ResolvedRepositoriesStore.load()` | `Filing(projects: ["shop"], repository: "yahyabedirhan/shop")` |
+| 5 | `defaultAction` → `nil`; `expiry` → `nil`; `PingStore.save` → `RecordStore.save` (Command) | `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
+| 6 | the app (Core): `ConfigWatcher` → `Shipyard.reloadPings()` → `numberPings` → `Listing` → `MenuModel` | as Trace 6, steps 5–7: listed under `shop` as `#1`, notified once |
+
+Nothing in steps 1–5 is in ShipyardCore. The CLI binary doesn't contain it (M2).
+
+### Trace 9: a remote ping, from a Linux machine to the Mac (0.1.0, #164)
+
+Setup: as Trace 7: `[remote] machines = ["netcup-vps"]`, project `shop` watching `yahyabedirhan/shop`. On `netcup-vps` the Linux `shipyard` (Command and Pings only) runs in a Herdr pane `w2:p1`, in a clone of `yahyabedirhan/shop`.
+
+| Step | Call (module, machine) | State after |
+|---|---|---|
+| 1 | `main.swift` builds the table with `Unfiled()` and `PingStore(SupportFolder.withoutTheApp/pings)` (Linux) | no `config.toml` anywhere in this binary |
+| 2 | `shipyard ping "Deploy?" --id q1` → `CommandTable` → `PingCommand` (Pings, Linux) | target `.repository("yahyabedirhan/shop")` from `origin` |
+| 3 | `Unfiled.file` (Pings, Linux) | `Filing(projects: [], repository: "yahyabedirhan/shop")`; never refuses |
+| 4 | `Unfiled.defaultAction` → `.herdr("w2:p1")`; `expiry` → now + 1 day; `PingStore.save` | `q1.json` saved; prints `q1`, exit 0 |
+| 5 | the Mac's machine timer → `RemotePingReader.list(machine: "netcup-vps")` (Core, Mac) → `HerdrCommand` (Command, Mac) → herdr-shipyard's `list` → `shipyard ping list --json` (Pings, Linux) | `PingStore.all()` drops expired pings as it reads (M4), then `PingList.encode` |
+| 6 | `PingList.decode` (Pings, Mac) → `RemoteMachines.record` (Core) | `q1` with `machine = "netcup-vps"`, `projects: []` |
+| 7 | `Shipyard.filedPings` → `ProjectFiling.filed(remote:)` (Config, Mac) | filed under `shop` by its repository (#115) |
+| 8 | `numberPings` → `Listing` → `MenuModel` → `EventDetector.pingEvents` → `Notifier` (Core, App) | listed under `shop` as its next number, its row naming `netcup-vps`; one banner; a click focuses `w2:p1` on `netcup-vps` (`HerdrFocus`, #117) |
+
+The filing rule the Mac applies in step 7 is the one `ProjectFiling` applies to a local ping in Trace 8, step 4, so the two can't drift apart.
+
+### Trace 10: a screenshot (0.1.0, #169)
+
+Setup: the app runs in the tabs layout with projects `shop` and `blog`, the panel closed. An agent wants a dark screenshot of `shop`'s tab for a QA ticket.
+
+| Step | Call (module) | State after |
+|---|---|---|
+| 1 | `shipyard panel tab shop` → `ControlCommands` → `ControlCommand.parse` (Control) | `ControlRequest.panelTab("shop")` |
+| 2 | `ControlClient.send` → `UnixSocketTransport` on `SupportFolder.app/control.sock` (Control) | one request written; waiting for the reply |
+| 3 | `ControlServer` (App) reads it, `reply(to:)` → `PanelControl.selectTab("shop")` | layout is tabs and `shop` is a tab: `PanelState.selectedTab = shop`; reply `{ ok: true, output: "showing shop\n" }`; exit 0 |
+| 4 | `shipyard screenshot /tmp/shop.png --appearance dark` → parse | `ControlRequest.screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false)` |
+| 5 | `ControlServer.reply` → `Screenshotter.capture` (App) | the panel's appearance set to dark; the panel isn't open, so `PanelControl.open()` (the status item's button on macOS 26); one layout pass |
+| 6 | `SCShareableContent` for this process → `SCScreenshotManager.captureImage` with a filter on the panel's window | a `CGImage` of the panel as drawn, written as PNG to `/tmp/shop.png` |
+| 7 | reply `{ ok: true, output: "/tmp/shop.png\n", error: "" }` → `ControlCommand.run` | prints `/tmp/shop.png`, exit 0; the panel stays open, as a person's click would leave it |
+
+| Variant | What happens |
+|---|---|
+| ScreenCaptureKit refuses or finds no window | `ImageRenderer(Panel)` at the screen's scale writes the PNG; reply `ok` with `error` "captured by rendering: <why>"; the CLI prints the path and the note on standard error, exit 0 (C4) |
+| rendering fails too | reply `{ ok: false, error: … }`; exit 1 |
+| `--menu-bar-icon` | `SailboatImage` rendered alone at the menu bar's size; the panel isn't opened |
+| a demo run | the same steps, on `<folder>/support/control.sock`; the client finds it because `app open --demo` launched the app with that `SHIPYARD_SUPPORT_DIR`, and the agent passes the same variable to later commands (#168) |
+
+### Trace 11: a refusal, a tab in the list layout (0.1.0, #167)
+
+Setup: `[menu] layout = "list"`, the app running.
+
+| Step | Call (module) | State after |
+|---|---|---|
+| 1 | `shipyard panel tab shop` → `ControlCommand.parse` (Control) | reads: `ControlRequest.panelTab("shop")` |
+| 2 | `ControlClient.send` → `ControlServer.reply` → `PanelControl.selectTab` (App) | refused: the layout is `list`; `PanelState` unchanged |
+| 3 | reply `{ ok: false, error: "the menu uses the list layout; tabs need [menu] layout = \"tabs\"" }` → `ControlCommand.run` | one line on standard error, exit 1; nothing in the app changed |
+
+| Variant | What happens |
+|---|---|
+| the app isn't running | `ControlClient` finds no socket (or the connection is refused): "shipyard isn't running; `shipyard app open`", exit 1, without a request |
+| `shipyard panel tab` (no name), `shipyard panel spin` | `ControlCommand.parse`: exit 2 with the panel usage; nothing sent |
+| `shipyard panel fold shopp` | `PanelControl.fold`: "no project is named `shopp`; the projects are `shop`, `blog`", exit 1 |
+| `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "`shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
+| `shipyard ping "x" --repo yahyabedirhan/shop` on the Mac when `shop` sets `pings = { show = false }` | `ProjectFiling` refuses: every project the ping lands in hides pings, exit 1; nothing written (#127) |
+
 ### Trace 3: agents drain the limit (rejection by budget)
 
 Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agents are running `gh` heavily.
@@ -1263,14 +1657,30 @@ What the traces turned up and the design now handles: the first refresh after ad
 | Oldest first | a `sort-by` choice in `Arrangement`, the schema |
 | A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
 | Another ping action | a `PingAction` case (its coding key) and its `PingIcon`, `PingCommand.actionFlags` and its parse case, `PanelText.fact`/`stateLabel`, `Palette.symbol(PingIcon)`, and either the app's `WorkspaceActions.run` (what `NSWorkspace` does) or, like Herdr's (#101), a core runner `Shipyard.runAction(ofPing:)` calls |
-| Another CLI command | a case in `ShipyardCLI.run` and its own core function |
+| Another CLI command | an entry in its module's `…Commands.entries` and one `table.add` line in `main.swift` (0.1.0) |
+| Another app control command | a `ControlRequest` case, its parse case in `ControlCommand`, its line in `ControlServer.reply`, and the operation on `PanelControlling` |
+| Another refusal on the Mac only (like #127) | `ProjectFiling` alone; the Linux build doesn't change |
 | The picker offering more groups | `PresetChoice` and `PresetPicker` only |
 
-Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI for the configuration (ADR 0001; the 0.0.5 CLI sends pings only, ADR 0004), multi-account support. Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), reading resolved repositories back at launch (resolving costs a few points once an hour; since 0.0.5 they're written for the CLI only), and a plugin seam for filters (each is a field and one line in `Listing`).
+**Where a future feature lands (0.1.0, ADR 0006).** The design's test is **notes**: an agent leaving the user a longer note than a ping, read later. It's out of scope and isn't built. It shows where each part of a new agent-facing feature goes:
+
+| Part of notes | Lands in | What you touch |
+|---|---|---|
+| the note, its store, `shipyard note …`, its list format for remote machines | a new `ShipyardNotes` module beside Pings, depending on Command only | `Note`, `NoteStore` over `RecordStore`, `NoteCommand`, `NoteCommands.entries`; nothing in Pings |
+| the command on every machine | `Sources/ShipyardCLI/main.swift` | one `table.add(NoteCommands.entries(…))` line, outside the `#if` |
+| filing a note under projects, if it ever needs that | Config | a `NoteFiling` beside `ProjectFiling`, or `PingFiling` generalised once a second user exists |
+| listing notes in the menu, reading them from machines | Core (and App for any view) | a new item kind or panel section, as a ping's are |
+| the package | `Package.swift` | one library target, one test target, and the executable's dependency |
+
+A change that touched Pings, or made the Linux build link Config or Core, would mean the boundary had slipped.
+
+Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI for the configuration (ADR 0001; the CLI sends pings, ADR 0004, and since 0.1.0 controls the app, never the file), multi-account support. Since 0.1.0 also: a second executable for app control, a plugin seam for commands (a table entry is enough), and the app filing every ping (ADR 0006). Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), reading resolved repositories back at launch (resolving costs a few points once an hour; since 0.0.5 they're written for the CLI only), and a plugin seam for filters (each is a field and one line in `Listing`).
 
 ---
 
 ## Decisions taken in review
+- **0.1.0, modules follow concerns ("A+")** (ADR 0006): the agent's side (Command, Pings, Config, Control) never links the app's rules (Core). Rejected: one core with a command table (the Linux binary would still carry everything), two executables (a second name, no more isolation), the app filing every ping (no refusal while the app is quit).
+- **0.1.0, app control is one Unix socket in the support folder**, owner-only, one JSON request per connection. Launching the app goes around it, by bundle id, since the app may not be running. Spec #160.
 - **0.0.2, review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh. Cost accepted: GitHub's search index can lag a PR by a short while, and it returns at most 100.
 - **0.0.2, `subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
 
