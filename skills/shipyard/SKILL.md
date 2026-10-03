@@ -452,7 +452,15 @@ The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard
 
 A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Nothing reaches GitHub.
 
-The same command works on the user's Mac and on their other machines that run Herdr with the herdr-shipyard plugin (see On another machine).
+The same command works on the user's Mac and on their other machines that run Herdr with the herdr-shipyard plugin. Where you run decides how the ping reaches the user:
+
+| | On the Mac | On another machine (a VPS) |
+|---|---|---|
+| How it reaches the menu | the app reads it from the Mac | the Mac asks the machine through Herdr about every 30 seconds, once `[remote] machines` names it (see Worked requests) |
+| Where it's filed | under the projects that watch its repository, checked as you send; none, and it's refused (see The command) | on the Mac, under the projects that watch its repository; none, and it lists under the machine's own section (see On another machine) |
+| Clicking it with no action | marks it seen | focuses your pane on that machine |
+| When it leaves | after it's seen, once `seen-window` passes | 24 hours after you sent or last replaced it, seen or not |
+| When you're blocked on the user | ping yourself | the plugin pings for you |
 
 Ping when the user should act or would want to know now: a pull request is ready for review, you're blocked waiting on their answer, something they asked for is published, a long task finished or failed. Don't ping for progress along the way, or when the user is talking to you right now. Prefer one ping you replace (same `--id`) over a pile of them, and withdraw a ping once it's no longer true.
 
@@ -473,7 +481,7 @@ shipyard ping withdraw <id>
 |---|---|
 | `"<title>"` | the one line the menu and the notification show; quote it, it's one argument |
 | `--body <text>` | more than the title fits, shown under it and in the notification |
-| `--from <label>` | who sent it, such as your name and the task (`"claude · checkout"`); `group-by = "author"` groups pings by it |
+| `--from <label>` | who sent it, such as your name and the task (`"claude · checkout"`); `group-by = "author"` groups pings by it. Start it with your agent's name, in any case and with words after it, so the row shows its logo: `claude`, `codex`, `opencode`, `cursor`, `pi`, `gemini`, `copilot`, `amp` or `droid` (also `Claude Code`, `Codex CLI`, `OpenAI Codex`, `Cursor Agent`, `Cursor CLI`, `Pi Agent`, `Pi Coding Agent`, `Gemini CLI`, `Copilot CLI`, `GitHub Copilot`, `Ampcode`, `Factory Droid`) |
 | `--id <id>` | names the ping, so you can replace or withdraw it: 1 to 64 lowercase letters, digits, `-` and `_`, starting with a letter or digit. Without it, one is made up |
 | `--open <url>` | clicking it opens the URL: a page, a pull request, an artifact, or an app's deep link; the URL needs its scheme (`https://…`) |
 | `--app <bundle id or name>` | clicking it brings the app forward, by name (`"Claude"`) or bundle id (`com.anthropic.claudefordesktop`) |
