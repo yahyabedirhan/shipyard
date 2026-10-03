@@ -206,6 +206,10 @@ public final class Shipyard {
     public func start() async {
         signedOutReason = nil
         appStateStore.load(at: clock.now)
+        // For the CLI, beside `repositories.json`: which config.toml this
+        // app reads, whatever the agent's shell says. A file that can't be
+        // written leaves the CLI to its own lookup.
+        try? ConfigLocation.record(configStore.url, in: repositoriesStore.directory)
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()

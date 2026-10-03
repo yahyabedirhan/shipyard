@@ -13,10 +13,13 @@ import ShipyardConfig
 let environment = ProcessInfo.processInfo.environment
 var table = CommandTable()
 #if os(macOS)
+// The config.toml the app recorded it reads, whatever this shell's
+// `XDG_CONFIG_HOME`; the command's own lookup before the app has run.
+let support = SupportFolder.app
 table.add(PingCommands.entries(
     filing: ProjectFiling(
-        configURL: ConfigStore.defaultURL(environment: environment),
-        repositories: ResolvedRepositoriesStore(directory: SupportFolder.app)
+        configURL: ConfigLocation.current(environment: environment, support: support),
+        repositories: ResolvedRepositoriesStore(directory: support)
     ),
     store: PingStore(directory: PingStore.appDirectory)
 ))

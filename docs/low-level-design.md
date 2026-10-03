@@ -268,8 +268,10 @@ Shipyard -> RemotePingReader       list(machine: label) -> PingList | Failure, e
 RemotePingReader -> HerdrCommand   --machine <label> plugin action invoke list --plugin yahyabedirhan.herdr-shipyard; --machine <label> plugin log list --plugin … --limit 10
 Shipyard -> RemoteMachines         follow(labels) on start and each valid change; record(result, for: label) as each machine answers; pings for the listing
 Shipyard -> ResolvedRepositoriesStore  record(each project's repositories) after every resolve, for the CLI
+Shipyard -> ConfigLocation         record(configStore.url, in: the resolved store's folder) on start, for the CLI (#126)
 CLILink -> LinkFileSystem          fileExists(app's CLI), entry(~/.local/bin/shipyard) -> none | link(destination) | other; createDirectory, createSymbolicLink on Link
 ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories as last resolved
+ShipyardCLI -> ConfigLocation      current(environment, support) -> the config.toml the app recorded, else its own lookup (#126)
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
@@ -454,7 +456,7 @@ public struct Filing { public var projects: [String]; public var repository: Str
 
 | | `Unfiled` (Pings) | `ProjectFiling` (Config) |
 |---|---|---|
-| Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigStore.defaultURL` for now; from `ConfigLocation` with #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests use `init(configuration:resolved:)`, two closures |
+| Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigLocation.current`: the path the app recorded, else `ConfigStore.defaultURL`, #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests use `init(configuration:resolved:)`, two closures |
 | `.project(name)` | `[name]`, no repository | `[name]` when the configuration names it; else exit 1 listing the projects (N1) |
 | `.repository(slug)` | `[]` with the repository | every project whose `owner/name` selectors or resolved list include it, ignoring case, spelled as the first one spells it; none: exit 1 listing the projects (N6), or `[]` with `.keepUnfiled` |
 | `.none(why)` (no `origin`) | `[]` | exit 1 saying `why`, with `--repo`/`--project` as the way out (N6), or `[]` with `.keepUnfiled` |
@@ -561,7 +563,7 @@ Operations:
 
 | Operation | Does | Rejects / edge |
 |---|---|---|
-| `start()` | create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); load config; `reloadPings()`, so pings sent while the app wasn't running list and notify at once, signed in or not, and those that left take their banners; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Connect with `gh` calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
+| `start()` | record `configStore.url` for the CLI (`ConfigLocation.record`, `config-location.json` beside `repositories.json`, #126; a failed write is ignored); create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); load config; `reloadPings()`, so pings sent while the app wasn't running list and notify at once, signed in or not, and those that left take their banners; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Connect with `gh` calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
 | `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()`, and `pollMachines()` beside it (0.0.6, #119), so every machine is asked at once too | as `refresh()`; an existing file is never touched |
 | `refresh()` | the refresh pipeline (§4), which resolves repository selectors first (forced after a configuration change and on ⌘R, else at most hourly); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay outside `ready` it only lists the pings again (below), so a seen ping past its window leaves, with its banner, even signed out; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing, rebuilds the menu from the last snapshot (so a closed item past its window leaves) and re-arms the timer for the configured interval or the pause's end, whichever is sooner. Each call first reads the pings again (`listPings()`), removing the seen ones past their seen-window (#103), and removes the banners of those that left, before the phase check |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
@@ -1083,13 +1085,13 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #165, before Control (the macOS branch imports ShipyardConfig, never ShipyardCore):
+Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #165 and #126, before Control (the macOS branch imports ShipyardConfig, never ShipyardCore):
 
 ```swift
 var table = CommandTable()
 #if os(macOS)
 table.add(PingCommands.entries(
-    filing: ProjectFiling(configURL: ConfigStore.defaultURL(environment: environment),
+    filing: ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: SupportFolder.app),
                           repositories: ResolvedRepositoriesStore(directory: SupportFolder.app)),
     store: PingStore(directory: PingStore.appDirectory)))
 #else

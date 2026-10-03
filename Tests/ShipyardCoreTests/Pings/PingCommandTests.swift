@@ -345,4 +345,60 @@ struct ShipyardCLITests {
         #expect(result.status == 1)
         #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
     }
+
+    // MARK: - Which config.toml
+
+    /// `shipyard <arguments>` as the Mac's `main.swift` assembles it, in an
+    /// agent's shell whose environment is `shell` and whose home is
+    /// `home`: the configuration file is the one `ConfigLocation` finds
+    /// beside `harness`'s app state, the folder the app writes for the CLI.
+    private func shipyard(_ arguments: String..., in harness: Harness, shell: [String: String], home: URL) -> CommandResult {
+        let filing = ProjectFiling(
+            configURL: ConfigLocation.current(environment: shell, home: home, support: harness.stateDirectory),
+            repositories: harness.repositoriesStore
+        )
+        return ShipyardCLI.run(
+            arguments,
+            table: .commands(filing: filing, store: harness.pingStore),
+            environment: CommandEnvironment(workingDirectory: harness.workingFolder, variables: shell, git: FakeGitRemote()),
+            now: harness.clock.now
+        )
+    }
+
+    /// A folder for an agent's own `XDG_CONFIG_HOME`, holding a
+    /// `shipyard/config.toml` with only the project `elsewhere`.
+    private func shellConfigHome() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-shell-\(UUID().uuidString)", isDirectory: true)
+        let config = folder.appendingPathComponent("shipyard/config.toml")
+        try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("[[projects]]\nname = \"elsewhere\"\nrepositories = [\"o/elsewhere\"]\n".utf8).write(to: config)
+        return folder
+    }
+
+    @Test("once the app has run, a ping files against the config.toml it reads, whatever XDG_CONFIG_HOME the agent's shell sets")
+    func appsConfiguration() async throws {
+        let harness = try Harness(config: twoProjects)
+        await harness.shipyard.start()
+        let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
+        let home = harness.workingFolder
+
+        let filed = shipyard("ping", "Ready", "--project", "shop", in: harness, shell: shell, home: home)
+        let refused = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: home)
+
+        #expect(filed.status == 0, "\(filed.error)")
+        #expect(harness.pingStore.all().map(\.projects) == [["shop"]])
+        #expect(refused.error == "shipyard ping: no project is named `elsewhere`; the projects are `shop`, `blog`\n")
+    }
+
+    @Test("before the app has ever run, a ping files against the config.toml the agent's shell points at")
+    func ownLookupBeforeTheApp() throws {
+        let harness = try Harness(config: twoProjects)
+        let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
+
+        let filed = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: harness.workingFolder)
+
+        #expect(filed.status == 0, "\(filed.error)")
+        #expect(harness.pingStore.all().map(\.projects) == [["elsewhere"]])
+    }
 }
