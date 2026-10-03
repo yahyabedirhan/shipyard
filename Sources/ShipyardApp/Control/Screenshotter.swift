@@ -34,7 +34,8 @@ protocol Screenshotting: AnyObject {
 /// 14.4), which needs no Screen Recording permission. When that fails or
 /// is refused, it renders a fresh panel itself, off screen. Unless asked
 /// to keep them, it hides the lease's dot and banner for the capture
-/// (`LeaseIndicator.isHiddenForCapture`) and shows them again afterwards.
+/// (`LeaseIndicator.hideForCapture()`) and shows them again afterwards
+/// (`showAfterCapture()`), once no other capture still hides them.
 @MainActor
 final class Screenshotter: Screenshotting {
     private let panel: any PanelControlling
@@ -56,9 +57,11 @@ final class Screenshotter: Screenshotting {
         let previous = NSApp.appearance
         if let appearance { NSApp.appearance = ScreenshotImage.appearance(appearance) }
         defer { NSApp.appearance = previous }
-        let wasHidden = indicator.isHiddenForCapture
-        Self.withoutAnimation { indicator.isHiddenForCapture = !withIndicator }
-        defer { Self.withoutAnimation { indicator.isHiddenForCapture = wasHidden } }
+        // Counted, not saved and restored: overlapping captures each end
+        // their own hiding. One asking for the indicator while another
+        // hides it captures without the banner.
+        if !withIndicator { Self.withoutAnimation { indicator.hideForCapture() } }
+        defer { if !withIndicator { Self.withoutAnimation { indicator.showAfterCapture() } } }
 
         let image: CGImage
         let captureFailure: String?
@@ -81,8 +84,9 @@ final class Screenshotter: Screenshotting {
 
     func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
         let drawing = appearance.map(ScreenshotImage.appearance) ?? NSApp.effectiveAppearance
-        // Rendered, not captured: the live icon keeps its dot meanwhile.
-        let dot = withIndicator && indicator.shown(at: Date()) != nil
+        // Rendered, not captured: the live icon keeps its dot meanwhile,
+        // and another capture hiding the indicator doesn't drop it here.
+        let dot = withIndicator && indicator.lease.status(at: Date()) != nil
         guard let image = await ScreenshotImage.menuBarIcon(appearance: drawing, leaseDot: dot) else {
             return .failed(why: "couldn't render the menu bar icon")
         }

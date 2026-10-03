@@ -130,6 +130,31 @@ struct ScreenshotImageTests {
         #expect(!indicator.isHiddenForCapture)
     }
 
+    @Test("overlapping captures without --with-indicator each hide the dot and the banner, and they come back once both have ended")
+    func overlappingCapturesShowTheIndicatorAfterwards() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("shipyard-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        _ = NSApplication.shared
+        let panel = ControlServerTests.FakePanel()
+        panel.refusal = PanelRefusal("the panel didn't open within 2 seconds")
+        let indicator = LeaseIndicator()
+        let drawn = DrawnPanels()
+        let screenshotter = Screenshotter(panel: panel, indicator: indicator) {
+            drawn.hidden.append(indicator.isHiddenForCapture)
+            return AnyView(Color.gray.frame(width: 20, height: 20))
+        }
+
+        // Both are under way at once: each waits while its fallback settles.
+        async let first = screenshotter.capturePanel(to: folder.appendingPathComponent("first.png"), appearance: .light, withIndicator: false)
+        async let second = screenshotter.capturePanel(to: folder.appendingPathComponent("second.png"), appearance: .light, withIndicator: false)
+        let outcomes = await [first, second]
+
+        #expect(outcomes == Array(repeating: .rendered(why: "the panel didn't open within 2 seconds"), count: 2))
+        #expect(drawn.hidden == [true, true])
+        #expect(!indicator.isHiddenForCapture)
+    }
+
     @Test("the image is written as a PNG at the path; a folder that doesn't exist is refused with the path")
     func write() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("shipyard-\(UUID().uuidString)", isDirectory: true)

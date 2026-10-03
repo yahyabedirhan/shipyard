@@ -14,9 +14,25 @@ import ShipyardControl
 final class LeaseIndicator {
     /// The lease as the control server last left it.
     var lease = ControlLease()
-    /// Set by `Screenshotter` while it captures without `--with-indicator`,
-    /// so the dot and the banner are left out, and cleared afterwards.
-    var isHiddenForCapture = false
+    /// How many captures without `--with-indicator` are under way, each
+    /// counted by `Screenshotter` from its start to its end. Captures can
+    /// overlap (one holder's parallel commands), so a count, not a flag:
+    /// the last one to end shows the dot and the banner again.
+    private(set) var capturesHiding = 0
+
+    /// Whether a capture hides the dot and the banner now.
+    var isHiddenForCapture: Bool { capturesHiding > 0 }
+
+    /// A capture that leaves the indicator out starts.
+    func hideForCapture() {
+        capturesHiding += 1
+    }
+
+    /// A capture that left the indicator out ends; the indicator is drawn
+    /// again once no other is under way.
+    func showAfterCapture() {
+        capturesHiding = max(0, capturesHiding - 1)
+    }
 
     /// The lease to draw at `now`: nil while it's free, or while a capture
     /// hides it.

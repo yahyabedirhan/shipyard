@@ -315,7 +315,7 @@ struct ControlServerTests {
         #expect(indicator.shown(at: clock.now) == nil)
         // A capture without the indicator hides a lease that's held.
         _ = await server.reply(to: ControlRequest.panelOpen.sent(by: Self.other))
-        indicator.isHiddenForCapture = true
+        indicator.hideForCapture()
         #expect(indicator.shown(at: clock.now) == nil)
         #expect(server.lease.current(at: clock.now)?.holder == Self.other)
     }
