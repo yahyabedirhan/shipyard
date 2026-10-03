@@ -173,3 +173,7 @@ The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glo
 ### Forks: your own OAuth App
 
 Sign in with GitHub uses the OAuth App client ID compiled into the build. A fork should use its own: create an OAuth App on GitHub (**Settings > Developer settings > OAuth Apps**), tick **Enable Device Flow**, and put its client ID in `OAuthApp.clientID` in `Sources/ShipyardCore/GitHub/Auth/DeviceFlow.swift`. Without one, the build connects through `gh` only. See [`docs/references/github-device-flow.md`](docs/references/github-device-flow.md) for GitHub's limits.
+
+## License
+
+MIT, see [`LICENSE`](LICENSE). The bundled agent logos are their owners'; see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).

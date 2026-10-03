@@ -84,6 +84,8 @@ bundle: build
 	@# The app's SwiftPM resources (the agents' logos), where AgentLogoImage
 	@# looks: in Resources, since a bundle at the app's root breaks its signature.
 	cp -R "$$(swift build -c release --show-bin-path)/$(APP)_$(APP)App.bundle" $(CONTENTS)/Resources/
+	@# The logos' MIT notices travel with every copy of them.
+	cp LICENSE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
 	@# bundle gives it the stable identity notifications and login items need.
