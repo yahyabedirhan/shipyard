@@ -1,4 +1,5 @@
 import ShipyardConfig
+import ShipyardControl
 import ShipyardCore
 import SwiftUI
 
@@ -177,17 +178,36 @@ struct Panel: View {
         return items
     }
 
+    /// The lease's banner first, in every phase and layout, then the others.
     private var banners: some View {
         let items = bannerItems
+        let leaseEnds = actions.leaseIndicator.shownEnd(at: Date())
         return VStack(spacing: 6) {
+            if let leaseEnds {
+                leaseBanner(ends: leaseEnds)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             ForEach(items) { item in
                 Banner(symbol: item.symbol, text: item.text, tint: item.tint, action: item.action)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .padding(.horizontal, 8)
-        .padding(.bottom, items.isEmpty ? 0 : 8)
+        .padding(.bottom, items.isEmpty && leaseEnds == nil ? 0 : 8)
         .animation(Motion.banner, value: items.map(\.id))
+        .animation(Motion.banner, value: leaseEnds == nil)
+    }
+
+    /// While an agent holds the lease: its banner, the countdown ticking
+    /// each second, on the second the time left changes. The control
+    /// server ends the lease when it runs out, which takes the banner away.
+    private func leaseBanner(ends: Date) -> some View {
+        // Whole seconds before the end: never later than now, since the cap counts from when it was taken.
+        TimelineView(.periodic(from: ends.addingTimeInterval(-ControlLease.cap), by: 1)) { context in
+            if let lease = actions.leaseIndicator.shown(at: context.date) {
+                LeaseBannerView(lease: lease)
+            }
+        }
     }
 
     // MARK: - Content

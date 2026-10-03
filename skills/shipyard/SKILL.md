@@ -553,7 +553,7 @@ On the user's Mac, three more commands open, steer and photograph the running ap
 ```sh
 shipyard app open [--demo <folder>] | quit | status [--json]
 shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
-shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
+shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
 ```
 
 | Command | What it does | Prints on success |
@@ -570,6 +570,7 @@ shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
 | `screenshot <file.png>` | saves the panel as it looks, opening it when it's closed; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
+| `--with-indicator` | keeps the yellow dot and the banner that show an agent is using shipyard; a screenshot leaves them out otherwise | |
 
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
 

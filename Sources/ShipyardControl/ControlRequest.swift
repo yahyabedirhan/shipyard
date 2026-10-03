@@ -30,10 +30,12 @@ public enum ControlRequest: Equatable, Sendable {
     /// project's name or `All`.
     case panelTab(name: String)
     /// `shipyard screenshot <file.png> [--appearance light|dark]
-    /// [--menu-bar-icon]`: the panel (or the menu bar icon alone) written
-    /// as a PNG at `path`, absolute since the app runs in another folder;
-    /// in `appearance` when it's set, as the Mac shows it otherwise.
-    case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool)
+    /// [--menu-bar-icon] [--with-indicator]`: the panel (or the menu bar
+    /// icon alone) written as a PNG at `path`, absolute since the app runs
+    /// in another folder; in `appearance` when it's set, as the Mac shows
+    /// it otherwise. The lease's dot and banner are left out of it unless
+    /// `withIndicator` keeps them.
+    case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -92,8 +94,11 @@ public struct ControlMessage: Equatable, Sendable {
             wire = Wire(command: "panel.showMore", project: project, kind: kind)
         case .panelTab(let name):
             wire = Wire(command: "panel.tab", name: name)
-        case .screenshot(let path, let appearance, let menuBarIcon):
-            wire = Wire(command: "screenshot", path: path, appearance: appearance?.rawValue, menuBarIcon: menuBarIcon)
+        case .screenshot(let path, let appearance, let menuBarIcon, let withIndicator):
+            wire = Wire(
+                command: "screenshot", path: path, appearance: appearance?.rawValue,
+                menuBarIcon: menuBarIcon, withIndicator: withIndicator
+            )
         }
         wire.holder = holder
         let encoder = JSONEncoder()
@@ -144,7 +149,10 @@ public struct ControlMessage: Equatable, Sendable {
                 }
                 appearance = known
             }
-            return .screenshot(path: path, appearance: appearance, menuBarIcon: wire.menuBarIcon ?? false)
+            return .screenshot(
+                path: path, appearance: appearance,
+                menuBarIcon: wire.menuBarIcon ?? false, withIndicator: wire.withIndicator ?? false
+            )
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -163,6 +171,7 @@ public struct ControlMessage: Equatable, Sendable {
         var path: String?
         var appearance: String?
         var menuBarIcon: Bool?
+        var withIndicator: Bool?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.

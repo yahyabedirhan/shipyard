@@ -106,6 +106,8 @@ enum Palette {
     static let amber = dynamic(light: 0x9A6700, dark: 0xD29922)
     /// The attention dot, the count badge, a prominent button.
     static let accent = dynamic(light: 0x006BED, dark: 0x4A94FF)
+    /// The lease's banner, in the yellow of the menu bar icon's dot (`LeaseDot`).
+    static let lease = Color(nsColor: .systemYellow)
 
     // MARK: Surfaces
 

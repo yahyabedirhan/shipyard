@@ -30,7 +30,14 @@ final class ControlServer {
     private let now: @MainActor () -> Date
     private let timeZone: TimeZone
     /// App control's lease: who may send leased requests, and until when.
-    private(set) var lease: ControlLease
+    /// Each change is shown (`indicator`) and its end looked out for.
+    private(set) var lease: ControlLease {
+        didSet { leaseChanged() }
+    }
+    /// The dot and the banner, which follow the lease.
+    let indicator: LeaseIndicator
+    /// Ends the lease once it runs out, when no request comes to.
+    private var settling: Task<Void, Never>?
     private var listener: Listener?
 
     init(
@@ -38,6 +45,7 @@ final class ControlServer {
         panel: any PanelControlling,
         screenshotter: any Screenshotting,
         lease: ControlLease = ControlLease(),
+        indicator: LeaseIndicator,
         now: @escaping @MainActor () -> Date = { Date() },
         timeZone: TimeZone = .current,
         quit: @escaping @MainActor () -> Void
@@ -46,9 +54,13 @@ final class ControlServer {
         self.panel = panel
         self.screenshotter = screenshotter
         self.lease = lease
+        self.indicator = indicator
         self.now = now
         self.timeZone = timeZone
         self.quit = quit
+        // `didSet` doesn't run in `init`: a lease a relaunch handed over is
+        // shown, and its end looked out for, from the start.
+        leaseChanged()
     }
 
     // MARK: - Dispatch
@@ -95,11 +107,11 @@ final class ControlServer {
             }
         case .panelTab(let name):
             return await steer { () throws(PanelRefusal) in "showing \(try panel.selectTab(name))" }
-        case .screenshot(let path, let appearance, let menuBarIcon):
+        case .screenshot(let path, let appearance, let menuBarIcon, let withIndicator):
             let file = URL(fileURLWithPath: path)
             let outcome = menuBarIcon
-                ? await screenshotter.menuBarIcon(to: file, appearance: appearance)
-                : await screenshotter.capturePanel(to: file, appearance: appearance)
+                ? await screenshotter.menuBarIcon(to: file, appearance: appearance, withIndicator: withIndicator)
+                : await screenshotter.capturePanel(to: file, appearance: appearance, withIndicator: withIndicator)
             switch outcome {
             case .captured:
                 return Answer(reply: .done(path + "\n"))
@@ -116,6 +128,31 @@ final class ControlServer {
         var status = panel.status()
         status.lease = lease.status(at: now())
         return status
+    }
+
+    // MARK: - The lease's end
+
+    /// Ends the lease if it has run out by now. A timer calls it at the
+    /// lease's end, so the dot and the banner go with no request.
+    func settleLease() {
+        _ = lease.settle(at: now())
+    }
+
+    /// Shows the lease as it is now, and looks out for its end: the timer
+    /// set for the last change is replaced by one for this one.
+    private func leaseChanged() {
+        if indicator.lease != lease { indicator.lease = lease }
+        settling?.cancel()
+        settling = nil
+        let time = now()
+        guard let term = lease.current(at: time) else { return }
+        let left = term.ends.timeIntervalSince(time)
+        settling = Task { [weak self] in
+            // A wake before the end settles nothing, and sets the timer again.
+            try? await Task.sleep(for: .seconds(left))
+            guard !Task.isCancelled else { return }
+            self?.settleLease()
+        }
     }
 
     /// The line `body` returns, done, or its refusal.
@@ -148,6 +185,8 @@ final class ControlServer {
     func stop() {
         listener?.close()
         listener = nil
+        settling?.cancel()
+        settling = nil
     }
 }
 

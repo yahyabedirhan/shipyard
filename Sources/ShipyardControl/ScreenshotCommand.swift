@@ -7,13 +7,17 @@ import ShipyardCommand
 public enum ScreenshotCommand {
     public static let usageText = """
         usage: shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
+                                  [--with-indicator]
 
           Saves shipyard's panel as it looks, opening it when it's closed, and
           prints the file's path. A relative path is relative to this folder.
+          The dot and the banner that show an agent holds shipyard are left
+          out of it.
 
-          --appearance     light or dark: the panel drawn in that appearance,
-                           then back to the Mac's
-          --menu-bar-icon  the menu bar icon alone instead of the panel
+          --appearance      light or dark: the panel drawn in that appearance,
+                            then back to the Mac's
+          --menu-bar-icon   the menu bar icon alone instead of the panel
+          --with-indicator  keeps the dot and the banner in the screenshot
 
         When the app can't capture its window, it renders the panel itself,
         writes that and says so on standard error, still exit 0. Exits 1 when
@@ -32,6 +36,7 @@ public enum ScreenshotCommand {
         var path: String?
         var appearance: ControlRequest.Appearance?
         var menuBarIcon = false
+        var withIndicator = false
         var rest = arguments[...]
         while let argument = rest.popFirst() {
             switch argument {
@@ -45,6 +50,8 @@ public enum ScreenshotCommand {
                 appearance = known
             case "--menu-bar-icon":
                 menuBarIcon = true
+            case "--with-indicator":
+                withIndicator = true
             case let option where option.hasPrefix("-") && option.count > 1:
                 return .failure(misread("shipyard screenshot: unknown option `\(option)`"))
             case let file where path == nil:
@@ -60,7 +67,7 @@ public enum ScreenshotCommand {
             return .failure(misread("shipyard screenshot: `\(path)` isn't a .png file"))
         }
         let absolute = URL(fileURLWithPath: path, relativeTo: workingDirectory).standardizedFileURL.path
-        return .success(.screenshot(path: absolute, appearance: appearance, menuBarIcon: menuBarIcon))
+        return .success(.screenshot(path: absolute, appearance: appearance, menuBarIcon: menuBarIcon, withIndicator: withIndicator))
     }
 
     /// `line`, then the usage, on standard error: exit 2.

@@ -18,7 +18,7 @@ struct ShipyardMenuBarApp: App {
         MenuBarExtra {
             Panel(shipyard: appDelegate.services.shipyard, actions: appDelegate.services)
         } label: {
-            MenuBarLabelView(shipyard: appDelegate.services.shipyard)
+            MenuBarLabelView(shipyard: appDelegate.services.shipyard, lease: appDelegate.services.leaseIndicator)
         }
         .menuBarExtraStyle(.window)
     }
@@ -27,15 +27,20 @@ struct ShipyardMenuBarApp: App {
 /// The menu bar icon, shipyard's sailboat (the app icon's figure), and the
 /// attention count next to it (the model's label: none at 0, or when
 /// `[menu-bar] count = "none"`). While the rate budget pauses refreshing, the
-/// icon is a pause glyph.
+/// icon is a pause glyph. While an agent holds the lease, the icon carries
+/// a yellow dot (`LeaseDot`), next to the count.
 struct MenuBarLabelView: View {
     let shipyard: Shipyard
+    let lease: LeaseIndicator
 
     var body: some View {
-        // Read in the view's body, so it redraws when the model changes.
+        // Read in the view's body, so it redraws when the model, or the lease, changes.
         let menu = shipyard.menu
+        let isLeased = lease.shown(at: Date()) != nil
         HStack(spacing: 3) {
-            if menu.canRefreshNow {
+            if isLeased {
+                Image(nsImage: LeaseDot.image(on: menu.canRefreshNow ? .sailboat : .paused))
+            } else if menu.canRefreshNow {
                 Image(nsImage: SailboatImage.menuBar())
             } else {
                 Image(systemName: "pause.circle")
@@ -97,6 +102,9 @@ final class AppServices {
     let panelState = PanelState()
     /// The panel as app control sees it.
     private let panelControl: PanelControl
+    /// The lease as the menu bar icon's dot and the panel's banner show it,
+    /// written by the control server.
+    let leaseIndicator = LeaseIndicator()
     private var controlServer: ControlServer?
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
@@ -156,7 +164,7 @@ final class AppServices {
     /// Listens on `control.sock` for the `shipyard` command. When it can't,
     /// the app runs on without app control and says why in the log.
     private func startControl() {
-        let screenshotter = Screenshotter(panel: panelControl) { [unowned self] in
+        let screenshotter = Screenshotter(panel: panelControl, indicator: leaseIndicator) { [unowned self] in
             AnyView(Panel(shipyard: shipyard, actions: self, isSnapshot: true))
         }
         let server = ControlServer(
@@ -165,6 +173,7 @@ final class AppServices {
             screenshotter: screenshotter,
             // A relaunch through `shipyard app open` hands its holder's lease over.
             lease: ControlLease(environment: ProcessInfo.processInfo.environment, at: Date()),
+            indicator: leaseIndicator,
             quit: { NSApp.terminate(nil) }
         )
         do {

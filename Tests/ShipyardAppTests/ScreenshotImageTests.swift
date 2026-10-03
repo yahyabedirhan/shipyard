@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 @testable import ShipyardApp
+import ShipyardCore
 import SwiftUI
 import Testing
 
@@ -67,6 +68,66 @@ struct ScreenshotImageTests {
         #expect(try opaque(light).count > 0)
         #expect(try opaque(light).brightness < 0.3)
         #expect(try opaque(dark).brightness > 0.7)
+    }
+
+    /// Whether the lease's indicator was hidden each time a fresh panel was drawn.
+    final class DrawnPanels {
+        var hidden: [Bool] = []
+    }
+
+    /// How many of the image's pixels are the lease dot's yellow.
+    func yellow(_ image: CGImage) throws -> Int {
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = try #require(CGContext(
+            data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return stride(from: 0, to: pixels.count, by: 4).filter { start in
+            pixels[start + 3] > 200 && pixels[start] > 200 && pixels[start + 1] > 150 && pixels[start + 2] < 90
+        }.count
+    }
+
+    @Test("the menu bar icon carries the lease's yellow dot only when asked, the sailboat still tinted for the appearance")
+    func menuBarIconWithLeaseDot() async throws {
+        let plain = try #require(await ScreenshotImage.menuBarIcon(appearance: ScreenshotImage.appearance(.light)))
+        let light = try #require(await ScreenshotImage.menuBarIcon(appearance: ScreenshotImage.appearance(.light), leaseDot: true))
+        let dark = try #require(await ScreenshotImage.menuBarIcon(appearance: ScreenshotImage.appearance(.dark), leaseDot: true))
+
+        #expect(try yellow(plain) == 0)
+        #expect(try yellow(light) > 0)
+        #expect(try yellow(dark) > 0)
+        #expect(light.width > plain.width)
+    }
+
+    @Test("without --with-indicator, the panel's fallback is drawn with the lease's dot and banner hidden, and they come back afterwards")
+    func fallbackHidesTheIndicator() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("shipyard-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        // The screenshotter sets the app's appearance, so the app object has to exist.
+        _ = NSApplication.shared
+        // The panel doesn't open, so the screenshot falls back to rendering a fresh one.
+        let panel = ControlServerTests.FakePanel()
+        panel.refusal = PanelRefusal("the panel didn't open within 2 seconds")
+        let indicator = LeaseIndicator()
+        let drawn = DrawnPanels()
+        let screenshotter = Screenshotter(panel: panel, indicator: indicator) {
+            drawn.hidden.append(indicator.isHiddenForCapture)
+            return AnyView(Color.gray.frame(width: 20, height: 20))
+        }
+        let file = folder.appendingPathComponent("panel.png")
+
+        let without = await screenshotter.capturePanel(to: file, appearance: .light, withIndicator: false)
+        let hiddenAfter = indicator.isHiddenForCapture
+        let with = await screenshotter.capturePanel(to: file, appearance: .light, withIndicator: true)
+
+        #expect(without == .rendered(why: "the panel didn't open within 2 seconds"))
+        #expect(with == .rendered(why: "the panel didn't open within 2 seconds"))
+        #expect(drawn.hidden == [true, false])
+        #expect(!hiddenAfter)
+        #expect(!indicator.isHiddenForCapture)
     }
 
     @Test("the image is written as a PNG at the path; a folder that doesn't exist is refused with the path")

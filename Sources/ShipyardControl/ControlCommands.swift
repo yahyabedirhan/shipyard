@@ -64,6 +64,7 @@ public enum ControlCommands {
           screenshot
                   save the app's panel, or its menu bar icon, as a PNG:
                   shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
+                                      [--with-indicator]
 
         """
 }

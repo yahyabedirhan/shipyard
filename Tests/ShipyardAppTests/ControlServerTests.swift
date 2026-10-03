@@ -42,13 +42,13 @@ struct ControlServerTests {
         var calls: [String] = []
         var outcome = ScreenshotOutcome.captured
 
-        func capturePanel(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
-            calls.append("panel \(file.path) \(appearance?.rawValue ?? "as is")")
+        func capturePanel(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
+            calls.append("panel \(file.path) \(appearance?.rawValue ?? "as is")\(withIndicator ? " with indicator" : "")")
             return outcome
         }
 
-        func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?) async -> ScreenshotOutcome {
-            calls.append("icon \(file.path) \(appearance?.rawValue ?? "as is")")
+        func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
+            calls.append("icon \(file.path) \(appearance?.rawValue ?? "as is")\(withIndicator ? " with indicator" : "")")
             return outcome
         }
     }
@@ -73,6 +73,7 @@ struct ControlServerTests {
     let screenshotter = FakeScreenshotter()
     let quitter = QuitRecorder()
     let clock = Clock()
+    let indicator = LeaseIndicator()
     /// A folder of its own for each test, short enough for a socket's path.
     let folder = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("shipyard-\(UUID().uuidString.prefix(8))", isDirectory: true)
@@ -85,6 +86,7 @@ struct ControlServerTests {
             socket: socket,
             panel: panel,
             screenshotter: screenshotter,
+            indicator: indicator,
             now: { clock.now },
             timeZone: TimeZone(identifier: "UTC")!,
             quit: { quitter.quits += 1 }
@@ -167,12 +169,16 @@ struct ControlServerTests {
         screenshotter.outcome = outcome
         let server = server()
 
-        let shot = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false).sent())
-        let icon = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: true).sent())
+        let shot = await server.reply(to: ControlRequest.screenshot(
+            path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false, withIndicator: false
+        ).sent())
+        let icon = await server.reply(to: ControlRequest.screenshot(
+            path: "/tmp/shop.png", appearance: nil, menuBarIcon: true, withIndicator: true
+        ).sent())
 
         #expect(shot == .init(reply: reply))
         #expect(icon == .init(reply: reply))
-        #expect(screenshotter.calls == ["panel /tmp/shop.png dark", "icon /tmp/shop.png as is"])
+        #expect(screenshotter.calls == ["panel /tmp/shop.png dark", "icon /tmp/shop.png as is with indicator"])
         #expect(panel.calls.isEmpty)
     }
 
@@ -221,8 +227,8 @@ struct ControlServerTests {
     @Test("a leased request from another holder is refused, naming the holder, with nothing done", arguments: [
         ControlRequest.appQuit, .appOpen, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
         .panelShowMore(project: "shop", kind: "issues"), .panelTab(name: "All"),
-        .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false),
-        .screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: true),
+        .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false, withIndicator: false),
+        .screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: true, withIndicator: true),
     ])
     func refusedToAnother(request: ControlRequest) async {
         let server = server()
@@ -255,6 +261,30 @@ struct ControlServerTests {
         #expect(refused.reply.ok == false)
         #expect(taken == .init(reply: .done("panel closed\n")))
         #expect(panel.calls == ["open", "fold shop", "close"])
+        #expect(server.lease.current(at: clock.now)?.holder == Self.other)
+    }
+
+    @Test("the dot and the banner follow the lease: shown from the request that takes it, gone once it's settled at its end, with no request")
+    func indicatorFollowsTheLease() async {
+        let server = server()
+        #expect(indicator.shown(at: clock.now) == nil)
+
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 12)
+        // Another agent's refused request changes nothing shown.
+        _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
+
+        #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0))
+        #expect(indicator.shownEnd(at: clock.now) == Date(timeIntervalSince1970: 60))
+        // Its end comes with no request: the server's timer settles it.
+        clock.now = Date(timeIntervalSince1970: 60)
+        server.settleLease()
+        #expect(indicator.lease == ControlLease())
+        #expect(indicator.shown(at: clock.now) == nil)
+        // A capture without the indicator hides a lease that's held.
+        _ = await server.reply(to: ControlRequest.panelOpen.sent(by: Self.other))
+        indicator.isHiddenForCapture = true
+        #expect(indicator.shown(at: clock.now) == nil)
         #expect(server.lease.current(at: clock.now)?.holder == Self.other)
     }
 
