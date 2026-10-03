@@ -27,10 +27,18 @@ struct PingCommandTests {
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
     let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
 
-    /// The Mac's filing over the configuration `text` and the resolved lists `resolved`.
+    /// The Mac's filing, as `main.swift` builds it, over a `config.toml`
+    /// holding `text` and the resolved lists `resolved`, in a fresh
+    /// temporary folder.
     private func filing(_ text: String = twoProjects, resolved: [String: [String]] = [:]) throws -> ProjectFiling {
-        let configuration = try Configuration.decode(text).configuration
-        return ProjectFiling(configuration: { .success(configuration) }, resolved: { resolved })
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-filing-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let configURL = folder.appendingPathComponent("config.toml")
+        try Data(text.utf8).write(to: configURL)
+        let repositories = ResolvedRepositoriesStore(directory: folder)
+        if !resolved.isEmpty { try repositories.record(resolved) }
+        return ProjectFiling(configURL: configURL, repositories: repositories)
     }
 
     private func ping(

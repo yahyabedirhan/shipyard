@@ -108,10 +108,10 @@ final class FakeHerdr: ShellRunning {
     /// The tabs focused, in order.
     var focused: [String] { state.current.focused }
 
-    /// Opens the tab `tab`, labelled `label`, with the panes `panes` in it.
-    func open(tab: String, label: String = "", panes: [String] = []) {
+    /// Opens the tab `tab`, unlabelled, with the panes `panes` in it.
+    func open(tab: String, panes: [String] = []) {
         state.withValue { state in
-            state.tabs[tab] = label
+            state.tabs[tab] = ""
             for pane in panes { state.panes[pane] = tab }
         }
     }

@@ -458,7 +458,7 @@ public struct Filing { public var projects: [String]; public var repository: Str
 
 | | `Unfiled` (Pings) | `ProjectFiling` (Config) |
 |---|---|---|
-| Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigLocation.current`: the path the app recorded, else `ConfigStore.defaultURL`, #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests use `init(configuration:resolved:)`, two closures |
+| Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigLocation.current`: the path the app recorded, else `ConfigStore.defaultURL`, #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests build it the same way, over a temporary `config.toml` |
 | `.project(name)` | `[name]`, no repository | `[name]` when the configuration names it; else exit 1 listing the projects (N1) |
 | `.repository(slug)` | `[]` with the repository | every project whose `owner/name` selectors or resolved list include it, ignoring case, spelled as the first one spells it; none: exit 1 listing the projects (N6), or `[]` with `.keepUnfiled` |
 | `.none(why)` (no `origin`) | `[]` | exit 1 saying `why`, with `--repo`/`--project` as the way out (N6), or `[]` with `.keepUnfiled` |

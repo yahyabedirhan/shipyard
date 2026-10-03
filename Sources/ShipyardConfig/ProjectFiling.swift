@@ -19,7 +19,7 @@ public struct ProjectFiling: PingFiling {
     /// Files against `configuration` and `resolved` (each project's
     /// repositories as the app last resolved them, by name), each read when
     /// a ping is filed.
-    public init(
+    private init(
         configuration: @escaping @Sendable () -> Result<Configuration, CommandResult>,
         resolved: @escaping @Sendable () -> [String: [String]]
     ) {
