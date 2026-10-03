@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// The list of a machine's pings that `shipyard ping list --json` prints and
 /// the Mac's shipyard reads from that machine through Herdr: part of the

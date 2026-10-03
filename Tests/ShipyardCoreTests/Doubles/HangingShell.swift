@@ -1,3 +1,4 @@
+import ShipyardCommand
 import ShipyardCore
 
 /// A `ShellRunning` whose command never finishes on its own, like an `npx`

@@ -1,12 +1,14 @@
 import Foundation
+import ShipyardCommand
 import ShipyardCore
+import ShipyardPings
 
 /// A `ShellRunning` standing in for the `herdr` command: a Herdr session
 /// with the tabs and panes it was given, answering `herdr pane get <id>`,
 /// `herdr pane list`, `herdr tab get <id>` and `herdr tab focus <id>` with
 /// Herdr's JSON, and
 /// recording every run. It's installed at `FakeHerdr.path` (one of
-/// `HerdrFocus.knownPaths`) until `installed` is false; `running` false
+/// `HerdrCommand.knownPaths`) until `installed` is false; `running` false
 /// answers as Herdr does with no server. `command` answers the same way for
 /// the `shipyard` command, which runs programs synchronously.
 ///

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 // What the app plugs into the core. Each port wraps an Apple-only service
 // (Keychain, notifications, the system clock, NSWorkspace) behind a small
@@ -71,16 +72,6 @@ public protocol WallClock: Sendable {
 public struct SystemClock: WallClock {
     public init() {}
     public var now: Date { Date() }
-}
-
-/// Waits the given number of seconds; throws `CancellationError` when
-/// cancelled. The device flow and the skill install wait with it, so tests
-/// can pass one that returns at once.
-public typealias Sleep = @Sendable (TimeInterval) async throws -> Void
-
-/// Real waiting, for the app.
-public let systemSleep: Sleep = { seconds in
-    try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
 }
 
 /// What running a ping's action came to.

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// Runs a ping's Herdr action (`--herdr`): focuses the tab or pane it
 /// names through the `herdr` command (`HerdrCommand`), so `Shipyard` can
@@ -64,12 +65,6 @@ public struct HerdrFocus: Sendable {
     /// The first `herdr` found: the known paths, then each `PATH` directory.
     func locate() -> String? {
         herdr.locate()
-    }
-
-    /// The first `herdr` found under the home folder `home`: the known
-    /// paths, then each directory of `pathEnvironment`.
-    static func locate(home: URL, pathEnvironment: String?, isExecutable: (String) -> Bool) -> String? {
-        HerdrCommand.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
     }
 
     /// Focuses the tab `id` names, or the tab of the pane it names, and

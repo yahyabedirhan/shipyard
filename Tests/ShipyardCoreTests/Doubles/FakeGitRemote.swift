@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardCore
 
 /// A `GitRemoteLookup` standing in for running `git`: a fake working

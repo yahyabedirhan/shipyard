@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import ShipyardCommand
+import ShipyardPings
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
 /// The app builds one with its adapters and the panel draws from it.
@@ -1039,14 +1041,14 @@ public final class Shipyard {
     }
 
     /// The listed pings, the remote ones filed against `configuration` and
-    /// the repositories last resolved (`PingCommand.filed(remote:)`), as
+    /// the repositories last resolved (`ProjectFiling.filed(remote:)`), as
     /// the CLI files a local one when it's sent.
     private func filedPings(_ configuration: Configuration) -> [Ping] {
         let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
         guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
         let resolved = resolvedRepositories ?? repositoriesStore.load()
         resolvedRepositories = resolved
-        return pings + remotePings.map { PingCommand.filed(remote: $0, configuration: configuration, resolved: resolved) }
+        return pings + remotePings.map { ProjectFiling.filed(remote: $0, configuration: configuration, resolved: resolved) }
     }
 
     /// Every project's listing, and each remote machine's own, from

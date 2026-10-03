@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// Owns `config.toml`: where it is, the last valid configuration read from
 /// it, and the error when the latest read failed.
@@ -212,7 +213,7 @@ public final class ConfigStore: @unchecked Sendable {
             }
             var repositories = Set<String>()
             for repository in project.repositories {
-                if !ConfigurationReader.isRepositorySlug(repository) {
+                if !GitRemote.isRepositorySlug(repository) {
                     issues.append(ConfigIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
                 } else if !repositories.insert(repository.lowercased()).inserted {
                     issues.append(ConfigIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.name)))

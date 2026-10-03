@@ -1,5 +1,7 @@
 import Foundation
+@testable import ShipyardCommand
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 // The shipyard agent skill (`skills/shipyard/SKILL.md`) teaches agents the

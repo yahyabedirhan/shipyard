@@ -1,5 +1,6 @@
 import Foundation
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 /// `shop`, which watches `yahyabedirhan/shop`, and two remote machines.

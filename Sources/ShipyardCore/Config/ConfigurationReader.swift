@@ -504,18 +504,6 @@ final class ConfigurationReader {
         "project `\(project)` lists repository `\(repository)` twice (names aren't case-sensitive)"
     }
 
-    /// `owner/name`: a GitHub login (letters, digits, hyphens) and a
-    /// repository name (letters, digits, `-`, `_`, `.`).
-    static func isRepositorySlug(_ slug: String) -> Bool {
-        let parts = slug.split(separator: "/", omittingEmptySubsequences: false)
-        guard parts.count == 2 else { return false }
-        let owner = parts[0], name = parts[1]
-        let ownerOK = !owner.isEmpty && owner.unicodeScalars.allSatisfy { $0.isASCIIAlphanumeric || $0 == "-" }
-        let nameOK = !name.isEmpty && name != "." && name != ".."
-            && name.unicodeScalars.allSatisfy { $0.isASCIIAlphanumeric || $0 == "-" || $0 == "_" || $0 == "." }
-        return ownerOK && nameOK
-    }
-
     // MARK: Typed reads
     //
     // Each returns nil when the key is absent, and records an error (and
@@ -686,15 +674,6 @@ private extension ItemKind {
         case .issue: "issue"
         case .workflowRun: "workflow run"
         case .ping: "ping"
-        }
-    }
-}
-
-private extension Unicode.Scalar {
-    var isASCIIAlphanumeric: Bool {
-        switch self {
-        case "A"..."Z", "a"..."z", "0"..."9": true
-        default: false
         }
     }
 }

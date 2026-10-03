@@ -1,3 +1,4 @@
+import ShipyardCommand
 import ShipyardCore
 import Testing
 

@@ -1,5 +1,7 @@
 import AppKit
+import ShipyardCommand
 import ShipyardCore
+import ShipyardPings
 import SwiftUI
 
 /// The menu bar app: an icon with no Dock icon (`LSUIElement` in the
@@ -89,7 +91,7 @@ final class AppServices {
             configStore: ConfigStore(url: configURL),
             appStateStore: AppStateStore(directory: Self.appSupportDirectory),
             configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
-            pingStore: PingStore(directory: PingStore.defaultDirectory),
+            pingStore: PingStore(directory: PingStore.appDirectory),
             repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
             tokenStore: Keychain(),
             actions: opener,
@@ -104,9 +106,9 @@ final class AppServices {
     }
 
     /// `~/Library/Application Support/Shipyard/`, where `state.json` and
-    /// `config-status.json` live: the core's one definition, which the CLI
+    /// `config-status.json` live: `SupportFolder`'s one definition, which the CLI
     /// reads `repositories.json` from, so the two can't disagree.
-    static var appSupportDirectory: URL { ResolvedRepositoriesStore.defaultDirectory }
+    static var appSupportDirectory: URL { SupportFolder.app }
 
     func start() {
         let shipyard = shipyard

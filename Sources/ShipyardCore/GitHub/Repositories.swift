@@ -2,6 +2,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import ShipyardCommand
 
 /// A repository the project picker offers or accepted.
 public struct RepoSummary: Equatable, Sendable, Identifiable {
@@ -205,7 +206,7 @@ enum RepositoriesQuery {
             if slug.hasSuffix(".git") { slug.removeLast(4) }
             break
         }
-        return ConfigurationReader.isRepositorySlug(slug) ? slug : nil
+        return GitRemote.isRepositorySlug(slug) ? slug : nil
     }
 
     /// REST's `GET /repos/{owner}/{repo}` answer, the fields the picker reads.

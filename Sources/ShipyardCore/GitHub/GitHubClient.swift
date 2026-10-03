@@ -2,6 +2,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import ShipyardCommand
 
 /// The signed-in GitHub account, from `GET /user`: the panel's header shows
 /// its avatar and `@login`, and opens its profile.

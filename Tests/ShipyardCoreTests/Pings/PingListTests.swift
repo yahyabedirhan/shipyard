@@ -1,4 +1,5 @@
 import Foundation
+@testable import ShipyardPings
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif

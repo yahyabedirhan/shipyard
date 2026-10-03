@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardCore
 
 /// Stands in for real waiting: each sleep returns at once, moves the manual

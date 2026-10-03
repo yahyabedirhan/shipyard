@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 // Selectors name authors and repositories in the configuration (ADR 0002):
 // a bare word is a group, `@` marks a login and `/` a repository. The key a
@@ -218,7 +219,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
             if text.hasSuffix("/*") {
                 let owner = String(text.dropLast(2))
                 if isLogin(owner) { return .owner(owner) }
-            } else if ConfigurationReader.isRepositorySlug(text) {
+            } else if GitRemote.isRepositorySlug(text) {
                 return .repository(text)
             }
             throw RepositorySelectorRejection("repository `\(text)` isn't `owner/name` or `owner/*`")

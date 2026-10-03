@@ -66,9 +66,26 @@ jobs:
             git ls-files -z | xargs -0 -r touch -d "@$fixed_time"
           fi
         shell: bash
-      # Builds ShipyardCore, the CLI and the tests on Linux, then runs them.
+      # Builds the libraries, the CLI and the tests on Linux, then runs them.
       - name: test
         run: swift test
+      # The Linux `shipyard` links ShipyardCommand and ShipyardPings only
+      # (ADR 0006). A debug build links every object of every module it
+      # depends on, so a symbol of another module (its mangled name, the
+      # name's length then the name) means the build depends on it.
+      - name: the linux cli links command and pings only
+        run: |
+          swift build --product shipyard-cli
+          bin="$(swift build --show-bin-path)/shipyard-cli"
+          # Through a file, not a pipe: under pipefail a grep that stops early fails nm.
+          symbols="$(mktemp)"
+          nm "$bin" > "$symbols"
+          grep -q 13ShipyardPings "$symbols" || { echo "nm found no ShipyardPings symbol in $bin, so it can't check the links"; exit 1; }
+          if grep -E '12ShipyardCore|14ShipyardConfig|15ShipyardControl|11TOMLDecoder' "$symbols" > "$symbols.foreign"; then
+            head -5 "$symbols.foreign"
+            echo "the Linux shipyard links a module other than ShipyardCommand and ShipyardPings"
+            exit 1
+          fi
       - name: list the sources this build holds
         if: github.event_name == 'push' && steps.restore.outputs.cache-hit != 'true'
         run: git ls-files -s -z > .build/ci-sources.txt

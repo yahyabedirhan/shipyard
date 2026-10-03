@@ -27,12 +27,6 @@ public struct ResolvedRepositoriesStore: Sendable {
         self.directory = directory
     }
 
-    /// `~/Library/Application Support/Shipyard/`, where `state.json` lives.
-    public static var defaultDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Shipyard", isDirectory: true)
-    }
-
     /// Each project's repositories (`owner/name`) by project name, as last
     /// recorded; empty when there's nothing that reads.
     public func load() -> [String: [String]] {

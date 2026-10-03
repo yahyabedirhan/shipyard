@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 /// What the Mac knows of each remote machine (`[remote] machines`): the
 /// pings its last good poll listed and how its latest poll went. Pure

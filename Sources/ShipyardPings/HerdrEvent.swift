@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// `shipyard herdr-event`: what the herdr-shipyard plugin's event hooks run,
 /// so an agent Herdr marks blocked pings the user without remembering to.
@@ -38,13 +39,13 @@ public enum HerdrEvent {
     /// The statuses that mean the agent went on, or isn't known to wait.
     static let resolvedStatuses: Set<String> = ["working", "idle", "done", "unknown"]
 
-    /// Handles the event the environment names. `configuration` is read only
-    /// to file a blocked agent's ping (a withdraw needs no projects); it
-    /// fails the command when config.toml doesn't read.
+    /// Handles the event the environment names. `filing` is asked only to
+    /// file a blocked agent's ping (a withdraw needs no projects), so on the
+    /// Mac only that reads config.toml, and fails the command when it
+    /// doesn't read.
     public static func run(
         environment: CommandEnvironment,
-        configuration: () -> Result<Configuration, CommandResult>,
-        resolved: @autoclosure () -> [String: [String]],
+        filing: any PingFiling,
         store: PingStore,
         now: Date
     ) -> CommandResult {
@@ -68,11 +69,6 @@ public enum HerdrEvent {
         if resolvedStatuses.contains(status) { return withdraw(id, store: store) }
         guard status == "blocked" else { return CommandResult() }
 
-        let read: Configuration
-        switch configuration() {
-        case .success(let configuration): read = configuration
-        case .failure(let failure): return failure
-        }
         let pane = PaneLookup(environment: environment).pane(payload.pane)
         // Herdr runs each event's hook on its own, so the agent may have gone
         // on (and that hook found nothing to withdraw) while this one looked
@@ -90,12 +86,10 @@ public enum HerdrEvent {
             request,
             folder: pane.folder,
             git: environment.git,
-            platform: environment.platform,
-            configuration: read,
-            resolved: resolved(),
+            filing: filing,
             store: store,
             now: now,
-            unfiled: true
+            whenNoProject: .keepUnfiled
         )
     }
 
@@ -197,12 +191,12 @@ public enum HerdrEvent {
         }
 
         /// The `herdr` to run: the one Herdr says it runs as, else the one
-        /// `HerdrFocus` finds.
+        /// `HerdrCommand` finds.
         private var herdr: String? {
             if let own = environment.variables[herdrVariable], own.hasPrefix("/"), environment.isExecutable(own) { return own }
             let home = environment.variables["HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
                 ?? FileManager.default.homeDirectoryForCurrentUser
-            return HerdrFocus.locate(home: home, pathEnvironment: environment.variables["PATH"], isExecutable: environment.isExecutable)
+            return HerdrCommand.locate(home: home, pathEnvironment: environment.variables["PATH"], isExecutable: environment.isExecutable)
         }
 
         /// What Herdr says about `id`: as much as it answered, nothing when

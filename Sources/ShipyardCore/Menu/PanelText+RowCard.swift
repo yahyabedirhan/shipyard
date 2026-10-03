@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 /// A row's hover card: only what the row doesn't already show. Its title
 /// and second line are on the row, so the card has the author's avatar (a

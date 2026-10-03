@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardCore
 import Testing
 

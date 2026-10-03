@@ -52,6 +52,31 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+  # The Linux `shipyard` links ShipyardCommand and ShipyardPings only (ADR
+  # 0006). The release builds are stripped, so this checks a debug build of
+  # the same product, which links every object of every module it depends
+  # on: a symbol of another module (its mangled name, the name's length then
+  # the name) means the build depends on it.
+  links:
+    name: links (command and pings only)
+    runs-on: ubuntu-latest
+    container: swift:6.4.0-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: no symbol of core, config, control or tomldecoder
+        run: |
+          swift build --product shipyard-cli
+          bin="$(swift build --show-bin-path)/shipyard-cli"
+          # Through a file, not a pipe: under pipefail a grep that stops early fails nm.
+          symbols="$(mktemp)"
+          nm "$bin" > "$symbols"
+          grep -q 13ShipyardPings "$symbols" || { echo "nm found no ShipyardPings symbol in $bin, so it can't check the links"; exit 1; }
+          if grep -E '12ShipyardCore|14ShipyardConfig|15ShipyardControl|11TOMLDecoder' "$symbols" > "$symbols.foreign"; then
+            head -5 "$symbols.foreign"
+            echo "the Linux shipyard links a module other than ShipyardCommand and ShipyardPings"
+            exit 1
+          fi
+
   check:
     name: check (static, runs on x86_64)
     needs: build
@@ -85,7 +110,7 @@ jobs:
   release:
     name: attach to the release
     if: github.event_name == 'release'
-    needs: check
+    needs: [check, links]
     runs-on: ubuntu-latest
     permissions:
       contents: write

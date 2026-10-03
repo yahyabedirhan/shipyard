@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ShipyardCommand
 
 /// One install of the agent skill as the panel shows it: offered, running
 /// (with Cancel), or how it ended. `SkillInstaller` has no timeout, so this

@@ -1,5 +1,6 @@
 import Foundation
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 private typealias Listed = RepositoryListResponse.Repository

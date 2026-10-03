@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 /// The numbers the Mac gives pings (`#3`), kept in the app state: one
 /// sequence per section, a project or a remote machine's own section of

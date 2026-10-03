@@ -358,9 +358,11 @@ Where each rule lives:
 
 Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
 
+**Where it stands after #164.** ShipyardCommand and ShipyardPings exist, and the Linux `shipyard` links only them. Config and Control don't exist yet. On macOS the executable links ShipyardCore in their place, and `ProjectFiling` lives in Core's `Config/ProjectFiling.swift`, so #165 moves it into ShipyardConfig with the rest of `Config/`. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. The command table has no Mac-only names yet: Control adds them.
+
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
-| **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `RecordStore`, `SupportFolder` | Foundation only | every build |
+| **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder` | Foundation only | every build |
 | **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
 | **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `ControlSocket` (the socket's path), `ControlCommand` (parsing `app`, `panel`, `screenshot` into a request, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport`, `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (for the request and reply types) |
@@ -397,13 +399,15 @@ No cycles. Pings never imports Config, so the Linux build can't reach `config.to
 // ShipyardApp stays declared only on macOS; the four libraries build everywhere.
 ```
 
+Until #165 the macOS condition names `ShipyardCore` instead of Config and Control (`.target(name: "ShipyardCore", condition: .when(platforms: [.macOS]))`), since the Mac's filing is in Core for now.
+
 | Build | Links | Filing | Commands in its table |
 |---|---|---|---|
 | `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings | `Unfiled` | `ping`, `herdr-event`; `app`, `panel`, `screenshot` answer exit 2, "runs on the Mac" |
 | `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel`, `screenshot` |
 | `Shipyard.app` | everything | `ProjectFiling` for remote pings | (not a command line) |
 
-**The link checks.** `linux-cli.yml` fails when the built Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig` or `15ShipyardControl` (Swift's mangled module names) (#164). `ci.yml`'s macOS job does the same for `12ShipyardCore` in `shipyard-cli` (#165).
+**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job does the same for `12ShipyardCore` in `shipyard-cli` (#165).
 
 **What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
 
@@ -413,14 +417,16 @@ No cycles. Pings never imports Config, so the Linux build can't reach `config.to
 | `CommandEnvironment.platform`, `CommandPlatform` | removed | the filing and the table replace every platform check (M3) |
 | the `switch` in `ShipyardCLI.run` | `CommandTable` in Command; `ShipyardCLI.run` routes over it | each module registers its own commands |
 | `ShellRunning`, `ProcessShellRunner` in `Skill/SkillInstaller.swift` | Command (`Shell.swift`) | `HerdrCommand` runs over it, and the skill installer still uses it from Core |
-| `GhCLI.Run` and `CommandOutput` in `GitHub/Auth/TokenProvider.swift` | Command (`ProgramRunning.swift`), `GhCLI` keeps using it | `HerdrEvent` runs `herdr` through `CommandEnvironment.run` |
+| `GhCLI.Run` and `CommandOutput` in `GitHub/Auth/TokenProvider.swift` | Command (`ProgramRunning.swift`: `ProgramRun`, `ProgramRunner.process`, `CommandOutput`); `GhCLI.Run` and `GhCLI.runProcess` stay as names for them | `HerdrEvent` runs `herdr` through `CommandEnvironment.run` |
+| `Sleep` and `systemSleep` in `Ports.swift` | Command (`Sleep.swift`) | `HerdrCommand` races its timeout with it (#164: not in the agreed list; the nearest fit) |
 | `ConfigurationReader.isRepositorySlug` | `GitRemote.isRepositorySlug` in Command | `--repo` is parsed by the ping command, which can't see Config |
 | one-file-per-ping code in `PingStore` | `RecordStore` in Command, `PingStore` over it | the next agent-side store (notes) reuses it |
-| `ResolvedRepositoriesStore.defaultDirectory` (the support folder) | `SupportFolder` in Command | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; it honours `SHIPYARD_SUPPORT_DIR` (C5) |
-| `PingStore.removeExpired` called by `ShipyardCLI` on Linux | `PingStore` drops expired pings as it reads | M4: a property of the store, not an `if` |
-| `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config | it reads the configuration |
+| `ResolvedRepositoriesStore.defaultDirectory` (the support folder) and the XDG folder in `PingStore.defaultDirectory(platform:)` | `SupportFolder.app` and `SupportFolder.withoutTheApp` in Command; `PingStore.appDirectory` and `PingStore.directoryWithoutTheApp` build on them | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; the demo launch makes `app` honour `SHIPYARD_SUPPORT_DIR` (C5) |
+| `PingStore.removeExpired` called by `ShipyardCLI` on Linux | `PingStore` drops expired pings as it reads, at its `now` (each command reads it `at` its own time) | M4: a property of the store, not an `if` |
+| `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config (in Core's `Config/` until #165) | it reads the configuration |
 | `PingCommand.send(…, platform:, unfiled:)` | `send(…, filing:, whenNoProject:)` | the platform becomes the filing; `unfiled` becomes `.keepUnfiled` |
-| `Ping.item`, `PingIcon` in `Pings/Ping.swift` | Core, `Items/Ping+Item.swift` | `Item` and the row's icon are the app's |
+| `Ping.item`, its URLs (`url(id:)`, `url(machine:id:)`, `id(from:)`, `remote(from:)`), `PingAction.icon` and `PingIcon` in `Pings/Ping.swift` | Core, `Items/Ping+Item.swift` | `Item`, the item's URL and the row's icon are the app's; nothing on the agent's side uses them |
+| `PingCommand.workingRepository` | stays in Pings | its reasons talk of filing a ping, so it isn't a general git lookup |
 | `ItemKind`, `StateGroup` in `Items/Item.swift` | Config, `Config/Kinds.swift` | the configuration's vocabulary |
 | `NotificationRule.covers(item)`, `AuthorSelector.matches(item)`, `AuthorFilter.includes(item)` | Core, `Config/Selectors+Items.swift` | matching an `Item` is the app's |
 | `ConfigStore.writePreset` | Core, `Config/ConfigStore+Preset.swift` | presets are the app's |
@@ -439,31 +445,33 @@ public protocol PingFiling: Sendable {
     /// The action a ping gets when the agent gives none; nil: none.
     func defaultAction(_ environment: CommandEnvironment) -> PingAction?
 }
-public enum FilingTarget { case project(String), repository(String), none }  // --project, --repo or origin, neither
+public enum FilingTarget { case project(String), repository(String), none(why: String) }  // --project, --repo or origin, neither (and why)
 public enum NoProject { case refuse, keepUnfiled }                          // ping refuses; herdr-event keeps it unfiled
 public struct Filing { public var projects: [String]; public var repository: String? }
 ```
 
-| | `Unfiled` (Pings) | `ProjectFiling` (Config) |
+| | `Unfiled` (Pings) | `ProjectFiling` (Config; Core's `Config/` until #165) |
 |---|---|---|
-| Built from | nothing | `configURL` (from `ConfigLocation`, #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `resolved: ResolvedRepositoriesStore` |
+| Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigStore.defaultURL` for now; from `ConfigLocation` with #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests use `init(configuration:resolved:)`, two closures |
 | `.project(name)` | `[name]`, no repository | `[name]` when the configuration names it; else exit 1 listing the projects (N1) |
 | `.repository(slug)` | `[]` with the repository | every project whose `owner/name` selectors or resolved list include it, ignoring case, spelled as the first one spells it; none: exit 1 listing the projects (N6), or `[]` with `.keepUnfiled` |
-| `.none` (no `origin`) | `[]` | exit 1 with `--repo`/`--project` as the way out (N6), or `[]` with `.keepUnfiled` |
-| every filed project hides pings (`pings.show = false`) | — | exit 1 (#127) |
+| `.none(why)` (no `origin`) | `[]` | exit 1 saying `why`, with `--repo`/`--project` as the way out (N6), or `[]` with `.keepUnfiled` |
+| every filed project hides pings (`pings.show = false`) | — | exit 1 (#127, not built yet) |
 | `expiry(sentAt:)` | `sent + PingCommand.lifetimeWithoutTheApp` (a day) | `nil` |
 | `defaultAction` | `.herdr(HERDR_PANE_ID)` when set | `nil` |
 | also | — | `filed(remote: Ping) -> Ping`, which `Shipyard` applies to each remote ping against the last valid configuration (#115) |
 
-Tests: the CLI tests that are parameterised by platform today become parameterised by filing, each case run through `ShipyardCLI.run` with the table `main.swift` would build (#164).
+`PingCommand.run` applies `defaultAction` when the agent gives no action, before it notes the terminal a `--herdr` action was sent from, so a default pane action gets the terminal as `--herdr` does. `HerdrEvent` always gives its own action.
+
+Tests: the CLI tests that were parameterised by platform are parameterised by filing (`RemotePingCommandTests`' `filing:`, `HerdrEventTests`' `filing:`, both `Unfiled()` or the Mac's `ProjectFiling`), each case run through `ShipyardCLI.run` with the table `main.swift` would build (`CommandTable.commands(filing:store:)` in the tests' `Harness.swift`) (#164).
 
 ### CommandTable and RecordStore — `ShipyardCommand/` (0.1.0, #164)
 
-`CommandTable` holds `Command` entries: `name`, `summary` (its line in `shipyard --help`), `usage`, and `run(arguments, environment, now) -> CommandResult`. `add(_:)` rejects a name already there. `ShipyardCLI.run(arguments, table:, environment:, now:)` answers `--help`/`-h`/`help` with the usage built from the table, `--version` with `shipyard <ShipyardVersion.current>`, and a name in `CommandTable.macOnly` (`app`, `panel`, `screenshot`) that the table lacks with exit 2, "`shipyard <name>` runs on the Mac, where the app is". Any other unknown name is exit 2 with the usage. A command's own `--help` is the entry's business, as `ping`'s is today.
+`CommandTable` holds `CommandTable.Entry`s: `name`, `help` (its lines under `commands:` in `shipyard --help`), and `run(arguments, environment, now) -> CommandResult`, with the arguments after the name. `add(_:)` traps on a name already there: two commands with one name is a mistake in assembling the build. `ShipyardCLI.run(arguments, table:, environment:, now:)` answers `--help`/`-h`/`help` with `ShipyardCLI.usage(table)`, the entries' help between the usage line and the options (word for word what 0.0.7 printed), `--version` with `shipyard <ShipyardVersion.current>`, and no arguments or an unknown name with exit 2 and the usage. A command's own `--help` is the entry's business, as `ping`'s is. Control adds `CommandTable.macOnly` (`app`, `panel`, `screenshot`): a name in it that the table lacks is exit 2, "`shipyard <name>` runs on the Mac, where the app is" (#166–#169; not before, since on the Mac without Control it would be wrong).
 
-`RecordStore<Record: Codable>(directory:)` keeps one `<id>.json` per record: `all()` (every file that reads, skipping the rest), `record(id:)`, `save(record, id:)` (creating the directory, replacing the file atomically), `remove(id:)`, and `removeIfUnchanged(record, id:) -> Bool`. `PingStore` keeps its operations (§ PingStore) and delegates the files, adding the ping rules: same-sending writes, and dropping a ping past its `expires` from `all()` and `ping(id:)` (removing its file through `removeIfUnchanged`).
+`RecordStore<Record: Codable & Equatable & Sendable>(directory:)` keeps one `<id>.json` per record, ISO 8601 dates: `all()` (every file that reads, skipping the rest, in no order), `record(id:)`, `save(record, id:)` (creating the directory, replacing the file atomically), `remove(id:)`, and `removeIfUnchanged(record, id:) -> Bool`. `PingStore` keeps its operations (§ PingStore) and delegates the files, adding the ping rules: oldest first, same-sending writes, and dropping a ping past its `expires` from `all()` and `ping(id:)` (removing its file through `removeIfUnchanged`). It reads expiry against `now`, a clock it's built with (the real time by default); `at(date)` is the same store reading as at `date`, which `PingCommands` gives each run, so a command's `now` decides.
 
-`SupportFolder`: `app(environment:home:)` is `SHIPYARD_SUPPORT_DIR` when it's set and absolute, else `~/Library/Application Support/Shipyard`; `withoutTheApp(environment:home:)` is `$XDG_DATA_HOME/shipyard`, else `~/.local/share/shipyard`. The app's stores, `PingStore` on the Mac, `ResolvedRepositoriesStore`, the avatar cache and `ControlSocket` all build on `app`, so the CLI and the app (a demo run included) can't disagree.
+`SupportFolder`: `app` is `~/Library/Application Support/Shipyard`; the demo launch makes it `app(environment:home:)`, `SHIPYARD_SUPPORT_DIR` when it's set and absolute. `withoutTheApp(environment:home:)` is `$XDG_DATA_HOME/shipyard` when it's absolute, else `~/.local/share/shipyard`. The app's stores, `PingStore` on the Mac, `ResolvedRepositoriesStore`, the avatar cache and later `ControlSocket` all build on `app`, so the CLI and the app (a demo run included) can't disagree.
 
 ### App control: the client — `ShipyardControl/` (0.1.0, #166–#169)
 
@@ -967,17 +975,19 @@ State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the
 
 After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it (`paused` arms for the configured interval, or the time left until the pause ends when that's sooner: each such firing sends nothing and only lists again from the last snapshot, so a closed item leaves within an interval of its window passing even while paused), so a busy hour slows shipyard down on its own instead of running the limit dry. Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
-### PingStore — `ShipyardCore/Pings/PingStore.swift` (0.0.5)
+### PingStore — `ShipyardPings/PingStore.swift` (0.0.5; over `RecordStore` since 0.1.0, #164)
 
-The pings agents send, one JSON file per ping (`<id>.json`) in `~/Library/Application Support/Shipyard/Pings/` (`PingStore.defaultDirectory`; tests pass a temporary one), apart from `state.json`: app state is what shipyard remembers from use, pings are data agents send. The format is private (ADR 0004); `Ping` is `Codable`, and a field added later is optional, so an older record still reads. The CLI and the running app write to it at the same time: each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet. A plain `struct`, not tied to the main actor, since the CLI uses it too.
+The pings agents send, one JSON file per ping (`<id>.json`, a `RecordStore<Ping>`) in `~/Library/Application Support/Shipyard/Pings/` (`PingStore.appDirectory`, in `SupportFolder.app`; tests pass a temporary one), apart from `state.json`: app state is what shipyard remembers from use, pings are data agents send. The format is private (ADR 0004); `Ping` is `Codable`, and a field added later is optional, so an older record still reads. The CLI and the running app write to it at the same time: each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet. A plain `struct`, not tied to the main actor, since the CLI uses it too.
 
-On Linux, a machine without the app (0.0.6, #110), the CLI keeps its pings in `$XDG_DATA_HOME/shipyard/pings` (`~/.local/share/shipyard/pings` when it's unset or not absolute), in the same format: `PingStore.defaultDirectory(platform:environment:home:)` picks it, and on macOS gives `defaultDirectory`. There a ping carries `expires` (a day after its sending or its last replace, `PingCommand.lifetimeWithoutTheApp`), since no one sees it there; on the Mac it's `nil` and the ping stays until seen. `PingList` leaves it out.
+On a machine without the app (0.0.6, #110), the CLI keeps its pings in `$XDG_DATA_HOME/shipyard/pings` (`~/.local/share/shipyard/pings` when it's unset or not absolute), in the same format: `PingStore.directoryWithoutTheApp(environment:home:)`, in `SupportFolder.withoutTheApp`. There a ping carries `expires` (a day after its sending or its last replace, `PingCommand.lifetimeWithoutTheApp`, which `Unfiled.expiry` gives), since no one sees it there; on the Mac it's `nil` and the ping stays until seen. `PingList` leaves it out.
+
+A ping past its `expires` is gone (M4): every read (`all()`, `ping(id:)`, and so the writes that read first) leaves it out and removes its file through `RecordStore.removeIfUnchanged`; a file that can't be removed stays, and every read still leaves it out. The store reads expiry against its `now`, the real time unless it's built with another clock; `at(date)` is the store reading as at `date`, which each command run gets, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. Nothing on the Mac expires, so there it changes nothing.
 
 | Operation | Returns / rejects |
 |---|---|
-| `all() -> [Ping]` | every `*.json` that reads, oldest first; none when the directory doesn't exist yet. A file that doesn't read is skipped |
-| `removeExpired(at:)` | removes each ping whose `expires` has passed (`Ping.isLive(at:)`), through `removeIfUnchanged`; a file that can't be removed stays, and readers leave it out by its expiry. Only the CLI on Linux calls it, before `ping` and `herdr-event` |
-| `ping(id:) -> Ping?` | one ping |
+| `all() -> [Ping]` | every live `*.json` that reads, oldest first; none when the directory doesn't exist yet. A file that doesn't read is skipped |
+| `at(_ now:) -> PingStore` | the same directory, reading expiry as at `now` |
+| `ping(id:) -> Ping?` | one live ping |
 | `save(ping) throws` | creates the directory when missing; replaces the ping's file atomically |
 | `markSeen(ping, at:) throws` | sets `seen` once (a second click keeps the first time) and clears `failure`. The ping is read again just before the write, and only the same sending as `ping` (`Ping.isSameSending`: same id, instance and content, whatever `seen` and `failure` say) is written: one withdrawn meanwhile stays gone, one replaced or sent anew stays unseen |
 | `recordFailure(ping, reason:detail:) throws` | sets `failure` (a few words, about 9 characters, to fit the row's meta column) and `failureDetail` (the whole reason, for the hover card; `nil` when the short one says it all, and on a failure written by 0.0.5), leaving `seen` as it is; only on the same sending, as `markSeen` (#100) |
@@ -986,7 +996,7 @@ On Linux, a machine without the app (0.0.6, #110), the CLI keeps its pings in `$
 
 The app watches `PingStore.watchedDirectory` with `ConfigWatcher(folder:)` and calls `Shipyard.reloadPings()`: the directory alone, whose entries change with every ping sent, replaced or withdrawn, so a save to `state.json` in its parent doesn't reload pings (#128). Until the directory exists the watch is on its nearest existing ancestor, so creating it is seen; the watch reopens after each change.
 
-### PingList — `ShipyardCore/Pings/PingList.swift` (0.0.6)
+### PingList — `ShipyardPings/PingList.swift` (0.0.6)
 
 The remote ping list: the JSON `shipyard ping list --json` prints on a machine and the Mac's shipyard reads from it through Herdr (#109). Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"0.0.6","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds. `version` is the contract's major version (`PingList.currentVersion`, 1): a field a reader can ignore keeps it, anything else bumps it. Each ping carries what it's sent with (id, instance, title, body, sender, repository, projects, action, sent); `seen` and `failure` stay on the machine that recorded them. Which pings to list (the machine's live ones) is the caller's choice.
 
@@ -995,9 +1005,9 @@ The remote ping list: the JSON `shipyard ping list --json` prints on a machine a
 | `PingList.encode(pings, shipyardVersion) -> String` | newest first (by `sent`, then id), at most `maxPings` (100), stopping at the first ping that would take the document over `byteBudget` (48 KiB, well under Herdr's 64 KiB action output); `truncated` when it stops early. Always a whole document |
 | `PingList.decode(text or data) throws(DecodeError) -> PingList` | reads `version` first: another one is `.unsupportedVersion(version, shipyardVersion:)`, whose `message(machine:)` says to update shipyard on that machine; not JSON, or a field missing or mistyped, is `.unreadable(reason)`. Unknown fields are ignored, and so is an action of a kind it doesn't know (the ping reads without one) |
 
-### HerdrCommand — `ShipyardCore/Pings/HerdrCommand.swift` (0.0.6, #111)
+### HerdrCommand — `ShipyardCommand/HerdrCommand.swift` (0.0.6, #111)
 
-Runs `herdr` for the app, directly (no shell) behind `ShellRunning`: `knownPaths(home:)` and `locate(home:pathEnvironment:isExecutable:)` find it (`~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`), and `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`. `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`. `HerdrFocus` and `RemotePingReader` both run through it.
+Runs `herdr` for the app, directly (no shell) behind `ShellRunning`: `knownPaths(home:)` and `locate(home:pathEnvironment:isExecutable:)` find it (`~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`), and `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`. `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`. `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say. Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
 
 ### HerdrFocus on a machine — `ShipyardCore/Pings/HerdrFocus.swift` (0.0.6, #117)
 
@@ -1027,40 +1037,40 @@ Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`:
 
 ### ResolvedRepositoriesStore — `ShipyardCore/State/ResolvedRepositoriesStore.swift` (0.0.5)
 
-Each project's repositories as the app last resolved them (`ResolvedRepositories.repositories`, by project name), in `repositories.json` beside `state.json` (`ResolvedRepositoriesStore.defaultDirectory`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.defaultDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one), so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub. The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it. Private format (ADR 0004): `{ "version": 1, "projects": { "<name>": ["owner/name", …] } }`. A plain `struct`, like `PingStore`, since the CLI uses it too. It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists, so a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again. It's left as it is on sign-out; the next account's first resolve replaces it.
+Each project's repositories as the app last resolved them (`ResolvedRepositories.repositories`, by project name), in `repositories.json` beside `state.json` (`SupportFolder.app`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.appDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one), so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub. The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it. Private format (ADR 0004): `{ "version": 1, "projects": { "<name>": ["owner/name", …] } }`. A plain `struct`, like `PingStore`, since the CLI uses it too. It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists, so a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again. It's left as it is on sign-out; the next account's first resolve replaces it.
 
 | Operation | Returns / rejects |
 |---|---|
 | `load() -> [ProjectName: [String]]` | the lists; empty when nothing reads |
 | `record(lists) throws` | replaces the file atomically; writes nothing when it already holds `lists` (the parent directory is watched for the ping store, so a needless write would wake it) |
 
-### PingCommand and ShipyardCLI — `ShipyardCore/Pings/PingCommand.swift`, `ShipyardCore/CLI/ShipyardCLI.swift`, `ShipyardCore/CLI/GitRemote.swift` (0.0.5)
+### PingCommand and ShipyardCLI — `ShipyardPings/PingCommand.swift`, `ShipyardPings/PingCommands.swift`, `ShipyardCommand/CommandTable.swift`, `ShipyardCommand/GitRemote.swift` (0.0.5; split by module in 0.1.0, #164)
 
-`ShipyardCLI.run(arguments, environment, configURL, repositories, pingStore, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and `ping`, which reads `config.toml` as the app does (a missing file is no projects; one that doesn't read fails with its first problem, since the CLI has no last valid configuration to fall back on) and the lists in `repositories` (a `ResolvedRepositoriesStore`), and runs `PingCommand.run`. `CommandResult` is the output, the error text and the exit status: 0 done, 1 refused (`failedStatus`), 2 arguments that don't read (`usageStatus`). `CommandEnvironment` is the working folder, the environment variables (`HERDR_PANE_ID`, which `--herdr` without an id takes; `TERM_PROGRAM` and `__CFBundleIdentifier`, which name its terminal) and `git`, a `GitRemoteLookup` port: `origin(in: folder) -> String?`, the remote's URL or `nil` when the folder isn't in a git repository or has no `origin`. `GitCLI` runs `git -C <folder> remote get-url origin` (through `/usr/bin/env`, so the agent's `PATH` finds git), so worktrees and `insteadOf` read as git reads them; tests pass `FakeGitRemote`, a fake working folder. `GitRemote.repository(fromURL:)` reads `https://`, `ssh://`, `git://` and scp-like `git@host:` URLs whose path is exactly `owner/name` (`.git` and a trailing `/` dropped); a local path, `file://` or a deeper path is no repository.
+`ShipyardCLI.run(arguments, table, environment, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and the commands of the build's `CommandTable` ([CommandTable](#commandtable-and-recordstore--shipyardcommand-010-164)). `PingCommands.entries(filing:store:)` gives `ping`, which answers its own `--help`, sends `withdraw` and `list` on without filing, and runs `PingCommand.run` with the filing; and `herdr-event`, which takes no arguments. On the Mac the filing (`ProjectFiling`) reads `config.toml` as the app does (a missing file is no projects; one that doesn't read fails with its first problem, since the CLI has no last valid configuration to fall back on) and the lists the app resolved (a `ResolvedRepositoriesStore`), only when a ping is filed. `CommandResult` is the output, the error text and the exit status: 0 done, 1 refused (`failedStatus`), 2 arguments that don't read (`usageStatus`). `CommandEnvironment` is the working folder, the environment variables (`HERDR_PANE_ID`, which `--herdr` without an id takes; `TERM_PROGRAM` and `__CFBundleIdentifier`, which name its terminal) and `git`, a `GitRemoteLookup` port: `origin(in: folder) -> String?`, the remote's URL or `nil` when the folder isn't in a git repository or has no `origin`. `GitCLI` runs `git -C <folder> remote get-url origin` (through `/usr/bin/env`, so the agent's `PATH` finds git), so worktrees and `insteadOf` read as git reads them; tests pass `FakeGitRemote`, a fake working folder. `GitRemote.repository(fromURL:)` reads `https://`, `ssh://`, `git://` and scp-like `git@host:` URLs whose path is exactly `owner/name` (`.git` and a trailing `/` dropped); a local path, `file://` or a deeper path is no repository.
 
 | Operation | Returns / rejects |
 |---|---|
-| `PingCommand.run(arguments, environment, configuration, resolved, store, now, newID) -> CommandResult` | `<title>` with `--repo <owner/name>` or `--project <name>` or neither, `--body`, `--from`, and one action flag at most (`actionFlags`: `--open <url>`, `--app <bundle id or name>`, `--herdr [<tab or pane id>]`), in any order; `--herdr` takes the next argument when `isHerdrID` (`<workspace>:t<n>` or `:p<n>`), else `HERDR_PANE_ID` (#101); the body, sender and action are saved with the ping (#100). `--project`: filed under that project, with no repository. Otherwise the repository is `--repo`'s, else the working folder's `origin`, and it's filed under every project (in configuration order) whose `owner/name` selectors or `resolved` list include it, ignoring case; the ping keeps the repository as the first such project spells it (GitHub's spelling once resolved), which `Ping.item` fills. Saves `Ping(id, title, projects, sent: now, repository)` and prints `<id>`. The id is `newID()` (`Ping.newID`: six letters and digits without `0 o 1 l i`), drawn again while the store has it, since ids are global | no title, two titles, an unknown option, a flag without its value, `--repo` that isn't `owner/name`, `--repo` with `--project`, two action flags, `--open` without a scheme, an empty `--app`, or `--herdr` without an id outside Herdr: exit 2; a project the configuration doesn't name: exit 1, listing them (or saying there are none); no `origin`, or one that isn't `owner/name`: exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; a repository no project watches: exit 1, listing the projects; a store that can't be written: exit 1 |
+| `PingCommand.run(arguments, environment, filing, store, now, newID) -> CommandResult` (the refusals for projects are `ProjectFiling`'s) | `<title>` with `--repo <owner/name>` or `--project <name>` or neither, `--body`, `--from`, and one action flag at most (`actionFlags`: `--open <url>`, `--app <bundle id or name>`, `--herdr [<tab or pane id>]`), in any order; `--herdr` takes the next argument when `isHerdrID` (`<workspace>:t<n>` or `:p<n>`), else `HERDR_PANE_ID` (#101); the body, sender and action are saved with the ping (#100). `--project`: filed under that project, with no repository. Otherwise the repository is `--repo`'s, else the working folder's `origin`, and it's filed under every project (in configuration order) whose `owner/name` selectors or `resolved` list include it, ignoring case; the ping keeps the repository as the first such project spells it (GitHub's spelling once resolved), which `Ping.item` fills. Saves `Ping(id, title, projects, sent: now, repository)` and prints `<id>`. The id is `newID()` (`Ping.newID`: six letters and digits without `0 o 1 l i`), drawn again while the store has it, since ids are global | no title, two titles, an unknown option, a flag without its value, `--repo` that isn't `owner/name`, `--repo` with `--project`, two action flags, `--open` without a scheme, an empty `--app`, or `--herdr` without an id outside Herdr: exit 2; a project the configuration doesn't name: exit 1, listing them (or saying there are none); no `origin`, or one that isn't `owner/name`: exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; a repository no project watches: exit 1, listing the projects; a store that can't be written: exit 1 |
 
 | `PingCommand.run`, `--id <id>` (#102) | names the ping; `isID` (`\A[a-z0-9][a-z0-9_-]{0,63}\z`, anchored so a trailing newline isn't accepted, which generated ids also match, and which keeps it a safe file name and URL path on a case-insensitive disk). A stored id is replaced: the new title, body, sender, action, projects and repository, the stored `sent` and `instance`, `seen` and `failure` cleared. A new ping gets a new `instance` (a UUID). Without it, `newID()` as above | an id that isn't one: exit 2 |
-| `PingCommand.withdraw(arguments, store) -> CommandResult` (#102) | `shipyard ping withdraw <id>`: `store.remove(id:)`, prints the id. `ShipyardCLI` sends `ping withdraw …` here before reading `config.toml`, so a broken file doesn't stop it | no id, two, or one that isn't an id: exit 2; an id no ping has: exit 1 ("no ping has the id …"); a store that can't be written: exit 1 |
+| `PingCommand.withdraw(arguments, store) -> CommandResult` (#102) | `shipyard ping withdraw <id>`: `store.remove(id:)`, prints the id. The `ping` entry sends `ping withdraw …` here without filing, so a broken `config.toml` doesn't stop it | no id, two, or one that isn't an id: exit 2; an id no ping has: exit 1 ("no ping has the id …"); a store that can't be written: exit 1 |
 | `PingCommand.list(arguments, store, now) -> CommandResult` (0.0.6, #110) | `shipyard ping list --json`: the store's live pings at `now` (`Ping.isLive`) as `PingList.encode` gives them, newest first and capped, plus a newline. Reads no `config.toml`. Works on macOS too, where every stored ping is live | anything but exactly `--json`: exit 2 |
 
-`PingCommand.Request.parse` reads the arguments after `ShipyardCLI` has checked for `withdraw` or `list` as the first one. `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`), `list` or a word starting with `--`, and `--help` after it isn't help.
+`PingCommand.Request.parse` reads the arguments after the `ping` entry has checked for `withdraw` or `list` as the first one. `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`), `list` or a word starting with `--`, and `--help` after it isn't help.
 
-`PingCommand.send(request, folder, git, platform, configuration, resolved, store, now, newID, unfiled)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path. `folder` is where the repository is looked up (`nil`: nowhere); `unfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
+`PingCommand.send(request, terminal, folder, git, filing, store, now, newID, whenNoProject)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path ([the pseudocode](#pingcommandsend-through-a-filing-010-164)). `folder` is where the repository is looked up (`nil`: nowhere); `whenNoProject: .keepUnfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
 
-**On a machine without the app (0.0.6, #110).** `CommandEnvironment.platform` (`CommandPlatform`: `macOS` or `linux`; `main.swift` passes `.current`, tests name it) decides. The rule is the platform alone: on Linux there's no app to file a ping for, so the CLI reads no `config.toml` and no `repositories.json` for `ping` or `herdr-event`, and `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it. `run` gives a ping without an action the agent's pane (`HERDR_PANE_ID`) as `.herdr(pane)`, so a click can focus it; an action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win. The ping gets `expires`, a day from its sending or its replace, and `ShipyardCLI` calls `removeExpired(at: now)` before `ping` and `herdr-event`, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. On macOS nothing changes from 0.0.5.
+**On a machine without the app (0.0.6, #110; the filing since 0.1.0, #164).** The build's filing decides: on Linux, `Unfiled`. There's no app to file a ping for, and the Linux build doesn't link the code that reads `config.toml` or `repositories.json`, so `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it. `run` gives a ping without an action the agent's pane (`HERDR_PANE_ID`) as `.herdr(pane)`, so a click can focus it; an action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win. The ping gets `expires`, a day from its sending or its replace, and `PingStore` drops expired pings as it reads, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. With the Mac's filing nothing changes from 0.0.5.
 
-**0.1.0 replaces the platform with the filing (#164, ADR 0006).** The behaviour above stays, but `CommandPlatform` goes: `Unfiled` gives the as-sent filing, the day's expiry and the pane as the default action, `PingStore` drops expired pings as it reads, and the Linux build never links the code that reads `config.toml` ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)).
+Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPlatform`), and `ShipyardCLI` removed expired pings before `ping` and `herdr-event` on Linux. #164 replaced both with the filing and the store's rule ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)), with the same behaviour.
 
-### HerdrEvent — `ShipyardCore/Pings/HerdrEvent.swift` (0.0.6, #112)
+### HerdrEvent — `ShipyardPings/HerdrEvent.swift` (0.0.6, #112)
 
-`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. `ShipyardCLI` sends it `HerdrEvent.run(environment, configuration, resolved, store, now)`; `configuration` is a closure, read only for a blocked agent's ping, so a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, lowercased (Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone), each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
+`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. The `herdr-event` entry runs `HerdrEvent.run(environment, filing, store, now)`; the filing is asked only for a blocked agent's ping, so on the Mac a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, lowercased (Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone), each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
 
 | Event | Does |
 |---|---|
-| `pane.agent_status_changed`, `blocked` | `herdr pane get <pane>` (its `tab_id` and `cwd`), then `herdr tab get <tab>` (its `label`), through `CommandEnvironment.run` (the synchronous `GhCLI.Run` port; tests answer with `FakeHerdr.command`), with Herdr's own `HERDR_BIN_PATH`, else `herdr` found as `HerdrFocus` finds it. Then `PingCommand.send` with `--id herdr-<pane>`: title "<Agent> is waiting in <tab label>" ("An agent…" without a name; the pane id without a label, or when `herdr` can't say), sender `display_agent` or `agent`, action `.herdr(pane)`, filed by the `origin` of the pane's `cwd` and saved `unfiled` when no project takes it. Blocking again replaces it (one per pane, no second notification); prints the id. Herdr runs each event's hook on its own, so when `pane get` already says the agent went on (another status), the ping isn't sent and any there is withdrawn, as that later event would. A ping saved `unfiled` reaches the Mac as a remote ping and lists in its machine's section |
+| `pane.agent_status_changed`, `blocked` | `herdr pane get <pane>` (its `tab_id` and `cwd`), then `herdr tab get <tab>` (its `label`), through `CommandEnvironment.run` (the synchronous `ProgramRun` port; tests answer with `FakeHerdr.command`), with Herdr's own `HERDR_BIN_PATH`, else `herdr` found by `HerdrCommand.locate`, as `HerdrFocus` finds it. Then `PingCommand.send` with `--id herdr-<pane>`: title "<Agent> is waiting in <tab label>" ("An agent…" without a name; the pane id without a label, or when `herdr` can't say), sender `display_agent` or `agent`, action `.herdr(pane)`, filed by the `origin` of the pane's `cwd` and kept unfiled (`.keepUnfiled`) when no project takes it. Blocking again replaces it (one per pane, no second notification); prints the id. Herdr runs each event's hook on its own, so when `pane get` already says the agent went on (another status), the ping isn't sent and any there is withdrawn, as that later event would. A ping saved `unfiled` reaches the Mac as a remote ping and lists in its machine's section |
 | `working`, `idle`, `done`, `unknown`; `pane.closed` | removes `herdr-<pane>` and prints its id; nothing, exit 0, when there's none |
 | `tab.closed`, `workspace.closed` (#112, found in #120) | Herdr 0.9.3 sends no `pane.closed` for the panes a closed tab or workspace takes with it, and these payloads name only the tab or workspace. So, when the store holds any ping this command sent (`herdr-<pane>` whose action is `.herdr(pane)`; a ping an agent sent with `--herdr` is never touched), it runs `herdr pane list` once and removes each one whose pane isn't listed, printing their ids. No such ping: nothing, exit 0, and `herdr` isn't run. When `herdr pane list` can't be run or doesn't read (no server, no `herdr`), nothing is removed, exit 1: the CLI sees only an exit status, so a pane Herdr doesn't know and a Herdr that didn't answer would read the same through `pane get` |
 | any other event or status | nothing, exit 0 |
@@ -1069,9 +1079,23 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 ### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
 
-A thin executable target over `ShipyardCore`: it gathers the arguments, the working folder, the environment (with `GitCLI`), `ConfigStore.defaultURL(environment:)`, `ResolvedRepositoriesStore.defaultDirectory` and `PingStore.defaultDirectory(platform: .current, environment:)`, with `CommandPlatform.current`, calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
+A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else:
+Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #164, with the Mac's filing still in Core:
+
+```swift
+var table = CommandTable()
+#if os(macOS)
+table.add(PingCommands.entries(
+    filing: ProjectFiling(configURL: ConfigStore.defaultURL(environment: environment),
+                          repositories: ResolvedRepositoriesStore(directory: SupportFolder.app)),
+    store: PingStore(directory: PingStore.appDirectory)))
+#else
+table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
+#endif
+```
+
+The target, once #126, #165 and Control land:
 
 ```swift
 var table = CommandTable()
@@ -1096,7 +1120,7 @@ Puts the CLI on the user's PATH (N10). `CLILink(cli:home:fileSystem:)` is `@Main
 
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
-Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (`ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`): an interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open. The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state (`idle`, `running`, `finished(result)`, `timedOut(seconds)`); `start()` races the install against a 180 s timeout (the sleep is injected, so tests don't wait), `cancel()` goes back to `idle` at once and stops the shell (a result that arrives after is dropped, so Install can start again straight away), and a timeout stops the shell and says so.
+Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (ShipyardCommand's `Shell.swift` since 0.1.0; `ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`): an interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open. The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state (`idle`, `running`, `finished(result)`, `timedOut(seconds)`); `start()` races the install against a 180 s timeout (the sleep is injected, so tests don't wait), `cancel()` goes back to `idle` at once and stops the shell (a result that arrives after is dropped, so Install can start again straight away), and a timeout stops the shell and says so.
 
 | Operation | Returns |
 |---|---|
@@ -1126,12 +1150,13 @@ shipyard/
 ├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
 │   ├── CommandResult.swift           # (moved) output, error text, exit status: 0 done, 1 refused, 2 usage
 │   ├── CommandEnvironment.swift      # (moved) working folder, variables, the git lookup and program-run ports; no platform
-│   ├── CommandTable.swift            # (0.1.0) the build's commands by name, their help lines; ShipyardCLI.run routes over it; the Mac-only names' exit 2
+│   ├── CommandTable.swift            # (moved from Core's CLI/ShipyardCLI.swift) the build's commands by name, their help lines; ShipyardCLI.run routes over it; the Mac-only names' exit 2 (with Control)
 │   ├── ProgramRunning.swift          # (moved from GhCLI.Run) run a program synchronously, CommandOutput
 │   ├── Shell.swift                   # (moved from SkillInstaller) ShellRunning port, ProcessShellRunner (cancellable, kills the process tree)
+│   ├── Sleep.swift                   # (moved from Ports.swift) Sleep, systemSleep: HerdrCommand's timeout, the device flow, the skill install
 │   ├── Version.swift                 # (moved) ShipyardVersion.current: the one place the version is recorded
-│   ├── GitRemote.swift               # (moved) the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name, isRepositorySlug
-│   ├── HerdrCommand.swift            # (moved) runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
+│   ├── GitRemote.swift               # (moved from Core's CLI/) the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name, isRepositorySlug
+│   ├── HerdrCommand.swift            # (moved from Core's Pings/) runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
 │   ├── RecordStore.swift             # (0.1.0) one JSON file per record in a folder, atomic replace, remove if unchanged
 │   └── SupportFolder.swift           # (0.1.0) the app's support folder (SHIPYARD_SUPPORT_DIR overrides it) and the XDG data folder without the app
 ├── Sources/ShipyardPings/            # (0.1.0) the agent's side of pings; Command only
@@ -1153,7 +1178,7 @@ shipyard/
 │   ├── ConfigStore.swift             # (moved) path, reload, last-valid fallback, append projects, set the layout
 │   ├── ConfigLocation.swift          # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
-│   └── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
+│   └── ProjectFiling.swift           # (0.1.0; in Core's Config/ until #165) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
 ├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command (AppKit only for the real launcher)
 │   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), versioned JSON
 │   ├── ControlReply.swift            # { ok, output, error }
@@ -1187,7 +1212,7 @@ shipyard/
 │   │       └── DeviceFlow.swift      # OAuth device flow
 │   ├── Items/
 │   │   ├── Item.swift                # Item, Snapshot, RepositoryError, RateLimit, fingerprint
-│   │   ├── Ping+Item.swift           # (moved) a ping as an Item; PingIcon
+│   │   ├── Ping+Item.swift           # (moved out of Ping.swift) a ping as an Item, its shipyard://ping URLs; PingAction.icon, PingIcon
 │   │   ├── Listing.swift             # the one filter: what a project lists (ADR 0003)
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
@@ -1511,16 +1536,21 @@ Setup: `[remote] machines = ["hetzner-vps", "netcup-vps"]` beside project `shop`
 ### PingCommand.send through a filing (0.1.0, #164)
 
 ```text
-send(request, folder, git, filing, store, now, newID, whenNoProject):
+run(arguments, environment, filing, store, now):
+    request = Request.parse(arguments) → failure: exit 2
+    request.action = request.action ?? filing.defaultAction(environment)   // Unfiled: the agent's pane
+    terminal = outerTerminal(environment) when the action is .herdr
+    send(request, terminal, environment.workingDirectory, environment.git, filing, store, now, .refuse)
+
+send(request, terminal, folder, git, filing, store, now, newID, whenNoProject):
     target = request.project.map(.project)
           ?? request.repository.map(.repository)                    // --repo
-          ?? folder.flatMap(GitRemote.workingRepository).map(.repository)
-          ?? .none
+          ?? folder.flatMap(PingCommand.workingRepository).map(.repository)
+          ?? .none(why)                                             // no origin, or none that reads, or no folder
     filing.file(target, whenNoProject) → failure: return it (exit 1), nothing written
-    action = request.action ?? filing.defaultAction(environment)    // Unfiled: the agent's pane
     stored = store.ping(id)                                         // an expired one reads as none (M4)
-    ping   = stored.replaced(by: request, filing, action)           // keeps sent and instance, clears seen and failure
-          ?? Ping(id ?? newID(), request, filing, action, sent: now, instance: UUID())
+    ping   = stored.replaced(by: request, filing)                   // keeps sent and instance, clears seen and failure
+          ?? Ping(id ?? newID(), request, filing, sent: now, instance: UUID())
     ping.expires = filing.expiry(sentAt: now)                       // a replace starts the day again
     store.save(ping) → failure: exit 1
     return id (exit 0)
@@ -1556,7 +1586,7 @@ Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an a
 |---|---|---|
 | 1 | `main.swift` (ShipyardCLI) builds the table: `PingCommands.entries(filing: ProjectFiling(…), store: PingStore(SupportFolder.app/Pings))` and `ControlCommands.entries(…)` | nothing read yet; `ProjectFiling` holds the path from `ConfigLocation` (#126) and the resolved store |
 | 2 | `ShipyardCLI.run(["ping", "Tests pass", "--from", "claude"])` → `CommandTable` (Command) → the `ping` entry (Pings) | `PingCommand.Request.parse`: title, sender, no action |
-| 3 | `GitRemote.workingRepository` (Command) | `yahyabedirhan/shop`; target `.repository("yahyabedirhan/shop")` |
+| 3 | `PingCommand.workingRepository` (Pings) over `GitRemote` (Command) | `yahyabedirhan/shop`; target `.repository("yahyabedirhan/shop")` |
 | 4 | `ProjectFiling.file(target, .refuse)` (Config) → `ConfigStore`'s reader on the recorded path, `ResolvedRepositoriesStore.load()` | `Filing(projects: ["shop"], repository: "yahyabedirhan/shop")` |
 | 5 | `defaultAction` → `nil`; `expiry` → `nil`; `PingStore.save` → `RecordStore.save` (Command) | `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
 | 6 | the app (Core): `ConfigWatcher` → `Shipyard.reloadPings()` → `numberPings` → `Listing` → `MenuModel` | as Trace 6, steps 5–7: listed under `shop` as `#1`, notified once |

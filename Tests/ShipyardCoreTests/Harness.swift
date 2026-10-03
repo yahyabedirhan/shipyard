@@ -1,4 +1,6 @@
 import Foundation
+@testable import ShipyardCommand
+@testable import ShipyardPings
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -77,7 +79,9 @@ struct Harness {
         self.store = store
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
-        pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true))
+        let clock = sleeper.clock
+        // Read at the harness's time, so a ping's expiry counts from its clock.
+        pingStore = PingStore(directory: stateDirectory.appendingPathComponent("Pings", isDirectory: true), now: { clock.now })
         repositoriesStore = ResolvedRepositoriesStore(directory: stateDirectory)
         shipyard = Shipyard(
             configStore: ConfigStore(url: configURL),
@@ -192,18 +196,27 @@ struct Harness {
     func cli(_ arguments: [String], origin: String? = nil, herdrPane: String? = nil, variables: [String: String] = [:]) -> CommandResult {
         ShipyardCLI.run(
             arguments,
+            table: macCommands,
             environment: CommandEnvironment(
                 workingDirectory: workingFolder,
                 variables: (herdrPane.map { ["HERDR_PANE_ID": $0] } ?? [:]).merging(variables) { $1 },
-                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:]),
-                // The harness is the Mac's app, so its CLI is the Mac's.
-                platform: .macOS
+                git: FakeGitRemote(origin.map { [workingFolder: $0] } ?? [:])
             ),
-            configURL: configURL,
-            repositories: repositoriesStore,
-            pingStore: pingStore,
             now: clock.now
         )
+    }
+
+    /// The commands the Mac's `shipyard` has, as its `main.swift` assembles
+    /// them, over this harness's configuration file, resolved repositories
+    /// and ping store: the harness is the Mac's app, so its CLI is the Mac's.
+    var macCommands: CommandTable {
+        .commands(filing: macFiling, store: pingStore)
+    }
+
+    /// The Mac's filing, against this harness's configuration file and
+    /// resolved repositories.
+    var macFiling: ProjectFiling {
+        ProjectFiling(configURL: configURL, repositories: repositoriesStore)
     }
 
     /// The section named `name` in the current menu.
@@ -216,6 +229,17 @@ extension GroupID {
     /// The All tab's group of `key`: the All tab has no project.
     static func allTab(_ key: GroupKey) -> GroupID {
         GroupID(project: "", key: key)
+    }
+}
+
+extension CommandTable {
+    /// A `shipyard` build's commands as its `main.swift` assembles them:
+    /// the pings' commands over `filing` (`Unfiled` on a machine without the
+    /// app, `ProjectFiling` on the Mac) and `store`.
+    static func commands(filing: any PingFiling, store: PingStore) -> CommandTable {
+        var table = CommandTable()
+        table.add(PingCommands.entries(filing: filing, store: store))
+        return table
     }
 }
 

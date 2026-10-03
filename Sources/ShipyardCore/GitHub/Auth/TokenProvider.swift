@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// Where the token shipyard signed in with came from.
 public enum TokenSource: Equatable, Sendable {
@@ -51,17 +52,6 @@ public protocol GhTokenLookup: Sendable {
     func token() -> String?
 }
 
-/// The output of a finished command.
-public struct CommandOutput: Equatable, Sendable {
-    public var status: Int32
-    public var standardOutput: String
-
-    public init(status: Int32, standardOutput: String) {
-        self.status = status
-        self.standardOutput = standardOutput
-    }
-}
-
 /// Finds `gh` and runs `gh auth token`.
 ///
 /// An `.app` starts with an almost empty `PATH`, so the Homebrew locations
@@ -69,7 +59,7 @@ public struct CommandOutput: Equatable, Sendable {
 public struct GhCLI: GhTokenLookup {
     /// Runs an executable with arguments and waits for it; `nil` when it
     /// couldn't be started.
-    public typealias Run = @Sendable (_ executable: String, _ arguments: [String]) -> CommandOutput?
+    public typealias Run = ProgramRun
 
     /// Where Homebrew installs `gh`, in the order they're tried.
     public static let knownPaths = [
@@ -111,22 +101,6 @@ public struct GhCLI: GhTokenLookup {
         return token.isEmpty ? nil : token
     }
 
-    /// Runs the command with Foundation's `Process`, reading its output
-    /// before waiting so a full pipe can't block it.
-    public static let runProcess: Run = { executable, arguments in
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return CommandOutput(status: process.terminationStatus, standardOutput: String(decoding: data, as: UTF8.self))
-    }
+    /// Runs the command with Foundation's `Process` (`ProgramRunner.process`).
+    public static let runProcess: Run = ProgramRunner.process
 }

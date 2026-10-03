@@ -1,4 +1,5 @@
 import Foundation
+@testable import ShipyardCommand
 @testable import ShipyardCore
 import Testing
 
@@ -412,7 +413,7 @@ struct ConfigurationValidationTests {
             ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name` or `owner/*`"),
             ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name` or `owner/*`"),
         ])
-        #expect(ConfigurationReader.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
+        #expect(GitRemote.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
     }
 
     @Test("a repository listed twice in one project is rejected, whatever its case")

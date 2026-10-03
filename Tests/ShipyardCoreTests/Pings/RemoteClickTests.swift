@@ -1,5 +1,7 @@
 import Foundation
+@testable import ShipyardCommand
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 /// `shop`, two remote machines, and `[herdr] terminal` set to Ghostty.

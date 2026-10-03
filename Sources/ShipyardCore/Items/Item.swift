@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 /// What kind of thing an item is.
 public enum ItemKind: String, Codable, Equatable, Hashable, Sendable {

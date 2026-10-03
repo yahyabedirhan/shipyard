@@ -1,5 +1,7 @@
 import Foundation
+@testable import ShipyardCommand
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 private let twoProjects = """
@@ -22,7 +24,13 @@ struct PingCommandTests {
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
     /// The agent's working folder, a fake one: `origin` says its remote.
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
-    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote(), platform: .macOS)
+    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
+
+    /// The Mac's filing over the configuration `text` and the resolved lists `resolved`.
+    private func filing(_ text: String = twoProjects, resolved: [String: [String]] = [:]) throws -> ProjectFiling {
+        let configuration = try Configuration.decode(text).configuration
+        return ProjectFiling(configuration: { .success(configuration) }, resolved: { resolved })
+    }
 
     private func ping(
         _ arguments: String...,
@@ -36,11 +44,9 @@ struct PingCommandTests {
             environment: CommandEnvironment(
                 workingDirectory: Self.folder,
                 variables: [:],
-                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:]),
-                platform: .macOS
+                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:])
             ),
-            configuration: try Configuration.decode(config).configuration,
-            resolved: resolved,
+            filing: try filing(config, resolved: resolved),
             store: store,
             now: Harness.now,
             newID: { id }
@@ -245,7 +251,7 @@ struct PingCommandTests {
             let result = PingCommand.run(
                 arguments,
                 environment: environment,
-                configuration: try Configuration.decode(twoProjects).configuration,
+                filing: try filing(),
                 store: store,
                 now: Harness.now
             )
@@ -272,7 +278,7 @@ struct PingCommandTests {
         let result = PingCommand.run(
             ["Ready", "--project", "shop"],
             environment: environment,
-            configuration: try Configuration.decode(twoProjects).configuration,
+            filing: try filing(),
             store: store,
             now: Harness.now,
             newID: { drawn.next()! }
