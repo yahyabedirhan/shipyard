@@ -147,11 +147,8 @@ final class AppServices {
 
     func start() {
         let shipyard = shipyard
-        configWatcher = ConfigWatcher(file: shipyard.configStore.url) { [weak self] in
-            Task {
-                await shipyard.reloadConfiguration()
-                self?.followNoticeListening()
-            }
+        configWatcher = ConfigWatcher(file: shipyard.configStore.url) {
+            Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
         // The `shipyard` CLI writes one file per ping into the store's
@@ -169,19 +166,28 @@ final class AppServices {
         }
         // Before a click that launched the app is handled (it's queued
         // behind this), `start()` has loaded the app state it marks seen in.
-        Task {
-            await shipyard.start()
-            followNoticeListening()
-        }
+        // The listener follows the configuration as soon as it's read,
+        // never waiting on GitHub, which `start()` and a reload then ask.
+        followNoticeListening()
+        Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
         startControl()
     }
 
     /// Listens for notices from other machines when, and on the port, the
     /// configuration says (`Shipyard.noticeListenerPort`), and stops when it
-    /// no longer does (ADR 0010). When the port can't be listened on, the
-    /// app runs on without it and says why in the log.
+    /// no longer does (ADR 0010), watching the port for its next change.
+    /// When the port can't be listened on, the app runs on without it and
+    /// says why in the log.
     private func followNoticeListening() {
+        withObservationTracking {
+            applyNoticeListening()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.followNoticeListening() }
+        }
+    }
+
+    private func applyNoticeListening() {
         let wanted = shipyard.noticeListenerPort
         guard noticeListener?.port != wanted else { return }
         noticeListener?.close()

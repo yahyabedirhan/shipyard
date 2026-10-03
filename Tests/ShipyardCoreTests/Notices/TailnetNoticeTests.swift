@@ -104,6 +104,32 @@ struct TailnetNoticeTests {
         #expect(harness.notifier.removed.count == 1)
     }
 
+    @Test("the listening port is announced as soon as the configuration is read, while GitHub is still answering the first refresh or a reload's")
+    func announcedBeforeRefresh() async throws {
+        let harness = try Harness(stored: "gho_stored", config: "[notify]\nlisten = true\n" + Self.shop)
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([try Harness.fixture("graphql-pull-requests.json")])
+        let shipyard = harness.shipyard
+        let seen = Locked<[Int?]>([])
+        // What the app watches: the port, through observation, while a GitHub request is in flight.
+        harness.stub.onSend { _ in
+            let port = await MainActor.run { shipyard.noticeListenerPort }
+            seen.withValue { $0.append(port) }
+        }
+        let announced = Locked(false)
+        withObservationTracking { _ = shipyard.noticeListenerPort } onChange: { announced.withValue { $0 = true } }
+
+        await shipyard.start()
+
+        #expect(announced.current)
+        #expect(seen.current.first == 47420)
+
+        seen.withValue { $0 = [] }
+        try harness.writeConfig("[notify]\nlisten = true\nport = 50000\n" + Self.shop)
+        await shipyard.reloadConfiguration()
+        #expect(seen.current.last == 50000)
+    }
+
     @Test("the app listens for notices only with [notify] listen = true, on its port, and stops when the setting goes")
     func listening() async throws {
         let harness = try await app()

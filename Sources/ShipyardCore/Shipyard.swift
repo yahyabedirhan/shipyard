@@ -471,6 +471,9 @@ public final class Shipyard {
         configError = configStore.error
         configWarnings = configStore.warnings
         presets = configStore.acceptsPreset ? Preset.all : []
+        let notify = configStore.lastValid.notify
+        let port = notify.listen ? notify.port : nil
+        if noticeListenerPort != port { noticeListenerPort = port }
         configStatusStore.record(ConfigStatus(
             checked: clock.now,
             config: configStore.url,
@@ -971,10 +974,10 @@ public final class Shipyard {
     /// The port on 127.0.0.1 the app listens on for notices from other
     /// machines, as the last valid configuration's `[notify]` says; `nil`
     /// unless `listen = true`, so nothing listens unless the user asked.
-    public var noticeListenerPort: Int? {
-        let notify = configStore.lastValid.notify
-        return notify.listen ? notify.port : nil
-    }
+    /// Set by every read of the configuration (`publishConfigStatus`), before
+    /// any GitHub request, and observed: the app follows its changes, so the
+    /// listener never waits on a refresh.
+    public private(set) var noticeListenerPort: Int?
 
     /// Marks the row's item seen without opening it (⌥-click): it needs
     /// attention again only once it changes. A ping's action isn't run,
