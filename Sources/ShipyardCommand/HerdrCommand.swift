@@ -73,10 +73,12 @@ public struct HerdrCommand: Sendable {
     }
 
     /// Runs `herdr` with `arguments`, on the saved machine `machine` when
-    /// it's given (`--machine <label>` first).
-    package func run(_ arguments: [String], on machine: String? = nil) async -> Outcome {
+    /// it's given (`--machine <label>` first), else against the named local
+    /// session `session` when it's given (`--session <name>` first). Herdr
+    /// refuses the two together: a saved machine names its own session.
+    package func run(_ arguments: [String], on machine: String? = nil, inSession session: String? = nil) async -> Outcome {
         guard let herdr = locate() else { return .notFound }
-        let prefix = machine.map { ["--machine", $0] } ?? []
+        let prefix = machine.map { ["--machine", $0] } ?? session.map { ["--session", $0] } ?? []
         let invocation = ShellInvocation(executable: herdr, arguments: prefix + arguments)
         let runner = runner, timeout = timeout, sleep = sleep
         // Whichever ends first stops the other (the runner returns at once

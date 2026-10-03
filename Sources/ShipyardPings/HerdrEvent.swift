@@ -84,6 +84,9 @@ public enum HerdrEvent {
         )
         return PingCommand.send(
             request,
+            // The hook runs in its server's environment, so a named
+            // session's name is there as in its panes.
+            herdrSession: PingCommand.herdrSession(environment.variables),
             folder: pane.folder,
             git: environment.git,
             filing: filing,

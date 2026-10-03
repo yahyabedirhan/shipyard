@@ -45,17 +45,21 @@ private extension Harness {
     /// (each `nil`: not set), Herdr's own `herdr` the fake one, and
     /// `agentFolder`'s `origin` `origin`, filing through `filing` (`nil`:
     /// the Mac's), with the focused pane `focusedPane` (`HERDR_PANE_ID` in a
-    /// hook is the focused pane).
+    /// hook is the focused pane), in the named Herdr session `session`
+    /// (`HERDR_SESSION`, which a hook inherits from its server; `nil`: the
+    /// default session).
     @discardableResult
     func herdrEvent(
         _ event: String?,
         _ json: String?,
         origin: String? = "git@github.com:yahyabedirhan/shop.git",
         filing: (any PingFiling)? = nil,
-        focusedPane: String? = nil
+        focusedPane: String? = nil,
+        session: String? = nil
     ) -> CommandResult {
         var variables = ["HERDR_BIN_PATH": FakeHerdr.path, "HERDR_ENV": "1"]
         variables["HERDR_PANE_ID"] = focusedPane
+        variables["HERDR_SESSION"] = session
         variables["HERDR_PLUGIN_EVENT"] = event
         variables["HERDR_PLUGIN_EVENT_JSON"] = json
         return ShipyardCLI.run(
@@ -88,6 +92,16 @@ private extension Harness {
 @MainActor
 struct HerdrEventTests {
     // MARK: Blocked
+
+    @Test("a blocked agent in a named Herdr session pings to be focused in that session")
+    func blockedInNamedSession() throws {
+        let harness = try Harness(config: shop)
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "CC · checkout", folder: agentFolder)
+
+        harness.herdrEvent("pane.agent_status_changed", statusChanged("blocked"), session: "work")
+
+        #expect(harness.pingStore.ping(id: "herdr-w1-p3")?.herdrSession == "work")
+    }
 
     @Test("a blocked agent sends herdr-<pane>, from the agent, focusing its pane, naming its tab, filed by its folder")
     func blockedSends() async throws {

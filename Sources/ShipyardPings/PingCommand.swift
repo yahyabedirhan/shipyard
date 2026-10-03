@@ -69,6 +69,19 @@ public enum PingCommand {
     /// pane's id, which `--herdr` without an id takes.
     static let herdrPaneVariable = "HERDR_PANE_ID"
 
+    /// The environment variable Herdr sets in the panes of a named session
+    /// (`herdr --session <name>`) to its name, inherited from its server.
+    static let herdrSessionVariable = "HERDR_SESSION"
+
+    /// The named Herdr session the CLI runs in, which a `--herdr` ping is
+    /// focused in on a click: `HERDR_SESSION`, when it names one. `nil` in
+    /// Herdr's default session (where it's unset, or `default`) and outside
+    /// Herdr.
+    static func herdrSession(_ variables: [String: String]) -> String? {
+        let name = variables[herdrSessionVariable]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty || name == "default" ? nil : name
+    }
+
     /// The bundle id of the terminal app the CLI runs in, which a `--herdr`
     /// ping brings forward on a click when `[herdr] terminal` is unset.
     /// `TERM_PROGRAM` names it when it's a known terminal's; Herdr sets its
@@ -125,11 +138,15 @@ public enum PingCommand {
         var sending = request
         // An action the agent gives wins over the filing's.
         if sending.action == nil { sending.action = filing.defaultAction(environment) }
-        let terminal: String?
-        if case .herdr = sending.action { terminal = outerTerminal(environment.variables) } else { terminal = nil }
+        var terminal: String?, session: String?
+        if case .herdr = sending.action {
+            terminal = outerTerminal(environment.variables)
+            session = herdrSession(environment.variables)
+        }
         return send(
             sending,
             terminal: terminal,
+            herdrSession: session,
             folder: environment.workingDirectory,
             git: environment.git,
             filing: filing,
@@ -139,8 +156,9 @@ public enum PingCommand {
         )
     }
 
-    /// Files `request` through `filing` and saves it, with the terminal a
-    /// `--herdr` ping was sent from (`outerTerminal`), as `run` does once
+    /// Files `request` through `filing` and saves it, with the terminal and
+    /// the named Herdr session a `--herdr` ping was sent from
+    /// (`outerTerminal`, `herdrSession`), as `run` does once
     /// its arguments read, then prints its id. It's filed by the one
     /// project `--project` names, else by its repository (`--repo`, else
     /// the `origin` of `folder`; none when `folder` is `nil`). A refusal is
@@ -152,6 +170,7 @@ public enum PingCommand {
     static func send(
         _ request: Request,
         terminal: String? = nil,
+        herdrSession: String? = nil,
         folder: URL?,
         git: any GitRemoteLookup,
         filing: any PingFiling,
@@ -188,6 +207,7 @@ public enum PingCommand {
                 sender: request.sender,
                 action: request.action,
                 terminal: terminal,
+                herdrSession: herdrSession,
                 instance: replaced?.instance ?? UUID().uuidString.lowercased(),
                 expires: filing.expiry(sentAt: now)
             ))

@@ -31,6 +31,13 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     /// forward on a click when `[herdr] terminal` isn't set; `nil` for any
     /// other ping, when the CLI couldn't tell, or before it was kept.
     public var terminal: String?
+    /// The named Herdr session a `--herdr` ping was sent from (Herdr's
+    /// `HERDR_SESSION` in the pane), whose server a click focuses its tab or
+    /// pane on (`herdr --session <name>`); `nil` for Herdr's default
+    /// session, for any other ping, and before it was kept. Kept on the
+    /// machine, never listed (`PingList`): a remote ping is focused in the
+    /// session its saved machine names.
+    public var herdrSession: String?
     /// Why its action last failed, in a few words for its row, shown until
     /// the next click, ⌥-click or dismiss; `nil` when it hasn't failed.
     public var failure: String?
@@ -55,7 +62,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var machine: String?
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, projects, sent, seen, repository, body, sender, action, terminal, failure, failureDetail, instance, expires
+        case id, title, projects, sent, seen, repository, body, sender, action, terminal, herdrSession, failure, failureDetail, instance, expires
     }
 
     public init(
@@ -69,6 +76,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         sender: String? = nil,
         action: PingAction? = nil,
         terminal: String? = nil,
+        herdrSession: String? = nil,
         failure: String? = nil,
         failureDetail: String? = nil,
         instance: String? = nil,
@@ -85,6 +93,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         self.sender = sender
         self.action = action
         self.terminal = terminal
+        self.herdrSession = herdrSession
         self.failure = failure
         self.failureDetail = failureDetail
         self.instance = instance

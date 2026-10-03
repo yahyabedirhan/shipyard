@@ -12,6 +12,11 @@ import ShipyardPings
 /// answers as Herdr does with no server. `command` answers the same way for
 /// the `shipyard` command, which runs programs synchronously.
 ///
+/// It runs named local sessions too (`open(tab:panes:inSession:)`):
+/// `herdr --session <name> pane get <id>` and `… tab focus <id>` answer
+/// from that session's server, a session not opened as Herdr does when
+/// its server isn't running, and `--session default` as plain `herdr`.
+///
 /// It knows saved machines too (`addMachine`): `herdr --machine <label>
 /// plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` starts
 /// a command log record of the machine's pings as `shipyard ping list
@@ -41,6 +46,10 @@ final class FakeHerdr: ShellRunning {
         var statuses: [String: String] = [:]
         var runs: [[String]] = []
         var focused: [String] = []
+        /// Each named session's tabs and panes, each to its tab (a tab to itself).
+        var sessions: [String: [String: String]] = [:]
+        /// The tabs focused in each named session, in order.
+        var focusedInSessions: [String: [String]] = [:]
         var machines: [String: Machine] = [:]
         var nextLog = 1
         /// Set by `timeOutReads`: every wait for an answer ends at once.
@@ -105,6 +114,20 @@ final class FakeHerdr: ShellRunning {
             state.tabs[tab] = label
             for pane in panes { state.panes[pane] = tab }
         }
+    }
+
+    /// Opens the tab `tab`, with the panes `panes` in it, in the named
+    /// session `session`, starting its server when it's the first.
+    func open(tab: String, panes: [String] = [], inSession session: String) {
+        state.withValue { state in
+            state.sessions[session, default: [:]][tab] = tab
+            for pane in panes { state.sessions[session, default: [:]][pane] = tab }
+        }
+    }
+
+    /// The tabs focused in the named session `session`, in order.
+    func focused(inSession session: String) -> [String] {
+        state.current.focusedInSessions[session] ?? []
     }
 
     /// Opens the pane `pane` in tab `tab` (labelled `label`), working in
@@ -245,6 +268,10 @@ final class FakeHerdr: ShellRunning {
             if arguments.first == "--machine", arguments.count > 1 {
                 return Self.answer(Array(arguments.dropFirst(2)), on: arguments[1], in: &state)
             }
+            if arguments.first == "--session", arguments.count > 1, arguments[1] != "default" {
+                return Self.answer(Array(arguments.dropFirst(2)), inSession: arguments[1], in: &state)
+            }
+            let arguments = arguments.first == "--session" ? Array(arguments.dropFirst(2)) : arguments
             if arguments == ["pane", "list"] {
                 let panes = state.panes.sorted { $0.key < $1.key }.map { #"{"pane_id":"\#($0.key)","tab_id":"\#($0.value)"}"# }
                 return ShellOutput(status: 0, output: #"{"id":"cli:pane:list","result":{"panes":[\#(panes.joined(separator: ","))],"type":"pane_list"}}"# + "\n")
@@ -266,6 +293,30 @@ final class FakeHerdr: ShellRunning {
                 return ShellOutput(status: 2, output: "usage: herdr …\n")
             }
         }
+    }
+
+    /// Answers `arguments` run with `--session <session>`, a named session.
+    private static func answer(_ arguments: [String], inSession session: String, in state: inout State) -> ShellOutput {
+        // Herdr's words when no server listens on the session's socket (`cli/server_not_running.rs`).
+        guard let known = state.sessions[session] else {
+            return error("server_not_running", "no herdr server is running at /herdr/sessions/\(session)/herdr.sock; run `herdr session attach \(session)` to start or attach it")
+        }
+        let id = arguments.last ?? ""
+        switch arguments {
+        case ["pane", "get", id] where !isTab(id):
+            guard let tab = known[id] else { return error("pane_not_found", "pane \(id) not found") }
+            return json(["id": "cli:pane:get", "result": ["type": "pane_info", "pane": ["pane_id": id, "tab_id": tab]] as [String: Any]])
+        case ["tab", "focus", id] where isTab(id):
+            guard known[id] != nil else { return error("tab_not_found", "tab \(id) not found") }
+            state.focusedInSessions[session, default: []].append(id)
+            return json(["id": "cli:tab:focus", "result": ["type": "ok"]])
+        default:
+            return ShellOutput(status: 2, output: "usage: herdr …\n")
+        }
+    }
+
+    private static func isTab(_ id: String) -> Bool {
+        id.range(of: ":t[0-9]+$", options: .regularExpression) != nil
     }
 
     /// Answers `arguments` run with `--machine <label>`.

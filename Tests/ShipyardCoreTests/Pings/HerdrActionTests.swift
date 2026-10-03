@@ -210,6 +210,52 @@ struct HerdrActionTests {
         #expect(harness.pingStore.ping(id: id)?.seen == harness.clock.now)
     }
 
+    // MARK: A named Herdr session
+
+    @Test("a ping sent from a named Herdr session focuses its pane in that session, not the default one")
+    func namedSession() async throws {
+        let harness = try await Harness.started(config: shopInGhostty, graphQL: onePullRequest)
+        // Each session numbers its panes alike: the default one has a w1:p3 too.
+        harness.herdr.open(tab: "w1:t1", panes: ["w1:p3"])
+        harness.herdr.open(tab: "w1:t2", panes: ["w1:p3"], inSession: "work")
+        let id = try await harness.send("Waiting", "--herdr", pane: "w1:p3", variables: ["HERDR_SESSION": "work"])
+
+        try await harness.click("Waiting")
+
+        #expect(harness.herdr.runs == [["--session", "work", "pane", "get", "w1:p3"], ["--session", "work", "tab", "focus", "w1:t2"]])
+        #expect(harness.herdr.focused(inSession: "work") == ["w1:t2"])
+        #expect(harness.herdr.focused.isEmpty)
+        #expect(harness.actions.ran == [.app("Ghostty")])
+        #expect(harness.pingStore.ping(id: id)?.seen == harness.clock.now)
+    }
+
+    @Test("a ping from Herdr's default session, which may name itself default, focuses as before", arguments: [nil, "default"] as [String?])
+    func defaultSession(_ name: String?) async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        harness.herdr.open(tab: "w1:t1", panes: ["w1:p3"])
+        let id = try await harness.send("Waiting", "--herdr", pane: "w1:p3", variables: name.map { ["HERDR_SESSION": $0] } ?? [:])
+
+        try await harness.click("Waiting")
+
+        #expect(harness.pingStore.ping(id: id)?.herdrSession == nil)
+        #expect(harness.herdr.runs == [["pane", "get", "w1:p3"], ["tab", "focus", "w1:t1"]])
+    }
+
+    @Test("a named session whose server isn't running fails the action, naming the session")
+    func namedSessionNotRunning() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        harness.herdr.open(tab: "w1:t1", panes: ["w1:p3"])
+        try await harness.send("Waiting", "--herdr", pane: "w1:p3", variables: ["HERDR_SESSION": "work"])
+
+        try await harness.click("Waiting")
+
+        let row = try harness.pingRow("Waiting")
+        #expect(row.needsAttention)
+        #expect(row.actionError == "Herdr off")
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Herdr session work isn't running")
+        #expect(harness.herdr.focused.isEmpty)
+    }
+
     @Test("clicking the ping's notification runs the Herdr action too")
     func fromNotification() async throws {
         let harness = try await Harness.started(config: shopInGhostty, graphQL: onePullRequest)
