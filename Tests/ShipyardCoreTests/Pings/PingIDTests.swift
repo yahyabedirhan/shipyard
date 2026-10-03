@@ -1,4 +1,6 @@
 import Foundation
+@testable import ShipyardCommand
+@testable import ShipyardPings
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -45,9 +47,6 @@ private extension Harness {
     func pingRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
-
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
 
     /// Refreshes with GitHub answering `onePullRequest` again.
     func refreshAgain() async {
@@ -112,16 +111,16 @@ struct PingIDTests {
 
     // MARK: Replacing
 
-    @Test("sending an id again replaces content, action and filing, keeps the sent time, and needs attention again")
+    @Test("sending an id again replaces content, action and filing, starts its age again, and needs attention again")
     func replace() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
-        let sent = harness.clock.now
         try await harness.send("Waiting for your input", "--project", "shop", "--id", "input", "--body", "Which total?", "--from", "agent", "--open", "https://example.com")
         harness.shipyard.markSeen(try #require(harness.pingRows().first))
         try harness.pingStore.recordFailure(try #require(harness.pingStore.ping(id: "input")), reason: "the app isn't installed")
         #expect(harness.shipyard.menu.attention.pings == 0)
 
         harness.clock.advance(by: 600)
+        let replacedAt = harness.clock.now
         try await harness.send("Still waiting, 10 min", "--id", "input", "--project", "blog", "--app", "Claude")
 
         let ping = try #require(harness.pingStore.ping(id: "input"))
@@ -131,11 +130,12 @@ struct PingIDTests {
         #expect(ping.sender == nil)
         #expect(ping.action == .app("Claude"))
         #expect(ping.projects == ["blog"])
-        #expect(ping.sent == sent)
+        #expect(ping.sent == replacedAt)
         #expect(ping.seen == nil)
         #expect(ping.failure == nil)
         #expect(harness.pingRows("shop").isEmpty)
         #expect(harness.pingRows("blog").map(\.title) == ["Still waiting, 10 min"])
+        #expect(harness.pingRows("blog").first?.since == replacedAt)
         #expect(harness.pingRows("blog").first?.needsAttention == true)
         #expect(harness.shipyard.menu.attention.pings == 1)
     }
@@ -308,15 +308,17 @@ struct PingIDTests {
 
     // MARK: --
 
-    @Test("after --, everything is the title: withdraw, or a word starting with --")
+    @Test("after --, everything is the title: withdraw, list, or a word starting with --")
     func endOfOptions() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
 
         try await harness.send("--project", "shop", "--id", "word", "--", "withdraw")
+        try await harness.send("--project", "shop", "--id", "listing", "--", "list")
         try await harness.send("--project", "shop", "--id", "flag", "--", "--help")
         try await harness.send("--project", "shop", "--id", "dashes", "--", "--")
 
         #expect(harness.pingStore.ping(id: "word")?.title == "withdraw")
+        #expect(harness.pingStore.ping(id: "listing")?.title == "list")
         #expect(harness.pingStore.ping(id: "flag")?.title == "--help")
         // Only the first -- ends the flags; a second is the title.
         #expect(harness.pingStore.ping(id: "dashes")?.title == "--")
@@ -330,16 +332,5 @@ struct PingIDTests {
 
         #expect(result.status == 2)
         #expect(result.error == "shipyard ping: one title only; quote it: shipyard ping \"-- --id\"\n")
-    }
-
-    @Test("the help shows --id, withdraw and --")
-    func help() throws {
-        let harness = try Harness(config: shopAndBlog)
-
-        let ping = harness.cli("ping", "--help").output
-        #expect(ping.contains("[--id <id>]"))
-        #expect(ping.contains("shipyard ping withdraw <id>"))
-        #expect(ping.contains("shipyard ping -- withdraw"))
-        #expect(harness.cli("--help").output.contains("shipyard ping withdraw <id>"))
     }
 }

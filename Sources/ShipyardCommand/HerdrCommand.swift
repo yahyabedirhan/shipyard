@@ -2,8 +2,9 @@ import Foundation
 
 /// Runs the `herdr` command for shipyard: on this computer, or on a saved
 /// machine through Herdr's own connection to it (`herdr --machine <label>
-/// …`). `HerdrFocus` focuses a ping's tab with it and `RemotePingReader`
-/// asks a machine for its pings.
+/// …`). The app's `HerdrFocus` focuses a ping's tab with it and its
+/// `RemotePingReader` asks a machine for its pings; `shipyard herdr-event`
+/// finds `herdr` with `locate`.
 ///
 /// It runs `herdr` itself, not through a shell, behind the `ShellRunning`
 /// port the skill installer uses (standard output and error together), so
@@ -12,7 +13,7 @@ import Foundation
 /// then on `PATH`, as `gh` is. Each run races `timeout`.
 public struct HerdrCommand: Sendable {
     /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
-    public static func knownPaths(home: URL) -> [String] {
+    private static func knownPaths(home: URL) -> [String] {
         [
             home.appendingPathComponent(".local/bin/herdr").path,
             "/opt/homebrew/bin/herdr",
@@ -44,13 +45,13 @@ public struct HerdrCommand: Sendable {
     }
 
     /// The first `herdr` found: the known paths, then each `PATH` directory.
-    func locate() -> String? {
+    package func locate() -> String? {
         Self.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
     }
 
     /// The first `herdr` found under the home folder `home`: the known
     /// paths, then each directory of `pathEnvironment`.
-    static func locate(home: URL, pathEnvironment: String?, isExecutable: (String) -> Bool) -> String? {
+    public static func locate(home: URL, pathEnvironment: String?, isExecutable: (String) -> Bool) -> String? {
         if let known = knownPaths(home: home).first(where: isExecutable) { return known }
         for directory in (pathEnvironment ?? "").split(separator: ":") {
             let candidate = directory.hasSuffix("/") ? "\(directory)herdr" : "\(directory)/herdr"
@@ -60,7 +61,7 @@ public struct HerdrCommand: Sendable {
     }
 
     /// How a run went.
-    enum Outcome: Sendable {
+    package enum Outcome: Sendable {
         /// No `herdr` was found.
         case notFound
         /// `herdr` was found but wouldn't start.
@@ -72,10 +73,12 @@ public struct HerdrCommand: Sendable {
     }
 
     /// Runs `herdr` with `arguments`, on the saved machine `machine` when
-    /// it's given (`--machine <label>` first).
-    func run(_ arguments: [String], on machine: String? = nil) async -> Outcome {
+    /// it's given (`--machine <label>` first), else against the named local
+    /// session `session` when it's given (`--session <name>` first). Herdr
+    /// refuses the two together: a saved machine names its own session.
+    package func run(_ arguments: [String], on machine: String? = nil, inSession session: String? = nil) async -> Outcome {
         guard let herdr = locate() else { return .notFound }
-        let prefix = machine.map { ["--machine", $0] } ?? []
+        let prefix = machine.map { ["--machine", $0] } ?? session.map { ["--session", $0] } ?? []
         let invocation = ShellInvocation(executable: herdr, arguments: prefix + arguments)
         let runner = runner, timeout = timeout, sleep = sleep
         // Whichever ends first stops the other (the runner returns at once
@@ -98,7 +101,7 @@ public struct HerdrCommand: Sendable {
 
     /// `output` read as Herdr's one JSON object: its `result` when the run
     /// worked; else its error's `code` and `message`, when it says.
-    static func answer(_ output: ShellOutput) -> Result<[String: Any], HerdrError> {
+    package static func answer(_ output: ShellOutput) -> Result<[String: Any], HerdrError> {
         let answer = (try? JSONSerialization.jsonObject(with: Data(output.output.utf8))) as? [String: Any]
         if output.status == 0 {
             return .success(answer?["result"] as? [String: Any] ?? [:])
@@ -112,7 +115,7 @@ public struct HerdrCommand: Sendable {
     /// poll and a click both say it. As Herdr's `cli/target.rs`
     /// (`resolve_machine`, at commit 65e35a3) words them, after `error: `,
     /// with exit status 2.
-    static func refusal(_ output: String, machine label: String) -> String? {
+    package static func refusal(_ output: String, machine label: String) -> String? {
         let line = output.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         switch line {
         case "error: unknown machine '\(label)'; use `herdr machine list`":
@@ -127,8 +130,8 @@ public struct HerdrCommand: Sendable {
     }
 
     /// The error Herdr answered with; both `nil` when it didn't say.
-    struct HerdrError: Error {
-        var code: String?
-        var message: String?
+    package struct HerdrError: Error {
+        package var code: String?
+        package var message: String?
     }
 }

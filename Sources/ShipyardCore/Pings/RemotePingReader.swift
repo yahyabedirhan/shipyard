@@ -1,4 +1,6 @@
 import Foundation
+import ShipyardCommand
+import ShipyardPings
 
 /// Asks one machine for its pings, through the Mac's Herdr and its saved
 /// machine connection (ADR 0005): never `ssh`, never an address.

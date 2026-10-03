@@ -1,5 +1,10 @@
 import AppKit
+import os
+import ShipyardCommand
+import ShipyardConfig
+import ShipyardControl
 import ShipyardCore
+import ShipyardPings
 import SwiftUI
 
 /// The menu bar app: an icon with no Dock icon (`LSUIElement` in the
@@ -56,11 +61,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         services.start()
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        services.stop()
+    }
 }
 
 /// The core with the app's adapters plugged in, and the triggers that make
 /// it refresh: the configuration watcher and waking from sleep. The panel's
-/// footer actions live here too.
+/// footer actions live here too, and app control's server, which the
+/// `shipyard` command asks through `control.sock`.
 @MainActor
 final class AppServices {
     let shipyard: Shipyard
@@ -74,7 +84,7 @@ final class AppServices {
     )
     /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
-        directory: AppServices.appSupportDirectory.appendingPathComponent("Avatar", isDirectory: true),
+        directory: AppServices.files.avatars,
         transport: URLSessionTransport()
     )
     private let notifier = Notifier()
@@ -82,20 +92,28 @@ final class AppServices {
     private var configWatcher: ConfigWatcher?
     private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
+    /// Whether the panel is open and the tab it shows, which its views and
+    /// app control both read and set.
+    let panelState = PanelState()
+    /// The panel as app control sees it.
+    private let panelControl: PanelControl
+    private var controlServer: ControlServer?
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
     init() {
-        let configURL = ConfigStore.defaultURL()
+        let files = Self.files
         shipyard = Shipyard(
-            configStore: ConfigStore(url: configURL),
-            appStateStore: AppStateStore(directory: Self.appSupportDirectory),
-            configStatusStore: ConfigStatusStore(directory: Self.appSupportDirectory),
-            pingStore: PingStore(directory: PingStore.defaultDirectory),
-            repositoriesStore: ResolvedRepositoriesStore(directory: Self.appSupportDirectory),
+            configStore: ConfigStore(url: files.config),
+            appStateStore: AppStateStore(directory: files.support),
+            configStatusStore: ConfigStatusStore(directory: files.support),
+            pingStore: PingStore(directory: files.pings),
+            repositoriesStore: ResolvedRepositoriesStore(directory: files.support),
             tokenStore: Keychain(),
             actions: opener,
             notifier: notifier,
-            loginItem: LaunchAtLogin()
+            loginItem: files.loginItem(LaunchAtLogin())
         )
+        panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
         notifier.onOpen = { [weak self] url in
             shipyard.openNotification(url)
@@ -103,10 +121,11 @@ final class AppServices {
         }
     }
 
-    /// `~/Library/Application Support/Shipyard/`, where `state.json` and
-    /// `config-status.json` live: the core's one definition, which the CLI
-    /// reads `repositories.json` from, so the two can't disagree.
-    static var appSupportDirectory: URL { ResolvedRepositoriesStore.defaultDirectory }
+    /// Where the app reads and writes: `config.toml` and the support folder
+    /// (`SupportFolder`'s one definition, which the CLI reads
+    /// `repositories.json` from, so the two can't disagree), both moved
+    /// into a demo's folder in a demo run.
+    static let files = AppFiles(environment: ProcessInfo.processInfo.environment)
 
     func start() {
         let shipyard = shipyard
@@ -115,8 +134,12 @@ final class AppServices {
         }
         configWatcher?.start()
         // The `shipyard` CLI writes one file per ping into the store's
-        // directory: watching it as a "file" sees each one arrive.
-        pingWatcher = ConfigWatcher(file: shipyard.pingStore.directory) {
+        // directory: watching that folder alone sees each one arrive, and
+        // not the app's own saves to `state.json` beside it. The folder is
+        // made before the watch opens (`Shipyard.start()` makes it too),
+        // so the watch is on it from the first moment.
+        try? shipyard.pingStore.createDirectory()
+        pingWatcher = ConfigWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
             Task { await shipyard.reloadPings() }
         }
         pingWatcher?.start()
@@ -127,6 +150,33 @@ final class AppServices {
         // behind this), `start()` has loaded the app state it marks seen in.
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
+        startControl()
+    }
+
+    /// Listens on `control.sock` for the `shipyard` command. When it can't,
+    /// the app runs on without app control and says why in the log.
+    private func startControl() {
+        let screenshotter = Screenshotter(panel: panelControl) { [unowned self] in
+            AnyView(Panel(shipyard: shipyard, actions: self, isSnapshot: true))
+        }
+        let server = ControlServer(
+            socket: ControlSocket.url(in: Self.files.support),
+            panel: panelControl,
+            screenshotter: screenshotter,
+            quit: { NSApp.terminate(nil) }
+        )
+        do {
+            try server.start()
+            controlServer = server
+        } catch {
+            Self.log.error("app control is off: \(error.description, privacy: .public)")
+        }
+    }
+
+    /// Before the app quits: stops app control and removes its socket.
+    func stop() {
+        controlServer?.stop()
+        controlServer = nil
     }
 
     // MARK: - Layout actions
@@ -181,12 +231,14 @@ final class AppServices {
     /// have changed it in System Settings). It doesn't refresh: looking
     /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
+        panelState.isOpen = true
         Task { await notifier.checkPermission() }
     }
 
     /// Closing the panel caps every group Show more revealed, so the menu
     /// opens with every cap back.
     func panelClosed() {
+        panelState.isOpen = false
         shipyard.panelClosed()
     }
 
@@ -219,69 +271,10 @@ final class AppServices {
     /// the configuration file), as a menu bar menu does; otherwise it stays on screen
     /// without being the key window, and keys go to the other app.
     /// Actions that only change the menu (⌥-click, collapse, Mark all
-    /// seen) don't call it.
-    ///
-    /// SwiftUI has no API to dismiss a `.window` style `MenuBarExtra`
-    /// (FB11984872), and closing its window directly leaves SwiftUI
-    /// thinking it's open, so the next click on the icon does nothing.
-    /// This closes it the way a click on the icon does, as the
-    /// MenuBarExtraAccess package does: through the status item. On
-    /// macOS 26 and earlier the icon's button toggles the window; from
-    /// macOS 27 the window lives for an "expanded interface session"
-    /// (private, so reached by selector and guarded), which is cancelled.
-    /// Each private selector is called only when it takes no argument and
-    /// returns an object, so a change to it leaves the menu open instead
-    /// of crashing.
-    /// It runs on the next turn of the main loop, after the click that
-    /// called it is handled.
+    /// seen) don't call it. It closes it as a click on the icon does
+    /// (`MenuBarWindow`).
     func closeMenu() {
-        DispatchQueue.main.async {
-            guard let item = Self.menuBarStatusItem() else { return }
-            let delegate = NSSelectorFromString("expandedInterfaceDelegate")
-            let session = NSSelectorFromString("expandedInterfaceSession")
-            if Self.returnsObject(item, delegate), Self.returnsObject(item, session),
-               item.perform(delegate)?.takeUnretainedValue() != nil {
-                // macOS 27+: SwiftUI drives the window through a session
-                // (the button's target is nil); it's presented while one exists.
-                let cancel = NSSelectorFromString("cancel")
-                if let current = item.perform(session)?.takeUnretainedValue() as? NSObject,
-                   Self.takesNoArguments(current, cancel) {
-                    current.perform(cancel)
-                }
-            } else if let button = item.button, button.state != .off {
-                // macOS 26 and earlier: the button is on while presented.
-                button.performClick(nil)
-            }
-        }
-    }
-
-    /// Whether `object` has an instance method `selector` that takes no
-    /// argument and returns an object, so `perform(_:)` can call it and
-    /// read its result.
-    private static func returnsObject(_ object: NSObject, _ selector: Selector) -> Bool {
-        guard takesNoArguments(object, selector),
-              let method = class_getInstanceMethod(type(of: object), selector) else { return false }
-        let type = method_copyReturnType(method)
-        defer { free(type) }
-        return String(cString: type) == "@"
-    }
-
-    /// Whether `object` has an instance method `selector` that takes no
-    /// argument (besides `self` and `_cmd`), so `perform(_:)` can call it.
-    private static func takesNoArguments(_ object: NSObject, _ selector: Selector) -> Bool {
-        guard object.responds(to: selector),
-              let method = class_getInstanceMethod(type(of: object), selector) else { return false }
-        return method_getNumberOfArguments(method) == 2
-    }
-
-    /// The menu bar icon's status item: the app has one, found through
-    /// its status bar window (a private `NSWindow` subclass that holds it).
-    private static func menuBarStatusItem() -> NSStatusItem? {
-        let key = "statusItem"
-        for window in NSApp.windows where window.responds(to: NSSelectorFromString(key)) {
-            if let item = window.value(forKey: key) as? NSStatusItem { return item }
-        }
-        return nil
+        MenuBarWindow.close()
     }
 
     func quit() {

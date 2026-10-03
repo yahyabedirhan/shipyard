@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 // Selectors name authors and repositories in the configuration (ADR 0002):
 // a bare word is a group, `@` marks a login and `/` a repository. The key a
@@ -66,25 +67,6 @@ public enum AuthorSelector: Hashable, Sendable, CustomStringConvertible {
         }
     }
 
-    /// Whether this selector covers an author. `viewer` is the signed-in
-    /// login, when known; an author the fetch already marked `.me` is the
-    /// viewer too. Logins match ignoring case, as GitHub's do.
-    public func matches(author: String, kind: AuthorKind, viewer: String?) -> Bool {
-        let author = author.lowercased()
-        let isBot = kind == .bot || author.hasSuffix("[bot]")
-        let isMe = !isBot && (kind == .me || viewer.map { $0.lowercased() == author } ?? false)
-        switch self {
-        case .me: return isMe
-        case .bots: return isBot
-        case .others: return !isMe && !isBot
-        case .login(let login): return login.lowercased() == author
-        }
-    }
-
-    public func matches(_ item: Item, viewer: String?) -> Bool {
-        matches(author: item.author, kind: item.authorKind, viewer: viewer)
-    }
-
     /// A GitHub login: letters, digits and hyphens, starting with a letter
     /// or digit; a bot's keeps GitHub's `[bot]` suffix.
     static func isLogin(_ text: String) -> Bool {
@@ -108,15 +90,6 @@ public struct AuthorFilter: Equatable, Sendable {
     public init(show: [AuthorSelector] = [], hide: [AuthorSelector] = []) {
         self.show = show
         self.hide = hide
-    }
-
-    public func includes(author: String, kind: AuthorKind, viewer: String?) -> Bool {
-        let matches = { (selector: AuthorSelector) in selector.matches(author: author, kind: kind, viewer: viewer) }
-        return (show.isEmpty || show.contains(where: matches)) && !hide.contains(where: matches)
-    }
-
-    public func includes(_ item: Item, viewer: String?) -> Bool {
-        includes(author: item.author, kind: item.authorKind, viewer: viewer)
     }
 }
 
@@ -172,7 +145,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
 
     /// The bare words `repositories` takes, in the documentation's order.
     public static let groupNames = RepositoryGroup.allCases.map(\.rawValue) + [anywhereName]
-    static let anywhereName = "anywhere"
+    package static let anywhereName = "anywhere"
 
     /// The selector as it's written in the file.
     public var description: String {
@@ -218,7 +191,7 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
             if text.hasSuffix("/*") {
                 let owner = String(text.dropLast(2))
                 if isLogin(owner) { return .owner(owner) }
-            } else if ConfigurationReader.isRepositorySlug(text) {
+            } else if GitRemote.isRepositorySlug(text) {
                 return .repository(text)
             }
             throw RepositorySelectorRejection("repository `\(text)` isn't `owner/name` or `owner/*`")

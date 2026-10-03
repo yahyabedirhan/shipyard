@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
@@ -6,9 +7,8 @@ import Testing
 /// their Herdr labels.
 @Suite("Configuration: remote machines")
 struct ConfigurationRemoteTests {
-    @Test("no machines by default; labels are read in order, trimmed")
+    @Test("no machines in an empty file; labels are read in order, trimmed")
     func machines() throws {
-        #expect(Configuration().remote.machines == [])
         #expect(try #require(decoded("")).configuration.remote.machines == [])
         let config = try #require(decoded("[remote]\nmachines = [\"netcup-vps\", \" My VPS \"]\n")).configuration
         #expect(config.remote.machines == ["netcup-vps", "My VPS"])

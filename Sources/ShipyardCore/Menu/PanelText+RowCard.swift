@@ -1,4 +1,6 @@
 import Foundation
+import ShipyardConfig
+import ShipyardPings
 
 /// A row's hover card: only what the row doesn't already show. Its title
 /// and second line are on the row, so the card has the author's avatar (a
@@ -138,7 +140,7 @@ extension PanelText {
         case .checks(let state): checks(state) ?? ""
         case .comments(let count): count == 0 ? "No comments" : count == 1 ? "1 comment" : "\(count) comments"
         case .reviews(let count): count == 1 ? "1 review" : "\(count) reviews"
-        case .updated(let age): age == "now" ? "updated now" : "updated \(age) ago"
+        case .updated(let age): "updated \(updatedAge(age))"
         case .trigger(let event, let by): "\(event.map(eventWord) ?? "Run") by \(by)"
         case .attempt(let attempt): "attempt \(attempt)"
         case .duration(let time, let running): running ? "Running for \(time)" : "Took \(time)"
@@ -149,6 +151,13 @@ extension PanelText {
         case .noAction: "Nothing to open: clicking marks it seen"
         case .failure(let reason): reason
         }
+    }
+
+    /// When a card's item last moved, from a row's age: "now", "5m ago".
+    /// The card shows it beside its clock icon; `fact(_:)` reads it as
+    /// "updated 5m ago".
+    public static func updatedAge(_ age: String) -> String {
+        age == "now" ? "now" : "\(age) ago"
     }
 
     static func reviewWord(_ review: ReviewDecision) -> String {

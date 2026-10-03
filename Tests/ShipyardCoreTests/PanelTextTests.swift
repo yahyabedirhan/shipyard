@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
@@ -26,6 +27,9 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(0) == nil)
         #expect(PanelText.attentionSummary(1) == "1 needs attention")
         #expect(PanelText.attentionSummary(10) == "10 need attention")
+        // A count badge says its number to VoiceOver in the same words.
+        #expect(PanelText.attentionCount(1) == "1 needs attention")
+        #expect(PanelText.attentionCount(7) == "7 need attention")
     }
 
     @Test("the layout button's hover help and VoiceOver label name the current layout and the next one")
@@ -150,8 +154,8 @@ struct PanelTextTests {
 
     @Test("a row's second line names the repository only in a project with more than one")
     func rowDetail() {
-        #expect(PanelText.rowDetail(row(), showingRepository: true, now: now) == "#21 · shipyard · yahyabedirhan · 37m")
-        #expect(PanelText.rowDetail(row(), showingRepository: false, now: now) == "#21 · yahyabedirhan · 37m")
+        #expect(PanelText.rowDetail(row(), showingRepository: true) == "#21 · shipyard · yahyabedirhan")
+        #expect(PanelText.rowDetail(row(), showingRepository: false) == "#21 · yahyabedirhan")
     }
 
     @Test("a repository is named without its owner")
@@ -191,6 +195,10 @@ struct PanelTextTests {
             [.review(.approved), .checks(.passed)],
             [.comments(3), .reviews(1), .updated("5m")],
         ])
+        // Beside its clock icon, the update reads as just the age.
+        #expect(PanelText.updatedAge("5m") == "5m ago")
+        #expect(PanelText.updatedAge("now") == "now")
+        #expect(PanelText.fact(.updated("now")) == "updated now")
         #expect(card.reasons == [])
         #expect(card.attention == nil)
     }
@@ -295,8 +303,10 @@ struct PanelTextTests {
         #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: true) == "Expand shipyard")
     }
 
-    @Test("a row's action, attention dot and check dot have words for VoiceOver and the hover help")
+    @Test("a row's action, attention dot and check dot, and the copy icon, have words for VoiceOver and the hover help")
     func rowWords() {
+        #expect(PanelText.copy == "Copy")
+        #expect(PanelText.copied == "Copied")
         #expect(PanelText.markRowSeen == "Mark seen")
         #expect(PanelText.needsAttention == "Needs attention")
         #expect(PanelText.checks(.none) == nil)
@@ -321,11 +331,12 @@ struct PanelTextTests {
         ))
     }
 
-    @Test("an issue's second line reads like a pull request's")
+    @Test("an issue's second line reads like a pull request's; a closed one ages from its close")
     func issueDetail() {
-        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: false, now: now) == "#17 · octocat · 3d")
-        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: true, now: now) == "#17 · shipyard · octocat · 3d")
-        #expect(PanelText.rowDetail(issue(state: .closed), showingRepository: false, now: now) == "#17 · octocat · 2h")
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: false) == "#17 · octocat")
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: true) == "#17 · shipyard · octocat")
+        #expect(PanelText.age(issue(state: .open).age(at: now)) == "3d")
+        #expect(PanelText.age(issue(state: .closed).age(at: now)) == "2h")
     }
 
     private func run(state: ItemState, branch: String? = "main") -> MenuRow {
@@ -346,18 +357,19 @@ struct PanelTextTests {
     }
 
     @Test("a run's second line names its branch and state, and ages from its start or finish", arguments: [
-        (ItemState.running, "#41 · main · running · 20m"),
-        (.succeeded, "#41 · main · succeeded · 12m"),
-        (.failed, "#41 · main · failed · 12m"),
+        (ItemState.running, "#41 · main · running", "20m"),
+        (.succeeded, "#41 · main · succeeded", "12m"),
+        (.failed, "#41 · main · failed", "12m"),
     ])
-    func runDetail(state: ItemState, text: String) {
-        #expect(PanelText.rowDetail(run(state: state), showingRepository: false, now: now) == text)
+    func runDetail(state: ItemState, text: String, age: String) {
+        #expect(PanelText.rowDetail(run(state: state), showingRepository: false) == text)
+        #expect(PanelText.age(run(state: state).age(at: now)) == age)
     }
 
     @Test("a run's second line names the repository only in a project with more than one, and leaves out a missing branch")
     func runDetailRepository() {
-        #expect(PanelText.rowDetail(run(state: .failed), showingRepository: true, now: now) == "#41 · shipyard · main · failed · 12m")
-        #expect(PanelText.rowDetail(run(state: .failed, branch: nil), showingRepository: false, now: now) == "#41 · failed · 12m")
+        #expect(PanelText.rowDetail(run(state: .failed), showingRepository: true) == "#41 · shipyard · main · failed")
+        #expect(PanelText.rowDetail(run(state: .failed, branch: nil), showingRepository: false) == "#41 · failed")
     }
 
     @Test("the state icon reads as the state and the kind, so VoiceOver tells an issue from a pull request")

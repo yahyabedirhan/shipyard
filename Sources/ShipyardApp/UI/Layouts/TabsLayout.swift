@@ -8,21 +8,22 @@ import SwiftUI
 ///
 /// More projects than fit: the strip scrolls sideways, and choosing a tab
 /// scrolls it into view, with the cut-off edges faded. The selected tab is
-/// kept while the menu is open and goes back to All when its project is
-/// removed from the configuration.
+/// `PanelState`'s, which `shipyard panel tab` sets too; it's kept while the
+/// menu closes and opens, and goes back to All when its project is removed
+/// from the configuration.
 struct TabsLayout: View {
     let model: MenuModel
+    let panel: PanelState
     let actions: LayoutActions
 
-    @State private var selection: MenuTab = .all
-    /// Whether the latest tab change moved right, so the list slides that way.
-    @State private var forward = true
     /// The row under the pointer, in the selected tab; one highlight glides
     /// between rows.
     @State private var highlight = RowHighlight()
 
-    /// `selection`, or All while its project isn't there.
-    private var tab: MenuTab { model.resolved(selection) }
+    /// The selected tab, or All while its project isn't there.
+    private var tab: MenuTab { model.resolved(panel.selectedTab) }
+    /// Whether the latest tab change moved right, so the list slides that way.
+    private var forward: Bool { panel.movedForward }
 
     var body: some View {
         let content = model.tabContent(for: tab)
@@ -38,16 +39,14 @@ struct TabsLayout: View {
         // A row gone from the tab (refreshed away, or another tab chosen) loses the highlight.
         .onChange(of: content.rowPlaces) { _, places in highlight.keep(in: places) }
         .onChange(of: model.tabs) {
-            if model.resolved(selection) != selection {
-                withAnimation(Motion.tab) { selection = .all }
+            if model.resolved(panel.selectedTab) != panel.selectedTab {
+                withAnimation(Motion.tab) { panel.select(.all, from: tab, in: model.tabs) }
             }
         }
     }
 
     private func select(_ next: MenuTab) {
-        let tabs = model.tabs
-        forward = (tabs.firstIndex(of: next) ?? 0) >= (tabs.firstIndex(of: tab) ?? 0)
-        withAnimation(Motion.tab) { selection = next }
+        withAnimation(Motion.tab) { panel.select(next, from: tab, in: model.tabs) }
     }
 
     // MARK: - Under the strip

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardPings
 
 /// What the user did to remote pings (seen, dismissed), kept on the Mac in
 /// the app state: nothing is written back to a machine, since a plugin

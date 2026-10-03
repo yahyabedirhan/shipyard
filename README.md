@@ -4,7 +4,7 @@
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
-**Status:** under construction. Versions stay at 0.0.x until the public launch; this README describes 0.0.3.
+**Status:** under construction; this README describes 0.1.0.
 
 ## Why it exists
 
@@ -92,6 +92,8 @@ machines = ["hetzner-vps"]
 
 Shipyard asks each machine for its pings through Herdr about every 30 seconds and files them under the projects that watch their repositories, or under the machine's name. Clicking one sent from a Herdr pane takes you to that agent. On those machines the plugin also pings you by itself when Herdr marks an agent blocked, and takes the ping back when the agent goes on. A machine that doesn't answer shows a quiet line and keeps its last pings.
 
+One known limit, with Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but your Mac's Herdr window only moves there when it's already showing that machine. When it's showing your Mac or another machine, nothing visible happens and the ping is marked seen; switch Herdr to that machine yourself to see the pane. Herdr has no command yet that switches an open window to a saved machine, so shipyard can't do it for you.
+
 ## Examples
 
 Each configuration below produced the screenshot under it, trimmed to the lines that matter. The first three watch two repositories as one project, with issues turned on.
@@ -112,7 +114,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+<img src="assets/screenshots/0.1.0/repo-subsections-showfirst.png" width="400" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 
 The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
 
@@ -130,7 +132,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/tabs.png" width="400" alt="The tabs layout on its All tab: a Pull requests group, then an Issues group, each row with its number, repository and author">
+<img src="assets/screenshots/0.1.0/tabs.png" width="400" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
 
 Grouped by date, three rows a group:
 
@@ -148,7 +150,7 @@ name = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
-<img src="assets/screenshots/shipyard-0.0.2/date.png" width="400" alt="The list layout grouped by date: a Today group with three rows and a Show more row, then a Yesterday group">
+<img src="assets/screenshots/0.1.0/date.png" width="400" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
 
 A file with no projects (or no file at all): the panel asks how you'll use shipyard, offers the three presets, and offers the agent skill:
 
@@ -158,15 +160,15 @@ version = 1
 
 <img src="assets/screenshots/shipyard-0.0.2/presets.png" width="400" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 
+## Changelog
+
+What changed in each version, with its pull requests, is in [`CHANGELOG.md`](CHANGELOG.md).
+
 ## Development
 
 `make test` runs the tests, and `make release` builds the release zip. With the Command Line Tools alone, the first build compiles the SDK's Swift modules (about 40 s); the `Makefile` keeps them in `~/Library/Caches/shipyard/ModuleCache`, so every other checkout and worktree reuses them. Installing Xcode avoids the cost, since it ships them prebuilt. Publishing a GitHub release runs the [`linux cli`](.github/workflows/linux-cli.yml) workflow, which attaches static Linux builds of the `shipyard` command (`shipyard-linux-x86_64`, `shipyard-linux-aarch64` and their `.sha256` files) to it; run it by hand to get the same files as workflow artifacts.
 
-A release goes in this order:
-
-1. Bump `ShipyardVersion.current` in [`Sources/ShipyardCore/Version.swift`](Sources/ShipyardCore/Version.swift) and merge it: the `linux cli` workflow fails unless `shipyard --version` matches the release's tag.
-2. Run `make release`, then publish a GitHub release tagged `v<version>` with the zip attached.
-3. Wait for the `linux cli` run to attach the Linux files before announcing the release. Until it does, the herdr-shipyard plugin can't install on a Linux machine, since it downloads them from the latest release.
+Releases follow the steps in the Releases section of [`AGENTS.md`](AGENTS.md), and each one gets an entry in [`CHANGELOG.md`](CHANGELOG.md).
 
 The design is in [`docs/low-level-design.md`](docs/low-level-design.md), the glossary in [`GLOSSARY.md`](GLOSSARY.md).
 

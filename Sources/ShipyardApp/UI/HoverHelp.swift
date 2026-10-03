@@ -1,26 +1,14 @@
+import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
 // The panel's hover help, in place of macOS's native tooltips (`.help`):
 // `hoverHelp(_:)` on a view, and `hoverHelpHost()` once on the panel, which
-// draws it. The style is chosen in one place, `HoverHelp.style`.
+// draws it: a small card under or over the hovered view, gliding from view
+// to view like the row highlight (see `docs/references/macos-hover-help.md`).
 
 /// How the hover help looks and when it shows.
 enum HoverHelp {
-    enum Style {
-        /// A small card drawn in the panel (`hoverHelpHost()`), under or
-        /// over the hovered view, gliding from row to row like the row
-        /// highlight. The recommended style (see
-        /// `docs/references/macos-hover-help.md`).
-        case card
-        /// SwiftUI's own popover, beside the hovered view (outside the
-        /// panel for a row). The runner-up, kept to try against the card.
-        case popover
-    }
-
-    /// The style every `hoverHelp(_:)` uses.
-    static let style: Style = .card
-
     /// Where the help is, which decides its timing.
     enum Context {
         /// The header's buttons, the account and the tabs: small targets
@@ -157,39 +145,18 @@ private struct HoverHelpSource: ViewModifier {
     let leadingInset: CGFloat
     @State private var id = UUID()
     @State private var hovering = false
-    @State private var presented = false
 
     func body(content: Content) -> some View {
         if let help = self.content {
-            styled(content, help: help)
+            content
+                .anchorPreference(key: HoverHelpKey.self, value: .bounds) { anchor in
+                    hovering ? HoverHelpAnchor(id: id, content: help, context: context, anchor: anchor, leadingInset: leadingInset) : nil
+                }
                 .onHover { hovering = $0 }
                 .onDisappear { hovering = false }
                 .accessibilityHint(help.spoken)
         } else {
             content
-        }
-    }
-
-    @ViewBuilder
-    private func styled(_ content: Content, help: HoverHelpContent) -> some View {
-        switch HoverHelp.style {
-        case .card:
-            content.anchorPreference(key: HoverHelpKey.self, value: .bounds) { anchor in
-                hovering ? HoverHelpAnchor(id: id, content: help, context: context, anchor: anchor, leadingInset: leadingInset) : nil
-            }
-        case .popover:
-            content
-                .task(id: hovering) {
-                    guard hovering else { presented = false; return }
-                    try? await Task.sleep(for: HoverHelp.timing(context).delay)
-                    if !Task.isCancelled { presented = true }
-                }
-                .popover(isPresented: $presented, arrowEdge: .trailing) {
-                    HoverHelpBody(content: help)
-                        .padding(.horizontal, HoverHelp.horizontalPadding + 2)
-                        .padding(.vertical, 7)
-                        .frame(maxWidth: HoverHelp.maxWidth)
-                }
         }
     }
 }
@@ -463,7 +430,7 @@ private struct FactView: View {
         case .comments(let count), .reviews(let count):
             Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
         case .updated(let age):
-            Text(age == "now" ? "now" : "\(age) ago").foregroundStyle(.secondary)
+            Text(PanelText.updatedAge(age)).foregroundStyle(.secondary)
         case .duration(let time, _):
             Text(time).monospacedDigit().foregroundStyle(.secondary)
         case .body(let text):

@@ -2,6 +2,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import ShipyardCommand
 
 /// The GitHub OAuth App shipyard signs in through with the device flow.
 public enum OAuthApp {

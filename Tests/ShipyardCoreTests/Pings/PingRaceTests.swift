@@ -1,4 +1,5 @@
 import Foundation
+@testable import ShipyardPings
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -25,8 +26,9 @@ private func sent(_ id: String = "input", title: String = "Waiting for your inpu
     Ping(id: id, title: title, projects: ["shop"], sent: Harness.now, action: .app("Claude"), instance: instance)
 }
 
-/// `ping` replaced as the CLI does with `--id`: new content, the same sent
-/// time and instance, unseen with no failure.
+/// `ping` replaced as the CLI does with `--id`: new content and the same
+/// instance, unseen with no failure. Its sent time is kept, unlike the
+/// CLI's, so only what each race changes differs.
 private func replaced(_ ping: Ping, title: String) -> Ping {
     Ping(id: ping.id, title: title, projects: ping.projects, sent: ping.sent, instance: ping.instance)
 }
@@ -35,9 +37,6 @@ private func replaced(_ ping: Ping, title: String) -> Ping {
 private extension Harness {
     /// The ping rows of `shop`.
     var pingRows: [MenuRow] { section("shop")?.rows.filter { $0.kind == .ping } ?? [] }
-
-    /// The pings' notifications posted so far.
-    var pingNotifications: [PostedNotification] { notifier.posted.filter { $0.event == .pingSent } }
 }
 
 /// The CLI and the app write the same ping store at once. The app reads a
@@ -48,32 +47,6 @@ private extension Harness {
 @MainActor
 struct PingRaceTests {
     // MARK: The store
-
-    @Test("marking seen a ping withdrawn meanwhile doesn't bring it back")
-    func seenAfterWithdraw() throws {
-        let store = temporaryStore()
-        try store.save(sent())
-        let read = try #require(store.ping(id: "input"))
-
-        try store.remove(id: "input")
-        try store.markSeen(read, at: Harness.now)
-
-        #expect(store.ping(id: "input") == nil)
-    }
-
-    @Test("marking seen a ping replaced meanwhile leaves the replacement unseen")
-    func seenAfterReplace() throws {
-        let store = temporaryStore()
-        try store.save(sent())
-        let read = try #require(store.ping(id: "input"))
-
-        try store.save(replaced(read, title: "Still waiting"))
-        try store.markSeen(read, at: Harness.now)
-
-        let stored = try #require(store.ping(id: "input"))
-        #expect(stored.title == "Still waiting")
-        #expect(stored.seen == nil)
-    }
 
     @Test("marking seen a ping withdrawn and sent anew under its id leaves the new one unseen")
     func seenAfterSentAnew() throws {

@@ -20,7 +20,7 @@ APP         := Shipyard
 # not beside the app in Contents/MacOS.
 CLI         := shipyard-cli
 # The version lives in one place, the core; the bundle is stamped with it.
-VERSION     := $(shell sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/ShipyardCore/Version.swift)
+VERSION     := $(shell sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/ShipyardCommand/Version.swift)
 
 BUILD_DIR   := build
 APP_BUNDLE  := $(BUILD_DIR)/$(APP).app

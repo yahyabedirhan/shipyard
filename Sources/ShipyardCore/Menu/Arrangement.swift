@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// How a project's listed items are drawn: grouped by `group-by`, each
 /// group sorted by `sort-by` with open (or running) items before closed (or

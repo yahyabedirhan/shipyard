@@ -1,5 +1,8 @@
 import Foundation
+@testable import ShipyardCommand
+import ShipyardConfig
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 private let twoProjects = """
@@ -22,7 +25,21 @@ struct PingCommandTests {
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
     /// The agent's working folder, a fake one: `origin` says its remote.
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
-    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote(), platform: .macOS)
+    let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
+
+    /// The Mac's filing, as `main.swift` builds it, over a `config.toml`
+    /// holding `text` and the resolved lists `resolved`, in a fresh
+    /// temporary folder.
+    private func filing(_ text: String = twoProjects, resolved: [String: [String]] = [:]) throws -> ProjectFiling {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-filing-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let configURL = folder.appendingPathComponent("config.toml")
+        try Data(text.utf8).write(to: configURL)
+        let repositories = ResolvedRepositoriesStore(directory: folder)
+        if !resolved.isEmpty { try repositories.record(resolved) }
+        return ProjectFiling(configURL: configURL, repositories: repositories)
+    }
 
     private func ping(
         _ arguments: String...,
@@ -36,11 +53,9 @@ struct PingCommandTests {
             environment: CommandEnvironment(
                 workingDirectory: Self.folder,
                 variables: [:],
-                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:]),
-                platform: .macOS
+                git: FakeGitRemote(origin.map { [Self.folder: $0] } ?? [:])
             ),
-            configuration: try Configuration.decode(config).configuration,
-            resolved: resolved,
+            filing: try filing(config, resolved: resolved),
             store: store,
             now: Harness.now,
             newID: { id }
@@ -80,14 +95,6 @@ struct PingCommandTests {
         #expect(result.output.isEmpty)
         #expect(result.error == "shipyard ping: no project is named `shopp`; the projects are `shop`, `blog`\n")
         #expect(store.all().isEmpty)
-    }
-
-    @Test("without projects in the configuration, the error says so")
-    func noProjects() throws {
-        let result = try ping("Ready", "--project", "shop", config: "")
-
-        #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
     }
 
     @Test("without a flag, the working folder's origin remote picks the repository, and the ping is filed under its project")
@@ -245,7 +252,7 @@ struct PingCommandTests {
             let result = PingCommand.run(
                 arguments,
                 environment: environment,
-                configuration: try Configuration.decode(twoProjects).configuration,
+                filing: try filing(),
                 store: store,
                 now: Harness.now
             )
@@ -272,7 +279,7 @@ struct PingCommandTests {
         let result = PingCommand.run(
             ["Ready", "--project", "shop"],
             environment: environment,
-            configuration: try Configuration.decode(twoProjects).configuration,
+            filing: try filing(),
             store: store,
             now: Harness.now,
             newID: { drawn.next()! }
@@ -310,11 +317,15 @@ struct ShipyardCLITests {
         #expect(result == CommandResult(output: "shipyard \(ShipyardVersion.current)\n"))
     }
 
-    @Test("ping help prints the ping usage")
+    @Test("ping help prints the ping usage, with --id, withdraw and --; the main help lists withdraw too")
     func pingHelp() throws {
-        let result = try Harness(config: twoProjects).cli("ping", "--help")
+        let harness = try Harness(config: twoProjects)
+        let result = harness.cli("ping", "--help")
         #expect(result.status == 0)
         #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>] [--id <id>]\n"))
+        #expect(result.output.contains("shipyard ping withdraw <id>"))
+        #expect(result.output.contains("shipyard ping -- withdraw"))
+        #expect(harness.cli("--help").output.contains("shipyard ping withdraw <id>"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")
@@ -337,5 +348,123 @@ struct ShipyardCLITests {
 
         #expect(result.status == 1)
         #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
+    }
+
+    // MARK: - Which config.toml
+
+    /// `shipyard <arguments>` as the Mac's `main.swift` assembles it, in an
+    /// agent's shell whose environment is `shell` and whose home is
+    /// `home`: the configuration file is the one `ConfigLocation` finds
+    /// beside `harness`'s app state, the folder the app writes for the CLI.
+    private func shipyard(_ arguments: String..., in harness: Harness, shell: [String: String], home: URL) -> CommandResult {
+        let filing = ProjectFiling(
+            configURL: ConfigLocation.current(environment: shell, home: home, support: harness.stateDirectory),
+            repositories: harness.repositoriesStore
+        )
+        return ShipyardCLI.run(
+            arguments,
+            table: .commands(filing: filing, store: harness.pingStore),
+            environment: CommandEnvironment(workingDirectory: harness.workingFolder, variables: shell, git: FakeGitRemote()),
+            now: harness.clock.now
+        )
+    }
+
+    /// A folder for an agent's own `XDG_CONFIG_HOME`, holding a
+    /// `shipyard/config.toml` with only the project `elsewhere`.
+    private func shellConfigHome() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-shell-\(UUID().uuidString)", isDirectory: true)
+        let config = folder.appendingPathComponent("shipyard/config.toml")
+        try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("[[projects]]\nname = \"elsewhere\"\nrepositories = [\"o/elsewhere\"]\n".utf8).write(to: config)
+        return folder
+    }
+
+    @Test("once the app has run, a ping files against the config.toml it reads, whatever XDG_CONFIG_HOME the agent's shell sets")
+    func appsConfiguration() async throws {
+        let harness = try Harness(config: twoProjects)
+        await harness.shipyard.start()
+        let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
+        let home = harness.workingFolder
+
+        let filed = shipyard("ping", "Ready", "--project", "shop", in: harness, shell: shell, home: home)
+        let refused = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: home)
+
+        #expect(filed.status == 0, "\(filed.error)")
+        #expect(harness.pingStore.all().map(\.projects) == [["shop"]])
+        #expect(refused.error == "shipyard ping: no project is named `elsewhere`; the projects are `shop`, `blog`\n")
+    }
+
+    @Test("before the app has ever run, a ping files against the config.toml the agent's shell points at")
+    func ownLookupBeforeTheApp() throws {
+        let harness = try Harness(config: twoProjects)
+        let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
+
+        let filed = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: harness.workingFolder)
+
+        #expect(filed.status == 0, "\(filed.error)")
+        #expect(harness.pingStore.all().map(\.projects) == [["elsewhere"]])
+    }
+
+    @Test("a ping only projects that hide pings would list is refused, naming them, and stores nothing; one any project shows is filed under all of them")
+    func pingNoProjectShows() throws {
+        let harness = try Harness(config: """
+            [defaults.pings]
+            show = false
+
+            [[projects]]
+            name = "shop"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "store"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "blog"
+            repositories = ["yahyabedirhan/blog", "yahyabedirhan/shop"]
+            pings = { show = true }
+
+            [[projects]]
+            name = "docs"
+            repositories = ["yahyabedirhan/docs"]
+
+            """)
+
+        let hidden = harness.cli("ping", "Ready", "--repo", "yahyabedirhan/docs")
+        #expect(hidden.status == 1)
+        #expect(hidden.output.isEmpty)
+        #expect(hidden.error == "shipyard ping: no project shows the ping: `docs` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+
+        let named = harness.cli("ping", "Ready", "--project", "shop")
+        #expect(named.error == "shipyard ping: no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+        #expect(harness.pingStore.all().isEmpty)
+
+        let shown = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+        #expect(shown.status == 0)
+        #expect(harness.pingStore.all().map(\.projects) == [["shop", "store", "blog"]])
+    }
+
+    @Test("when every project hides pings, the refusal names each that would list it and says none shows them")
+    func noProjectShowsPings() throws {
+        let harness = try Harness(config: """
+            [defaults.pings]
+            show = false
+
+            [[projects]]
+            name = "shop"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            name = "store"
+            repositories = ["yahyabedirhan/shop"]
+
+            """)
+
+        let result = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+
+        #expect(result.status == 1)
+        #expect(result.error == "shipyard ping: no project shows the ping: `shop`, `store` hide pings (pings.show = false); no project shows pings\n")
+        #expect(harness.pingStore.all().isEmpty)
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// The words the panel shows for what the menu model and the orchestrator
 /// hold: a row's age, when the list was last updated, and why the
@@ -45,11 +46,13 @@ public enum PanelText {
 
     /// Next to the heading: "3 need attention"; `nil` when nothing does.
     public static func attentionSummary(_ count: Int) -> String? {
-        switch count {
-        case ..<1: nil
-        case 1: "1 needs attention"
-        default: "\(count) need attention"
-        }
+        count < 1 ? nil : attentionCount(count)
+    }
+
+    /// How many need attention, in words: "1 needs attention", "3 need
+    /// attention". Also a count badge's VoiceOver label.
+    public static func attentionCount(_ count: Int) -> String {
+        count == 1 ? "1 needs attention" : "\(count) need attention"
     }
 
     /// A row's age: "now" under a minute, then "5m", "3h", "2d".
@@ -58,19 +61,13 @@ public enum PanelText {
         return "\(count)\(unit.prefix(1))"
     }
 
-    /// A row's second line: "#21 · shipyard · yahyabedirhan · 37m", naming
-    /// the repository (without its owner) only when `showingRepository`
-    /// (its project has more than one): "#21 · yahyabedirhan · 37m". An
-    /// issue reads the same. A workflow run (whose first line is its
-    /// workflow's name) names its branch and state instead of its author:
-    /// "#41 · shipyard · main · failed · 12m", aged from its start while
-    /// running and from its finish after.
-    public static func rowDetail(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
-        (detailParts(row, showingRepository: showingRepository) + [age(row.age(at: now))]).joined(separator: " · ")
-    }
-
-    /// The same second line without the age, for a layout that shows the
-    /// age apart, aligned on the right: "#21 · shipyard · yahyabedirhan".
+    /// A row's second line: "#21 · shipyard · yahyabedirhan", naming the
+    /// repository (without its owner) only when `showingRepository` (its
+    /// project has more than one): "#21 · yahyabedirhan". An issue reads
+    /// the same. A workflow run (whose first line is its workflow's name)
+    /// names its branch and state instead of its author: "#41 · shipyard ·
+    /// main · failed". The layouts show the row's age apart, aligned on the
+    /// right (`age(_:)` of `MenuRow.age(at:)`).
     public static func rowDetail(_ row: MenuRow, showingRepository: Bool) -> String {
         detailParts(row, showingRepository: showingRepository).joined(separator: " · ")
     }
@@ -136,6 +133,10 @@ public enum PanelText {
     public static let dismissPing = "Dismiss"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
+    /// The copy icon's VoiceOver label (and its word, where it has one)
+    /// before a copy, and after it.
+    public static let copy = "Copy"
+    public static let copied = "Copied"
 
     /// What a pull request's check dot means, for VoiceOver and the row's
     /// hover help; `nil` with no checks.
@@ -204,11 +205,7 @@ public enum PanelText {
     /// All, "2 need attention" on a project's tab, and "All caught up" in
     /// place of the count when nothing needs attention.
     public static func tabSummary(attention: Int, projects: Int, tab: MenuTab) -> String {
-        let count = switch attention {
-        case 0: "All caught up"
-        case 1: "1 needs attention"
-        default: "\(attention) need attention"
-        }
+        let count = attention == 0 ? "All caught up" : attentionCount(attention)
         guard tab == .all else { return count }
         return "\(count) · \(projects) \(projects == 1 ? "project" : "projects")"
     }

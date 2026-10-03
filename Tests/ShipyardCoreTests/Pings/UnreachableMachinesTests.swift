@@ -1,5 +1,7 @@
 import Foundation
+@testable import ShipyardCommand
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 private let shop = """
@@ -14,12 +16,6 @@ private let twoMachines = "[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
-/// A ping as a machine's `shipyard` lists it, sent `minutes` before the
-/// harness's now.
-private func ping(_ id: String, _ title: String, minutes: Double = 5) -> Ping {
-    Ping(id: id, title: title, projects: [], sent: Harness.now.addingTimeInterval(-minutes * 60), instance: "i-\(id)")
-}
-
 @MainActor
 private extension Harness {
     /// A harness signed in with `config`, whose Herdr has saved
@@ -27,28 +23,13 @@ private extension Harness {
     /// started and polled once.
     static func polled(_ config: String = twoMachines, hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
-        harness.graphQL([onePullRequest])
-        harness.herdr.addMachine("hetzner-vps", pings: hetzner)
-        harness.herdr.addMachine("netcup-vps", pings: netcup)
-        await harness.shipyard.start()
-        await harness.machineTimer.fire()
+        await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup, polled: true)
         return harness
-    }
-
-    func titles(_ name: String) -> [String] {
-        section(name)?.rows.map(\.title) ?? []
     }
 
     /// The panel's quiet lines about machines, as it shows them.
     var machineLines: [String] {
         shipyard.menu.machineNotices.map(PanelText.machineNotice)
-    }
-
-    /// Fires the machine timer, which must be armed, and waits for the poll.
-    func poll(sourceLocation: SourceLocation = #_sourceLocation) async {
-        let fired = await machineTimer.fire()
-        #expect(fired, "the machine timer wasn't armed", sourceLocation: sourceLocation)
     }
 }
 
@@ -71,7 +52,7 @@ private func eventually(_ condition: () -> Bool) async -> Bool {
 struct UnreachableMachinesTests {
     @Test("a label Herdr has no machine for is one quiet line, with the line Herdr prints read, and no last pings to keep")
     func unknownLabel() async throws {
-        let harness = try await Harness.polled("[remote]\nmachines = [\"netcup-vps\", \"typo-vps\"]\n\n" + shop, netcup: [ping("q1", "Deploy?")])
+        let harness = try await Harness.polled("[remote]\nmachines = [\"netcup-vps\", \"typo-vps\"]\n\n" + shop, netcup: [remotePing("q1", "Deploy?")])
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
         #expect(harness.shipyard.remote.machine("typo-vps")?.failure == "Herdr has no saved machine named typo-vps")
         #expect(harness.machineLines == ["Herdr has no saved machine named typo-vps."])
@@ -80,9 +61,9 @@ struct UnreachableMachinesTests {
 
     @Test("a machine disabled in Herdr keeps its last pings, says so, and its next good poll clears the line")
     func disabledAndBack() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?")])
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?")])
         harness.herdr.setReach(.disabled, on: "netcup-vps")
-        harness.herdr.setPings([ping("q2", "Unseen while down")], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q2", "Unseen while down")], on: "netcup-vps")
         await harness.poll()
 
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
@@ -102,7 +83,7 @@ struct UnreachableMachinesTests {
 
     @Test("a machine Herdr can't connect to keeps its last pings and is one quiet line")
     func unreachable() async throws {
-        let harness = try await Harness.polled(netcup: [ping("q1", "Deploy?")])
+        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?")])
         harness.herdr.setReach(.unreachable, on: "netcup-vps")
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
@@ -111,7 +92,7 @@ struct UnreachableMachinesTests {
 
     @Test("without herdr, or with it stopped, every machine keeps its last pings and says why, one line each")
     func herdrMissing() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?")])
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?")])
         harness.herdr.installed = false
         let runs = harness.herdr.runs.count
         await harness.poll()
@@ -130,28 +111,25 @@ struct UnreachableMachinesTests {
         #expect(harness.machineLines.last == "Herdr isn't running, so netcup-vps can't be reached. Its last pings stay listed.")
     }
 
-
-
     @Test("a truncated list shows what came and notes it, until a whole list comes")
     func truncated() async throws {
         let harness = try await Harness.polled()
-        harness.herdr.setPings((0..<120).map { ping("p\($0)", "Ping \($0)", minutes: Double($0)) }, on: "netcup-vps")
+        harness.herdr.setPings((0..<120).map { remotePing("p\($0)", "Ping \($0)", minutes: Double($0)) }, on: "netcup-vps")
         await harness.poll()
         #expect(harness.section("netcup-vps")?.rows.count == PingList.maxPings)
         #expect(harness.machineLines == ["netcup-vps has more pings than it could send. Showing its newest 100."])
 
-        harness.herdr.setPings([ping("p0", "Ping 0")], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("p0", "Ping 0")], on: "netcup-vps")
         await harness.poll()
         #expect(harness.titles("netcup-vps") == ["Ping 0"])
         #expect(harness.machineLines.isEmpty)
     }
 
-
     @Test("one slow machine never delays another, or the menu, and times out on its own")
     func slowMachine() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?")])
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?")])
         harness.herdr.setReach(.hanging, on: "netcup-vps")
-        harness.herdr.setPings([ping("a2", "Fixed")], on: "hetzner-vps")
+        harness.herdr.setPings([remotePing("a2", "Fixed")], on: "hetzner-vps")
         let polling = Task { await harness.poll() }
 
         // hetzner lists while netcup still hangs, and GitHub refreshes meanwhile.
@@ -171,9 +149,9 @@ struct UnreachableMachinesTests {
 
     @Test("⌘R polls every machine at once, beside the GitHub refresh")
     func refreshNowPolls() async throws {
-        let harness = try await Harness.polled(hetzner: [ping("a1", "Tests are red")], netcup: [ping("q1", "Deploy?")])
-        harness.herdr.setPings([ping("a2", "Fixed")], on: "hetzner-vps")
-        harness.herdr.setPings([ping("q2", "Merge it?")], on: "netcup-vps")
+        let harness = try await Harness.polled(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?")])
+        harness.herdr.setPings([remotePing("a2", "Fixed")], on: "hetzner-vps")
+        harness.herdr.setPings([remotePing("q2", "Merge it?")], on: "netcup-vps")
         let requests = harness.graphQLRequests.count
 
         await harness.shipyard.refreshNow()
@@ -184,7 +162,6 @@ struct UnreachableMachinesTests {
         // The machine timer comes back a full interval after.
         #expect(harness.machineTimer.armed == Shipyard.machinePollInterval)
     }
-
 }
 
 /// The lines Herdr prints when it refuses a machine before asking it

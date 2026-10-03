@@ -1,5 +1,9 @@
 import Foundation
+@testable import ShipyardCommand
+@testable import ShipyardConfig
+@testable import ShipyardControl
 @testable import ShipyardCore
+@testable import ShipyardPings
 import Testing
 
 // The shipyard agent skill (`skills/shipyard/SKILL.md`) teaches agents the
@@ -168,20 +172,7 @@ struct SkillDocumentTests {
         #expect(CommandResult.failedStatus == 1 && CommandResult.usageStatus == 2)
 
         // Every example command reads as the command reads it.
-        var examples: [[String]] = []
-        var inShell = false
-        var pending = ""
-        for line in text.components(separatedBy: "\n") {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed == "```sh" { inShell = true; continue }
-            if trimmed == "```" { inShell = false; continue }
-            guard inShell else { continue }
-            if trimmed.hasSuffix("\\") { pending += String(trimmed.dropLast()) + " "; continue }
-            let command = pending + trimmed
-            pending = ""
-            guard command.hasPrefix("shipyard ping"), !command.contains("<") else { continue }
-            examples.append(shellWords(command))
-        }
+        let examples = shellExamples(in: text, command: "ping")
         #expect(examples.count >= 4)
         var withdrawn = 0
         for words in examples {
@@ -199,6 +190,58 @@ struct SkillDocumentTests {
         let actions = examples.compactMap { try? PingCommand.Request.parse(Array($0.dropFirst(2)), herdrPane: "w1:p3").get() }
         #expect(actions.contains { $0.action == .herdr("w1:p3") && $0.id != nil })
         #expect(actions.contains { if case .url = $0.action { true } else { false } })
+    }
+
+    @Test("it teaches app control as it's built: every subcommand, the exit codes, and examples that read")
+    func appControl() throws {
+        let text = try skill()
+        let flowing = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        // The synopsis is the commands' own, word for word.
+        for usage in [ControlCommand.usageText, PanelCommand.usageText, ScreenshotCommand.usageText] {
+            let synopsis = usage.components(separatedBy: "\n\n")[0]
+                .replacingOccurrences(of: "usage: ", with: "")
+                .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            #expect(flowing.contains(synopsis), "`\(synopsis)` isn't taught")
+        }
+        // The refusals and the fallback's note, in the command's words.
+        for line in [
+            ControlCommand.notRunning, "captured by rendering: <why>", "runs on the Mac, where the app is",
+            "use a folder with a shorter path", "the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`",
+        ] {
+            #expect(text.contains(line), "`\(line)` isn't quoted")
+        }
+        #expect(text.contains("<folder>/shipyard/config.toml"))
+        #expect(text.contains("**0**") && text.contains("**1**") && text.contains("**2**"))
+
+        // Every example reads as its command reads it, and each subcommand and option has one.
+        let demo = FileManager.default.temporaryDirectory.appendingPathComponent("skill-demo-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: demo, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: demo) }
+        let environment = CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: [:])
+        var taught: Set<String> = []
+        for command in ["app", "panel", "screenshot"] {
+            for words in shellExamples(in: text, command: command) {
+                var arguments = Array(words.dropFirst(2))
+                // A demo folder must exist to read; the example's own is made by its block.
+                if let flag = arguments.firstIndex(of: "--demo"), flag + 1 < arguments.count { arguments[flag + 1] = demo.path }
+                let reads = switch command {
+                case "app": (try? ControlCommand.parse(arguments, environment: environment).get()) != nil
+                case "panel": (try? PanelCommand.parse(arguments).get()) != nil
+                default: (try? ScreenshotCommand.parse(arguments, workingDirectory: environment.workingDirectory).get()) != nil
+                }
+                #expect(reads, "\(words) doesn't read")
+                taught.insert(command == "screenshot" ? command : "\(command) \(arguments.first ?? "")")
+                for option in ["--demo", "--json", "--appearance", "--menu-bar-icon"] where arguments.contains(option) {
+                    taught.insert("\(command) \(option)")
+                }
+            }
+        }
+        let every: Set<String> = [
+            "app open", "app --demo", "app quit", "app status", "app --json",
+            "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel tab",
+            "screenshot", "screenshot --appearance", "screenshot --menu-bar-icon",
+        ]
+        #expect(every.subtracting(taught).isEmpty, "no example for \(every.subtracting(taught).sorted())")
     }
 
     @Test("every key the schema declares is named")
@@ -363,6 +406,30 @@ struct SkillDocumentTests {
         #expect(text.contains("echo \"taplo exit status: $?\""))
         #expect(SkillInstaller.command.contains("skills add yahyabedirhan/shipyard"))
     }
+}
+
+/// The `shipyard <command>` lines of the ```sh fences in `text`, each split
+/// into words: a line ending in `\` continues on the next, `||` and `&&`
+/// separate commands, and a synopsis (with `<placeholders>`) is skipped.
+private func shellExamples(in text: String, command: String) -> [[String]] {
+    var examples: [[String]] = []
+    var inShell = false
+    var pending = ""
+    for line in text.components(separatedBy: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed == "```sh" { inShell = true; continue }
+        if trimmed == "```" { inShell = false; continue }
+        guard inShell else { continue }
+        if trimmed.hasSuffix("\\") { pending += String(trimmed.dropLast()) + " "; continue }
+        let joined = pending + trimmed
+        pending = ""
+        for part in joined.components(separatedBy: "||").flatMap({ $0.components(separatedBy: "&&") }) {
+            let words = shellWords(part.trimmingCharacters(in: .whitespaces))
+            guard words.count > 1, words[0] == "shipyard", words[1] == command, !part.contains("<") else { continue }
+            examples.append(words)
+        }
+    }
+    return examples
 }
 
 /// `command` split into words as a shell splits it, for double-quoted words and plain ones.

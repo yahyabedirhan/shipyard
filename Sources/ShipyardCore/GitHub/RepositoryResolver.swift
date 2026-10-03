@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// What a project's repository selectors stand for right now.
 public struct ResolvedRepositories: Equatable, Sendable {
@@ -146,5 +147,18 @@ public final class RepositoryResolver {
         case .graphQL(let message): message
         default: "GitHub's answer couldn't be read"
         }
+    }
+}
+
+extension ProjectSettings {
+    /// These settings watching exactly the repositories `resolved` found for
+    /// them, each as `owner/name`. Without a resolution (none yet), only the
+    /// single repositories the project names. `anywhere` stays, since it
+    /// resolves to no repositories.
+    public func resolved(by resolved: ResolvedRepositories?) -> ProjectSettings {
+        var settings = self
+        settings.repositories = (resolved?.repositories ?? repositorySlugs).map(RepositorySelector.repository)
+        if usesAnywhere { settings.repositories.append(.anywhere) }
+        return settings
     }
 }

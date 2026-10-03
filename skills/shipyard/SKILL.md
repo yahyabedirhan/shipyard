@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app`, `panel` and `screenshot`, on my data or a demo's."
 ---
 
 # shipyard configuration
@@ -8,6 +8,8 @@ description: "Edit shipyard's config.toml, the macOS menu bar app listing pull r
 Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface for settings: there is no settings window, and no command changes it. The app applies every save live.
 
 Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration.
+
+On the Mac, agents can also open, steer and screenshot the running app with `shipyard app`, `panel` and `screenshot`, on the user's data or a demo's. See Driving the app, at the end.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
@@ -448,6 +450,8 @@ herdr plugin install yahyabedirhan/herdr-shipyard
 
 The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard asks each machine for its pings about every 30 seconds. A machine it can't reach shows a quiet line in the menu and keeps its last pings until it answers again.
 
+Tell the user one known limit of Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it's already showing that machine. When it shows the Mac or another machine, the click looks like it did nothing (the ping is still marked seen); they switch Herdr to that machine themselves to see the pane. Herdr has no command yet that switches an open window to a saved machine, so no setting changes this.
+
 ## Sending pings
 
 A **ping** is a short message you send the user through shipyard: a title, an optional body and sender, and at most one action that clicking it runs (open a URL, bring an app forward, or focus a Herdr tab). It's listed under the projects that watch the repository you're working in, needs attention until the user clicks it, and posts a notification (the `ping.sent` event). Nothing reaches GitHub.
@@ -492,8 +496,8 @@ shipyard ping withdraw <id>
 
 - **One action at most.** With none, clicking the ping only marks it seen. When an action fails (the pane closed, no such app), the ping stays unseen and its row says why.
 - **Where it's filed.** Without `--repo` or `--project`, the repository is the working folder's git remote `origin`, as `owner/name`, and the ping is filed under every project that watches it: one whose `repositories` names it, or brings it in through a group or `owner/*` (as the app last looked them up, so a project just added needs the app to have refreshed once). `--repo` and `--project` don't go together.
-- **Output.** On success it prints the ping's id, such as `k7qm2x`, and exits 0: the id is what `--id` and `withdraw` take. The Mac numbers the ping in each project it's listed in (`#3` on its row), in the order pings arrive; a replace keeps the number. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, or `config.toml` doesn't read, which only the Mac checks; the id to withdraw is unknown), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked.
-- **Replacing.** Sending an id that's already there replaces that ping: the new title, body, sender, action and projects, unseen again, with no second notification.
+- **Output.** On success it prints the ping's id, such as `k7qm2x`, and exits 0: the id is what `--id` and `withdraw` take. The Mac numbers the ping in each project it's listed in (`#3` on its row), in the order pings arrive; a replace keeps the number. Otherwise it prints one line on standard error: exit 1 when it's refused (no project watches the repository or has that name, every project it would go under hides pings with `pings.show = false`, or `config.toml` doesn't read, which only the Mac checks; the id to withdraw is unknown), exit 2 when the arguments don't read (a missing title, two actions, a bad id, `--herdr` alone outside Herdr). The refusals list the user's projects: pick one with `--project`, or, when the repository should have its own, offer the user to watch it (see Worked requests) rather than editing the file unasked. A ping refused because its projects hide pings names them and the projects that show pings: send it with `--project` under one of those, or tell the user it couldn't reach them; the user hid pings there on purpose, so don't turn `show` back on unasked.
+- **Replacing.** Sending an id that's already there replaces that ping: the new title, body, sender, action and projects, its age starting again from the replace, unseen again, with no second notification.
 - **Withdrawing.** `shipyard ping withdraw <id>` takes the ping back: it leaves the menu and its notification leaves Notification Center. An id no ping has exits 1; the user may have dismissed it, or it left after being seen, so there's nothing left to do.
 - **Listing.** `shipyard ping list` with `--json` prints the computer's pings as JSON, for shipyard on the user's Mac to read; you don't need it to ping.
 - **Herdr's terminal.** A `--herdr` click focuses the tab in Herdr; the click also brings forward the terminal app the ping was sent from, which the CLI notes by itself. The user can name another with `[herdr] terminal` (see Keys and defaults), which wins.
@@ -540,4 +544,133 @@ shipyard ping withdraw cache-question
 
 ```sh
 shipyard ping "Claude is asking for permission" --app Claude --project shop
+```
+
+## Driving the app
+
+On the user's Mac, three more commands open, steer and photograph the running app, so you can see what shipyard shows, check a change, or attach a screenshot: `shipyard app`, `shipyard panel` and `shipyard screenshot`. They talk to the app directly; they need no Accessibility or Screen Recording permission, and they never change `config.toml`. The command is found as in Sending pings (`~/.local/bin/shipyard`).
+
+```sh
+shipyard app open [--demo <folder>] | quit | status [--json]
+shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
+shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
+```
+
+| Command | What it does | Prints on success |
+|---|---|---|
+| `app open` | launches shipyard in the background unless it runs, and waits until it answers (about 10 seconds at most) | the status, as `app status` does |
+| `app open --demo <folder>` | quits shipyard and runs it on demo data (see Demo runs) | the status, with a `demo:` line |
+| `app quit` | quits shipyard and waits until it's gone | `shipyard quit` |
+| `app status` | whether shipyard runs, and what its panel shows | the status (below) |
+| `app status --json` | the same, as one JSON object on one line | the status as JSON |
+| `panel open`, `panel close` | opens or closes the menu bar icon's panel, waiting until it has | `panel open`, `panel closed` |
+| `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
+| `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs` or `pings` | `showing all <kind> in <project>` |
+| `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
+| `screenshot <file.png>` | saves the panel as it looks, opening it when it's closed; a relative path is taken from the folder you run in | the file's absolute path |
+| `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
+| `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
+
+`app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
+
+```text
+shipyard 0.1.0 is running
+panel: closed
+layout: tabs
+tab: All
+projects: shop, blog
+folded: none
+showing all: pull-requests in shop
+```
+
+With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`) and `demo` (the demo folder, `null` otherwise); read it rather than the lines when you act on it.
+
+What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. The panel stays open after a screenshot; close it when you're done.
+
+### Exit codes
+
+- **0**: done. A screenshot is still exit 0 when the app couldn't capture its window and drew the panel itself instead: it writes that picture, prints the path, and says so on standard error, `captured by rendering: <why>`. Look at such a picture before you rely on it.
+- **1**: refused, with one line on standard error saying why. Shipyard isn't running (``shipyard isn't running; `shipyard app open` ``), or didn't answer within 10 seconds of launching. No project, kind or tab has that name; the line lists the ones that exist, such as ``no project is named `shopp`; the projects are `shop`, `blog` ``, so try again with one of them. `tab` in the list layout (``the menu uses the list layout; tabs need `[menu] layout = "tabs"` ``). `show-more` on a project not grouped by kind. A screenshot nothing could be written for, such as one into a folder that doesn't exist.
+- **2**: the arguments don't read (a missing name, an unknown subcommand or option, a path that isn't `.png`, a `--demo` folder that doesn't exist); the line comes with the usage. On a machine other than the Mac, every one of these commands is exit 2 too: ``shipyard: `shipyard app` runs on the Mac, where the app is``.
+
+### Demo runs
+
+`shipyard app open --demo <folder>` shows shipyard with example data, for a screenshot or a check, without touching the user's setup. The folder holds a configuration at `<folder>/shipyard/config.toml`, written like the user's (everything above applies); the run keeps its own state in `<folder>/support`. It quits the user's app, launches shipyard on the folder, and every later `shipyard app`, `panel` and `screenshot` reaches the demo, with nothing more to pass. `app status` says `demo: <folder>` while it runs.
+
+- **The user's files stay as they were.** Their `config.toml`, their state and their login item are left alone; the run writes only a small pointer file in shipyard's support folder, which the next plain `app open` removes.
+- **Plain `shipyard app open` brings the user's app back**: it quits the demo and launches the user's own. Always end a demo with it, so the user is left with their shipyard running.
+- **It reads GitHub as the signed-in user**, so name public repositories in a demo's configuration: what it shows ends up in screenshots. Signing out from a demo's panel would sign the user out too.
+- **Pings you send meanwhile go to the user's app**, not the demo, and show there once it's back.
+- **Put the folder in the user's home**, such as `~/shipyard-demo`, never in a shared folder like `/tmp`: another account on the Mac could create that folder first and answer your `panel` and `screenshot` commands in the demo's place.
+- **Keep the folder's path short**: the run refuses one whose path is too long for its socket, saying `use a folder with a shorter path`.
+
+### What it can't do
+
+- **Click.** Rows, buttons, links and the gear menu can't be clicked, and nothing is typed into the panel: steer it only with the `panel` commands, and ask the user for anything else.
+- **Hover.** Hover cards and tooltips never show in a screenshot.
+- **The real menu bar.** A screenshot shows the panel, or the icon drawn on its own with `--menu-bar-icon`; the menu bar strip itself, with its count and the other apps' icons, can't be captured.
+- **Another machine's app.** The commands reach the app on the Mac you run on. From another machine there's no app to drive: ask the user, or run on their Mac.
+
+### Worked app control
+
+**"Is shipyard running?"** Ask, and launch it when it isn't:
+
+```sh
+shipyard app status --json || shipyard app open
+```
+
+**"Restart shipyard."** Quit it, then open it again; `open` returns once it answers:
+
+```sh
+shipyard app quit
+shipyard app open
+```
+
+**"Show me the panel."** Open it, and close it when you've looked:
+
+```sh
+shipyard panel open
+shipyard panel close
+```
+
+**"Collapse the blog project."** By its `name`; unfold it the same way:
+
+```sh
+shipyard panel fold blog
+shipyard panel unfold blog
+```
+
+**"Show me every pull request in shop."** The group of that kind opens past its `show-first` cap until the panel closes:
+
+```sh
+shipyard panel show-more shop pull-requests
+```
+
+**"Screenshot the shop tab in dark mode."** In the tabs layout, select the tab, then capture; the path printed is the file:
+
+```sh
+shipyard panel tab shop
+shipyard screenshot shop-dark.png --appearance dark
+```
+
+**"Screenshot the menu bar icon."**
+
+```sh
+shipyard screenshot icon.png --menu-bar-icon --appearance light
+```
+
+**"Screenshot shipyard with example data."** Write a demo configuration naming public repositories, run the demo, capture it, then bring the user's app back:
+
+```sh
+mkdir -p ~/shipyard-demo/shipyard
+cat > ~/shipyard-demo/shipyard/config.toml <<'TOML'
+version = 1
+
+[[projects]]
+name = "swift"
+repositories = ["swiftlang/swift"]
+TOML
+shipyard app open --demo ~/shipyard-demo
+shipyard screenshot ~/shipyard-demo/panel.png
+shipyard app open
 ```

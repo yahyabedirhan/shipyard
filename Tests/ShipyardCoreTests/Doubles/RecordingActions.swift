@@ -1,5 +1,6 @@
 import Foundation
 import ShipyardCore
+import ShipyardPings
 
 /// An `ActionRunning` that records the URLs it was asked to open and the
 /// ping actions it was asked to run. Told to fail (`failure`), it reports

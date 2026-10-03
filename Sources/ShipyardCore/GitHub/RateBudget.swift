@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// One of GitHub's two hourly limits shipyard spends.
 public enum RateAPI: String, CaseIterable, Equatable, Hashable, Sendable {

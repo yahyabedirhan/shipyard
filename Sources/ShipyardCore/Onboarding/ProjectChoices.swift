@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// What the user has picked so far in the project picker: the repositories
 /// offered (the ones they typed, then the suggestions), the ones chosen, and

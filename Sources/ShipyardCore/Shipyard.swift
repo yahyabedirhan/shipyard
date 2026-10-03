@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import ShipyardCommand
+import ShipyardConfig
+import ShipyardPings
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
 /// The app builds one with its adapters and the panel draws from it.
@@ -202,7 +205,16 @@ public final class Shipyard {
     /// touched.
     public func start() async {
         signedOutReason = nil
+        // The ping store's folder exists from the start, so the app's watch
+        // is on it alone and never on the support folder `state.json` is
+        // saved in. A folder that can't be made leaves the watch on its
+        // nearest existing ancestor.
+        try? pingStore.createDirectory()
         appStateStore.load(at: clock.now)
+        // For the CLI, beside `repositories.json`: which config.toml this
+        // app reads, whatever the agent's shell says. A file that can't be
+        // written leaves the CLI to its own lookup.
+        try? ConfigLocation.record(configStore.url, in: repositoriesStore.directory)
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
@@ -689,7 +701,9 @@ public final class Shipyard {
     /// Records `events` in `state` and returns what to post: each event not
     /// handled before, once, in the first project (in configuration order)
     /// that lists the item and whose rules select it. Every event is
-    /// recorded as handled, notified or not.
+    /// recorded as handled, notified or not, except a remote ping's that
+    /// only its machine's section lists and passes over: that waits, once,
+    /// for a project to file the ping (`NotifiedEvents.passOverUnfiled`).
     private static func select(
         _ events: [Event],
         listings: [String: [Item]],
@@ -709,12 +723,20 @@ public final class Shipyard {
         var notifications: [PostedNotification] = []
         for id in order {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
-            let selected = occurrences.first { event in
-                guard listed[event.project]?.contains(event.item.id) == true, let project = settings[event.project] else { return false }
-                return NotificationRules.shouldNotify(event, settings: project, viewer: viewer)
+            let filed = occurrences.filter { listed[$0.project]?.contains($0.item.id) == true && settings[$0.project] != nil }
+            // A remote ping only its machine's section lists may be filed
+            // under a project later, once its selectors resolve.
+            let unfiled = !filed.isEmpty && filed.allSatisfy(\.isInMachineSection)
+            if unfiled && state.notified.passedOverUnfiled(first) { continue }
+            let selected = filed.first { event in
+                settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, viewer: viewer) } ?? false
             }
             if let selected { notifications.append(NotificationRules.notification(for: selected)) }
-            state.notified.insert(first, at: now)
+            if unfiled && selected == nil {
+                state.notified.passOverUnfiled(first, at: now)
+            } else {
+                state.notified.insert(first, at: now)
+            }
         }
         return notifications
     }
@@ -879,7 +901,7 @@ public final class Shipyard {
     /// went, lists the pings at once from the last snapshot: no GitHub
     /// request. A new ping a project lists posts its `ping.sent`
     /// notification when the project's rules select it; a replaced one
-    /// (same id, same sent time) doesn't again. A ping that went (withdrawn
+    /// (same id, same instance) doesn't again. A ping that went (withdrawn
     /// with the CLI) takes its notification out of Notification Center.
     /// The app's watcher on the store calls this.
     public func reloadPings() async {
@@ -898,7 +920,9 @@ public final class Shipyard {
         let listings = self.listings(for: configured, in: snapshot, configuration: configuration)
         let projects = configured + Self.machineSettings(configuration)
         let events = EventDetector.pingEvents(listings: listings, projects: projects)
-        let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
+        let notified = appStateStore.state.notified
+        // One its machine's section passed over waits there for a project to file it.
+        let unhandled = events.filter { !notified.contains($0) && !($0.isInMachineSection && notified.passedOverUnfiled($0)) }
         guard !unhandled.isEmpty else { return }
         let now = clock.now
         let viewer = snapshot?.viewerLogin
@@ -933,7 +957,7 @@ public final class Shipyard {
         return Task {
             let outcome: ActionOutcome
             if case .herdr(let target) = action {
-                outcome = await runHerdr(target, sentFrom: ping.terminal)
+                outcome = await runHerdr(target, inSession: ping.herdrSession, sentFrom: ping.terminal)
             } else {
                 outcome = await actions.run(action)
             }
@@ -983,12 +1007,13 @@ public final class Shipyard {
 
     /// A ping's Herdr action: focuses the tab or pane `target` names
     /// (`HerdrFocus`), on the saved machine `machine` for a remote ping,
-    /// then, once that worked, brings `[herdr] terminal` forward through
-    /// the action port, as an `--app` action would. Without a terminal set,
+    /// in the named Herdr session `session` a local one was sent from (its
+    /// `herdrSession`), then, once that worked, brings `[herdr] terminal`
+    /// forward through the action port, as an `--app` action would. Without a terminal set,
     /// the one the ping was sent from (`sentFrom`) comes forward instead;
     /// with neither, only the focus runs. Either failing fails the action.
-    private func runHerdr(_ target: String, on machine: String? = nil, sentFrom: String? = nil) async -> ActionOutcome {
-        let focused = await herdr.focus(target, on: machine)
+    private func runHerdr(_ target: String, on machine: String? = nil, inSession session: String? = nil, sentFrom: String? = nil) async -> ActionOutcome {
+        let focused = await herdr.focus(target, on: machine, inSession: session)
         guard focused == .done, let terminal = configStore.lastValid.herdr.terminal ?? sentFrom else { return focused }
         return await actions.run(.app(terminal))
     }
@@ -1039,14 +1064,14 @@ public final class Shipyard {
     }
 
     /// The listed pings, the remote ones filed against `configuration` and
-    /// the repositories last resolved (`PingCommand.filed(remote:)`), as
+    /// the repositories last resolved (`ProjectFiling.filed(remote:)`), as
     /// the CLI files a local one when it's sent.
     private func filedPings(_ configuration: Configuration) -> [Ping] {
         let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
         guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
         let resolved = resolvedRepositories ?? repositoriesStore.load()
         resolvedRepositories = resolved
-        return pings + remotePings.map { PingCommand.filed(remote: $0, configuration: configuration, resolved: resolved) }
+        return pings + remotePings.map { ProjectFiling.filed(remote: $0, configuration: configuration, resolved: resolved) }
     }
 
     /// Every project's listing, and each remote machine's own, from
@@ -1233,9 +1258,12 @@ public final class Shipyard {
         let now = clock.now
         let listedRemote = filedPings(configuration).filter { $0.machine != nil && !Self.hasLeft($0, in: configuration, at: now) }
         let current = Dictionary(
-            (stored + listedRemote).map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
+            (stored + listedRemote).map { ($0.item.id, Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? "")) },
             uniquingKeysWith: { first, _ in first }
         )
+        func isCurrent(_ recorded: String, _ url: String) -> Bool {
+            current[url].map { NotifiedEvents.records(recorded, as: $0) } ?? false
+        }
         let pingRecords = appStateStore.state.notified.records.filter { key, record in
             guard let url = URL(string: key) else { return false }
             if Ping.id(from: url) == nil {
@@ -1243,12 +1271,12 @@ public final class Shipyard {
                 let removed = followsConfiguredMachines && !configured.contains(machine)
                 guard removed || (answered.contains(machine) && (!truncated.contains(machine) || listedURLs.contains(key))) else { return false }
             }
-            return record.events.contains { $0 != current[key] }
+            return record.events.contains { !isCurrent($0, key) }
         }
         guard !pingRecords.isEmpty else { return }
         appStateStore.update { state in
             for key in pingRecords.keys.sorted() {
-                leftBanners += state.notified.remove(itemID: key) { $0 != current[key] }
+                leftBanners += state.notified.remove(itemID: key) { !isCurrent($0, key) }
             }
         }
     }

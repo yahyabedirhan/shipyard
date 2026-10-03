@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// The app's verdict on `config.toml` after a reload: whether it accepted
 /// the file and, when it didn't, the problems the panel's banner lists. The

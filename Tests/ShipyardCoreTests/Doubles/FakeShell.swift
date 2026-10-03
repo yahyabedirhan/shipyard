@@ -1,3 +1,4 @@
+import ShipyardCommand
 import ShipyardCore
 
 /// A `ShellRunning` standing in for spawning the login shell: records what

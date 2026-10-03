@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// A ready-made configuration for one main use of shipyard: a whole
 /// commented file to start from. Onboarding offers them (`Preset.all`, in

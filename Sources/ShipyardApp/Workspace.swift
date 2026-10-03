@@ -1,5 +1,6 @@
 import AppKit
 import ShipyardCore
+import ShipyardPings
 
 /// Opens items in the browser, runs pings' link and app actions (and so
 /// brings `[herdr] terminal` forward), and opens documents in their editor,

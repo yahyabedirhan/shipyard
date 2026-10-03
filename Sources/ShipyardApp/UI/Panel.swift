@@ -1,3 +1,4 @@
+import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
@@ -8,6 +9,9 @@ import SwiftUI
 struct Panel: View {
     let shipyard: Shipyard
     let actions: AppServices
+    /// A panel drawn only for a screenshot's fallback, never on screen: its
+    /// appearing and disappearing aren't the panel opening and closing.
+    var isSnapshot = false
     /// The header's "Install agent skill…" shows the install card above the footer.
     @State private var showsSkillInstall = false
     /// The header's "Link shipyard CLI…" shows the link card above the footer.
@@ -39,8 +43,8 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
         .animation(Motion.banner, value: showsCLILink)
-        .onAppear { actions.panelOpened() }
-        .onDisappear { actions.panelClosed() }
+        .onAppear { if !isSnapshot { actions.panelOpened() } }
+        .onDisappear { if !isSnapshot { actions.panelClosed() } }
     }
 
     // MARK: - Header
@@ -222,7 +226,7 @@ struct Panel: View {
         case .list:
             ListLayout(model: shipyard.menu, actions: actions.layoutActions)
         case .tabs:
-            TabsLayout(model: shipyard.menu, actions: actions.layoutActions)
+            TabsLayout(model: shipyard.menu, panel: actions.panelState, actions: actions.layoutActions)
         }
     }
 

@@ -1,9 +1,9 @@
 import Foundation
 
 /// Watches the configuration file's directory and calls `onChange` (on the
-/// main actor) once changes have settled for 200 ms. The ping store's
-/// directory is watched the same way, as the "file": a ping written into it
-/// is a write to the directory.
+/// main actor) once changes have settled for 200 ms. The ping store is
+/// watched as a folder instead (`init(folder:)`): only the folder itself,
+/// so a save beside it (`state.json`) doesn't fire.
 ///
 /// Editors and agents usually save by writing a new file and renaming it
 /// over the old one, which leaves a watch on the old file's descriptor
@@ -15,7 +15,14 @@ import Foundation
 /// ancestor is watched instead, so creating it is noticed.
 @MainActor
 final class ConfigWatcher {
-    private let file: URL
+    /// What to watch: a file in its directory, or a folder alone, which
+    /// says where it is each time the watch opens (it may have been created).
+    private enum Target {
+        case file(URL)
+        case folder(@MainActor () -> URL)
+    }
+
+    private let target: Target
     private let debounce: TimeInterval
     private let onChange: @MainActor () -> Void
     // Written on the main actor only; `deinit` cancels them (closing the descriptors).
@@ -24,7 +31,16 @@ final class ConfigWatcher {
     private var pending: DispatchWorkItem?
 
     init(file: URL, debounce: TimeInterval = 0.2, onChange: @escaping @MainActor () -> Void) {
-        self.file = file
+        target = .file(file)
+        self.debounce = debounce
+        self.onChange = onChange
+    }
+
+    /// Watches the folder `folder` returns, asked again each time the watch
+    /// opens: a create, rename or delete in it, or the folder itself going.
+    /// Nothing beside it, such as a save to its parent.
+    init(folder: @escaping @MainActor () -> URL, debounce: TimeInterval = 0.2, onChange: @escaping @MainActor () -> Void) {
+        target = .folder(folder)
         self.debounce = debounce
         self.onChange = onChange
     }
@@ -42,8 +58,14 @@ final class ConfigWatcher {
     private func watch() {
         directorySource?.cancel()
         fileSource?.cancel()
-        directorySource = source(at: Self.nearestExisting(file.deletingLastPathComponent()), events: [.write, .delete, .rename])
-        fileSource = source(at: file, events: [.write, .extend, .delete, .rename, .attrib])
+        switch target {
+        case .file(let file):
+            directorySource = source(at: Self.nearestExisting(file.deletingLastPathComponent()), events: [.write, .delete, .rename])
+            fileSource = source(at: file, events: [.write, .extend, .delete, .rename, .attrib])
+        case .folder(let folder):
+            directorySource = source(at: folder(), events: [.write, .delete, .rename])
+            fileSource = nil
+        }
     }
 
     private func source(at url: URL, events: DispatchSource.FileSystemEvent) -> (any DispatchSourceFileSystemObject)? {

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// Onboarding's first step, as the user fills it in: the preset chosen,
 /// for `incoming-contributions` whether it watches every repository the

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 // The words of a project's groups: their titles and the date buckets' names.
 extension PanelText {

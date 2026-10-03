@@ -9,15 +9,15 @@ Checked 2026-09-26 for issue #72, against the sources listed at the end. The que
 - It looks like the panel: the system's `.regularMaterial`, the panel's hairline and corner radius, the panel's type scale. Its motion is the system spring the row highlight already uses, and an opacity fade. Nothing is hand-drawn beyond a rounded rectangle, and nothing is hand-animated.
 - It meets each thing the ticket asks for. It never covers the row the pointer is on: it sits under the hovered view, or over it when there's no room below. The panel's edge can't cut it off, because it's placed inside the panel's bounds with a margin, and it's drawn at the panel's frame, so the scroll view's clip doesn't cut it either. On the header's buttons it shows after a 0.5 s rest and at once while warm, as native tooltips do, gliding from one to the next. On the item rows it waits 1 s and closes as the pointer leaves, so it doesn't follow the pointer down the list and cover the rows under it. It never takes the pointer, the keyboard focus or the key window.
 - VoiceOver keeps the text: `.help` set the view's accessibility hint (Apple: "Adding help to a view configures the view's accessibility hint and its help tag"), so `hoverHelp(_:)` sets `.accessibilityHint` with the same words, and the card itself is hidden from accessibility.
-- The style is chosen in one place (`HoverHelp.style`), and the placement rule is `HoverHelpPlacement` in `ShipyardCore/Menu/`, with tests.
+- The placement rule is `HoverHelpPlacement` in `ShipyardCore/Menu/`, with tests.
 
-**Runner-up: SwiftUI's own `.popover`, shown on hover.** It's the most native look (the system's popover chrome and arrow), and it's its own window, so it can sit beside the panel and cover no rows at all. It's built as `HoverHelp.Style.popover`, one line away. It isn't the default because the risks can only be checked in the real menu, which agents can't drive:
+**Runner-up: SwiftUI's own `.popover`, shown on hover.** It's the most native look (the system's popover chrome and arrow), and it's its own window, so it can sit beside the panel and cover no rows at all. It isn't the default because the risks can only be checked in the real menu, which agents can't drive:
 
 - An `NSPopover` is a window, and its behavior decides "which user interactions will cause the popover to close". A transient popover closes on most interactions. A popover that takes the key window could take the arrow keys from the list, which depends on the panel's window being key.
 - Apple's guidance is to "show one popover at a time", and a hover popover per row means closing one popover and opening the next on every row the pointer crosses.
 - The HIG places popovers for "a small amount of information or functionality" that people interact with, not for passive help. The HIG entry for passive help is the tooltip.
 
-If the maintainer prefers the popover's look after trying both, switching is one line, followed by a check of the risks above.
+It was first built as a second style, `HoverHelp.Style.popover`, one line away from the card, to try against it. It was never tried in the real menu, and the maintainer chose to remove it rather than keep it to try later (#84, #160). Trying the popover again means building it anew (`popover(isPresented:arrowEdge:)` on the hovered view after its context's delay), then checking the risks above.
 
 ## What the options were measured against
 
@@ -47,7 +47,7 @@ Apple's **TipKit** (macOS 14+) has `popoverTip`, but it's for feature discovery,
 | Option | Look | Covers the hovered row? | Cut off at the panel's edge? | Focus, clicks | Verdict |
 |---|---|---|---|---|---|
 | `.help` (today) | The system's help tag: small, late, dated | Can cover the rows under it, and lingers | Can be (the ticket's screenshots) | None | What the maintainer wants gone |
-| `.popover` on hover (SwiftUI, macOS 10.15+) | Native popover chrome and arrow | No: `arrowEdge` puts it beside the view; nil lets the system choose | No: its own window, repositioned by the system | A window: may take key and arrows; transient ones close on interaction | **Runner-up**, built as the alternative style |
+| `.popover` on hover (SwiftUI, macOS 10.15+) | Native popover chrome and arrow | No: `arrowEdge` puts it beside the view; nil lets the system choose | No: its own window, repositioned by the system | A window: may take key and arrows; transient ones close on interaction | **Runner-up**; built as an alternative style, then removed untried |
 | `NSPopover` through `NSViewRepresentable` | Same as above | No | No | Controllable (`behavior`, `animates`), but it's AppKit in a SwiftUI app | More control than `.popover` for the same risks, and more code |
 | A SwiftUI card drawn by the panel (`overlayPreferenceValue`, anchor preferences) | The panel's own: system material, hairline | No, by placement | No, by placement inside the bounds | None: `allowsHitTesting(false)`, no window | **Recommended** |
 | Text inline in the row | Plain text | n/a | n/a | None | Right where the text is short or the row can grow (note and error rows); the item rows can't hold their full detail on one line |

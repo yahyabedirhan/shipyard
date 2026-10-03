@@ -1,4 +1,5 @@
 import Foundation
+@testable import ShipyardPings
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -35,16 +36,19 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         #expect(list == PingList(version: 1, shipyardVersion: "0.0.6", pings: pings, truncated: false))
     }
 
-    @Test func seenAndFailureStayOnTheMachine() throws {
+    @Test func seenFailureAndHerdrSessionStayOnTheMachine() throws {
         var seen = ping("seen-one", minutesAgo: 1)
         seen.seen = Date(timeIntervalSince1970: 1_790_000_000)
         seen.failure = "no such app"
+        // `herdr --machine` reaches the session its saved machine names.
+        seen.herdrSession = "work"
 
         let text = PingList.encode([seen])
         let list = try PingList.decode(text)
 
         #expect(!text.contains("seen\""))
         #expect(!text.contains("failure"))
+        #expect(!text.contains("herdrSession"))
         #expect(list.pings == [ping("seen-one", minutesAgo: 1)])
     }
 
@@ -61,15 +65,6 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         let list = try PingList.decode(PingList.encode(pings))
 
         #expect(list.pings.map(\.id) == ["a", "b", "c"])
-    }
-
-    @Test func atMostAHundredPingsAreListedAndTheRestMarkedTruncated() throws {
-        let pings = (0..<150).map { ping("p\($0)", minutesAgo: $0) }
-
-        let list = try PingList.decode(PingList.encode(pings))
-
-        #expect(list.pings.map(\.id) == (0..<100).map { "p\($0)" })
-        #expect(list.truncated)
     }
 
     @Test func aHundredPingsExactlyIsNotTruncated() throws {

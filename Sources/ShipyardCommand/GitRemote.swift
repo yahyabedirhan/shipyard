@@ -1,6 +1,6 @@
 import Foundation
 
-/// Reads a folder's git `origin` remote. The seam between the core and
+/// Reads a folder's git `origin` remote. The seam between a command and
 /// spawning `git`, so tests use a fake working folder.
 public protocol GitRemoteLookup: Sendable {
     /// The URL of `origin` for the repository `folder` is in, as git prints
@@ -13,9 +13,9 @@ public protocol GitRemoteLookup: Sendable {
 /// `PATH` as the agent's terminal has it, so worktrees, submodules and
 /// `url.<base>.insteadOf` read as git reads them.
 public struct GitCLI: GitRemoteLookup {
-    private let run: GhCLI.Run
+    private let run: ProgramRun
 
-    public init(run: @escaping GhCLI.Run = GhCLI.runProcess) {
+    public init(run: @escaping ProgramRun = ProgramRunner.process) {
         self.run = run
     }
 
@@ -53,6 +53,29 @@ public enum GitRemote {
         while path.hasSuffix("/") { path.removeLast() }
         if path.hasSuffix(".git") { path.removeLast(4) }
         let slug = String(path)
-        return ConfigurationReader.isRepositorySlug(slug) ? slug : nil
+        return isRepositorySlug(slug) ? slug : nil
+    }
+
+    /// Whether `slug` is a repository as `owner/name`: a GitHub login
+    /// (letters, digits, hyphens) and a repository name (letters, digits,
+    /// `-`, `_`, `.`). The configuration's selectors and `--repo` both read
+    /// repositories by it.
+    public static func isRepositorySlug(_ slug: String) -> Bool {
+        let parts = slug.split(separator: "/", omittingEmptySubsequences: false)
+        guard parts.count == 2 else { return false }
+        let owner = parts[0], name = parts[1]
+        let ownerOK = !owner.isEmpty && owner.unicodeScalars.allSatisfy { $0.isASCIIAlphanumeric || $0 == "-" }
+        let nameOK = !name.isEmpty && name != "." && name != ".."
+            && name.unicodeScalars.allSatisfy { $0.isASCIIAlphanumeric || $0 == "-" || $0 == "_" || $0 == "." }
+        return ownerOK && nameOK
+    }
+}
+
+private extension Unicode.Scalar {
+    var isASCIIAlphanumeric: Bool {
+        switch self {
+        case "A"..."Z", "a"..."z", "0"..."9": true
+        default: false
+        }
     }
 }

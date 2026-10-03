@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// A change in an item that shipyard can notify about, such as `pr.opened`,
 /// found by comparing the known items with a new snapshot.
@@ -32,6 +33,12 @@ public struct Event: Equatable, Hashable, Sendable {
     /// What the notification says, for example "New PR #57"; a ping's own
     /// title for `ping.sent`.
     public var headline: String { kind == .pingSent ? item.title : kind.headline(number: item.number) }
+
+    /// Whether the event is a remote ping's, listed in its machine's own
+    /// section (filed under no project), which bears the machine's label.
+    var isInMachineSection: Bool {
+        item.ping?.machine.map { $0 == project } ?? false
+    }
 }
 
 /// What happened to an item between two refreshes, whatever its kind. The

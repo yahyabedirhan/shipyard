@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 // The project picker's words (`ProjectPicker`).
 extension PanelText {
