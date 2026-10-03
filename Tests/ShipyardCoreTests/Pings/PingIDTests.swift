@@ -114,16 +114,16 @@ struct PingIDTests {
 
     // MARK: Replacing
 
-    @Test("sending an id again replaces content, action and filing, keeps the sent time, and needs attention again")
+    @Test("sending an id again replaces content, action and filing, starts its age again, and needs attention again")
     func replace() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
-        let sent = harness.clock.now
         try await harness.send("Waiting for your input", "--project", "shop", "--id", "input", "--body", "Which total?", "--from", "agent", "--open", "https://example.com")
         harness.shipyard.markSeen(try #require(harness.pingRows().first))
         try harness.pingStore.recordFailure(try #require(harness.pingStore.ping(id: "input")), reason: "the app isn't installed")
         #expect(harness.shipyard.menu.attention.pings == 0)
 
         harness.clock.advance(by: 600)
+        let replacedAt = harness.clock.now
         try await harness.send("Still waiting, 10 min", "--id", "input", "--project", "blog", "--app", "Claude")
 
         let ping = try #require(harness.pingStore.ping(id: "input"))
@@ -133,11 +133,12 @@ struct PingIDTests {
         #expect(ping.sender == nil)
         #expect(ping.action == .app("Claude"))
         #expect(ping.projects == ["blog"])
-        #expect(ping.sent == sent)
+        #expect(ping.sent == replacedAt)
         #expect(ping.seen == nil)
         #expect(ping.failure == nil)
         #expect(harness.pingRows("shop").isEmpty)
         #expect(harness.pingRows("blog").map(\.title) == ["Still waiting, 10 min"])
+        #expect(harness.pingRows("blog").first?.since == replacedAt)
         #expect(harness.pingRows("blog").first?.needsAttention == true)
         #expect(harness.shipyard.menu.attention.pings == 1)
     }

@@ -186,7 +186,7 @@ struct HerdrEventTests {
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.repository == nil)
     }
 
-    @Test("blocking again replaces the pane's ping: one ping, its new title, unseen again, and no second notification")
+    @Test("blocking again replaces the pane's ping: one ping, its new title, aged from the new block, unseen again, and no second notification")
     func blockingAgainReplaces() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout", folder: agentFolder)
@@ -196,6 +196,7 @@ struct HerdrEventTests {
         try harness.pingStore.markSeen(first, at: harness.clock.now)
 
         harness.clock.advance(by: 60)
+        let blockedAgain = harness.clock.now
         harness.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout, again", folder: agentFolder)
         #expect(harness.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
         await harness.shipyard.reloadPings()
@@ -204,7 +205,7 @@ struct HerdrEventTests {
         let again = try #require(harness.pingStore.ping(id: "herdr-w1-p3"))
         #expect(again.title == "Claude is waiting in checkout, again")
         #expect(again.seen == nil)
-        #expect(again.sent == first.sent)
+        #expect(again.sent == blockedAgain)
         #expect(again.instance == first.instance)
         #expect(harness.notifier.posted.filter { $0.event == .pingSent }.count == 1)
     }

@@ -7,7 +7,7 @@ import ShipyardPings
 extension Ping {
     /// The ping as a listed item: kind `ping`, with no number (0) until
     /// `Listing` gives it its section's (`PingNumbers`), always open, aged from when
-    /// it was sent, in the repository it was filed by (if any). Its URL only
+    /// it was sent or last replaced, in the repository it was filed by (if any). Its URL only
     /// names it (`shipyard://ping/<id>`, or `shipyard://ping/<machine>/<id>`
     /// for a remote ping), so it never collides with a GitHub item's, nor
     /// the same id on another machine; a click runs its `action` instead. It has no GitHub author:

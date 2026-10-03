@@ -107,8 +107,8 @@ public enum PingCommand {
     /// without an action takes the filing's default one (`Unfiled`: the
     /// agent's Herdr pane). `newID` makes the id when `--id` gives none;
     /// one already stored is drawn again. A `--id` already stored replaces
-    /// that ping: its sent time and instance stay, and it's unseen again
-    /// with no failure.
+    /// that ping: its sent time starts again at `now`, its instance stays,
+    /// and it's unseen again with no failure.
     public static func run(
         _ arguments: [String],
         environment: CommandEnvironment,
@@ -175,14 +175,14 @@ public enum PingCommand {
         }
         let replaced = store.ping(id: id)
         do {
-            // A replace keeps when the ping was first sent and its instance,
-            // so it isn't notified again; seen and failure start over, so it
-            // needs attention again.
+            // A replace is what the agent says now, so its age starts again;
+            // it keeps its instance, so it isn't notified again; seen and
+            // failure start over, so it needs attention again.
             try store.save(Ping(
                 id: id,
                 title: request.title,
                 projects: filed.projects,
-                sent: replaced?.sent ?? now,
+                sent: now,
                 repository: filed.repository,
                 body: request.body,
                 sender: request.sender,

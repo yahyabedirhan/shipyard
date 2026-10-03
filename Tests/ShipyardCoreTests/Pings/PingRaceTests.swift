@@ -26,8 +26,9 @@ private func sent(_ id: String = "input", title: String = "Waiting for your inpu
     Ping(id: id, title: title, projects: ["shop"], sent: Harness.now, action: .app("Claude"), instance: instance)
 }
 
-/// `ping` replaced as the CLI does with `--id`: new content, the same sent
-/// time and instance, unseen with no failure.
+/// `ping` replaced as the CLI does with `--id`: new content and the same
+/// instance, unseen with no failure. Its sent time is kept, unlike the
+/// CLI's, so only what each race changes differs.
 private func replaced(_ ping: Ping, title: String) -> Ping {
     Ping(id: ping.id, title: title, projects: ping.projects, sent: ping.sent, instance: ping.instance)
 }

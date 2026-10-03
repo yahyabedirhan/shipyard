@@ -166,7 +166,7 @@ struct RemotePingCommandTests {
 
     // MARK: - Replace and withdraw
 
-    @Test("sending an id again replaces it: its sent time and instance stay, and its day starts again")
+    @Test("sending an id again replaces it: its age and its day start again, and its instance stays")
     func replace() throws {
         shipyard("ping", "Building", "--id", "build")
         let first = try stored()
@@ -176,9 +176,12 @@ struct RemotePingCommandTests {
 
         let replaced = try stored()
         #expect(replaced.title == "Built")
-        #expect(replaced.sent == Self.now)
+        #expect(replaced.sent == later)
         #expect(replaced.instance == first.instance)
         #expect(replaced.expires == later.addingTimeInterval(Self.day))
+        // The list the Mac reads carries the replace's time, so its row is aged from it.
+        let list = try PingList.decode(shipyard("ping", "list", "--json", at: later).output)
+        #expect(list.pings.map(\.sent) == [later])
     }
 
     @Test("withdraw removes the ping and prints its id; an id no ping has is exit 1")

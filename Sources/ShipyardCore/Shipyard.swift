@@ -881,7 +881,7 @@ public final class Shipyard {
     /// went, lists the pings at once from the last snapshot: no GitHub
     /// request. A new ping a project lists posts its `ping.sent`
     /// notification when the project's rules select it; a replaced one
-    /// (same id, same sent time) doesn't again. A ping that went (withdrawn
+    /// (same id, same instance) doesn't again. A ping that went (withdrawn
     /// with the CLI) takes its notification out of Notification Center.
     /// The app's watcher on the store calls this.
     public func reloadPings() async {

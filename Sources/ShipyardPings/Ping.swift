@@ -13,7 +13,7 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
     public var title: String
     /// The names of the projects it's filed under.
     public var projects: [String]
-    /// When it was sent.
+    /// When it was sent, or last replaced: a replace starts its age again.
     public var sent: Date
     /// When the user saw it (clicked its row); `nil` while it needs attention.
     public var seen: Date?
