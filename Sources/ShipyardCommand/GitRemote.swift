@@ -69,6 +69,24 @@ public enum GitRemote {
             && name.unicodeScalars.allSatisfy { $0.isASCIIAlphanumeric || $0 == "-" || $0 == "_" || $0 == "." }
         return ownerOK && nameOK
     }
+
+    /// Why a working folder names no repository, as the error line says it.
+    public struct NoRepository: Error, Equatable, Sendable {
+        public var message: String
+    }
+
+    /// The repository of the working folder `url`: its git remote
+    /// `origin`, as `owner/name`, read through `git`. When there's none,
+    /// why, naming what was to be filed by it (`subject`: "ping", "notice").
+    public static func workingRepository(folder url: URL, git: any GitRemoteLookup, filing subject: String) -> Result<String, NoRepository> {
+        guard let origin = git.origin(in: url) else {
+            return .failure(NoRepository(message: "the working folder (\(url.path)) isn't a git repository with a remote `origin` to file the \(subject) by"))
+        }
+        guard let slug = repository(fromURL: origin) else {
+            return .failure(NoRepository(message: "the working folder's remote `origin` (\(origin)) doesn't name a repository as owner/name"))
+        }
+        return .success(slug)
+    }
 }
 
 private extension Unicode.Scalar {

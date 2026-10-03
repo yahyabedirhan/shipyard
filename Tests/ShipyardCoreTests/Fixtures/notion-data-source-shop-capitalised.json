@@ -1,0 +1,22 @@
+{
+  "object": "data_source",
+  "id": "27a0c3e1-8f4b-80bb-c002-0000000000e2",
+  "created_time": "2026-09-20T10:06:00.000Z",
+  "last_edited_time": "2026-09-20T10:06:00.000Z",
+  "properties": {
+    "Name": { "id": "title", "name": "Name", "description": null, "type": "title", "title": {} },
+    "No.": { "id": "Cd%3E2", "name": "No.", "description": null, "type": "unique_id", "unique_id": { "prefix": "SHO" } }
+  },
+  "parent": { "type": "database_id", "database_id": "27a0c3e1-8f4b-80aa-b003-0000000000d2" },
+  "database_parent": { "type": "page_id", "page_id": "27a0c3e1-8f4b-80d2-9a51-c7e3b2f0d101" },
+  "archived": false,
+  "in_trash": false,
+  "is_inline": false,
+  "title": [{ "type": "text", "text": { "content": "Shop", "link": null }, "plain_text": "Shop", "href": null }],
+  "description": [],
+  "icon": null,
+  "cover": null,
+  "url": "https://www.notion.so/27a0c3e18f4b80aab0030000000000d2",
+  "public_url": null,
+  "request_id": "6e0d3f2a-1b2c-4d5e-8f90-0a1b2c3d4e66"
+}

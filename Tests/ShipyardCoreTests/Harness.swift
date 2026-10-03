@@ -41,11 +41,19 @@ struct Harness {
     let timer = ManualTimer()
     /// The remote machines' poll timer, apart from the refresh's.
     let machineTimer = ManualTimer()
+    /// The notes' timer, apart from the refresh's.
+    let notesTimer = ManualTimer()
+    /// Where the Notion token is kept, standing in for its Keychain item:
+    /// empty (no notes) until a scenario connects or stores one.
+    let notion: InMemoryTokenStore
     let actions = RecordingActions()
     /// The Herdr a ping's `--herdr` action focuses, and the remote
     /// machines are asked through: no tabs or machines until added.
     let herdr = FakeHerdr()
     let notifier = RecordingNotifier()
+    /// The Mac's own Tailscale login, as the tailnet listener checks it:
+    /// none until a scenario sets one.
+    let tailnet = FakeTailnet()
     let loginItem = RecordingLoginItem()
     /// Where this app reads and writes, as the app decides it.
     let files: AppFiles
@@ -75,20 +83,22 @@ struct Harness {
         try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
         if let config { try Data(config.utf8).write(to: configURL) }
-        self.init(files: AppFiles(config: configURL, support: stateDirectory), store: InMemoryTokenStore(token: stored), gh: ghToken, clientID: clientID)
+        self.init(files: AppFiles(config: configURL, support: stateDirectory), store: InMemoryTokenStore(token: stored), notion: InMemoryTokenStore(), gh: ghToken, clientID: clientID)
     }
 
     /// The app as launched with `environment` (with `home` for the
     /// user's own folders), signed in with a stored token: its files where
     /// `AppFiles` puts them, as `AppServices` builds them.
     init(launchedWith environment: [String: String], home: URL) {
-        self.init(files: AppFiles(environment: environment, home: home), store: InMemoryTokenStore(token: "gho_stored"), gh: nil)
+        // The user's own Notion token is in the Keychain, as on the maintainer's Mac.
+        self.init(files: AppFiles(environment: environment, home: home), store: InMemoryTokenStore(token: "gho_stored"), notion: InMemoryTokenStore(token: "ntn_user"), gh: nil)
     }
 
     /// A harness over existing configuration and support folders.
-    private init(files: AppFiles, store: InMemoryTokenStore, gh ghToken: String?, clientID: String = "test-client-id") {
+    private init(files: AppFiles, store: InMemoryTokenStore, notion: InMemoryTokenStore, gh ghToken: String?, clientID: String = "test-client-id") {
         self.files = files
         self.store = store
+        self.notion = notion
         self.ghToken = ghToken
         gh = FakeGhLookup(token: ghToken)
         let clock = sleeper.clock
@@ -112,6 +122,9 @@ struct Harness {
             clock: sleeper.clock,
             timer: timer,
             machineTimer: machineTimer,
+            notionTokenStore: files.notionTokenStore(notion),
+            notesTimer: notesTimer,
+            tailnet: tailnet,
             sleep: sleeper.sleep,
             oauthClientID: clientID
         )
@@ -132,7 +145,7 @@ struct Harness {
     /// the same configuration file, app-state directory and token store,
     /// with the clock where this one's is, not started yet.
     func relaunched() -> Harness {
-        let next = Harness(files: files, store: store, gh: ghToken)
+        let next = Harness(files: files, store: store, notion: notion, gh: ghToken)
         next.clock.set(clock.now)
         return next
     }

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardNotices
 
 /// What the `shipyard` command asks of the running app: one request per
 /// connection over `control.sock`, sent as a `ControlMessage` with its
@@ -44,6 +45,12 @@ public enum ControlRequest: Equatable, Sendable {
     /// `shipyard control release`: the lease given up, when this agent
     /// holds it.
     case controlRelease
+    /// `shipyard notify "<title>" …`: an agent's notice, shown when the
+    /// user's rules select it for its project, answered with the app's
+    /// verdict; or `shipyard notify withdraw <id>`, the notice shown under
+    /// that id taken away. Not leased: any agent may post one while
+    /// another drives the app.
+    case notify(NoticeRequest)
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -59,13 +66,17 @@ public enum ControlRequest: Equatable, Sendable {
     /// keeps the client's timeout and the app's sleep within range.
     public static let longestWait = 3600
 
+    /// The most bytes the app reads of one request: 8 MB, room for a
+    /// notice's image (`Notice.largestImage`, base64 in its JSON).
+    public static let largestMessage = 8 << 20
+
     /// Whether the request needs the lease (`ControlLease`) before it's
     /// answered. `app.status` doesn't: it changes nothing, and reports the
     /// lease. Nor do `control.take` and `control.release`, which are the
     /// lease's own requests.
     public var isLeased: Bool {
         switch self {
-        case .appStatus, .controlTake, .controlRelease: false
+        case .appStatus, .controlTake, .controlRelease, .notify: false
         default: true
         }
     }
@@ -126,6 +137,8 @@ public struct ControlMessage: Equatable, Sendable {
             wire = Wire(command: "control.take", waitSeconds: waitSeconds)
         case .controlRelease:
             wire = Wire(command: "control.release")
+        case .notify(let notice):
+            wire = Wire(command: "notify", notice: notice)
         }
         wire.holder = holder
         let encoder = JSONEncoder()
@@ -188,6 +201,9 @@ public struct ControlMessage: Equatable, Sendable {
             }
             return .controlTake(waitSeconds: wire.waitSeconds)
         case "control.release": return .controlRelease
+        case "notify":
+            guard let notice = wire.notice else { throw .unreadable("the control command `notify` needs its `notice`") }
+            return .notify(notice)
         default: throw .unknownCommand(wire.command)
         }
     }
@@ -208,6 +224,9 @@ public struct ControlMessage: Equatable, Sendable {
         var menuBarIcon: Bool?
         var withIndicator: Bool?
         var waitSeconds: Int?
+        /// `notify`'s request, as one object in its own shape
+        /// (`NoticeRequest`): the notice's, or `{"withdraw":"<id>"}`.
+        var notice: NoticeRequest?
 
         /// The field at `path`, which `command` needs: refused when the
         /// request leaves it out.

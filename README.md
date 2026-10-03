@@ -94,6 +94,10 @@ Shipyard asks each machine for its pings through Herdr about every 30 seconds an
 
 One known limit, with Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but your Mac's Herdr window only moves there when it's already showing that machine. When it's showing your Mac or another machine, nothing visible happens and the ping is marked seen; switch Herdr to that machine yourself to see the pane. Herdr has no command yet that switches an open window to a saved machine, so shipyard can't do it for you.
 
+### Notes
+
+Your own notes, kept in Notion, list under each project too: one database per project, titled with the project's name, under a "Shipyard Notes" page. Dictate a note to any agent and it writes it there; the menu lists each project's open notes, newest first, with their numbers (`SHOP-7`) and labels, and clicking one opens it in Notion. The pencil icon on a project's header starts a note there: it creates the project's database the first time, then an empty note, and opens it in Notion for you to type or dictate. Notes never need attention. Give the app the token of an internal Notion connection shared with the Shipyard Notes page once, from the gear menu's **Connect Notion…**; it's kept in your Keychain, and the notes are read every minute and whenever you open the menu. `notes = { show = false }` in a project's block keeps its notes out.
+
 ## Examples
 
 Each configuration below produced the screenshot under it, trimmed to the lines that matter. The first three watch two repositories as one project, with issues turned on.

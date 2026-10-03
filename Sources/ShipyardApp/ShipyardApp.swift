@@ -4,6 +4,7 @@ import ShipyardCommand
 import ShipyardConfig
 import ShipyardControl
 import ShipyardCore
+import ShipyardNotices
 import ShipyardPings
 import SwiftUI
 
@@ -106,6 +107,9 @@ final class AppServices {
     /// written by the control server.
     let leaseIndicator = LeaseIndicator()
     private var controlServer: ControlServer?
+    /// The listener for notices from other machines, while `[notify]
+    /// listen = true`; `nil` otherwise, so nothing listens unasked.
+    private var noticeListener: NoticeListener?
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
     init() {
@@ -116,10 +120,11 @@ final class AppServices {
             configStatusStore: ConfigStatusStore(directory: files.support),
             pingStore: PingStore(directory: files.pings),
             repositoriesStore: ResolvedRepositoriesStore(directory: files.support),
-            tokenStore: Keychain(),
+            tokenStore: Keychain.github,
             actions: opener,
             notifier: notifier,
-            loginItem: files.loginItem(LaunchAtLogin())
+            loginItem: files.loginItem(LaunchAtLogin()),
+            notionTokenStore: files.notionTokenStore(Keychain.notion)
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
@@ -161,9 +166,41 @@ final class AppServices {
         }
         // Before a click that launched the app is handled (it's queued
         // behind this), `start()` has loaded the app state it marks seen in.
+        // The listener follows the configuration as soon as it's read,
+        // never waiting on GitHub, which `start()` and a reload then ask.
+        followNoticeListening()
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
         startControl()
+    }
+
+    /// Listens for notices from other machines when, and on the port, the
+    /// configuration says (`Shipyard.noticeListenerPort`), and stops when it
+    /// no longer does (ADR 0010), watching the port for its next change.
+    /// When the port can't be listened on, the app runs on without it and
+    /// says why in the log.
+    private func followNoticeListening() {
+        withObservationTracking {
+            applyNoticeListening()
+        } onChange: { [weak self] in
+            Task { @MainActor in self?.followNoticeListening() }
+        }
+    }
+
+    private func applyNoticeListening() {
+        let wanted = shipyard.noticeListenerPort
+        guard noticeListener?.port != wanted else { return }
+        noticeListener?.close()
+        noticeListener = nil
+        guard let port = wanted else { return }
+        let shipyard = shipyard
+        do {
+            noticeListener = try NoticeListener.start(port: port) { request, login in
+                await shipyard.receive(request, from: login)
+            }
+        } catch {
+            Self.log.error("notices from other machines are off: \(error.description, privacy: .public)")
+        }
     }
 
     /// Listens on `control.sock` for the `shipyard` command. When it can't,
@@ -185,6 +222,9 @@ final class AppServices {
                 guard let notice = ControlNotice(transition) else { return }
                 Task { await shipyard.notify(notice) }
             },
+            // An agent's notice is shown when its project's rules say so,
+            // or withdrawn.
+            notices: { request in await shipyard.receive(request) },
             quit: { NSApp.terminate(nil) }
         )
         do {
@@ -199,13 +239,15 @@ final class AppServices {
     func stop() {
         controlServer?.stop()
         controlServer = nil
+        noticeListener?.close()
+        noticeListener = nil
     }
 
     // MARK: - Layout actions
 
     /// What the menu's layout can do: open or mark seen a row, mark a
     /// project (or every project) seen, collapse a project, open a
-    /// project's repository.
+    /// project's repository, start a note in a project.
     var layoutActions: LayoutActions {
         let shipyard = shipyard
         return LayoutActions(
@@ -224,6 +266,12 @@ final class AppServices {
             openRepository: { [weak self] project in
                 shipyard.openRepository(of: project)
                 self?.closeMenu()
+            },
+            startNote: { [weak self] project in
+                // The menu closes once Notion opens the note; a failure stays in view on the project.
+                Task { @MainActor in
+                    if await shipyard.startNote(in: project.name) { self?.closeMenu() }
+                }
             }
         )
     }
@@ -250,11 +298,14 @@ final class AppServices {
     }
 
     /// Opening the panel rereads the notification permission (the user may
-    /// have changed it in System Settings). It doesn't refresh: looking
-    /// costs no GitHub request, the timer keeps the data fresh.
+    /// have changed it in System Settings) and the notes, so one just
+    /// written shows. It doesn't refresh GitHub: looking costs no GitHub
+    /// request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
         Task { await notifier.checkPermission() }
+        let shipyard = shipyard
+        Task { await shipyard.panelOpened() }
     }
 
     /// Closing the panel caps every group Show more revealed, so the menu

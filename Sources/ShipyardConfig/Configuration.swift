@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 
 /// Everything the user controls, read from `config.toml` (ADR 0001).
 ///
@@ -21,6 +22,7 @@ public struct Configuration: Equatable, Sendable {
     public var attention = AttentionToggles()
     public var herdr = HerdrSettings()
     public var remote = RemoteSettings()
+    public var notify = NotifySettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -47,6 +49,7 @@ public struct Configuration: Equatable, Sendable {
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
             pings: project.pings.applied(to: defaults.pings),
+            notes: project.notes.applied(to: defaults.notes),
             notifications: project.notifications ?? defaults.notifications,
             arrangement: project.arrangement.applied(to: defaults.arrangement),
             archived: project.archived ?? defaults.archived,
@@ -100,6 +103,20 @@ extension Configuration {
         public init(machines: [String] = []) { self.machines = machines }
     }
 
+    /// `[notify]`: whether the app listens for notices from the user's
+    /// other machines (ADR 0010). Off by default: nothing listens unless
+    /// the user turns it on. On, it listens on 127.0.0.1 only, at `port`,
+    /// which `tailscale serve` exposes to the tailnet.
+    public struct NotifySettings: Equatable, Sendable {
+        public var listen: Bool
+        /// The port on 127.0.0.1; `NoticePort.default` by default.
+        public var port: Int
+        public init(listen: Bool = false, port: Int = NoticePort.default) {
+            self.listen = listen
+            self.port = port
+        }
+    }
+
     /// `[attention]`: which reasons make an item need attention.
     public struct AttentionToggles: Equatable, Sendable {
         public var unseen = true
@@ -120,12 +137,15 @@ extension Configuration {
         public var issues = IssueSettings()
         public var workflowRuns = WorkflowRunSettings()
         public var pings = PingSettings()
-        /// `[[defaults.notifications]]`; a new pull request and a new ping
-        /// in any project, and an agent starting and ending a lease on app
-        /// control, by default.
+        /// `[defaults.notes]`: the user's notes in Notion, listed per project.
+        public var notes = NoteSettings()
+        /// `[[defaults.notifications]]`; a new pull request, a new ping and
+        /// an agent's notice in any project, and an agent starting and
+        /// ending a lease on app control, by default.
         public var notifications: [NotificationRule] = [
             NotificationRule(event: .prOpened),
             NotificationRule(event: .pingSent),
+            NotificationRule(event: .agentNotice),
             NotificationRule(event: .controlStarted),
             NotificationRule(event: .controlEnded),
         ]
@@ -148,6 +168,7 @@ extension Configuration {
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
         public var pings = PingOverrides()
+        public var notes = NoteOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
         /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
@@ -163,6 +184,7 @@ extension Configuration {
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
             pings: PingOverrides = .init(),
+            notes: NoteOverrides = .init(),
             notifications: [NotificationRule]? = nil,
             arrangement: ArrangementOverrides = .init(),
             archived: Bool? = nil,
@@ -174,6 +196,7 @@ extension Configuration {
             self.issues = issues
             self.workflowRuns = workflowRuns
             self.pings = pings
+            self.notes = notes
             self.notifications = notifications
             self.arrangement = arrangement
             self.archived = archived
@@ -256,6 +279,8 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
     /// An agent sent a new ping (`shipyard ping`).
     case pingSent = "ping.sent"
+    /// An agent posted a notice (`shipyard notify`): shown, never listed.
+    case agentNotice = "agent.notice"
     /// An agent took app control's lease: it's using shipyard.
     case controlStarted = "control.started"
     /// The lease ended: the agent released it, it ran out, or the user
@@ -483,6 +508,28 @@ public struct PingOverrides: Equatable, Sendable {
     }
 }
 
+/// `notes`: the user's own notes, kept in Notion (one database per
+/// project, under the "Shipyard Notes" page) and listed by the app. They
+/// take `show` alone.
+public struct NoteSettings: Equatable, Sendable {
+    public var show = true
+    public init(show: Bool = true) {
+        self.show = show
+    }
+}
+
+/// The `notes` keys a table sets; unset keys keep the value below.
+public struct NoteOverrides: Equatable, Sendable {
+    public var show: Bool?
+    public init(show: Bool? = nil) {
+        self.show = show
+    }
+
+    public func applied(to base: NoteSettings) -> NoteSettings {
+        NoteSettings(show: show ?? base.show)
+    }
+}
+
 /// How a project's listed items are grouped, sorted and drawn.
 public struct ArrangementSettings: Equatable, Sendable {
     public var groupBy: GroupBy = .kind
@@ -535,6 +582,7 @@ public struct ProjectSettings: Equatable, Sendable {
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
     public var pings: PingSettings
+    public var notes: NoteSettings
     public var notifications: [NotificationRule]
     public var arrangement: ArrangementSettings
     /// Whether groups and `owner/*` bring in archived repositories.
@@ -549,6 +597,7 @@ public struct ProjectSettings: Equatable, Sendable {
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
         pings: PingSettings = PingSettings(),
+        notes: NoteSettings = NoteSettings(),
         notifications: [NotificationRule],
         arrangement: ArrangementSettings = ArrangementSettings(),
         archived: Bool = false,
@@ -560,6 +609,7 @@ public struct ProjectSettings: Equatable, Sendable {
         self.issues = issues
         self.workflowRuns = workflowRuns
         self.pings = pings
+        self.notes = notes
         self.notifications = notifications
         self.arrangement = arrangement
         self.archived = archived
@@ -581,6 +631,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
         case .ping: pings.show
+        case .note: notes.show
         }
     }
 
@@ -591,6 +642,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .issue: issues.states
         case .workflowRun: workflowRuns.states
         case .ping: Set(StateGroup.all(for: .ping))
+        case .note: Set(StateGroup.all(for: .note))
         }
     }
 
@@ -602,6 +654,8 @@ public struct ProjectSettings: Equatable, Sendable {
         case .workflowRun: workflowRuns.authors
         // A ping has no GitHub author: every one is listed.
         case .ping: AuthorFilter()
+        // A note is the user's own: every open one is listed.
+        case .note: AuthorFilter()
         }
     }
 }
@@ -727,16 +781,19 @@ extension Configuration {
 
         # When to notify, for every project: one block per rule. The list
         # replaces the default rules below, so keep them to hear of new pull
-        # requests and pings, and of an agent starting and ending its turn
-        # with the app (control.started, control.ended). Other events include
-        # "run.failed" and "pr.review_requested"; authors narrows a rule to
-        # some authors, as above (empty: everyone).
+        # requests and pings, to see your agents' notices (agent.notice), and
+        # to hear of an agent starting and ending its turn with the app
+        # (control.started, control.ended). Other events include "run.failed"
+        # and "pr.review_requested"; authors narrows a rule to some authors,
+        # as above (empty: everyone).
         # [[defaults.notifications]]
         # event = "pr.opened"
         # authors = []
         # [[defaults.notifications]]
         # event = "ping.sent"
         # authors = []
+        # [[defaults.notifications]]
+        # event = "agent.notice"
         # [[defaults.notifications]]
         # event = "control.started"
         # [[defaults.notifications]]

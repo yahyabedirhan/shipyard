@@ -80,6 +80,7 @@ struct PresetTextTests {
             NotificationRule(event: .prOpened, authors: [.others]),
             NotificationRule(event: .issueOpened, authors: [.others]),
             NotificationRule(event: .pingSent),
+            NotificationRule(event: .agentNotice),
             NotificationRule(event: .controlStarted),
             NotificationRule(event: .controlEnded),
         ])
@@ -89,7 +90,7 @@ struct PresetTextTests {
         #expect(reviews.pullRequests.reviewRequested)
         #expect(!reviews.issues.show)
         #expect(reviews.arrangement.groupBy == .repository)
-        #expect(reviews.notifications == [NotificationRule(event: .prReviewRequested), NotificationRule(event: .pingSent)])
+        #expect(reviews.notifications == [.prReviewRequested, .pingSent, .agentNotice].map { NotificationRule(event: $0) })
 
         // Picked repositories take owned's place.
         let chosen = try decoded(.incomingContributions, [NewProject(name: "Incoming", repositories: ["octocat/hello-world"])])
@@ -108,6 +109,6 @@ struct PresetTextTests {
         #expect(!queue.issues.show && !queue.workflowRuns.show)
         #expect(queue.arrangement.groupBy == .repository)
         #expect(queue.arrangement.subsections == true)
-        #expect(queue.notifications == [NotificationRule(event: .prReviewRequested), NotificationRule(event: .pingSent)])
+        #expect(queue.notifications == [.prReviewRequested, .pingSent, .agentNotice].map { NotificationRule(event: $0) })
     }
 }

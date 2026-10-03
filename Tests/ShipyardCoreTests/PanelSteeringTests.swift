@@ -99,7 +99,7 @@ struct PanelSteeringTests {
 
     @Test("show-more refuses an unknown project or kind, and a kind the project doesn't list, naming what it has", arguments: [
         ("shopp", "pull-requests", "no project is named `shopp`; the projects are `shop`, `blog`"),
-        ("shop", "prs", "no kind is named `prs`; the kinds are `pull-requests`, `issues`, `workflow-runs`, `pings`"),
+        ("shop", "prs", "no kind is named `prs`; the kinds are `pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`"),
         ("shop", "workflow-runs", "`shop` lists no workflow-runs; its kinds are `pull-requests`, `issues`"),
         ("blog", "pull-requests", "`blog` lists no group by kind; show-more needs `group-by = \"kind\"`, the default"),
     ])

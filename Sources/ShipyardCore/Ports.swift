@@ -1,5 +1,6 @@
 import Foundation
 import ShipyardConfig
+import ShipyardNotices
 import ShipyardPings
 
 // What the app plugs into the core. Each port wraps an Apple-only service
@@ -37,14 +38,61 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
     /// it to `Shipyard.openNotification(_:)`, which opens the item and marks
     /// it seen.
     public var itemURL: URL
+    /// A line between the title and the body; `nil` for none. An agent's
+    /// notice's `--subtitle`.
+    public var subtitle: String?
+    /// A picture shown with it; `nil` for none.
+    public var image: NoticeImage?
+    /// What it sounds like: the default sound unless an agent's notice says.
+    public var sound: NoticeSound
+    /// The key Notification Center stacks it under; `nil` stacks it with
+    /// its project's (`project`).
+    public var thread: String?
+    /// How much it interrupts; `nil` is macOS's default, `active`.
+    public var level: NoticeLevel?
+    /// Its buttons, in order, each handing its own URL to
+    /// `Shipyard.openNotification(_:)` when pressed, as a click hands
+    /// `itemURL`; none for most.
+    public var buttons: [Button]
 
-    public init(id: String, event: EventKind, project: String, headline: String, itemTitle: String, itemURL: URL) {
+    public init(
+        id: String,
+        event: EventKind,
+        project: String,
+        headline: String,
+        itemTitle: String,
+        itemURL: URL,
+        subtitle: String? = nil,
+        image: NoticeImage? = nil,
+        sound: NoticeSound = .default,
+        thread: String? = nil,
+        level: NoticeLevel? = nil,
+        buttons: [Button] = []
+    ) {
         self.id = id
         self.event = event
         self.project = project
         self.headline = headline
         self.itemTitle = itemTitle
         self.itemURL = itemURL
+        self.subtitle = subtitle
+        self.image = image
+        self.sound = sound
+        self.thread = thread
+        self.level = level
+        self.buttons = buttons
+    }
+
+    /// A notification's button: its label, and the URL pressing it hands
+    /// `Shipyard.openNotification(_:)`.
+    public struct Button: Equatable, Hashable, Sendable {
+        public var label: String
+        public var url: URL
+
+        public init(label: String, url: URL) {
+            self.label = label
+            self.url = url
+        }
     }
 
     /// The notification's title: "e-commerce · New PR #107", or the
@@ -63,6 +111,26 @@ public protocol Notifying: Sendable {
     /// Notification Center, as when its ping is withdrawn or dismissed. One
     /// that was never posted, or is gone already, is no error.
     func removeDelivered(id: String) async
+    /// Whether a notification posted now could show: false when the user
+    /// turned shipyard's notifications off. Never asked yet counts as
+    /// could, since the first post asks. An agent's notice asks it first,
+    /// so its verdict is never `shown` for a notice macOS would drop.
+    func canShow() async -> Bool
+}
+
+/// Learns the Mac's own Tailscale login, the one login whose notices the
+/// app takes from the tailnet (ADR 0010). The seam between the core and
+/// asking Tailscale, so tests use a fake; the app's is `TailscaleCLI`.
+public protocol TailnetIdentity: Sendable {
+    /// The login, such as `me@example.com`, or why it can't be learned now.
+    func ownLogin() async -> Result<String, TailnetLoginUnknown>
+}
+
+/// Why the Mac's own Tailscale login can't be learned: "Tailscale is
+/// stopped". While it can't, every notice from the tailnet is refused.
+public struct TailnetLoginUnknown: Error, Equatable, Sendable {
+    public var reason: String
+    public init(_ reason: String) { self.reason = reason }
 }
 
 /// Tells the core what time it is, so tests can fix and move time.

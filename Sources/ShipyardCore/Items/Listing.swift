@@ -39,12 +39,17 @@ public enum Listing {
     ///
     /// Each ping's item carries the number `numbers` gave it in that
     /// section (`PingNumbers`), or none (0) before it has one.
+    ///
+    /// A project's `notes` (from its Notion database, by project name)
+    /// come last, the archived ones left out; like pings, they list
+    /// before GitHub answers.
     public static func listings(
         for projects: [ProjectSettings],
         in snapshot: Snapshot?,
         pings: [Ping] = [],
         machines: [ProjectSettings] = [],
         numbers: PingNumbers? = nil,
+        notes: [String: [Note]] = [:],
         now: Date
     ) -> [String: [Item]] {
         let sections = sections(of: pings, projects: projects.map(\.name), machines: machines.map(\.name))
@@ -61,8 +66,9 @@ public enum Listing {
                 snapshot.items[project.name] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
             }
             let filed = filed(in: project.name)
-            guard fetched != nil || !filed.isEmpty else { continue }
-            listings[project.name] = (fetched ?? []) + filed.filter {
+            let written = (notes[project.name] ?? []).filter { !$0.isArchived }.map(\.item)
+            guard fetched != nil || !filed.isEmpty || !written.isEmpty else { continue }
+            listings[project.name] = (fetched ?? []) + (filed + written).filter {
                 lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
@@ -117,8 +123,8 @@ public enum Listing {
         case .pullRequest: project.pullRequests.closedWindow
         case .issue: project.issues.closedWindow
         case .workflowRun: project.workflowRuns.finishedWindow
-        // A ping's window is its seen-window, above.
-        case .ping: 0
+        // A ping's window is its seen-window, above; a note is always open.
+        case .ping, .note: 0
         }
         guard window > 0, let closedAt = item.closedAt else { return false }
         return closedAt >= now.addingTimeInterval(-window)

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import ShipyardCommand
 import ShipyardConfig
+import ShipyardNotices
 import ShipyardPings
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.
@@ -18,6 +19,9 @@ import ShipyardPings
 /// `pingStore` and listed with the projects' items, without GitHub; the
 /// pings of the remote machines (`[remote] machines`) are polled through
 /// Herdr on a timer of their own (`pollMachines()`) and listed with them.
+/// The user's notes are read from Notion, with the token the user gave
+/// (`connectNotion`), every minute and when the menu opens
+/// (`refreshNotes()`), and listed with them too.
 /// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
@@ -80,6 +84,23 @@ public final class Shipyard {
     /// read from the file, so a remote ping whose machine it doesn't name
     /// has left (`forgetLeftPings`).
     private var followsConfiguredMachines = false
+    /// Each project's open notes, by project name, as Notion last listed
+    /// them; a project whose read failed keeps its last ones.
+    public private(set) var notes: [String: [Note]] = [:]
+    /// Why each project's notes couldn't be read, by project name, for its
+    /// error row; empty once a read works.
+    public private(set) var noteErrors: [String: String] = [:]
+    /// Whether the user gave shipyard a Notion token (`connectNotion`),
+    /// for the settings menu.
+    public private(set) var notionConnected = false
+    /// The projects the new-note icon is starting a note in now.
+    public private(set) var startingNotes: Set<String> = []
+    /// Why the new-note icon couldn't start a note, by project name, for
+    /// its error row; cleared when the menu opens again or a note starts.
+    public private(set) var newNoteErrors: [String: String] = [:]
+    /// How often the notes are read, apart from the refresh; opening the
+    /// menu reads them too.
+    public static let notesInterval: TimeInterval = 60
     /// Why the latest refresh failed; `nil` once one succeeds.
     public private(set) var fetchError: GitHubError?
     /// Whether a refresh is running now.
@@ -127,7 +148,19 @@ public final class Shipyard {
     /// One poll of the remote machines at a time; a call meanwhile (an
     /// edit adding a machine, ⌘R) makes one more run after it.
     @ObservationIgnored private var machineGate = RefreshGate()
+    /// Keeps the Notion token the notes are read with: the Keychain in the
+    /// app; `nil` reads no notes.
+    private let notionTokenStore: (any TokenStore)?
+    /// Reads the notes every `notesInterval`, apart from `timer`.
+    private let notesTimer: any RefreshTimer
+    /// One read of the notes at a time; a call meanwhile makes one more.
+    @ObservationIgnored private var notesGate = RefreshGate()
+    /// Finds each project's notes database, remembering what it found.
+    @ObservationIgnored private let notesReader = NotesReader()
     private let notifier: any Notifying
+    /// Learns the Mac's own Tailscale login, the one whose notices the
+    /// tailnet listener takes (`receive(_:from:)`).
+    private let tailnet: any TailnetIdentity
     private let loginItem: any LoginItem
     private let timer: any RefreshTimer
     private let clock: any WallClock
@@ -172,6 +205,9 @@ public final class Shipyard {
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
         machineTimer: any RefreshTimer = TaskRefreshTimer(),
+        notionTokenStore: (any TokenStore)? = nil,
+        notesTimer: any RefreshTimer = TaskRefreshTimer(),
+        tailnet: any TailnetIdentity = TailscaleCLI(),
         sleep: @escaping Sleep = systemSleep,
         oauthClientID: String = OAuthApp.clientID
     ) {
@@ -185,7 +221,10 @@ public final class Shipyard {
         self.herdr = herdr
         self.remoteReader = remote
         self.machineTimer = machineTimer
+        self.notionTokenStore = notionTokenStore
+        self.notesTimer = notesTimer
         self.notifier = notifier
+        self.tailnet = tailnet
         self.loginItem = loginItem
         self.clock = clock
         self.timer = timer
@@ -223,6 +262,13 @@ public final class Shipyard {
         await reloadPings()
         // So do the remote machines' pings, from their first poll.
         await followMachines()
+        // And the notes, from their first read, when the user gave a token.
+        notionConnected = notionToken() != nil
+        if notionConnected {
+            // The headers' new-note icons show at once, before any read.
+            rebuildMenu(configStore.lastValid)
+            armNotesTimer(after: 0)
+        }
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -399,6 +445,8 @@ public final class Shipyard {
             forceResolve = true
             followLaunchAtLogin()
             await followMachines()
+            // A project added, renamed, or showing notes now: read them at once.
+            if notionConnected { armNotesTimer(after: 0) }
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
             // Projects, filters, `[attention]` and `[menu-bar]` apply at
             // once, even if the refresh below can't run (paused) or fails.
@@ -423,6 +471,9 @@ public final class Shipyard {
         configError = configStore.error
         configWarnings = configStore.warnings
         presets = configStore.acceptsPreset ? Preset.all : []
+        let notify = configStore.lastValid.notify
+        let port = notify.listen ? notify.port : nil
+        if noticeListenerPort != port { noticeListenerPort = port }
         configStatusStore.record(ConfigStatus(
             checked: clock.now,
             config: configStore.url,
@@ -640,6 +691,7 @@ public final class Shipyard {
                 configuration: configuration,
                 state: appStateStore.state,
                 expanded: expandedGroups,
+                notes: notesMenuState,
                 now: clock.now
             )
             // A fold whose group is gone, or whose project is, goes too.
@@ -792,6 +844,11 @@ public final class Shipyard {
     /// await; the app doesn't wait for it.
     @discardableResult
     public func open(_ row: MenuRow) -> Task<Void, Never> {
+        // A note opens in Notion, and never needs attention to clear.
+        if row.kind == .note {
+            actions.open(row.url)
+            return Task {}
+        }
         if let ping = row.item.ping {
             guard ping.machine == nil else { return runAction(ofRemotePing: row.item.url) }
             return runAction(ofPing: ping.id)
@@ -829,6 +886,8 @@ public final class Shipyard {
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
         // A lease notification's click opens the panel, which the app does.
         guard itemURL != ControlNotice.panelURL else { return Task {} }
+        // An agent's notice runs the action its click or button carries, if any.
+        guard !NoticeRules.isNoticeURL(itemURL) else { return runAction(ofNotice: NoticeRules.click(from: itemURL)) }
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
         guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
         actions.open(itemURL)
@@ -851,10 +910,86 @@ public final class Shipyard {
         await notifier.post(NotificationRules.notification(for: notice, at: clock.now))
     }
 
+    /// Answers an agent's notice request (`shipyard notify`) with the
+    /// verdict its command exits by: a notice is shown (`show(_:)`), a
+    /// withdrawal done (`withdrawNotice(id:)`).
+    public func receive(_ request: NoticeRequest) async -> NoticeVerdict {
+        switch request {
+        case .show(let notice): return await show(notice)
+        case .withdraw(let id): return await withdrawNotice(id: id)
+        }
+    }
+
+    /// Shows an agent's `notice` (`shipyard notify`) when the last valid
+    /// configuration files it under a project whose rules select
+    /// `agent.notice` (`NoticeRules`), and says what came of it: the
+    /// verdict the agent's command exits by. Nothing is stored, counted or
+    /// listed. A notice with an `id` is posted under it
+    /// (`NoticeRules.notificationID`), replacing one still shown under it;
+    /// one without is its own notification, never replacing another.
+    /// A notice taken off a remote machine names it (`machine`, its Herdr
+    /// label), so a Herdr click or button focuses the pane there, as a
+    /// remote ping's does.
+    public func show(_ notice: Notice, from machine: String? = nil) async -> NoticeVerdict {
+        let resolved = resolvedRepositories ?? repositoriesStore.load()
+        resolvedRepositories = resolved
+        switch NoticeRules.project(for: notice, configuration: configStore.lastValid, resolved: resolved) {
+        case .failure(let refusal):
+            return .refused(refusal.message)
+        case .success(let project):
+            guard await notifier.canShow() else { return .refused(NoticeRules.notificationsOff) }
+            let id = NoticeRules.notificationID(notice.id ?? UUID().uuidString.lowercased())
+            await notifier.post(NoticeRules.notification(for: notice, project: project, id: id, machine: machine))
+            return .shown
+        }
+    }
+
+    /// Takes the notice shown under `id` (its `--id`) out of Notification
+    /// Center (`shipyard notify withdraw <id>`). Nothing is kept of a
+    /// notice, so one gone already, or never shown, is no error: always `.shown`.
+    public func withdrawNotice(id: String) async -> NoticeVerdict {
+        await notifier.removeDelivered(id: NoticeRules.notificationID(id))
+        return .shown
+    }
+
+    /// Answers a notice request from another machine, which the app's
+    /// tailnet listener received with `login`, the `Tailscale-User-Login`
+    /// that `tailscale serve` put on the request (ADR 0010). It's taken only
+    /// when `login` is exactly the Mac's own Tailscale login, looked up now;
+    /// then it's answered as one from the Mac (`receive(_:)`): a notice
+    /// shown, a withdrawal done. Without a login, with another, or while the
+    /// Mac's own can't be learned, it's refused and nothing changes. A
+    /// notice whose click or a button focuses Herdr is refused too
+    /// (`TailnetWire.herdrRefusal`): the command refuses it before sending,
+    /// and this catches one sent another way.
+    public func receive(_ request: NoticeRequest, from login: String?) async -> NoticeVerdict {
+        guard let login, !login.isEmpty else { return .refused(NoticeRules.noLogin) }
+        switch await tailnet.ownLogin() {
+        case .failure(let unknown):
+            return .refused(NoticeRules.ownLoginUnknown(unknown.reason))
+        case .success(let own) where own != login:
+            return .refused(NoticeRules.otherLogin(login))
+        case .success:
+            // The request names no machine, so a Herdr action would focus the Mac's own Herdr.
+            if case .show(let notice) = request, notice.focusesHerdr { return .refused(TailnetWire.herdrRefusal) }
+            return await receive(request)
+        }
+    }
+
+    /// The port on 127.0.0.1 the app listens on for notices from other
+    /// machines, as the last valid configuration's `[notify]` says; `nil`
+    /// unless `listen = true`, so nothing listens unless the user asked.
+    /// Set by every read of the configuration (`publishConfigStatus`), before
+    /// any GitHub request, and observed: the app follows its changes, so the
+    /// listener never waits on a refresh.
+    public private(set) var noticeListenerPort: Int?
+
     /// Marks the row's item seen without opening it (⌥-click): it needs
     /// attention again only once it changes. A ping's action isn't run,
     /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
+        // A note has nothing to see.
+        guard row.kind != .note else { return }
         if let ping = row.item.ping {
             if ping.machine == nil { markPingsSeen([ping]) } else { markRemoteSeen([ping]) }
             return
@@ -1016,6 +1151,25 @@ public final class Shipyard {
         }
     }
 
+    /// Runs what a notice's click or button carries (`NoticeRules.Click`),
+    /// as a ping's click runs its action: a Herdr one focuses its tab or
+    /// pane in the session it was sent from, then brings the terminal
+    /// forward; one from a remote machine focuses it there, as a remote
+    /// ping's does. A notice isn't kept, so how it went is only logged by the
+    /// app's action port; `nil` (a notice without an action) does nothing.
+    private func runAction(ofNotice click: NoticeRules.Click?) -> Task<Void, Never> {
+        guard let click else { return Task {} }
+        return Task {
+            if case .herdr(let target) = click.action, let machine = click.machine {
+                _ = await runHerdr(target, on: machine)
+            } else if case .herdr(let target) = click.action {
+                _ = await runHerdr(target, inSession: click.herdrSession, sentFrom: click.terminal)
+            } else {
+                _ = await actions.run(click.action)
+            }
+        }
+    }
+
     /// A ping's Herdr action: focuses the tab or pane `target` names
     /// (`HerdrFocus`), on the saved machine `machine` for a remote ping,
     /// in the named Herdr session `session` a local one was sent from (its
@@ -1098,6 +1252,7 @@ public final class Shipyard {
             pings: pings,
             machines: configuration.remote.machines.map(configuration.settings(forMachine:)),
             numbers: appStateStore.state.pingNumbers,
+            notes: notes,
             now: clock.now
         )
     }
@@ -1171,7 +1326,9 @@ public final class Shipyard {
     /// last pings and records why. A machine whose pings changed posts its
     /// new pings' `ping.sent` notifications, once per sending, and takes
     /// the notifications of the pings it no longer lists out of
-    /// Notification Center. No GitHub request is made. Then the
+    /// Notification Center. A machine that answered then hands over the
+    /// notices its agents left for the Mac, shown by the user's rules
+    /// unless they waited too long. No GitHub request is made. Then the
     /// machine timer comes back in `machinePollInterval`. Its timer calls
     /// this. A call while a poll runs returns at once, and the running poll
     /// goes again when it's done, so a machine added meanwhile is asked.
@@ -1191,25 +1348,57 @@ public final class Shipyard {
         armMachineTimer(after: Self.machinePollInterval)
     }
 
+    /// What one machine answered a poll: its pings, or the notices taken off it.
+    private enum MachineAnswer: Sendable {
+        case pings(String, Result<PingList, RemotePingReader.Failure>)
+        case notices(String, [QueuedNotice])
+    }
+
+    /// One poll: each machine's pings, listed as they come, and once a
+    /// machine's pings are in, the notices waiting on it, shown as they
+    /// come (`showQueued`). A machine whose pings couldn't be read isn't
+    /// asked for its notices.
     private func pollMachinesOnce() async {
         let reader = remoteReader
-        await withTaskGroup(of: (String, Result<PingList, RemotePingReader.Failure>).self) { group in
+        await withTaskGroup(of: MachineAnswer.self) { group in
             for label in remote.labels {
-                group.addTask { (label, await reader.list(machine: label)) }
+                group.addTask { .pings(label, await reader.list(machine: label)) }
             }
-            for await (label, result) in group {
-                let before = remote.machine(label)
-                remote.record(result, for: label, at: clock.now)
-                menu.machineNotices = MachineNotice.notices(remote)
-                let after = remote.machine(label)
-                // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
-                let firstAnswer = before?.answered == nil && after?.answered != nil
-                guard after?.pings != before?.pings || firstAnswer else { continue }
-                rebuildMenu(configStore.lastValid)
-                forgetLeftPings(stored: pings)
-                await removeLeftBanners()
-                await notifyNewPings()
+            while let answer = await group.next() {
+                switch answer {
+                case .pings(let label, let result):
+                    await record(result, for: label)
+                    guard case .success = result else { continue }
+                    group.addTask { .notices(label, await reader.takeNotices(machine: label)) }
+                case .notices(let label, let queued):
+                    await showQueued(queued, from: label)
+                }
             }
+        }
+    }
+
+    /// Records the pings the machine `label` listed, or why it couldn't,
+    /// and lists them and notifies the new ones when they changed.
+    private func record(_ result: Result<PingList, RemotePingReader.Failure>, for label: String) async {
+        let before = remote.machine(label)
+        remote.record(result, for: label, at: clock.now)
+        menu.machineNotices = MachineNotice.notices(remote)
+        let after = remote.machine(label)
+        // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
+        let firstAnswer = before?.answered == nil && after?.answered != nil
+        guard after?.pings != before?.pings || firstAnswer else { return }
+        rebuildMenu(configStore.lastValid)
+        forgetLeftPings(stored: pings)
+        await removeLeftBanners()
+        await notifyNewPings()
+    }
+
+    /// Shows the notices taken off a machine, oldest first, each by the
+    /// same rules as any notice (`show`), and drops one that waited longer
+    /// than `NoticeRules.maxQueuedAge`. Nobody waits for their verdicts.
+    private func showQueued(_ queued: [QueuedNotice], from machine: String) async {
+        for notice in queued where NoticeRules.isFresh(notice, at: clock.now) {
+            _ = await show(notice.notice, from: machine)
         }
     }
 
@@ -1330,6 +1519,181 @@ public final class Shipyard {
         listPings()
     }
 
+    // MARK: - Notes
+
+    /// The menu opened: the notes are read again, so one just written
+    /// shows (`refreshNotes()`), and why a note couldn't be started last
+    /// time goes. Nothing else is fetched: GitHub's items keep to their timer.
+    public func panelOpened() async {
+        if !newNoteErrors.isEmpty {
+            newNoteErrors = [:]
+            rebuildMenu(configStore.lastValid)
+        }
+        await refreshNotes()
+    }
+
+    /// The new-note icon on `project`'s header: creates the project's
+    /// notes database under the entry page when it has none, then an empty
+    /// note in it (`NotesReader.startNote`), opens the note in Notion
+    /// through the action port, and reads the notes again so the menu
+    /// lists it. A failure opens nothing and shows on the project as
+    /// "new note: <why>". A click while a note is being started in the
+    /// project does nothing. Answers whether a note was opened.
+    @discardableResult
+    public func startNote(in project: String) async -> Bool {
+        guard !startingNotes.contains(project) else { return false }
+        guard let token = notionToken() else {
+            failNewNote(in: project, .notConnected)
+            return false
+        }
+        startingNotes.insert(project)
+        newNoteErrors[project] = nil
+        rebuildMenu(configStore.lastValid)
+        let result = await notesReader.startNote(in: project, client: NotionClient(token: token, transport: transport))
+        startingNotes.remove(project)
+        switch result {
+        case .success(let url):
+            actions.open(url)
+            rebuildMenu(configStore.lastValid)
+            await refreshNotes()
+            return true
+        case .failure(let error):
+            failNewNote(in: project, error)
+            return false
+        }
+    }
+
+    /// Shows why a note couldn't be started in `project`.
+    private func failNewNote(in project: String, _ error: NewNoteError) {
+        newNoteErrors[project] = PanelText.newNoteError(error)
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// What the menu shows about notes besides their rows.
+    private var notesMenuState: NotesMenuState {
+        NotesMenuState(connected: notionConnected, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes)
+    }
+
+    /// Reads every project's open notes from Notion (`NotesReader`): one
+    /// query per project that shows notes and has a database, through the
+    /// HTTP transport GitHub's requests use, and lists them. A project
+    /// whose read failed keeps its last notes and gets an error row; a
+    /// project without a database lists none. Then the notes timer comes
+    /// back in `notesInterval`. Without a token, nothing is read and no
+    /// note is listed. A call while a read runs makes one more after it.
+    public func refreshNotes() async {
+        guard notionToken() != nil else {
+            forgetNotes()
+            notesTimer.disarm()
+            return
+        }
+        guard notesGate.begin() else { return }
+        repeat {
+            await readNotes()
+        } while notesGate.finish() && notesGate.begin()
+        armNotesTimer(after: Self.notesInterval)
+    }
+
+    /// Checks `token` with Notion and, when Notion takes it, keeps it in
+    /// the token store and reads the notes with it. The settings menu's
+    /// Notion card calls this; the token is never written anywhere else.
+    public func connectNotion(token: String) async -> NotionConnection {
+        let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return .empty }
+        guard let store = notionTokenStore else { return .couldNotSave("there's nowhere to keep it") }
+        do {
+            try await NotionClient(token: token, transport: transport).me()
+        } catch NotionError.unauthorized {
+            return .rejected
+        } catch let error as NotionError {
+            return .couldNotCheck(error)
+        } catch {
+            return .couldNotCheck(.network(error.localizedDescription))
+        }
+        do {
+            try store.save(token)
+        } catch {
+            return .couldNotSave(String(describing: error))
+        }
+        notesReader.reset()
+        notionConnected = true
+        // The headers' new-note icons show, whatever the read finds.
+        rebuildMenu(configStore.lastValid)
+        await refreshNotes()
+        return .connected
+    }
+
+    /// Forgets the Notion token (deleting it from the token store) and
+    /// every note with it: the menu lists none until the user connects again.
+    public func disconnectNotion() {
+        try? notionTokenStore?.delete()
+        notionConnected = false
+        newNoteErrors = [:]
+        forgetNotes()
+        notesTimer.disarm()
+        // The headers' new-note icons go.
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// The Notion token the token store keeps; `nil` with none.
+    private func notionToken() -> String? {
+        guard let token = try? notionTokenStore?.token(), !token.isEmpty else { return nil }
+        return token
+    }
+
+    /// Reads the notes once with the token kept now, and lists them when
+    /// they changed. A read that finishes after the token changed or went
+    /// is dropped.
+    private func readNotes() async {
+        guard let token = notionToken() else { return }
+        let configuration = configStore.lastValid
+        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
+        let reading = projects.isEmpty
+            ? NotesReading.read([:])
+            : await notesReader.read(projects: projects, client: NotionClient(token: token, transport: transport))
+        guard notionToken() == token else { return }
+        var read: [String: [Note]] = [:]
+        var errors: [String: String] = [:]
+        switch reading {
+        case .failed(let error):
+            // Nothing is known: every project keeps its notes, with why.
+            for project in projects {
+                read[project] = notes[project]
+                errors[project] = PanelText.noteError(error)
+            }
+        case .read(let results):
+            for (project, result) in results {
+                switch result {
+                case .success(let listed):
+                    read[project] = listed
+                case .failure(let error):
+                    read[project] = notes[project]
+                    errors[project] = PanelText.noteError(error)
+                }
+            }
+        }
+        guard read != notes || errors != noteErrors else { return }
+        notes = read
+        noteErrors = errors
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// Lists no notes and no notes errors.
+    private func forgetNotes() {
+        notesReader.reset()
+        guard !notes.isEmpty || !noteErrors.isEmpty else { return }
+        notes = [:]
+        noteErrors = [:]
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// Arms the notes timer to read them after `seconds`.
+    private func armNotesTimer(after seconds: TimeInterval) {
+        notesTimer.arm(after: seconds) { [weak self] in
+            await self?.refreshNotes()
+        }
+    }
+
     /// Collapses the project's section, or expands it if it's collapsed.
     /// Remembered across restarts.
     public func toggleCollapsed(_ project: String) {
@@ -1391,6 +1755,7 @@ public final class Shipyard {
             configuration: configuration,
             state: appStateStore.state,
             expanded: expandedGroups,
+            notes: notesMenuState,
             now: clock.now
         )
         rebuilt.fetchError = menu.fetchError

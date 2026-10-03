@@ -582,6 +582,33 @@ struct PressButtonStyle: ButtonStyle {
     }
 }
 
+/// A project's new-note icon (its header in the list, its tab's summary in
+/// the tabs): a square and pencil that starts a note in the project's
+/// Notion database and opens it. While the note is being started, the
+/// native mini spinner stands in for it, at the same size, and a click
+/// does nothing.
+struct NewNoteIcon: View {
+    let project: String
+    let state: NewNoteButton
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 16, height: 16)
+                .opacity(state == .starting ? 0 : 1)
+                .overlay {
+                    if state == .starting { ProgressView().controlSize(.mini) }
+                }
+        }
+        .buttonStyle(IconButtonStyle())
+        .disabled(state == .starting)
+        .hoverHelp(PanelText.newNoteHelp(project))
+        .accessibilityLabel(PanelText.newNoteHelp(project))
+    }
+}
+
 /// A layout's Mark all seen (or Mark seen) for a project or a tab: a
 /// checkmark and `title` as a text button. `action` brings its own animation.
 struct MarkSeenButton: View {

@@ -35,7 +35,7 @@ struct DemoRunTests {
         #expect(files.demo == nil)
     }
 
-    @Test("open --demo launches the app on the folder: configuration, state, resolved repositories, pings and socket stay in it, and the user's (login item included) are untouched")
+    @Test("open --demo launches the app on the folder: configuration, state, resolved repositories, pings and socket stay in it, and the user's (login item and Notion token included) are untouched")
     func demoRun() async throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("sy-\(UUID().uuidString.prefix(8))", isDirectory: true).standardizedFileURL
@@ -77,6 +77,9 @@ struct DemoRunTests {
         #expect(harness.files == AppFiles(config: demoConfig, support: demoSupport, demo: demo))
         // The login item is the user's app's: the demo's launch-at-login doesn't touch it.
         #expect(harness.loginItem.settings.isEmpty)
+        // Nor is the user's Notion token read: a demo never lists their notes.
+        #expect(!harness.shipyard.notionConnected)
+        #expect(try harness.notion.token() == "ntn_user")
         #expect(harness.shipyard.configStore.lastValid.projects.map(\.name) == ["shipyard"])
         #expect(harness.section("shipyard")?.rows.filter { $0.kind == .ping }.map(\.title) == ["In the demo"])
         let written = try FileManager.default.contentsOfDirectory(atPath: demoSupport.path).sorted()

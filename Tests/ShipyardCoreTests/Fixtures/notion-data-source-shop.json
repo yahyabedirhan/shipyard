@@ -1,0 +1,29 @@
+{
+  "object": "data_source",
+  "id": "27a0c3e1-8f4b-80bb-c001-0000000000e1",
+  "created_time": "2026-09-20T10:05:00.000Z",
+  "last_edited_time": "2026-09-24T09:30:00.000Z",
+  "properties": {
+    "Status": { "id": "Zz%3Ft", "name": "Status", "description": null, "type": "select", "select": { "options": [
+      { "id": "8c1f2a3b-0000-4000-8000-0000000000a1", "name": "Open", "color": "green", "description": null },
+      { "id": "8c1f2a3b-0000-4000-8000-0000000000a2", "name": "Archived", "color": "gray", "description": null }
+    ] } },
+    "Labels": { "id": "q%5Bwx", "name": "Labels", "description": null, "type": "multi_select", "multi_select": { "options": [
+      { "id": "1d2e3f40-0000-4000-8000-0000000000b1", "name": "ideation", "color": "blue", "description": null }
+    ] } },
+    "No.": { "id": "Ab%3C1", "name": "No.", "description": null, "type": "unique_id", "unique_id": { "prefix": "SHOP" } },
+    "Name": { "id": "title", "name": "Name", "description": null, "type": "title", "title": {} }
+  },
+  "parent": { "type": "database_id", "database_id": "27a0c3e1-8f4b-80aa-b002-0000000000d1" },
+  "database_parent": { "type": "page_id", "page_id": "27a0c3e1-8f4b-80d2-9a51-c7e3b2f0d101" },
+  "archived": false,
+  "in_trash": false,
+  "is_inline": false,
+  "title": [{ "type": "text", "text": { "content": "shop", "link": null }, "plain_text": "shop", "href": null }],
+  "description": [],
+  "icon": null,
+  "cover": null,
+  "url": "https://www.notion.so/27a0c3e18f4b80aab0020000000000d1",
+  "public_url": null,
+  "request_id": "6e0d3f2a-1b2c-4d5e-8f90-0a1b2c3d4e64"
+}

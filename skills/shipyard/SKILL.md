@@ -1,15 +1,17 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app`, `panel` and `screenshot`, on my data or a demo's."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. Use `shipyard notify` from any of my machines to post a status notice (tests running, done) that needs nothing from me. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app`, `panel` and `screenshot`, on my data or a demo's. And use for my notes, kept in Notion per shipyard project: to take a note I dictate, find one by its number, or list, tidy or archive them."
 ---
 
 # shipyard configuration
 
 Shipyard lists the pull requests (and, when turned on, issues and workflow runs) of the **projects** in one TOML file, and sends macOS notifications for the **events** its **notification rules** select. That file is the whole interface for settings: there is no settings window, and no command changes it. The app applies every save live.
 
-Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration.
+Agents also send the user **pings** through shipyard with the `shipyard ping` command: short messages that take the user where the agent means when clicked. See Sending pings, after the configuration. For a status update that needs nothing from the user, they post a **notice** with `shipyard notify` instead: a notification that isn't kept. See Ping or notice?.
 
 On the Mac, agents can also open, steer and screenshot the running app with `shipyard app`, `panel` and `screenshot`, on the user's data or a demo's, one agent at a time. See Driving the app, at the end.
+
+The user's own **notes** live in Notion, one numbered list per project, and the menu lists the open ones. Before you take a note the user dictates, look one up by its number, or list, tidy or archive notes, read [references/notes.md](references/notes.md): it holds where notes live, the rules every agent follows, and each operation through the Notion connector or `ntn`.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
@@ -37,7 +39,7 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    - A top-level key (`refresh-interval-seconds`, `launch-at-login`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
    - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
-   - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
+   - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
    - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show` and `seen-window`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
@@ -75,8 +77,10 @@ Tables:
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
+| `[notify] listen` | `false` | whether the app takes notices (`shipyard notify`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
+| `[notify] port` | `47420` | the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
 
-What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]` and `[defaults.pings]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
+What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
 | Key | Default | Allowed |
 |---|---|---|
@@ -97,7 +101,8 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `pings.seen-window` | `"24h"` | a window: how long a seen ping stays listed, counted from when it was seen; an unseen ping stays until it's seen. A seen ping leaves within one refresh of its window passing, and is deleted |
-| `notifications` | four rules: `pr.opened`, `ping.sent`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
+| `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page, matched by the project's exact name. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion. The project's header has a new-note icon that creates an empty note in its database (creating the database first, when there is none) and opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads them every minute and when the menu opens, once the user gave it their Notion token (the settings menu's Connect Notion). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
+| `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
 
@@ -107,7 +112,7 @@ How every project's items are grouped and sorted in the menu, set straight under
 
 | Key | Default | Allowed |
 |---|---|---|
-| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then pings, then issues, then runs), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z; pings by who sent them, then those that don't say, as "Pings"), `"none"` (one list); one level only |
+| `[defaults] group-by` | `"kind"` | `"kind"` (pull requests, then pings, then issues, then runs, then notes), `"repository"` (A to Z), `"date"` (Today, Yesterday, This week, This month, Older), `"author"` (A to Z; pings by who sent them, then those that don't say, as "Pings"), `"none"` (one list); one level only |
 | `[defaults] subsections` | unset | boolean: `true` draws each group under a subheader (its name and count), `false` after a divider line; unset keeps each layout's own look (dividers in the list, subheaders in tabs) |
 | `[defaults] sort-by` | `"updated"` | `"updated"` (newest first), `"created"` (newest first), `"title"` (A to Z); open or running items always come first. `"date"` groups by this date (`"updated"` when sorting by title) |
 | `[defaults] show-first` | `0` | a whole number, 0 or more: each group shows its first N rows and a "Show N more" row, which reveals the rest and then reads "Show less"; `0` shows every row. With `group-by = "none"` it caps the whole project. A group's count includes the rows it hides, and every cap comes back when the menu closes |
@@ -127,16 +132,16 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 |---|---|---|
 | `name` | yes | non-empty, unique across projects; the section's title |
 | `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere` (see Which repositories); no URLs |
-| `pull-requests`, `issues`, `workflow-runs`, `pings` | no | inline tables with the keys above |
+| `pull-requests`, `issues`, `workflow-runs`, `pings`, `notes` | no | inline tables with the keys above |
 | `group-by`, `subsections`, `sort-by`, `show-first` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
 
 ## Overrides
 
-- A project's `pull-requests`, `issues`, `workflow-runs` and `pings` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
+- A project's `pull-requests`, `issues`, `workflow-runs`, `pings` and `notes` tables merge **key by key** onto `[defaults.*]`: `issues = { show = true }` shows issues and keeps the default `closed-window`. A list such as `states` is one key: the project's list replaces the default's. `authors` merges key by key too: a project's `authors = { hide = [...] }` replaces the default `hide` and keeps the default `show`.
 - A project's `notifications` **replaces** the default list for that project; it doesn't add to it. Repeat any default rule the project should keep. `notifications = []` means no notifications for that project.
-- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, `ping.sent`, `control.started` and `control.ended`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them. Likewise, without `control.started` and `control.ended` it gets none when an agent starts or stops using the app.
+- `[[defaults.notifications]]` blocks likewise replace the built-in defaults (`pr.opened` from everyone, `ping.sent`, `agent.notice`, `control.started` and `control.ended`): once the file has one, write those rules too if they should stay. A file that lists its own rules without `ping.sent` gets no notification for pings; add `{ event = "ping.sent" }` to hear of them. A project whose rules leave out `agent.notice` refuses agents' notices, so `shipyard notify` exits 1 there; add `{ event = "agent.notice" }` to see them. Likewise, without `control.started` and `control.ended` it gets none when an agent starts or stops using the app.
 
 ## Which repositories: repository selectors
 
@@ -201,6 +206,7 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `control.started` | an agent started using the shipyard app (`shipyard app`, `panel` or `screenshot`): "Claude Code is using shipyard", over where it runs. Decided by `[[defaults.notifications]]` (or the built-in defaults) only: a project's own list and a rule's `authors` don't apply to it, and the app warns about either. Clicking it opens the panel, whose banner names the agent |
 | `control.ended` | that agent is done with the app: "Claude Code is done with shipyard", over why (released, its lease ran out, you stopped it). Decided as `control.started` is |
 | `ping.sent` | an agent sent a new ping: titled with the project and the ping's title, over its body and sender. A ping is notified once, and clicking the notification does what clicking the ping does: runs its action (opens its link or app, or focuses its Herdr tab) and marks it seen. Pings have no author, so a rule with `authors` never selects one |
+| `agent.notice` | an agent posted a notice with `shipyard notify`: titled with the project and the notice's title, over its body and sender. Each notice is its own notification unless an `--id` replaces one, never listed or kept. A project whose rules leave it out refuses the notice, and the agent is told. Notices have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
 
@@ -410,7 +416,7 @@ To show issues in every project instead, set it once in the defaults:
 show = true
 ```
 
-**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the defaults `pr.opened` and `ping.sent` beside `run.failed`:
+**"Show CI runs for this project and tell me when they fail."** A `workflow-runs` override, and a notification list that keeps the defaults `pr.opened`, `ping.sent` and `agent.notice` beside `run.failed`:
 
 ```toml
 [[projects]]
@@ -420,6 +426,7 @@ workflow-runs = { show = true }
 notifications = [
   { event = "pr.opened" },
   { event = "ping.sent" },
+  { event = "agent.notice" },
   { event = "run.failed" },
 ]
 ```
@@ -435,7 +442,7 @@ authors = ["others"]
 event = "ping.sent"
 ```
 
-To keep a project's pings out of its menu, `pings = { show = false }` in its block; to keep seen pings for a week, `seen-window = "7d"` in `[defaults.pings]`.
+To keep a project's pings out of its menu, `pings = { show = false }` in its block; to keep seen pings for a week, `seen-window = "7d"` in `[defaults.pings]`. Notes work the same way: `notes = { show = false }` in a project's block keeps its notes out of the menu, and `show = false` in `[defaults.notes]` keeps every project's out unless its block says `notes = { show = true }`.
 
 **"Show pings from my VPS."** Shipyard reaches another machine only through Herdr, so the machine must already be one of the user's Herdr saved machines; ask for its label when you don't know it, and never write a host or an address. List the label in `[remote] machines` (add to the list when it exists):
 
@@ -453,6 +460,27 @@ herdr plugin install yahyabedirhan/herdr-shipyard
 The plugin's page is <https://github.com/yahyabedirhan/herdr-shipyard>. Shipyard asks each machine for its pings about every 30 seconds. A machine it can't reach shows a quiet line in the menu and keeps its last pings until it answers again.
 
 Tell the user one known limit of Herdr 0.9.3: clicking a machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it's already showing that machine. When it shows the Mac or another machine, the click looks like it did nothing (the ping is still marked seen); they switch Herdr to that machine themselves to see the pane. Herdr has no command yet that switches an open window to a saved machine, so no setting changes this.
+
+**"Let my VPS's notices reach me."** Notices from another machine travel over the user's tailnet, so the Mac and the machine must both be on it, logged in as the user. Turn the listener on in `config.toml`:
+
+```toml
+[notify]
+listen = true
+```
+
+The rest happens outside `config.toml`, on the Mac (`tailscale serve`) and in the machine's own `cli.toml` (`app-machine`): [references/notices.md](references/notices.md), "Receive notices from another machine", has each step and a test notice.
+
+## Ping or notice?
+
+Shipyard carries two kinds of message from you to the user. Pick by what the user has to do:
+
+| | Ping (`shipyard ping`) | Notice (`shipyard notify`) |
+|---|---|---|
+| For | something the user should act on or would want to know now: a pull request ready for review, a question you're blocked on, a long task finished or failed | a status update that needs nothing from them: "orchestration started", "tests running", "deployed to staging" |
+| What the user sees | a row in the menu that needs attention until clicked, and a notification (`ping.sent`) | a notification only (`agent.notice`): never listed, counted or kept |
+| What you learn | its id; it waits for the user | exit 0 when the app showed it, or when it was queued for the Mac's poll (it says `queued`); exit 1 with why when it wasn't shown |
+
+When in doubt, a notice: it costs the user nothing to ignore. Never both for one thing. A notice follows the user's notification rules and tells you whether it was shown, which a notification you post yourself doesn't. It works on the Mac and on the user's other machines running Herdr, and from those straight over the user's tailnet once they've set that up. [references/notices.md](references/notices.md) has the command, its flags, its routes, the exit codes and worked examples.
 
 ## Sending pings
 
@@ -568,7 +596,7 @@ shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 | `app status --json` | the same, as one JSON object on one line | the status as JSON |
 | `panel open`, `panel close` | opens or closes the menu bar icon's panel, waiting until it has | `panel open`, `panel closed` |
 | `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
-| `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs` or `pings` | `showing all <kind> in <project>` |
+| `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs`, `pings` or `notes` | `showing all <kind> in <project>` |
 | `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
 | `screenshot <file.png>` | saves the panel as it looks, opening it when it's closed; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |

@@ -11,7 +11,7 @@ A named group of one or more GitHub repositories, shown as one section in the me
 _Avoid_: Repo (when the group is meant), workspace
 
 **Item**:
-Anything listed under a project: a pull request, an issue, a workflow run or a ping.
+Anything listed under a project: a pull request, an issue, a workflow run, a ping or a note.
 _Avoid_: Entry, row (a row is how an item is drawn, not the item)
 
 **Row**:
@@ -25,6 +25,10 @@ _Avoid_: History, retention
 **Workflow run**:
 One GitHub Actions run in a project's repositories. It's shown while it runs and for a short window after it finishes.
 _Avoid_: Action, job, build, CI
+
+**Note**:
+The user's own note (an idea, a reminder, a "not now" thought), kept in Notion under its project, with a title, labels, and a number unique in the project that is never given twice. Open until it's archived. An agent writes one only for the user, in the user's words.
+_Avoid_: Idea, memo, issue (an issue is GitHub's)
 
 ### What a project lists
 
@@ -87,8 +91,8 @@ _Avoid_: Badge, unread count
 ### Notifications
 
 **Notification**:
-A macOS banner shipyard posts when a notification rule matches an event. A ping can cause one; it isn't one.
-_Avoid_: Ping, alert
+A macOS banner shipyard posts when a notification rule matches an event. A ping or a notice can cause one; neither is one.
+_Avoid_: Ping, notice, alert
 
 **Event**:
 A change in an item that shipyard can notify about, such as `pr.opened` or `run.failed`.
@@ -96,6 +100,14 @@ A change in an item that shipyard can notify about, such as `pr.opened` or `run.
 **Ping**:
 A short message an agent sends the user through shipyard, filed under every project that watches the agent's repository, with one action that takes the user where the agent wants them: a link, an app, or a Herdr tab. Kept by shipyard itself, not fetched from GitHub. An agent can replace or withdraw a ping it sent, by its id. The Mac numbers pings in each project (`#1`, `#2`, …), in the order it first sees them, like issues in a repository; a machine's own section counts on its own. A replace keeps the number, and a number is never given twice.
 _Avoid_: Notification (that's the macOS banner), message, alert
+
+**Notice**:
+An agent's disposable status message, such as "tests running" or "done", posted with `shipyard notify`. Filed like a ping, it's shown as a notification when its project's rules select `agent.notice`, and never kept, counted or listed. The agent learns whether it was shown. It is not a ping, which waits for the user, and not a notification, the macOS banner it may cause.
+_Avoid_: Ping, notification, status ping, toast
+
+**App machine**:
+The Mac running the app, as another machine's `shipyard` names it: `[notify] app-machine` in that machine's `cli.toml`, by the Mac's MagicDNS name. A notice from that machine goes straight to the app machine over the user's tailnet, where the app takes it only from the Mac's own Tailscale login (ADR 0010). A machine without one leaves its notices for the Mac's poll.
+_Avoid_: Host, server, target Mac
 
 **Known agent**:
 A coding agent shipyard recognises in a ping's sender, such as Claude Code or Codex, shown with that agent's real logo, which the app bundles.
@@ -124,8 +136,12 @@ _Avoid_: Alert, subscription, watch
 ### Settings and state
 
 **Configuration**:
-The user's choice of what shipyard shows and when it notifies: projects, item kinds, windows, refresh interval, notification rules. It lives in one file that the user and their agents edit.
+The user's choice of what the app shows and when it notifies: projects, item kinds, windows, refresh interval, notification rules. It lives in one file on the Mac, `config.toml`, that the user and their agents edit, and only the app acts on it.
 _Avoid_: Settings, preferences, state
+
+**CLI settings**:
+What the `shipyard` command does on the machine it runs on, such as which Mac it sends notices to. They live in `cli.toml` on every machine, beside `config.toml` on the Mac, and only the command reads them. No setting is in both files. A missing file means the defaults; one that doesn't read stops the command that needs it.
+_Avoid_: Configuration (the app's), CLI config, preferences
 
 **App state**:
 What shipyard remembers on its own from how the user uses it, such as collapsed sections and which items have been seen. Never written to the configuration.

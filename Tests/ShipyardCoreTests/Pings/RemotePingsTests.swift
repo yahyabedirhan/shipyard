@@ -38,14 +38,16 @@ private extension Harness {
 struct RemotePingsTests {
     // MARK: Asking a machine
 
-    @Test("each machine is asked through Herdr: the plugin's list action, then its log record among the newest few")
+    @Test("each machine is asked through Herdr: the plugin's list action, then its log record among the newest few; then its notices")
     func asksThroughHerdr() async throws {
         let harness = try await Harness.withMachines(netcup: [remotePing("q1", "Deploy?")])
         await harness.poll()
         let invoke: [String] = ["plugin", "action", "invoke", "list"] + plugin
         let logList: [String] = ["plugin", "log", "list"] + plugin + ["--limit", "10"]
+        // The notices waiting on it, after its pings are listed (`RemoteNoticeTests`): none here.
+        let notices: [String] = ["plugin", "action", "invoke", "notices"] + plugin
         for label in ["hetzner-vps", "netcup-vps"] {
-            #expect(harness.herdr.runs(on: label) == [invoke, logList])
+            #expect(harness.herdr.runs(on: label) == [invoke, logList, notices, logList])
         }
         // Nothing but `--machine` runs: no ssh, no shell.
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
@@ -66,7 +68,9 @@ struct RemotePingsTests {
         harness.herdr.addMachine("netcup-vps", pings: [remotePing("q1", "Deploy?")], runningFor: 2)
         await harness.shipyard.start()
         await harness.poll()
-        #expect(harness.herdr.runs(on: "netcup-vps").filter { $0.starts(with: ["plugin", "log", "list"]) }.count == 3)
+        // Up to the notices, which are asked for once the pings are in.
+        let pingRuns = harness.herdr.runs(on: "netcup-vps").prefix { !$0.starts(with: ["plugin", "action", "invoke", "notices"]) }
+        #expect(pingRuns.filter { $0.starts(with: ["plugin", "log", "list"]) }.count == 3)
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
     }
 

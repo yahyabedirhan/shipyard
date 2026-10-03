@@ -129,6 +129,25 @@
         }
       }
     },
+    "notify": {
+      "description": "Notices from your other machines' agents (shipyard notify), straight to this Mac over your tailnet. Off by default: nothing listens unless listen is true. The app listens on 127.0.0.1 only and takes only notices sent from this Mac's own Tailscale login; you expose the port with tailscale serve, and each other machine names this Mac in its own cli.toml.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "listen": {
+          "description": "Whether the app listens for notices from your other machines.",
+          "type": "boolean",
+          "default": false
+        },
+        "port": {
+          "description": "The port on 127.0.0.1 the app listens on, which tailscale serve exposes to your tailnet: tailscale serve --bg --http=<port> http://127.0.0.1:<port>.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 47420
+        }
+      }
+    },
     "defaults": {
       "description": "What every project shows and notifies about, unless the project overrides it.",
       "type": "object",
@@ -142,12 +161,14 @@
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
         "pings": { "$ref": "#/definitions/pings" },
+        "notes": { "$ref": "#/definitions/notes" },
         "notifications": {
-          "description": "The notification rules for every project that doesn't list its own, and the only rules for app control's control.started and control.ended. Default: a new pull request by anyone, a new ping, and an agent starting and ending its lease on the app.",
+          "description": "The notification rules for every project that doesn't list its own, and the only rules for app control's control.started and control.ended. Default: a new pull request by anyone, a new ping, an agent's notice, and an agent starting and ending its lease on the app.",
           "$ref": "#/definitions/notifications",
           "default": [
             { "event": "pr.opened", "authors": [] },
             { "event": "ping.sent", "authors": [] },
+            { "event": "agent.notice", "authors": [] },
             { "event": "control.started", "authors": [] },
             { "event": "control.ended", "authors": [] }
           ]
@@ -227,6 +248,7 @@
         "issues": { "$ref": "#/definitions/issues" },
         "workflow-runs": { "$ref": "#/definitions/workflow-runs" },
         "pings": { "$ref": "#/definitions/pings" },
+        "notes": { "$ref": "#/definitions/notes" },
         "notifications": {
           "description": "This project's notification rules; replaces [[defaults.notifications]]. An empty list means no notifications for this project.",
           "$ref": "#/definitions/notifications"
@@ -363,6 +385,18 @@
         }
       }
     },
+    "notes": {
+      "description": "Your own notes, kept in Notion: one database per project, titled with the project's name, under the \"Shipyard Notes\" page. The menu lists a project's open notes, newest first, once the app has your Notion token. Notes take only show.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "show": {
+          "description": "List notes.",
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
     "authors": {
       "description": "Whose items this kind lists: those show matches (empty: everyone) minus those hide matches; hide wins. Items left out are never shown, counted or notified. A project's authors merges key by key onto the defaults'.",
       "type": "object",
@@ -399,7 +433,7 @@
       "required": ["event"],
       "properties": {
         "event": {
-          "description": "The change to notify about. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
+          "description": "The change to notify about. agent.notice is an agent's notice (shipyard notify), refused for a project whose rules leave it out. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
           "type": "string",
           "enum": [
             "pr.opened",
@@ -415,12 +449,13 @@
             "run.failed",
             "run.succeeded",
             "ping.sent",
+            "agent.notice",
             "control.started",
             "control.ended"
           ]
         },
         "authors": {
-          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping or a notice has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
           "anyOf": [
             { "$ref": "#/definitions/author-selectors" },
             {

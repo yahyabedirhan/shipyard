@@ -20,3 +20,7 @@ ADR 0004 made `shipyard` a general command line with room for more commands, and
 - CI fails if the Linux `shipyard` links Config, Control or Core, and if the Mac `shipyard` links Core.
 - A type that both sides use moves down to the lowest module that needs it. Code that matches an item or reads the menu stays in Core, as an extension, even when the type it extends lives lower down: the item kinds and state groups belong to Config, while matching an `Item` against them belongs to Core.
 - `docs/low-level-design.md` keeps the module table and each build's links. A change that moves a module boundary updates both in the same change.
+
+## Amendment, 2026-10-03: the command's own settings
+
+ADR 0008 gives the `shipyard` command a settings file of its own, `cli.toml`, read by a new agent-side module, **ShipyardCLISettings** (Command and TOMLDecoder). Both builds link it, so the Linux `shipyard` now links TOMLDecoder, and CI's link checks no longer refuse it. They still refuse Config, Control and Core: the Linux build never reads `config.toml`.

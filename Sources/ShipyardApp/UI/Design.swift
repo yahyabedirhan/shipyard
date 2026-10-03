@@ -138,9 +138,10 @@ enum Palette {
     /// A row's colour, by kind: a pull request open green, draft gray,
     /// merged purple, closed red; an issue open green, closed purple; a
     /// workflow run running amber, succeeded green, failed red; a ping
-    /// gray, as a message (its dot and bold title say it's unseen).
+    /// gray, as a message (its dot and bold title say it's unseen); a note
+    /// gray too, as the user's own.
     static func color(_ state: ItemState, kind: ItemKind) -> Color {
-        if kind == .ping { return gray }
+        if kind == .ping || kind == .note { return gray }
         return switch state {
         case .open, .succeeded: green
         case .draft: gray
@@ -192,6 +193,7 @@ enum Palette {
         case (.workflowRun, .failed): "xmark.circle.fill"
         case (.workflowRun, _): "checkmark.circle.fill"
         case (.ping, _): "bell.fill"
+        case (.note, _): "note.text"
         }
     }
 
