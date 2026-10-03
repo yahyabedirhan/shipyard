@@ -76,6 +76,12 @@ extension MenuModel {
         throw PanelRefusal("no tab is named `\(name)`; the tabs are \(Self.quoted(tabs.map(PanelText.tabTitle)))")
     }
 
+    /// Every section's name, in menu order, as `fold`, `unfold` and `tab`
+    /// accept them: the projects', then the remote machines'.
+    public var projectNames: [String] {
+        sections.map(\.name)
+    }
+
     /// The projects whose sections are collapsed, in menu order.
     public var collapsedProjects: [String] {
         sections.filter(\.isCollapsed).map(\.name)

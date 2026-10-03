@@ -205,6 +205,11 @@ public final class Shipyard {
     /// touched.
     public func start() async {
         signedOutReason = nil
+        // The ping store's folder exists from the start, so the app's watch
+        // is on it alone and never on the support folder `state.json` is
+        // saved in. A folder that can't be made leaves the watch on its
+        // nearest existing ancestor.
+        try? pingStore.createDirectory()
         appStateStore.load(at: clock.now)
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be

@@ -583,7 +583,7 @@ folded: none
 showing all: pull-requests in shop
 ```
 
-With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects`, `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`) and `demo` (the demo folder, `null` otherwise); read it rather than the lines when you act on it.
+With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`) and `demo` (the demo folder, `null` otherwise); read it rather than the lines when you act on it.
 
 What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. The panel stays open after a screenshot; close it when you're done.
 

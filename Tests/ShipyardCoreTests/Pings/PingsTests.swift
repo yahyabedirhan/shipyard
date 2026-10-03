@@ -83,9 +83,10 @@ struct PingsTests {
     func sentWhileRunning() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         let requests = harness.graphQLRequests.count
-        // Before the first ping the store's directory doesn't exist, so the
-        // watch is on the folder it will be created in.
-        #expect(harness.pingStore.watchedDirectory.standardizedFileURL == harness.stateDirectory.standardizedFileURL)
+        // Starting made the store's directory, so even before the first
+        // ping the watch is on it alone, not on the support folder.
+        #expect(harness.pingStore.watchedDirectory.standardizedFileURL == harness.pingStore.directory.standardizedFileURL)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: harness.pingStore.directory.path).isEmpty)
 
         let id = try harness.ping("Waiting for your input")
         await harness.shipyard.reloadPings()

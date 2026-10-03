@@ -52,11 +52,18 @@ public struct PingStore: Sendable {
             .appendingPathComponent("pings", isDirectory: true)
     }
 
+    /// Creates `directory` when it's missing, so the app can watch it
+    /// before the first ping is sent.
+    public func createDirectory() throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
     /// The folder the app watches to see a ping sent, replaced or
     /// withdrawn: `directory` itself, whose entries change with every one
-    /// and with nothing else (`state.json` is saved in its parent). While
-    /// `directory` doesn't exist yet, its nearest existing ancestor, so
-    /// creating it is seen; the watch is opened again after each change.
+    /// and with nothing else (`state.json` is saved in its parent). The app
+    /// creates it when it starts; should it be removed later, its nearest
+    /// existing ancestor, so creating it again is seen. The watch is opened
+    /// again after each change.
     public var watchedDirectory: URL {
         var candidate = directory.standardizedFileURL
         while !FileManager.default.fileExists(atPath: candidate.path), candidate.path != "/" {

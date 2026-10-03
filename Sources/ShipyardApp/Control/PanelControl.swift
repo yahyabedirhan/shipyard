@@ -55,7 +55,8 @@ final class PanelControl: PanelControlling {
             layout: configuration.menu.layout.rawValue,
             // As `tab` accepts it: only while the menu draws tabs.
             tab: menu.layout == .tabs ? PanelText.tabTitle(menu.resolved(state.selectedTab)) : nil,
-            projects: configuration.projects.map(\.name),
+            // As `fold` and `tab` accept them, remote machines included.
+            projects: menu.projectNames,
             folded: menu.collapsedProjects,
             showingAll: menu.kindGroupsShowingAll.map { AppStatus.Group(project: $0.project, kind: $0.kind.commandName) },
             demo: demo?.path
