@@ -84,7 +84,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 
 ## QA
 
-When a ticket that changes what the maintainer sees or does is built, close it and open a separate QA ticket, linked to it both ways. Label it `ready-for-qa` and assign it to the maintainer. It holds the installed build, how to use the feature, numbered try-this steps with known risks marked, what to do when done, and screenshots when there are any. QA doesn't hold the pull request. Only visual, interactive changes get a QA ticket; configuration, agent and skill changes close when built.
+When a ticket that changes what the maintainer sees or does is built, close it and open a separate QA ticket, linked to it both ways. Label it `ready-for-qa` and assign it to the maintainer. It holds the installed build, how to use the feature, numbered try-this steps with known risks marked, what to do when done, and the screenshots you took with `shipyard screenshot` of the installed build (see Testing), committed under `assets/screenshots/<topic>/`. QA doesn't hold the pull request. Only visual, interactive changes get a QA ticket; configuration, agent and skill changes close when built.
 
 ## Design
 
@@ -92,7 +92,9 @@ When a ticket that changes what the maintainer sees or does is built, close it a
 
 ## Testing
 
-Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac. Accessibility access is blocked for agents on purpose, so clicking, scripting or opening the installed app always fails; don't retry it or look for a way around it. When a change needs a check in the real menu, name the check in the handoff or pull request and leave it to the maintainer.
+Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac.
+
+Check a visual change, and take screenshots, with app control, the shipyard skill's "Driving the app": `make install` the build first, then `shipyard app`, `panel` and `screenshot` (the installed `/Applications/Shipyard.app/Contents/Helpers/shipyard`). Show example data with a demo run (`shipyard app open --demo <folder>`, public repositories only), and finish with plain `shipyard app open`, so the maintainer's normal app is running when you're done. The maintainer may be using the menu meanwhile: before every step that changes what the app shows (each `make install`, `app open` or `quit`, `panel` command and `screenshot`), send them a desktop notification, "Starting: <step>", and right after it "Done: <step> (<result>)", so they leave the panel alone. App control is the only way in: Accessibility is blocked for agents on purpose, so clicking, scripting System Events or any other Accessibility route fails; don't retry it or look for a way around it. When a check needs a click, a hover or the real menu bar strip, name it in the handoff or pull request and leave it to the maintainer.
 
 Each contract has one owner test at the strongest boundary, usually a `Harness` scenario. A new or changed test passes this gate first, and a missing answer means it isn't added yet:
 
