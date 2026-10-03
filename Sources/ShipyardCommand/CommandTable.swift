@@ -46,6 +46,13 @@ public struct CommandTable: Sendable {
     public func entry(named name: String) -> Entry? {
         entries.first { $0.name == name }
     }
+
+    /// The commands that control the Mac's app, which only the Mac's build
+    /// links (ShipyardControl). A build without one of them refuses it with
+    /// a pointer to the Mac instead of calling it unknown. Each name joins
+    /// when its command exists on the Mac, so the Mac never answers "runs
+    /// on the Mac" for a command it lacks.
+    public static let macOnly: Set<String> = ["app"]
 }
 
 /// The `shipyard` command line (ADR 0004), bundled in `Shipyard.app` and
@@ -87,6 +94,9 @@ public enum ShipyardCLI {
             return CommandResult(output: "shipyard \(ShipyardVersion.current)\n")
         default:
             guard let entry = table.entry(named: command) else {
+                if CommandTable.macOnly.contains(command) {
+                    return .usage("shipyard: `shipyard \(command)` runs on the Mac, where the app is")
+                }
                 return CommandResult(error: "shipyard: unknown command `\(command)`\n" + usage(table), status: CommandResult.usageStatus)
             }
             return entry.run(Array(arguments.dropFirst()), environment, now)

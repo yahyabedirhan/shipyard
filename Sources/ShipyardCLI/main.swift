@@ -3,13 +3,15 @@ import ShipyardCommand
 import ShipyardPings
 #if os(macOS)
 import ShipyardConfig
+import ShipyardControl
 #endif
 
 // `shipyard`: assembles this build's commands and prints what
 // `ShipyardCLI.run` returns. The `#if` is decided at compile time, and so
 // is what the build links (ADR 0006): on a machine without the app pings
 // are kept as sent (`Unfiled`), on the Mac they're filed against
-// config.toml. Nothing after it asks the platform.
+// config.toml, and the Mac's build controls the app (`app`). Nothing after
+// it asks the platform.
 let environment = ProcessInfo.processInfo.environment
 var table = CommandTable()
 #if os(macOS)
@@ -23,6 +25,7 @@ table.add(PingCommands.entries(
     ),
     store: PingStore(directory: PingStore.appDirectory)
 ))
+table.add(ControlCommands.entries(support: SupportFolder.app, launcher: WorkspaceLauncher()))
 #else
 table.add(PingCommands.entries(
     filing: Unfiled(),

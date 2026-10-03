@@ -125,18 +125,19 @@ jobs:
         run: swift build --build-tests $CI_SWIFT_FLAGS
       - name: test
         run: swift test --skip-build $CI_SWIFT_FLAGS
-      # The Mac `shipyard` links ShipyardConfig for its filing and never
-      # ShipyardCore, the app's rules (ADR 0006). The debug build above
-      # linked every object of every module it depends on, so a Core symbol
-      # (its mangled name, the name's length then the name) means it depends
-      # on Core.
-      - name: the mac cli links config, never core
+      # The Mac `shipyard` links ShipyardConfig for its filing and
+      # ShipyardControl for the `app` command, and never ShipyardCore, the
+      # app's rules (ADR 0006). The debug build above linked every object of
+      # every module it depends on, so a Core symbol (its mangled name, the
+      # name's length then the name) means it depends on Core.
+      - name: the mac cli links config and control, never core
         run: |
           bin="$(swift build --show-bin-path $CI_SWIFT_FLAGS)/shipyard-cli"
           # Through a file, not a pipe: under pipefail a grep that stops early fails nm.
           symbols="$(mktemp)"
           nm "$bin" > "$symbols"
           grep -q 14ShipyardConfig "$symbols" || { echo "nm found no ShipyardConfig symbol in $bin, so it can't check the links"; exit 1; }
+          grep -q 15ShipyardControl "$symbols" || { echo "nm found no ShipyardControl symbol in $bin: the Mac shipyard has no app command"; exit 1; }
           if grep -E '12ShipyardCore' "$symbols" > "$symbols.foreign"; then
             head -5 "$symbols.foreign"
             echo "the Mac shipyard links ShipyardCore"

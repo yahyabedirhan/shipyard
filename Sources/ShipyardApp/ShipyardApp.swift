@@ -1,6 +1,8 @@
 import AppKit
+import os
 import ShipyardCommand
 import ShipyardConfig
+import ShipyardControl
 import ShipyardCore
 import ShipyardPings
 import SwiftUI
@@ -59,11 +61,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         services.start()
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        services.stop()
+    }
 }
 
 /// The core with the app's adapters plugged in, and the triggers that make
 /// it refresh: the configuration watcher and waking from sleep. The panel's
-/// footer actions live here too.
+/// footer actions live here too, and app control's server, which the
+/// `shipyard` command asks through `control.sock`.
 @MainActor
 final class AppServices {
     let shipyard: Shipyard
@@ -85,6 +92,10 @@ final class AppServices {
     private var configWatcher: ConfigWatcher?
     private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
+    /// The panel as app control sees it.
+    private let panelControl: PanelControl
+    private var controlServer: ControlServer?
+    private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
     init() {
         let configURL = ConfigStore.defaultURL()
@@ -99,6 +110,7 @@ final class AppServices {
             notifier: notifier,
             loginItem: LaunchAtLogin()
         )
+        panelControl = PanelControl(shipyard: shipyard)
         let shipyard = shipyard
         notifier.onOpen = { [weak self] url in
             shipyard.openNotification(url)
@@ -131,6 +143,29 @@ final class AppServices {
         // behind this), `start()` has loaded the app state it marks seen in.
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
+        startControl()
+    }
+
+    /// Listens on `control.sock` for the `shipyard` command. When it can't,
+    /// the app runs on without app control and says why in the log.
+    private func startControl() {
+        let server = ControlServer(
+            socket: ControlSocket.url(in: Self.appSupportDirectory),
+            panel: panelControl,
+            quit: { NSApp.terminate(nil) }
+        )
+        do {
+            try server.start()
+            controlServer = server
+        } catch {
+            Self.log.error("app control is off: \(error.description, privacy: .public)")
+        }
+    }
+
+    /// Before the app quits: stops app control and removes its socket.
+    func stop() {
+        controlServer?.stop()
+        controlServer = nil
     }
 
     // MARK: - Layout actions
@@ -185,12 +220,14 @@ final class AppServices {
     /// have changed it in System Settings). It doesn't refresh: looking
     /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
+        panelControl.isOpen = true
         Task { await notifier.checkPermission() }
     }
 
     /// Closing the panel caps every group Show more revealed, so the menu
     /// opens with every cap back.
     func panelClosed() {
+        panelControl.isOpen = false
         shipyard.panelClosed()
     }
 

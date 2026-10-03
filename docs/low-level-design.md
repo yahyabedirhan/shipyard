@@ -360,15 +360,15 @@ Where each rule lives:
 
 Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
 
-**Where it stands after #165.** ShipyardCommand, ShipyardPings and ShipyardConfig exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings and Config, never Core; each build's link check says so. Control doesn't exist yet, so the Mac executable's table holds only the ping commands. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. The command table has no Mac-only names yet: Control adds them. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
+**Where it stands after #166.** ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so. Control holds `app open | quit | status`; `panel` (#167) and `screenshot` (#169) add their requests, and `app open --demo` (#168) its launch. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. `CommandTable.macOnly` holds `app` alone: each Mac-only command adds its name when it exists on the Mac. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
 
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
 | **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder` | Foundation only | every build |
 | **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `WindowDuration`, `LayoutSetting`, `ConfigStore` (path, reload, last valid, append, set layout), `ConfigLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
-| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `ControlSocket` (the socket's path), `ControlCommand` (parsing `app`, `panel`, `screenshot` into a request, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport`, `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (for the request and reply types) |
-| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config, Control | the app |
+| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlReply`, `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it), `ControlCommand` (parsing `app`, `panel`, `screenshot` into an invocation, and a reply into a `CommandResult`), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), and `ControlCommands` (its entries for the table) | Command | the Mac `shipyard`, the app (the wire types and the socket calls) |
+| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; and the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`) | Command, Pings, Config | the app |
 | **ShipyardApp** | The Apple-framework layer it has today, plus `Control/`: `ControlServer`, `PanelControl` and `PanelState`, `Screenshotter`, `DemoLaunch` | everything | the app |
 
 ```text
@@ -380,12 +380,12 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
               │        │         │
          ShipyardConfig┘         │
               ▲                  │
-              └──── ShipyardCore ┘   (Core depends on all four)
-                         ▲
-                    ShipyardApp
+         ShipyardCore            │   (Core depends on Command, Pings and Config)
+              ▲                  │
+              └──── ShipyardApp ─┘   (the app depends on all five)
 ```
 
-No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core.
+Core doesn't import Control: only the app's side of control (the server, the panel control) needs its types, and they live in the app (#166). No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core.
 
 **What each build links.** `Package.swift` declares the four new library targets on every platform, so their tests run on Linux, and declares the executable's extra dependencies only when the manifest is read on macOS, each still conditioned on it:
 
@@ -401,15 +401,15 @@ cliDependencies += [
 // ShipyardApp stays declared only on macOS; the four libraries build everywhere.
 ```
 
-A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default build system since Swift 6.4, drops the conditioned target from a Linux link but still links the package products below it, so the Linux `shipyard` built by 6.4 (the release's static binaries included) carried TOMLDecoder, while 6.2's native build system left it out. Declaring the dependency only in a macOS manifest gives both build systems nothing to link; the condition stays for the native build system should a Mac ever build for Linux. Until Control lands (#166–#169) the list names `ShipyardConfig` alone.
+A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default build system since Swift 6.4, drops the conditioned target from a Linux link but still links the package products below it, so the Linux `shipyard` built by 6.4 (the release's static binaries included) carried TOMLDecoder, while 6.2's native build system left it out. Declaring the dependency only in a macOS manifest gives both build systems nothing to link; the condition stays for the native build system should a Mac ever build for Linux.
 
 | Build | Links | Filing | Commands in its table |
 |---|---|---|---|
-| `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings | `Unfiled` | `ping`, `herdr-event`; `app`, `panel`, `screenshot` answer exit 2, "runs on the Mac" |
-| `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel`, `screenshot` |
+| `shipyard` on Linux (the static binaries `linux-cli.yml` attaches to a release) | Command, Pings | `Unfiled` | `ping`, `herdr-event`; `app` (and `panel`, `screenshot` once built) answers exit 2, "runs on the Mac" |
+| `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`; `panel` and `screenshot` once built (#167, #169) |
 | `Shipyard.app` | everything | `ProjectFiling` for remote pings | (not a command line) |
 
-**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job (every push) checks the Mac's debug `shipyard-cli` the same way, after the tests: `nm` must find `14ShipyardConfig` and no `12ShipyardCore` (#165).
+**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job (every push) checks the Mac's debug `shipyard-cli` the same way, after the tests: `nm` must find `14ShipyardConfig` and `15ShipyardControl` and no `12ShipyardCore` (#165, #166).
 
 **What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
 
@@ -471,7 +471,7 @@ Tests: the CLI tests that were parameterised by platform are parameterised by fi
 
 ### CommandTable and RecordStore — `ShipyardCommand/` (0.1.0, #164)
 
-`CommandTable` holds `CommandTable.Entry`s: `name`, `help` (its lines under `commands:` in `shipyard --help`), and `run(arguments, environment, now) -> CommandResult`, with the arguments after the name. `add(_:)` traps on a name already there: two commands with one name is a mistake in assembling the build. `ShipyardCLI.run(arguments, table:, environment:, now:)` answers `--help`/`-h`/`help` with `ShipyardCLI.usage(table)`, the entries' help between the usage line and the options (word for word what 0.0.7 printed), `--version` with `shipyard <ShipyardVersion.current>`, and no arguments or an unknown name with exit 2 and the usage. A command's own `--help` is the entry's business, as `ping`'s is. Control adds `CommandTable.macOnly` (`app`, `panel`, `screenshot`): a name in it that the table lacks is exit 2, "`shipyard <name>` runs on the Mac, where the app is" (#166–#169; not before, since on the Mac without Control it would be wrong).
+`CommandTable` holds `CommandTable.Entry`s: `name`, `help` (its lines under `commands:` in `shipyard --help`), and `run(arguments, environment, now) -> CommandResult`, with the arguments after the name. `add(_:)` traps on a name already there: two commands with one name is a mistake in assembling the build. `ShipyardCLI.run(arguments, table:, environment:, now:)` answers `--help`/`-h`/`help` with `ShipyardCLI.usage(table)`, the entries' help between the usage line and the options (word for word what 0.0.7 printed), `--version` with `shipyard <ShipyardVersion.current>`, and no arguments or an unknown name with exit 2 and the usage. A command's own `--help` is the entry's business, as `ping`'s is. `CommandTable.macOnly` names the commands only the Mac's build links: a name in it that the table lacks is exit 2, "shipyard: `shipyard <name>` runs on the Mac, where the app is", and the usage doesn't list it. It holds `app` since #166; `panel` (#167) and `screenshot` (#169) join it with their commands, never before, since the Mac would then answer "runs on the Mac" for a command it lacks.
 
 `RecordStore<Record: Codable & Equatable & Sendable>(directory:)` keeps one `<id>.json` per record, ISO 8601 dates: `all()` (every file that reads, skipping the rest, in no order), `record(id:)`, `save(record, id:)` (creating the directory, replacing the file atomically), `remove(id:)`, and `removeIfUnchanged(record, id:) -> Bool`. `PingStore` keeps its operations (§ PingStore) and delegates the files, adding the ping rules: oldest first, same-sending writes, and dropping a ping past its `expires` from `all()` and `ping(id:)` (removing its file through `removeIfUnchanged`). It reads expiry against `now`, a clock it's built with (the real time by default); `at(date)` is the same store reading as at `date`, which `PingCommands` gives each run, so a command's `now` decides.
 
@@ -488,33 +488,37 @@ reply    {"ok":true,"output":"folded shop\n","error":""}                  one JS
 
 | `ControlRequest` | From | Reply's `output` |
 |---|---|---|
-| `app.status` (`json: Bool`) | `shipyard app status [--json]` | the status as lines, or as one JSON object: `running`, `version`, `panelOpen`, `layout`, `projects`, `demo` (the folder or null) |
-| `app.quit` | `shipyard app quit` | `quitting`; the app replies, then terminates and removes the socket |
+| `app.status` (`json: Bool`) | `shipyard app status [--json]` | `AppStatus` as lines (`shipyard 0.1.0 is running`, `panel: closed`, `layout: tabs`, `projects: shop, blog`), or as one JSON object on one line, keys sorted: `layout`, `panelOpen`, `projects`, `running` (always true), `version`; #168 adds `demo` (the folder or null) |
+| `app.quit` | `shipyard app quit` | `shipyard quit`; the app replies, then terminates and removes the socket. The CLI prints it once nothing answers on the socket (a look every quarter second, each with a 1 s timeout, up to 10 s; still answering: exit 1), so a following `app open` launches a new app instead of finding the old one |
 | `panel.open`, `panel.close` | `shipyard panel open`, `close` | `panel open`, `panel closed` |
 | `panel.fold`, `panel.unfold` (`project`) | `shipyard panel fold <project>`, `unfold <project>` | `folded <project>`, `unfolded <project>` |
 | `panel.showMore` (`project`, `kind`) | `shipyard panel show-more <project> <kind>` (`pull-requests`, `issues`, `workflow-runs`, `pings`) | `showing all <kind> in <project>` |
 | `panel.tab` (`name`) | `shipyard panel tab <name>` (a project's name, or `All`) | `showing <name>` |
 | `screenshot` (`path`, `appearance`, `menuBarIcon`) | `shipyard screenshot <file.png> [--appearance light\|dark] [--menu-bar-icon]` | the absolute path written; `error` holds the fallback's note when the panel was rendered |
 
-`app open [--demo <folder>]` isn't a request: the app may not be running. `ControlCommand` sends `app.quit` when the app answers and a demo is asked for (or when a demo runs and plain `open` is asked for). Then `AppLaunching.launch(bundleID: "com.yahyabedirhan.shipyard", environment:)` starts it through `NSWorkspace.openApplication` with `activates = false` and, for a demo, `XDG_CONFIG_HOME` and `SHIPYARD_SUPPORT_DIR`. It then sends `app.status` every quarter second for up to 10 seconds, against the socket under the demo's support folder for a demo. Answered: exit 0 with the status. Never answered: exit 1.
+`app open [--demo <folder>]` isn't a request: the app may not be running. `ControlCommand` first sends `app.status`: when the app answers (or is there but fails to), that's the result and nothing is launched. #168 adds: it sends `app.quit` when the app answers and a demo is asked for (or when a demo runs and plain `open` is asked for). Otherwise `AppLaunching.launch(bundleID: "com.yahyabedirhan.shipyard", environment:)` starts it through `NSWorkspace.openApplication` with `activates = false` (and, for a demo, `XDG_CONFIG_HOME` and `SHIPYARD_SUPPORT_DIR`), waiting up to 10 s for Launch Services. It then sends `app.status` every quarter second for up to 10 seconds, against the socket `ControlSocket.locate` finds, each look waiting 1 s at most, since a starting app may accept a connection before it can answer (a look that times out is looked at again). Answered: exit 0 with the status. Never answered: exit 1, "shipyard didn't answer within 10 seconds of launching". The launch failing: exit 1 with Launch Services' reason.
 
 | Operation | Returns / rejects |
 |---|---|
-| `ControlCommand.parse(command, arguments) -> Result<Invocation, CommandResult>` | an `Invocation` (`open(demo:)` or a `ControlRequest`) | a missing or extra argument, an unknown subcommand, a relative or non-`.png` screenshot path (made absolute against the working folder first), an `--appearance` other than `light` or `dark`, a `--demo` folder that doesn't exist: exit 2 |
-| `ControlCommand.run(invocation, client, launcher, support) -> CommandResult` | a reply's `ok`: exit 0, `output` to standard output, `error` (a note) to standard error | `ok: false`: exit 1 with `error`; `notRunning` (no socket, or the connection refused): exit 1, "shipyard isn't running; `shipyard app open`"; a reply that doesn't read, or another `version`: exit 1 naming both versions |
-| `ControlClient.send(request) -> Result<ControlReply, ControlClient.Failure>` | connects to `ControlSocket.url(support:)` through `ControlTransport` (`UnixSocketTransport`; tests pass an in-memory one), with a 15 s read timeout (a screenshot may render) | `notRunning`, `timedOut`, `unreadable` |
+| `ControlCommand.parse(arguments) -> Result<Invocation, CommandResult>` (the arguments after `app`; `panel` and `screenshot` add theirs) | an `Invocation`: `open` (#168 adds its demo folder), `quit`, or `send(ControlRequest)`; `--help` or `-h`: the usage on standard output, exit 0 | no subcommand, an unknown one, an extra argument; later a relative or non-`.png` screenshot path (made absolute against the working folder first), an `--appearance` other than `light` or `dark`, a `--demo` folder that doesn't exist: exit 2 with the line and the usage; nothing sent |
+| `ControlCommand.run(invocation, context:) -> CommandResult` (`Context`: the client, the launcher and the pause between looks) | a reply's `ok`: exit 0, `output` to standard output, `error` (a note) to standard error | `ok: false`: exit 1 with `error`; `notRunning` (no socket, or the connection refused): exit 1, "shipyard isn't running; `shipyard app open`"; no reply within the timeout: exit 1, "shipyard didn't answer within 15 seconds"; a reply that doesn't read: exit 1, "couldn't ask shipyard: the app's reply doesn't read; is the app from the same build as this shipyard (<version>)?". A request of another `version` is the app's to refuse, naming both versions (`ControlServer.reply`) |
+| `ControlClient.send(request) -> Result<ControlReply, ControlClient.Failure>` | connects to the socket `ControlSocket.locate(support:)` found, through `ControlTransport` (`UnixSocketTransport`; tests pass an in-memory one), writes the request, half-closes, reads the reply to its end, with a 15 s timeout on each read and write (a screenshot may render) | `notRunning`, `timedOut(seconds)`, `failed(why)` (the connection, or a reply that doesn't read) |
 
-Tests: the parsing, the encoding and the exit codes run through `ShipyardCLI.run` with a fake transport and a fake launcher (`Tests/ShipyardControlTests`, which runs on Linux too, since only the real launcher needs AppKit).
+`ControlSocket.url(in: support)` is where the app listens; `ControlSocket.locate(support:)` is where every client command looks, `app open`'s wait included. Today they're the same file. A demo run (#168) changes only `locate`: `app open --demo` writes a pointer in the normal support folder naming the demo's, and `locate` follows it, so later commands find the demo's socket without an environment variable.
 
-**Known limit:** a Unix socket's path is at most 104 bytes on macOS. `ControlSocket` refuses a longer one with a line naming the path, so a demo folder nested deep needs a shorter path.
+Every write on the socket, the client's and the server's, passes `MSG_NOSIGNAL` (`UnixSocket.writeAll`): a peer that already closed fails the write instead of raising `SIGPIPE`, which would end the process. `SO_NOSIGPIPE` isn't enough on macOS, which refuses it on an accepted socket whose peer has already closed.
+
+Tests: the parsing, the wire format, the status's two forms and the exit codes run through `ShipyardCLI.run` with a fake transport and a recording launcher (`Tests/ShipyardControlTests/AppCommandTests.swift`, which runs on Linux too, since only the real launcher needs AppKit), as does a build without Control refusing `app`.
+
+**Known limit:** a Unix socket's path is at most 103 bytes on macOS (the address holds 104 with the closing zero). `UnixSocketTransport` and the server refuse a longer one with a line naming the path, so a demo folder nested deep needs a shorter path.
 
 ### App control: the app's side — `ShipyardApp/Control/` (0.1.0, #166–#169)
 
 | Type | Owns | Operations |
 |---|---|---|
-| `ControlServer` | the listening socket: created at launch in `SupportFolder.app`, a stale file from a crash replaced, `chmod 0600` before `listen`, removed at quit; one request per connection, read on a background queue, answered on the main actor | `reply(to request) async -> ControlReply`: the dispatch, tested in `ShipyardAppTests` with a fake `PanelControlling` and `Screenshotting` |
+| `ControlServer` (main actor) | the listening socket: `start()` at launch (`AppServices.start`) on `ControlSocket.url(in: SupportFolder.app)`, creating the folder when it's missing; a file nothing answers on (left by a crash) replaced, one another app answers on left alone (this app then runs without control, saying why in the log); `chmod 0600` before `listen`; `stop()` at quit (`applicationWillTerminate`) removes it. One request per connection, read on a background queue with a 5 s timeout (a connection that sends nothing gets no reply), answered on the main actor, written back, closed | `reply(to data) async -> Answer` (`reply`, and `quits` for `app.quit`, which quits once the reply is written): the dispatch, tested in `ShipyardAppTests` with a fake `PanelControlling` (#169 adds `Screenshotting`); the real socket, from `ControlClient` to the server and back in a temporary folder, tested there too |
 | `PanelState` (`@Observable`, main actor) | `isOpen`, `selectedTab` (moved out of `TabsLayout`'s private `@State`, so a click and a command set the same value; `MenuTabs`' fallback to All still applies) | read and set by the panel's views and `PanelControl` |
-| `PanelControl: PanelControlling` | opening and closing the `MenuBarExtra` window: on macOS 26 and earlier through the status item's button, as the existing close does; on macOS 27 through the expanded-interface session, best effort | `status() -> AppStatus`; `open()`, `close()`; `fold(project)`, `unfold(project)` (through `Shipyard.toggleCollapsed`, only when the fold differs); `showMore(project, kind)` (through `Shipyard.showMore` on the project's group of that kind); `selectTab(name)`. Each refuses with the valid names: an unknown project, kind or tab, or `tab` in the list layout ("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`") |
+| `PanelControl: PanelControlling` | since #166: `isOpen`, set by the panel's appearing and disappearing (`AppServices.panelOpened`/`panelClosed`), and `status()` from the last valid configuration (layout, projects) and `ShipyardVersion`; #167 moves `isOpen` into `PanelState` and adds the rest. Opening and closing the `MenuBarExtra` window: on macOS 26 and earlier through the status item's button, as the existing close does; on macOS 27 through the expanded-interface session, best effort | `status() -> AppStatus`; `open()`, `close()`; `fold(project)`, `unfold(project)` (through `Shipyard.toggleCollapsed`, only when the fold differs); `showMore(project, kind)` (through `Shipyard.showMore` on the project's group of that kind); `selectTab(name)`. Each refuses with the valid names: an unknown project, kind or tab, or `tab` in the list layout ("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`") |
 | `Screenshotter: Screenshotting` | capturing the panel's window | `capture(to:appearance:)`: sets the panel's appearance, opens it when closed and waits for a layout pass, then captures with `SCScreenshotManager` filtered to this process's panel window (`SCShareableContent` limited to the current process), which needs no Screen Recording permission. When that fails or is refused, it renders `Panel` with `ImageRenderer` at the screen's scale and returns `rendered(why)`. `--menu-bar-icon` renders `SailboatImage` alone. Hover cards and the menu bar strip are never captured |
 | `DemoLaunch` | knowing a demo run | `current(environment) -> URL?`: the support folder when `SHIPYARD_SUPPORT_DIR` is set; `AppServices` builds every store on `SupportFolder.app`, and `status` reports the folder |
 
@@ -1085,7 +1089,7 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #165 and #126, before Control (the macOS branch imports ShipyardConfig, never ShipyardCore):
+Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else. As built by #126 and #166 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
 
 ```swift
 var table = CommandTable()
@@ -1094,12 +1098,13 @@ table.add(PingCommands.entries(
     filing: ProjectFiling(configURL: ConfigLocation.current(environment: environment, support: SupportFolder.app),
                           repositories: ResolvedRepositoriesStore(directory: SupportFolder.app)),
     store: PingStore(directory: PingStore.appDirectory)))
+table.add(ControlCommands.entries(support: SupportFolder.app, launcher: WorkspaceLauncher()))
 #else
 table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
 #endif
 ```
 
-The target, once #126 and Control land:
+The target, once the demo launch lands:
 
 ```swift
 var table = CommandTable()
@@ -1154,7 +1159,7 @@ shipyard/
 ├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
 │   ├── CommandResult.swift           # (moved) output, error text, exit status: 0 done, 1 refused, 2 usage
 │   ├── CommandEnvironment.swift      # (moved) working folder, variables, the git lookup and program-run ports; no platform
-│   ├── CommandTable.swift            # (moved from Core's CLI/ShipyardCLI.swift) the build's commands by name, their help lines; ShipyardCLI.run routes over it; the Mac-only names' exit 2 (with Control)
+│   ├── CommandTable.swift            # (moved from Core's CLI/ShipyardCLI.swift) the build's commands by name, their help lines; ShipyardCLI.run routes over it; macOnly: the Mac-only names' exit 2
 │   ├── ProgramRunning.swift          # (moved from GhCLI.Run) run a program synchronously, CommandOutput
 │   ├── Shell.swift                   # (moved from SkillInstaller) ShellRunning port, ProcessShellRunner (cancellable, kills the process tree)
 │   ├── Sleep.swift                   # (moved from Ports.swift) Sleep, systemSleep: HerdrCommand's timeout, the device flow, the skill install
@@ -1184,11 +1189,13 @@ shipyard/
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
 │   └── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
 ├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command (AppKit only for the real launcher)
-│   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), versioned JSON
+│   ├── ControlRequest.swift          # the requests (app.status, app.quit; panel.*, screenshot later), versioned JSON; ControlProtocolError
 │   ├── ControlReply.swift            # { ok, output, error }
-│   ├── ControlSocket.swift           # control.sock in SupportFolder.app; the 104-byte path limit
-│   ├── ControlCommand.swift          # app, panel, screenshot arguments → an invocation; a reply → CommandResult; app open's launch and wait
-│   ├── ControlClient.swift           # one request per connection over ControlTransport (UnixSocketTransport), read timeout
+│   ├── AppStatus.swift               # what app status reports: as lines, or one JSON object
+│   ├── ControlSocket.swift           # control.sock in the support folder (url(in:)); where clients look for it (locate(support:))
+│   ├── UnixSocket.swift              # the POSIX calls both ends make (package): address, timeouts, MSG_NOSIGNAL writes, reading to the end; the 103-byte path limit
+│   ├── ControlCommand.swift          # app, panel, screenshot arguments → an invocation; a reply → CommandResult; app open's launch and wait, app quit's wait
+│   ├── ControlClient.swift           # one request per connection over ControlTransport (UnixSocketTransport), 15 s timeout
 │   ├── AppLauncher.swift             # AppLaunching port; WorkspaceLauncher: NSWorkspace.openApplication by bundle id, in the background, with a demo's environment
 │   └── ControlCommands.swift         # the `app`, `panel` and `screenshot` entries for the CommandTable
 ├── Sources/ShipyardCore/             # the app's rules; Command, Pings, Config, Control, Foundation, FoundationNetworking and Observation, so agents can build and test it on a Linux VPS
@@ -1265,8 +1272,8 @@ shipyard/
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
 │   ├── Control/                      # (0.1.0) the app's side of app control
-│   │   ├── ControlServer.swift       # control.sock (0600, removed at quit): one request per connection, reply(to:) dispatches over PanelControlling and Screenshotting
-│   │   ├── PanelControl.swift        # PanelControlling: open and close the panel (status item up to macOS 26, expanded session on 27), fold, Show more, tab, status; PanelState (isOpen, selectedTab)
+│   │   ├── ControlServer.swift       # control.sock (0600, removed at quit): one request per connection, reply(to:) dispatches over PanelControlling (and Screenshotting, #169)
+│   │   ├── PanelControl.swift        # PanelControlling: status, isOpen (#166); open and close the panel (status item up to macOS 26, expanded session on 27), fold, Show more, tab; PanelState (isOpen, selectedTab) (#167)
 │   │   ├── Screenshotter.swift       # Screenshotting: ScreenCaptureKit on this process's panel window, else ImageRenderer of Panel; the menu bar icon alone
 │   │   └── DemoLaunch.swift          # a demo run: the folder SHIPYARD_SUPPORT_DIR names, for status
 │   ├── Brand/
@@ -1293,7 +1300,7 @@ shipyard/
 │           ├── ConnectView.swift     # why signed out, Sign in with GitHub (the code, Cancel), the gh way (gh auth login, Connect with gh, install hint)
 │           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
-├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher
+├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport and launcher (AppCommandTests, Doubles)
 ├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping and config suites stay here
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + app-state dirs, fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
@@ -1304,7 +1311,7 @@ shipyard/
 │   ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; the skill document against the code and the schema
 │   ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
 │   └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport, fake gh, fake git remote (a fake working folder), fake shell, hanging shell, instant sleeper
-└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control and screenshotter (0.1.0)
+└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control (and screenshotter, #169), and its real socket in a temporary folder (0.1.0)
 ```
 
 Shipyard is a macOS app and only ships for macOS. Linux is a development environment, where agents build and test every library, and a platform only for the `shipyard` command: since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005). Since 0.1.0 the package follows concerns (ADR 0006): the four libraries on the agent's side (Command, Pings, Config, Control) and `ShipyardCore` build on Linux, importing only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder (Config's), with AppKit only behind `#if canImport(AppKit)` in Control's launcher. Each build links what it uses (the table in [Modules and what each build links](#modules-and-what-each-build-links)). `ShipyardCore` holds the app's rules: the GitHub client, attention, events, notification rules, the rate budget, the menu model and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, the control server, the screenshotter and the SwiftUI views. Tests target the libraries, so they run on the VPS. The app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`, and the control server's dispatch.
@@ -1567,10 +1574,11 @@ No `if` names a platform. `withdraw` and `list` never call the filing, so `Proje
 
 ```text
 reply(to data):
-    request = ControlRequest.decode(data) → unreadable or another version: { ok: false, error: "… version …" }
+    request = ControlRequest.decode(data) → not JSON, another version, or an unknown command: { ok: false, error: why }
+                                             (another version names both: "the shipyard command speaks control version 2 and the app version 1: reinstall …")
     switch request:
       app.status       → { ok, output: status.text or status.json }      // PanelControl.status(): running, version, panelOpen, layout, projects, demo
-      app.quit         → { ok, output: "quitting" }, then NSApp.terminate after the reply is written
+      app.quit         → { ok, output: "shipyard quit\n" }, then NSApp.terminate after the reply is written
       panel.open/close → panel.open() / panel.close()
       panel.fold(p)    → panel.fold(p)         → unknown p: { ok: false, error: "no project is named `p`; the projects are …" }
       panel.showMore   → panel.showMore(p, k)  → unknown p or k: refused with the valid names
@@ -1634,7 +1642,7 @@ Setup: the app runs in the tabs layout with projects `shop` and `blog`, the pane
 | ScreenCaptureKit refuses or finds no window | `ImageRenderer(Panel)` at the screen's scale writes the PNG; reply `ok` with `error` "captured by rendering: <why>"; the CLI prints the path and the note on standard error, exit 0 (C4) |
 | rendering fails too | reply `{ ok: false, error: … }`; exit 1 |
 | `--menu-bar-icon` | `SailboatImage` rendered alone at the menu bar's size; the panel isn't opened |
-| a demo run | the same steps, on `<folder>/support/control.sock`; the client finds it because `app open --demo` launched the app with that `SHIPYARD_SUPPORT_DIR`, and the agent passes the same variable to later commands (#168) |
+| a demo run | the same steps, on `<folder>/support/control.sock`; the client finds it through `ControlSocket.locate`, which follows the pointer `app open --demo` wrote in the normal support folder (#168) |
 
 ### Trace 11: a refusal, a tab in the list layout (0.1.0, #167)
 
@@ -1651,7 +1659,7 @@ Setup: `[menu] layout = "list"`, the app running.
 | the app isn't running | `ControlClient` finds no socket (or the connection is refused): "shipyard isn't running; `shipyard app open`", exit 1, without a request |
 | `shipyard panel tab` (no name), `shipyard panel spin` | `ControlCommand.parse`: exit 2 with the panel usage; nothing sent |
 | `shipyard panel fold shopp` | `PanelControl.fold`: "no project is named `shopp`; the projects are `shop`, `blog`", exit 1 |
-| `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "`shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
+| `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "shipyard: `shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
 | `shipyard ping "x" --repo yahyabedirhan/shop` on the Mac when `shop` sets `pings = { show = false }` | `ProjectFiling` refuses: every project the ping lands in hides pings, exit 1; nothing written (#127) |
 
 ### Trace 3: agents drain the limit (rejection by budget)
@@ -1693,7 +1701,7 @@ What the traces turned up and the design now handles: the first refresh after ad
 | A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
 | Another ping action | a `PingAction` case (its coding key) and its `PingIcon`, `PingCommand.actionFlags` and its parse case, `PanelText.fact`/`stateLabel`, `Palette.symbol(PingIcon)`, and either the app's `WorkspaceActions.run` (what `NSWorkspace` does) or, like Herdr's (#101), a core runner `Shipyard.runAction(ofPing:)` calls |
 | Another CLI command | an entry in its module's `…Commands.entries` and one `table.add` line in `main.swift` (0.1.0) |
-| Another app control command | a `ControlRequest` case, its parse case in `ControlCommand`, its line in `ControlServer.reply`, and the operation on `PanelControlling` |
+| Another app control command | a `ControlRequest` case (its `command` name and fields in `ControlRequest.Wire`), its parse case in `ControlCommand`, its line in `ControlServer.reply`, and the operation on `PanelControlling`; a new top-level command also its entry in `ControlCommands.entries` and its name in `CommandTable.macOnly` |
 | Another refusal on the Mac only (like #127) | `ProjectFiling` alone; the Linux build doesn't change |
 | The picker offering more groups | `PresetChoice` and `PresetPicker` only |
 
