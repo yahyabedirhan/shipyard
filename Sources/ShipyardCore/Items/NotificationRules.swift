@@ -73,6 +73,29 @@ public struct NotifiedEvents: Equatable, Sendable {
     /// Records `event` as handled at `now`.
     public mutating func insert(_ event: Event, at now: Date) {
         records[event.item.id, default: Record(events: [], present: now)].events.insert(Self.key(event))
+        records[event.item.id]?.events.remove(Self.unfiledKey(event))
+    }
+
+    /// Whether `event`, a remote ping's `ping.sent`, was passed over while
+    /// only its machine's section listed it (`passOverUnfiled(_:at:)`).
+    public func passedOverUnfiled(_ event: Event) -> Bool {
+        records[event.item.id]?.events.contains(Self.unfiledKey(event)) ?? false
+    }
+
+    /// Records that `event`, a remote ping's `ping.sent`, was passed over
+    /// at `now` while only its machine's section listed it, before any
+    /// project filed it. It isn't handled yet: a project that files the
+    /// ping later, once its group or `owner/*` selector resolves, gets its
+    /// chance once, so the ping notifies at most once per sending in all.
+    /// Its machine's section doesn't try again.
+    public mutating func passOverUnfiled(_ event: Event, at now: Date) {
+        records[event.item.id, default: Record(events: [], present: now)].events.insert(Self.unfiledKey(event))
+    }
+
+    /// Whether `recorded`, one of an item's recorded events, is `event`'s:
+    /// handled, or passed over while unfiled.
+    static func records(_ recorded: String, as event: Event) -> Bool {
+        recorded == key(event) || recorded == unfiledKey(event)
     }
 
     /// Drops the recorded events of the item `id` names that `isGone`
@@ -86,7 +109,8 @@ public struct NotifiedEvents: Equatable, Sendable {
         guard !gone.isEmpty else { return [] }
         record.events.subtract(gone)
         records[id] = record.events.isEmpty ? nil : record
-        return gone.sorted().map { key in
+        // One passed over while unfiled posted nothing to take away.
+        return gone.filter { !$0.hasPrefix(Self.unfiledPrefix) }.sorted().map { key in
             let parts = key.split(separator: " ", maxSplits: 1).map(String.init)
             return parts.count == 2 ? "\(parts[0]) \(id) \(parts[1])" : "\(key) \(id)"
         }
@@ -113,5 +137,12 @@ public struct NotifiedEvents: Equatable, Sendable {
     /// How `event` is recorded in its item's record: its kind, then its occurrence.
     static func key(_ event: Event) -> String {
         event.occurrence.isEmpty ? event.kind.rawValue : "\(event.kind.rawValue) \(event.occurrence)"
+    }
+
+    private static let unfiledPrefix = "unfiled "
+
+    /// How `event` is recorded while passed over unfiled: `unfiled `, then its key.
+    private static func unfiledKey(_ event: Event) -> String {
+        unfiledPrefix + key(event)
     }
 }

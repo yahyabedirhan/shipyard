@@ -147,6 +147,52 @@ struct RemotePingNotificationTests {
         #expect(harness.notifier.removed.last == notificationID("netcup-vps", "q1", instance: "i-q1-2"))
     }
 
+    @Test(
+        "a remote ping its machine's section lists until a group resolves, then a project files, notifies once in all",
+        arguments: [
+            // The machine's section passes it over: the project's rules get their chance.
+            (defaults: "notifications = []", expected: ["mine · Tests are red"]),
+            // The machine's section notified it: the project doesn't again.
+            (defaults: "notifications = [{ event = \"ping.sent\" }]", expected: ["netcup-vps · Tests are red"]),
+        ]
+    )
+    func filedOnceResolved(defaults: String, expected: [String]) async throws {
+        let harness = try Harness(stored: "gho_stored", config: """
+            [defaults]
+            \(defaults)
+
+            [remote]
+            machines = ["hetzner-vps", "netcup-vps"]
+
+            [[projects]]
+            name = "mine"
+            repositories = ["owned"]
+            notifications = [{ event = "ping.sent" }]
+
+            """)
+        // The group brings in nothing at first, then `yahyabedirhan/shop`.
+        harness.stub.on(
+            "POST",
+            GitHubClient.graphQLURL,
+            body: RepositoryListResponse.groupQuery,
+            answers: [RepositoryListResponse.page([]), RepositoryListResponse.page([RepositoryListResponse.Repository("yahyabedirhan/shop")])]
+        )
+        try await harness.startWithMachines(netcup: [ping("a1", "Tests are red", repository: "yahyabedirhan/shop")])
+        await harness.poll()
+        #expect(harness.section("netcup-vps")?.rows.map(\.title) == ["Tests are red"])
+
+        harness.clock.advance(by: 120)
+        await harness.shipyard.refreshNow()
+        #expect(harness.section("mine")?.rows.filter { $0.kind == .ping }.map(\.title) == ["Tests are red"])
+        #expect(harness.section("netcup-vps") == nil)
+
+        // Neither another refresh nor another poll notifies it again.
+        harness.clock.advance(by: 120)
+        await harness.shipyard.refreshNow()
+        await harness.poll()
+        #expect(harness.pingNotifications.map(\.title) == expected)
+    }
+
     @Test("the same id on two machines notifies twice, and only the one that leaves takes its banner away")
     func sameIDOnTwoMachines() async throws {
         let harness = try await Harness.notifying(hetzner: [ping("q1", "From hetzner")], netcup: [ping("q1", "From netcup")])

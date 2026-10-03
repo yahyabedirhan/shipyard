@@ -696,7 +696,9 @@ public final class Shipyard {
     /// Records `events` in `state` and returns what to post: each event not
     /// handled before, once, in the first project (in configuration order)
     /// that lists the item and whose rules select it. Every event is
-    /// recorded as handled, notified or not.
+    /// recorded as handled, notified or not, except a remote ping's that
+    /// only its machine's section lists and passes over: that waits, once,
+    /// for a project to file the ping (`NotifiedEvents.passOverUnfiled`).
     private static func select(
         _ events: [Event],
         listings: [String: [Item]],
@@ -716,12 +718,20 @@ public final class Shipyard {
         var notifications: [PostedNotification] = []
         for id in order {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
-            let selected = occurrences.first { event in
-                guard listed[event.project]?.contains(event.item.id) == true, let project = settings[event.project] else { return false }
-                return NotificationRules.shouldNotify(event, settings: project, viewer: viewer)
+            let filed = occurrences.filter { listed[$0.project]?.contains($0.item.id) == true && settings[$0.project] != nil }
+            // A remote ping only its machine's section lists may be filed
+            // under a project later, once its selectors resolve.
+            let unfiled = !filed.isEmpty && filed.allSatisfy(\.isInMachineSection)
+            if unfiled && state.notified.passedOverUnfiled(first) { continue }
+            let selected = filed.first { event in
+                settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, viewer: viewer) } ?? false
             }
             if let selected { notifications.append(NotificationRules.notification(for: selected)) }
-            state.notified.insert(first, at: now)
+            if unfiled && selected == nil {
+                state.notified.passOverUnfiled(first, at: now)
+            } else {
+                state.notified.insert(first, at: now)
+            }
         }
         return notifications
     }
@@ -905,7 +915,9 @@ public final class Shipyard {
         let listings = self.listings(for: configured, in: snapshot, configuration: configuration)
         let projects = configured + Self.machineSettings(configuration)
         let events = EventDetector.pingEvents(listings: listings, projects: projects)
-        let unhandled = events.filter { !appStateStore.state.notified.contains($0) }
+        let notified = appStateStore.state.notified
+        // One its machine's section passed over waits there for a project to file it.
+        let unhandled = events.filter { !notified.contains($0) && !($0.isInMachineSection && notified.passedOverUnfiled($0)) }
         guard !unhandled.isEmpty else { return }
         let now = clock.now
         let viewer = snapshot?.viewerLogin
@@ -1241,9 +1253,12 @@ public final class Shipyard {
         let now = clock.now
         let listedRemote = filedPings(configuration).filter { $0.machine != nil && !Self.hasLeft($0, in: configuration, at: now) }
         let current = Dictionary(
-            (stored + listedRemote).map { ($0.item.id, NotifiedEvents.key(Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? ""))) },
+            (stored + listedRemote).map { ($0.item.id, Event(kind: .pingSent, project: "", item: $0.item, occurrence: $0.instance ?? "")) },
             uniquingKeysWith: { first, _ in first }
         )
+        func isCurrent(_ recorded: String, _ url: String) -> Bool {
+            current[url].map { NotifiedEvents.records(recorded, as: $0) } ?? false
+        }
         let pingRecords = appStateStore.state.notified.records.filter { key, record in
             guard let url = URL(string: key) else { return false }
             if Ping.id(from: url) == nil {
@@ -1251,12 +1266,12 @@ public final class Shipyard {
                 let removed = followsConfiguredMachines && !configured.contains(machine)
                 guard removed || (answered.contains(machine) && (!truncated.contains(machine) || listedURLs.contains(key))) else { return false }
             }
-            return record.events.contains { $0 != current[key] }
+            return record.events.contains { !isCurrent($0, key) }
         }
         guard !pingRecords.isEmpty else { return }
         appStateStore.update { state in
             for key in pingRecords.keys.sorted() {
-                leftBanners += state.notified.remove(itemID: key) { $0 != current[key] }
+                leftBanners += state.notified.remove(itemID: key) { !isCurrent($0, key) }
             }
         }
     }
