@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// One tab of the tabs layout: every project, or one of them by name.
 public enum MenuTab: Hashable, Sendable {

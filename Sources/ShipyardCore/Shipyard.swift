@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import ShipyardCommand
+import ShipyardConfig
 import ShipyardPings
 
 /// The orchestrator: owns the lifecycle phase and handles the user's actions.

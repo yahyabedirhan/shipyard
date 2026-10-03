@@ -125,6 +125,23 @@ jobs:
         run: swift build --build-tests $CI_SWIFT_FLAGS
       - name: test
         run: swift test --skip-build $CI_SWIFT_FLAGS
+      # The Mac `shipyard` links ShipyardConfig for its filing and never
+      # ShipyardCore, the app's rules (ADR 0006). The debug build above
+      # linked every object of every module it depends on, so a Core symbol
+      # (its mangled name, the name's length then the name) means it depends
+      # on Core.
+      - name: the mac cli links config, never core
+        run: |
+          bin="$(swift build --show-bin-path $CI_SWIFT_FLAGS)/shipyard-cli"
+          # Through a file, not a pipe: under pipefail a grep that stops early fails nm.
+          symbols="$(mktemp)"
+          nm "$bin" > "$symbols"
+          grep -q 14ShipyardConfig "$symbols" || { echo "nm found no ShipyardConfig symbol in $bin, so it can't check the links"; exit 1; }
+          if grep -E '12ShipyardCore' "$symbols" > "$symbols.foreign"; then
+            head -5 "$symbols.foreign"
+            echo "the Mac shipyard links ShipyardCore"
+            exit 1
+          fi
       # Saved before the bundle, so the cache holds the debug build branches
       # restore, not the release build only main and tags make.
       - name: save .build

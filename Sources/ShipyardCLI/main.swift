@@ -2,7 +2,7 @@ import Foundation
 import ShipyardCommand
 import ShipyardPings
 #if os(macOS)
-import ShipyardCore
+import ShipyardConfig
 #endif
 
 // `shipyard`: assembles this build's commands and prints what

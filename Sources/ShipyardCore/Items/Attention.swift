@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// Owns the needs-attention rule next to the data it reads: which version of
 /// each item the user has seen.

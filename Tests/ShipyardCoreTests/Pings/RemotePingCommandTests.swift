@@ -1,5 +1,6 @@
 import Foundation
 @testable import ShipyardCommand
+import ShipyardConfig
 @testable import ShipyardCore
 @testable import ShipyardPings
 import Testing

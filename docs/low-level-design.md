@@ -358,7 +358,7 @@ Where each rule lives:
 
 Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules. Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core), #166–#169 (Control and the app's side of it). Until each one lands, the class sections after this one name each file where it is today, and the [folder tree](#folder-tree) shows where it goes. Each ticket updates the headings it moves.
 
-**Where it stands after #164.** ShipyardCommand and ShipyardPings exist, and the Linux `shipyard` links only them. Config and Control don't exist yet. On macOS the executable links ShipyardCore in their place, and `ProjectFiling` lives in Core's `Config/ProjectFiling.swift`, so #165 moves it into ShipyardConfig with the rest of `Config/`. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. The command table has no Mac-only names yet: Control adds them.
+**Where it stands after #165.** ShipyardCommand, ShipyardPings and ShipyardConfig exist. The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings and Config, never Core; each build's link check says so. Control doesn't exist yet, so the Mac executable's table holds only the ping commands. `SupportFolder.app` doesn't read `SHIPYARD_SUPPORT_DIR` yet: the demo launch adds that. The command table has no Mac-only names yet: Control adds them. Core and the app reach a few of Config's internals (`ConfigStore`'s `read` and `validate`, `Configuration.acceptsPreset` and `projectBlock`, `RepositorySelector.anywhereName`) through Swift's `package` access, so they stay out of Config's public interface.
 
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
@@ -385,21 +385,21 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
 
 No cycles. Pings never imports Config, so the Linux build can't reach `config.toml`, and nothing below Core imports Core.
 
-**What each build links.** `Package.swift` declares the four new library targets on every platform, so their tests run on Linux, and makes the executable's extra dependencies conditional:
+**What each build links.** `Package.swift` declares the four new library targets on every platform, so their tests run on Linux, and declares the executable's extra dependencies only when the manifest is read on macOS, each still conditioned on it:
 
 ```swift
-.executableTarget(
-    name: "ShipyardCLI",                           // product shipyard-cli, bundled as Contents/Helpers/shipyard
-    dependencies: [
-        "ShipyardCommand", "ShipyardPings",
-        .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
-        .target(name: "ShipyardControl", condition: .when(platforms: [.macOS])),
-    ]
-)
+var cliDependencies: [Target.Dependency] = ["ShipyardCommand", "ShipyardPings"]
+#if os(macOS)
+cliDependencies += [
+    .target(name: "ShipyardConfig", condition: .when(platforms: [.macOS])),
+    .target(name: "ShipyardControl", condition: .when(platforms: [.macOS])),
+]
+#endif
+.executableTarget(name: "ShipyardCLI", dependencies: cliDependencies)   // product shipyard-cli, bundled as Contents/Helpers/shipyard
 // ShipyardApp stays declared only on macOS; the four libraries build everywhere.
 ```
 
-Until #165 the macOS condition names `ShipyardCore` instead of Config and Control (`.target(name: "ShipyardCore", condition: .when(platforms: [.macOS]))`), since the Mac's filing is in Core for now.
+A platform condition alone isn't enough (#165): Swift Build, SwiftPM's default build system since Swift 6.4, drops the conditioned target from a Linux link but still links the package products below it, so the Linux `shipyard` built by 6.4 (the release's static binaries included) carried TOMLDecoder, while 6.2's native build system left it out. Declaring the dependency only in a macOS manifest gives both build systems nothing to link; the condition stays for the native build system should a Mac ever build for Linux. Until Control lands (#166–#169) the list names `ShipyardConfig` alone.
 
 | Build | Links | Filing | Commands in its table |
 |---|---|---|---|
@@ -407,7 +407,7 @@ Until #165 the macOS condition names `ShipyardCore` instead of Config and Contro
 | `shipyard` on macOS (`Contents/Helpers/shipyard`) | Command, Pings, Config, Control | `ProjectFiling` | `ping`, `herdr-event`, `app`, `panel`, `screenshot` |
 | `Shipyard.app` | everything | `ProjectFiling` for remote pings | (not a command line) |
 
-**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job does the same for `12ShipyardCore` in `shipyard-cli` (#165).
+**The link checks.** `ci.yml`'s Linux job (every push) and `linux-cli.yml`'s `links` job (every release, which waits on it) fail when the Linux binary holds a symbol of another module: `nm` on it must find no `12ShipyardCore`, `14ShipyardConfig`, `15ShipyardControl` or `11TOMLDecoder` (Swift's mangled module names: the name's length, then the name), and must find `13ShipyardPings`, so a binary `nm` can't read fails too (#164). They check a debug build of `shipyard-cli`: the release binaries are stripped, and a debug link keeps every object of every module the product depends on. `ci.yml`'s macOS job (every push) checks the Mac's debug `shipyard-cli` the same way, after the tests: `nm` must find `14ShipyardConfig` and no `12ShipyardCore` (#165).
 
 **What moves across a boundary.** A type moves down to the lowest module that needs it. Code that matches an item or touches the menu stays in Core, as an extension:
 
@@ -423,13 +423,15 @@ Until #165 the macOS condition names `ShipyardCore` instead of Config and Contro
 | one-file-per-ping code in `PingStore` | `RecordStore` in Command, `PingStore` over it | the next agent-side store (notes) reuses it |
 | `ResolvedRepositoriesStore.defaultDirectory` (the support folder) and the XDG folder in `PingStore.defaultDirectory(platform:)` | `SupportFolder.app` and `SupportFolder.withoutTheApp` in Command; `PingStore.appDirectory` and `PingStore.directoryWithoutTheApp` build on them | `PingStore` (Pings) and the socket (Control) build on it, and neither may import Config; the demo launch makes `app` honour `SHIPYARD_SUPPORT_DIR` (C5) |
 | `PingStore.removeExpired` called by `ShipyardCLI` on Linux | `PingStore` drops expired pings as it reads, at its `now` (each command reads it `at` its own time) | M4: a property of the store, not an `if` |
-| `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config (in Core's `Config/` until #165) | it reads the configuration |
+| `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config | it reads the configuration |
 | `PingCommand.send(…, platform:, unfiled:)` | `send(…, filing:, whenNoProject:)` | the platform becomes the filing; `unfiled` becomes `.keepUnfiled` |
 | `Ping.item`, its URLs (`url(id:)`, `url(machine:id:)`, `id(from:)`, `remote(from:)`), `PingAction.icon` and `PingIcon` in `Pings/Ping.swift` | Core, `Items/Ping+Item.swift` | `Item`, the item's URL and the row's icon are the app's; nothing on the agent's side uses them |
 | `PingCommand.workingRepository` | stays in Pings | its reasons talk of filing a ping, so it isn't a general git lookup |
 | `ItemKind`, `StateGroup` in `Items/Item.swift` | Config, `Config/Kinds.swift` | the configuration's vocabulary |
-| `NotificationRule.covers(item)`, `AuthorSelector.matches(item)`, `AuthorFilter.includes(item)` | Core, `Config/Selectors+Items.swift` | matching an `Item` is the app's |
+| `NotificationRule.covers(item)`, `AuthorSelector.matches(item)` and `matches(author:kind:viewer:)`, `AuthorFilter.includes(item)` and `includes(author:kind:viewer:)` | Core, `Config/Selectors+Items.swift` | matching an `Item` is the app's; the author forms take an `AuthorKind`, which is the item's and stays in Core's `Items/Item.swift` (#165) |
+| `ProjectSettings.resolved(by:)` | Core, an extension in `GitHub/RepositoryResolver.swift` | it takes the resolver's `ResolvedRepositories` (#165) |
 | `ConfigStore.writePreset` | Core, `Config/ConfigStore+Preset.swift` | presets are the app's |
+| `Configuration.acceptsPreset` in `Config/PresetSetting.swift` | Config, beside `ConfigStore` | `reload()` records it; `PresetSetting.swift` keeps `presetRefused` (#165) |
 | `KnownAgent`, `HerdrFocus` and the remote ping files in `Pings/` | stay in Core's `Pings/` | the Mac's side of pings |
 
 ### PingFiling, Unfiled and ProjectFiling — `ShipyardPings/PingFiling.swift`, `ShipyardConfig/ProjectFiling.swift` (0.1.0, #164, #165)
@@ -450,7 +452,7 @@ public enum NoProject { case refuse, keepUnfiled }                          // p
 public struct Filing { public var projects: [String]; public var repository: String? }
 ```
 
-| | `Unfiled` (Pings) | `ProjectFiling` (Config; Core's `Config/` until #165) |
+| | `Unfiled` (Pings) | `ProjectFiling` (Config) |
 |---|---|---|
 | Built from | nothing | `init(configURL:repositories:)`: `configURL` (`ConfigStore.defaultURL` for now; from `ConfigLocation` with #126), read only when a ping is filed, so `withdraw` and `list` never read `config.toml`, and a file that doesn't read fails with its first problem, exit 1, as today; `repositories: ResolvedRepositoriesStore`. Tests use `init(configuration:resolved:)`, two closures |
 | `.project(name)` | `[name]`, no repository | `[name]` when the configuration names it; else exit 1 listing the projects (N1) |
@@ -591,7 +593,7 @@ Operations:
 | `signOut()` | clears the token store (deletes the Keychain item) → `signedOut` with `userSignedOut(result)`; app state (seen, collapsed) is kept. The header's gear menu has Sign out | if the token came from `gh`, `ghStillSignedIn`: the connect screen says `gh` is still signed in and leads with Connect with `gh`, since the next `start()` picks `gh`'s token up again |
 | `request(body)` (internal) | every GitHub API call runs through it | a 401 → `signedOut` with `rejected(source)`, dropping the stored token when it came from the token store |
 
-### Configuration — `ShipyardCore/Config/Configuration.swift`
+### Configuration — `ShipyardConfig/Configuration.swift`
 
 A `Codable` value decoded with TOMLDecoder. Every key is optional; missing keys take defaults, so an empty file is valid. Defaults shown, as the file a user would write:
 
@@ -697,7 +699,7 @@ Keys are kebab-case (TOML's usual style, as in Cargo and Starship). Per-project 
 
 Events: `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded ping.sent` (0.0.5; in the default rules beside `pr.opened`). Author selectors: `me`, `others`, `bots` or `@login` (ADR 0002); the old notification strings `any | me | others | bots` still read, with a warning.
 
-**Selectors** (`Config/Selectors.swift`): `AuthorSelector` and `RepositorySelector` parse a string or reject it with the hints in §1's error table; the key a selector sits under says which set it's from, so a bare word is a group, `@` marks a login and `/` a repository. `AuthorSelector.matches(author, authorKind, viewer)` is the only author match in the codebase; `AuthorFilter.includes` is `(show.isEmpty || show.contains(where: matches)) && !hide.contains(where: matches)`. `ProjectSettings.repositories` is `[RepositorySelector]`, and each kind's settings carry `states` (a set of `StateGroup`, the values that kind takes; `ItemState.group` maps a draft to `open` and a running run to `in-progress`) and `authors` (and pull requests `reviewRequested`); `ArrangementSettings` holds `groupBy`, `subsections` (optional: unset keeps the layout's own), `sortBy` and `showFirst`, and `archived` and `forks` sit beside them. All merge key by key in `settings(for:)`. The cross-key rule for `anywhere` (G2) is checked in the reader. The schema keeps `hide-authors` and the old notification strings, marked deprecated, so `taplo check` still passes on files the app accepts.
+**Selectors** (`ShipyardConfig/Selectors.swift`; matching in the core's `Config/Selectors+Items.swift`): `AuthorSelector` and `RepositorySelector` parse a string or reject it with the hints in §1's error table; the key a selector sits under says which set it's from, so a bare word is a group, `@` marks a login and `/` a repository. `AuthorSelector.matches(author, authorKind, viewer)` is the only author match in the codebase; `AuthorFilter.includes` is `(show.isEmpty || show.contains(where: matches)) && !hide.contains(where: matches)`. `ProjectSettings.repositories` is `[RepositorySelector]`, and each kind's settings carry `states` (a set of `StateGroup`, the values that kind takes; `ItemState.group` maps a draft to `open` and a running run to `in-progress`) and `authors` (and pull requests `reviewRequested`); `ArrangementSettings` holds `groupBy`, `subsections` (optional: unset keeps the layout's own), `sortBy` and `showFirst`, and `archived` and `forks` sit beside them. All merge key by key in `settings(for:)`. The cross-key rule for `anywhere` (G2) is checked in the reader. The schema keeps `hide-authors` and the old notification strings, marked deprecated, so `taplo check` still passes on files the app accepts.
 
 Operations:
 
@@ -711,7 +713,7 @@ Operations:
 
 Unknown keys are ignored with a warning, so a newer file doesn't break an older app. TOMLDecoder parses the file but doesn't say where a value came from, so `ConfigurationReader` walks the parsed `TOMLTable` key by key and `TOMLSourceMap` (a light second pass over the text) finds the line of each key path for the messages. The published schema is `schema/config.schema.json`; tests check the example above and a file setting every key against it.
 
-### ConfigStore — `ShipyardCore/Config/ConfigStore.swift`
+### ConfigStore — `ShipyardConfig/ConfigStore.swift` (+ the core's `Config/ConfigStore+Preset.swift`)
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigError?`, `warnings: [ConfigIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
 Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2), `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show`, a `[[defaults.notifications]]` rule, a comment pointing Herdr users at `[herdr] terminal` and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails), `writePreset(preset, projects)` (the third writer, below) and `acceptsPreset` (whether the latest reload found a file a preset may be written over). The core has no file watcher; the app's `ConfigWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
@@ -1035,7 +1037,7 @@ Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`:
 
 `MachineNotice` (`ShipyardCore/Menu/MachineNotice.swift`, #119) is the panel's one quiet line per machine: `unreachable(reason, answered:)` while its latest poll failed (`answered` when a poll before it succeeded), else `truncated(listed:)` while its list stopped early; none once a poll is good and whole. `MenuModel.machineNotices` holds them in configuration order, `PanelText.machineNotice` words them ("netcup-vps is disabled in Herdr. Its last pings stay listed.", without the second sentence for a machine that never answered), and the panel draws each as a gray banner, as it does the configuration warnings. Every reason names its machine. `HerdrCommand.refusal`, which the reader and `HerdrFocus` share, reads the plain line Herdr prints, exit status 2, when it refuses a label before asking (`cli/target.rs`, `resolve_machine`, at Herdr commit 65e35a3): `` error: unknown machine '<label>'; use `herdr machine list` ``, `error: machine '<label>' is disabled`, `error: machine label '<label>' is ambiguous; use its profile ID`. A machine Herdr can't connect to ends with Rust's Debug form of the error, which isn't read: "Couldn't reach <label> through Herdr".
 
-### ResolvedRepositoriesStore — `ShipyardCore/State/ResolvedRepositoriesStore.swift` (0.0.5)
+### ResolvedRepositoriesStore — `ShipyardConfig/ResolvedRepositoriesStore.swift` (0.0.5)
 
 Each project's repositories as the app last resolved them (`ResolvedRepositories.repositories`, by project name), in `repositories.json` beside `state.json` (`SupportFolder.app`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.appDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one), so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub. The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it. Private format (ADR 0004): `{ "version": 1, "projects": { "<name>": ["owner/name", …] } }`. A plain `struct`, like `PingStore`, since the CLI uses it too. It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists, so a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again. It's left as it is on sign-out; the next account's first resolve replaces it.
 
@@ -1081,7 +1083,7 @@ Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not
 
 A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #164, with the Mac's filing still in Core:
+Since 0.1.0 (#164, #165) it assembles the build's `CommandTable` and nothing else. As built by #165, before Control (the macOS branch imports ShipyardConfig, never ShipyardCore):
 
 ```swift
 var table = CommandTable()
@@ -1095,7 +1097,7 @@ table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: Pi
 #endif
 ```
 
-The target, once #126, #165 and Control land:
+The target, once #126 and Control land:
 
 ```swift
 var table = CommandTable()
@@ -1175,10 +1177,10 @@ shipyard/
 │   ├── Selectors.swift               # (moved) AuthorSelector, AuthorFilter, RepositorySelector: parse, the hints (ADR 0002); matching items is Core's
 │   ├── WindowDuration.swift          # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
-│   ├── ConfigStore.swift             # (moved) path, reload, last-valid fallback, append projects, set the layout
+│   ├── ConfigStore.swift             # (moved) path, reload, last-valid fallback, append projects, set the layout; Configuration.acceptsPreset (moved from PresetSetting.swift)
 │   ├── ConfigLocation.swift          # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
-│   └── ProjectFiling.swift           # (0.1.0; in Core's Config/ until #165) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
+│   └── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
 ├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command (AppKit only for the real launcher)
 │   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), versioned JSON
 │   ├── ControlReply.swift            # { ok, output, error }
@@ -1193,10 +1195,10 @@ shipyard/
 │   ├── RefreshScheduler.swift        # RefreshGate (one at a time, queues one more) + RefreshTimer port and its Task-based timer
 │   ├── Ports.swift                   # what the app plugs in: Notifying, TokenStore, WallClock, Sleep, ActionRunning, LoginItem
 │   ├── Config/
-│   │   ├── Selectors+Items.swift     # (moved out of Config's files) NotificationRule.covers, AuthorSelector.matches, AuthorFilter.includes an Item
+│   │   ├── Selectors+Items.swift     # (moved out of Config's files) NotificationRule.covers, AuthorSelector.matches, AuthorFilter.includes an author or an Item
 │   │   ├── ConfigStore+Preset.swift  # (moved) writePreset: the third writer
 │   │   ├── Presets.swift             # the three presets: names, what they ask for, their file text
-│   │   ├── PresetSetting.swift       # the third writer's text: a preset into a file whose only live key is version
+│   │   ├── PresetSetting.swift       # the third writer's refusal (presetRefused): a preset only into a file whose only live key is version
 │   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
@@ -1205,7 +1207,7 @@ shipyard/
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
 │   │   ├── Repositories.swift        # the picker's calls: recent repositories (GraphQL), checking a typed one (REST); RepoSummary, RepositoryCheck; a group's or owner's repositories, paged
-│   │   ├── RepositoryResolver.swift  # repository selectors → repositories, hourly; archived and forks; an error per selector
+│   │   ├── RepositoryResolver.swift  # repository selectors → repositories, hourly; archived and forks; an error per selector; ProjectSettings.resolved(by:)
 │   │   ├── WorkflowRuns.swift        # REST runs request + parse + branch filter
 │   │   └── Auth/
 │   │       ├── TokenProvider.swift   # TokenStore → gh → none; GhCLI finds and runs gh

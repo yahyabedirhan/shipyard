@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// A change in an item that shipyard can notify about, such as `pr.opened`,
 /// found by comparing the known items with a new snapshot.

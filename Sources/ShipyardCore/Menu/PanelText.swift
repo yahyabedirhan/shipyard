@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// The words the panel shows for what the menu model and the orchestrator
 /// hold: a row's age, when the list was last updated, and why the

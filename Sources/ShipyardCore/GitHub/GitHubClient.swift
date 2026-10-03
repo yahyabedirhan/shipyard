@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// One repository a refresh asks GitHub about, and what it asks for.
 struct RepositoryRequest: Equatable, Sendable {

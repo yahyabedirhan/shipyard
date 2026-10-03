@@ -1,4 +1,5 @@
 import AppKit
+import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// What the panel draws: one section per project, in configuration order,
 /// then one per remote machine with pings of its own (`[remote] machines`),

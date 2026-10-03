@@ -268,14 +268,6 @@ public struct NotificationRule: Equatable, Sendable {
         self.event = event
         self.authors = authors
     }
-
-    /// Whether the rule covers an item's author: any of its selectors
-    /// matches, or it has none. A ping has no GitHub author, so a rule with
-    /// `authors` never covers one.
-    public func covers(_ item: Item, viewer: String?) -> Bool {
-        if item.kind == .ping { return authors.isEmpty }
-        return authors.isEmpty || authors.contains { $0.matches(item, viewer: viewer) }
-    }
 }
 
 // MARK: - Per-kind settings and their overrides
@@ -556,23 +548,12 @@ public struct ProjectSettings: Equatable, Sendable {
     }
 
     /// The single repositories among its selectors (`owner/name`), in order:
-    /// all of them once the settings are `resolved(by:)`.
+    /// all of them once the settings are `resolved(by:)` (the core's).
     public var repositorySlugs: [String] { repositories.compactMap(\.slug) }
 
     /// Whether the project lists the review search's pull requests from any
     /// repository (`anywhere`).
     public var usesAnywhere: Bool { repositories.contains(.anywhere) }
-
-    /// These settings watching exactly the repositories `resolved` found for
-    /// them, each as `owner/name`. Without a resolution (none yet), only the
-    /// single repositories the project names. `anywhere` stays, since it
-    /// resolves to no repositories.
-    public func resolved(by resolved: ResolvedRepositories?) -> ProjectSettings {
-        var settings = self
-        settings.repositories = (resolved?.repositories ?? repositorySlugs).map(RepositorySelector.repository)
-        if usesAnywhere { settings.repositories.append(.anywhere) }
-        return settings
-    }
 
     /// Whether the project lists items of `kind` (its `show` for that kind).
     public func shows(_ kind: ItemKind) -> Bool {
@@ -762,7 +743,7 @@ extension Configuration {
     /// One project's `[[projects]]` block: its header, name and
     /// repositories, ending in a newline. The picker's appends and the
     /// presets both build on it, each adding the blank lines around it.
-    static func projectBlock(_ project: NewProject) -> String {
+    package static func projectBlock(_ project: NewProject) -> String {
         let repositories = project.repositories.map(tomlString).joined(separator: ", ")
         return """
             [[projects]]

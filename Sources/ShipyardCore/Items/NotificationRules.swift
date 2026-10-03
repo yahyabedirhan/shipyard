@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 
 /// Decides which events are notified. Pure.
 ///

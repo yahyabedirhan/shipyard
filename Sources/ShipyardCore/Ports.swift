@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 import ShipyardPings
 
 // What the app plugs into the core. Each port wraps an Apple-only service

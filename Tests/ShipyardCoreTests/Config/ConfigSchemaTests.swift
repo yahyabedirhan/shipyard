@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 import TOMLDecoder

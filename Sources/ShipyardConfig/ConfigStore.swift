@@ -8,9 +8,9 @@ import ShipyardCommand
 /// directory and calls `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
 /// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
-/// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and
-/// `writePreset(_:projects:)` writes a whole file only over one that holds
-/// nothing but `version`.
+/// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and the
+/// core's `writePreset(_:projects:)` writes a whole file only over one that
+/// holds nothing but `version`.
 public final class ConfigStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
@@ -166,40 +166,10 @@ public final class ConfigStore: @unchecked Sendable {
         return reload()
     }
 
-    /// Writes `preset`'s whole file, with `projects` as its picked
-    /// repositories, for onboarding's first step: only when the file is
-    /// missing or its only live key is `version`. Creates the directory when
-    /// it's missing. Throws a `ConfigError` (and writes nothing) when the
-    /// file holds anything else or doesn't read, when a project is invalid
-    /// (as for `append(projects:)`), or when the preset's file wouldn't read
-    /// with these projects; throws the file system's error when it can't
-    /// write. Returns the reload that follows.
-    @discardableResult
-    public func writePreset(_ preset: Preset, projects: [NewProject] = []) throws -> ReloadResult {
-        try validate(projects, against: [])
-        let text = preset.text(projects: projects)
-        _ = try Configuration.decode(text)
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: url.path) {
-            guard let current = String(data: try read(), encoding: .utf8), Configuration.acceptsPreset(current) else {
-                throw Configuration.presetRefused
-            }
-            // In place, as `setLayout`: a symlinked file stays a symlink.
-            let handle = try FileHandle(forWritingTo: url)
-            defer { try? handle.close() }
-            try handle.truncate(atOffset: 0)
-            try handle.write(contentsOf: Data(text.utf8))
-        } else {
-            try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            // `withoutOverwriting`: a file an editor wrote meanwhile wins.
-            try Data(text.utf8).write(to: url, options: .withoutOverwriting)
-        }
-        return reload()
-    }
-
     /// Checks the picker's projects before a write: names not empty and not
-    /// among `existing` or each other, at least one `owner/name` each, none twice.
-    private func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigError) {
+    /// among `existing` or each other, at least one `owner/name` each, none
+    /// twice. Package-wide for the core's preset writer.
+    package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigError) {
         var issues: [ConfigIssue] = []
         var names = Set(existing)
         for project in projects {
@@ -229,13 +199,26 @@ public final class ConfigStore: @unchecked Sendable {
         return try body()
     }
 
-    /// The file's bytes; a missing file reads as empty.
-    private func read() throws(ConfigError) -> Data {
+    /// The file's bytes; a missing file reads as empty. Package-wide for
+    /// the core's preset writer.
+    package func read() throws(ConfigError) -> Data {
         guard FileManager.default.fileExists(atPath: url.path) else { return Data() }
         do {
             return try Data(contentsOf: url)
         } catch {
             throw ConfigError([ConfigIssue(line: nil, message: "can't read \(url.path): \(error.localizedDescription)")])
         }
+    }
+}
+
+extension Configuration {
+    /// Whether a preset may replace `text`: it reads, and its only live key
+    /// is `version`, as in the commented header the app creates. Comments
+    /// and blank lines don't count; any table, even an empty one, does.
+    /// `ConfigStore.reload()` records it, and the core's preset writer
+    /// checks it again before writing.
+    package static func acceptsPreset(_ text: String) -> Bool {
+        guard (try? decode(text)) != nil else { return false }
+        return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && $0.path == [.key("version")] }
     }
 }
