@@ -154,13 +154,14 @@ final class ConfigurationReader {
         }
 
         if let defaults = table(node, "defaults") {
-            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "pings", "notifications", "archived", "forks"] + Self.arrangementKeys)
+            warnUnknownKeys(in: defaults, known: ["pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks"] + Self.arrangementKeys)
             if let value = bool(defaults, "archived") { config.defaults.archived = value }
             if let value = bool(defaults, "forks") { config.defaults.forks = value }
             config.defaults.pullRequests = pullRequests(defaults).applied(to: config.defaults.pullRequests)
             config.defaults.issues = issues(defaults).applied(to: config.defaults.issues)
             config.defaults.workflowRuns = workflowRuns(defaults).applied(to: config.defaults.workflowRuns)
             config.defaults.pings = pings(defaults).applied(to: config.defaults.pings)
+            config.defaults.notes = notes(defaults).applied(to: config.defaults.notes)
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
             config.defaults.arrangement = arrangement(defaults).applied(to: config.defaults.arrangement)
         }
@@ -200,7 +201,7 @@ final class ConfigurationReader {
 
     private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
         warnUnknownKeys(in: node, known: [
-            "name", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notifications", "archived", "forks",
+            "name", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks",
         ] + Self.arrangementKeys)
         let name = string(node, "name")
         let repositories = strings(node, "repositories")
@@ -241,6 +242,7 @@ final class ConfigurationReader {
             issues: issues(node),
             workflowRuns: workflowRuns(node),
             pings: pings(node),
+            notes: notes(node),
             notifications: notifications(node, inProject: true),
             arrangement: arrangement(node),
             archived: bool(node, "archived"),
@@ -326,6 +328,19 @@ final class ConfigurationReader {
             error("`\(key)` doesn't apply to pings; `pings` takes only `show` and `seen-window`", at: node.path + [.key(key)])
         }
         return PingOverrides(show: bool(node, "show"), seenWindow: duration(node, "seen-window"))
+    }
+
+    /// The filters other kinds take that notes don't: each is rejected on
+    /// its line, since a note lists while it's open in Notion.
+    static let notNoteKeys = notPingKeys + ["seen-window"]
+
+    private func notes(_ parent: Node) -> NoteOverrides {
+        guard let node = table(parent, "notes") else { return .init() }
+        warnUnknownKeys(in: node, known: ["show"] + Self.notNoteKeys)
+        for key in Self.notNoteKeys where node.table.contains(key: key) {
+            error("`\(key)` doesn't apply to notes; `notes` takes only `show`", at: node.path + [.key(key)])
+        }
+        return NoteOverrides(show: bool(node, "show"))
     }
 
     /// A kind's `states`: a list of the states that kind takes. Each one it
@@ -697,6 +712,7 @@ private extension ItemKind {
         case .issue: "issue"
         case .workflowRun: "workflow run"
         case .ping: "ping"
+        case .note: "note"
         }
     }
 }

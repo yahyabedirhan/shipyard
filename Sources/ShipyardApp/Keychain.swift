@@ -2,13 +2,25 @@ import Foundation
 import Security
 import ShipyardCore
 
-/// The app's token store: one generic password in the login Keychain, so a
-/// token from Sign in with GitHub survives restarts. `TokenProvider` reads it
-/// before asking `gh`; Sign out and a rejected token delete it.
+/// The app's token stores: one generic password each in the login
+/// Keychain, so a token survives restarts. The GitHub one (`.github`) holds
+/// the token from Sign in with GitHub: `TokenProvider` reads it before
+/// asking `gh`; Sign out and a rejected token delete it. The Notion one
+/// (`.notion`) holds the token the settings menu's Notion card takes;
+/// Disconnect Notion deletes it.
 struct Keychain: TokenStore {
-    /// The item's service and account: what Keychain Access lists it under.
+    /// The items' service: what Keychain Access lists them under.
     static let service = "com.yahyabedirhan.shipyard"
-    static let account = "github-token"
+
+    /// The GitHub token's item.
+    static let github = Keychain(account: "github-token", label: "Shipyard GitHub token")
+    /// The Notion token's item.
+    static let notion = Keychain(account: "notion-token", label: "Shipyard Notion token")
+
+    /// The item's account, under the service.
+    let account: String
+    /// The item's name in Keychain Access.
+    let label: String
 
     /// A Keychain call failed with this `OSStatus`.
     struct Failure: Error, Equatable {
@@ -19,7 +31,7 @@ struct Keychain: TokenStore {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Self.service,
-            kSecAttrAccount as String: Self.account,
+            kSecAttrAccount as String: account,
         ]
     }
 
@@ -49,7 +61,7 @@ struct Keychain: TokenStore {
         case errSecItemNotFound:
             var attributes = item
             attributes[kSecValueData as String] = data
-            attributes[kSecAttrLabel as String] = "Shipyard GitHub token"
+            attributes[kSecAttrLabel as String] = label
             attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             let added = SecItemAdd(attributes as CFDictionary, nil)
             guard added == errSecSuccess else { throw Failure(status: added) }

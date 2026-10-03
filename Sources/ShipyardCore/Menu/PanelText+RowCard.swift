@@ -112,6 +112,12 @@ extension PanelText {
             if let body = ping?.body { facts.append([.body(body)]) }
             if let ping { facts.append([ping.action.map { .action($0) } ?? .noAction]) }
             if let failure = ping?.failureDetail ?? ping?.failure { facts.append([.failure(failure)]) }
+        case .note:
+            // Where clicking it takes you, and when it last changed.
+            facts.append([.action(.url(row.url))])
+            if let note = row.item.note, note.edited.timeIntervalSince(note.created) >= 60 {
+                facts.append([.updated(age(max(0, now.timeIntervalSince(note.edited))))])
+            }
         }
         let headline = row.kind == .workflowRun ? (details.runTitle ?? row.title) : row.title
         let tagged = row.attentionReasons.filter { $0 == .reviewRequested || $0 == .checksFailed }

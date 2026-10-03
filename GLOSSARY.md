@@ -11,7 +11,7 @@ A named group of one or more GitHub repositories, shown as one section in the me
 _Avoid_: Repo (when the group is meant), workspace
 
 **Item**:
-Anything listed under a project: a pull request, an issue, a workflow run or a ping.
+Anything listed under a project: a pull request, an issue, a workflow run, a ping or a note.
 _Avoid_: Entry, row (a row is how an item is drawn, not the item)
 
 **Row**:

@@ -116,10 +116,11 @@ final class AppServices {
             configStatusStore: ConfigStatusStore(directory: files.support),
             pingStore: PingStore(directory: files.pings),
             repositoriesStore: ResolvedRepositoriesStore(directory: files.support),
-            tokenStore: Keychain(),
+            tokenStore: Keychain.github,
             actions: opener,
             notifier: notifier,
-            loginItem: files.loginItem(LaunchAtLogin())
+            loginItem: files.loginItem(LaunchAtLogin()),
+            notionTokenStore: Keychain.notion
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
@@ -250,11 +251,14 @@ final class AppServices {
     }
 
     /// Opening the panel rereads the notification permission (the user may
-    /// have changed it in System Settings). It doesn't refresh: looking
-    /// costs no GitHub request, the timer keeps the data fresh.
+    /// have changed it in System Settings) and the notes, so one just
+    /// written shows. It doesn't refresh GitHub: looking costs no GitHub
+    /// request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
         Task { await notifier.checkPermission() }
+        let shipyard = shipyard
+        Task { await shipyard.panelOpened() }
     }
 
     /// Closing the panel caps every group Show more revealed, so the menu

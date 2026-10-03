@@ -104,6 +104,9 @@ let everyKey = """
     show = false
     seen-window = "2h"
 
+    [defaults.notes]
+    show = false
+
     [[defaults.notifications]]
     event = "pr.merged"
     authors = ["me"]
@@ -120,6 +123,7 @@ let everyKey = """
     issues = { show = false, states = ["closed"], closed-window = "30m", authors = { show = ["@renovate[bot]"], hide = [] } }
     workflow-runs = { show = false, states = ["succeeded"], finished-window = "45s", branches = "default-and-pull-requests", authors = { show = ["bots"], hide = ["others"] } }
     pings = { show = true, seen-window = "0" }
+    notes = { show = true }
     notifications = [{ event = "issue.opened", authors = ["bots", "@octocat"] }]
     group-by = "date"
     subsections = false
@@ -230,6 +234,7 @@ struct ConfigurationDecodingTests {
             show: true, states: [.inProgress, .failed], finishedWindow: 12 * 3600, branches: .all, authors: AuthorFilter(show: [.me], hide: [.login("yabepa")])
         ))
         #expect(config.defaults.pings == PingSettings(show: false, seenWindow: 7200))
+        #expect(config.defaults.notes == NoteSettings(show: false))
         #expect(config.defaults.notifications == [
             NotificationRule(event: .prMerged, authors: [.me]),
             NotificationRule(event: .runFailed),
@@ -252,6 +257,7 @@ struct ConfigurationDecodingTests {
             show: false, states: [.succeeded], finishedWindow: 45, branches: .defaultAndPullRequests, authors: .init(show: [.bots], hide: [.others])
         ))
         #expect(project.pings == PingOverrides(show: true, seenWindow: 0))
+        #expect(project.notes == NoteOverrides(show: true))
         #expect(project.notifications == [NotificationRule(event: .issueOpened, authors: [.bots, .login("octocat")])])
         #expect(config.defaults.arrangement == .init(groupBy: .repository, subsections: true, sortBy: .created, showFirst: 5))
         #expect(project.arrangement == .init(groupBy: .date, subsections: false, sortBy: .title, showFirst: 0))

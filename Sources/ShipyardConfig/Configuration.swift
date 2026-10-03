@@ -47,6 +47,7 @@ public struct Configuration: Equatable, Sendable {
             issues: project.issues.applied(to: defaults.issues),
             workflowRuns: project.workflowRuns.applied(to: defaults.workflowRuns),
             pings: project.pings.applied(to: defaults.pings),
+            notes: project.notes.applied(to: defaults.notes),
             notifications: project.notifications ?? defaults.notifications,
             arrangement: project.arrangement.applied(to: defaults.arrangement),
             archived: project.archived ?? defaults.archived,
@@ -120,6 +121,8 @@ extension Configuration {
         public var issues = IssueSettings()
         public var workflowRuns = WorkflowRunSettings()
         public var pings = PingSettings()
+        /// `[defaults.notes]`: the user's notes in Notion, listed per project.
+        public var notes = NoteSettings()
         /// `[[defaults.notifications]]`; a new pull request and a new ping
         /// in any project, and an agent starting and ending a lease on app
         /// control, by default.
@@ -148,6 +151,7 @@ extension Configuration {
         public var issues = IssueOverrides()
         public var workflowRuns = WorkflowRunOverrides()
         public var pings = PingOverrides()
+        public var notes = NoteOverrides()
         /// Replaces the default notification rules when present.
         public var notifications: [NotificationRule]?
         /// The project's own `group-by`, `subsections`, `sort-by` and `show-first`.
@@ -163,6 +167,7 @@ extension Configuration {
             issues: IssueOverrides = .init(),
             workflowRuns: WorkflowRunOverrides = .init(),
             pings: PingOverrides = .init(),
+            notes: NoteOverrides = .init(),
             notifications: [NotificationRule]? = nil,
             arrangement: ArrangementOverrides = .init(),
             archived: Bool? = nil,
@@ -174,6 +179,7 @@ extension Configuration {
             self.issues = issues
             self.workflowRuns = workflowRuns
             self.pings = pings
+            self.notes = notes
             self.notifications = notifications
             self.arrangement = arrangement
             self.archived = archived
@@ -483,6 +489,28 @@ public struct PingOverrides: Equatable, Sendable {
     }
 }
 
+/// `notes`: the user's own notes, kept in Notion (one database per
+/// project, under the "Shipyard Notes" page) and listed by the app. They
+/// take `show` alone.
+public struct NoteSettings: Equatable, Sendable {
+    public var show = true
+    public init(show: Bool = true) {
+        self.show = show
+    }
+}
+
+/// The `notes` keys a table sets; unset keys keep the value below.
+public struct NoteOverrides: Equatable, Sendable {
+    public var show: Bool?
+    public init(show: Bool? = nil) {
+        self.show = show
+    }
+
+    public func applied(to base: NoteSettings) -> NoteSettings {
+        NoteSettings(show: show ?? base.show)
+    }
+}
+
 /// How a project's listed items are grouped, sorted and drawn.
 public struct ArrangementSettings: Equatable, Sendable {
     public var groupBy: GroupBy = .kind
@@ -535,6 +563,7 @@ public struct ProjectSettings: Equatable, Sendable {
     public var issues: IssueSettings
     public var workflowRuns: WorkflowRunSettings
     public var pings: PingSettings
+    public var notes: NoteSettings
     public var notifications: [NotificationRule]
     public var arrangement: ArrangementSettings
     /// Whether groups and `owner/*` bring in archived repositories.
@@ -549,6 +578,7 @@ public struct ProjectSettings: Equatable, Sendable {
         issues: IssueSettings,
         workflowRuns: WorkflowRunSettings,
         pings: PingSettings = PingSettings(),
+        notes: NoteSettings = NoteSettings(),
         notifications: [NotificationRule],
         arrangement: ArrangementSettings = ArrangementSettings(),
         archived: Bool = false,
@@ -560,6 +590,7 @@ public struct ProjectSettings: Equatable, Sendable {
         self.issues = issues
         self.workflowRuns = workflowRuns
         self.pings = pings
+        self.notes = notes
         self.notifications = notifications
         self.arrangement = arrangement
         self.archived = archived
@@ -581,6 +612,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .issue: issues.show
         case .workflowRun: workflowRuns.show
         case .ping: pings.show
+        case .note: notes.show
         }
     }
 
@@ -591,6 +623,7 @@ public struct ProjectSettings: Equatable, Sendable {
         case .issue: issues.states
         case .workflowRun: workflowRuns.states
         case .ping: Set(StateGroup.all(for: .ping))
+        case .note: Set(StateGroup.all(for: .note))
         }
     }
 
@@ -602,6 +635,8 @@ public struct ProjectSettings: Equatable, Sendable {
         case .workflowRun: workflowRuns.authors
         // A ping has no GitHub author: every one is listed.
         case .ping: AuthorFilter()
+        // A note is the user's own: every open one is listed.
+        case .note: AuthorFilter()
         }
     }
 }

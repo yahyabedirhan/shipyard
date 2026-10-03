@@ -13,7 +13,7 @@ public struct PanelRefusal: Error, Equatable, Sendable {
 
 extension ItemKind {
     /// The kinds in the order `shipyard panel show-more` lists them.
-    public static let commandOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping]
+    public static let commandOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
 
     /// The kind as `shipyard panel show-more` names it.
     public var commandName: String {
@@ -22,6 +22,7 @@ extension ItemKind {
         case .issue: "issues"
         case .workflowRun: "workflow-runs"
         case .ping: "pings"
+        case .note: "notes"
         }
     }
 

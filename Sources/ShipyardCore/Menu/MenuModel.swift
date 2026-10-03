@@ -84,12 +84,15 @@ public struct MenuModel: Equatable, Sendable {
     /// project still gets a section, empty and not loaded yet; so does a
     /// project without a listing (added since the snapshot was fetched).
     /// `expanded` holds the groups Show more revealed past their cap.
+    /// `noteErrors` holds why a project's notes couldn't be read, by
+    /// project name: an error row after its others, loaded or not.
     public static func build(
         listings: [String: [Item]],
         snapshot: Snapshot?,
         configuration: Configuration,
         state: AppState,
         expanded: Set<GroupID> = [],
+        noteErrors: [String: String] = [:],
         now: Date
     ) -> MenuModel {
         guard let snapshot else {
@@ -106,6 +109,7 @@ public struct MenuModel: Equatable, Sendable {
                         expanded: expanded,
                         now: now
                     ),
+                    errors: noteErrorRows(noteErrors, project: project.name, configuration: configuration),
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
                     repositories: project.repositories.compactMap(\.slug)
@@ -143,7 +147,8 @@ public struct MenuModel: Equatable, Sendable {
                             .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
                             .first
                             .map(MenuErrorRow.init)
-                    } + reviewSearchErrors(snapshot, settings: settings),
+                    } + reviewSearchErrors(snapshot, settings: settings)
+                    + noteErrorRows(noteErrors, project: project.name, configuration: configuration),
                 notes: reviewSearchNotes(snapshot, settings: settings),
                 // `anywhere` brings in pull requests from any repository.
                 showsRepository: repositories.count > 1 || settings.usesAnywhere,
@@ -279,6 +284,16 @@ public struct MenuModel: Equatable, Sendable {
         return [MenuErrorRow(error)]
     }
 
+    /// The row saying why `project`'s notes couldn't be read, while it
+    /// shows notes: "notes: can't reach Notion (…)".
+    private static func noteErrorRows(_ errors: [String: String], project: String, configuration: Configuration) -> [MenuErrorRow] {
+        guard let message = errors[project],
+              let settings = configuration.projects.first(where: { $0.name == project }).map(configuration.settings(for:)),
+              settings.notes.show
+        else { return [] }
+        return [MenuErrorRow(.notes(message))]
+    }
+
     /// The note in a project using `anywhere` when the review search
     /// matched more pull requests than its one page holds.
     private static func reviewSearchNotes(_ snapshot: Snapshot, settings: ProjectSettings) -> [String] {
@@ -288,7 +303,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// The order kinds appear in within a section.
-    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun]
+    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 }
 
 /// One project in the panel.
@@ -296,7 +311,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
     /// Its listed items as `Arrangement` groups and sorts them: by default
-    /// pull requests, then pings, then issues, then workflow runs; within each kind, open
+    /// pull requests, then pings, then issues, then workflow runs, then
+    /// notes; within each kind, open
     /// (or running) items first (most recently updated first), then closed
     /// (or finished) ones (most recently closed first).
     public var groups: [RowGroup]
