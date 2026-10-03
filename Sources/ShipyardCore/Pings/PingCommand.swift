@@ -2,7 +2,7 @@ import Foundation
 
 /// `shipyard ping`: reads its arguments, files the ping under the projects
 /// that watch its repository (or under the one `--project` names), saves it
-/// to the ping store and prints its number and id (`#3 k7qm2x`). Pure apart from the store and the
+/// to the ping store and prints its id (`k7qm2x`). Pure apart from the store and the
 /// git remote it reads through `CommandEnvironment`, so tests call it as a
 /// function; the `shipyard` executable only prints what it returns.
 ///
@@ -18,9 +18,9 @@ public enum PingCommand {
 
         Sends the user a ping: it's listed under the projects that watch the
         repository of the working folder (its git remote `origin`), needs
-        their attention until they click it, and prints its number and its
-        id on one line, such as `#3 k7qm2x`. Clicking it runs its action, if
-        it has one, and marks it seen.
+        their attention until they click it, and prints its id, such as
+        `k7qm2x`. Clicking it runs its action, if it has one, and marks it
+        seen. The Mac's shipyard numbers it in each project it's listed in.
 
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
@@ -105,10 +105,8 @@ public enum PingCommand {
     /// `owner/name`, or one in the project's list in `resolved` (each
     /// project's repositories as the app last resolved them, by name).
     /// `newID` makes the id when `--id` gives none; one already stored is
-    /// drawn again. A new ping takes the store's next number
-    /// (`PingStore.takeNumber()`). A `--id` already stored replaces that
-    /// ping: its sent time and number stay, and it's unseen again with no
-    /// failure.
+    /// drawn again. A `--id` already stored replaces that ping: its sent
+    /// time and instance stay, and it's unseen again with no failure.
     ///
     /// On Linux (`environment.platform`), a machine without the app, it
     /// isn't filed (`send`), and a ping without an action takes the
@@ -203,13 +201,10 @@ public enum PingCommand {
             id = drawn
         }
         let replaced = store.ping(id: id)
-        let number: Int
         do {
-            // A replace keeps when the ping was first sent, its instance,
-            // so it isn't notified again, and its number; seen and failure
-            // start over, so it needs attention again. A ping written
-            // before pings were numbered takes one when it's replaced.
-            number = try replaced?.number ?? store.takeNumber()
+            // A replace keeps when the ping was first sent and its instance,
+            // so it isn't notified again; seen and failure start over, so it
+            // needs attention again.
             try store.save(Ping(
                 id: id,
                 title: request.title,
@@ -221,13 +216,12 @@ public enum PingCommand {
                 action: request.action,
                 terminal: terminal,
                 instance: replaced?.instance ?? UUID().uuidString.lowercased(),
-                number: number,
                 expires: expires
             ))
         } catch {
             return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
-        return CommandResult(output: "#\(number) \(id)\n")
+        return CommandResult(output: "\(id)\n")
     }
 
     /// The projects `request` is filed under against `configuration`, and

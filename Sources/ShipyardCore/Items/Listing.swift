@@ -34,35 +34,63 @@ public enum Listing {
     /// by its machine instead, under the machine's label, with the
     /// settings `machines` gives it (`Configuration.settings(forMachine:)`).
     /// A machine with no such ping has no listing.
+    ///
+    /// Each ping's item carries the number `numbers` gave it in that
+    /// section (`PingNumbers`), or none (0) before it has one.
     public static func listings(
         for projects: [ProjectSettings],
         in snapshot: Snapshot?,
         pings: [Ping] = [],
         machines: [ProjectSettings] = [],
+        numbers: PingNumbers? = nil,
         now: Date
     ) -> [String: [Item]] {
+        let sections = sections(of: pings, projects: projects.map(\.name), machines: machines.map(\.name))
+        func filed(in section: String) -> [Item] {
+            (sections[section] ?? []).map { ping in
+                var item = ping.item
+                item.number = numbers?.number(of: item.id, in: section) ?? 0
+                return item
+            }
+        }
         var listings: [String: [Item]] = [:]
         for project in projects {
             let fetched = snapshot.flatMap { snapshot in
                 snapshot.items[project.name] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
             }
-            let filed = pings.filter { $0.projects.contains(project.name) }.map(\.item)
+            let filed = filed(in: project.name)
             guard fetched != nil || !filed.isEmpty else { continue }
             listings[project.name] = (fetched ?? []) + filed.filter {
                 lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
-        let names = Set(projects.map(\.name))
         for machine in machines {
-            let unfiled = pings
-                .filter { $0.machine == machine.name && !$0.projects.contains(where: names.contains) }
-                .map(\.item)
+            let unfiled = filed(in: machine.name)
             guard !unfiled.isEmpty else { continue }
             listings[machine.name] = unfiled.filter {
                 lists($0, project: machine, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
         return listings
+    }
+
+    /// The sections `pings` are filed in, by name, before any filter: each
+    /// project in `projects` its pings name, and each machine in `machines`
+    /// its remote pings filed under none of `projects`. A section with no
+    /// ping is left out. Where `listings` lists them, and what the Mac
+    /// numbers them in (`PingNumbers`).
+    public static func sections(of pings: [Ping], projects: [String], machines: [String]) -> [String: [Ping]] {
+        var sections: [String: [Ping]] = [:]
+        let names = Set(projects)
+        for project in projects {
+            let filed = pings.filter { $0.projects.contains(project) }
+            if !filed.isEmpty { sections[project] = filed }
+        }
+        for machine in machines {
+            let unfiled = pings.filter { $0.machine == machine && !$0.projects.contains(where: names.contains) }
+            if !unfiled.isEmpty { sections[machine] = unfiled }
+        }
+        return sections
     }
 
     /// Whether `project` lists `item`. `reviewRequested` holds the open pull

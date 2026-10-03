@@ -1050,15 +1050,55 @@ public final class Shipyard {
     }
 
     /// Every project's listing, and each remote machine's own, from
-    /// `snapshot` and the listed pings (`Listing.listings`).
+    /// `snapshot` and the listed pings (`Listing.listings`), each ping
+    /// numbered in its section, a new one given its number first
+    /// (`numberPings`).
     private func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, configuration: Configuration) -> [String: [Item]] {
-        Listing.listings(
+        let pings = filedPings(configuration)
+        numberPings(pings, projects: projects.map(\.name), configuration: configuration)
+        return Listing.listings(
             for: projects,
             in: snapshot,
-            pings: filedPings(configuration),
+            pings: pings,
             machines: configuration.remote.machines.map(configuration.settings(forMachine:)),
+            numbers: appStateStore.state.pingNumbers,
             now: clock.now
         )
+    }
+
+    /// Gives each ping new to a section (a project, or a machine's own
+    /// section) that section's next number, the first time the Mac lists it
+    /// there, and retires the numbers of the pings that left (`PingNumbers`),
+    /// saved in the app state. A ping that has left (`hasLeft`) isn't
+    /// numbered. A remote ping's number waits, as its marks do, while its
+    /// machine hasn't answered since the app started, or its list stopped
+    /// before it; it's retired once its machine is no longer configured.
+    ///
+    /// The first time (no numbers kept yet), it waits until every
+    /// configured machine has answered or failed, so the pings already
+    /// there are numbered together, oldest sent first. Nothing is numbered
+    /// under the defaults standing in for a file broken since launch.
+    private func numberPings(_ pings: [Ping], projects: [String], configuration: Configuration) {
+        guard configStore.error == nil || followsConfiguredMachines else { return }
+        let heard = Set(remote.machines.filter { $0.answered != nil || $0.failure != nil }.map(\.label))
+        guard appStateStore.state.pingNumbers != nil || Set(configuration.remote.machines).isSubset(of: heard) else { return }
+        let now = clock.now
+        let present = pings.filter { !Self.hasLeft($0, in: configuration, at: now) }
+        let sections = Listing.sections(of: present, projects: projects, machines: configuration.remote.machines)
+        let answered = Set(remote.machines.filter { $0.answered != nil }.map(\.label))
+        let truncated = Set(remote.machines.filter(\.truncated).map(\.label))
+        let configured = Set(configuration.remote.machines)
+        let listedURLs = Set(remote.pings.map(\.item.id))
+        let follows = followsConfiguredMachines
+        appStateStore.update { state in
+            var numbers = state.pingNumbers ?? PingNumbers()
+            numbers.number(sections) { url in
+                guard let machine = URL(string: url).flatMap(Ping.remote(from:))?.machine else { return true }
+                if follows && !configured.contains(machine) { return true }
+                return answered.contains(machine) && (!truncated.contains(machine) || listedURLs.contains(url))
+            }
+            state.pingNumbers = numbers
+        }
     }
 
     /// Each remote machine's settings, for its own section's listing and
@@ -1105,8 +1145,9 @@ public final class Shipyard {
             await pollMachinesOnce()
         } while machineGate.finish() && machineGate.begin()
         pruneRemoteMarks()
-        // A seen remote ping may have passed its seen-window since, taking its banner.
-        if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) {
+        // A seen remote ping may have passed its seen-window since, taking its banner;
+        // and the pings still waiting for their first numbers take them once every machine answered or failed.
+        if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) || appStateStore.state.pingNumbers == nil {
             rebuildMenu(configStore.lastValid)
             forgetLeftPings(stored: pings)
             await removeLeftBanners()
