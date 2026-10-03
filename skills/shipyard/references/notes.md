@@ -126,7 +126,9 @@ Drop the `Labels` condition for every open note. Notes the user wrote straight i
 
 A project's database is created the first time a note is added to it, by you or by the menu's new-note icon.
 
-1. Pick a prefix: two to five uppercase letters from the project's name (`shipyard` → `SHIP`), not already in the entry page's list of project prefixes (under "What can grow").
+The icon makes the database with the same properties and a prefix no other database's `No.` uses, but it doesn't touch the entry page, so its prefix isn't in the list yet. When you find a database whose prefix the list lacks, add its line (`<project name>: <PREFIX>`) to the list.
+
+1. Pick a prefix: two to five uppercase letters from the project's name (`shipyard` → `SHIP`), not already in the entry page's list of project prefixes (under "What can grow") nor used by another database's `No.` (its schema shows `unique_id` with the prefix).
 2. Add the line `<project name>: <PREFIX>` to that list.
 3. Create the database under the entry page, titled exactly the project's name:
    - Connector: `notion-create-database` with the entry page as parent and `CREATE TABLE ("Name" TITLE, "No." UNIQUE_ID PREFIX 'SHIP', "Labels" MULTI_SELECT(), "Status" SELECT('Open':green, 'Archived':gray))`.

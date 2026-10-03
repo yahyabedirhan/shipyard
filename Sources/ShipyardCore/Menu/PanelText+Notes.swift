@@ -23,6 +23,21 @@ extension PanelText {
         }
     }
 
+    /// Why the new-note icon couldn't start a note, after "new note: " on
+    /// the project's error row.
+    public static func newNoteError(_ error: NewNoteError) -> String {
+        switch error {
+        case .notConnected: "connect Notion first, from the settings menu"
+        case .noEntryPage: "no page titled Shipyard Notes is shared with shipyard's Notion connection"
+        case .notion(let error): noteError(error)
+        }
+    }
+
+    /// The new-note icon's hover help: "New note in shop".
+    public static func newNoteHelp(_ project: String) -> String {
+        "New note in \(project)"
+    }
+
     /// The settings menu's item that shows the Notion card.
     public static let connectNotion = "Connect Notion…"
     /// The settings menu's item that forgets the token, once connected.

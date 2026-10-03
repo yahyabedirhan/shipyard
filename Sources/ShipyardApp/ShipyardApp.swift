@@ -209,7 +209,7 @@ final class AppServices {
 
     /// What the menu's layout can do: open or mark seen a row, mark a
     /// project (or every project) seen, collapse a project, open a
-    /// project's repository.
+    /// project's repository, start a note in a project.
     var layoutActions: LayoutActions {
         let shipyard = shipyard
         return LayoutActions(
@@ -228,6 +228,12 @@ final class AppServices {
             openRepository: { [weak self] project in
                 shipyard.openRepository(of: project)
                 self?.closeMenu()
+            },
+            startNote: { [weak self] project in
+                // The menu closes once Notion opens the note; a failure stays in view on the project.
+                Task { @MainActor in
+                    if await shipyard.startNote(in: project.name) { self?.closeMenu() }
+                }
             }
         )
     }

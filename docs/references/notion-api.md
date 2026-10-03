@@ -7,6 +7,7 @@ Checked 2026-10-03 against:
 - [Upgrade guide 2025-09-03](https://developers.notion.com/docs/upgrade-guide-2025-09-03) and [upgrade guide 2026-03-11](https://developers.notion.com/docs/upgrade-guide-2026-03-11)
 - [Internal connections](https://developers.notion.com/guides/get-started/internal-connections) and [Connection capabilities](https://developers.notion.com/reference/capabilities)
 - [Data source properties](https://developers.notion.com/reference/property-object) (Unique ID, Multi-select)
+- [Retrieve a data source](https://developers.notion.com/reference/retrieve-a-data-source) (checked 2026-10-04)
 - [Query a data source](https://developers.notion.com/reference/query-a-data-source) and [Filter data source entries](https://developers.notion.com/reference/post-database-query-filter)
 - [Working with markdown content](https://developers.notion.com/guides/data-apis/working-with-markdown-content)
 - [Request limits](https://developers.notion.com/reference/request-limits) and [Status codes](https://developers.notion.com/reference/status-codes)
@@ -35,6 +36,7 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 - `POST /v1/databases` (on `2025-09-03`) takes a `parent` page, a `title`, and `initial_data_source.properties`. It returns the database with its one data source's id in `data_sources`. Measured: a database under the entry page with `Name` (title), `No.` (`unique_id` with a prefix), `Labels` (`multi_select`, no options) and `Status` (`select`: Open, Archived).
 - **Unique ID** (`unique_id`, shown as `auto_increment_id` by the connector): its `prefix` is a string or `null`. "Notion assigns each page a unique number within the data source. You can configure the prefix, but you cannot write a page's number." A page's value is `{"number": 42, "prefix": "TASK"}`. Measured: numbering starts at 1, and the spike saw that a trashed page's number is never given again. A data source has at most one unique ID property.
 - **Multi-select:** option names are unique ignoring case, and can't contain commas; a request sets at most 100. Through the REST API (and so `ntn`), a page written with a new option name adds the option to the schema. Measured: Claude's Notion connector refuses it instead ("Invalid multi_select value … the data source must be updated to add it"), so an agent adds the option to the schema first.
+- `GET /v1/data_sources/{id}` returns a data source's schema: `properties` by name, each with its `type` and that type's settings, so a `No.` reads `{"type": "unique_id", "unique_id": {"prefix": "SHOP"}}`. The app reads each database's prefix this way before it creates one, so a new database's prefix is unique.
 - **Child databases:** `GET /v1/blocks/{page id}/children` lists a page's databases as `child_database` blocks, each with its `title`. That's how a project's database is found under the entry page by name.
 
 ## Querying a data source
@@ -52,7 +54,7 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 
 ## Pages and their content as Markdown
 
-- `POST /v1/pages` with `parent: {"type": "data_source_id", "data_source_id": …}`, `properties`, and `markdown` for the body, which can't be combined with `children`. Measured on `2025-09-03`. Creating with `markdown` needs insert content (and, per the guide, insert property).
+- `POST /v1/pages` with `parent: {"type": "data_source_id", "data_source_id": …}`, `properties`, and `markdown` for the body, which can't be combined with `children`. Measured on `2025-09-03`. Without a body the page is empty; the app's new-note icon sends only `Status` (Open), and its answer is the page, with its `url` and its new `No.`. Creating with `markdown` needs insert content (and, per the guide, insert property).
 - Set the title explicitly. "If `properties.title` is omitted, the first `# h1` heading is extracted as the page title"; the spike saw a page created from only a heading end up untitled.
 - `GET /v1/pages/{id}/markdown` returns `{"markdown", "truncated", "unknown_block_ids"}`; `PATCH /v1/pages/{id}/markdown` inserts or replaces content. `ntn pages get` and `ntn pages edit` use them (`edit` replaces the whole body).
 - A page's `url` is its Notion link (`https://app.notion.com/p/<title>-<id>`), which opens it in the Notion app or the browser.

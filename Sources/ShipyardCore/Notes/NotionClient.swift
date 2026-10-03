@@ -28,8 +28,9 @@ public enum NotionError: Error, Equatable, Sendable {
 /// It reads: who the token is (`me`), pages by title (`searchPages`), a
 /// page's child databases (`childDatabases`), a database's data sources
 /// (`dataSources`), a data source's open notes (`openNotes`) and a page's
-/// first line of text (`firstLine`). Creating a page or a database is one
-/// more method over `send`.
+/// first line of text (`firstLine`), and a data source's number prefix
+/// (`notePrefix`). For the new-note icon it creates a notes database
+/// (`createNotesDatabase`) and an empty note (`createEmptyNote`).
 public struct NotionClient: Sendable {
     public static let apiURL = URL(string: "https://api.notion.com/v1")!
     /// The `Notion-Version` every request names.
@@ -133,6 +134,52 @@ public struct NotionClient: Sendable {
         return nil
     }
 
+    /// The prefix of data source `dataSourceID`'s `No.` property ("SHOP"),
+    /// from its schema (`GET /v1/data_sources/{id}`); `nil` when it has no
+    /// `No.`, or one without a prefix.
+    public func notePrefix(ofDataSource dataSourceID: String) async throws -> String? {
+        let schema = try await send("GET", "data_sources/\(dataSourceID)", as: DataSource.self)
+        return schema.properties[NoteProperty.number]?.unique_id?.prefix
+    }
+
+    // MARK: - Creates
+
+    /// Creates a project's notes database under page `pageID`, titled
+    /// `title`, with the fixed core the shipyard skill's notes reference
+    /// defines: `Name` (title), `No.` (unique ID with `prefix`), `Labels`
+    /// (multi-select, no options) and `Status` (select: Open, Archived).
+    /// `POST /v1/databases`; answers the new database and its data source.
+    public func createNotesDatabase(under pageID: String, title: String, prefix: String?) async throws -> (database: String, dataSource: String) {
+        let body: [String: Any] = [
+            "parent": ["type": "page_id", "page_id": pageID],
+            "title": [["text": ["content": title]]],
+            "initial_data_source": ["properties": [
+                NoteProperty.name: ["title": [String: Any]()],
+                NoteProperty.number: ["unique_id": ["prefix": prefix ?? NSNull()]],
+                NoteProperty.labels: ["multi_select": ["options": [Any]()]],
+                NoteProperty.status: ["select": ["options": [
+                    ["name": Note.open, "color": "green"],
+                    ["name": Note.archived, "color": "gray"],
+                ]]],
+            ]],
+        ]
+        let database = try await send("POST", "databases", body: body, as: Database.self)
+        guard let id = database.id, let source = database.data_sources.first?.id else { throw NotionError.unreadable("POST databases") }
+        return (id, source)
+    }
+
+    /// Creates an empty note, its `Status` Open, in data source
+    /// `dataSourceID` (`POST /v1/pages`), and answers its Notion URL.
+    public func createEmptyNote(in dataSourceID: String) async throws -> URL {
+        let body: [String: Any] = [
+            "parent": ["type": "data_source_id", "data_source_id": dataSourceID],
+            "properties": [NoteProperty.status: ["select": ["name": Note.open]]],
+        ]
+        let page = try await send("POST", "pages", body: body, as: PageObject.self)
+        guard let url = page.url.flatMap(URL.init(string:)) else { throw NotionError.unreadable("POST pages") }
+        return url
+    }
+
     // MARK: - Sending
 
     /// Sends one request to `path` under the API (`users/me`), with
@@ -204,9 +251,11 @@ public struct NotionClient: Sendable {
     }
 }
 
-/// The note properties the app reads: the fixed core every project's
-/// database has (the shipyard skill's notes reference defines it).
+/// The note properties the app reads, and creates a database with: the
+/// fixed core every project's database has (the shipyard skill's notes
+/// reference defines it).
 enum NoteProperty {
+    static let name = "Name"
     static let number = "No."
     static let labels = "Labels"
     static let status = "Status"
@@ -269,10 +318,20 @@ private struct Block: Decodable {
 /// `GET /v1/databases/{id}`: its data sources.
 private struct Database: Decodable {
     struct Source: Decodable { var id: String }
+    var id: String?
     var data_sources: [Source]
 }
 
-/// A page, from search or a data-source query.
+/// `GET /v1/data_sources/{id}`: its schema; only a unique ID's prefix is read.
+private struct DataSource: Decodable {
+    struct Property: Decodable {
+        struct UniqueID: Decodable { var prefix: String? }
+        var unique_id: UniqueID?
+    }
+    var properties: [String: Property]
+}
+
+/// A page, from search, a data-source query or a create.
 private struct PageObject: Decodable {
     /// One property value; only the types notes use are read.
     struct Property: Decodable {

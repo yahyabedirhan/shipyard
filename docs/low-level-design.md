@@ -30,7 +30,7 @@ Since 0.0.2 a refresh also **resolves** each project's repository selectors (gro
 
 Since 0.0.5 agents also send the user **pings** with the `shipyard` command line, a second executable bundled in the app (ADR 0004). The **ping command** files a ping under the projects that watch the repository of the agent's working folder (or `--repo`, or the one `--project` names), matching against the configuration and the repository lists the app last resolved, and writes it to the **ping store**, one file per ping in Application Support, which the app watches; a ping is listed as a fourth kind of item beside the fetched ones, with no GitHub request.
 
-Since effort `notes-and-notify` (spec #187, #192) the menu also lists the user's **notes**: their own notes, kept in Notion, one database per project under a "Shipyard Notes" page. The app reads them itself with a Notion token the user gave it once (kept in the Keychain), every minute and when the menu opens, through the same HTTP seam as GitHub (`NotionClient`, `NotesReader`), and lists them as a fifth kind of item; agents write notes in Notion with their own tools, so there's no notes code on the agent's side (Trace 14).
+Since effort `notes-and-notify` (spec #187, #192) the menu also lists the user's **notes**: their own notes, kept in Notion, one database per project under a "Shipyard Notes" page. The app reads them itself with a Notion token the user gave it once (kept in the Keychain), every minute and when the menu opens, through the same HTTP seam as GitHub (`NotionClient`, `NotesReader`), and lists them as a fifth kind of item; agents write notes in Notion with their own tools, so there's no notes code on the agent's side (Trace 14). A new-note icon on each project's header creates an empty note, and the project's database the first time, and opens it in Notion (#196, Trace 16).
 
 Since 0.1.0 agents also steer and capture the app with **app control**: `shipyard app`, `panel` and `screenshot` on the Mac send one JSON request over a Unix socket in the app's support folder, and the app's **control server** answers it (Trace 10). Since 0.2.0 app control is **leased** (ADR 0007): each request carries its **holder**, and the server refuses another agent's while one holds the lease (Trace 13).
 
@@ -166,7 +166,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | L9 | The app posts a macOS notification when a lease starts and when it ends, as the events `control.started` and `control.ended`: "<Agent> is using shipyard" over its place, and "<Agent> is done with shipyard" over why (released, its lease ran out, you stopped it). Only the top-level rules decide them (`[[defaults.notifications]]`, or the built-in list when the file has none, which holds both); a project's own list and a rule's `authors` don't apply, and the reader warns about either. Clicking either opens the panel, where the banner shows who holds shipyard. A renewal and a relaunch's handover post nothing, so one lease makes one pair (#182). |
 | L10 | The maintainer takes shipyard back with Stop in the lease's banner: the lease ends (`stopped`), and its holder is barred for 5 minutes. A barred holder's leased requests and `control take` (with or without `--wait`, so it never joins the line) are refused with exit 1 and nothing done, "the user took shipyard back; ask them before using it again". For those 5 minutes the panel shows a quiet line, "You took shipyard back from <Agent> · Allow", and Allow lifts the bar at once. When anyone waits, the first waiter gets the lease as on a release, and its banner shows above the quiet line, which stays for the whole bar. Stop and Allow are the maintainer's only clicks that reach the lease (#181). |
 
-**Added in effort `notes-and-notify`** (spec #187; Trace 14 follows a read):
+**Added in effort `notes-and-notify`** (spec #187; Trace 14 follows a read, Trace 16 the new-note icon):
 
 | # | Requirement |
 |---|---|
@@ -176,6 +176,9 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | NT4 | `[defaults.notes] show` (default `true`) and a project's `notes = { show = … }` decide whether notes are listed, merged as the pings' are; `states`, `authors`, `drafts`, `review-requested` and `seen-window` under notes are rejected with their line (#192). |
 | NT5 | Notes are read every 60 seconds on a timer of their own (`Shipyard.notesInterval`), and when the menu opens (`Shipyard.panelOpened()`): one children listing of the entry page and one query per project that shows notes and has a database; the entry page, each database's data source and each untitled note's first line are remembered. No token: nothing is read and no note listed. A configuration change reads them at once (#192). |
 | NT6 | A query that fails, or a token Notion rejects, shows on the project as an error row, "notes: <why>" (every project showing notes when nothing could be read), and the project keeps the notes it last had: never an empty list. A project without a database shows no Notes group and no error (#192). |
+| NT7 | While Notion is connected, each project that shows notes has a **new-note icon** on its header (the list's section header; the tabs' summary line on its tab). A click creates the project's database under the entry page when none is titled exactly its name (`POST /v1/databases`, with the skill's fixed core: `Name` title, `No.` unique ID, `Labels` multi-select with no options, `Status` select Open green and Archived gray), then an empty note in its data source (`POST /v1/pages`, `Status` Open), opens the note's URL, and reads the notes again so the menu lists it. While it runs the icon shows a spinner and a second click does nothing. The app never writes the entry page (#196). |
+| NT8 | A new database's `No.` prefix is two to five uppercase letters from the project's name that no database under the entry page uses (each one's schema, `GET /v1/data_sources/{id}`): the name's first 4, 3, 5 then 2 letters (A to Z only); then its first letter followed by later letters of the name, in order; then its first letter and any letter; then any two letters (`NotePrefix`). Agents add the prefix to the entry page's list when they find it missing, as the skill's notes reference says (#196). |
+| NT9 | A failure to start a note (no token, no "Shipyard Notes" page shared with the connection, a token Notion rejects, Notion out of reach) opens nothing, leaves the menu open, and shows on the project as an error row, "new note: <why>", until the menu opens again or a note starts there (#196). |
 
 **Added for 0.3.0** (effort `notes-and-notify`, spec #187; Trace 15 follows a notice):
 
@@ -237,7 +240,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | Syncing pings between machines, writing back to a machine (seen and dismiss stay on the Mac) | ADR 0005 (0.0.6): the Mac reads remote pings through Herdr and never writes to a machine; it supersedes 0.0.5's "pings from other machines" |
 | Clicking, hovering or typing in the panel through app control; capturing the real menu bar strip or a hover card | Spec #160: app control steers the panel through the app's own operations, and ScreenCaptureKit captures only the app's own window |
 | Controlling the app on another machine; switching the layout through app control | Spec #160: control is a socket only the Mac's user can reach, and the layout stays a `config.toml` edit (ADR 0001) |
-| Writing notes from the app, or a `shipyard note` command | Spec #187: agents write notes in Notion with their own tools; the app only reads them (and, with the new-note icon, #196, creates a page or a database) |
+| Writing notes from the app, or a `shipyard note` command; writing the entry page (the prefix list) | Spec #187: agents write notes in Notion with their own tools; the app only reads them (and, with the new-note icon, #196, creates an empty page or a database). The icon leaves the entry page's prefix list to agents (ADR 0009: shipyard only lists and starts notes) |
 
 ---
 
@@ -291,8 +294,10 @@ Nouns from the requirements, sorted:
 | Lease (0.2.0) | **Value** (`ControlLease`, in Control, pure, given the time on each call): the held `Term` (holder, taken, ends) or free; answers a leased request with the term or a `Refusal`, and the `Transition`s on the way (started, renewed, ended with an `Ending`); `control take` and `release` (#178), and a first-come-first-served line of waiting `take`s, each with the time its wait runs out; the holders the maintainer stopped, each `Bar`red until a time (#181); the control server owns the one instance (#177, ADR 0007), and shows it through the app's `LeaseIndicator`: the menu bar icon's dot and the panel's banner (#180) |
 | Holder (0.2.0) | **Value** (`Holder`, in Control): who sends a request, `{ key, name, place }`, worked out by the CLI on each call (`Holder.find`) through the `ProcessTable` **port** (`SystemProcessTable`, macOS's `sysctl`; tests use a fake) (#177) |
 | Note (#192) | **Value** (`Note`, in Core's `Notes/`): a page in a project's notes database: id, URL, number and prefix (`No.`), title, first line (untitled only), labels, status, created and edited; as an item, kind `note` (`Note.item`) |
-| Notion client (#192) | **Entity** (`NotionClient`, in Core, over the `HTTPTransport` port): Notion's REST API at version `2025-09-03`: `me`, `searchPages(titled:)`, `childDatabases(of:)`, `dataSources(ofDatabase:)`, `openNotes(in:)`, `firstLine(ofPage:)`, all through one `send`; errors as `NotionError` |
-| Notes reader (#192) | **Entity** (`NotesReader`, in Core): finds the entry page, matches projects to databases, queries each, and remembers what it found; answers `NotesReading` |
+| Notion client (#192) | **Entity** (`NotionClient`, in Core, over the `HTTPTransport` port): Notion's REST API at version `2025-09-03`: `me`, `searchPages(titled:)`, `childDatabases(of:)`, `dataSources(ofDatabase:)`, `openNotes(in:)`, `firstLine(ofPage:)`, and since #196 `notePrefix(ofDataSource:)`, `createNotesDatabase(under:title:prefix:)` and `createEmptyNote(in:)`, all through one `send`; errors as `NotionError` |
+| Notes reader (#192) | **Entity** (`NotesReader`, in Core): finds the entry page, matches projects to databases, queries each, and remembers what it found; answers `NotesReading`; since #196 `startNote(in:client:)` makes a project's database when it has none, then an empty note, answering its URL or a `NewNoteError` |
+| Note prefix (#196) | **Value** (`NotePrefix`, in Core's `Notes/`, pure): the first free prefix for a project's name, given the prefixes taken (NT8) |
+| Notes menu state (#196) | **Value** (`NotesMenuState`, in Core's `Menu/`): what `MenuModel.build` shows about notes besides their rows: connected, read errors, start errors, the projects a note is being started in; a section's icon is `MenuSection.newNote: NewNoteButton?` (`ready`, `starting`) |
 | Control message (0.2.0) | **Value** (`ControlMessage`, in Control): a `ControlRequest` with its `Holder`, as it goes over the socket (protocol version 2) (#177) |
 
 Relationships:
@@ -334,9 +339,10 @@ Shipyard -> Notifier               post(notification); removeDelivered(id) for a
 Notifier -> Shipyard               openNotification(itemURL) on a click; a lease's (ControlNotice.panelURL) opens the panel instead (0.2.0, #182)
 Shipyard -> NotesReader            read(projects showing notes, client) -> NotesReading, on the notes timer, when the menu opens, and after connecting (#192)
 NotesReader -> NotionClient        searchPages(titled: "Shipyard Notes") once; childDatabases(of: entry page) each read; dataSources(ofDatabase:) once per database; openNotes(in: data source) per project; firstLine(ofPage:) per untitled note, once per edit
+NotesReader -> NotionClient        startNote (#196): childDatabases(of: entry page); with no database titled the project, dataSources(ofDatabase:) and notePrefix(ofDataSource:) per database, then createNotesDatabase; then createEmptyNote(in: data source)
 NotionClient -> HTTPTransport      the same seam as GitHubClient: Notion's answers are recorded in tests (`StubHTTP+Notion.swift`)
 Shipyard -> TokenStore (Notion)    token() before each read; save(token) after Notion took it (connectNotion); delete() on Disconnect Notion
-Shipyard -> MenuModel              build(listings, snapshot (errors, when fetched), config, appState, expandedGroups, noteErrors) -> what Panel draws
+Shipyard -> MenuModel              build(listings, snapshot (errors, when fetched), config, appState, expandedGroups, notes: NotesMenuState) -> what Panel draws
 MenuModel -> Arrangement           groups(items, settings, folds, expanded, now) -> [RowGroup]
 Panel    -> Shipyard               click(item), collapse(project), markAllSeen(), refresh()
 Onboarding -> Shipyard            suggestedRepositories(), checkRepository(text), addProjects(projects)
@@ -423,6 +429,9 @@ Where each rule lives:
 | Which notes are open (#192) | the query's filter in `NotionClient.openNotes`, and `Listing`, which leaves out an archived note anyway |
 | What a note's row shows (#192) | `Note.displayTitle` and `Note.reference`; `PanelText.number`, `noteLabels` and `rowDetail` |
 | Whether a project's notes read failed, and the error row's words (#192) | `Shipyard.noteErrors`, worded by `PanelText.noteError` |
+| Whether a project's header has the new-note icon, and whether it's busy (#196) | `MenuModel.build` from `NotesMenuState` (connected, `notes.show`, `Shipyard.startingNotes`) |
+| A new database's prefix (#196) | `NotePrefix.choose`, over the prefixes `NotesReader.startNote` read |
+| Whether starting a note failed, and the error row's words (#196) | `Shipyard.newNoteErrors`, worded by `PanelText.newNoteError` |
 
 ---
 
@@ -705,6 +714,8 @@ notionConnected: Bool              (#192: a Notion token is kept; the settings m
 notionTokenStore: TokenStore?      (#192: port; the Keychain's notion-token item in the app; nil reads no notes)
 notesTimer: RefreshTimer           (#192: port; reads the notes every notesInterval (60 s), apart from timer; armed at 0 at start and on each valid configuration change while connected)
 notesReader: NotesReader           (#192: the entry page, data sources and first lines found so far)
+startingNotes: Set<ProjectName>    (#196: the projects the new-note icon is starting a note in; their icons spin)
+newNoteErrors: [ProjectName: String] (#196: why the icon couldn't start a note, for its error row; cleared when the menu opens)
 loginItem: LoginItem               (port; told launch-at-login at start and on every valid configuration change)
 ```
 
@@ -744,9 +755,10 @@ Operations:
 | `open(row)`, `openNotification(url)` on a remote ping (#117) | `runAction(ofRemotePing: url)` runs the action of the ping as its machine last listed it: a Herdr action through `runHerdr(target, on: machine)` (`HerdrFocus.focus(target, on:)`, then `[herdr] terminal`), a link or an app on the Mac through the action port. `done` (or no action) marks the sending clicked seen through `markRemoteSeen`, so one replaced meanwhile stays unseen; `failed(reason)` records the reason on that sending in `remote` (`RemoteMachines.recordFailure`, in memory) for the row and rebuilds the menu; `markRemoteSeen` (a click that works, ⌥-click, Mark all seen) clears it | a ping its machine no longer lists does nothing; the Mac's Herdr window moves only when it already shows that machine |
 | `toggleCollapsed(project)` | flips app state; the section keeps its rows and its count | — |
 | `refreshNotes()` (async, #192) | reads the token; with none, forgets every note and disarms the notes timer. Otherwise reads each project that shows notes through `NotesReader` (one at a time, `notesGate`, queuing one more), then: a project read lists its notes; a project whose query failed keeps its last notes and gets `noteErrors[project]`; a `.failed` read (401, Notion out of reach) keeps every project's notes and gives each an error; a project with no database lists none. Rebuilds the menu when anything changed, then arms the notes timer for `notesInterval` | a read that finishes after the token changed or went is dropped |
-| `panelOpened()` (async, #192) | the app's panel appeared: `refreshNotes()`. GitHub isn't asked | as `refreshNotes()` |
+| `panelOpened()` (async, #192) | the app's panel appeared: clears `newNoteErrors` (#196), then `refreshNotes()`. GitHub isn't asked | as `refreshNotes()` |
+| `startNote(in: project) -> Bool` (async, #196) | the header's new-note icon: with a token and no start running there, adds the project to `startingNotes`, rebuilds the menu, `NotesReader.startNote` (the database when there's none, then an empty note), opens the note's URL through the action port, rebuilds and `refreshNotes()`; answers `true`, and the app closes the menu | `false`, nothing opened: a start already running there does nothing; no token, no entry page or a Notion failure sets `newNoteErrors[project]` (`PanelText.newNoteError`) and rebuilds, the menu staying open |
 | `connectNotion(token:) -> NotionConnection` (async, #192) | trims the token, checks it with `NotionClient.me()`, saves it to the Notion token store, forgets what the reader found, sets `notionConnected` and reads the notes | `.empty`, `.rejected` (401), `.couldNotCheck(error)`, `.couldNotSave(why)`: nothing kept |
-| `disconnectNotion()` (#192) | deletes the token, clears `notes` and `noteErrors`, disarms the notes timer, rebuilds the menu | — |
+| `disconnectNotion()` (#192) | deletes the token, clears `notes`, `noteErrors` and `newNoteErrors`, disarms the notes timer, rebuilds the menu (the icons go) | — |
 | `open(row)` / `markSeen(row)` on a note (#192) | `open` opens the page's Notion URL through the action port; nothing is marked seen, and `markSeen` does nothing | — |
 | `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core since 0.0.1; since 0.0.2 the connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder; shipyard's own is compiled in since #23) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
 | `openVerificationPage()` | the code screen's Copy code and open GitHub (the app copies the code first): opens the code's `verificationURL` (github.com/login/device) through `ActionRunning` | only while `connecting(code)`; otherwise does nothing |
@@ -1456,10 +1468,12 @@ shipyard/
 │   │   └── AppFiles.swift            # (0.1.0) where the app reads and writes, from its launch environment: config.toml, the support folder, the demo folder in a demo run (which leaves the login item alone)
 │   ├── Notes/                        # (#192) the user's notes in Notion
 │   │   ├── Note.swift                # a note: number and prefix, title or first line, labels, status; as an Item
-│   │   ├── NotionClient.swift        # Notion's REST API at 2025-09-03 over HTTPTransport: me, search, child databases, data sources, the open-notes query, a page's first line; NotionError
-│   │   └── NotesReader.swift         # the entry page → each project's database → its data source → its open notes, remembered between reads; NotesReading, NotionConnection
+│   │   ├── NotionClient.swift        # Notion's REST API at 2025-09-03 over HTTPTransport: me, search, child databases, data sources, the open-notes query, a page's first line; a data source's prefix, the database and empty-note creates (#196); NotionError
+│   │   ├── NotePrefix.swift          # (#196) pure: a new database's prefix from the project's name, free among the others
+│   │   └── NotesReader.swift         # the entry page → each project's database → its data source → its open notes, remembered between reads; starting a note (#196); NotesReading, NewNoteError, NotionConnection
 │   ├── Menu/
-│   │   ├── PanelText+Notes.swift     # (#192) a notes error row's words; the Notion card's words
+│   │   ├── PanelText+Notes.swift     # (#192) a notes error row's words; the Notion card's words; the new-note icon's help and error (#196)
+│   │   ├── NotesMenuState.swift      # (#196) what the menu shows about notes besides rows: errors, connected, starting; NewNoteButton
 │   │   ├── MenuModel.swift           # pure: sections of groups, from listings; semantic state colours, label
 │   │   ├── MachineNotice.swift       # pure: one quiet line per remote machine that failed or sent a truncated list
 │   │   ├── Arrangement.swift         # pure: group, sort, cap: RowGroup
@@ -1510,7 +1524,7 @@ shipyard/
 │       ├── Panel.swift               # the shared frame: header (the account button, #49), banners, phase switch, layout switch, footer
 │       ├── Design.swift              # design tokens: spacing grid, type scale, Palette (state and surface colours, light/dark), motion
 │       ├── AgentLogoImage.swift      # loads a known agent's logo from the app's resource bundle (Contents/Resources in the app, beside the build otherwise), for light or dark, as a template where it's one glyph
-│       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, a known agent's logo (AgentMarkView), an item row's click, hover help and highlight (itemRow), Mark seen button, button styles, the row highlight's shape (rowHighlight)
+│       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, a known agent's logo (AgentMarkView), an item row's click, hover help and highlight (itemRow), the new-note icon (#196), Mark seen button, button styles, the row highlight's shape (rowHighlight)
 │       ├── HoverHelp.swift           # hoverHelp(_:) in place of .help: the card the panel draws (hoverHelpHost), its timing and style, VoiceOver's hint
 │       ├── LeaseBannerView.swift     # (0.2.0, #180, #181) the lease's banner: the agent's logo (or a generic mark), LeaseBanner's words, the countdown, Stop
 │       ├── LeaseDot.swift            # (0.2.0, #180) the menu bar icon with the lease's yellow dot: one image in its own colours, the icon tinted for the menu bar's appearance
@@ -1520,7 +1534,7 @@ shipyard/
 │       ├── NotionConnectCard.swift   # (#192) the settings menu's Connect Notion…: a secure field, Connect, and how it went
 │       ├── Components+Groups.swift   # GroupHeader (a subsection's subheader) and ShowMoreRow, shared by both layouts
 │       ├── Layouts/
-│       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, dismiss a ping, mark all seen, collapse, fold a subsection, Show more or less
+│       │   ├── LayoutActions.swift   # what a layout can do to the menu: open, mark seen, dismiss a ping, mark all seen, collapse, fold a subsection, Show more or less, start a note (#196)
 │       │   ├── ListLayout.swift      # [menu] layout = "list": pinned project headers, one line per item
 │       │   └── TabsLayout.swift      # [menu] layout = "tabs": the pill strip, the line under it, a tab's rows as its arrangement groups them, All by kind; the selected tab is PanelState's
 │       └── Onboarding/
@@ -1974,7 +1988,7 @@ Setup: the user connected Notion (the token is in the Keychain's `notion-token` 
 | 3 | `NotionClient.childDatabases(of: entry page)`: `GET /v1/blocks/{id}/children` → `shop`, `Shop` | `blog` matches neither (exact name): no database, no Notes group |
 | 4 | `shop`'s data source is remembered (`GET /v1/databases/{id}` the first time) → `openNotes(in:)`: `POST /v1/data_sources/{id}/query`, Status empty or not Archived, newest created first | SHOP-7, SHOP-6 (untitled), SHOP-5 |
 | 5 | SHOP-6 has no title: `firstLine(ofPage:)`, once per edit | its first line is its row's title |
-| 6 | `Shipyard` sets `notes["shop"]`, clears its error, rebuilds the menu: `Listing.listings(…, notes:)` → `MenuModel.build(…, noteErrors:)` | a "Notes" group in `shop`, SHOP-7 first; no count changes |
+| 6 | `Shipyard` sets `notes["shop"]`, clears its error, rebuilds the menu: `Listing.listings(…, notes:)` → `MenuModel.build(…, notes: NotesMenuState)` | a "Notes" group in `shop`, SHOP-7 first; no count changes |
 | 7 | The notes timer is armed for 60 s | the next read in a minute |
 | 8 | The user clicks SHOP-7: `Shipyard.open(row)` → `ActionRunning.open(notion URL)` | Notion opens the page; nothing is marked seen |
 
@@ -1999,6 +2013,22 @@ Setup: the app runs; `config.toml` has projects `shop` (`yahyabedirhan/shop`) an
 | the app isn't running | step 2 finds no socket: "shipyard notify: shipyard isn't running, so this notice wasn't shown", exit 1; nothing is launched |
 | B is in a folder with no `origin` and passes neither flag | step 1 stops: "… isn't a git repository with a remote `origin` to file the notice by; pass --repo <owner/name> or --project <name>", exit 1, nothing sent |
 | B runs it on a Linux machine | "shipyard: `shipyard notify` runs on the Mac, where the app is", exit 2 (`CommandTable.macOnly`), until the tailnet and poll routes (#194, #195) |
+
+### Trace 16: the new-note icon starts `blog`'s first note (#196)
+
+Setup: as Trace 14; `blog` has no database. `shop`'s `No.` prefix is SHOP, `Shop`'s SHO.
+
+| Step | Call (module) | State after |
+|---|---|---|
+| 1 | The user clicks the pencil on `blog`'s header: `LayoutActions.startNote` → `Shipyard.startNote(in: "blog")` (Core) | `startingNotes = ["blog"]`; the menu rebuilds and the icon spins |
+| 2 | `NotesReader.startNote(in: "blog", client:)`: `childDatabases(of: entry page)` → `shop`, `Shop`; none is titled `blog` | — |
+| 3 | Each database's data source (`shop`'s remembered; `GET /v1/databases/{Shop}`) → `notePrefix(ofDataSource:)`: `GET /v1/data_sources/{id}` → SHOP, SHO | taken = {SHOP, SHO} |
+| 4 | `NotePrefix.choose(for: "blog", taken:)` → BLOG; `createNotesDatabase(under: entry page, title: "blog", prefix: "BLOG")`: `POST /v1/databases` with the fixed core | the new database's data source is remembered |
+| 5 | `createEmptyNote(in: data source)`: `POST /v1/pages`, `Status` Open → its URL | BLOG-1 exists, empty |
+| 6 | `Shipyard` drops `blog` from `startingNotes`, `ActionRunning.open(URL)`; the app closes the menu | Notion opens BLOG-1 for the user to type or dictate |
+| 7 | `refreshNotes()`, as Trace 14 from step 2 | `blog` gets a Notes group with BLOG-1, "Untitled" until it has a title or a line |
+
+Rejection: Notion answers 401 at step 5. `startNote` answers `false`, nothing opens, the menu stays open, and `blog` gets the row "new note: Notion rejected the token; connect Notion again from the settings menu" until the menu opens again. The database made at step 4 stays, so the next click makes only the page.
 
 ### Trace 3: agents drain the limit (rejection by budget)
 
@@ -2026,7 +2056,7 @@ What the traces turned up and the design now handles: the first refresh after ad
 | Quick actions (merge, close) | `GitHubClient` (one mutation), `ListLayout` row context menu |
 | Mark agent PRs (body marker / co-author trailer) | `ProjectQuery` fetches `body` tail, `Item.isAgent`, author filter gains `agents` |
 | New item kind (discussions, releases) | `Item.kind`, a query fragment, `MenuModel`, config section, schema. Five files, accepted: it's rare. Notes (#192) took `ItemKind.note` and each exhaustive switch over it (`PanelText`, `PanelSteering`, `Attention`, `Listing`, `Configuration`, the app's `Palette`), `Item.note`, a client of its own and a timer |
-| Creating a note or a notes database (the new-note icon, #196) | `NotionClient`: one method each over `send` (`POST /v1/pages` with a `data_source_id` parent; `POST /v1/databases` with `initial_data_source.properties`), and a `Shipyard` operation the header's icon calls |
+| Creating a note or a notes database (the new-note icon, #196, built) | `NotionClient`: one method each over `send` (`createEmptyNote`: `POST /v1/pages` with a `data_source_id` parent; `createNotesDatabase`: `POST /v1/databases` with `initial_data_source.properties`), `NotesReader.startNote`, and `Shipyard.startNote(in:)`, which the header's icon calls through `LayoutActions` |
 | Quiet hours / Do-Not-Disturb rules | `NotificationRules` + a config field |
 | GitHub Enterprise | a `host` config field read by `GitHubClient` and `DeviceFlow` |
 | Notarized releases | `Makefile` only |

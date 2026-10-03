@@ -191,7 +191,7 @@ struct ListLayout: View {
 
 /// The chevron, the project's name and attention count, then what the
 /// project says in place of rows ("Nothing open") or, on hover, Mark all
-/// seen. Highlighted by the pointer or the keys, it draws the highlight
+/// seen, and last its new-note icon while Notion is connected. Highlighted by the pointer or the keys, it draws the highlight
 /// over its own background, since it pins above the rows: a square band the header's full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
@@ -244,6 +244,9 @@ private struct ListSectionHeader: View {
                     withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
                 }
                 .opacity(hover ? 1 : 0)
+            }
+            if let newNote = section.newNote {
+                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
             }
         }
         .padding(.leading, 6)

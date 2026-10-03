@@ -51,6 +51,8 @@ public struct Note: Equatable, Hashable, Sendable {
         self.edited = edited
     }
 
+    /// The status a note starts with, as the new-note icon writes it.
+    public static let open = "Open"
     /// The status that takes a note out of the menu.
     public static let archived = "Archived"
 

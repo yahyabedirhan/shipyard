@@ -93,6 +93,11 @@ public final class Shipyard {
     /// Whether the user gave shipyard a Notion token (`connectNotion`),
     /// for the settings menu.
     public private(set) var notionConnected = false
+    /// The projects the new-note icon is starting a note in now.
+    public private(set) var startingNotes: Set<String> = []
+    /// Why the new-note icon couldn't start a note, by project name, for
+    /// its error row; cleared when the menu opens again or a note starts.
+    public private(set) var newNoteErrors: [String: String] = [:]
     /// How often the notes are read, apart from the refresh; opening the
     /// menu reads them too.
     public static let notesInterval: TimeInterval = 60
@@ -254,7 +259,11 @@ public final class Shipyard {
         await followMachines()
         // And the notes, from their first read, when the user gave a token.
         notionConnected = notionToken() != nil
-        if notionConnected { armNotesTimer(after: 0) }
+        if notionConnected {
+            // The headers' new-note icons show at once, before any read.
+            rebuildMenu(configStore.lastValid)
+            armNotesTimer(after: 0)
+        }
         // A file broken since launch has no valid configuration behind it,
         // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
@@ -674,7 +683,7 @@ public final class Shipyard {
                 configuration: configuration,
                 state: appStateStore.state,
                 expanded: expandedGroups,
-                noteErrors: noteErrors,
+                notes: notesMenuState,
                 now: clock.now
             )
             // A fold whose group is gone, or whose project is, goes too.
@@ -1397,10 +1406,56 @@ public final class Shipyard {
     // MARK: - Notes
 
     /// The menu opened: the notes are read again, so one just written
-    /// shows (`refreshNotes()`). Nothing else is fetched: GitHub's items
-    /// keep to their timer.
+    /// shows (`refreshNotes()`), and why a note couldn't be started last
+    /// time goes. Nothing else is fetched: GitHub's items keep to their timer.
     public func panelOpened() async {
+        if !newNoteErrors.isEmpty {
+            newNoteErrors = [:]
+            rebuildMenu(configStore.lastValid)
+        }
         await refreshNotes()
+    }
+
+    /// The new-note icon on `project`'s header: creates the project's
+    /// notes database under the entry page when it has none, then an empty
+    /// note in it (`NotesReader.startNote`), opens the note in Notion
+    /// through the action port, and reads the notes again so the menu
+    /// lists it. A failure opens nothing and shows on the project as
+    /// "new note: <why>". A click while a note is being started in the
+    /// project does nothing. Answers whether a note was opened.
+    @discardableResult
+    public func startNote(in project: String) async -> Bool {
+        guard !startingNotes.contains(project) else { return false }
+        guard let token = notionToken() else {
+            failNewNote(in: project, .notConnected)
+            return false
+        }
+        startingNotes.insert(project)
+        newNoteErrors[project] = nil
+        rebuildMenu(configStore.lastValid)
+        let result = await notesReader.startNote(in: project, client: NotionClient(token: token, transport: transport))
+        startingNotes.remove(project)
+        switch result {
+        case .success(let url):
+            actions.open(url)
+            rebuildMenu(configStore.lastValid)
+            await refreshNotes()
+            return true
+        case .failure(let error):
+            failNewNote(in: project, error)
+            return false
+        }
+    }
+
+    /// Shows why a note couldn't be started in `project`.
+    private func failNewNote(in project: String, _ error: NewNoteError) {
+        newNoteErrors[project] = PanelText.newNoteError(error)
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// What the menu shows about notes besides their rows.
+    private var notesMenuState: NotesMenuState {
+        NotesMenuState(connected: notionConnected, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes)
     }
 
     /// Reads every project's open notes from Notion (`NotesReader`): one
@@ -1446,6 +1501,8 @@ public final class Shipyard {
         }
         notesReader.reset()
         notionConnected = true
+        // The headers' new-note icons show, whatever the read finds.
+        rebuildMenu(configStore.lastValid)
         await refreshNotes()
         return .connected
     }
@@ -1455,8 +1512,11 @@ public final class Shipyard {
     public func disconnectNotion() {
         try? notionTokenStore?.delete()
         notionConnected = false
+        newNoteErrors = [:]
         forgetNotes()
         notesTimer.disarm()
+        // The headers' new-note icons go.
+        rebuildMenu(configStore.lastValid)
     }
 
     /// The Notion token the token store keeps; `nil` with none.
@@ -1579,7 +1639,7 @@ public final class Shipyard {
             configuration: configuration,
             state: appStateStore.state,
             expanded: expandedGroups,
-            noteErrors: noteErrors,
+            notes: notesMenuState,
             now: clock.now
         )
         rebuilt.fetchError = menu.fetchError

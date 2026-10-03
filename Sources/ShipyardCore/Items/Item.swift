@@ -250,6 +250,12 @@ public struct RepositoryError: Equatable, Sendable {
     public static func notes(_ message: String) -> RepositoryError {
         RepositoryError(repository: "notes", kind: .other, message: message)
     }
+
+    /// The new-note icon couldn't start a note: shown in its project's
+    /// section as "new note: <why>" (`PanelText.newNoteError`).
+    public static func newNote(_ message: String) -> RepositoryError {
+        RepositoryError(repository: "new note", kind: .other, message: message)
+    }
 }
 
 /// One of GitHub's hourly limits, as the latest response reported it.

@@ -61,19 +61,69 @@ final class NotesReader {
     }
 
     /// The entry page's child databases; `nil` when no page shared with
-    /// the connection is titled "Shipyard Notes". A remembered entry page
-    /// that's gone (404) is searched for again, once.
+    /// the connection is titled "Shipyard Notes".
     private func databases(_ client: NotionClient) async throws -> [(id: String, title: String)]? {
+        try await entry(client)?.databases
+    }
+
+    /// The entry page and its child databases; `nil` when no page shared
+    /// with the connection is titled "Shipyard Notes". A remembered entry
+    /// page that's gone (404) is searched for again, once.
+    private func entry(_ client: NotionClient) async throws -> (page: String, databases: [(id: String, title: String)])? {
         if let page = entryPage {
             do {
-                return try await client.childDatabases(of: page)
+                return (page, try await client.childDatabases(of: page))
             } catch NotionError.http(404, _, _) {
                 entryPage = nil
             }
         }
         guard let page = try await client.searchPages(titled: Self.entryPageTitle).first else { return nil }
         entryPage = page
-        return try await client.childDatabases(of: page)
+        return (page, try await client.childDatabases(of: page))
+    }
+
+    /// Starts a note in `project`: creates its database under the entry
+    /// page when none is titled exactly its name (with the fixed core and
+    /// a prefix from its name that no other database's `No.` uses), then
+    /// an empty note in the database's data source. Answers the note's
+    /// Notion URL. A new database's data source is remembered, so the next
+    /// read finds it without asking.
+    func startNote(in project: String, client: NotionClient) async -> Result<URL, NewNoteError> {
+        do {
+            guard let entry = try await entry(client) else { return .failure(.noEntryPage) }
+            let source: String
+            if let database = entry.databases.first(where: { $0.title == project })?.id {
+                source = try await dataSource(of: database, client: client)
+            } else {
+                var taken: Set<String> = []
+                for database in entry.databases {
+                    let schema = try await dataSource(of: database.id, client: client)
+                    if let prefix = try await client.notePrefix(ofDataSource: schema) { taken.insert(prefix) }
+                }
+                let created = try await client.createNotesDatabase(
+                    under: entry.page,
+                    title: project,
+                    prefix: NotePrefix.choose(for: project, taken: taken)
+                )
+                dataSources[created.database] = created.dataSource
+                source = created.dataSource
+            }
+            return .success(try await client.createEmptyNote(in: source))
+        } catch let error as NotionError {
+            return .failure(.notion(error))
+        } catch {
+            return .failure(.notion(.network(error.localizedDescription)))
+        }
+    }
+
+    /// Database `database`'s data source: the remembered one, else its first.
+    private func dataSource(of database: String, client: NotionClient) async throws -> String {
+        if let known = dataSources[database] { return known }
+        guard let first = try await client.dataSources(ofDatabase: database).first else {
+            throw NotionError.unreadable("GET databases/\(database): no data source")
+        }
+        dataSources[database] = first
+        return first
     }
 
     /// The open notes of `database`, each untitled one with its body's first line.
@@ -114,6 +164,16 @@ final class NotesReader {
         firstLines[note.id] = (note.edited, line)
         return line
     }
+}
+
+/// Why the new-note icon couldn't start a note (`Shipyard.startNote`).
+public enum NewNoteError: Error, Equatable, Sendable {
+    /// No Notion token is kept.
+    case notConnected
+    /// No page titled "Shipyard Notes" is shared with the connection.
+    case noEntryPage
+    /// A request to Notion failed.
+    case notion(NotionError)
 }
 
 /// What giving shipyard a Notion token came to (`Shipyard.connectNotion`).
