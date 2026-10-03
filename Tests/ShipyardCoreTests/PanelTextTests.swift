@@ -154,8 +154,8 @@ struct PanelTextTests {
 
     @Test("a row's second line names the repository only in a project with more than one")
     func rowDetail() {
-        #expect(PanelText.rowDetail(row(), showingRepository: true, now: now) == "#21 · shipyard · yahyabedirhan · 37m")
-        #expect(PanelText.rowDetail(row(), showingRepository: false, now: now) == "#21 · yahyabedirhan · 37m")
+        #expect(PanelText.rowDetail(row(), showingRepository: true) == "#21 · shipyard · yahyabedirhan")
+        #expect(PanelText.rowDetail(row(), showingRepository: false) == "#21 · yahyabedirhan")
     }
 
     @Test("a repository is named without its owner")
@@ -331,11 +331,12 @@ struct PanelTextTests {
         ))
     }
 
-    @Test("an issue's second line reads like a pull request's")
+    @Test("an issue's second line reads like a pull request's; a closed one ages from its close")
     func issueDetail() {
-        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: false, now: now) == "#17 · octocat · 3d")
-        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: true, now: now) == "#17 · shipyard · octocat · 3d")
-        #expect(PanelText.rowDetail(issue(state: .closed), showingRepository: false, now: now) == "#17 · octocat · 2h")
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: false) == "#17 · octocat")
+        #expect(PanelText.rowDetail(issue(state: .open), showingRepository: true) == "#17 · shipyard · octocat")
+        #expect(PanelText.age(issue(state: .open).age(at: now)) == "3d")
+        #expect(PanelText.age(issue(state: .closed).age(at: now)) == "2h")
     }
 
     private func run(state: ItemState, branch: String? = "main") -> MenuRow {
@@ -356,18 +357,19 @@ struct PanelTextTests {
     }
 
     @Test("a run's second line names its branch and state, and ages from its start or finish", arguments: [
-        (ItemState.running, "#41 · main · running · 20m"),
-        (.succeeded, "#41 · main · succeeded · 12m"),
-        (.failed, "#41 · main · failed · 12m"),
+        (ItemState.running, "#41 · main · running", "20m"),
+        (.succeeded, "#41 · main · succeeded", "12m"),
+        (.failed, "#41 · main · failed", "12m"),
     ])
-    func runDetail(state: ItemState, text: String) {
-        #expect(PanelText.rowDetail(run(state: state), showingRepository: false, now: now) == text)
+    func runDetail(state: ItemState, text: String, age: String) {
+        #expect(PanelText.rowDetail(run(state: state), showingRepository: false) == text)
+        #expect(PanelText.age(run(state: state).age(at: now)) == age)
     }
 
     @Test("a run's second line names the repository only in a project with more than one, and leaves out a missing branch")
     func runDetailRepository() {
-        #expect(PanelText.rowDetail(run(state: .failed), showingRepository: true, now: now) == "#41 · shipyard · main · failed · 12m")
-        #expect(PanelText.rowDetail(run(state: .failed, branch: nil), showingRepository: false, now: now) == "#41 · failed · 12m")
+        #expect(PanelText.rowDetail(run(state: .failed), showingRepository: true) == "#41 · shipyard · main · failed")
+        #expect(PanelText.rowDetail(run(state: .failed, branch: nil), showingRepository: false) == "#41 · failed")
     }
 
     @Test("the state icon reads as the state and the kind, so VoiceOver tells an issue from a pull request")

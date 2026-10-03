@@ -61,19 +61,13 @@ public enum PanelText {
         return "\(count)\(unit.prefix(1))"
     }
 
-    /// A row's second line: "#21 · shipyard · yahyabedirhan · 37m", naming
-    /// the repository (without its owner) only when `showingRepository`
-    /// (its project has more than one): "#21 · yahyabedirhan · 37m". An
-    /// issue reads the same. A workflow run (whose first line is its
-    /// workflow's name) names its branch and state instead of its author:
-    /// "#41 · shipyard · main · failed · 12m", aged from its start while
-    /// running and from its finish after.
-    public static func rowDetail(_ row: MenuRow, showingRepository: Bool, now: Date) -> String {
-        (detailParts(row, showingRepository: showingRepository) + [age(row.age(at: now))]).joined(separator: " · ")
-    }
-
-    /// The same second line without the age, for a layout that shows the
-    /// age apart, aligned on the right: "#21 · shipyard · yahyabedirhan".
+    /// A row's second line: "#21 · shipyard · yahyabedirhan", naming the
+    /// repository (without its owner) only when `showingRepository` (its
+    /// project has more than one): "#21 · yahyabedirhan". An issue reads
+    /// the same. A workflow run (whose first line is its workflow's name)
+    /// names its branch and state instead of its author: "#41 · shipyard ·
+    /// main · failed". The layouts show the row's age apart, aligned on the
+    /// right (`age(_:)` of `MenuRow.age(at:)`).
     public static func rowDetail(_ row: MenuRow, showingRepository: Bool) -> String {
         detailParts(row, showingRepository: showingRepository).joined(separator: " · ")
     }

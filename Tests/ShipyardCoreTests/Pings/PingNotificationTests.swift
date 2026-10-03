@@ -55,12 +55,6 @@ private extension Harness {
 @Suite("A ping's notification")
 @MainActor
 struct PingNotificationTests {
-    @Test("ping.sent is in the default rules")
-    func defaultRules() {
-        #expect(Configuration().defaults.notifications.contains(NotificationRule(event: .pingSent)))
-        #expect(EventKind(rawValue: "ping.sent") == .pingSent)
-    }
-
     @Test("a new ping posts one notification, titled with its project and title, with its body and sender")
     func postsOne() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)

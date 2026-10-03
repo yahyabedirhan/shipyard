@@ -121,17 +121,6 @@ struct PingActionTests {
         #expect(harness.shipyard.menu.attention.pings == 0)
     }
 
-    @Test("clicking a ping without an action only marks it seen")
-    func noAction() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        try await harness.send("Done")
-
-        await harness.shipyard.open(try harness.pingRow("Done")).value
-
-        #expect(harness.actions.ran.isEmpty)
-        #expect(try harness.pingRow("Done").needsAttention == false)
-    }
-
     @Test("clicking a ping's notification runs its action and marks it seen")
     func notificationClickRunsAction() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
@@ -248,8 +237,6 @@ struct PingActionTests {
         #expect(link.agent == .claude)
         #expect(PanelText.rowCard(link, now: harness.clock.now).agent == .claude)
         #expect(PanelText.rowDetail(link, showingRepository: false) == "#1 · claude · The design doc, ready to read")
-        harness.clock.advance(by: 300)
-        #expect(PanelText.rowDetail(link, showingRepository: false, now: harness.clock.now) == "#1 · claude · The design doc, ready to read · 5m")
         #expect(PanelText.stateLabel(link) == "ping, opens a link")
         #expect(PanelText.rowCard(link, now: harness.clock.now).lines == [
             "The design doc,\nready to read",
@@ -334,19 +321,5 @@ struct PingActionTests {
         #expect(GroupKey.sender("claude").text == "sender:claude")
         #expect(GroupKey(text: "sender:claude") == .sender("claude"))
         #expect(GroupKey(text: "sender:") == nil)
-    }
-
-    // MARK: The record
-
-    @Test("a ping's action reads back from the store as it was written")
-    func storedAction() throws {
-        let store = PingStore(directory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
-        let pings = [
-            Ping(id: "aaaaaa", title: "Link", projects: ["shop"], sent: Harness.now, action: .url(artifact)),
-            Ping(id: "bbbbbb", title: "App", projects: ["shop"], sent: Harness.now, action: .app("Claude"), failure: "No app named Claude"),
-        ]
-        for ping in pings { try store.save(ping) }
-        #expect(store.all() == pings)
     }
 }

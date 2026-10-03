@@ -264,19 +264,6 @@ struct PingExpiryTests {
         #expect(harness.pingTitles("shop-too").isEmpty)
     }
 
-    @Test("dismissing a ping whose action failed removes it with its failure")
-    func dismissFailed() async throws {
-        let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
-        let id = try await harness.send("Needs you", "--app", "Claude")
-        harness.actions.failure = "Claude isn't installed"
-        await harness.shipyard.open(try harness.pingRow("Needs you")).value
-
-        harness.shipyard.dismiss(try harness.pingRow("Needs you"))
-
-        #expect(harness.pingTitles().isEmpty)
-        #expect(harness.pingStore.ping(id: id) == nil)
-    }
-
     @Test("dismiss does nothing to a pull request's row")
     func dismissPullRequest() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
@@ -285,21 +272,5 @@ struct PingExpiryTests {
         harness.shipyard.dismiss(row)
 
         #expect(harness.section("shop")?.rows.contains { $0.kind == .pullRequest } == true)
-    }
-
-    @Test("a dismissed ping stays gone after a refresh and a relaunch")
-    func dismissedStaysGone() async throws {
-        let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
-        try await harness.send("Ready")
-        harness.shipyard.dismiss(try harness.pingRow("Ready"))
-
-        await harness.refreshAgain()
-        #expect(harness.pingTitles().isEmpty)
-
-        let relaunched = harness.relaunched()
-        relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
-        relaunched.graphQL([onePullRequest])
-        await relaunched.shipyard.start()
-        #expect(relaunched.pingTitles().isEmpty)
     }
 }

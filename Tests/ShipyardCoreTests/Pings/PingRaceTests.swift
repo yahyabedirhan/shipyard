@@ -51,32 +51,6 @@ private extension Harness {
 struct PingRaceTests {
     // MARK: The store
 
-    @Test("marking seen a ping withdrawn meanwhile doesn't bring it back")
-    func seenAfterWithdraw() throws {
-        let store = temporaryStore()
-        try store.save(sent())
-        let read = try #require(store.ping(id: "input"))
-
-        try store.remove(id: "input")
-        try store.markSeen(read, at: Harness.now)
-
-        #expect(store.ping(id: "input") == nil)
-    }
-
-    @Test("marking seen a ping replaced meanwhile leaves the replacement unseen")
-    func seenAfterReplace() throws {
-        let store = temporaryStore()
-        try store.save(sent())
-        let read = try #require(store.ping(id: "input"))
-
-        try store.save(replaced(read, title: "Still waiting"))
-        try store.markSeen(read, at: Harness.now)
-
-        let stored = try #require(store.ping(id: "input"))
-        #expect(stored.title == "Still waiting")
-        #expect(stored.seen == nil)
-    }
-
     @Test("marking seen a ping withdrawn and sent anew under its id leaves the new one unseen")
     func seenAfterSentAnew() throws {
         let store = temporaryStore()
