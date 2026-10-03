@@ -159,6 +159,10 @@ struct ConfigurationDecodingTests {
         #expect(config.defaults.workflowRuns == .init(
             show: false, states: [.inProgress, .failed, .succeeded], finishedWindow: 3 * 3600, branches: .defaultAndPullRequests, authors: AuthorFilter()
         ))
+        // Pings show in every project, and a seen one stays listed a day.
+        #expect(config.defaults.pings == PingSettings(show: true, seenWindow: 86_400))
+        #expect(config.herdr.terminal == nil)
+        #expect(config.remote.machines == [])
         #expect(config.defaults.notifications == [NotificationRule(event: .prOpened, authors: []), NotificationRule(event: .pingSent, authors: [])])
         #expect(config.defaults.arrangement == .init(groupBy: .kind, subsections: nil, sortBy: .updated, showFirst: 0))
         #expect(!config.defaults.archived)
