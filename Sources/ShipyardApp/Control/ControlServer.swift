@@ -26,33 +26,51 @@ final class ControlServer {
     private let panel: any PanelControlling
     private let screenshotter: any Screenshotting
     private let quit: @MainActor () -> Void
+    /// The time the lease is decided at, and the zone its refusals name it in.
+    private let now: @MainActor () -> Date
+    private let timeZone: TimeZone
+    /// App control's lease: who may send leased requests, and until when.
+    private(set) var lease = ControlLease()
     private var listener: Listener?
 
     init(
         socket: URL,
         panel: any PanelControlling,
         screenshotter: any Screenshotting,
+        now: @escaping @MainActor () -> Date = { Date() },
+        timeZone: TimeZone = .current,
         quit: @escaping @MainActor () -> Void
     ) {
         self.socket = socket
         self.panel = panel
         self.screenshotter = screenshotter
+        self.now = now
+        self.timeZone = timeZone
         self.quit = quit
     }
 
     // MARK: - Dispatch
 
-    /// The answer to one request as the client sent it.
+    /// The answer to one request as the client sent it. A leased request
+    /// asks the lease first: refused for anyone but its holder, with
+    /// nothing done.
     func reply(to data: Data) async -> Answer {
-        let request: ControlRequest
+        let message: ControlMessage
         do throws(ControlProtocolError) {
-            request = try ControlRequest.decode(data)
+            message = try ControlMessage.decode(data)
         } catch {
             return Answer(reply: .refused(error.message))
         }
-        switch request {
+        if message.request.isLeased {
+            let time = now()
+            if case .failure(let refusal) = lease.use(by: message.holder, at: time).answer {
+                return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
+            }
+        }
+        switch message.request {
         case .appStatus(let json):
-            let status = panel.status()
+            var status = panel.status()
+            status.lease = lease.status(at: now())
             return Answer(reply: .done(json ? status.json : status.text))
         case .appQuit:
             return Answer(reply: .done("shipyard quit\n"), quits: true)

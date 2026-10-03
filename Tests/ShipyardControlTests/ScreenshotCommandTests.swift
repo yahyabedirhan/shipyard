@@ -19,6 +19,7 @@ struct ScreenshotCommandTests {
             support: URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true),
             launcher: RecordingLauncher(),
             transport: transport,
+            processes: FakeProcessTable.agent,
             pause: { _ in }
         ))
         return ShipyardCLI.run(
@@ -31,11 +32,11 @@ struct ScreenshotCommandTests {
 
     @Test("the request names an absolute path, the appearance and whether it's the menu bar icon", arguments: [
         (["/tmp/x.png"], ControlRequest.screenshot(path: "/tmp/x.png", appearance: nil, menuBarIcon: false),
-         #"{"command":"screenshot","menuBarIcon":false,"path":"\/tmp\/x.png","version":1}"#),
+         #"{"command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":false,"path":"\/tmp\/x.png","version":2}"#),
         (["shots/x.PNG", "--appearance", "dark"], .screenshot(path: "/work/shop/shots/x.PNG", appearance: .dark, menuBarIcon: false),
-         #"{"appearance":"dark","command":"screenshot","menuBarIcon":false,"path":"\/work\/shop\/shots\/x.PNG","version":1}"#),
+         #"{"appearance":"dark","command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":false,"path":"\/work\/shop\/shots\/x.PNG","version":2}"#),
         (["--menu-bar-icon", "--appearance", "light", "../icon.png"], .screenshot(path: "/work/icon.png", appearance: .light, menuBarIcon: true),
-         #"{"appearance":"light","command":"screenshot","menuBarIcon":true,"path":"\/work\/icon.png","version":1}"#),
+         #"{"appearance":"light","command":"screenshot",\#(FakeProcessTable.wire(place: "/work/shop")),"menuBarIcon":true,"path":"\/work\/icon.png","version":2}"#),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("/tmp/x.png\n"))

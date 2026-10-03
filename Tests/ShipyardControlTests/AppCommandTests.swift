@@ -33,6 +33,7 @@ struct AppCommandTests {
             support: support,
             launcher: launcher,
             transport: transport,
+            processes: FakeProcessTable.agent,
             pause: { seconds in pauses.withValue { $0.append(seconds) } }
         ))
         return ShipyardCLI.run(
@@ -53,7 +54,8 @@ struct AppCommandTests {
 
         #expect(result == CommandResult(output: Self.status.text))
         let exchange = try #require(app.exchanges.current.only)
-        #expect(String(decoding: exchange.request, as: UTF8.self) == #"{"command":"app.status","json":false,"version":1}"#)
+        #expect(String(decoding: exchange.request, as: UTF8.self)
+            == #"{"command":"app.status",\#(FakeProcessTable.wire()),"json":false,"version":2}"#)
         #expect(exchange.socket.path == "/Users/agent/Library/Application Support/Shipyard/control.sock")
         #expect(exchange.timeout == 15)
     }
@@ -68,14 +70,16 @@ struct AppCommandTests {
         #expect(app.requests == [.appStatus(json: true)])
     }
 
-    @Test("the status reads as lines, or as one JSON object")
+    @Test("the status reads as lines, or as one JSON object, with the lease's holder, place, time left and waiters")
     func statusFormats() {
         let tabs = AppStatus(
             version: "0.1.0", panelOpen: false, layout: "tabs", tab: "shop", projects: ["shop", "blog"],
-            folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")]
+            folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")],
+            lease: .init(holder: "Claude Code", place: "Herdr pane w1-2", secondsLeft: 48, waiting: 1)
         )
         #expect(tabs.text == """
             shipyard 0.1.0 is running
+            lease: Claude Code in Herdr pane w1-2, 48s left, 1 waiting
             panel: closed
             layout: tabs
             tab: shop
@@ -84,12 +88,15 @@ struct AppCommandTests {
             showing all: pull-requests in shop
 
             """)
-        #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
+        #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","#
+            + #""lease":{"holder":"Claude Code","place":"Herdr pane w1-2","secondsLeft":48,"waiting":1},"#
+            + #""panelOpen":false,"projects":["shop","blog"],"#
             + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.1.0"}"# + "\n")
-        // The list layout has no tab: no line, and null in the JSON.
+        // The list layout has no tab: no line, and null in the JSON. A free lease is `free`, and null.
         let list = AppStatus(version: "0.1.0", panelOpen: true, layout: "list", projects: [])
         #expect(list.text == """
             shipyard 0.1.0 is running
+            lease: free
             panel: open
             layout: list
             projects: none
@@ -98,6 +105,7 @@ struct AppCommandTests {
 
             """)
         #expect(list.json.contains(#""tab":null"#))
+        #expect(list.json.contains(#""lease":null"#))
     }
 
     @Test("a demo run's status names its folder, as a line and in the JSON")
@@ -108,6 +116,7 @@ struct AppCommandTests {
         #expect(demo.text == """
             shipyard 0.1.0 is running
             demo: /Users/agent/demo
+            lease: free
             panel: closed
             layout: tabs
             projects: shop, blog
@@ -116,7 +125,7 @@ struct AppCommandTests {
 
             """)
         #expect(demo.json
-            == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","panelOpen":false,"projects":["shop","blog"],"#
+            == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","lease":null,"panelOpen":false,"projects":["shop","blog"],"#
             + #""running":true,"showingAll":[],"tab":null,"version":"0.1.0"}"# + "\n")
     }
 

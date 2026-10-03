@@ -58,9 +58,21 @@ struct ControlServerTests {
         var quits = 0
     }
 
+    /// The time the server decides the lease at, moved by the test.
+    final class Clock {
+        var now = Date(timeIntervalSince1970: 0)
+    }
+
+    /// The agent the tests' requests come from, and another one.
+    nonisolated static let agent = Holder(key: "CLAUDE_CODE_SESSION_ID=agent", name: "Claude Code", place: "/work")
+    nonisolated static let other = Holder(key: "process:300@800250000", name: "codex", place: "Herdr pane w1-2")
+    /// `agent` as it reads in a request on the wire.
+    nonisolated static let agentWire = #""holder":{"key":"CLAUDE_CODE_SESSION_ID=agent","name":"Claude Code","place":"\/work"}"#
+
     let panel = FakePanel()
     let screenshotter = FakeScreenshotter()
     let quitter = QuitRecorder()
+    let clock = Clock()
     /// A folder of its own for each test, short enough for a socket's path.
     let folder = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("shipyard-\(UUID().uuidString.prefix(8))", isDirectory: true)
@@ -68,7 +80,15 @@ struct ControlServerTests {
 
     func server(socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock")) -> ControlServer {
         let quitter = quitter
-        return ControlServer(socket: socket, panel: panel, screenshotter: screenshotter, quit: { quitter.quits += 1 })
+        let clock = clock
+        return ControlServer(
+            socket: socket,
+            panel: panel,
+            screenshotter: screenshotter,
+            now: { clock.now },
+            timeZone: TimeZone(identifier: "UTC")!,
+            quit: { quitter.quits += 1 }
+        )
     }
 
     // MARK: - Dispatch
@@ -77,8 +97,8 @@ struct ControlServerTests {
     func status() async {
         let server = server()
 
-        let text = await server.reply(to: ControlRequest.appStatus(json: false).encoded())
-        let json = await server.reply(to: ControlRequest.appStatus(json: true).encoded())
+        let text = await server.reply(to: ControlRequest.appStatus(json: false).sent())
+        let json = await server.reply(to: ControlRequest.appStatus(json: true).sent())
 
         #expect(text == .init(reply: .done(Self.status.text)))
         #expect(json == .init(reply: .done(Self.status.json)))
@@ -86,7 +106,7 @@ struct ControlServerTests {
 
     @Test("quit answers, and quits once the reply is written")
     func quit() async {
-        let answer = await server().reply(to: ControlRequest.appQuit.encoded())
+        let answer = await server().reply(to: ControlRequest.appQuit.sent())
 
         #expect(answer == .init(reply: .done("shipyard quit\n"), quits: true))
         #expect(quitter.quits == 0)
@@ -101,7 +121,7 @@ struct ControlServerTests {
         (.panelTab(name: "all"), "tab all", "showing All\n"),
     ])
     func panel(request: ControlRequest, call: String, output: String) async {
-        let answer = await server().reply(to: request.encoded())
+        let answer = await server().reply(to: request.sent())
 
         #expect(answer == .init(reply: .done(output)))
         #expect(panel.calls == [call])
@@ -113,7 +133,7 @@ struct ControlServerTests {
     func panelRefused(request: ControlRequest) async {
         panel.refusal = PanelRefusal("what exists is named here")
 
-        let answer = await server().reply(to: request.encoded())
+        let answer = await server().reply(to: request.sent())
 
         #expect(answer == .init(reply: .refused("what exists is named here")))
         #expect(panel.calls.count == 1)
@@ -128,8 +148,8 @@ struct ControlServerTests {
         screenshotter.outcome = outcome
         let server = server()
 
-        let shot = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false).encoded())
-        let icon = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: true).encoded())
+        let shot = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: false).sent())
+        let icon = await server.reply(to: ControlRequest.screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: true).sent())
 
         #expect(shot == .init(reply: reply))
         #expect(icon == .init(reply: reply))
@@ -138,11 +158,11 @@ struct ControlServerTests {
     }
 
     @Test("a screenshot without an absolute path, or with an unknown appearance, is refused and nothing is captured", arguments: [
-        (#"{"version":1,"command":"screenshot","path":"shop.png"}"#,
+        (#"{"version":2,"command":"screenshot",\#(ControlServerTests.agentWire),"path":"shop.png"}"#,
          "the control command `screenshot` needs an absolute `path`, not `shop.png`"),
-        (#"{"version":1,"command":"screenshot","path":"/tmp/shop.png","appearance":"sepia"}"#,
+        (#"{"version":2,"command":"screenshot",\#(ControlServerTests.agentWire),"path":"/tmp/shop.png","appearance":"sepia"}"#,
          "the control command `screenshot` has no appearance `sepia`; it takes `light` or `dark`"),
-        (#"{"version":1,"command":"screenshot"}"#, "the control command `screenshot` needs its `path`"),
+        (#"{"version":2,"command":"screenshot",\#(ControlServerTests.agentWire)}"#, "the control command `screenshot` needs its `path`"),
     ])
     func screenshotUnreadable(request: String, why: String) async {
         let answer = await server().reply(to: Data(request.utf8))
@@ -153,22 +173,89 @@ struct ControlServerTests {
 
     @Test("a panel request without the field it needs is refused, and the panel isn't asked")
     func panelMissingField() async {
-        let answer = await server().reply(to: Data(#"{"version":1,"command":"panel.showMore","project":"shop"}"#.utf8))
+        let answer = await server().reply(to: Data(#"{"version":2,"command":"panel.showMore",\#(ControlServerTests.agentWire),"project":"shop"}"#.utf8))
 
         #expect(answer == .init(reply: .refused("the control command `panel.showMore` needs its `kind`")))
         #expect(panel.calls.isEmpty)
     }
 
-    @Test("a request of another version, an unknown command or no JSON is refused with a reply that says so", arguments: [
-        (#"{"version":2,"command":"app.status"}"#,
-         "the shipyard command speaks control version 2 and the app version 1: reinstall shipyard so both come from one build"),
-        (#"{"version":1,"command":"app.spin"}"#, "the app doesn't know the control command `app.spin`"),
+    @Test("a request of another version, without a holder, of an unknown command or not JSON is refused with a reply that says so", arguments: [
+        (#"{"version":1,"command":"panel.open"}"#,
+         "the shipyard command speaks control version 1 and the app version 2: reinstall shipyard so both come from one build"),
+        (#"{"version":2,"command":"panel.open"}"#, "the control command `panel.open` needs its `holder`"),
+        (#"{"version":2,"command":"app.spin",\#(ControlServerTests.agentWire)}"#, "the app doesn't know the control command `app.spin`"),
         ("status please", "the request isn't a control request"),
     ])
     func refused(request: String, why: String) async {
-        let answer = await server().reply(to: Data(request.utf8))
+        let server = server()
+
+        let answer = await server.reply(to: Data(request.utf8))
 
         #expect(answer == .init(reply: .refused(why)))
+        #expect(panel.calls.isEmpty)
+        // Nothing that didn't read takes the lease.
+        #expect(server.lease.current(at: clock.now) == nil)
+    }
+
+    // MARK: - The lease
+
+    @Test("a leased request from another holder is refused, naming the holder, with nothing done", arguments: [
+        ControlRequest.appQuit, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
+        .panelShowMore(project: "shop", kind: "issues"), .panelTab(name: "All"),
+        .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false),
+        .screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: true),
+    ])
+    func refusedToAnother(request: ControlRequest) async {
+        let server = server()
+        // The agent's first leased request takes the lease, for a minute.
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 12)
+
+        let answer = await server.reply(to: request.sent(by: Self.other))
+
+        #expect(answer == .init(reply: .refused(
+            "shipyard is in use by Claude Code in /work until 00:01:00 (48s left); `shipyard control take --wait <seconds>` to queue"
+        )))
+        #expect(panel.calls == ["open"])
+        #expect(screenshotter.calls.isEmpty)
+        #expect(quitter.quits == 0)
+    }
+
+    @Test("the holder's requests renew the lease; once it runs out, another holder takes it")
+    func holderThenAnother() async {
+        let server = server()
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 50)
+        let renewed = await server.reply(to: ControlRequest.panelFold(project: "shop").sent())
+        clock.now = Date(timeIntervalSince1970: 109)
+        let refused = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
+        clock.now = Date(timeIntervalSince1970: 110)
+        let taken = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
+
+        #expect(renewed == .init(reply: .done("folded shop\n")))
+        #expect(refused.reply.ok == false)
+        #expect(taken == .init(reply: .done("panel closed\n")))
+        #expect(panel.calls == ["open", "fold shop", "close"])
+        #expect(server.lease.current(at: clock.now)?.holder == Self.other)
+    }
+
+    @Test("status is never refused, takes no lease, and reports the lease as lines and as JSON")
+    func statusReportsTheLease() async {
+        let server = server()
+        let free = await server.reply(to: ControlRequest.appStatus(json: false).sent(by: Self.other))
+        #expect(free == .init(reply: .done(Self.status.text)))
+        #expect(server.lease.current(at: clock.now) == nil)
+
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+        clock.now = Date(timeIntervalSince1970: 12)
+        let text = await server.reply(to: ControlRequest.appStatus(json: false).sent(by: Self.other))
+        let json = await server.reply(to: ControlRequest.appStatus(json: true).sent(by: Self.other))
+
+        var held = Self.status
+        held.lease = AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0)
+        #expect(text == .init(reply: .done(held.text)))
+        #expect(json == .init(reply: .done(held.json)))
+        #expect(text.reply.output.contains("lease: Claude Code in /work, 48s left, 0 waiting\n"))
     }
 
     // MARK: - The socket
@@ -180,7 +267,8 @@ struct ControlServerTests {
         // Left by an app that crashed.
         try Data().write(to: socket)
         let server = server(socket: socket)
-        let client = ControlClient(socket: socket, transport: UnixSocketTransport())
+        let client = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
+        let another = ControlClient(socket: socket, holder: Self.other, transport: UnixSocketTransport())
 
         try server.start()
         var info = stat()
@@ -191,6 +279,13 @@ struct ControlServerTests {
         // The client blocks while it waits, so it runs off the main actor the server answers on.
         let status = await Task.detached { client.send(.appStatus(json: true)) }.value
         #expect(status == .success(.done(Self.status.json)))
+        let opened = await Task.detached { client.send(.panelOpen) }.value
+        #expect(opened == .success(.done("panel open\n")))
+        // Another agent's quit is refused over the socket, and the app stays.
+        let refused = await Task.detached { another.send(.appQuit) }.value
+        #expect(refused == .success(.refused(
+            "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard control take --wait <seconds>` to queue"
+        )))
         let quit = await Task.detached { client.send(.appQuit) }.value
         #expect(quit == .success(.done("shipyard quit\n")))
         for _ in 0..<200 where quitter.quits == 0 {
@@ -214,11 +309,11 @@ struct ControlServerTests {
         // Sends a request and closes at once: the reply is written to a closed peer.
         let impatient = UnixSocket.make()
         try #require(UnixSocket.connectSocket(impatient, to: try #require(UnixSocket.address(socket.path))) == 0)
-        _ = UnixSocket.writeAll(impatient, ControlRequest.appStatus(json: false).encoded())
+        _ = UnixSocket.writeAll(impatient, ControlRequest.appStatus(json: false).sent())
         close(impatient)
         try await Task.sleep(nanoseconds: 50_000_000)
 
-        let client = ControlClient(socket: socket, transport: UnixSocketTransport())
+        let client = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
         let status = await Task.detached { client.send(.appStatus(json: false)) }.value
         #expect(status == .success(.done(Self.status.text)))
     }
@@ -232,5 +327,12 @@ struct ControlServerTests {
 
         #expect(throws: ControlServer.Failure.self) { try server(socket: socket).start() }
         #expect(FileManager.default.fileExists(atPath: socket.path))
+    }
+}
+
+extension ControlRequest {
+    /// The request as `holder`'s `shipyard` command sends it.
+    fileprivate func sent(by holder: Holder = ControlServerTests.agent) -> Data {
+        ControlMessage(self, holder: holder).encoded()
     }
 }

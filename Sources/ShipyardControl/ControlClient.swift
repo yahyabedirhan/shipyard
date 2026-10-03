@@ -58,6 +58,8 @@ public struct UnixSocketTransport: ControlTransport {
 public struct ControlClient: Sendable {
     /// The socket, from `ControlSocket.locate(support:)`.
     public var socket: URL
+    /// Who every request is sent as (`Holder.find`).
+    public var holder: Holder
     public var transport: any ControlTransport
     /// How long to wait for the reply. A screenshot may render the panel,
     /// so it's generous.
@@ -65,8 +67,9 @@ public struct ControlClient: Sendable {
 
     public static let defaultTimeout: TimeInterval = 15
 
-    public init(socket: URL, transport: any ControlTransport, timeout: TimeInterval = ControlClient.defaultTimeout) {
+    public init(socket: URL, holder: Holder, transport: any ControlTransport, timeout: TimeInterval = ControlClient.defaultTimeout) {
         self.socket = socket
+        self.holder = holder
         self.transport = transport
         self.timeout = timeout
     }
@@ -83,7 +86,7 @@ public struct ControlClient: Sendable {
     public func send(_ request: ControlRequest) -> Result<ControlReply, Failure> {
         let data: Data
         do throws(ControlTransportFailure) {
-            data = try transport.exchange(request.encoded(), socket: socket, timeout: timeout)
+            data = try transport.exchange(ControlMessage(request, holder: holder).encoded(), socket: socket, timeout: timeout)
         } catch {
             switch error {
             case .notRunning: return .failure(.notRunning)

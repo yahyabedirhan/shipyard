@@ -159,7 +159,7 @@ private final class Sockets: ControlTransport {
         guard socket == self.socket, launcher.environments.current.contains(where: { !$0.isEmpty }), !quit.current else {
             throw .notRunning
         }
-        if (try? ControlRequest.decode(request)) == .appQuit {
+        if (try? ControlMessage.decode(request))?.request == .appQuit {
             quit.withValue { $0 = true }
             return ControlReply.done("shipyard quit\n").encoded()
         }

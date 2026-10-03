@@ -57,13 +57,42 @@ final class FakeTransport: ControlTransport {
             return list.count - 1
         }
         // A request the CLI sent always reads; a test that fails here broke the encoding.
-        let decoded = try! ControlRequest.decode(request)
-        return try answer(decoded, socket, index).get()
+        let decoded = try! ControlMessage.decode(request)
+        return try answer(decoded.request, socket, index).get()
+    }
+
+    /// The messages sent, decoded.
+    var messages: [ControlMessage] {
+        exchanges.current.map { try! ControlMessage.decode($0.request) }
     }
 
     /// The requests sent, decoded.
-    var requests: [ControlRequest] {
-        exchanges.current.map { try! ControlRequest.decode($0.request) }
+    var requests: [ControlRequest] { messages.map(\.request) }
+}
+
+/// A process table in memory: the `shipyard` command is `currentPID`, and
+/// `processes` its ancestors and anything else.
+struct FakeProcessTable: ProcessTable {
+    var currentPID: Int32
+    var processes: [ProcessRecord]
+
+    func process(_ pid: Int32) -> ProcessRecord? {
+        processes.first { $0.pid == pid }
+    }
+
+    /// The tree the command tests run in: `shipyard` (500), run by `zsh`
+    /// (400) under the agent `claude` (300), under `launchd` (1).
+    static let agent = FakeProcessTable(currentPID: 500, processes: [
+        ProcessRecord(pid: 500, parent: 400, started: Date(timeIntervalSince1970: 1_000), name: "shipyard"),
+        ProcessRecord(pid: 400, parent: 300, started: Date(timeIntervalSince1970: 900), name: "zsh"),
+        ProcessRecord(pid: 300, parent: 1, started: Date(timeIntervalSince1970: 800.25), name: "claude"),
+        ProcessRecord(pid: 1, parent: 0, started: Date(timeIntervalSince1970: 0), name: "launchd"),
+    ])
+
+    /// The holder `agent`'s tree gives a command run in `place` with no
+    /// session variable, as it reads in a request on the wire.
+    static func wire(place: String = "/work") -> String {
+        #""holder":{"key":"process:300@800250000","name":"claude","place":"\#(place.replacingOccurrences(of: "/", with: #"\/"#))"}"#
     }
 }
 

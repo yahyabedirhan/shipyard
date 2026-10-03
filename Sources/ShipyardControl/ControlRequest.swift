@@ -1,15 +1,9 @@
 import Foundation
 
 /// What the `shipyard` command asks of the running app: one request per
-/// connection over `control.sock`. On the wire it's one JSON object naming
-/// the protocol's `version` and the `command`, with the command's own
-/// fields beside them:
-///
-///     {"version":1,"command":"app.status","json":true}
-///
-/// The wire format is a contract between a `shipyard` and the app of the
-/// same build. A new request is a case here, its `command` name and its
-/// fields in `Wire`.
+/// connection over `control.sock`, sent as a `ControlMessage` with its
+/// holder. A new request is a case here, its `command` name and its fields
+/// in `ControlMessage.Wire`.
 public enum ControlRequest: Equatable, Sendable {
     /// `shipyard app status [--json]`: the status as lines, or as one JSON
     /// object (`AppStatus`).
@@ -43,13 +37,39 @@ public enum ControlRequest: Equatable, Sendable {
     }
 
     /// The protocol's version. A request or app of another version is
-    /// refused with both numbers, never misread.
-    public static let version = 1
+    /// refused with both numbers, never misread. Version 2 put the holder
+    /// on every request.
+    public static let version = 2
 
-    /// The request as one JSON object.
+    /// Whether the request needs the lease (`ControlLease`). Only
+    /// `app.status` doesn't: it changes nothing, and reports the lease.
+    public var isLeased: Bool {
+        if case .appStatus = self { return false }
+        return true
+    }
+}
+
+/// One request as it goes over the socket: what's asked, and who asks. On
+/// the wire it's one JSON object naming the protocol's `version`, the
+/// `command` and the `holder`, with the command's own fields beside them:
+///
+///     {"command":"app.status","holder":{"key":"…","name":"Claude Code","place":"/Users/me/shop"},"json":true,"version":2}
+///
+/// The wire format is a contract between a `shipyard` and the app of the
+/// same build.
+public struct ControlMessage: Equatable, Sendable {
+    public var request: ControlRequest
+    public var holder: Holder
+
+    public init(_ request: ControlRequest, holder: Holder) {
+        self.request = request
+        self.holder = holder
+    }
+
+    /// The message as one JSON object.
     public func encoded() -> Data {
-        let wire: Wire
-        switch self {
+        var wire: Wire
+        switch request {
         case .appStatus(let json):
             wire = Wire(command: "app.status", json: json)
         case .appQuit:
@@ -69,22 +89,32 @@ public enum ControlRequest: Equatable, Sendable {
         case .screenshot(let path, let appearance, let menuBarIcon):
             wire = Wire(command: "screenshot", path: path, appearance: appearance?.rawValue, menuBarIcon: menuBarIcon)
         }
+        wire.holder = holder
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         // Encoding a struct of strings, numbers and booleans can't fail.
         return try! encoder.encode(wire)
     }
 
-    /// Reads a request the client sent: refused when it isn't JSON, names
-    /// another version, or names a command this build doesn't know.
-    public static func decode(_ data: Data) throws(ControlProtocolError) -> ControlRequest {
+    /// Reads a message the client sent: refused when it isn't JSON, names
+    /// another version, has no holder, or names a command this build
+    /// doesn't know.
+    public static func decode(_ data: Data) throws(ControlProtocolError) -> ControlMessage {
         let wire: Wire
         do {
             wire = try JSONDecoder().decode(Wire.self, from: data)
         } catch {
             throw .unreadable("the request isn't a control request")
         }
-        guard wire.version == version else { throw .otherVersion(wire.version) }
+        guard wire.version == ControlRequest.version else { throw .otherVersion(wire.version) }
+        guard let holder = wire.holder else {
+            throw .unreadable("the control command `\(wire.command)` needs its `holder`")
+        }
+        return ControlMessage(try request(wire), holder: holder)
+    }
+
+    /// The request `wire` names, with the fields its command needs.
+    private static func request(_ wire: Wire) throws(ControlProtocolError) -> ControlRequest {
         switch wire.command {
         case "app.status": return .appStatus(json: wire.json ?? false)
         case "app.quit": return .appQuit
@@ -100,9 +130,9 @@ public enum ControlRequest: Equatable, Sendable {
             guard path.hasPrefix("/") else {
                 throw .unreadable("the control command `screenshot` needs an absolute `path`, not `\(path)`")
             }
-            var appearance: Appearance?
+            var appearance: ControlRequest.Appearance?
             if let name = wire.appearance {
-                guard let known = Appearance(rawValue: name) else {
+                guard let known = ControlRequest.Appearance(rawValue: name) else {
                     throw .unreadable("the control command `screenshot` has no appearance `\(name)`; it takes `light` or `dark`")
                 }
                 appearance = known
@@ -113,9 +143,12 @@ public enum ControlRequest: Equatable, Sendable {
     }
 
     /// Every request's fields, each optional but `version` and `command`.
+    /// `holder` is optional here only so a request without one is refused
+    /// in words.
     struct Wire: Codable {
         var version = ControlRequest.version
         var command: String
+        var holder: Holder?
         var json: Bool?
         var project: String?
         var kind: String?
