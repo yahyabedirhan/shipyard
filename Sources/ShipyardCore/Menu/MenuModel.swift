@@ -324,7 +324,11 @@ public struct MenuModel: Equatable, Sendable {
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 
-    /// The order of the slots in a list section's header.
+    /// The order of the slots in a list section's header. It is the same
+    /// list as `ItemKind.commandOrder` on purpose, kept apart so the slots'
+    /// order stays fixed whatever that list becomes. The `[menu]
+    /// header-counts` default (`Configuration.Menu`) and the schema list
+    /// the same order; `ConfigSchemaTests` checks the three agree.
     static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
 
     /// The kinds with a slot in a list section's header: those `[menu]

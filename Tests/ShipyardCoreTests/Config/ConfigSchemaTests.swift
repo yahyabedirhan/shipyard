@@ -294,6 +294,13 @@ struct ConfigSchemaTests {
         let properties = try #require(schema["properties"] as? [String: Any])
         #expect(enumValues(["menu-bar", "properties", "count"], in: properties) == MenuBarCount.allCases.map(\.rawValue))
         #expect(enumValues(["menu", "properties", "layout"], in: properties) == MenuLayout.allCases.map(\.rawValue))
+        // The header's slot order, the `header-counts` default and the
+        // schema's list name the kinds in one order.
+        let headerCountNames = MenuModel.headerCountOrder.map(\.commandName)
+        #expect(enumValues(["menu", "properties", "header-counts", "items"], in: properties) == headerCountNames)
+        let headerCounts = ((properties["menu"] as? [String: Any])?["properties"] as? [String: Any])?["header-counts"] as? [String: Any]
+        #expect(headerCounts?["default"] as? [String] == headerCountNames)
+        #expect(Configuration.Menu().headerCounts == MenuModel.headerCountOrder)
         #expect(enumValues(["rate-limit", "properties", "show"], in: properties) == RateLimitDisplay.allCases.map(\.rawValue))
         #expect(enumValues(["group-by"], in: definitions) == GroupBy.allCases.map(\.rawValue))
         #expect(enumValues(["sort-by"], in: definitions) == SortBy.allCases.map(\.rawValue))

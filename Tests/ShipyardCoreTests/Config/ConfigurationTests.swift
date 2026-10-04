@@ -410,6 +410,9 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 4, message: "unknown kind `pull-request` in `header-counts` (did you mean `pull-requests`?)")])
         #expect(rejection("[menu]\nheader-counts = [\"issues\", \"pings\", \"issues\"]\n")
             == [ConfigIssue(line: 2, message: "`issues` is listed twice in `header-counts`")])
+        // Across lines, the error is on the repeated copy's line.
+        #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pings\",\n  \"issues\",\n]\n")
+            == [ConfigIssue(line: 5, message: "`issues` is listed twice in `header-counts`")])
         // A project can't set it: it's ignored there, with a warning.
         let project = try #require(decoded("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
         #expect(project.configuration.menu.headerCounts == Configuration.Menu().headerCounts)

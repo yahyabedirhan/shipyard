@@ -1163,7 +1163,9 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               sizes the panel from a zero-height proposal, so the height is fixed rather than
                               flexible (#27, MeasuredScrollView)
           header ×N           pinned while its rows scroll: chevron (click collapses/expands, spring), folder, name,
-                              then the fixed slot of "Mark all seen"'s check (#212: a checkmark icon button, hover help and accessibility label "Mark all seen", shown on hover while `attentionCount > 0`, its width kept while hidden so the chips never move), then one fixed slot per kind holding its
+                              then the fixed slot of "Mark all seen"'s check (#212: a checkmark icon button, hover help
+                              and accessibility label "Mark all seen", shown on hover while `attentionCount > 0`, its
+                              width kept while hidden so the chips never move), then one fixed slot per kind holding its
                               count chip (`HeaderCountChip`: the kind's state-neutral row icon and its count, accent
                               on a faint accent capsule while it needs attention, expanded or collapsed, else gray;
                               empty at 0), or "Nothing open" / "Not loaded yet" in their place, then the new-note

@@ -1,5 +1,6 @@
 import Foundation
 import ShipyardCommand
+import ShipyardConfig
 import ShipyardControl
 import ShipyardCore
 import SwiftUI

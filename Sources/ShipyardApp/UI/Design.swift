@@ -41,6 +41,9 @@ enum Grid {
     /// A list header's slot for its Mark all seen check, just left of the
     /// chips: kept while the check is hidden, so the chips never move.
     static let markSeenSlot: CGFloat = 24
+    /// Every list header slot's height, filled or empty, so an empty slot
+    /// still holds its place in the header's line.
+    static let headerSlotHeight: CGFloat = 22
     /// How far a row's hover highlight sits in from the panel's edges.
     static let inset: CGFloat = 4
     /// The tallest the scrolling area gets before it scrolls.

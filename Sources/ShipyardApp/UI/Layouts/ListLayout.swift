@@ -305,7 +305,7 @@ private struct HeaderSlot<Content: View>: View {
             Color.clear
             content
         }
-        .frame(width: width, height: 22)
+        .frame(width: width, height: Grid.headerSlotHeight)
     }
 }
 

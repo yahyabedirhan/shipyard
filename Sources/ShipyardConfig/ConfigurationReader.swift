@@ -386,17 +386,22 @@ final class ConfigurationReader {
         let path = node.path + [.key("header-counts")]
         let valid = ItemKind.commandOrder.map(\.commandName)
         var kinds: [ItemKind] = []
+        var spelled: [String: Int] = [:]
         var readable = true
         for text in texts {
+            // Which appearance of this exact spelling it is, to find its line.
+            let occurrence = spelled[text, default: 0]
+            spelled[text] = occurrence + 1
+            let line = map.line(for: path, value: text, occurrence: occurrence)
             guard let kind = ItemKind(commandName: text) else {
                 let hint = Suggestion.nearest(to: text, in: valid).map { "did you mean `\($0)`?" }
                     ?? "expected " + valid.map { "`\($0)`" }.joined(separator: ", ")
-                error("unknown kind `\(text)` in `header-counts` (\(hint))", at: path, value: text)
+                errors.append(ConfigIssue(line: line, message: "unknown kind `\(text)` in `header-counts` (\(hint))"))
                 readable = false
                 continue
             }
             if kinds.contains(kind) {
-                error("`\(text)` is listed twice in `header-counts`", at: path, value: text)
+                errors.append(ConfigIssue(line: line, message: "`\(text)` is listed twice in `header-counts`"))
                 readable = false
             }
             kinds.append(kind)
