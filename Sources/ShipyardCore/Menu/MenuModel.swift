@@ -217,7 +217,7 @@ public struct MenuModel: Equatable, Sendable {
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
         }
-        let kinds = Self.headerCountKinds(configuration.menu, sections: sections)
+        let kinds = Self.headerCountKinds(configuration.menu)
         for index in sections.indices {
             sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: kinds)
         }
@@ -327,22 +327,19 @@ public struct MenuModel: Equatable, Sendable {
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 
-    /// The order of the slots in a list section's header. It is the same
-    /// list as `ItemKind.commandOrder` on purpose, kept apart so the slots'
+    /// The order of the chips in a list section's header. It is the same
+    /// list as `ItemKind.commandOrder` on purpose, kept apart so the chips'
     /// order stays fixed whatever that list becomes. The `[menu]
     /// header-counts` default (`Configuration.Menu`) and the schema list
     /// the same order; `ConfigSchemaTests` checks the three agree.
     static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
 
-    /// The kinds with a slot in every list section's header: those `[menu]
-    /// header-counts` lists that at least one of `sections` has a row of
-    /// (hidden and folded rows too, machines' sections included), always
-    /// in `headerCountOrder`, whatever order the file lists them in. The
-    /// same kinds in every header keep the columns lined up; a kind no
-    /// section lists leaves no empty column.
-    static func headerCountKinds(_ menu: Configuration.Menu, sections: [MenuSection]) -> [ItemKind] {
-        let listed = Set(sections.lazy.flatMap(\.rows).map(\.kind))
-        return headerCountOrder.filter { menu.headerCounts.contains($0) && listed.contains($0) }
+    /// The kinds a list section's header may count: those `[menu]
+    /// header-counts` lists, always in `headerCountOrder`, whatever order
+    /// the file lists them in. A section shows a chip only for the ones it
+    /// has rows of (`HeaderCount.counts`).
+    static func headerCountKinds(_ menu: Configuration.Menu) -> [ItemKind] {
+        headerCountOrder.filter { menu.headerCounts.contains($0) }
     }
 }
 
@@ -369,11 +366,10 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Rows in this section needing attention: what Mark all seen covers
     /// and a project's tab counts.
     public var attentionCount: Int
-    /// The list header's chips: one slot per kind `[menu] header-counts`
-    /// lists that some section in the menu has rows of, the same kinds in
-    /// every section and in the header's own order, each with its row
-    /// count (0 leaves the slot empty) and whether it needs attention.
-    /// `applyAttention` fills it; empty until then.
+    /// The list header's chips: one per kind `[menu] header-counts` lists
+    /// that this section has rows of, in the header's own order, each with
+    /// its row count and whether it needs attention. A kind without rows
+    /// here has no chip. `applyAttention` fills it; empty until then.
     public var headerCounts: [HeaderCount] = []
     /// Whether the user collapsed it. Its rows are still here, and still
     /// count towards the attention count.
@@ -456,9 +452,10 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     }
 }
 
-/// One slot of a list section's header: a kind, how many rows of it the
+/// One chip of a list section's header: a kind, how many rows of it the
 /// section lists (shown, behind Show more and in folded subsections), and
-/// whether any of them needs attention. A count of 0 leaves the slot empty.
+/// whether any of them needs attention. The count is never 0: a kind
+/// without rows has no chip.
 public struct HeaderCount: Equatable, Sendable, Identifiable {
     public var kind: ItemKind
     public var count: Int
@@ -474,10 +471,11 @@ public struct HeaderCount: Equatable, Sendable, Identifiable {
         self.needsAttention = needsAttention
     }
 
-    /// One slot per kind of `kinds`, in that order, counting `rows`.
+    /// One chip per kind of `kinds` that `rows` has, in that order.
     static func counts(_ rows: [MenuRow], kinds: [ItemKind]) -> [HeaderCount] {
-        kinds.map { kind in
+        kinds.compactMap { kind in
             let ofKind = rows.filter { $0.kind == kind }
+            guard !ofKind.isEmpty else { return nil }
             return HeaderCount(
                 kind: kind,
                 count: ofKind.count,

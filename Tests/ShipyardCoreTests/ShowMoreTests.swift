@@ -144,17 +144,17 @@ struct ShowMoreTests {
         #expect(harness.group(runs)?.isFolded == true)
         #expect(harness.group(pullRequests)?.hiddenCount == 2)
 
-        let slots = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
-        // Every listed kind has a slot, in the header's order; notes, with
-        // no rows in any section, get no column.
-        #expect(slots() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!"])
+        let chips = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
+        // Every kind with rows has a chip, in the header's order; notes,
+        // with no rows, get none.
+        #expect(chips() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!"])
 
         harness.shipyard.markAllSeen(project: "shop")
 
-        #expect(slots() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1"])
+        #expect(chips() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1"])
     }
 
-    @Test("header-counts picks which kinds get a slot, never their order, and a slot needs rows in some section")
+    @Test("header-counts picks which kinds get a chip, never their order, and a chip needs rows in its own section")
     func headerCountKinds() async throws {
         let docs = "yahyabedirhan/shop-docs"
         let config = config(
@@ -165,15 +165,16 @@ struct ShowMoreTests {
             PullRequestsResponse(web, (1...7).map { PR($0) }, issues: [Issue(8)]),
             PullRequestsResponse(docs, [], issues: []),
         ]))
+        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
         try #require(harness.cli("ping", "Ready", "--project", "docs").status == 0)
         await harness.shipyard.reloadPings()
 
-        let slots = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }
-        // The issue has a row but no slot; notes, listed nowhere, get no
-        // column; the ping in docs leaves shop an empty slot, so the
-        // columns line up, in the header's order rather than the file's.
-        #expect(slots("shop") == ["pullRequest 7", "ping 0"])
-        #expect(slots("docs") == ["pullRequest 0", "ping 1"])
+        let chips = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }
+        // The issue has a row but isn't listed, so no chip; notes have no
+        // rows, so no chip; shop's pull requests give docs no chip; the
+        // chips keep the header's order rather than the file's.
+        #expect(chips("shop") == ["pullRequest 7", "ping 1"])
+        #expect(chips("docs") == ["ping 1"])
     }
 
     @Test("with group-by none, the cap applies to the whole project")

@@ -39,7 +39,6 @@ struct ListLayout: View {
                                 let place = MenuRowPlace.header(section.name)
                                 ListSectionHeader(
                                     section: section,
-                                    reservesNewNote: reservesNewNote,
                                     isHighlighted: highlight.isHighlighted(place),
                                     actions: actions
                                 )
@@ -67,13 +66,6 @@ struct ListLayout: View {
             )
         }
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
-    }
-
-    /// Whether any header has a new-note icon: only then does every header
-    /// keep a new-note slot, so the chips line up; otherwise they end at
-    /// the header's right padding.
-    private var reservesNewNote: Bool {
-        model.sections.contains { $0.newNote != nil }
     }
 
     /// After ← or →: collapses or expands the project, or folds or unfolds
@@ -197,20 +189,16 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron and the project's name; then the fixed slot of Mark all
-/// seen's check, shown on hover while anything needs attention; then
-/// one fixed slot per kind with its count chip (`MenuSection.headerCounts`,
-/// only the kinds some project lists), or what the project says in their
-/// place ("Nothing open"), right-aligned where the chips end; and last the
-/// new-note slot, only while some header has the icon. Highlighted
-/// by the pointer or the keys, it draws the highlight over its own
-/// background, since it pins above the rows: a square band the header's
-/// full width.
+/// The chevron and the project's name; then, right-aligned, Mark all
+/// seen's check, shown on hover while anything needs attention; then a
+/// count chip per kind the project has rows of (`MenuSection.headerCounts`),
+/// each as wide as its content, or what the project says in their place
+/// ("Nothing open"); and last the new-note icon, when the project has
+/// one. Nothing keeps a fixed slot. Highlighted by the pointer or the
+/// keys, it draws the highlight over its own background, since it pins
+/// above the rows: a square band the header's full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
-    /// Whether to keep the trailing new-note slot: true while any header
-    /// in the list has the icon, so the chips line up across headers.
-    let reservesNewNote: Bool
     let isHighlighted: Bool
     let actions: LayoutActions
     @State private var hover = false
@@ -246,41 +234,27 @@ private struct ListSectionHeader: View {
             .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
             .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
             if let empty = PanelText.emptySection(section) {
-                // In place of the chips, right-aligned to end where the last
-                // chip column does: at the right padding without a new-note slot.
+                // In place of the chips, right-aligned.
                 Text(empty)
                     .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .fixedSize()
-                    .frame(minWidth: Grid.countSlot * CGFloat(section.headerCounts.count), alignment: .trailing)
             } else {
-                // The check's slot keeps its width while the check is
-                // hidden, so the chips never move on hover.
-                HeaderSlot(width: Grid.markSeenSlot) {
-                    if section.attentionCount > 0 {
-                        MarkAllSeenIcon {
-                            withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
-                        }
-                        .opacity(hover ? 1 : 0)
+                // The check stays laid out while hidden, so the chips
+                // never move on hover.
+                if section.attentionCount > 0 {
+                    MarkAllSeenIcon {
+                        withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
                     }
+                    .opacity(hover ? 1 : 0)
                 }
-                HStack(spacing: 0) {
-                    ForEach(section.headerCounts) { slot in
-                        HeaderSlot(width: Grid.countSlot, alignment: .leading) {
-                            HeaderCountChip(slot: slot)
-                        }
-                    }
+                HStack(spacing: Grid.chipGap) {
+                    ForEach(section.headerCounts) { HeaderCountChip(chip: $0) }
                 }
             }
-            // While any header has the icon, the new-note slot keeps its
-            // width without it, so the chips line up across headers.
-            if reservesNewNote {
-                HeaderSlot(width: Grid.newNoteSlot) {
-                    if let newNote = section.newNote {
-                        NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
-                    }
-                }
+            if let newNote = section.newNote {
+                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
             }
         }
         .padding(.leading, 6)
@@ -306,29 +280,10 @@ private struct ListSectionHeader: View {
     }
 }
 
-/// One fixed slot in a project's header, `width` wide whether or not it
-/// holds anything: the clear placeholder keeps an empty slot's width,
-/// which a frame around nothing would not, so each slot keeps its column
-/// in every header.
-private struct HeaderSlot<Content: View>: View {
-    let width: CGFloat
-    var alignment: Alignment = .center
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        ZStack(alignment: alignment) {
-            Color.clear
-            content
-        }
-        .frame(width: width, height: Grid.headerSlotHeight)
-    }
-}
-
 /// A project header's Mark all seen: a checkmark alone at the chips' icon
 /// size and weight, secondary gray from `IconButtonStyle` (primary on
-/// hover), its name in the hover help and for VoiceOver. The style's
-/// button frame keeps the hit area, a little wider than its slot.
-/// `action` brings its own animation.
+/// hover), its name in the hover help and for VoiceOver, in the style's
+/// button frame. `action` brings its own animation.
 private struct MarkAllSeenIcon: View {
     let action: () -> Void
 
@@ -346,36 +301,32 @@ private struct MarkAllSeenIcon: View {
 
 /// One kind's count in a project's header: its icon and number, in the
 /// accent on a faint accent capsule while any of its rows needs attention
-/// (expanded or collapsed alike), else secondary gray. Nothing at 0: the
-/// slot stays, empty.
+/// (expanded or collapsed alike), else secondary gray. As wide as its
+/// content: the model gives no chip at 0.
 private struct HeaderCountChip: View {
-    let slot: HeaderCount
+    let chip: HeaderCount
 
     var body: some View {
-        if slot.count > 0 {
-            HStack(spacing: 2) {
-                Image(systemName: Palette.symbol(slot.kind))
-                    .font(.system(size: 9, weight: .semibold))
-                Text(String(slot.count))
-                    .font(TypeScale.badge)
-                    .contentTransition(.numericText(value: Double(slot.count)))
-                    // A three-digit count shrinks to stay inside its slot.
-                    .minimumScaleFactor(0.7)
-            }
-            .lineLimit(1)
-            .foregroundStyle(slot.needsAttention ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(.secondary))
-            .padding(.horizontal, 4)
-            .frame(height: 16)
-            .background {
-                Capsule()
-                    .fill(Palette.accent.opacity(0.14))
-                    .opacity(slot.needsAttention ? 1 : 0)
-            }
-            .animation(Motion.tint, value: slot.needsAttention)
-            .animation(Motion.count, value: slot.count)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(PanelText.headerCount(slot))
+        HStack(spacing: 2) {
+            Image(systemName: Palette.symbol(chip.kind))
+                .font(.system(size: 9, weight: .semibold))
+            Text(String(chip.count))
+                .font(TypeScale.badge)
+                .contentTransition(.numericText(value: Double(chip.count)))
         }
+        .lineLimit(1)
+        .foregroundStyle(chip.needsAttention ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(.secondary))
+        .padding(.horizontal, 4)
+        .frame(height: 16)
+        .background {
+            Capsule()
+                .fill(Palette.accent.opacity(0.14))
+                .opacity(chip.needsAttention ? 1 : 0)
+        }
+        .animation(Motion.tint, value: chip.needsAttention)
+        .animation(Motion.count, value: chip.count)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(PanelText.headerCount(chip))
     }
 }
 

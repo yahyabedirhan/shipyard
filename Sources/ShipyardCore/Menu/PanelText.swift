@@ -221,9 +221,9 @@ public enum PanelText {
 
     /// What a list header's chip says to VoiceOver: its count and kind, and
     /// whether it needs attention. "3 pull requests, needs attention", "1 note".
-    public static func headerCount(_ slot: HeaderCount) -> String {
-        let count = "\(slot.count) \(kindNoun(slot.kind, plural: slot.count != 1))"
-        return slot.needsAttention ? "\(count), needs attention" : count
+    public static func headerCount(_ chip: HeaderCount) -> String {
+        let count = "\(chip.count) \(kindNoun(chip.kind, plural: chip.count != 1))"
+        return chip.needsAttention ? "\(count), needs attention" : count
     }
 
     // MARK: - The tabs layout
