@@ -244,7 +244,7 @@ private struct ListSectionHeader: View {
             } else {
                 // The check's slot keeps its width while the check is
                 // hidden, so the chips never move on hover.
-                Group {
+                HeaderSlot(width: Grid.markSeenSlot) {
                     if section.attentionCount > 0 {
                         MarkAllSeenIcon {
                             withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
@@ -252,22 +252,21 @@ private struct ListSectionHeader: View {
                         .opacity(hover ? 1 : 0)
                     }
                 }
-                .frame(width: Grid.markSeenSlot)
                 HStack(spacing: 0) {
                     ForEach(section.headerCounts) { slot in
-                        HeaderCountChip(slot: slot)
-                            .frame(width: Grid.countSlot, alignment: .leading)
+                        HeaderSlot(width: Grid.countSlot, alignment: .leading) {
+                            HeaderCountChip(slot: slot)
+                        }
                     }
                 }
             }
             // The new-note slot keeps its width without the icon, so the
             // chips line up across headers.
-            Group {
+            HeaderSlot(width: Grid.newNoteSlot) {
                 if let newNote = section.newNote {
                     NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
                 }
             }
-            .frame(width: Grid.newNoteSlot)
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
@@ -289,6 +288,24 @@ private struct ListSectionHeader: View {
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .animation(Motion.count, value: section.attentionCount)
+    }
+}
+
+/// One fixed slot in a project's header, `width` wide whether or not it
+/// holds anything: the clear placeholder keeps an empty slot's width,
+/// which a frame around nothing would not, so each slot keeps its column
+/// in every header.
+private struct HeaderSlot<Content: View>: View {
+    let width: CGFloat
+    var alignment: Alignment = .center
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        ZStack(alignment: alignment) {
+            Color.clear
+            content
+        }
+        .frame(width: width, height: 22)
     }
 }
 
