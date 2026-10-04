@@ -38,6 +38,9 @@ enum Grid {
     /// A list header's slot for its new-note icon, an icon button's width:
     /// kept without the icon, so the chips line up across headers.
     static let newNoteSlot: CGFloat = 24
+    /// A list header's slot for its Mark all seen check, just left of the
+    /// chips: kept while the check is hidden, so the chips never move.
+    static let markSeenSlot: CGFloat = 24
     /// How far a row's hover highlight sits in from the panel's edges.
     static let inset: CGFloat = 4
     /// The tallest the scrolling area gets before it scrolls.

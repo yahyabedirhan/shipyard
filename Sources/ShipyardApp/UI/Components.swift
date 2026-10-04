@@ -609,7 +609,7 @@ struct NewNoteIcon: View {
     }
 }
 
-/// A layout's Mark all seen (or Mark seen) for a project or a tab: a
+/// The tabs layout's Mark all seen (or Mark seen) for a tab: a
 /// checkmark and `title` as a text button. `action` brings its own animation.
 struct MarkSeenButton: View {
     let title: String

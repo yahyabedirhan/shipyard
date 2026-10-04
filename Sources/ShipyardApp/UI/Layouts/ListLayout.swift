@@ -189,7 +189,8 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron and the project's name; then, on hover, Mark all seen; then
+/// The chevron and the project's name; then the fixed slot of Mark all
+/// seen's check, shown on hover while anything needs attention; then
 /// one fixed slot per kind with its count chip (`MenuSection.headerCounts`),
 /// or what the project says in their place ("Nothing open"); and last the
 /// new-note slot, holding its icon while Notion is connected. Highlighted
@@ -241,12 +242,17 @@ private struct ListSectionHeader: View {
                     .fixedSize()
                     .frame(minWidth: Grid.countSlot * CGFloat(section.headerCounts.count), alignment: .trailing)
             } else {
-                if section.attentionCount > 0 {
-                    MarkSeenButton(title: PanelText.markAllSeen) {
-                        withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
+                // The check's slot keeps its width while the check is
+                // hidden, so the chips never move on hover.
+                Group {
+                    if section.attentionCount > 0 {
+                        MarkAllSeenIcon {
+                            withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
+                        }
+                        .opacity(hover ? 1 : 0)
                     }
-                    .opacity(hover ? 1 : 0)
                 }
+                .frame(width: Grid.markSeenSlot)
                 HStack(spacing: 0) {
                     ForEach(section.headerCounts) { slot in
                         HeaderCountChip(slot: slot)
@@ -283,6 +289,23 @@ private struct ListSectionHeader: View {
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .animation(Motion.count, value: section.attentionCount)
+    }
+}
+
+/// A project header's Mark all seen: a checkmark alone, its name in the
+/// hover help and for VoiceOver. `action` brings its own animation.
+private struct MarkAllSeenIcon: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 16, height: 16)
+        }
+        .buttonStyle(IconButtonStyle())
+        .hoverHelp(PanelText.markAllSeen)
+        .accessibilityLabel(PanelText.markAllSeen)
     }
 }
 
