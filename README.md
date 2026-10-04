@@ -4,7 +4,7 @@
 
 A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
 
-**Status:** under construction; this README describes 0.2.0.
+**Status:** under construction; this README describes 0.3.0.
 
 ## Why it exists
 
