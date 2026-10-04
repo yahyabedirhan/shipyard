@@ -215,6 +215,7 @@ public struct MenuModel: Equatable, Sendable {
                 sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
+            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: Self.headerCountKinds)
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
@@ -322,6 +323,10 @@ public struct MenuModel: Equatable, Sendable {
 
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
+
+    /// The kinds with a slot in a list section's header: every kind, in
+    /// `kindOrder`.
+    static let headerCountKinds: [ItemKind] = kindOrder
 }
 
 /// One project in the panel.
@@ -344,8 +349,13 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether a row's second line names its repository: only when the
     /// project has more than one, or uses `anywhere`.
     public var showsRepository: Bool
-    /// Rows in this section needing attention, for its header.
+    /// Rows in this section needing attention: what Mark all seen covers
+    /// and a project's tab counts.
     public var attentionCount: Int
+    /// The list header's chips: one slot per kind, in the menu's kind
+    /// order, each with its row count and whether it needs attention.
+    /// `applyAttention` fills it; empty until then.
+    public var headerCounts: [HeaderCount] = []
     /// Whether the user collapsed it. Its rows are still here, and still
     /// count towards the attention count.
     public var isCollapsed: Bool
@@ -424,6 +434,37 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// repository in the configuration, on GitHub; `nil` without one.
     public var repositoryURL: URL? {
         repositories.first.flatMap { URL(string: "https://github.com/\($0)") }
+    }
+}
+
+/// One slot of a list section's header: a kind, how many rows of it the
+/// section lists (shown, behind Show more and in folded subsections), and
+/// whether any of them needs attention. A count of 0 leaves the slot empty.
+public struct HeaderCount: Equatable, Sendable, Identifiable {
+    public var kind: ItemKind
+    public var count: Int
+    /// Whether at least one of its rows needs attention: never for notes,
+    /// which `Attention` never flags.
+    public var needsAttention: Bool
+
+    public var id: ItemKind { kind }
+
+    public init(kind: ItemKind, count: Int, needsAttention: Bool) {
+        self.kind = kind
+        self.count = count
+        self.needsAttention = needsAttention
+    }
+
+    /// One slot per kind of `kinds`, in that order, counting `rows`.
+    static func counts(_ rows: [MenuRow], kinds: [ItemKind]) -> [HeaderCount] {
+        kinds.map { kind in
+            let ofKind = rows.filter { $0.kind == kind }
+            return HeaderCount(
+                kind: kind,
+                count: ofKind.count,
+                needsAttention: ofKind.contains(where: \.needsAttention)
+            )
+        }
     }
 }
 

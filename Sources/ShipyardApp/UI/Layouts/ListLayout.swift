@@ -4,7 +4,7 @@ import SwiftUI
 /// `[menu] layout = "list"`: every project in one scrolling list, one line
 /// per item in columns (number, title, author or repository, age), under
 /// project headers that stay pinned while their rows scroll by. A header
-/// collapses its project, shows its attention count and, on hover, Mark
+/// collapses its project, shows a count chip per kind and, on hover, Mark
 /// all seen.
 ///
 /// The keys: ↑ and ↓ step through headers, subheaders and items, wrapping
@@ -189,10 +189,13 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron, the project's name and attention count, then what the
-/// project says in place of rows ("Nothing open") or, on hover, Mark all
-/// seen, and last its new-note icon while Notion is connected. Highlighted by the pointer or the keys, it draws the highlight
-/// over its own background, since it pins above the rows: a square band the header's full width.
+/// The chevron and the project's name; then, on hover, Mark all seen; then
+/// one fixed slot per kind with its count chip (`MenuSection.headerCounts`),
+/// or what the project says in their place ("Nothing open"); and last the
+/// new-note slot, holding its icon while Notion is connected. Highlighted
+/// by the pointer or the keys, it draws the highlight over its own
+/// background, since it pins above the rows: a square band the header's
+/// full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
     let isHighlighted: Bool
@@ -202,7 +205,7 @@ private struct ListSectionHeader: View {
     var body: some View {
         HStack(spacing: 6) {
             Button {
-                // Not animated (see `ListLayout.lineTransition`): the chevron, the count and the lines animate themselves.
+                // Not animated (see `ListLayout.lineTransition`): the chevron, the chips and the lines animate themselves.
                 actions.toggleCollapsed(section)
             } label: {
                 HStack(spacing: 6) {
@@ -219,12 +222,6 @@ private struct ListSectionHeader: View {
                         .font(TypeScale.section)
                         .foregroundStyle(.primary.opacity(0.9))
                         .lineLimit(1)
-                    if section.attentionCount > 0 {
-                        // Muted while its rows are in view; the accent once collapsed.
-                        // The badge fades its own colour, and keeps its number still.
-                        CountBadge(count: section.attentionCount, muted: !section.isCollapsed)
-                            .transition(.scale(scale: 0.4).combined(with: .opacity))
-                    }
                     Spacer(minLength: 8)
                 }
                 .frame(maxHeight: .infinity)
@@ -236,18 +233,35 @@ private struct ListSectionHeader: View {
             .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
             .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
             if let empty = PanelText.emptySection(section) {
+                // In place of the chips, ending where they would.
                 Text(empty)
                     .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
-            } else if section.attentionCount > 0 {
-                MarkSeenButton(title: PanelText.markAllSeen) {
-                    withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
+                    .lineLimit(1)
+                    .fixedSize()
+                    .frame(minWidth: Grid.countSlot * CGFloat(section.headerCounts.count), alignment: .trailing)
+            } else {
+                if section.attentionCount > 0 {
+                    MarkSeenButton(title: PanelText.markAllSeen) {
+                        withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
+                    }
+                    .opacity(hover ? 1 : 0)
                 }
-                .opacity(hover ? 1 : 0)
+                HStack(spacing: 0) {
+                    ForEach(section.headerCounts) { slot in
+                        HeaderCountChip(slot: slot)
+                            .frame(width: Grid.countSlot, alignment: .leading)
+                    }
+                }
             }
-            if let newNote = section.newNote {
-                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+            // The new-note slot keeps its width without the icon, so the
+            // chips line up across headers.
+            Group {
+                if let newNote = section.newNote {
+                    NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+                }
             }
+            .frame(width: Grid.newNoteSlot)
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
@@ -269,6 +283,41 @@ private struct ListSectionHeader: View {
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .animation(Motion.count, value: section.attentionCount)
+    }
+}
+
+/// One kind's count in a project's header: its icon and number, in the
+/// accent on a faint accent capsule while any of its rows needs attention
+/// (expanded or collapsed alike), else secondary gray. Nothing at 0: the
+/// slot stays, empty.
+private struct HeaderCountChip: View {
+    let slot: HeaderCount
+
+    var body: some View {
+        if slot.count > 0 {
+            HStack(spacing: 2) {
+                Image(systemName: Palette.symbol(slot.kind))
+                    .font(.system(size: 9, weight: .semibold))
+                Text(String(slot.count))
+                    .font(TypeScale.badge)
+                    .contentTransition(.numericText(value: Double(slot.count)))
+                    // A three-digit count shrinks to stay inside its slot.
+                    .minimumScaleFactor(0.7)
+            }
+            .lineLimit(1)
+            .foregroundStyle(slot.needsAttention ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(.secondary))
+            .padding(.horizontal, 4)
+            .frame(height: 16)
+            .background {
+                Capsule()
+                    .fill(Palette.accent.opacity(0.14))
+                    .opacity(slot.needsAttention ? 1 : 0)
+            }
+            .animation(Motion.tint, value: slot.needsAttention)
+            .animation(Motion.count, value: slot.count)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(PanelText.headerCount(slot))
+        }
     }
 }
 

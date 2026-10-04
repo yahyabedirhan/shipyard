@@ -32,6 +32,12 @@ enum Grid {
     static let agentMark: CGFloat = 14
     /// The age's column.
     static let ageColumn: CGFloat = 26
+    /// A list header's slot for one kind's count chip: fixed, so each kind
+    /// keeps its column in every header.
+    static let countSlot: CGFloat = 34
+    /// A list header's slot for its new-note icon, an icon button's width:
+    /// kept without the icon, so the chips line up across headers.
+    static let newNoteSlot: CGFloat = 24
     /// How far a row's hover highlight sits in from the panel's edges.
     static let inset: CGFloat = 4
     /// The tallest the scrolling area gets before it scrolls.
@@ -186,14 +192,23 @@ enum Palette {
     static func symbol(_ state: ItemState, kind: ItemKind) -> String {
         switch (kind, state) {
         case (.pullRequest, .merged): "arrow.triangle.merge"
-        case (.pullRequest, _): "arrow.triangle.pull"
         case (.issue, .closed): "checkmark.circle"
-        case (.issue, _): "smallcircle.filled.circle"
         case (.workflowRun, .running): "arrow.triangle.2.circlepath.circle.fill"
         case (.workflowRun, .failed): "xmark.circle.fill"
         case (.workflowRun, _): "checkmark.circle.fill"
-        case (.ping, _): "bell.fill"
-        case (.note, _): "note.text"
+        default: symbol(kind)
+        }
+    }
+
+    /// A kind's icon whatever its state, from its rows' icons: a list
+    /// header's chip. A run's is the running icon's circle-path alone.
+    static func symbol(_ kind: ItemKind) -> String {
+        switch kind {
+        case .pullRequest: "arrow.triangle.pull"
+        case .issue: "smallcircle.filled.circle"
+        case .workflowRun: "arrow.triangle.2.circlepath"
+        case .ping: "bell.fill"
+        case .note: "note.text"
         }
     }
 

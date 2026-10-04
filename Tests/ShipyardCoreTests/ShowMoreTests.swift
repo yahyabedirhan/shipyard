@@ -125,6 +125,34 @@ struct ShowMoreTests {
         #expect(harness.shipyard.menu.menuBarLabel == .total(0))
     }
 
+    @Test("a list header counts each kind's rows, capped and folded ones too, and flags the kinds needing attention")
+    func headerCounts() async throws {
+        let config = config("show-first = 5\nsubsections = true\nworkflow-runs = { show = true }")
+        let harness = try Harness(stored: "gho_stored", config: config)
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([answer])
+        // A failed run needs attention until seen; a succeeded one never does.
+        var failed = WorkflowRunsResponse.Run(9)
+        failed.conclusion = "failure"
+        harness.stub.on("GET", WorkflowRunsResponse.url(web), WorkflowRunsResponse(web, [failed, WorkflowRunsResponse.Run(10)]).answer())
+        await harness.shipyard.start()
+        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
+        await harness.shipyard.reloadPings()
+        let runs = GroupID(project: "shop", key: .kind(.workflowRun))
+        harness.shipyard.toggleGroup(runs)
+        #expect(harness.group(runs)?.isFolded == true)
+        #expect(harness.group(pullRequests)?.hiddenCount == 2)
+
+        let slots = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
+        // Every kind has a slot, in the menu's kind order; notes, with no
+        // rows, leave theirs empty.
+        #expect(slots() == ["pullRequest 7!", "ping 1!", "issue 1!", "workflowRun 2!", "note 0"])
+
+        harness.shipyard.markAllSeen(project: "shop")
+
+        #expect(slots() == ["pullRequest 7", "ping 1", "issue 1", "workflowRun 2", "note 0"])
+    }
+
     @Test("with group-by none, the cap applies to the whole project")
     func wholeProject() async throws {
         let harness = try await Harness.started(config: config("show-first = 3\ngroup-by = \"none\""), graphQL: answer)
