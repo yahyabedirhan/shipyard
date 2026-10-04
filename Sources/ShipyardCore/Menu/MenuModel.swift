@@ -215,8 +215,11 @@ public struct MenuModel: Equatable, Sendable {
                 sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
-            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: Self.headerCountKinds(configuration.menu))
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
+        }
+        let kinds = Self.headerCountKinds(configuration.menu, sections: sections)
+        for index in sections.indices {
+            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: kinds)
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
@@ -331,11 +334,15 @@ public struct MenuModel: Equatable, Sendable {
     /// the same order; `ConfigSchemaTests` checks the three agree.
     static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
 
-    /// The kinds with a slot in a list section's header: those `[menu]
-    /// header-counts` lists, always in `headerCountOrder`, whatever order
-    /// the file lists them in.
-    static func headerCountKinds(_ menu: Configuration.Menu) -> [ItemKind] {
-        headerCountOrder.filter(menu.headerCounts.contains)
+    /// The kinds with a slot in every list section's header: those `[menu]
+    /// header-counts` lists that at least one of `sections` has a row of
+    /// (hidden and folded rows too, machines' sections included), always
+    /// in `headerCountOrder`, whatever order the file lists them in. The
+    /// same kinds in every header keep the columns lined up; a kind no
+    /// section lists leaves no empty column.
+    static func headerCountKinds(_ menu: Configuration.Menu, sections: [MenuSection]) -> [ItemKind] {
+        let listed = Set(sections.lazy.flatMap(\.rows).map(\.kind))
+        return headerCountOrder.filter { menu.headerCounts.contains($0) && listed.contains($0) }
     }
 }
 
@@ -363,8 +370,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// and a project's tab counts.
     public var attentionCount: Int
     /// The list header's chips: one slot per kind `[menu] header-counts`
-    /// lists, in the header's own order, each with its row count and
-    /// whether it needs attention.
+    /// lists that some section in the menu has rows of, the same kinds in
+    /// every section and in the header's own order, each with its row
+    /// count (0 leaves the slot empty) and whether it needs attention.
     /// `applyAttention` fills it; empty until then.
     public var headerCounts: [HeaderCount] = []
     /// Whether the user collapsed it. Its rows are still here, and still

@@ -36,11 +36,13 @@ enum Grid {
     /// keeps its column in every header.
     static let countSlot: CGFloat = 34
     /// A list header's slot for its new-note icon, an icon button's width:
-    /// kept without the icon, so the chips line up across headers.
+    /// while any header has the icon, kept in the others without it, so
+    /// the chips line up across headers.
     static let newNoteSlot: CGFloat = 24
     /// A list header's slot for its Mark all seen check, just left of the
-    /// chips: kept while the check is hidden, so the chips never move.
-    static let markSeenSlot: CGFloat = 24
+    /// chips, as small as the check's hit area: kept while the check is
+    /// hidden, so the chips never move.
+    static let markSeenSlot: CGFloat = 18
     /// Every list header slot's height, filled or empty, so an empty slot
     /// still holds its place in the header's line.
     static let headerSlotHeight: CGFloat = 22

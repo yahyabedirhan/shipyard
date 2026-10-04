@@ -39,6 +39,7 @@ struct ListLayout: View {
                                 let place = MenuRowPlace.header(section.name)
                                 ListSectionHeader(
                                     section: section,
+                                    reservesNewNote: reservesNewNote,
                                     isHighlighted: highlight.isHighlighted(place),
                                     actions: actions
                                 )
@@ -66,6 +67,13 @@ struct ListLayout: View {
             )
         }
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
+    }
+
+    /// Whether any header has a new-note icon: only then does every header
+    /// keep a new-note slot, so the chips line up; otherwise they end at
+    /// the header's right padding.
+    private var reservesNewNote: Bool {
+        model.sections.contains { $0.newNote != nil }
     }
 
     /// After ← or →: collapses or expands the project, or folds or unfolds
@@ -191,14 +199,18 @@ struct ListLayout: View {
 
 /// The chevron and the project's name; then the fixed slot of Mark all
 /// seen's check, shown on hover while anything needs attention; then
-/// one fixed slot per kind with its count chip (`MenuSection.headerCounts`),
-/// or what the project says in their place ("Nothing open"); and last the
-/// new-note slot, holding its icon while Notion is connected. Highlighted
+/// one fixed slot per kind with its count chip (`MenuSection.headerCounts`,
+/// only the kinds some project lists), or what the project says in their
+/// place ("Nothing open"), right-aligned where the chips end; and last the
+/// new-note slot, only while some header has the icon. Highlighted
 /// by the pointer or the keys, it draws the highlight over its own
 /// background, since it pins above the rows: a square band the header's
 /// full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
+    /// Whether to keep the trailing new-note slot: true while any header
+    /// in the list has the icon, so the chips line up across headers.
+    let reservesNewNote: Bool
     let isHighlighted: Bool
     let actions: LayoutActions
     @State private var hover = false
@@ -234,7 +246,8 @@ private struct ListSectionHeader: View {
             .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
             .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
             if let empty = PanelText.emptySection(section) {
-                // In place of the chips, ending where they would.
+                // In place of the chips, right-aligned to end where the last
+                // chip column does: at the right padding without a new-note slot.
                 Text(empty)
                     .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
@@ -260,11 +273,13 @@ private struct ListSectionHeader: View {
                     }
                 }
             }
-            // The new-note slot keeps its width without the icon, so the
-            // chips line up across headers.
-            HeaderSlot(width: Grid.newNoteSlot) {
-                if let newNote = section.newNote {
-                    NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+            // While any header has the icon, the new-note slot keeps its
+            // width without it, so the chips line up across headers.
+            if reservesNewNote {
+                HeaderSlot(width: Grid.newNoteSlot) {
+                    if let newNote = section.newNote {
+                        NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+                    }
                 }
             }
         }
@@ -309,15 +324,18 @@ private struct HeaderSlot<Content: View>: View {
     }
 }
 
-/// A project header's Mark all seen: a checkmark alone, its name in the
-/// hover help and for VoiceOver. `action` brings its own animation.
+/// A project header's Mark all seen: a checkmark alone at the chips' icon
+/// size and weight, secondary gray from `IconButtonStyle` (primary on
+/// hover), its name in the hover help and for VoiceOver. The style's
+/// button frame keeps the hit area, a little wider than its slot.
+/// `action` brings its own animation.
 private struct MarkAllSeenIcon: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 9, weight: .semibold))
                 .frame(width: 16, height: 16)
         }
         .buttonStyle(IconButtonStyle())

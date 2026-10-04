@@ -145,23 +145,35 @@ struct ShowMoreTests {
         #expect(harness.group(pullRequests)?.hiddenCount == 2)
 
         let slots = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
-        // Every kind has a slot, in the header's order; notes, with no
-        // rows, leave theirs empty.
-        #expect(slots() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!", "note 0"])
+        // Every listed kind has a slot, in the header's order; notes, with
+        // no rows in any section, get no column.
+        #expect(slots() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!"])
 
         harness.shipyard.markAllSeen(project: "shop")
 
-        #expect(slots() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1", "note 0"])
+        #expect(slots() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1"])
     }
 
-    @Test("header-counts picks which kinds get a slot, never their order")
+    @Test("header-counts picks which kinds get a slot, never their order, and a slot needs rows in some section")
     func headerCountKinds() async throws {
-        let config = config("show-first = 5", menu: "header-counts = [\"notes\", \"pings\", \"pull-requests\"]")
-        let harness = try await Harness.started(config: config, graphQL: answer)
+        let docs = "yahyabedirhan/shop-docs"
+        let config = config(
+            "show-first = 5\n\n[[projects]]\nname = \"docs\"\nrepositories = [\"\(docs)\"]",
+            menu: "header-counts = [\"notes\", \"pings\", \"pull-requests\"]"
+        )
+        let harness = try await Harness.started(config: config, graphQL: PullRequestsResponse.answer([
+            PullRequestsResponse(web, (1...7).map { PR($0) }, issues: [Issue(8)]),
+            PullRequestsResponse(docs, [], issues: []),
+        ]))
+        try #require(harness.cli("ping", "Ready", "--project", "docs").status == 0)
+        await harness.shipyard.reloadPings()
 
-        // The issue has a row but no slot; the pings and notes slots stay,
-        // empty, in the header's order rather than the file's.
-        #expect((harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } == ["pullRequest 7", "ping 0", "note 0"])
+        let slots = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }
+        // The issue has a row but no slot; notes, listed nowhere, get no
+        // column; the ping in docs leaves shop an empty slot, so the
+        // columns line up, in the header's order rather than the file's.
+        #expect(slots("shop") == ["pullRequest 7", "ping 0"])
+        #expect(slots("docs") == ["pullRequest 0", "ping 1"])
     }
 
     @Test("with group-by none, the cap applies to the whole project")

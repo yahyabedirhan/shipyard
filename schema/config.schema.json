@@ -55,7 +55,7 @@
           "default": "list"
         },
         "header-counts": {
-          "description": "The kinds with a count in each project header of the list layout, each listed once. The counts keep their own order: pull requests, issues, workflow runs, pings, notes. Every project shares this list.",
+          "description": "The kinds with a count in each project header of the list layout, each listed once. A kind shows only when some project lists an item of it. The counts keep their own order: pull requests, issues, workflow runs, pings, notes. Every project shares this list.",
           "type": "array",
           "items": {
             "type": "string",

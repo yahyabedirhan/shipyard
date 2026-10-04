@@ -69,7 +69,7 @@ Tables:
 |---|---|---|
 | `[menu-bar] count` | `"total"` | `"total"`, `"per-kind"` (PRs, issues, runs, pings apart), `"none"` |
 | `[menu] layout` | `"list"` | `"list"` (every project in one scrolling list, one line per item), `"tabs"` (one project at a time) |
-| `[menu] header-counts` | all five | a list of `"pull-requests"`, `"issues"`, `"workflow-runs"`, `"pings"`, `"notes"`, each once: the kinds with a count in each project header of the list layout. The counts always keep that order, whatever order the list has. Global only: a project can't set it |
+| `[menu] header-counts` | all five | a list of `"pull-requests"`, `"issues"`, `"workflow-runs"`, `"pings"`, `"notes"`, each once: the kinds with a count in each project header of the list layout. A kind shows only when some project lists an item of it; then every header has its column, empty where that project has none. The counts always keep that order, whatever order the list has. Global only: a project can't set it |
 | `[rate-limit] show` | `"always"` | `"always"`, `"when-low"` (below 25%), `"never"` |
 | `[rate-limit] max-share-percent` | `10` | `1`–`50`: the share of each hourly GitHub limit shipyard may spend (it's shared with the user's agents) |
 | `[attention] unseen` | `true` | an item not clicked yet needs attention |
