@@ -34,6 +34,22 @@ The maintainer's own todos (QA #202 and #204, the #188 spike, the private setup 
   - The maintainer hasn't listened to its narration yet.
 - **The studio's own follow-ups** are explainer-studio issues #5 "Keep Kokoro's word timings so captions and beats line up exactly", #6 "A shared captions component" and #7 "A shared folder of sound effects".
 
+## From the orchestrator's session
+
+What the build session knew that PR #206 and the steps above don't say:
+
+- **More places the `[notices]` rename reaches,** beyond the PR comment's list:
+  - #204's body (step 9) and two comments on #188 quote `[notify]`, `app-scheme` and `app-port`.
+  - The private machine setup's Tailscale doc names `[notify] listen` once; its pull request has already merged, so that edit goes on a new branch there.
+  - The skill's frontmatter description is at 1022 of 1024 characters, so a rename that touches it must stay within the limit.
+- **Worktrees kept for `/settle-effort`:**
+  - This worktree, leased with treehouse (holder `notes-and-notify`).
+  - Two builders' worktrees under the main checkout's `.claude/worktrees/` are locked by the harness, so `git worktree remove` refused them. `agent-a132fb134e1d8ece3` holds #191 at `7297388`, and `agent-a864b61b4ea8b2ad3` holds #190 at `f70065b`. Both are integrated (cherry-picked, so only patch or PR-head proofs apply), clean and idle. Unlock them with `git worktree unlock` before removing, and delete their `worktree-agent-…` branches after.
+- **The herdr-shipyard clone** beside this repository's clone is on branch `notices-poll`, clean and pushed, as herdr-shipyard#2's head.
+- **The Mac's installed app** is this branch's build at 862fe6f (`shipyard --version` still says 0.2.0), running on the maintainer's own config, with nothing listening on 47420. A rename on this branch needs another `make install`, under the lease, before QA.
+- **On the poll route, a VPS needs herdr-shipyard#2's plugin:** with the old plugin, `shipyard notify` exits 1 because `scripts/notices.sh` is missing. The release's machine steps reinstall the plugin, which covers it.
+- **The static Linux build passed:** `linux cli` ran on push at c77a7b1, including the static SDK build with FoundationNetworking.
+
 ## Suggested skills
 
 - `shipyard`: the configuration and the ping commands.
