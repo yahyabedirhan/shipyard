@@ -291,9 +291,8 @@ private struct MarkAllSeenIcon: View {
         Button(action: action) {
             Image(systemName: "checkmark")
                 .font(.system(size: 9, weight: .semibold))
-                .frame(width: 16, height: 16)
         }
-        .buttonStyle(IconButtonStyle())
+        .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.markAllSeen)
         .accessibilityLabel(PanelText.markAllSeen)
     }

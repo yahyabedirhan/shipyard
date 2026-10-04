@@ -449,15 +449,18 @@ extension View {
 struct IconButtonStyle: ButtonStyle {
     /// An icon with a word beside it: as wide as both, rather than square.
     var labeled = false
+    /// A small icon in a row of chips: a tight square, not the toolbar's 24×22.
+    var compact = false
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        IconButtonBody(configuration: configuration, labeled: labeled)
+        IconButtonBody(configuration: configuration, labeled: labeled, compact: compact)
     }
 }
 
 private struct IconButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let labeled: Bool
+    let compact: Bool
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
 
@@ -467,9 +470,9 @@ private struct IconButtonBody: View {
             .foregroundStyle(hover && isEnabled ? .primary : .secondary)
             .opacity(isEnabled ? 1 : 0.4)
             .padding(.horizontal, labeled ? 6 : 0)
-            .frame(width: labeled ? nil : 24, height: 22)
+            .frame(width: labeled ? nil : compact ? 16 : 24, height: compact ? 16 : 22)
             .background(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 4 : 6, style: .continuous)
                     .fill(configuration.isPressed ? Palette.pressed : hover && isEnabled ? Palette.hover : .clear)
             )
             .contentShape(Rectangle())
