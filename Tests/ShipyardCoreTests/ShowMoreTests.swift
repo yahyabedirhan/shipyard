@@ -12,11 +12,12 @@ private typealias Issue = PullRequestsResponse.Issue
 private let web = "yahyabedirhan/shop-web"
 
 /// One project, "shop", with issues shown, arranged by `settings` under
-/// `[menu] layout`.
-private func config(_ settings: String = "show-first = 5", layout: MenuLayout = .list) -> String {
+/// `[menu] layout` and any other `[menu]` lines in `menu`.
+private func config(_ settings: String = "show-first = 5", layout: MenuLayout = .list, menu: String = "") -> String {
     """
     [menu]
     layout = "\(layout.rawValue)"
+    \(menu)
 
     [defaults.issues]
     show = true
@@ -144,13 +145,23 @@ struct ShowMoreTests {
         #expect(harness.group(pullRequests)?.hiddenCount == 2)
 
         let slots = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
-        // Every kind has a slot, in the menu's kind order; notes, with no
+        // Every kind has a slot, in the header's order; notes, with no
         // rows, leave theirs empty.
-        #expect(slots() == ["pullRequest 7!", "ping 1!", "issue 1!", "workflowRun 2!", "note 0"])
+        #expect(slots() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!", "note 0"])
 
         harness.shipyard.markAllSeen(project: "shop")
 
-        #expect(slots() == ["pullRequest 7", "ping 1", "issue 1", "workflowRun 2", "note 0"])
+        #expect(slots() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1", "note 0"])
+    }
+
+    @Test("header-counts picks which kinds get a slot, never their order")
+    func headerCountKinds() async throws {
+        let config = config("show-first = 5", menu: "header-counts = [\"notes\", \"pings\", \"pull-requests\"]")
+        let harness = try await Harness.started(config: config, graphQL: answer)
+
+        // The issue has a row but no slot; the pings and notes slots stay,
+        // empty, in the header's order rather than the file's.
+        #expect((harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } == ["pullRequest 7", "ping 0", "note 0"])
     }
 
     @Test("with group-by none, the cap applies to the whole project")

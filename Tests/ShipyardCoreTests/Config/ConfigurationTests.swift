@@ -54,6 +54,7 @@ let everyKey = """
 
     [menu]
     layout = "tabs"
+    header-counts = ["notes", "pull-requests"]
 
     [rate-limit]
     show = "when-low"
@@ -157,6 +158,7 @@ struct ConfigurationDecodingTests {
         #expect(config.launchAtLogin)
         #expect(config.menuBar.count == .total)
         #expect(config.menu.layout == .list)
+        #expect(config.menu.headerCounts == [.pullRequest, .issue, .workflowRun, .ping, .note])
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
         // Every author, in every kind: an existing file lists what it did.
@@ -224,6 +226,7 @@ struct ConfigurationDecodingTests {
         #expect(!config.launchAtLogin)
         #expect(config.menuBar.count == .perKind)
         #expect(config.menu.layout == .tabs)
+        #expect(config.menu.headerCounts == [.note, .pullRequest])
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.herdr == .init(terminal: "Ghostty"))
@@ -393,6 +396,24 @@ struct ConfigurationValidationTests {
             == [ConfigIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
         #expect(rejection("[defaults.workflow-runs]\nbranches = \"al\"\n")
             == [ConfigIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
+    }
+
+    @Test("header-counts lists the kinds with a header slot, each once, globally")
+    func headerCounts() throws {
+        // Without the key, every kind.
+        #expect(try #require(decoded("[menu]\nlayout = \"list\"\n")).configuration.menu.headerCounts
+            == [.pullRequest, .issue, .workflowRun, .ping, .note])
+        let subset = try #require(decoded("[menu]\nheader-counts = [\"pings\", \"issues\"]\n"))
+        #expect(subset.configuration.menu.headerCounts == [.ping, .issue])
+        #expect(subset.warnings.isEmpty)
+        #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pull-request\",\n]\n")
+            == [ConfigIssue(line: 4, message: "unknown kind `pull-request` in `header-counts` (did you mean `pull-requests`?)")])
+        #expect(rejection("[menu]\nheader-counts = [\"issues\", \"pings\", \"issues\"]\n")
+            == [ConfigIssue(line: 2, message: "`issues` is listed twice in `header-counts`")])
+        // A project can't set it: it's ignored there, with a warning.
+        let project = try #require(decoded("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
+        #expect(project.configuration.menu.headerCounts == Configuration.Menu().headerCounts)
+        #expect(project.warnings == [ConfigIssue(line: 4, message: "unknown setting `projects[0].header-counts` (ignored)")])
     }
 
     @Test("an unknown group-by or sort-by is rejected with the nearest valid one")

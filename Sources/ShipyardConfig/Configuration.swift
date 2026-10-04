@@ -70,7 +70,14 @@ extension Configuration {
     /// `[menu]`
     public struct Menu: Equatable, Sendable {
         public var layout: MenuLayout = .list
-        public init(layout: MenuLayout = .list) { self.layout = layout }
+        /// `header-counts`: the kinds with a slot in the list layout's
+        /// project headers, each once, as the file lists them. The slots
+        /// keep the menu's own order whatever this one is.
+        public var headerCounts: [ItemKind] = ItemKind.commandOrder
+        public init(layout: MenuLayout = .list, headerCounts: [ItemKind] = ItemKind.commandOrder) {
+            self.layout = layout
+            self.headerCounts = headerCounts
+        }
     }
 
     /// `[rate-limit]`

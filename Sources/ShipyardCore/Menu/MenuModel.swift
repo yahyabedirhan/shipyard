@@ -215,7 +215,7 @@ public struct MenuModel: Equatable, Sendable {
                 sections[index].groups[group].attentionCount = sections[index].groups[group].allRows.filter(\.needsAttention).count
             }
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
-            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: Self.headerCountKinds)
+            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: Self.headerCountKinds(configuration.menu))
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
         }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
@@ -324,9 +324,15 @@ public struct MenuModel: Equatable, Sendable {
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 
-    /// The kinds with a slot in a list section's header: every kind, in
-    /// `kindOrder`.
-    static let headerCountKinds: [ItemKind] = kindOrder
+    /// The order of the slots in a list section's header.
+    static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
+
+    /// The kinds with a slot in a list section's header: those `[menu]
+    /// header-counts` lists, always in `headerCountOrder`, whatever order
+    /// the file lists them in.
+    static func headerCountKinds(_ menu: Configuration.Menu) -> [ItemKind] {
+        headerCountOrder.filter(menu.headerCounts.contains)
+    }
 }
 
 /// One project in the panel.
@@ -352,8 +358,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Rows in this section needing attention: what Mark all seen covers
     /// and a project's tab counts.
     public var attentionCount: Int
-    /// The list header's chips: one slot per kind, in the menu's kind
-    /// order, each with its row count and whether it needs attention.
+    /// The list header's chips: one slot per kind `[menu] header-counts`
+    /// lists, in the header's own order, each with its row count and
+    /// whether it needs attention.
     /// `applyAttention` fills it; empty until then.
     public var headerCounts: [HeaderCount] = []
     /// Whether the user collapsed it. Its rows are still here, and still
