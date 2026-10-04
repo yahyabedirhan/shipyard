@@ -84,12 +84,17 @@ public struct MenuModel: Equatable, Sendable {
     /// project still gets a section, empty and not loaded yet; so does a
     /// project without a listing (added since the snapshot was fetched).
     /// `expanded` holds the groups Show more revealed past their cap.
+    /// `notes` says why a project's notes couldn't be read or a note
+    /// couldn't be started (error rows after its others, loaded or not),
+    /// and gives each project showing notes its new-note icon once Notion
+    /// is connected.
     public static func build(
         listings: [String: [Item]],
         snapshot: Snapshot?,
         configuration: Configuration,
         state: AppState,
         expanded: Set<GroupID> = [],
+        notes: NotesMenuState = NotesMenuState(),
         now: Date
     ) -> MenuModel {
         guard let snapshot else {
@@ -106,13 +111,14 @@ public struct MenuModel: Equatable, Sendable {
                         expanded: expanded,
                         now: now
                     ),
+                    errors: noteErrorRows(notes, project: project.name, configuration: configuration),
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
                     repositories: project.repositories.compactMap(\.slug)
                 )
             }
             var model = MenuModel(
-                sections: sections + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
+                sections: newNoteIcons(sections, notes, configuration: configuration) + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
                 layout: configuration.menu.layout
             )
             model.applyAttention(state, configuration: configuration)
@@ -143,7 +149,8 @@ public struct MenuModel: Equatable, Sendable {
                             .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
                             .first
                             .map(MenuErrorRow.init)
-                    } + reviewSearchErrors(snapshot, settings: settings),
+                    } + reviewSearchErrors(snapshot, settings: settings)
+                    + noteErrorRows(notes, project: project.name, configuration: configuration),
                 notes: reviewSearchNotes(snapshot, settings: settings),
                 // `anywhere` brings in pull requests from any repository.
                 showsRepository: repositories.count > 1 || settings.usesAnywhere,
@@ -153,7 +160,7 @@ public struct MenuModel: Equatable, Sendable {
             )
         }
         var model = MenuModel(
-            sections: sections + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
+            sections: newNoteIcons(sections, notes, configuration: configuration) + machineSections(listings, configuration: configuration, state: state, expanded: expanded, now: now),
             layout: configuration.menu.layout,
             lastUpdated: snapshot.fetchedAt
         )
@@ -279,6 +286,32 @@ public struct MenuModel: Equatable, Sendable {
         return [MenuErrorRow(error)]
     }
 
+    /// The rows saying why `project`'s notes couldn't be read ("notes:
+    /// can't reach Notion (…)") and why a note couldn't be started there
+    /// ("new note: …"), while it shows notes.
+    private static func noteErrorRows(_ notes: NotesMenuState, project: String, configuration: Configuration) -> [MenuErrorRow] {
+        guard showsNotes(project, configuration: configuration) else { return [] }
+        return (notes.readErrors[project].map { [MenuErrorRow(.notes($0))] } ?? [])
+            + (notes.startErrors[project].map { [MenuErrorRow(.newNote($0))] } ?? [])
+    }
+
+    /// `sections` with the new-note icon on each project that shows notes,
+    /// while Notion is connected: starting while a note is being started there.
+    private static func newNoteIcons(_ sections: [MenuSection], _ notes: NotesMenuState, configuration: Configuration) -> [MenuSection] {
+        guard notes.connected else { return sections }
+        return sections.map { section in
+            guard showsNotes(section.name, configuration: configuration) else { return section }
+            var section = section
+            section.newNote = notes.starting.contains(section.name) ? .starting : .ready
+            return section
+        }
+    }
+
+    /// Whether the project named `project` lists notes.
+    private static func showsNotes(_ project: String, configuration: Configuration) -> Bool {
+        configuration.projects.first { $0.name == project }.map { configuration.settings(for: $0).notes.show } ?? false
+    }
+
     /// The note in a project using `anywhere` when the review search
     /// matched more pull requests than its one page holds.
     private static func reviewSearchNotes(_ snapshot: Snapshot, settings: ProjectSettings) -> [String] {
@@ -288,7 +321,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// The order kinds appear in within a section.
-    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun]
+    static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 }
 
 /// One project in the panel.
@@ -296,7 +329,8 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The project's name, unique in the configuration.
     public var name: String
     /// Its listed items as `Arrangement` groups and sorts them: by default
-    /// pull requests, then pings, then issues, then workflow runs; within each kind, open
+    /// pull requests, then pings, then issues, then workflow runs, then
+    /// notes; within each kind, open
     /// (or running) items first (most recently updated first), then closed
     /// (or finished) ones (most recently closed first).
     public var groups: [RowGroup]
@@ -324,6 +358,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The machine's label, for a remote machine's own section (its pings
     /// filed under no project); `nil` for a project's.
     public var machine: String?
+    /// The header's new-note icon: on a project that shows notes while
+    /// Notion is connected (`MenuModel.build`'s `notes`); `nil` hides it.
+    public var newNote: NewNoteButton?
 
     public var id: String { name }
 

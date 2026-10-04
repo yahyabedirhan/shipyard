@@ -191,7 +191,7 @@ struct ListLayout: View {
 
 /// The chevron, the project's name and attention count, then what the
 /// project says in place of rows ("Nothing open") or, on hover, Mark all
-/// seen. Highlighted by the pointer or the keys, it draws the highlight
+/// seen, and last its new-note icon while Notion is connected. Highlighted by the pointer or the keys, it draws the highlight
 /// over its own background, since it pins above the rows: a square band the header's full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
@@ -245,6 +245,9 @@ private struct ListSectionHeader: View {
                 }
                 .opacity(hover ? 1 : 0)
             }
+            if let newNote = section.newNote {
+                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+            }
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
@@ -288,8 +291,8 @@ private struct ListRow: View {
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
             // A ping written before pings were numbered has none (0); the
-            // column stays, so titles line up.
-            Text(row.number > 0 ? String(row.number) : "")
+            // column stays, so titles line up. A note's carries its prefix.
+            Text(PanelText.number(row))
                 .font(TypeScale.meta)
                 .foregroundStyle(.tertiary)
                 .frame(minWidth: Grid.numberColumn, alignment: .trailing)
@@ -347,12 +350,13 @@ private struct ListRow: View {
     /// or why its action failed, while it has (the hover card has it whole);
     /// one filed with `--project` has no repository, so it names its
     /// sender there too. A remote ping names its machine first, wherever
-    /// it's listed.
+    /// it's listed. A note names its labels.
     private var meta: String? {
         if let error = row.actionError { return error }
         if row.machine != nil { return PanelText.pingMeta(row) }
         if showsRowRepository { return PanelText.repositoryName(row.repository) }
         if row.kind == .ping { return PanelText.sender(row) }
+        if row.kind == .note { return PanelText.noteLabels(row) }
         return row.kind == .workflowRun ? nil : row.author
     }
 
@@ -360,6 +364,7 @@ private struct ListRow: View {
         if row.actionError != nil { return "exclamationmark.triangle.fill" }
         if row.machine != nil { return "server.rack" }
         if showsRowRepository { return "shippingbox" }
+        if row.kind == .note { return "tag" }
         return row.authorKind == .bot ? "cpu" : nil
     }
 

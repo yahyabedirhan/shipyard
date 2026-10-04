@@ -20,3 +20,7 @@ This supersedes the 0.0.5 out-of-scope line "pings from other machines".
 - `shipyard ping list --json` is part of the CLI's public contract (ADR 0004), with a major version the Mac refuses to read across.
 - Plugin actions take no arguments, so nothing flows back to a machine: seeing and dismissing a remote ping stay on the Mac.
 - A remote ping arrives up to one poll (30 seconds) late, and a machine Herdr can't reach keeps its last pings listed until it answers again.
+
+## Amendment, 2026-10-04: notices may reach in
+
+ADR 0010 makes one narrow exception to "a machine never reaches in": an agent's notice (`shipyard notify`) may go from another machine straight to the app on the Mac, over the user's tailnet, when the user turns it on (`[notices] listen = true`) and only from the Mac's own Tailscale login. Pings, and everything else, still go the Mac's way, through Herdr.

@@ -107,8 +107,8 @@ public struct ProjectFiling: PingFiling {
     /// The projects that watch `slug`, in the configuration's order, each
     /// with the repository spelled as that project knows it (GitHub's
     /// spelling once resolved). Repositories match ignoring case, as
-    /// GitHub's names do.
-    static func watchers(
+    /// GitHub's names do. The app files an agent's notice by it too.
+    public static func watchers(
         of slug: String,
         configuration: Configuration,
         resolved: [String: [String]]
@@ -121,8 +121,8 @@ public struct ProjectFiling: PingFiling {
         }
     }
 
-    /// The projects a ping can be filed under, for an error.
-    private static func listing(_ names: [String]) -> String {
+    /// The projects a ping (or the app, a notice) can be filed under, for an error.
+    public static func listing(_ names: [String]) -> String {
         names.isEmpty ? "config.toml has no projects yet"
             : "the projects are " + names.map { "`\($0)`" }.joined(separator: ", ")
     }

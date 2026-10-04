@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import os
 import ShipyardCore
+import ShipyardNotices
 import UserNotifications
 
 /// Posts the core's notifications through the system notification center.
@@ -40,6 +41,10 @@ final class Notifier: NSObject, Notifying {
     nonisolated private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "notifications")
     /// The user info key that carries `PostedNotification.itemURL`.
     nonisolated private static let itemURLKey = "itemURL"
+    /// The user info key that carries each button's URL, in order.
+    nonisolated private static let buttonURLsKey = "buttonURLs"
+    /// How a button's action identifier starts, before its index.
+    nonisolated private static let buttonPrefix = "button "
 
     override init() {
         // `UNUserNotificationCenter.current()` traps outside an app bundle.
@@ -54,6 +59,15 @@ final class Notifier: NSObject, Notifying {
     func checkPermission() async {
         guard let center else { return }
         permission = Self.permission(await center.notificationSettings().authorizationStatus)
+    }
+
+    /// Whether a notification posted now could show: not when the user
+    /// turned shipyard's notifications off, read afresh. Run outside a
+    /// `.app` bundle, nothing shows.
+    func canShow() async -> Bool {
+        guard center != nil else { return false }
+        await checkPermission()
+        return permission != .denied
     }
 
     /// Queues the notification and returns at once: the first one waits
@@ -94,17 +108,77 @@ final class Notifier: NSObject, Notifying {
         }
         let content = UNMutableNotificationContent()
         content.title = notification.title
+        if let subtitle = notification.subtitle { content.subtitle = subtitle }
         content.body = notification.body
-        content.sound = .default
-        // Groups a project's notifications together in Notification Center.
-        content.threadIdentifier = notification.project
-        content.userInfo = [Self.itemURLKey: notification.itemURL.absoluteString]
+        content.sound = switch notification.sound {
+        case .default: .default
+        case .silent: nil
+        case .named(let name): UNNotificationSound(named: UNNotificationSoundName(name))
+        }
+        // Groups a project's notifications together in Notification Center,
+        // or a notice's thread.
+        content.threadIdentifier = notification.thread ?? notification.project
+        if let level = notification.level {
+            content.interruptionLevel = switch level {
+            case .passive: .passive
+            case .active: .active
+            }
+        }
+        content.userInfo = [
+            Self.itemURLKey: notification.itemURL.absoluteString,
+            Self.buttonURLsKey: notification.buttons.map(\.url.absoluteString),
+        ]
+        if !notification.buttons.isEmpty {
+            content.categoryIdentifier = await category(for: notification.buttons, in: center)
+        }
+        if let image = notification.image, let attachment = Self.attachment(image) {
+            content.attachments = [attachment]
+        }
         let request = UNNotificationRequest(identifier: notification.id, content: content, trigger: nil)
         do {
             try await center.add(request)
             Self.log.info("notified \(notification.id, privacy: .public): \(notification.title, privacy: .public)")
         } catch {
             Self.log.error("couldn't notify \(notification.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// The categories registered for buttons, by identifier: one per set of
+    /// labels, since a category fixes its buttons' titles.
+    @ObservationIgnored private var categories: [String: UNNotificationCategory] = [:]
+
+    /// The category whose buttons are `buttons`' labels, in order,
+    /// registered with the center first when it's new. A button's action
+    /// identifier is `button <index>`, which a press hands back.
+    private func category(for buttons: [PostedNotification.Button], in center: UNUserNotificationCenter) async -> String {
+        let labels = buttons.map(\.label)
+        let identifier = "agent.notice buttons " + labels.joined(separator: "\u{1F}")
+        guard categories[identifier] == nil else { return identifier }
+        categories[identifier] = UNNotificationCategory(
+            identifier: identifier,
+            actions: labels.enumerated().map { UNNotificationAction(identifier: Self.buttonPrefix + String($0.offset), title: $0.element) },
+            intentIdentifiers: []
+        )
+        center.setNotificationCategories(Set(categories.values))
+        // Reading them back waits until they're set, so the notification
+        // posted next shows its buttons.
+        _ = await center.notificationCategories()
+        return identifier
+    }
+
+    /// `image` written to a file of its own and attached: macOS moves the
+    /// file into its own store. `nil`, logged, when it can't be.
+    private static func attachment(_ image: NoticeImage) -> UNNotificationAttachment? {
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("shipyard-notice-\(UUID().uuidString)")
+            .appendingPathExtension((image.name as NSString).pathExtension)
+        do {
+            try image.data.write(to: file)
+            return try UNNotificationAttachment(identifier: "image", url: file)
+        } catch {
+            try? FileManager.default.removeItem(at: file)
+            log.error("couldn't attach the notice's image \(image.name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
@@ -148,15 +222,24 @@ extension Notifier: UNUserNotificationCenterDelegate {
         [.banner, .list, .sound]
     }
 
-    /// A click: open the item and mark it seen. Dismissing does nothing.
+    /// A click: open the item and mark it seen. A button: hand on its own
+    /// URL, as a click hands the item's. Dismissing does nothing.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
-              let text = response.notification.request.content.userInfo[Self.itemURLKey] as? String,
-              let url = URL(string: text)
-        else { return }
+        let userInfo = response.notification.request.content.userInfo
+        let text: String?
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+            text = userInfo[Self.itemURLKey] as? String
+        } else if response.actionIdentifier.hasPrefix(Self.buttonPrefix),
+                  let index = Int(response.actionIdentifier.dropFirst(Self.buttonPrefix.count)),
+                  let urls = userInfo[Self.buttonURLsKey] as? [String], urls.indices.contains(index) {
+            text = urls[index]
+        } else {
+            text = nil
+        }
+        guard let text, let url = URL(string: text) else { return }
         await MainActor.run {
             Self.log.info("opened from a notification: \(text, privacy: .public)")
             onOpen?(url)

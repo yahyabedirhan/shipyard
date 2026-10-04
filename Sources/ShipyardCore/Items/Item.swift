@@ -59,8 +59,8 @@ public enum AuthorKind: String, Equatable, Hashable, Sendable {
     case other
 }
 
-/// One pull request, issue or workflow run in a project's repositories, or
-/// a ping filed under a project.
+/// One pull request, issue or workflow run in a project's repositories, a
+/// ping filed under a project, or one of the project's notes.
 public struct Item: Equatable, Hashable, Sendable, Identifiable {
     /// The item's URL, unique across pull requests, issues and runs; a
     /// ping's is `shipyard://ping/<id>`.
@@ -100,6 +100,9 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
     /// The ping this item lists, for kind `ping`: whether it's been seen
     /// lives there, not in the app state's seen records. `nil` otherwise.
     public var ping: Ping?
+    /// The note this item lists, for kind `note`: its number's prefix and
+    /// its labels, which only the row shows. `nil` otherwise.
+    public var note: Note?
 
     public init(
         kind: ItemKind,
@@ -119,7 +122,8 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         branch: String? = nil,
         avatarURL: URL? = nil,
         details: ItemDetails = ItemDetails(),
-        ping: Ping? = nil
+        ping: Ping? = nil,
+        note: Note? = nil
     ) {
         self.kind = kind
         self.repository = repository
@@ -139,6 +143,7 @@ public struct Item: Equatable, Hashable, Sendable, Identifiable {
         self.avatarURL = avatarURL
         self.details = details
         self.ping = ping
+        self.note = note
     }
 
     /// Everything whose change makes a seen item "changed": state, update
@@ -238,6 +243,18 @@ public struct RepositoryError: Equatable, Sendable {
     /// in place of a repository, as "review requests: <GitHub's message>".
     public static func reviewSearch(_ message: String) -> RepositoryError {
         RepositoryError(repository: "review requests", kind: .other, message: message)
+    }
+
+    /// The project's notes couldn't be read from Notion: shown in its
+    /// section as "notes: <why>" (`PanelText.noteError`), never as no notes.
+    public static func notes(_ message: String) -> RepositoryError {
+        RepositoryError(repository: "notes", kind: .other, message: message)
+    }
+
+    /// The new-note icon couldn't start a note: shown in its project's
+    /// section as "new note: <why>" (`PanelText.newNoteError`).
+    public static func newNote(_ message: String) -> RepositoryError {
+        RepositoryError(repository: "new note", kind: .other, message: message)
     }
 }
 

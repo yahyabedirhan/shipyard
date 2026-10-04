@@ -146,8 +146,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         authors = { hide = ["me", "bots"] }
 
         # Notify when someone else opens a pull request or an issue, when
-        # one of your agents sends a ping, and when an agent starts and
-        # stops using the shipyard app.
+        # one of your agents sends a ping or a notice, and when an agent
+        # starts and stops using the shipyard app.
         [[defaults.notifications]]
         event = "pr.opened"
         authors = ["others"]
@@ -158,6 +158,9 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         [[defaults.notifications]]
         event = "ping.sent"
+
+        [[defaults.notifications]]
+        event = "agent.notice"
 
         [[defaults.notifications]]
         event = "control.started"
@@ -172,7 +175,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         # The pull requests waiting on your review, or a team's you're in, in
         # any repository. anywhere lists only those, so this project shows no
-        # issues, and it notifies each new request (and ping) instead.
+        # issues, and it notifies each new request (and ping, and notice) instead.
         [[projects]]
         name = "Review requests"
         repositories = ["anywhere"]
@@ -181,6 +184,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
         notifications = [
           { event = "pr.review_requested" },
           { event = "ping.sent" },
+          { event = "agent.notice" },
         ]
 
         """
@@ -195,7 +199,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         # The pull requests waiting on your review, or a team's you're in, in
         # any repository, grouped by repository under subheaders. Each new
-        # request notifies, and so does each ping your agents send.
+        # request notifies, and so does each ping and notice your agents send.
         [[projects]]
         name = "Review queue"
         repositories = ["anywhere"]
@@ -205,6 +209,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
         notifications = [
           { event = "pr.review_requested" },
           { event = "ping.sent" },
+          { event = "agent.notice" },
         ]
 
         """

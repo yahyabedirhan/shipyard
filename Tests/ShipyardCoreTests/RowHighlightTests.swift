@@ -13,6 +13,7 @@ struct RowHighlightTests {
         case .issue: "issues"
         case .workflowRun: "actions/runs"
         case .ping: "pings"
+        case .note: "notes"
         }
         return MenuRow(Item(
             kind: kind,

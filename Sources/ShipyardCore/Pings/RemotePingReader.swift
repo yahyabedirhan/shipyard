@@ -78,14 +78,32 @@ public struct RemotePingReader: Sendable {
     /// The pings the machine `label` lists, each marked with its machine
     /// (`Ping.machine`), or why they couldn't be read.
     public func list(machine label: String) async -> Result<PingList, Failure> {
+        await timed(label) {
+            switch await self.output(of: Self.actionID, on: label) {
+            case .success(let stdout): self.decode(stdout, machine: label)
+            case .failure(.herdr(let failure)): .failure(failure)
+            case .failure(.noLog): .failure(Failure("Herdr didn't say where \(label)'s ping list went"))
+            case .failure(.lost): .failure(Failure("Herdr lost \(label)'s ping list"))
+            case .failure(.failed): .failure(Failure("shipyard on \(label) couldn't list its pings"))
+            case .failure(.stillRunning): .failure(Failure("\(label) is still listing its pings"))
+            }
+        }
+    }
+
+    /// `body`'s result, or a failure saying `label` didn't answer in time
+    /// once `timeout` has passed, whichever comes first.
+    func timed<Value: Sendable>(
+        _ label: String,
+        _ body: @escaping @Sendable () async -> Result<Value, Failure>
+    ) async -> Result<Value, Failure> {
         let timeout = timeout, sleep = sleep
-        return await withTaskGroup(of: Result<PingList, Failure>?.self) { group in
-            group.addTask { await self.read(label) }
+        return await withTaskGroup(of: Result<Value, Failure>?.self) { group in
+            group.addTask { await body() }
             group.addTask {
                 guard (try? await sleep(timeout)) != nil else { return nil }
                 return .failure(Failure("\(label) didn't answer in time"))
             }
-            var first: Result<PingList, Failure>?
+            var first: Result<Value, Failure>?
             for await result in group where first == nil {
                 first = result
                 if result != nil { group.cancelAll() }
@@ -94,38 +112,54 @@ public struct RemotePingReader: Sendable {
         }
     }
 
-    private func read(_ label: String) async -> Result<PingList, Failure> {
+    /// Why a plugin action's output couldn't be had.
+    enum ActionFailure: Error {
+        /// Herdr couldn't be run, refused, or didn't answer in time.
+        case herdr(Failure)
+        /// Herdr started the action but didn't say which log record holds it.
+        case noLog
+        /// Its log record wasn't among the newest.
+        case lost
+        /// The action ended without succeeding.
+        case failed
+        /// It was still running after `waitAttempts` asks.
+        case stillRunning
+    }
+
+    /// What the plugin's action `action` printed on the machine `label`:
+    /// invoked, then its log record asked for until it's no longer running.
+    func output(of action: String, on label: String) async -> Result<String, ActionFailure> {
         let invoked: [String: Any]
-        switch await run(["plugin", "action", "invoke", Self.actionID, "--plugin", Self.pluginID], on: label) {
-        case .failure(let failure): return .failure(failure)
+        switch await run(["plugin", "action", "invoke", action, "--plugin", Self.pluginID], on: label) {
+        case .failure(let failure): return .failure(.herdr(failure))
         case .success(let result): invoked = result
         }
         guard let logID = (invoked["log"] as? [String: Any])?["log_id"] as? String else {
-            return .failure(Failure("Herdr didn't say where \(label)'s ping list went"))
+            return .failure(.noLog)
         }
         for attempt in 0..<max(1, waitAttempts) {
             if attempt > 0 {
-                guard (try? await wait(waitInterval)) != nil else { return .failure(Failure("\(label) didn't answer in time")) }
+                guard (try? await wait(waitInterval)) != nil else { return .failure(.herdr(Failure("\(label) didn't answer in time"))) }
             }
             let listed: [String: Any]
             switch await run(["plugin", "log", "list", "--plugin", Self.pluginID, "--limit", String(Self.logLimit)], on: label) {
-            case .failure(let failure): return .failure(failure)
+            case .failure(let failure): return .failure(.herdr(failure))
             case .success(let result): listed = result
             }
             let logs = listed["logs"] as? [[String: Any]] ?? []
             guard let record = logs.first(where: { $0["log_id"] as? String == logID }) else {
-                return .failure(Failure("Herdr lost \(label)'s ping list"))
+                return .failure(.lost)
             }
             switch record["status"] as? String {
             case "running":
                 continue
             case "succeeded":
-                return decode(record["stdout"] as? String ?? "", machine: label)
+                return .success(record["stdout"] as? String ?? "")
             default:
-                return .failure(Failure("shipyard on \(label) couldn't list its pings"))
+                return .failure(.failed)
             }
         }
-        return .failure(Failure("\(label) is still listing its pings"))
+        return .failure(.stillRunning)
     }
 
     /// The list `stdout` holds, its pings marked with `label`.

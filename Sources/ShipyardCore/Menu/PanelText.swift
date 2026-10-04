@@ -73,11 +73,15 @@ public enum PanelText {
     }
 
     private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
+        // A note: its number with its prefix, then its labels.
+        if let note = row.item.note { return (note.reference.map { [$0] } ?? []) + note.labels }
         let repository = showingRepository && !row.repository.isEmpty ? [repositoryName(row.repository)] : []
         let subject: [String] = switch row.kind {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         case .ping: pingDetail(row)
+        // Above: a note's line is its own.
+        case .note: []
         }
         // A ping written before pings were numbered has none (0).
         return (row.number > 0 ? ["#\(row.number)"] : []) + repository + subject
@@ -92,6 +96,22 @@ public enum PanelText {
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
         let parts = [row.machine, sender(row), body].compactMap { $0 }
         return parts.isEmpty ? ["ping"] : parts
+    }
+
+    /// The list layout's number column: a note's number with its prefix,
+    /// "SHIP-7"; any other row's number, "21"; nothing for a row without one
+    /// (a ping written before pings were numbered).
+    public static func number(_ row: MenuRow) -> String {
+        if row.kind == .note { return row.item.note?.reference ?? "" }
+        return row.number > 0 ? String(row.number) : ""
+    }
+
+    /// A note's labels, as the list layout's narrow column names them:
+    /// "ideation, brainstorming"; `nil` for a note without labels, or any
+    /// other row.
+    public static func noteLabels(_ row: MenuRow) -> String? {
+        guard let labels = row.item.note?.labels, !labels.isEmpty else { return nil }
+        return labels.joined(separator: ", ")
     }
 
     /// What a ping's row names in the list layout's narrow column: the
@@ -160,11 +180,13 @@ public enum PanelText {
         case .noAction: return "ping, click marks it seen"
         case nil: break
         }
+        if row.kind == .note { return "note, opens in Notion" }
         let kind = switch row.kind {
         case .pullRequest: "pull request"
         case .issue: "issue"
         case .workflowRun: "workflow run"
         case .ping: "ping"
+        case .note: "note"
         }
         return "\(state(row.state)) \(kind)"
     }

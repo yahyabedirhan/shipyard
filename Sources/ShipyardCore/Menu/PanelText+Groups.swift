@@ -25,6 +25,7 @@ extension PanelText {
         case .issue: "Issues"
         case .workflowRun: "Runs"
         case .ping: "Pings"
+        case .note: "Notes"
         }
     }
 

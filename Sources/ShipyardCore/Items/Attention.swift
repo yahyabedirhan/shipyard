@@ -80,9 +80,10 @@ public struct Attention: Equatable, Sendable {
 
     /// Whether an item in this state may need attention at all: open ones
     /// (drafts included, pings too) and failed workflow runs. Closed,
-    /// merged, running and succeeded never do.
+    /// merged, running and succeeded never do, and neither does a note,
+    /// the user's own.
     static func canNeedAttention(_ item: Item) -> Bool {
-        item.state.isOpen || item.state == .failed
+        item.kind != .note && (item.state.isOpen || item.state == .failed)
     }
 
     /// Records the version of `item` the user has seen now.
@@ -149,6 +150,8 @@ public struct AttentionCounts: Equatable, Sendable {
         case .issue: issues += 1
         case .workflowRun: workflowRuns += 1
         case .ping: pings += 1
+        // Never: a note doesn't need attention.
+        case .note: break
         }
     }
 }

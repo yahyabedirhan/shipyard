@@ -51,7 +51,8 @@ struct TabsLayout: View {
 
     // MARK: - Under the strip
 
-    /// What the tab needs, and Mark all seen (or Mark seen) for it.
+    /// What the tab needs, and Mark all seen (or Mark seen) for it; on a
+    /// project's tab, its new-note icon too.
     private func summary(_ content: MenuTabContent) -> some View {
         HStack(spacing: 4) {
             if content.attentionCount == 0 {
@@ -70,6 +71,10 @@ struct TabsLayout: View {
                     withAnimation(Motion.seen) { actions.markAllSeen(section(for: tab)) }
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
+            }
+            // A project's tab stands for its header: its new-note icon is here.
+            if let section = section(for: tab), let newNote = section.newNote {
+                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
             }
         }
         .font(TypeScale.meta)

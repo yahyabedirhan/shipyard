@@ -69,11 +69,12 @@ jobs:
       # Builds the libraries, the CLI and the tests on Linux, then runs them.
       - name: test
         run: swift test
-      # The Linux `shipyard` links ShipyardCommand and ShipyardPings only
-      # (ADR 0006). A debug build links every object of every module it
-      # depends on, so a symbol of another module (its mangled name, the
-      # name's length then the name) means the build depends on it.
-      - name: the linux cli links command and pings only
+      # The Linux `shipyard` links ShipyardCommand, ShipyardPings,
+      # ShipyardCLISettings and ShipyardNotices only, with TOMLDecoder for
+      # cli.toml (ADR 0006, 0008, 0010). A debug build links every object of every module it depends
+      # on, so a symbol of another module (its mangled name, the name's
+      # length then the name) means the build depends on it.
+      - name: the linux cli links command, pings, cli settings and notices only
         run: |
           swift build --product shipyard-cli
           bin="$(swift build --show-bin-path)/shipyard-cli"
@@ -81,9 +82,10 @@ jobs:
           symbols="$(mktemp)"
           nm "$bin" > "$symbols"
           grep -q 13ShipyardPings "$symbols" || { echo "nm found no ShipyardPings symbol in $bin, so it can't check the links"; exit 1; }
-          if grep -E '12ShipyardCore|14ShipyardConfig|15ShipyardControl|11TOMLDecoder' "$symbols" > "$symbols.foreign"; then
+          grep -q 15ShipyardNotices "$symbols" || { echo "nm found no ShipyardNotices symbol in $bin: the Linux shipyard has no notify"; exit 1; }
+          if grep -E '12ShipyardCore|14ShipyardConfig|15ShipyardControl' "$symbols" > "$symbols.foreign"; then
             head -5 "$symbols.foreign"
-            echo "the Linux shipyard links a module other than ShipyardCommand and ShipyardPings"
+            echo "the Linux shipyard links a module other than ShipyardCommand, ShipyardPings, ShipyardCLISettings and ShipyardNotices"
             exit 1
           fi
       - name: list the sources this build holds

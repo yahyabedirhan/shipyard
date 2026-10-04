@@ -16,4 +16,7 @@ struct LayoutActions {
     var toggleShowMore: (RowGroup) -> Void
     /// Opens the project's first repository on GitHub (Return on its header).
     var openRepository: (MenuSection) -> Void
+    /// Starts a note in the project and opens it in Notion (the header's
+    /// new-note icon).
+    var startNote: (MenuSection) -> Void
 }

@@ -67,7 +67,7 @@ public enum PingCommand {
 
     /// The environment variable Herdr sets in each of its panes to that
     /// pane's id, which `--herdr` without an id takes.
-    static let herdrPaneVariable = "HERDR_PANE_ID"
+    public static let herdrPaneVariable = "HERDR_PANE_ID"
 
     /// The environment variable Herdr sets in the panes of a named session
     /// (`herdr --session <name>`) to its name, inherited from its server.
@@ -77,7 +77,7 @@ public enum PingCommand {
     /// focused in on a click: `HERDR_SESSION`, when it names one. `nil` in
     /// Herdr's default session (where it's unset, or `default`) and outside
     /// Herdr.
-    static func herdrSession(_ variables: [String: String]) -> String? {
+    public static func herdrSession(_ variables: [String: String]) -> String? {
         let name = variables[herdrSessionVariable]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return name.isEmpty || name == "default" ? nil : name
     }
@@ -88,7 +88,7 @@ public enum PingCommand {
     /// own (`herdr`) in its panes, so then `__CFBundleIdentifier`, the app
     /// macOS launched the process tree from, does, and last the variables a
     /// terminal sets for itself. `nil` when none says.
-    static func outerTerminal(_ variables: [String: String]) -> String? {
+    public static func outerTerminal(_ variables: [String: String]) -> String? {
         let known = [
             "ghostty": "com.mitchellh.ghostty",
             "iTerm.app": "com.googlecode.iterm2",
@@ -223,7 +223,7 @@ public enum PingCommand {
         if let project = request.project { return .project(project) }
         if let repository = request.repository { return .repository(repository) }
         guard let folder else { return .none(why: "the ping names no repository") }
-        switch workingRepository(folder: folder, git: git) {
+        switch GitRemote.workingRepository(folder: folder, git: git, filing: "ping") {
         case .success(let slug): return .repository(slug)
         case .failure(let reason): return .none(why: reason.message)
         }
@@ -265,32 +265,15 @@ public enum PingCommand {
     /// `-` and `_`, starting with a letter or digit. Generated ids are such
     /// ids too. One rule for every id keeps it a safe file name and a URL
     /// path, the same on case-insensitive disks.
-    static func isID(_ id: String) -> Bool {
+    public static func isID(_ id: String) -> Bool {
         // `\A` and `\z`, not `^` and `$`, which also match before a
         // trailing newline: "build-42\n" isn't an id.
         id.range(of: #"\A[a-z0-9][a-z0-9_-]{0,63}\z"#, options: .regularExpression) != nil
     }
 
     /// What's wrong with an id that isn't one, for the error line.
-    static func idRule(_ id: String) -> String {
+    public static func idRule(_ id: String) -> String {
         "an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`"
-    }
-
-    /// Why the working folder names no repository, as the error line says it.
-    struct NoRepository: Error, Equatable {
-        var message: String
-    }
-
-    /// The repository of the working folder `url`: its git remote `origin`, as `owner/name`.
-    static func workingRepository(folder url: URL, git: any GitRemoteLookup) -> Result<String, NoRepository> {
-        let folder = url.path
-        guard let origin = git.origin(in: url) else {
-            return .failure(NoRepository(message: "the working folder (\(folder)) isn't a git repository with a remote `origin` to file the ping by"))
-        }
-        guard let slug = GitRemote.repository(fromURL: origin) else {
-            return .failure(NoRepository(message: "the working folder's remote `origin` (\(origin)) doesn't name a repository as owner/name"))
-        }
-        return .success(slug)
     }
 
     /// A ping's arguments, read.
@@ -414,7 +397,7 @@ public enum PingCommand {
     /// prints them: a workspace, a colon, then `t` or `p` and a number
     /// (`w1:t2`, `w1:p3`). Only such an argument after `--herdr` is its id,
     /// so `--herdr "Ready"` still reads "Ready" as the title.
-    static func isHerdrID(_ argument: String) -> Bool {
+    public static func isHerdrID(_ argument: String) -> Bool {
         argument.range(of: #"\A[^\s:]+:[tp][0-9]+\z"#, options: .regularExpression) != nil
     }
 

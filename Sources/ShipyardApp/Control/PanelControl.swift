@@ -22,7 +22,7 @@ protocol PanelControlling: AnyObject {
     /// Expands the project's section.
     func unfold(_ project: String) throws(PanelRefusal)
     /// Shows every row of the project's group of `kind`
-    /// (`pull-requests`, `issues`, `workflow-runs`, `pings`).
+    /// (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`).
     func showMore(_ project: String, kind: String) throws(PanelRefusal)
     /// Selects the tab `name` names in the tabs layout, and returns its
     /// title (`All`, or the project's name).

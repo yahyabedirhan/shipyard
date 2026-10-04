@@ -109,6 +109,8 @@ extension EventKind {
         case .runSucceeded: "Run #\(number) succeeded"
         // A ping's headline is its title (`Event.headline`), not its number.
         case .pingSent: "New ping"
+        // No item has one: a notice's title is its own (`Notice.title`).
+        case .agentNotice: "New notice"
         // No item has one: a control event's title names its agent (`ControlNotice`).
         case .controlStarted: "An agent is using shipyard"
         case .controlEnded: "An agent is done with shipyard"
