@@ -7,23 +7,23 @@ import TOMLDecoder
 /// setting appears in both (ADR 0008). Every key is optional, so a missing
 /// or empty file is the defaults.
 public struct CLISettings: Equatable, Sendable {
-    /// `[notify]`: where `shipyard notify` sends a notice.
-    public var notify: NotifySettings
+    /// `[notices]`: where `shipyard notify` sends a notice.
+    public var notices: NoticeSettings
 
-    public init(notify: NotifySettings = NotifySettings()) {
-        self.notify = notify
+    public init(notices: NoticeSettings = NoticeSettings()) {
+        self.notices = notices
     }
 
     /// What a missing or empty `cli.toml` means.
     public static let defaults = CLISettings()
 }
 
-/// `cli.toml`'s `[notify]` table: where this machine's `shipyard notify`
+/// `cli.toml`'s `[notices]` table: where this machine's `shipyard notify`
 /// sends a notice. With `app-machine` set, straight to the app on that Mac
 /// over the user's tailnet, at `<app-scheme>://<app-machine>:<app-port>` (ADR
 /// 0010). A new setting is a property, a key in
-/// `CLISettings.Reader.notifyKeys` and a line in `CLISettings.Reader.notify(_:)`.
-public struct NotifySettings: Equatable, Sendable {
+/// `CLISettings.Reader.noticesKeys` and a line in `CLISettings.Reader.notices(_:)`.
+public struct NoticeSettings: Equatable, Sendable {
     /// `app-machine`: the Mac running the app, by its MagicDNS name (`my-mac`
     /// or `my-mac.tail1234.ts.net`); none by default.
     public var appMachine: String?
@@ -46,7 +46,7 @@ public struct NotifySettings: Equatable, Sendable {
     }
 }
 
-/// One thing wrong with `cli.toml`: "line 3: unknown setting `notify.app-machin`".
+/// One thing wrong with `cli.toml`: "line 3: unknown setting `notices.app-machin`".
 public struct CLISettingsIssue: Hashable, Sendable, CustomStringConvertible {
     /// 1-based line in `cli.toml`, when the problem can be placed.
     public var line: Int?
@@ -93,38 +93,38 @@ extension CLISettings {
     final class Reader {
         private(set) var issues: [CLISettingsIssue] = []
 
-        static let rootKeys = ["notify"]
-        static let notifyKeys = ["app-machine", "app-scheme", "app-port"]
+        static let rootKeys = ["notices"]
+        static let noticesKeys = ["app-machine", "app-scheme", "app-port"]
 
         func settings(from root: TOMLTable) -> CLISettings {
             rejectUnknownKeys(in: root, path: [], known: Self.rootKeys)
             var settings = CLISettings()
-            if let table = table(root, "notify", path: []) {
-                settings.notify = notify(table)
+            if let table = table(root, "notices", path: []) {
+                settings.notices = notices(table)
             }
             return settings
         }
 
-        func notify(_ table: TOMLTable) -> NotifySettings {
-            rejectUnknownKeys(in: table, path: ["notify"], known: Self.notifyKeys)
-            var settings = NotifySettings()
-            if let raw = string(table, "app-machine", path: ["notify"]) {
+        func notices(_ table: TOMLTable) -> NoticeSettings {
+            rejectUnknownKeys(in: table, path: ["notices"], known: Self.noticesKeys)
+            var settings = NoticeSettings()
+            if let raw = string(table, "app-machine", path: ["notices"]) {
                 let machine = raw.trimmingCharacters(in: .whitespaces)
                 if machine.isEmpty {
-                    issue("`notify.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way")
+                    issue("`notices.app-machine` names your Mac by its MagicDNS name, such as `my-mac`; leave it out to send notices no faster way")
                 } else if machine.contains("://") {
-                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`: `app-scheme` and `app-port` are settings of their own")
+                    issue("`notices.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`: `app-scheme` and `app-port` are settings of their own")
                 } else if !Self.isHostName(machine) {
-                    issue("`notify.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`")
+                    issue("`notices.app-machine` is your Mac's MagicDNS name alone, such as `my-mac`, not `\(machine)`")
                 } else {
                     settings.appMachine = machine
                 }
             }
-            if let raw = string(table, "app-scheme", path: ["notify"]) {
-                if let scheme = NotifySettings.Scheme(rawValue: raw) {
+            if let raw = string(table, "app-scheme", path: ["notices"]) {
+                if let scheme = NoticeSettings.Scheme(rawValue: raw) {
                     settings.appScheme = scheme
                 } else {
-                    issue("`notify.app-scheme` is `http` or `https`, not `\(raw)`")
+                    issue("`notices.app-scheme` is `http` or `https`, not `\(raw)`")
                 }
             }
             if table.contains(key: "app-port") {
@@ -132,10 +132,10 @@ extension CLISettings {
                     if NoticePort.range.contains(Int(port)) {
                         settings.appPort = Int(port)
                     } else {
-                        issue("`notify.app-port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))")
+                        issue("`notices.app-port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))")
                     }
                 } else {
-                    issue("`notify.app-port` must be a whole number")
+                    issue("`notices.app-port` must be a whole number")
                 }
             }
             return settings

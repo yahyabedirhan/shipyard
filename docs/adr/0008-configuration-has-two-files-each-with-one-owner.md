@@ -2,7 +2,7 @@
 
 Shipyard's settings live in two files. **`config.toml`** is the app's: it exists on the Mac only, and `ShipyardConfig` reads it. **`cli.toml`** is the `shipyard` command's, on every machine: agent-side code reads it, through `ShipyardCLISettings`. On a machine without the app it's `$XDG_CONFIG_HOME/shipyard/cli.toml` (`~/.config/shipyard/cli.toml` by default). On the Mac it sits beside the `config.toml` the app reads. Each `shipyard` build picks the place once, when it assembles its commands, as it picks its ping filing (ADR 0006).
 
-**No setting appears in both files.** A setting belongs to the side that acts on it: what the app shows, listens for or notifies about goes in `config.toml`, and what the command does on the machine it runs on goes in `cli.toml`. A table's name may appear in both when each file's table holds only its own side's settings. `[notify]` is the first: `config.toml`'s says whether the app listens for notices, and `cli.toml`'s which Mac this machine sends them to.
+**No setting appears in both files.** A setting belongs to the side that acts on it: what the app shows, listens for or notifies about goes in `config.toml`, and what the command does on the machine it runs on goes in `cli.toml`. A table's name may appear in both when each file's table holds only its own side's settings. `[notices]` is the first: `config.toml`'s says whether the app listens for notices, and `cli.toml`'s which Mac this machine sends them to.
 
 The Mac's `shipyard ping` keeps reading `config.toml` to file pings against the projects, as ADR 0006 allows: only the Mac build links `ShipyardConfig`, and filing reads the app's projects rather than a setting of the command's own.
 

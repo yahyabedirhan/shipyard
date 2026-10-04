@@ -7,8 +7,8 @@ import ShipyardNotices
 
 /// The app's listener for notices from the user's other machines (ADR
 /// 0010): an HTTP server on 127.0.0.1 only, at the port `config.toml`'s
-/// `[notify]` names, which `tailscale serve` exposes to the tailnet. It's
-/// started only with `[notify] listen = true`.
+/// `[notices]` names, which `tailscale serve` exposes to the tailnet. It's
+/// started only with `[notices] listen = true`.
 ///
 /// Each connection is one request, `POST /notify` with a notice request's
 /// JSON (`TailnetWire`: a notice to show, or a withdrawal), answered with the verdict `respond` gives for it and

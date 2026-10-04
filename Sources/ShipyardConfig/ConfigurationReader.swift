@@ -85,7 +85,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notify", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -146,14 +146,14 @@ final class ConfigurationReader {
             }
         }
 
-        if let notify = table(node, "notify") {
-            warnUnknownKeys(in: notify, known: ["listen", "port"])
-            if let value = bool(notify, "listen") { config.notify.listen = value }
-            if let port = int(notify, "port") {
+        if let notices = table(node, "notices") {
+            warnUnknownKeys(in: notices, known: ["listen", "port"])
+            if let value = bool(notices, "listen") { config.notices.listen = value }
+            if let port = int(notices, "port") {
                 if NoticePort.range.contains(port) {
-                    config.notify.port = port
+                    config.notices.port = port
                 } else {
-                    error("`port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))", at: notify.path + [.key("port")])
+                    error("`port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))", at: notices.path + [.key("port")])
                 }
             }
         }

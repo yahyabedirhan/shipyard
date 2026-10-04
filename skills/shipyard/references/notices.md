@@ -47,12 +47,12 @@ A notice reaches the user's Mac one of three ways. You don't pick one: the machi
 | Where you run | Route | What it prints |
 |---|---|---|
 | the Mac | straight to the running shipyard app, which says whether it was shown; shipyard is never started for a notice | `shown` |
-| another machine whose `cli.toml` has `[notify] app-machine` set | over the user's tailnet to the Mac's app, within about a second, which says whether it was shown | `shown` |
+| another machine whose `cli.toml` has `[notices] app-machine` set | over the user's tailnet to the Mac's app, within about a second, which says whether it was shown | `shown` |
 | another machine without `app-machine` | left with the herdr-shipyard plugin, which holds it until the Mac's next poll of the machine, the poll remote pings take | `queued; shown within about 30 seconds if the Mac is awake` |
 
 **No Herdr on the tailnet route.** A notice sent over the tailnet carries no machine, so a `--herdr` click or a `herdr` button would focus the Mac's own Herdr, not your pane: the command refuses it before sending (exit 2), and the Mac refuses one that arrives anyway. There, use `--open` or `--app`; to keep the Herdr action, leave `app-machine` out of the machine's `cli.toml` so the notice takes the poll route, which focuses your pane on your machine as a remote ping's does.
 
-Setting up the tailnet route is in Receive notices from another machine, below. To tell which a machine uses before sending, look for `app-machine` under `[notify]` in its `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`); no file, or no `app-machine` in it, means the poll route.
+Setting up the tailnet route is in Receive notices from another machine, below. To tell which a machine uses before sending, look for `app-machine` under `[notices]` in its `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`); no file, or no `app-machine` in it, means the poll route.
 
 On the poll route, `queued` isn't `shown`:
 
@@ -74,7 +74,7 @@ On the poll route, `queued` isn't `shown`:
   - on the poll route, the herdr-shipyard plugin is missing ("… isn't the herdr-shipyard plugin's link …"), too old to hold notices ("… can't hold notices; update it …"), or didn't queue this one ("the herdr-shipyard plugin didn't queue this notice: …", such as a notice too large). Tell the user the line if it mattered; installing or updating the plugin is theirs to do.
   - on the tailnet route:
     - "couldn't reach the app machine `<name>` …" or "the app machine `<name>` didn't answer within <n> seconds …": the Mac is asleep, away or off the tailnet. Nothing is queued or retried.
-    - "the app machine `<name>` answered HTTP <status> without a verdict …": the Mac answered, but not shipyard: the app isn't running, `[notify] listen` isn't `true`, or `tailscale serve` points elsewhere.
+    - "the app machine `<name>` answered HTTP <status> without a verdict …": the Mac answered, but not shipyard: the app isn't running, `[notices] listen` isn't `true`, or `tailscale serve` points elsewhere.
     - "… isn't this Mac's Tailscale login …", "the request carried no Tailscale login …" or "shipyard couldn't learn this Mac's Tailscale login …": the identity check refused it (see below).
   - on another machine, "…/cli.toml doesn't read (…)": fix the file it names; nothing is sent either way until it reads.
 - **2**: the arguments don't read, with what's wrong: a missing title, two titles, an unknown option, `--repo` and `--project` together, two click actions, a fourth button, a button without `<label>=<action>`, a level other than `passive` or `active`, an id that isn't one, a `--herdr` click or a `herdr` button on the tailnet route, or an image that can't be read, isn't a PNG, JPEG or GIF, or is over 5 MB.
@@ -87,7 +87,7 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
 2. **The Mac listens.** In `config.toml`:
 
    ```toml
-   [notify]
+   [notices]
    listen = true
    # port = 47420   the default; change it here and in the two steps below together
    ```
@@ -102,13 +102,13 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
 4. **The machine names its Mac** in its own `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`), by the Mac's MagicDNS name, short or full (`tailscale status` on the machine lists it):
 
    ```toml
-   [notify]
+   [notices]
    app-machine = "my-mac"
    # app-scheme = "http"   http or https, as tailscale serve exposes it
    # app-port = 47420      the port tailscale serve exposes
    ```
 
-   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notify]` has the Mac's `listen` and `port`), and an unknown key in it is an error.
+   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notices]` has the Mac's `listen` and `port`), and an unknown key in it is an error.
 5. **A test notice**, from the machine:
 
    ```sh

@@ -52,7 +52,7 @@ public enum NotifyCommand {
 
         Where it runs decides its route. On the Mac, it goes to the running app,
         and prints `shown` once the app showed it. On another machine whose
-        cli.toml sets [notify] app-machine (with app-scheme and app-port when
+        cli.toml sets [notices] app-machine (with app-scheme and app-port when
         tailscale serve needs others), it goes over the tailnet to the app on
         that Mac, and prints `shown` the same way; a --herdr click or a herdr
         button can't go that way (the Mac would focus its own Herdr). Otherwise

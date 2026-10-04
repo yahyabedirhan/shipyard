@@ -106,7 +106,7 @@ An agent's disposable status message, such as "tests running" or "done", posted 
 _Avoid_: Ping, notification, status ping, toast
 
 **App machine**:
-The Mac running the app, as another machine's `shipyard` names it: `[notify] app-machine` in that machine's `cli.toml`, by the Mac's MagicDNS name. A notice from that machine goes straight to the app machine over the user's tailnet, where the app takes it only from the Mac's own Tailscale login (ADR 0010). A machine without one leaves its notices for the Mac's poll.
+The Mac running the app, as another machine's `shipyard` names it: `[notices] app-machine` in that machine's `cli.toml`, by the Mac's MagicDNS name. A notice from that machine goes straight to the app machine over the user's tailnet, where the app takes it only from the Mac's own Tailscale login (ADR 0010). A machine without one leaves its notices for the Mac's poll.
 _Avoid_: Host, server, target Mac
 
 **Known agent**:

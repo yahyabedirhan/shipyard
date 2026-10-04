@@ -107,7 +107,7 @@ final class AppServices {
     /// written by the control server.
     let leaseIndicator = LeaseIndicator()
     private var controlServer: ControlServer?
-    /// The listener for notices from other machines, while `[notify]
+    /// The listener for notices from other machines, while `[notices]
     /// listen = true`; `nil` otherwise, so nothing listens unasked.
     private var noticeListener: NoticeListener?
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")

@@ -6,7 +6,7 @@ import Testing
 
 /// `shipyard notify` as an agent runs it on a machine without the app,
 /// through `ShipyardCLI.run` with that build's table: `cli.toml`'s
-/// `[notify]` decides the route, and with `app-machine` set the notice goes
+/// `[notices]` decides the route, and with `app-machine` set the notice goes
 /// to the Mac over the tailnet, one HTTP request answered with the app's
 /// verdict. A recording HTTP stands in for the network. Whether the app
 /// shows it is the app's to say (`TailnetNoticeTests`).
@@ -43,7 +43,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("with app-machine set the notice is posted to the Mac as its JSON, and `shown` printed once the app showed it")
     func shown() throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         let result = shipyard(["notify", "Tests running", "--body", "12 of 40 passed", "--from", "claude"], http: http)
@@ -59,7 +59,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("a withdrawal goes the same way, as its own JSON, and prints `withdrawn` once the app did it")
     func withdraw() throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         let result = shipyard(["notify", "withdraw", "tests"], http: http)
@@ -77,7 +77,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("the scheme and port come from cli.toml, as tailscale serve exposes the app's port")
     func schemeAndPort() throws {
-        try write("[notify]\napp-machine = \"my-mac.tail1234.ts.net\"\napp-scheme = \"https\"\napp-port = 443\n")
+        try write("[notices]\napp-machine = \"my-mac.tail1234.ts.net\"\napp-scheme = \"https\"\napp-port = 443\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         _ = shipyard(["notify", "Done"], http: http)
@@ -87,7 +87,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("the app's refusal exits 1 with its reason, whatever the HTTP status it came with", arguments: [200, 403])
     func refused(status: Int) throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: status, body: Data(#"{"refused":"notices are off for project `shop`"}"#.utf8)))
 
         let result = shipyard(["notify", "Done"], http: http)
@@ -101,17 +101,17 @@ struct TailnetNotifyCommandTests {
         (.timedOut, "the app machine `my-mac` didn't answer within 3 seconds, so this notice may not have been shown"),
         (.answered(status: 502, body: Data("Bad Gateway".utf8)),
          "the app machine `my-mac` answered HTTP 502 without a verdict, so this notice wasn't shown; "
-            + "check that shipyard runs there with [notify] listen = true, behind tailscale serve"),
+            + "check that shipyard runs there with [notices] listen = true, behind tailscale serve"),
     ])
     func unreachable(outcome: RecordingHTTP.Outcome, line: String) throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
 
         let result = shipyard(["notify", "Done"], http: RecordingHTTP(outcome))
 
         #expect(result == CommandResult(error: "shipyard notify: \(line)\n", status: 1))
     }
 
-    @Test("without app-machine, or without cli.toml, the notice takes the poll route instead, and nothing goes over the tailnet", arguments: [nil, "", "[notify]\napp-port = 8080\n"])
+    @Test("without app-machine, or without cli.toml, the notice takes the poll route instead, and nothing goes over the tailnet", arguments: [nil, "", "[notices]\napp-port = 8080\n"])
     func unset(text: String?) throws {
         if let text { try write(text) }
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
@@ -126,7 +126,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("a cli.toml that doesn't read exits 1 naming it, and sends nothing either way")
     func malformed() throws {
-        try write("[notify]\napp-machin = \"my-mac\"\n")
+        try write("[notices]\napp-machin = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
         let poll = RecordingRoute()
 
@@ -134,7 +134,7 @@ struct TailnetNotifyCommandTests {
         #expect(poll.notices.current.isEmpty)
 
         #expect(result.status == 1)
-        #expect(result.error.hasPrefix("shipyard notify: \(settings.url.path) doesn't read (unknown setting `notify.app-machin`"), "\(result.error)")
+        #expect(result.error.hasPrefix("shipyard notify: \(settings.url.path) doesn't read (unknown setting `notices.app-machin`"), "\(result.error)")
         #expect(http.posts.current.isEmpty)
     }
 
@@ -143,7 +143,7 @@ struct TailnetNotifyCommandTests {
         ["--open", "https://example.com", "--button", "Back=herdr:w1:p3"],
     ])
     func herdrRefused(flags: [String]) throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         let result = shipyard(["notify", "Done"] + flags, http: http)
@@ -166,7 +166,7 @@ struct TailnetNotifyCommandTests {
 
     @Test("arguments that don't read exit 2 before cli.toml is read")
     func misread() throws {
-        try write("[notify]\napp-machine = \"my-mac\"\n")
+        try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
         let result = shipyard(["notify", "Done", "--colour", "red"], http: http)

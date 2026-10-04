@@ -129,7 +129,7 @@
         }
       }
     },
-    "notify": {
+    "notices": {
       "description": "Notices from your other machines' agents (shipyard notify), straight to this Mac over your tailnet. Off by default: nothing listens unless listen is true. The app listens on 127.0.0.1 only and takes only notices sent from this Mac's own Tailscale login; you expose the port with tailscale serve, and each other machine names this Mac in its own cli.toml.",
       "type": "object",
       "additionalProperties": false,

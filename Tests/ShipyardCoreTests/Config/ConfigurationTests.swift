@@ -71,7 +71,7 @@ let everyKey = """
     [remote]
     machines = ["hetzner-vps", "netcup-vps"]
 
-    [notify]
+    [notices]
     listen = true
     port = 50000
 
@@ -228,7 +228,7 @@ struct ConfigurationDecodingTests {
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.herdr == .init(terminal: "Ghostty"))
         #expect(config.remote == .init(machines: ["hetzner-vps", "netcup-vps"]))
-        #expect(config.notify == .init(listen: true, port: 50000))
+        #expect(config.notices == .init(listen: true, port: 50000))
         #expect(config.defaults.pullRequests == .init(
             show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),

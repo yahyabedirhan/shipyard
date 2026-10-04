@@ -23,4 +23,4 @@ This supersedes the 0.0.5 out-of-scope line "pings from other machines".
 
 ## Amendment, 2026-10-04: notices may reach in
 
-ADR 0010 makes one narrow exception to "a machine never reaches in": an agent's notice (`shipyard notify`) may go from another machine straight to the app on the Mac, over the user's tailnet, when the user turns it on (`[notify] listen = true`) and only from the Mac's own Tailscale login. Pings, and everything else, still go the Mac's way, through Herdr.
+ADR 0010 makes one narrow exception to "a machine never reaches in": an agent's notice (`shipyard notify`) may go from another machine straight to the app on the Mac, over the user's tailnet, when the user turns it on (`[notices] listen = true`) and only from the Mac's own Tailscale login. Pings, and everything else, still go the Mac's way, through Herdr.

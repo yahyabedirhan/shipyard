@@ -22,7 +22,7 @@ public struct Configuration: Equatable, Sendable {
     public var attention = AttentionToggles()
     public var herdr = HerdrSettings()
     public var remote = RemoteSettings()
-    public var notify = NotifySettings()
+    public var notices = NoticeSettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -103,11 +103,11 @@ extension Configuration {
         public init(machines: [String] = []) { self.machines = machines }
     }
 
-    /// `[notify]`: whether the app listens for notices from the user's
+    /// `[notices]`: whether the app listens for notices from the user's
     /// other machines (ADR 0010). Off by default: nothing listens unless
     /// the user turns it on. On, it listens on 127.0.0.1 only, at `port`,
     /// which `tailscale serve` exposes to the tailnet.
-    public struct NotifySettings: Equatable, Sendable {
+    public struct NoticeSettings: Equatable, Sendable {
         public var listen: Bool
         /// The port on 127.0.0.1; `NoticePort.default` by default.
         public var port: Int

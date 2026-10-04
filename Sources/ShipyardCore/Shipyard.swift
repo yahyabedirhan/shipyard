@@ -471,8 +471,8 @@ public final class Shipyard {
         configError = configStore.error
         configWarnings = configStore.warnings
         presets = configStore.acceptsPreset ? Preset.all : []
-        let notify = configStore.lastValid.notify
-        let port = notify.listen ? notify.port : nil
+        let notices = configStore.lastValid.notices
+        let port = notices.listen ? notices.port : nil
         if noticeListenerPort != port { noticeListenerPort = port }
         configStatusStore.record(ConfigStatus(
             checked: clock.now,
@@ -977,7 +977,7 @@ public final class Shipyard {
     }
 
     /// The port on 127.0.0.1 the app listens on for notices from other
-    /// machines, as the last valid configuration's `[notify]` says; `nil`
+    /// machines, as the last valid configuration's `[notices]` says; `nil`
     /// unless `listen = true`, so nothing listens unless the user asked.
     /// Set by every read of the configuration (`publishConfigStatus`), before
     /// any GitHub request, and observed: the app follows its changes, so the

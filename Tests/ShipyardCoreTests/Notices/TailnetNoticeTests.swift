@@ -120,7 +120,7 @@ struct TailnetNoticeTests {
 
     @Test("the listening port is announced as soon as the configuration is read, while GitHub is still answering the first refresh or a reload's")
     func announcedBeforeRefresh() async throws {
-        let harness = try Harness(stored: "gho_stored", config: "[notify]\nlisten = true\n" + Self.shop)
+        let harness = try Harness(stored: "gho_stored", config: "[notices]\nlisten = true\n" + Self.shop)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([try Harness.fixture("graphql-pull-requests.json")])
         let shipyard = harness.shipyard
@@ -139,25 +139,25 @@ struct TailnetNoticeTests {
         #expect(seen.current.first == 47420)
 
         seen.withValue { $0 = [] }
-        try harness.writeConfig("[notify]\nlisten = true\nport = 50000\n" + Self.shop)
+        try harness.writeConfig("[notices]\nlisten = true\nport = 50000\n" + Self.shop)
         await shipyard.reloadConfiguration()
         #expect(seen.current.last == 50000)
     }
 
-    @Test("the app listens for notices only with [notify] listen = true, on its port, and stops when the setting goes")
+    @Test("the app listens for notices only with [notices] listen = true, on its port, and stops when the setting goes")
     func listening() async throws {
         let harness = try await app()
         #expect(harness.shipyard.noticeListenerPort == nil)
 
-        try harness.writeConfig("[notify]\nlisten = true\n" + Self.shop)
+        try harness.writeConfig("[notices]\nlisten = true\n" + Self.shop)
         await harness.shipyard.reloadConfiguration()
         #expect(harness.shipyard.noticeListenerPort == 47420)
 
-        try harness.writeConfig("[notify]\nlisten = true\nport = 50000\n" + Self.shop)
+        try harness.writeConfig("[notices]\nlisten = true\nport = 50000\n" + Self.shop)
         await harness.shipyard.reloadConfiguration()
         #expect(harness.shipyard.noticeListenerPort == 50000)
 
-        try harness.writeConfig("[notify]\nlisten = false\nport = 50000\n" + Self.shop)
+        try harness.writeConfig("[notices]\nlisten = false\nport = 50000\n" + Self.shop)
         await harness.shipyard.reloadConfiguration()
         #expect(harness.shipyard.noticeListenerPort == nil)
     }
