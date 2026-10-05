@@ -171,7 +171,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 | L7 | `control take --wait <seconds>` (0 to 3600) from another agent waits in line, first come, first served: its connection stays open until it gets the lease (held to the cap, as L6) or its wait runs out, exit 1, "waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)". The client reads a `take`'s reply for its wait plus the usual 15 seconds. When the lease frees (released, or run out), the first waiter whose wait hasn't run out gets it, and `app status` counts the waiters. `--wait` is `take`'s alone (#178). |
 | L8 | `control` is a Mac-only command: a Linux `shipyard` answers it exit 2, "runs on the Mac", as M5 (#178). |
 | L9 | The app posts a macOS notification when a lease starts and when it ends, as the events `control.started` and `control.ended`: "<Agent> is using shipyard" over its place, and "<Agent> is done with shipyard" over why (released, its lease ran out, you stopped it). Only the top-level rules decide them (`[[defaults.notifications]]`, or the built-in list when the file has none, which holds both); a project's own list and a rule's `authors` don't apply, and the reader warns about either. Clicking either opens the panel, where the banner shows who holds shipyard. A renewal and a relaunch's handover post nothing, so one lease makes one pair (#182). |
-| L10 | The maintainer takes shipyard back with Stop in the lease's banner: the lease ends (`stopped`), and its holder is barred for 5 minutes. A barred holder's leased requests and `control take` (with or without `--wait`, so it never joins the line) are refused with exit 1 and nothing done, "the user took shipyard back; ask them before using it again". For those 5 minutes the panel shows a quiet line, "You took shipyard back from <Agent> · Allow", and Allow lifts the bar at once. When anyone waits, the first waiter gets the lease as on a release, and its banner shows above the quiet line, which stays for the whole bar. Stop and Allow are the maintainer's only clicks that reach the lease (#181). |
+| L10 | The maintainer takes shipyard back with Stop in the lease's banner: the lease ends (`stopped`), and its holder is barred for 5 minutes. A barred holder's leased requests and `control take` (with or without `--wait`, so it never joins the line) are refused with exit 1 and nothing done, "the user took shipyard back; ask them before using it again". For those 5 minutes the panel shows a quiet line, "You took shipyard back from <Agent> · Allow again", and Allow again lifts the bar at once. When anyone waits, the first waiter gets the lease as on a release, and its banner shows above the quiet line, which stays for the whole bar. Stop and Allow are the maintainer's only clicks that reach the lease (#181). |
 
 **Added in effort `notes-and-notify`**, notes (spec #187; Trace 14 follows a read, Trace 16 the new-note icon):
 
@@ -669,7 +669,7 @@ The place is `Herdr pane <HERDR_PANE_ID>` when that's set, else the working fold
 | `current(at:) -> Term?`, `waiting(at:) -> Int`, `status(at:) -> AppStatus.Lease?` | the term held at a time; how many wait in line, their waits not run out; `app status`'s lease, its seconds left rounded up, and the waiters |
 | `Refusal.message(at:timeZone:)` | `inUse` (and `queued`, which the server never sends): "shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard control take --wait <seconds>` to queue"; `waitedOut`: "waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)"; `stopped`: "the user took shipyard back; ask them before using it again" (#181) |
 | `Term.held(timeZone:)` | "you hold shipyard until <HH:mm:ss>" |
-| `LeaseBanner(status(at: now)!)` (#180) | the banner's words: `agent` (the holder's name, which the app finds a logo for with `KnownAgent(sender:)`), `place` (a folder's last component, `shop`; `Herdr pane <id>` as it is), `title` ("Claude Code uses shipyard", the first line, its first letter capitalised for a process's name), `timeLeft` (`48s` under a minute, `4m 05s` above), `waiting` (`2 waiting`, nil when nobody waits), `detail` (the smaller second line: place, time left and waiting joined by ` · `, so a Herdr pane's whole id shows), `text` (title and detail joined by ` · `, for VoiceOver); `stop` ("Stop"), its button; `tookBack(from: name)` ("You took shipyard back from Claude Code"), a stopped holder's quiet line, and `allow` ("Allow"), its button (#181) |
+| `LeaseBanner(status(at: now)!)` (#180) | the banner's words, in two lines (#216): `agent` (the holder's name, which the app finds a logo for with `KnownAgent(sender:)`), `place` (a folder's last component, `shop`; `Herdr pane <id>` as it is), `headline` (the first line: the purpose, its first letter capitalised, or "Claude Code uses shipyard" when the agent gave none), `timeLeft` (`48s left` under a minute, `4m 05s left` above, beside Stop), `waiting` (`2 waiting`, nil when nobody waits), `step`, `detail` (the smaller second line: the step and waiting joined by ` · `, nil when both are; the logo names the agent), `help` ("Claude Code in shop", the tooltip), `text` (headline, detail, time left and help joined by ` · `, for VoiceOver); `stop` ("Stop"), its button; `tookBack(from: name)` ("You took shipyard back from Claude Code"), a stopped holder's quiet line, and `allow` ("Allow again"), its button (#181) |
 
 The transitions are for the app to redraw and notify by (the banner, the dot and the lease's notifications build on them); a refusal, or a request that doesn't read, changes nothing.
 
@@ -1148,14 +1148,15 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               <CLILinkCard> (the offer to link the CLI, always shown here, under the skill's)
       banners                 the lease's banner first, in any phase and layout, while an agent holds it (#180,
                               <LeaseBannerView>): the agent's logo (AgentMarkView from KnownAgent(sender:), a generic
-                              terminal mark for an unknown agent), "Claude Code uses shipyard" over a smaller line, the
-                              place (cut in the middle only when it can't fit) · the time left · "2 waiting"
-                              (LeaseBanner's words, #199), on a yellow tint;
+                              terminal mark for an unknown agent), the headline (the purpose, or "Claude Code uses
+                              shipyard") over a smaller line with the step · "2 waiting", cut in the middle so the
+                              step's "12s ago" stays whole, then the time left and Stop, centred on both lines; the
+                              place is the tooltip (LeaseBanner's words, #199, #216), on a yellow tint;
                               a 1 s TimelineView aligned to the lease's end ticks the countdown; it slides in and out
-                              as the lease starts and ends; Stop at its end (AppServices.stopLease, #181) ·
+                              as the lease starts and ends; Stop takes shipyard back (AppServices.stopLease, #181) ·
                               under it, a gray quiet line per agent the maintainer stopped, while its 5-minute bar
                               lasts, also under the next holder's banner: "You took shipyard back from Claude Code",
-                              Allow (AppServices.allowLeaseHolder, #181) ·
+                              Allow again at its right edge where Stop sits (AppServices.allowLeaseHolder, #181, #216) ·
                               config error (any phase) · config warnings (any phase, gray: unknown settings the
                               file ignores, "config.toml line 1: unknown setting `future-key` (ignored)", with a
                               "did you mean" when one is close) · once ready: refresh delay (stretched, backed off: amber;
@@ -2018,13 +2019,13 @@ Setup: the app runs, the lease is free. Agent A is Claude Code (`CLAUDE_CODE_SES
 | Step | Call (module) | State after |
 |---|---|---|
 | 1 | 12:00:00, A: `shipyard panel open` → `ControlCommands` → `Holder.find` (Control) | holder `{ key: "CLAUDE_CODE_SESSION_ID=5f1c", name: "Claude Code", place: "/Users/me/shop" }`; `ControlMessage(.panelOpen, holder)` sent at version 2 |
-| 2 | `ControlServer.reply` → `ControlLease.use(by: A, at: 12:00:00)` (App, Control) | free, so taken: A until 12:01:00 (`started`); `LeaseIndicator.lease` set, so the menu bar icon gets its yellow dot and the panel's banner reads "Claude Code uses shipyard" over "shop · 1m 00s" (#180); a timer set for 12:01:00; `PanelControl.open()`; reply "panel open", exit 0 |
+| 2 | `ControlServer.reply` → `ControlLease.use(by: A, at: 12:00:00)` (App, Control) | free, so taken: A until 12:01:00 (`started`); `LeaseIndicator.lease` set, so the menu bar icon gets its yellow dot and the panel's banner reads "Claude Code uses shipyard" beside "1m 00s left" (#180, #216); a timer set for 12:01:00; `PanelControl.open()`; reply "panel open", exit 0 |
 | 3 | 12:00:20, B: `shipyard screenshot /tmp/b.png` → `Holder.find` walks the process table: `shipyard` ← `zsh` ← `codex` (pid 300, started at t) | holder `{ key: "process:300@<t in µs>", name: "codex", place: "Herdr pane w1-2" }` |
 | 4 | `ControlServer.reply` → `use(by: B, at: 12:00:20)` | refused (`ok: false`) with "shipyard is in use by Claude Code in /Users/me/shop until 12:01:00 (40s left); `shipyard control take --wait <seconds>` to queue"; nothing captured; B exits 1 with that line |
 | 5 | B: `shipyard app status` (not leased) | `lease: Claude Code in /Users/me/shop, 40s left, 0 waiting`, exit 0; the lease unchanged |
 | 6 | 12:00:30, A: `shipyard panel fold blog` | renewed: A until 12:01:30 (`renewed`); folded |
 | 7 | 12:01:30, nothing from A since | the timer fires: `settleLease()`, A's lease `ended(.expired)`; the dot and the banner go (#180) |
-| 8 | 12:01:40, B: `shipyard screenshot /tmp/b.png` | B takes it until 12:02:40 (`started`), the dot and B's banner ("Codex uses shipyard" over "Herdr pane w1-2 · …") back; the capture hides them, then they return |
+| 8 | 12:01:40, B: `shipyard screenshot /tmp/b.png` | B takes it until 12:02:40 (`started`), the dot and B's banner ("Codex uses shipyard" beside "… left") back; the capture hides them, then they return |
 
 | Variant | What happens |
 |---|---|

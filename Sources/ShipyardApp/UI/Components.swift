@@ -89,15 +89,17 @@ struct CountBadge: View {
 }
 
 /// A note above the content: what's wrong or slowed down, tinted by how
-/// much it matters, with an optional link-style action.
+/// much it matters, with an optional link-style action under the words, or
+/// at the right edge, as the lease banner's Stop is, when `trailing`.
 struct Banner: View {
     let symbol: String
     let text: String
     let tint: Color
     var action: (title: String, run: () -> Void)?
+    var trailing = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: trailing ? .center : .top, spacing: 8) {
             Image(systemName: symbol)
                 .symbolRenderingMode(.hierarchical)
                 .font(.system(size: 12, weight: .semibold))
@@ -110,17 +112,26 @@ struct Banner: View {
                     .lineSpacing(1)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
-                if let action {
-                    Button(action.title, action: action.run)
-                        .buttonStyle(TextButtonStyle(tint: tint))
+                if let action, !trailing {
+                    button(action)
                 }
             }
             Spacer(minLength: 0)
+            if let action, trailing {
+                button(action)
+                    .fixedSize()
+                    .layoutPriority(1)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(tint.opacity(0.11)))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(tint.opacity(0.18), lineWidth: 0.5))
+    }
+
+    private func button(_ action: (title: String, run: () -> Void)) -> some View {
+        Button(action.title, action: action.run)
+            .buttonStyle(TextButtonStyle(tint: tint))
     }
 }
 

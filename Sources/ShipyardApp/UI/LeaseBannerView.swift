@@ -2,11 +2,12 @@ import ShipyardControl
 import ShipyardCore
 import SwiftUI
 
-/// The banner topping the panel while an agent holds the lease: the
-/// agent's logo, "Claude Code uses shipyard", then why it took shipyard
-/// and what it's doing when known, over its place, the time left and how
-/// many wait, in `LeaseBanner`'s words, and Stop, which takes shipyard
-/// back. Stop is the banner's only way into the lease.
+/// The banner topping the panel while an agent holds the lease, in two
+/// lines: the agent's logo, the headline (why it took shipyard, or
+/// "Claude Code uses shipyard") over a smaller line with its step and how
+/// many wait, then the time left and Stop, centred, in
+/// `LeaseBanner`'s words. Where it runs is the tooltip. Stop takes shipyard
+/// back, and is the banner's only way into the lease.
 struct LeaseBannerView: View {
     let lease: AppStatus.Lease
     /// Takes shipyard back from the holder (`ControlServer.stopLease`).
@@ -17,45 +18,31 @@ struct LeaseBannerView: View {
         HStack(spacing: 8) {
             LeaseAgentMark(agent: KnownAgent(sender: banner.agent))
             VStack(alignment: .leading, spacing: 1) {
-                Text(banner.title)
+                Text(banner.headline)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.85))
                     .lineLimit(1)
-                if let purpose = banner.purpose {
-                    Text(purpose)
-                        .font(TypeScale.meta)
-                        .foregroundStyle(.primary.opacity(0.85))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                if let step = banner.step {
-                    Text(step)
+                    .truncationMode(.tail)
+                if let detail = banner.detail {
+                    // A new step replaces the old one outright: a crossfade drew both at once.
+                    // Cut in the middle, so the step's "12s ago" and the queue stay whole.
+                    Text(detail)
                         .font(TypeScale.meta)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                        .truncationMode(.tail)
-                        .contentTransition(.opacity)
-                }
-                HStack(spacing: 4) {
-                    // The place gives way first, cut in the middle, so the countdown stays whole.
-                    Text(banner.place)
-                        .lineLimit(1)
                         .truncationMode(.middle)
-                    Group {
-                        Text("·")
-                        Text(banner.timeLeft)
-                            .contentTransition(.numericText(countsDown: true))
-                        if let waiting = banner.waiting {
-                            Text("·")
-                            Text(waiting)
-                        }
-                    }
-                    .fixedSize()
+                        .contentTransition(.identity)
                 }
-                .font(TypeScale.meta)
-                .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            // The countdown and Stop share the banner's centre line, so Stop
+            // sits where the stopped agent's Allow again does.
+            Text(banner.timeLeft)
+                .font(TypeScale.meta)
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .contentTransition(.numericText(countsDown: true))
+                .fixedSize()
             Button(LeaseBanner.stop, action: stop)
                 .buttonStyle(TextButtonStyle(tint: Palette.red))
                 .fixedSize()
@@ -66,7 +53,7 @@ struct LeaseBannerView: View {
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.lease.opacity(0.14)))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
-        .animation(Motion.hover, value: banner.step)
+        .help(banner.help)
         // One element reading both lines as one, with Stop as its action.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)
