@@ -3,26 +3,31 @@ import ShipyardControl
 import Testing
 
 /// The banner's words while an agent holds the lease, the owner test: who,
-/// where, the countdown and the queue, as the maintainer reads them.
+/// why, the step, the countdown, the queue and where, as the maintainer reads them.
 @Suite("The lease banner")
 struct LeaseBannerTests {
-    @Test("the banner names the agent and its place, the time left and how many wait", arguments: [
+    @Test("the banner heads with the purpose or the agent, over its step and how many wait", arguments: [
         (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop", secondsLeft: 48, waiting: 0),
-         "Claude Code uses shipyard · shop · 48s"),
+         "Claude Code uses shipyard", nil as String?, "48s left", "Claude Code in shop"),
         (AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 1),
-         "Codex uses shipyard · Herdr pane w1-2 · 5m 00s · 1 waiting"),
-        (AppStatus.Lease(holder: "an unknown agent", place: "/", secondsLeft: 65, waiting: 3),
-         "An unknown agent uses shipyard · / · 1m 05s · 3 waiting"),
+         "Codex uses shipyard", "1 waiting", "5m 00s left", "codex in Herdr pane w1-2"),
+        (AppStatus.Lease(holder: "an unknown agent", place: "/", secondsLeft: 65, waiting: 3,
+                         step: "Taking a screenshot…"),
+         "An unknown agent uses shipyard", "Taking a screenshot… · 3 waiting", "1m 05s left", "an unknown agent in /"),
         (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop/", secondsLeft: 0, waiting: 0),
-         "Claude Code uses shipyard · shop · 0s"),
-        (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop", secondsLeft: 48, waiting: 0,
-                         purpose: "checking the header icons", step: "Taking a screenshot…"),
-         "Claude Code uses shipyard · Checking the header icons · Taking a screenshot… · shop · 48s"),
+         "Claude Code uses shipyard", nil, "0s left", "Claude Code in shop"),
+        (AppStatus.Lease(holder: "codex", place: "/Users/me/shop", secondsLeft: 48, waiting: 2,
+                         purpose: "checking the header icons", step: "Took a screenshot · 12s ago"),
+         "Checking the header icons", "Took a screenshot · 12s ago · 2 waiting", "48s left", "codex in shop"),
     ])
-    func words(lease: AppStatus.Lease, text: String) {
+    func words(lease: AppStatus.Lease, headline: String, detail: String?, timeLeft: String, help: String) {
         let banner = LeaseBanner(lease)
 
-        #expect(banner.text == text)
+        #expect(banner.headline == headline)
+        #expect(banner.detail == detail)
+        #expect(banner.timeLeft == timeLeft)
+        #expect(banner.help == help)
+        #expect(banner.text == ([headline, detail, timeLeft, help].compactMap { $0 }).joined(separator: " · "))
         #expect(banner.agent == lease.holder)
     }
 
@@ -47,7 +52,7 @@ struct LeaseBannerTests {
             lease.status(at: Date(timeIntervalSince1970: seconds)).map { LeaseBanner($0).timeLeft }
         }
 
-        #expect(shown == ["1m 00s", "59s", "48s", "1s"])
+        #expect(shown == ["1m 00s left", "59s left", "48s left", "1s left"])
         // At its end the lease is free, and there's no banner to draw.
         #expect(lease.status(at: Date(timeIntervalSince1970: 60)) == nil)
     }

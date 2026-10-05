@@ -212,7 +212,8 @@ struct Panel: View {
                     symbol: "hand.raised.fill",
                     text: LeaseBanner.tookBack(from: bar.holder.name),
                     tint: Palette.gray,
-                    action: (LeaseBanner.allow, { actions.allowLeaseHolder(bar.holder.key) })
+                    action: (LeaseBanner.allow, { actions.allowLeaseHolder(bar.holder.key) }),
+                    trailing: true
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
