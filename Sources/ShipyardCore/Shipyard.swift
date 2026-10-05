@@ -866,6 +866,13 @@ public final class Shipyard {
         actions.open(url)
     }
 
+    /// Opens a repository's page for one kind on GitHub in the browser (a
+    /// click on a header's count chip, or a choice from its menu):
+    /// `MenuSection.pageLinks(for:)`. It marks nothing seen.
+    public func openPage(_ link: PageLink) {
+        actions.open(link.url)
+    }
+
     /// Opens the signed-in account's profile on GitHub in the browser (a
     /// click on the header's avatar or handle). Opens nothing until
     /// the account is known.

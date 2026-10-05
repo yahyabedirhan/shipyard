@@ -2,6 +2,12 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
+## Unreleased
+
+- **Open a project on GitHub from its header.** In the list layout, an open-in-browser icon shows beside a project's name on hover and opens its repository, as Return on the header does. Each pull request, issue and run count chip opens that kind's page (`/pulls`, `/issues`, `/actions`); in a project of several repositories it opens a menu of each repository's page with its count. The header's check, the new icon and a ping's ✕ share one smaller button size.
+- **Agents can't fight you over the panel.** `shipyard screenshot` no longer opens a closed panel: it renders it off screen and says so on standard error. For 30 seconds after you close the panel, clicking elsewhere included, `shipyard panel open` is refused with the time it can open it again, so an agent can't reopen it in a loop.
+- **See what an agent is doing in shipyard.** While an agent holds app control, the panel's banner shows what it's doing ("Taking a screenshot…", then "Took a screenshot · 12s ago"), so you can tell whether to leave the panel open. `shipyard control take --for "<purpose>"` adds why, in a few words, under the agent's name. `app status --json` reports both as the lease's `purpose` and `step`.
+
 ## 0.3.0 (2026-10-04)
 
 Your own notes from Notion are listed under each project, with a new-note icon on its header, and agents post disposable status notices with `shipyard notify`: on the Mac, over your tailnet, or through the herdr-shipyard plugin, following your notification rules. It builds [#187](https://github.com/yahyabedirhan/shipyard/issues/187) "Spec: notes-and-notify, the user's notes in Notion and agents' notices", in [#206](https://github.com/yahyabedirhan/shipyard/pull/206).

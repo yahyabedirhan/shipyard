@@ -15,6 +15,9 @@ struct LeaseBannerTests {
          "An unknown agent uses shipyard · / · 1m 05s · 3 waiting"),
         (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop/", secondsLeft: 0, waiting: 0),
          "Claude Code uses shipyard · shop · 0s"),
+        (AppStatus.Lease(holder: "Claude Code", place: "/Users/me/shop", secondsLeft: 48, waiting: 0,
+                         purpose: "checking the header icons", step: "Taking a screenshot…"),
+         "Claude Code uses shipyard · Checking the header icons · Taking a screenshot… · shop · 48s"),
     ])
     func words(lease: AppStatus.Lease, text: String) {
         let banner = LeaseBanner(lease)

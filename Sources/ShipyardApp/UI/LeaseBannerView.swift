@@ -3,8 +3,9 @@ import ShipyardCore
 import SwiftUI
 
 /// The banner topping the panel while an agent holds the lease: the
-/// agent's logo, "Claude Code uses shipyard" over its place, the time left and
-/// how many wait, in `LeaseBanner`'s words, and Stop, which takes shipyard
+/// agent's logo, "Claude Code uses shipyard", then why it took shipyard
+/// and what it's doing when known, over its place, the time left and how
+/// many wait, in `LeaseBanner`'s words, and Stop, which takes shipyard
 /// back. Stop is the banner's only way into the lease.
 struct LeaseBannerView: View {
     let lease: AppStatus.Lease
@@ -20,6 +21,21 @@ struct LeaseBannerView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.primary.opacity(0.85))
                     .lineLimit(1)
+                if let purpose = banner.purpose {
+                    Text(purpose)
+                        .font(TypeScale.meta)
+                        .foregroundStyle(.primary.opacity(0.85))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                if let step = banner.step {
+                    Text(step)
+                        .font(TypeScale.meta)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .contentTransition(.opacity)
+                }
                 HStack(spacing: 4) {
                     // The place gives way first, cut in the middle, so the countdown stays whole.
                     Text(banner.place)
@@ -50,6 +66,7 @@ struct LeaseBannerView: View {
         .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.lease.opacity(0.14)))
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
+        .animation(Motion.hover, value: banner.step)
         // One element reading both lines as one, with Stop as its action.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)

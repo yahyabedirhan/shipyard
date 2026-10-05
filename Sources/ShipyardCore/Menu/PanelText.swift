@@ -137,6 +137,13 @@ public enum PanelText {
         repository.split(separator: "/").last.map(String.init) ?? repository
     }
 
+    /// A list section's header's open-in-browser icon, for its hover help
+    /// and VoiceOver: the repository it opens, without its owner. "Open
+    /// shipyard on GitHub".
+    public static func openRepository(_ repository: String) -> String {
+        "Open \(repositoryName(repository)) on GitHub"
+    }
+
     /// A list section's header, for VoiceOver's hint: what a click does to
     /// it. "Collapse shipyard", "Expand shipyard".
     public static func sectionFoldHelp(_ name: String, isCollapsed: Bool) -> String {
@@ -224,6 +231,14 @@ public enum PanelText {
     public static func headerCount(_ chip: HeaderCount) -> String {
         let count = "\(chip.count) \(kindNoun(chip.kind, plural: chip.count != 1))"
         return chip.needsAttention ? "\(count), needs attention" : count
+    }
+
+    /// A list header's chip, for its hover help and VoiceOver's hint: the
+    /// page a click opens (`MenuSection.pageLinks(for:)`), and its menu's heading. "Open pull
+    /// requests on GitHub", "Open Actions on GitHub".
+    public static func headerCountPage(_ kind: ItemKind) -> String {
+        let page = kind == .workflowRun ? "Actions" : kindNoun(kind, plural: true)
+        return "Open \(page) on GitHub"
     }
 
     // MARK: - The tabs layout

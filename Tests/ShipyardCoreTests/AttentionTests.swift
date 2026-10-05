@@ -87,15 +87,19 @@ struct AttentionTests {
         #expect(harness.count == 0)
     }
 
-    @Test("Return on a project's header opens its first configured repository on GitHub and marks nothing seen")
+    @Test("Return on a project's header opens its first configured repository on GitHub, a count chip its kind's page, and neither marks anything seen")
     func openingAProjectsRepository() async throws {
         let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
         let eCommerce = try #require(harness.section("e-commerce"))
         #expect(eCommerce.repositories == ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"])
 
         harness.shipyard.openRepository(of: eCommerce)
+        harness.shipyard.openPage(try #require(eCommerce.pageLinks(for: .workflowRun).first))
 
-        #expect(harness.actions.opened == [try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend"))])
+        #expect(harness.actions.opened == [
+            try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend")),
+            try #require(URL(string: "https://github.com/yahyabedirhan/e-commerce-frontend/actions")),
+        ])
         #expect(harness.count == 6)
     }
 

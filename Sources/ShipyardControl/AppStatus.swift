@@ -28,12 +28,21 @@ public struct AppStatus: Codable, Equatable, Sendable {
         public var place: String
         public var secondsLeft: Int
         public var waiting: Int
+        /// Why the holder took shipyard (`control take --for`); left out of
+        /// the JSON when it didn't say.
+        public var purpose: String?
+        /// What the holder is doing ("Taking a screenshot…"), or last did
+        /// and when ("Took a screenshot · 12s ago"); left out of the JSON
+        /// before its first step.
+        public var step: String?
 
-        public init(holder: String, place: String, secondsLeft: Int, waiting: Int) {
+        public init(holder: String, place: String, secondsLeft: Int, waiting: Int, purpose: String? = nil, step: String? = nil) {
             self.holder = holder
             self.place = place
             self.secondsLeft = secondsLeft
             self.waiting = waiting
+            self.purpose = purpose
+            self.step = step
         }
     }
 

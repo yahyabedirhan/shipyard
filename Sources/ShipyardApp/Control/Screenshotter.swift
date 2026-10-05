@@ -20,7 +20,8 @@ enum ScreenshotOutcome: Equatable {
 /// the lease's dot and banner out unless `withIndicator` keeps them.
 @MainActor
 protocol Screenshotting: AnyObject {
-    /// The panel, opened when it's closed, written as a PNG at `file`, in
+    /// The panel, captured while it's open and rendered off screen while
+    /// it's closed (never opened for it), written as a PNG at `file`, in
     /// `appearance` when it's set (and back to the app's own afterwards).
     func capturePanel(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome
     /// The menu bar icon alone, as the menu bar draws it in `appearance`
@@ -112,13 +113,12 @@ final class Screenshotter: Screenshotting {
         }
     }
 
-    /// Opens the panel, lets it settle, and captures its window as drawn.
+    /// Captures the open panel's window as drawn, after a moment for a new
+    /// appearance to settle. A closed panel isn't opened: a screenshot
+    /// never puts the panel in front of the user, who may have just closed
+    /// it, so it's rendered instead.
     private func capture() async throws(ScreenshotFailure) -> CGImage {
-        do throws(PanelRefusal) {
-            try await panel.open()
-        } catch {
-            throw ScreenshotFailure(error.reason)
-        }
+        guard panel.status().panelOpen else { throw ScreenshotFailure("the panel is closed") }
         try? await Task.sleep(for: Self.settle)
         guard let window = MenuBarWindow.panelWindow else { throw ScreenshotFailure("the panel's window isn't on screen") }
         guard #available(macOS 14.4, *) else {

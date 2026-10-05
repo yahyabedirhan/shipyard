@@ -1,7 +1,10 @@
 import Foundation
 
 /// The words of the banner that tops the panel while an agent holds the
-/// lease: "Claude Code uses shipyard" over "shop · 48s · 2 waiting". Made
+/// lease: "Claude Code uses shipyard", then why ("Checking the header
+/// icons") when its `take` said, what it's doing ("Taking a screenshot…",
+/// or "Took a screenshot · 12s ago" once done), and "shop · 48s · 2
+/// waiting". Made
 /// from the lease as `app status` reports it at the moment drawn, so the
 /// countdown ticks with the time it's made at. The app finds the agent's
 /// logo from `agent` (`KnownAgent`) and draws the parts.
@@ -17,6 +20,11 @@ public struct LeaseBanner: Equatable, Sendable {
     public var timeLeft: String
     /// `2 waiting` while others queue for the lease; nil when nobody does.
     public var waiting: String?
+    /// Why the agent took shipyard, its first letter capitalized; nil when
+    /// it didn't say.
+    public var purpose: String?
+    /// What the agent is doing, or last did and when; nil before its first step.
+    public var step: String?
 
     public init(_ lease: AppStatus.Lease) {
         agent = lease.holder
@@ -26,6 +34,8 @@ public struct LeaseBanner: Equatable, Sendable {
         let minutes = lease.secondsLeft / 60, seconds = lease.secondsLeft % 60
         timeLeft = minutes == 0 ? "\(seconds)s" : "\(minutes)m " + (seconds < 10 ? "0" : "") + "\(seconds)s"
         waiting = lease.waiting > 0 ? "\(lease.waiting) waiting" : nil
+        purpose = lease.purpose.map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        step = lease.step
     }
 
     /// The banner's second line, smaller: the place, the time left and how
@@ -34,9 +44,9 @@ public struct LeaseBanner: Equatable, Sendable {
         ([place, timeLeft] + (waiting.map { [$0] } ?? [])).joined(separator: " · ")
     }
 
-    /// The banner as one line, for VoiceOver: both lines joined by ` · `.
+    /// The banner as one line, for VoiceOver: every line joined by ` · `.
     public var text: String {
-        "\(title) · \(detail)"
+        ([title] + [purpose, step].compactMap { $0 } + [detail]).joined(separator: " · ")
     }
 
     /// The banner's button, which takes shipyard back from the holder.
