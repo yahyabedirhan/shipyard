@@ -189,9 +189,11 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron and the project's name; then, right-aligned, Mark all
-/// seen's check, shown on hover while anything needs attention; then a
-/// count chip per kind the project has rows of (`MenuSection.headerCounts`),
+/// The chevron and the project's name; then, right-aligned, the
+/// open-in-browser icon, shown on hover while the project has a
+/// repository; Mark all seen's check, shown on hover while anything needs
+/// attention; then a count chip per kind the project has rows of
+/// (`MenuSection.headerCounts`),
 /// each as wide as its content, or what the project says in their place
 /// ("Nothing open"); and last the new-note icon, when the project has
 /// one. Nothing keeps a fixed slot. Highlighted by the pointer or the
@@ -233,6 +235,11 @@ private struct ListSectionHeader: View {
             .accessibilityLabel(section.name)
             .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
             .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
+            // Kept laid out while hidden, like the check, so nothing moves on hover.
+            if let repository = section.repositories.first {
+                OpenRepositoryIcon(repository: repository) { actions.openRepository(section) }
+                    .opacity(hover ? 1 : 0)
+            }
             if let empty = PanelText.emptySection(section) {
                 // In place of the chips, right-aligned.
                 Text(empty)
@@ -295,6 +302,24 @@ private struct MarkAllSeenIcon: View {
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.markAllSeen)
         .accessibilityLabel(PanelText.markAllSeen)
+    }
+}
+
+/// A project header's open-in-browser icon: opens the project's first
+/// repository on GitHub, as Return on the header does, in the check's
+/// compact button. Its hover help and VoiceOver label name the repository.
+private struct OpenRepositoryIcon: View {
+    let repository: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "arrow.up.right.square")
+                .font(.system(size: 9.5, weight: .semibold))
+        }
+        .buttonStyle(IconButtonStyle(compact: true))
+        .hoverHelp(PanelText.openRepository(repository))
+        .accessibilityLabel(PanelText.openRepository(repository))
     }
 }
 

@@ -162,6 +162,7 @@ struct PanelTextTests {
     func repositoryName() {
         #expect(PanelText.repositoryName("yahyabedirhan/shipyard") == "shipyard")
         #expect(PanelText.repositoryName("shipyard") == "shipyard")
+        #expect(PanelText.openRepository("yahyabedirhan/shipyard") == "Open shipyard on GitHub")
     }
 
     @Test("a pull request's card holds only what its row doesn't: branches, size, review, comments and when it last moved")
