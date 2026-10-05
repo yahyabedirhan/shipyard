@@ -19,7 +19,8 @@ public enum LeaseCommand {
     }
 
     public static let usageText = """
-        usage: shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
+        usage: shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>]
+                                | release [--key <k>]
 
           take      hold shipyard until 5 minutes after you took it, so other
                     agents' app, panel and screenshot commands are refused
@@ -27,6 +28,9 @@ public enum LeaseCommand {
                     --wait <seconds>: while another agent holds it, wait in
                     line, first come first served, up to that long (0 to
                     3600)
+                    --for <purpose>: why, in a few words, shown to the user on
+                    the panel's banner ("checking the header icons"); one
+                    line, at most 80 characters
           release   give shipyard up, so the next agent in line gets it; does
                     nothing when you don't hold it
           --key <k> hold or give it up as <k>, for this command only, in place
@@ -53,7 +57,7 @@ public enum LeaseCommand {
         }
         let options: Set<String>
         switch subcommand {
-        case "take": options = ["--wait", "--key"]
+        case "take": options = ["--wait", "--for", "--key"]
         case "release": options = ["--key"]
         default: return .failure(misread("shipyard control: unknown command `\(subcommand)`"))
         }
@@ -64,7 +68,7 @@ public enum LeaseCommand {
                 return .failure(misread("shipyard control \(subcommand): unexpected `\(option)`"))
             }
             guard let value = rest.popFirst() else {
-                let what = option == "--wait" ? "a number of seconds" : "a key"
+                let what = option == "--wait" ? "a number of seconds" : option == "--for" ? "a purpose" : "a key"
                 return .failure(misread("shipyard control \(subcommand): \(option) needs \(what)"))
             }
             values[option] = value
@@ -82,7 +86,12 @@ public enum LeaseCommand {
             }
             wait = whole
         }
-        return .success(Invocation(.controlTake(waitSeconds: wait), key: values["--key"]))
+        if let purpose = values["--for"], !ControlLease.readsAsPurpose(purpose) {
+            return .failure(misread(
+                "shipyard control take: --for takes one line of at most \(ControlLease.longestPurpose) characters"
+            ))
+        }
+        return .success(Invocation(.controlTake(waitSeconds: wait, purpose: values["--for"]), key: values["--key"]))
     }
 
     /// `line`, then the usage, on standard error: exit 2.

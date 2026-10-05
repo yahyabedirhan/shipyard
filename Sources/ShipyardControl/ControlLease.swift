@@ -22,16 +22,34 @@ public struct ControlLease: Equatable, Sendable {
     /// How long a holder the maintainer stopped is refused, unless allowed back.
     public static let bar: TimeInterval = 5 * 60
 
-    /// A lease held: by whom, when it was taken and when it ends.
+    /// The longest purpose `control take --for` takes, in characters.
+    public static let longestPurpose = 80
+
+    /// Whether `purpose` can be a lease's purpose: one line, not blank, at
+    /// most `longestPurpose` characters.
+    public static func readsAsPurpose(_ purpose: String) -> Bool {
+        !purpose.trimmingCharacters(in: .whitespaces).isEmpty
+            && purpose.count <= longestPurpose
+            && !purpose.contains(where: \.isNewline)
+    }
+
+    /// A lease held: by whom, when it was taken and when it ends; why, when
+    /// its `take` said; and the step its holder is on, or last ended.
     public struct Term: Equatable, Sendable {
         public var holder: Holder
         public var taken: Date
         public var ends: Date
+        /// Why the holder took shipyard (`control take --for`), for the banner.
+        public var purpose: String?
+        /// The holder's latest step, running or ended.
+        public var activity: Activity?
 
-        public init(holder: Holder, taken: Date, ends: Date) {
+        public init(holder: Holder, taken: Date, ends: Date, purpose: String? = nil, activity: Activity? = nil) {
             self.holder = holder
             self.taken = taken
             self.ends = ends
+            self.purpose = purpose
+            self.activity = activity
         }
 
         /// The latest it can end, however it's renewed.
@@ -46,6 +64,30 @@ public struct ControlLease: Equatable, Sendable {
         /// `timeZone`: `you hold shipyard until 12:05:00`.
         public func held(timeZone: TimeZone) -> String {
             "you hold shipyard until \(ControlLease.clock(ends, timeZone))"
+        }
+    }
+
+    /// The holder's latest step: what it is, when it began, and when it
+    /// ended, nil while it runs.
+    public struct Activity: Equatable, Sendable {
+        public var step: ControlStep
+        public var began: Date
+        public var ended: Date?
+
+        public init(step: ControlStep, began: Date, ended: Date? = nil) {
+            self.step = step
+            self.began = began
+            self.ended = ended
+        }
+
+        /// The banner's step line at `now`: "Taking a screenshot…" while it
+        /// runs; "Took a screenshot · 12s ago" once it has ended ("just
+        /// now" under a second, minutes from one).
+        public func line(at now: Date) -> String {
+            guard let ended else { return step.doing }
+            let seconds = max(0, Int(now.timeIntervalSince(ended)))
+            let ago = seconds < 1 ? "just now" : seconds < 60 ? "\(seconds)s ago" : "\(seconds / 60)m ago"
+            return "\(step.done) · \(ago)"
         }
     }
 
@@ -110,6 +152,7 @@ public struct ControlLease: Equatable, Sendable {
     struct Waiter: Equatable, Sendable {
         var holder: Holder
         var until: Date
+        var purpose: String?
     }
 
     /// What a request got, and what changed on the way.
@@ -190,7 +233,7 @@ public struct ControlLease: Equatable, Sendable {
         queue.removeAll { now >= $0.until }
         guard !queue.isEmpty else { return transitions }
         let next = queue.removeFirst()
-        term = Term(holder: next.holder, taken: now, ends: now.addingTimeInterval(Self.cap))
+        term = Term(holder: next.holder, taken: now, ends: now.addingTimeInterval(Self.cap), purpose: next.purpose)
         transitions.append(.started(next.holder))
         return transitions
     }
@@ -221,17 +264,19 @@ public struct ControlLease: Equatable, Sendable {
     }
 
     /// `control take` from `holder` at `now`: when `holder` holds the lease,
-    /// or it's free, it's held until the cap (`renewed` or `started`).
+    /// or it's free, it's held until the cap (`renewed` or `started`), with
+    /// `purpose` as its purpose when one is given (a renewal without one
+    /// keeps the last).
     /// While another holds it, the `take` waits in line until `deadline`
     /// (`queued`: a holder already in line keeps its place and waits until
     /// the later deadline), or is refused at once without a deadline after
     /// `now`. A barred holder is refused at once, wait or not, so it never
     /// joins the line.
-    public mutating func take(by holder: Holder, at now: Date, waitingUntil deadline: Date? = nil) -> Decision {
+    public mutating func take(by holder: Holder, at now: Date, waitingUntil deadline: Date? = nil, purpose: String? = nil) -> Decision {
         var transitions = settle(at: now)
         guard !isBarred(holder) else { return Decision(answer: .failure(.stopped), transitions: transitions) }
         guard var term else {
-            let term = Term(holder: holder, taken: now, ends: now.addingTimeInterval(Self.cap))
+            let term = Term(holder: holder, taken: now, ends: now.addingTimeInterval(Self.cap), purpose: purpose)
             self.term = term
             transitions.append(.started(holder))
             return Decision(answer: .success(term), transitions: transitions)
@@ -243,13 +288,15 @@ public struct ControlLease: Equatable, Sendable {
             if let place = queue.firstIndex(where: { $0.holder.key == holder.key }) {
                 queue[place].holder = holder
                 queue[place].until = max(queue[place].until, deadline)
+                queue[place].purpose = purpose ?? queue[place].purpose
             } else {
-                queue.append(Waiter(holder: holder, until: deadline))
+                queue.append(Waiter(holder: holder, until: deadline, purpose: purpose))
             }
             return Decision(answer: .failure(.queued(term)), transitions: transitions)
         }
         term.ends = term.capped
         term.holder = holder
+        if let purpose { term.purpose = purpose }
         self.term = term
         transitions.append(.renewed(holder))
         return Decision(answer: .success(term), transitions: transitions)
@@ -263,6 +310,25 @@ public struct ControlLease: Equatable, Sendable {
         guard let term, term.holder.key == holder.key else { return transitions }
         self.term = nil
         return transitions + [.ended(term.holder, .released)] + settle(at: now)
+    }
+
+    // MARK: - What the holder is doing
+
+    /// `holder` began `step` at `now`: the lease's activity, for the
+    /// banner, when `holder` holds it; anyone else's step changes nothing.
+    public mutating func began(_ step: ControlStep, by holder: Holder, at now: Date) {
+        guard var term = current(at: now), term.holder.key == holder.key else { return }
+        term.activity = Activity(step: step, began: now)
+        self.term = term
+    }
+
+    /// `holder`'s step that began at `began` ended at `now`; a later step
+    /// already under way, or another holder's lease, is left alone.
+    public mutating func ended(stepBegunAt began: Date, by holder: Holder, at now: Date) {
+        guard var term = current(at: now), term.holder.key == holder.key,
+              term.activity?.began == began, term.activity?.ended == nil else { return }
+        term.activity?.ended = now
+        self.term = term
     }
 
     // MARK: - The maintainer taking shipyard back
@@ -327,7 +393,8 @@ public struct ControlLease: Equatable, Sendable {
     public func status(at now: Date) -> AppStatus.Lease? {
         current(at: now).map {
             AppStatus.Lease(
-                holder: $0.holder.name, place: $0.holder.place, secondsLeft: $0.secondsLeft(at: now), waiting: waiting(at: now)
+                holder: $0.holder.name, place: $0.holder.place, secondsLeft: $0.secondsLeft(at: now), waiting: waiting(at: now),
+                purpose: $0.purpose, step: $0.activity?.line(at: now)
             )
         }
     }
@@ -336,8 +403,9 @@ public struct ControlLease: Equatable, Sendable {
 /// A term as it goes in the quit's reply and the relaunch's environment:
 /// its times as seconds since 1970, whatever the coder's date strategy.
 extension ControlLease.Term: Codable {
+    /// The purpose is handed over; the step isn't (the relaunch ended it).
     private enum CodingKeys: String, CodingKey {
-        case holder, taken, ends
+        case holder, taken, ends, purpose
     }
 
     public init(from decoder: any Decoder) throws {
@@ -345,6 +413,8 @@ extension ControlLease.Term: Codable {
         holder = try container.decode(Holder.self, forKey: .holder)
         taken = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .taken))
         ends = Date(timeIntervalSince1970: try container.decode(Double.self, forKey: .ends))
+        purpose = try container.decodeIfPresent(String.self, forKey: .purpose)
+        activity = nil
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -352,5 +422,6 @@ extension ControlLease.Term: Codable {
         try container.encode(holder, forKey: .holder)
         try container.encode(taken.timeIntervalSince1970, forKey: .taken)
         try container.encode(ends.timeIntervalSince1970, forKey: .ends)
+        try container.encodeIfPresent(purpose, forKey: .purpose)
     }
 }

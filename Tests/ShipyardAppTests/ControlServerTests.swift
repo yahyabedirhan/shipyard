@@ -355,10 +355,12 @@ struct ControlServerTests {
 
         _ = await server.reply(to: ControlRequest.panelOpen.sent())
         clock.now = Date(timeIntervalSince1970: 12)
-        // Another agent's refused request changes nothing shown.
+        // Another agent's refused request changes nothing shown, its step included.
         _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
 
-        #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0))
+        #expect(indicator.shown(at: clock.now) == AppStatus.Lease(
+            holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0, step: "Opened the panel · 12s ago"
+        ))
         #expect(indicator.shownEnd(at: clock.now) == Date(timeIntervalSince1970: 60))
         // Its end comes with no request: the server's timer settles it.
         clock.now = Date(timeIntervalSince1970: 60)
@@ -439,7 +441,7 @@ struct ControlServerTests {
         #expect(recorder.notices == [.ended(agent: "Claude Code", reason: .ranOut)])
     }
 
-    @Test("status is never refused, takes no lease, and reports the lease as lines and as JSON")
+    @Test("status is never refused, takes no lease, and reports the lease as lines and as JSON, with the holder's last step; another's status isn't a step")
     func statusReportsTheLease() async {
         let server = server()
         let free = await server.reply(to: ControlRequest.appStatus(json: false).sent(by: Self.other))
@@ -452,7 +454,7 @@ struct ControlServerTests {
         let json = await server.reply(to: ControlRequest.appStatus(json: true).sent(by: Self.other))
 
         var held = Self.status
-        held.lease = AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0)
+        held.lease = AppStatus.Lease(holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0, step: "Opened the panel · 12s ago")
         #expect(text == .init(reply: .done(held.text)))
         #expect(json == .init(reply: .done(held.json)))
         #expect(text.reply.output.contains("lease: Claude Code in /work, 48s left, 0 waiting\n"))

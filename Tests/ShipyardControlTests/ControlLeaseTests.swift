@@ -267,6 +267,35 @@ struct ControlLeaseTests {
         #expect(lease.status(at: Self.at(60)) == nil)
     }
 
+    @Test("a take's purpose and the holder's steps show in the status: a step while it runs, then done and how long ago; another's step, or an ended one's late end, changes nothing")
+    func purposeAndSteps() {
+        let screenshot = ControlStep(doing: "Taking a screenshot…", done: "Took a screenshot")
+        var lease = ControlLease()
+        _ = lease.take(by: Self.a, at: Self.at(0), purpose: "checking the header icons")
+        #expect(lease.status(at: Self.at(0))?.purpose == "checking the header icons")
+        #expect(lease.status(at: Self.at(0))?.step == nil)
+
+        lease.began(screenshot, by: Self.a, at: Self.at(10))
+        lease.began(ControlStep(doing: "Folding shop…", done: "Folded shop"), by: Self.b, at: Self.at(10))
+        #expect(lease.status(at: Self.at(10.5))?.step == "Taking a screenshot…")
+        lease.ended(stepBegunAt: Self.at(10), by: Self.a, at: Self.at(11))
+        #expect(lease.status(at: Self.at(11.5))?.step == "Took a screenshot · just now")
+        #expect(lease.status(at: Self.at(23))?.step == "Took a screenshot · 12s ago")
+        #expect(lease.status(at: Self.at(131))?.step == "Took a screenshot · 2m ago")
+
+        // A step that began meanwhile isn't ended by the earlier one's end.
+        lease.began(ControlStep(doing: "Folding shop…", done: "Folded shop"), by: Self.a, at: Self.at(140))
+        lease.ended(stepBegunAt: Self.at(10), by: Self.a, at: Self.at(141))
+        #expect(lease.status(at: Self.at(142))?.step == "Folding shop…")
+
+        // Taking it again without a purpose keeps the last; a waiter's purpose comes with the lease it gets.
+        _ = lease.take(by: Self.a, at: Self.at(150))
+        #expect(lease.status(at: Self.at(150))?.purpose == "checking the header icons")
+        _ = lease.take(by: Self.b, at: Self.at(160), waitingUntil: Self.at(400), purpose: "a demo screenshot")
+        _ = lease.release(by: Self.a, at: Self.at(170))
+        #expect(lease.status(at: Self.at(170)).map { [$0.holder, $0.purpose, $0.step] } == ["codex", "a demo screenshot", nil])
+    }
+
     // MARK: - A relaunch's handover
 
     /// The handover's JSON for `a`'s lease, taken at `taken` and ending at `ends`.

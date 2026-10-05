@@ -37,11 +37,12 @@ public enum ControlRequest: Equatable, Sendable {
     /// it otherwise. The lease's dot and banner are left out of it unless
     /// `withIndicator` keeps them.
     case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
-    /// `shipyard control take [--wait <seconds>]`: the lease held until its
-    /// cap. While another agent holds it, refused at once, or with
-    /// `waitSeconds` (0 to `longestWait`), answered once it's this agent's
-    /// or the wait runs out.
-    case controlTake(waitSeconds: Int?)
+    /// `shipyard control take [--wait <seconds>] [--for <purpose>]`: the
+    /// lease held until its cap. While another agent holds it, refused at
+    /// once, or with `waitSeconds` (0 to `longestWait`), answered once it's
+    /// this agent's or the wait runs out. `purpose` says why, for the
+    /// lease banner.
+    case controlTake(waitSeconds: Int?, purpose: String? = nil)
     /// `shipyard control release`: the lease given up, when this agent
     /// holds it.
     case controlRelease
@@ -84,7 +85,7 @@ public enum ControlRequest: Equatable, Sendable {
     /// How long the app may keep the request before it answers, past the
     /// client's usual timeout: a `take`'s wait in line.
     public var wait: TimeInterval {
-        if case .controlTake(let seconds?) = self { return TimeInterval(seconds) }
+        if case .controlTake(let seconds?, _) = self { return TimeInterval(seconds) }
         return 0
     }
 }
@@ -133,8 +134,8 @@ public struct ControlMessage: Equatable, Sendable {
                 command: "screenshot", path: path, appearance: appearance?.rawValue,
                 menuBarIcon: menuBarIcon, withIndicator: withIndicator
             )
-        case .controlTake(let waitSeconds):
-            wire = Wire(command: "control.take", waitSeconds: waitSeconds)
+        case .controlTake(let waitSeconds, let purpose):
+            wire = Wire(command: "control.take", waitSeconds: waitSeconds, purpose: purpose)
         case .controlRelease:
             wire = Wire(command: "control.release")
         case .notify(let notice):
@@ -199,7 +200,10 @@ public struct ControlMessage: Equatable, Sendable {
                     "the control command `control.take` needs a `waitSeconds` from 0 to \(ControlRequest.longestWait), not \(seconds)"
                 )
             }
-            return .controlTake(waitSeconds: wire.waitSeconds)
+            if let purpose = wire.purpose, !ControlLease.readsAsPurpose(purpose) {
+                throw .unreadable("the control command `control.take` needs a `purpose` of one line, at most \(ControlLease.longestPurpose) characters")
+            }
+            return .controlTake(waitSeconds: wire.waitSeconds, purpose: wire.purpose)
         case "control.release": return .controlRelease
         case "notify":
             guard let notice = wire.notice else { throw .unreadable("the control command `notify` needs its `notice`") }
@@ -224,6 +228,7 @@ public struct ControlMessage: Equatable, Sendable {
         var menuBarIcon: Bool?
         var withIndicator: Bool?
         var waitSeconds: Int?
+        var purpose: String?
         /// `notify`'s request, as one object in its own shape
         /// (`NoticeRequest`): the notice's, or `{"withdraw":"<id>"}`.
         var notice: NoticeRequest?

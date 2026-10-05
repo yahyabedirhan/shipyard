@@ -116,9 +116,14 @@ final class ControlServer {
             case .failure(let refusal): return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
             }
         }
+        // The holder's step shows on the banner while it runs, then as done.
+        let step = message.request.step
+        let began = now()
+        if let step { lease.began(step, by: message.holder, at: began) }
+        defer { if step != nil { lease.ended(stepBegunAt: began, by: message.holder, at: now()) } }
         switch message.request {
-        case .controlTake(let seconds):
-            return await take(by: message.holder, waiting: seconds)
+        case .controlTake(let seconds, let purpose):
+            return await take(by: message.holder, waiting: seconds, purpose: purpose)
         case .controlRelease:
             // The next waiter's take is answered as the lease changes (`leaseChanged`).
             apply(lease.release(by: message.holder, at: now()))
@@ -129,6 +134,8 @@ final class ControlServer {
         case .appOpen:
             return Answer(reply: .done(status().text))
         case .appQuit:
+            // The step isn't handed over: the relaunch ends it.
+            granted?.activity = nil
             return Answer(reply: ControlReply(ok: true, output: "shipyard quit\n", lease: granted), quits: true)
         case .panelOpen:
             return await steer { () async throws(PanelRefusal) in try await panel.open(); return "panel open" }
@@ -181,9 +188,11 @@ final class ControlServer {
     /// wait; with one, the take waits in line, suspended so the main actor
     /// answers other requests (the holder's release among them), until
     /// `leaseChanged` finds the lease handed to it or its wait runs out.
-    private func take(by holder: Holder, waiting seconds: Int?) async -> Answer {
+    private func take(by holder: Holder, waiting seconds: Int?, purpose: String?) async -> Answer {
         let time = now()
-        let decision = lease.take(by: holder, at: time, waitingUntil: seconds.map { time.addingTimeInterval(TimeInterval($0)) })
+        let decision = lease.take(
+            by: holder, at: time, waitingUntil: seconds.map { time.addingTimeInterval(TimeInterval($0)) }, purpose: purpose
+        )
         apply(decision.transitions)
         switch decision.answer {
         case .success(let term):

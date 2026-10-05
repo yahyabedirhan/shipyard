@@ -585,7 +585,7 @@ On the user's Mac, three more commands open, steer and photograph the running ap
 shipyard app open [--demo <folder>] | quit | status [--json]
 shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
 shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
-shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
+shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release [--key <k>]
 ```
 
 | Command | What it does | Prints on success |
@@ -604,6 +604,7 @@ shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
 | `--with-indicator` | keeps the yellow dot and the banner that show an agent is using shipyard; a screenshot leaves them out otherwise | |
 | `control take` | holds shipyard for a run, until 5 minutes after you took it (see Taking turns) | `you hold shipyard until <HH:mm:ss>` |
+| `control take --for <purpose>` | the same, and shows the user why on the panel's banner, in a few words (`--for "checking the header icons"`); one line, 80 characters at most. Always say why: the banner also shows each command you run as you run it ("Taking a screenshot…", then "Took a screenshot · 12s ago"), so the user can tell whether to leave the panel open | the same |
 | `control take --wait <seconds>` | while another agent holds shipyard, waits in line up to that long (3600 at most), first come, first served | the same, once you hold it |
 | `control release` | gives shipyard up for the next agent; does nothing when you don't hold it | `released shipyard` |
 
@@ -719,7 +720,7 @@ shipyard screenshot icon.png --menu-bar-icon --appearance light
 **"Screenshot the panel in both appearances."** A run of steps: hold shipyard for it, waiting up to a minute for an agent that holds it, and release it at the end:
 
 ```sh
-shipyard control take --wait 60
+shipyard control take --wait 60 --for "screenshots in both appearances"
 shipyard screenshot panel-light.png --appearance light
 shipyard screenshot panel-dark.png --appearance dark
 shipyard panel close

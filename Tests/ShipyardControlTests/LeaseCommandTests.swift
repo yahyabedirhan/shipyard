@@ -39,6 +39,8 @@ struct LeaseCommandTests {
          #"{"command":"control.take",\#(FakeProcessTable.wire()),"version":2,"waitSeconds":30}"#, 45),
         (["take", "--key", "k", "--wait", "0"], .controlTake(waitSeconds: 0),
          #"{"command":"control.take","holder":{"key":"k","name":"claude","place":"\/work"},"version":2,"waitSeconds":0}"#, 15),
+        (["take", "--for", "checking the header icons"], .controlTake(waitSeconds: nil, purpose: "checking the header icons"),
+         #"{"command":"control.take",\#(FakeProcessTable.wire()),"purpose":"checking the header icons","version":2}"#, 15),
         (["release"], .controlRelease, #"{"command":"control.release",\#(FakeProcessTable.wire()),"version":2}"#, 15),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String, timeout: TimeInterval) throws {
@@ -85,6 +87,10 @@ struct LeaseCommandTests {
          "shipyard control take: --wait takes whole seconds from 0 to 3600, not `9223372036854775807`\n"),
         (["control", "take", "--wait", "5", "--wait", "6"], "shipyard control take: unexpected `--wait`\n"),
         (["control", "take", "--key"], "shipyard control take: --key needs a key\n"),
+        (["control", "take", "--for"], "shipyard control take: --for needs a purpose\n"),
+        (["control", "take", "--for", " "], "shipyard control take: --for takes one line of at most 80 characters\n"),
+        (["control", "take", "--for", "two\nlines"], "shipyard control take: --for takes one line of at most 80 characters\n"),
+        (["control", "take", "--for", String(repeating: "a", count: 81)], "shipyard control take: --for takes one line of at most 80 characters\n"),
         (["control", "take", "--key", ""], "shipyard control take: --key needs a key\n"),
         (["control", "release", "--wait", "5"], "shipyard control release: unexpected `--wait`\n"),
         (["control", "release", "now"], "shipyard control release: unexpected `now`\n"),
