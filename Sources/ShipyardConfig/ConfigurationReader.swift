@@ -111,8 +111,9 @@ final class ConfigurationReader {
         }
 
         if let menu = table(node, "menu") {
-            warnUnknownKeys(in: menu, known: ["layout"])
+            warnUnknownKeys(in: menu, known: ["layout", "header-counts"])
             if let layout = choice(menu, "layout", MenuLayout.self) { config.menu.layout = layout }
+            if let kinds = headerCounts(menu) { config.menu.headerCounts = kinds }
         }
 
         if let rateLimit = table(node, "rate-limit") {
@@ -375,6 +376,37 @@ final class ConfigurationReader {
             readable = false
         }
         return readable ? states : nil
+    }
+
+    /// `[menu] header-counts`: a list of kind names. A name that isn't a
+    /// kind's is an error on its own line, with the nearest one suggested;
+    /// so is a name listed twice.
+    private func headerCounts(_ node: Node) -> [ItemKind]? {
+        guard let texts = strings(node, "header-counts") else { return nil }
+        let path = node.path + [.key("header-counts")]
+        let valid = ItemKind.commandOrder.map(\.commandName)
+        var kinds: [ItemKind] = []
+        var spelled: [String: Int] = [:]
+        var readable = true
+        for text in texts {
+            // Which appearance of this exact spelling it is, to find its line.
+            let occurrence = spelled[text, default: 0]
+            spelled[text] = occurrence + 1
+            let line = map.line(for: path, value: text, occurrence: occurrence)
+            guard let kind = ItemKind(commandName: text) else {
+                let hint = Suggestion.nearest(to: text, in: valid).map { "did you mean `\($0)`?" }
+                    ?? "expected " + valid.map { "`\($0)`" }.joined(separator: ", ")
+                errors.append(ConfigIssue(line: line, message: "unknown kind `\(text)` in `header-counts` (\(hint))"))
+                readable = false
+                continue
+            }
+            if kinds.contains(kind) {
+                errors.append(ConfigIssue(line: line, message: "`\(text)` is listed twice in `header-counts`"))
+                readable = false
+            }
+            kinds.append(kind)
+        }
+        return readable ? kinds : nil
     }
 
     /// A kind's `authors = { show = [...], hide = [...] }`.

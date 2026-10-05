@@ -181,14 +181,20 @@ public enum PanelText {
         case nil: break
         }
         if row.kind == .note { return "note, opens in Notion" }
-        let kind = switch row.kind {
+        return "\(state(row.state)) \(kindNoun(row.kind))"
+    }
+
+    /// A kind as a noun for VoiceOver: "pull request", or "pull requests"
+    /// when `plural`.
+    static func kindNoun(_ kind: ItemKind, plural: Bool = false) -> String {
+        let noun = switch kind {
         case .pullRequest: "pull request"
         case .issue: "issue"
         case .workflowRun: "workflow run"
         case .ping: "ping"
         case .note: "note"
         }
-        return "\(state(row.state)) \(kind)"
+        return plural ? noun + "s" : noun
     }
 
     /// A state in a word: "open", "merged", "running", "failed"…, for a
@@ -211,6 +217,13 @@ public enum PanelText {
     public static func emptySection(_ section: MenuSection) -> String? {
         if !section.isLoaded { return "Not loaded yet" }
         return section.rows.isEmpty && section.errors.isEmpty ? "Nothing open" : nil
+    }
+
+    /// What a list header's chip says to VoiceOver: its count and kind, and
+    /// whether it needs attention. "3 pull requests, needs attention", "1 note".
+    public static func headerCount(_ chip: HeaderCount) -> String {
+        let count = "\(chip.count) \(kindNoun(chip.kind, plural: chip.count != 1))"
+        return chip.needsAttention ? "\(count), needs attention" : count
     }
 
     // MARK: - The tabs layout

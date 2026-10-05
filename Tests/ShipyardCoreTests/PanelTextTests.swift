@@ -303,6 +303,13 @@ struct PanelTextTests {
         #expect(PanelText.sectionFoldHelp("shipyard", isCollapsed: true) == "Expand shipyard")
     }
 
+    @Test("a list header's count chip tells VoiceOver its count, its kind and whether it needs attention")
+    func headerCount() {
+        #expect(PanelText.headerCount(HeaderCount(kind: .pullRequest, count: 3, needsAttention: true)) == "3 pull requests, needs attention")
+        #expect(PanelText.headerCount(HeaderCount(kind: .workflowRun, count: 1, needsAttention: false)) == "1 workflow run")
+        #expect(PanelText.headerCount(HeaderCount(kind: .note, count: 2, needsAttention: false)) == "2 notes")
+    }
+
     @Test("a row's action, attention dot and check dot, and the copy icon, have words for VoiceOver and the hover help")
     func rowWords() {
         #expect(PanelText.copy == "Copy")

@@ -70,7 +70,15 @@ extension Configuration {
     /// `[menu]`
     public struct Menu: Equatable, Sendable {
         public var layout: MenuLayout = .list
-        public init(layout: MenuLayout = .list) { self.layout = layout }
+        /// `header-counts`: the kinds the list layout's project headers
+        /// count, each once, as the file lists them; a header shows a chip
+        /// only for the kinds its project has rows of. The chips keep the
+        /// menu's own order whatever this one is.
+        public var headerCounts: [ItemKind] = ItemKind.commandOrder
+        public init(layout: MenuLayout = .list, headerCounts: [ItemKind] = ItemKind.commandOrder) {
+            self.layout = layout
+            self.headerCounts = headerCounts
+        }
     }
 
     /// `[rate-limit]`

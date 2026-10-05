@@ -53,6 +53,16 @@
           "type": "string",
           "enum": ["list", "tabs"],
           "default": "list"
+        },
+        "header-counts": {
+          "description": "The kinds with a count in each project header of the list layout, each listed once. A project's header shows a count for each listed kind it has items of. The counts keep their own order: pull requests, issues, workflow runs, pings, notes. Every project shares this list.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["pull-requests", "issues", "workflow-runs", "pings", "notes"]
+          },
+          "uniqueItems": true,
+          "default": ["pull-requests", "issues", "workflow-runs", "pings", "notes"]
         }
       }
     },

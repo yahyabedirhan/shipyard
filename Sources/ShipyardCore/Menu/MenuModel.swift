@@ -217,6 +217,10 @@ public struct MenuModel: Equatable, Sendable {
             sections[index].attentionCount = sections[index].rows.filter(\.needsAttention).count
             sections[index].isCollapsed = state.collapsed.contains(sections[index].name)
         }
+        let kinds = Self.headerCountKinds(configuration.menu)
+        for index in sections.indices {
+            sections[index].headerCounts = HeaderCount.counts(sections[index].rows, kinds: kinds)
+        }
         attention = state.attention.counts(sections.flatMap(\.rows).map(\.item), toggles: toggles)
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
     }
@@ -322,6 +326,21 @@ public struct MenuModel: Equatable, Sendable {
 
     /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
+
+    /// The order of the chips in a list section's header. It is the same
+    /// list as `ItemKind.commandOrder` on purpose, kept apart so the chips'
+    /// order stays fixed whatever that list becomes. The `[menu]
+    /// header-counts` default (`Configuration.Menu`) and the schema list
+    /// the same order; `ConfigSchemaTests` checks the three agree.
+    static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
+
+    /// The kinds a list section's header may count: those `[menu]
+    /// header-counts` lists, always in `headerCountOrder`, whatever order
+    /// the file lists them in. A section shows a chip only for the ones it
+    /// has rows of (`HeaderCount.counts`).
+    static func headerCountKinds(_ menu: Configuration.Menu) -> [ItemKind] {
+        headerCountOrder.filter { menu.headerCounts.contains($0) }
+    }
 }
 
 /// One project in the panel.
@@ -344,8 +363,14 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// Whether a row's second line names its repository: only when the
     /// project has more than one, or uses `anywhere`.
     public var showsRepository: Bool
-    /// Rows in this section needing attention, for its header.
+    /// Rows in this section needing attention: what Mark all seen covers
+    /// and a project's tab counts.
     public var attentionCount: Int
+    /// The list header's chips: one per kind `[menu] header-counts` lists
+    /// that this section has rows of, in the header's own order, each with
+    /// its row count and whether it needs attention. A kind without rows
+    /// here has no chip. `applyAttention` fills it; empty until then.
+    public var headerCounts: [HeaderCount] = []
     /// Whether the user collapsed it. Its rows are still here, and still
     /// count towards the attention count.
     public var isCollapsed: Bool
@@ -424,6 +449,39 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// repository in the configuration, on GitHub; `nil` without one.
     public var repositoryURL: URL? {
         repositories.first.flatMap { URL(string: "https://github.com/\($0)") }
+    }
+}
+
+/// One chip of a list section's header: a kind, how many rows of it the
+/// section lists (shown, behind Show more and in folded subsections), and
+/// whether any of them needs attention. The count is never 0: a kind
+/// without rows has no chip.
+public struct HeaderCount: Equatable, Sendable, Identifiable {
+    public var kind: ItemKind
+    public var count: Int
+    /// Whether at least one of its rows needs attention: never for notes,
+    /// which `Attention` never flags.
+    public var needsAttention: Bool
+
+    public var id: ItemKind { kind }
+
+    public init(kind: ItemKind, count: Int, needsAttention: Bool) {
+        self.kind = kind
+        self.count = count
+        self.needsAttention = needsAttention
+    }
+
+    /// One chip per kind of `kinds` that `rows` has, in that order.
+    static func counts(_ rows: [MenuRow], kinds: [ItemKind]) -> [HeaderCount] {
+        kinds.compactMap { kind in
+            let ofKind = rows.filter { $0.kind == kind }
+            guard !ofKind.isEmpty else { return nil }
+            return HeaderCount(
+                kind: kind,
+                count: ofKind.count,
+                needsAttention: ofKind.contains(where: \.needsAttention)
+            )
+        }
     }
 }
 

@@ -12,11 +12,12 @@ private typealias Issue = PullRequestsResponse.Issue
 private let web = "yahyabedirhan/shop-web"
 
 /// One project, "shop", with issues shown, arranged by `settings` under
-/// `[menu] layout`.
-private func config(_ settings: String = "show-first = 5", layout: MenuLayout = .list) -> String {
+/// `[menu] layout` and any other `[menu]` lines in `menu`.
+private func config(_ settings: String = "show-first = 5", layout: MenuLayout = .list, menu: String = "") -> String {
     """
     [menu]
     layout = "\(layout.rawValue)"
+    \(menu)
 
     [defaults.issues]
     show = true
@@ -123,6 +124,57 @@ struct ShowMoreTests {
         harness.shipyard.markAllSeen(project: "shop")
 
         #expect(harness.shipyard.menu.menuBarLabel == .total(0))
+    }
+
+    @Test("a list header counts each kind's rows, capped and folded ones too, and flags the kinds needing attention")
+    func headerCounts() async throws {
+        let config = config("show-first = 5\nsubsections = true\nworkflow-runs = { show = true }")
+        let harness = try Harness(stored: "gho_stored", config: config)
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([answer])
+        // A failed run needs attention until seen; a succeeded one never does.
+        var failed = WorkflowRunsResponse.Run(9)
+        failed.conclusion = "failure"
+        harness.stub.on("GET", WorkflowRunsResponse.url(web), WorkflowRunsResponse(web, [failed, WorkflowRunsResponse.Run(10)]).answer())
+        await harness.shipyard.start()
+        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
+        await harness.shipyard.reloadPings()
+        let runs = GroupID(project: "shop", key: .kind(.workflowRun))
+        harness.shipyard.toggleGroup(runs)
+        #expect(harness.group(runs)?.isFolded == true)
+        #expect(harness.group(pullRequests)?.hiddenCount == 2)
+
+        let chips = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
+        // Every kind with rows has a chip, in the header's order; notes,
+        // with no rows, get none.
+        #expect(chips() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!"])
+
+        harness.shipyard.markAllSeen(project: "shop")
+
+        #expect(chips() == ["pullRequest 7", "issue 1", "workflowRun 2", "ping 1"])
+    }
+
+    @Test("header-counts picks which kinds get a chip, never their order, and a chip needs rows in its own section")
+    func headerCountKinds() async throws {
+        let docs = "yahyabedirhan/shop-docs"
+        let config = config(
+            "show-first = 5\n\n[[projects]]\nname = \"docs\"\nrepositories = [\"\(docs)\"]",
+            menu: "header-counts = [\"notes\", \"pings\", \"pull-requests\"]"
+        )
+        let harness = try await Harness.started(config: config, graphQL: PullRequestsResponse.answer([
+            PullRequestsResponse(web, (1...7).map { PR($0) }, issues: [Issue(8)]),
+            PullRequestsResponse(docs, [], issues: []),
+        ]))
+        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
+        try #require(harness.cli("ping", "Ready", "--project", "docs").status == 0)
+        await harness.shipyard.reloadPings()
+
+        let chips = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }
+        // The issue has a row but isn't listed, so no chip; notes have no
+        // rows, so no chip; shop's pull requests give docs no chip; the
+        // chips keep the header's order rather than the file's.
+        #expect(chips("shop") == ["pullRequest 7", "ping 1"])
+        #expect(chips("docs") == ["ping 1"])
     }
 
     @Test("with group-by none, the cap applies to the whole project")
