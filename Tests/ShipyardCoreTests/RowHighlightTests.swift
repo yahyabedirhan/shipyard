@@ -639,11 +639,41 @@ struct RowHighlightTests {
         #expect(tab.row(at: place(nil, row(.pullRequest, 9))) == nil)
     }
 
-    @Test("a project's header opens the first repository listed in the configuration")
-    func projectRepositoryURL() {
-        let several = MenuSection(name: "shop", rows: [], repositories: ["yahyabedirhan/shop-web", "yahyabedirhan/shop-api"])
+    @Test("a project's header opens the first repository listed in the configuration; a count chip offers each repository's page for its kind with its count, configured ones first, then any a row comes from")
+    func projectRepositoryURL() throws {
+        let one = MenuSection(name: "shipyard", rows: [row(.pullRequest, 1)], repositories: ["yahyabedirhan/shipyard"])
+        let several = MenuSection(
+            name: "shop",
+            rows: [
+                row(.pullRequest, 1, repository: "yahyabedirhan/shop-api"),
+                row(.pullRequest, 2, repository: "yahyabedirhan/shop-api"),
+                row(.pullRequest, 3, repository: "acme/review-me"),
+                row(.issue, 4, repository: "yahyabedirhan/shop-web"),
+            ],
+            repositories: ["yahyabedirhan/shop-web", "yahyabedirhan/shop-api"]
+        )
+        let none = MenuSection(name: "none", rows: [])
+        func link(_ repository: String, _ page: String, _ count: Int) throws -> PageLink {
+            PageLink(repository: repository, count: count, url: try #require(URL(string: "https://github.com/\(repository)/\(page)")))
+        }
 
         #expect(several.repositoryURL == URL(string: "https://github.com/yahyabedirhan/shop-web"))
-        #expect(MenuSection(name: "none", rows: []).repositoryURL == nil)
+        #expect(none.repositoryURL == nil)
+
+        #expect(one.pageLinks(for: .pullRequest) == [try link("yahyabedirhan/shipyard", "pulls", 1)])
+        #expect(one.pageLinks(for: .issue) == [try link("yahyabedirhan/shipyard", "issues", 0)])
+        #expect(one.pageLinks(for: .workflowRun) == [try link("yahyabedirhan/shipyard", "actions", 0)])
+        #expect(several.pageLinks(for: .pullRequest) == [
+            try link("yahyabedirhan/shop-web", "pulls", 0),
+            try link("yahyabedirhan/shop-api", "pulls", 2),
+            try link("acme/review-me", "pulls", 1),
+        ])
+        #expect(several.pageLinks(for: .issue) == [
+            try link("yahyabedirhan/shop-web", "issues", 1),
+            try link("yahyabedirhan/shop-api", "issues", 0),
+        ])
+        #expect(one.pageLinks(for: .ping).isEmpty)
+        #expect(one.pageLinks(for: .note).isEmpty)
+        #expect(none.pageLinks(for: .pullRequest).isEmpty)
     }
 }

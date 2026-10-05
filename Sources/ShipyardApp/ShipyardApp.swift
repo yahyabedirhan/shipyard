@@ -267,6 +267,10 @@ final class AppServices {
                 shipyard.openRepository(of: project)
                 self?.closeMenu()
             },
+            openPage: { [weak self] link in
+                shipyard.openPage(link)
+                self?.closeMenu()
+            },
             startNote: { [weak self] project in
                 // The menu closes once Notion opens the note; a failure stays in view on the project.
                 Task { @MainActor in

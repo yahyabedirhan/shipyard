@@ -309,6 +309,9 @@ struct PanelTextTests {
         #expect(PanelText.headerCount(HeaderCount(kind: .pullRequest, count: 3, needsAttention: true)) == "3 pull requests, needs attention")
         #expect(PanelText.headerCount(HeaderCount(kind: .workflowRun, count: 1, needsAttention: false)) == "1 workflow run")
         #expect(PanelText.headerCount(HeaderCount(kind: .note, count: 2, needsAttention: false)) == "2 notes")
+        #expect(PanelText.headerCountPage(.pullRequest) == "Open pull requests on GitHub")
+        #expect(PanelText.headerCountPage(.issue) == "Open issues on GitHub")
+        #expect(PanelText.headerCountPage(.workflowRun) == "Open Actions on GitHub")
     }
 
     @Test("a row's action, attention dot and check dot, and the copy icon, have words for VoiceOver and the hover help")

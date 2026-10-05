@@ -450,6 +450,47 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     public var repositoryURL: URL? {
         repositories.first.flatMap { URL(string: "https://github.com/\($0)") }
     }
+
+    /// What a click on the header's count chip for `kind` offers: each
+    /// repository's page for that kind on GitHub (`/pulls`, `/issues` or
+    /// `/actions`), with how many of the section's rows of that kind are
+    /// from it. The configured repositories come first, in order, then any
+    /// other a row comes from (`anywhere`), in the order the rows have them.
+    /// One link opens at once; several are a menu to choose from. Empty for
+    /// pings and notes, which have no page, and for a project without
+    /// repositories.
+    public func pageLinks(for kind: ItemKind) -> [PageLink] {
+        let path: String
+        switch kind {
+        case .pullRequest: path = "pulls"
+        case .issue: path = "issues"
+        case .workflowRun: path = "actions"
+        case .ping, .note: return []
+        }
+        let kindRows = rows.filter { $0.kind == kind && !$0.repository.isEmpty }
+        var order = repositories
+        for row in kindRows where !order.contains(row.repository) { order.append(row.repository) }
+        return order.compactMap { repository in
+            URL(string: "https://github.com/\(repository)/\(path)").map { url in
+                PageLink(repository: repository, count: kindRows.count { $0.repository == repository }, url: url)
+            }
+        }
+    }
+}
+
+/// A repository's page for one kind on GitHub, as a header's count chip
+/// offers it: the repository, how many of the section's rows of that kind
+/// are from it, and the page.
+public struct PageLink: Equatable, Sendable {
+    public var repository: String
+    public var count: Int
+    public var url: URL
+
+    public init(repository: String, count: Int, url: URL) {
+        self.repository = repository
+        self.count = count
+        self.url = url
+    }
 }
 
 /// One chip of a list section's header: a kind, how many rows of it the

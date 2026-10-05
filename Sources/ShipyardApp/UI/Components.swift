@@ -261,13 +261,13 @@ private struct DismissButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 9, weight: .bold))
+                .font(.system(size: 8, weight: .bold))
         }
-        .buttonStyle(IconButtonStyle())
+        .buttonStyle(IconButtonStyle(compact: true))
         .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(Palette.panel)
-                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover))
+                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Palette.hover))
         )
         .hoverHelp(PanelText.dismissPing)
         .accessibilityLabel(PanelText.dismissPing)

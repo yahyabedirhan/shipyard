@@ -233,6 +233,14 @@ public enum PanelText {
         return chip.needsAttention ? "\(count), needs attention" : count
     }
 
+    /// A list header's chip, for its hover help and VoiceOver's hint: the
+    /// page a click opens (`MenuSection.pageLinks(for:)`), and its menu's heading. "Open pull
+    /// requests on GitHub", "Open Actions on GitHub".
+    public static func headerCountPage(_ kind: ItemKind) -> String {
+        let page = kind == .workflowRun ? "Actions" : kindNoun(kind, plural: true)
+        return "Open \(page) on GitHub"
+    }
+
     // MARK: - The tabs layout
 
     /// A tab's title: "All", or its project's name.

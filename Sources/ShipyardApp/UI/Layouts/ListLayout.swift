@@ -1,3 +1,5 @@
+import AppKit
+import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
@@ -189,13 +191,14 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron and the project's name; then, right-aligned, the
+/// The chevron and the project's name, then right beside the name the
 /// open-in-browser icon, shown on hover while the project has a
-/// repository; Mark all seen's check, shown on hover while anything needs
-/// attention; then a count chip per kind the project has rows of
-/// (`MenuSection.headerCounts`),
-/// each as wide as its content, or what the project says in their place
-/// ("Nothing open"); and last the new-note icon, when the project has
+/// repository; then, right-aligned, Mark all seen's check, shown on hover
+/// while anything needs attention; then a count chip per kind the project
+/// has rows of (`MenuSection.headerCounts`), each as wide as its content
+/// and, for a kind with a page on GitHub, a button that opens it (in a
+/// project of several repositories, a menu of each one's page and count),
+/// or what the project says in their place ("Nothing open"); and last the new-note icon, when the project has
 /// one. Nothing keeps a fixed slot. Highlighted by the pointer or the
 /// keys, it draws the highlight over its own background, since it pins
 /// above the rows: a square band the header's full width.
@@ -207,38 +210,48 @@ private struct ListSectionHeader: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Button {
-                // Not animated (see `ListLayout.lineTransition`): the chevron, the chips and the lines animate themselves.
-                actions.toggleCollapsed(section)
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.tertiary)
-                        .animation(Motion.collapse) { $0.rotationEffect(.degrees(section.isCollapsed ? 0 : 90)) }
-                        .frame(width: Grid.dotColumn)
-                    Image(systemName: "folder.fill")
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    Text(section.name)
-                        .font(TypeScale.section)
-                        .foregroundStyle(.primary.opacity(0.9))
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
+            // The fold button fills the header's left part; the chevron,
+            // folder and name are drawn over it and let clicks through,
+            // so only the open-in-browser icon beside the name takes its own.
+            ZStack(alignment: .leading) {
+                Button {
+                    // Not animated (see `ListLayout.lineTransition`): the chevron, the chips and the lines animate themselves.
+                    actions.toggleCollapsed(section)
+                } label: {
+                    Color.clear
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
                 }
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            // No hover help: the chevron says it collapses. VoiceOver hears what a click does.
-            .accessibilityLabel(section.name)
-            .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
-            .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
-            // Kept laid out while hidden, like the check, so nothing moves on hover.
-            if let repository = section.repositories.first {
-                OpenRepositoryIcon(repository: repository) { actions.openRepository(section) }
-                    .opacity(hover ? 1 : 0)
+                .buttonStyle(.plain)
+                // No hover help: the chevron says it collapses. VoiceOver hears what a click does.
+                .accessibilityLabel(section.name)
+                .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
+                .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
+                HStack(spacing: 6) {
+                    Group {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.tertiary)
+                            .animation(Motion.collapse) { $0.rotationEffect(.degrees(section.isCollapsed ? 0 : 90)) }
+                            .frame(width: Grid.dotColumn)
+                        Image(systemName: "folder.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        Text(section.name)
+                            .font(TypeScale.section)
+                            .foregroundStyle(.primary.opacity(0.9))
+                            .lineLimit(1)
+                    }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    if let repository = section.repositories.first {
+                        OpenRepositoryIcon(repository: repository) { actions.openRepository(section) }
+                            .fixedSize()
+                            .opacity(hover ? 1 : 0)
+                    }
+                }
+                .padding(.trailing, 8)
             }
             if let empty = PanelText.emptySection(section) {
                 // In place of the chips, right-aligned.
@@ -257,7 +270,25 @@ private struct ListSectionHeader: View {
                     .opacity(hover ? 1 : 0)
                 }
                 HStack(spacing: Grid.chipGap) {
-                    ForEach(section.headerCounts) { HeaderCountChip(chip: $0) }
+                    ForEach(section.headerCounts) { chip in
+                        let links = section.pageLinks(for: chip.kind)
+                        if !links.isEmpty {
+                            Button {
+                                if links.count == 1 {
+                                    actions.openPage(links[0])
+                                } else {
+                                    PageLinkMenu.show(links, kind: chip.kind, open: actions.openPage)
+                                }
+                            } label: {
+                                HeaderCountChip(chip: chip)
+                            }
+                                .buttonStyle(ChipButtonStyle())
+                                .hoverHelp(PanelText.headerCountPage(chip.kind))
+                                .accessibilityHint(PanelText.headerCountPage(chip.kind))
+                        } else {
+                            HeaderCountChip(chip: chip)
+                        }
+                    }
                 }
             }
             if let newNote = section.newNote {
@@ -297,7 +328,7 @@ private struct MarkAllSeenIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "checkmark")
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 8.5, weight: .semibold))
         }
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.markAllSeen)
@@ -306,8 +337,9 @@ private struct MarkAllSeenIcon: View {
 }
 
 /// A project header's open-in-browser icon: opens the project's first
-/// repository on GitHub, as Return on the header does, in the check's
-/// compact button. Its hover help and VoiceOver label name the repository.
+/// repository on GitHub, as Return on the header does, in the compact
+/// button the check and a ping row's ✕ use. Its hover help and VoiceOver
+/// label name the repository.
 private struct OpenRepositoryIcon: View {
     let repository: String
     let action: () -> Void
@@ -315,7 +347,7 @@ private struct OpenRepositoryIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "arrow.up.right.square")
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
         }
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.openRepository(repository))
@@ -351,6 +383,66 @@ private struct HeaderCountChip: View {
         .animation(Motion.count, value: chip.count)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(PanelText.headerCount(chip))
+    }
+}
+
+/// A count chip's menu in a project of several repositories: under a
+/// heading naming the page ("Open pull requests on GitHub"), one item per
+/// repository, named without its owner, with its count as the item's
+/// badge (none at 0). Native, at the pointer, so it reads like any menu;
+/// choosing an item opens that repository's page.
+@MainActor
+private enum PageLinkMenu {
+    static func show(_ links: [PageLink], kind: ItemKind, open: @escaping (PageLink) -> Void) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(.sectionHeader(title: PanelText.headerCountPage(kind)))
+        for link in links {
+            let item = ActionMenuItem(title: PanelText.repositoryName(link.repository)) { open(link) }
+            if link.count > 0 { item.badge = NSMenuItemBadge(count: link.count) }
+            item.toolTip = link.repository
+            menu.addItem(item)
+        }
+        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+    }
+}
+
+/// A menu item that runs a closure when chosen.
+private final class ActionMenuItem: NSMenuItem {
+    private let run: () -> Void
+
+    init(title: String, run: @escaping () -> Void) {
+        self.run = run
+        super.init(title: title, action: #selector(choose), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) { fatalError("not decoded") }
+
+    @objc private func choose() { run() }
+}
+
+/// A count chip that opens its kind's page: the chip on a faint capsule
+/// while hovered, darker while pressed.
+private struct ChipButtonStyle: ButtonStyle {
+    func makeBody(configuration: ButtonStyleConfiguration) -> some View {
+        ChipButtonBody(configuration: configuration)
+    }
+}
+
+private struct ChipButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var hover = false
+
+    var body: some View {
+        configuration.label
+            .background {
+                Capsule().fill(configuration.isPressed ? Palette.pressed : hover ? Palette.hover : .clear)
+            }
+            .contentShape(Capsule())
+            .onHover { hover = $0 }
+            .animation(Motion.hover, value: hover)
     }
 }
 
