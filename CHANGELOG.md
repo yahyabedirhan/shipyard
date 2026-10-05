@@ -5,6 +5,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 ## Unreleased
 
 - **Open a project on GitHub from its header.** In the list layout, an open-in-browser icon shows beside a project's name on hover and opens its repository, as Return on the header does. Each pull request, issue and run count chip opens that kind's page (`/pulls`, `/issues`, `/actions`); in a project of several repositories it opens a menu of each repository's page with its count. The header's check, the new icon and a ping's ✕ share one smaller button size.
+- **Agents can't fight you over the panel.** `shipyard screenshot` no longer opens a closed panel: it renders it off screen and says so on standard error. For 30 seconds after you close the panel, clicking elsewhere included, `shipyard panel open` is refused with the time it can open it again, so an agent can't reopen it in a loop.
 
 ## 0.3.0 (2026-10-04)
 

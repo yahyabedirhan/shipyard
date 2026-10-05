@@ -15,12 +15,18 @@ struct ControlServerTests {
     static let status = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: ["shop"])
 
     /// Records each call it's asked to make, and refuses all of them with
-    /// `refusal` when it's set.
+    /// `refusal` when it's set. Its status says the panel is open unless
+    /// `isOpen` is false.
     final class FakePanel: PanelControlling {
         var calls: [String] = []
         var refusal: PanelRefusal?
+        var isOpen = true
 
-        func status() -> AppStatus { ControlServerTests.status }
+        func status() -> AppStatus {
+            var status = ControlServerTests.status
+            status.panelOpen = isOpen
+            return status
+        }
 
         private func record(_ call: String) throws(PanelRefusal) {
             calls.append(call)

@@ -64,7 +64,12 @@ final class PanelControl: PanelControlling {
         )
     }
 
+    /// Refused while the user's close keeps app control out
+    /// (`PanelReopenGuard`), with nothing done.
     func open() async throws(PanelRefusal) {
+        if !state.isOpen, let refusal = state.reopenGuard.refusal(at: Date(), timeZone: .current) {
+            throw PanelRefusal(refusal)
+        }
         guard await present(true) else {
             throw PanelRefusal("the panel didn't open within \(Self.wait.components.seconds) seconds; click shipyard's menu bar icon")
         }
@@ -80,13 +85,20 @@ final class PanelControl: PanelControlling {
     /// is, and waits until the panel's appearing (or disappearing) says so.
     private func present(_ open: Bool) async -> Bool {
         guard state.isOpen != open else { return true }
-        if open { MenuBarWindow.open() } else { MenuBarWindow.close() }
+        if open {
+            MenuBarWindow.open()
+        } else {
+            state.closingByControl = true
+            MenuBarWindow.close()
+        }
         let step = Duration.milliseconds(50)
         var waited = Duration.zero
         while state.isOpen != open, waited < Self.wait {
             try? await Task.sleep(for: step)
             waited += step
         }
+        // A close that didn't happen isn't app control's any more.
+        if !open, state.isOpen { state.closingByControl = false }
         return state.isOpen == open
     }
 

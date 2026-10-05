@@ -313,9 +313,12 @@ final class AppServices {
     }
 
     /// Closing the panel caps every group Show more revealed, so the menu
-    /// opens with every cap back.
+    /// opens with every cap back, and, unless app control closed it, keeps
+    /// app control from opening it again for a while (`PanelReopenGuard`).
     func panelClosed() {
         panelState.isOpen = false
+        panelState.reopenGuard.panelClosed(byControl: panelState.closingByControl, at: Date())
+        panelState.closingByControl = false
         shipyard.panelClosed()
     }
 

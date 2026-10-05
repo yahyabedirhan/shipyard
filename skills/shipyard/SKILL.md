@@ -595,11 +595,11 @@ shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
 | `app quit` | quits shipyard and waits until it's gone | `shipyard quit` |
 | `app status` | whether shipyard runs, and what its panel shows | the status (below) |
 | `app status --json` | the same, as one JSON object on one line | the status as JSON |
-| `panel open`, `panel close` | opens or closes the menu bar icon's panel, waiting until it has | `panel open`, `panel closed` |
+| `panel open`, `panel close` | opens or closes the menu bar icon's panel, waiting until it has. For 30 seconds after the user closes the panel (by clicking elsewhere too), `panel open` is refused with the time it can open it again; wait for that time and don't retry sooner | `panel open`, `panel closed` |
 | `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
 | `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs`, `pings` or `notes` | `showing all <kind> in <project>` |
 | `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
-| `screenshot <file.png>` | saves the panel as it looks, opening it when it's closed; a relative path is taken from the folder you run in | the file's absolute path |
+| `screenshot <file.png>` | saves the panel as it looks; a closed panel is rendered off screen without opening it (said on standard error), so `panel open` first for the panel as drawn on screen; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
 | `--with-indicator` | keeps the yellow dot and the banner that show an agent is using shipyard; a screenshot leaves them out otherwise | |
@@ -622,7 +622,7 @@ showing all: pull-requests in shop
 
 With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
 
-What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. The panel stays open after a screenshot; close it when you're done.
+What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. Close the panel when you're done. Never run these commands in a loop to wait for something, such as data loading: check `app status` once, and take one screenshot.
 
 ### Taking turns
 
@@ -647,7 +647,7 @@ A command shipyard won't run for you exits 1 with one of these lines:
 ### Exit codes
 
 - **0**: done. A screenshot is still exit 0 when the app couldn't capture its window and drew the panel itself instead: it writes that picture, prints the path, and says so on standard error, `captured by rendering: <why>`. Look at such a picture before you rely on it.
-- **1**: refused, with one line on standard error saying why. Another agent holds shipyard, or the user took it back (see Taking turns). Shipyard isn't running (``shipyard isn't running; `shipyard app open` ``), or didn't answer within 10 seconds of launching. No project, kind or tab has that name; the line lists the ones that exist, such as ``no project is named `shopp`; the projects are `shop`, `blog` ``, so try again with one of them. `tab` in the list layout (``the menu uses the list layout; tabs need `[menu] layout = "tabs"` ``). `show-more` on a project not grouped by kind. A screenshot nothing could be written for, such as one into a folder that doesn't exist.
+- **1**: refused, with one line on standard error saying why. Another agent holds shipyard, or the user took it back (see Taking turns). Shipyard isn't running (``shipyard isn't running; `shipyard app open` ``), or didn't answer within 10 seconds of launching. No project, kind or tab has that name; the line lists the ones that exist, such as ``no project is named `shopp`; the projects are `shop`, `blog` ``, so try again with one of them. `tab` in the list layout (``the menu uses the list layout; tabs need `[menu] layout = "tabs"` ``). `show-more` on a project not grouped by kind. `panel open` within 30 seconds of the user closing the panel (the line gives the time it can open again). A screenshot nothing could be written for, such as one into a folder that doesn't exist.
 - **2**: the arguments don't read (a missing name, an unknown subcommand or option, a path that isn't `.png`, a `--demo` folder that doesn't exist); the line comes with the usage. On a machine other than the Mac, every one of these commands is exit 2 too: ``shipyard: `shipyard app` runs on the Mac, where the app is``.
 
 ### Demo runs

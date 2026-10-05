@@ -1,4 +1,5 @@
 import Observation
+import ShipyardControl
 import ShipyardCore
 
 /// The panel's own state, which the app owns rather than a view, so a
@@ -13,6 +14,11 @@ final class PanelState {
     /// Whether the panel's window is on screen: its appearing and
     /// disappearing set it.
     var isOpen = false
+    /// Whether app control asked the panel to close (`shipyard panel
+    /// close`) and it hasn't closed yet: its close then starts no wait.
+    var closingByControl = false
+    /// App control's wait after the user closes the panel.
+    var reopenGuard = PanelReopenGuard()
     /// The tabs layout's selected tab.
     private(set) var selectedTab: MenuTab = .all
     /// Whether the latest tab change moved right in `tabs`, so the list

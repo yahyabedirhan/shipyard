@@ -9,8 +9,10 @@ public enum ScreenshotCommand {
         usage: shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
                                   [--with-indicator]
 
-          Saves shipyard's panel as it looks, opening it when it's closed, and
-          prints the file's path. A relative path is relative to this folder.
+          Saves shipyard's panel as it looks and prints the file's path. A
+          closed panel isn't opened: it's rendered off screen instead, and
+          that's said on standard error. A relative path is relative to this
+          folder.
           The dot and the banner that show an agent holds shipyard are left
           out of it.
 

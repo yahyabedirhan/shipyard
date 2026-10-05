@@ -101,16 +101,16 @@ struct ScreenshotImageTests {
         #expect(light.width > plain.width)
     }
 
-    @Test("without --with-indicator, the panel's fallback is drawn with the lease's dot and banner hidden, and they come back afterwards")
+    @Test("a closed panel is rendered, never opened; without --with-indicator, with the lease's dot and banner hidden, and they come back afterwards")
     func fallbackHidesTheIndicator() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("shipyard-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         // The screenshotter sets the app's appearance, so the app object has to exist.
         _ = NSApplication.shared
-        // The panel doesn't open, so the screenshot falls back to rendering a fresh one.
+        // The panel is closed, so the screenshot renders a fresh one rather than opening it.
         let panel = ControlServerTests.FakePanel()
-        panel.refusal = PanelRefusal("the panel didn't open within 2 seconds")
+        panel.isOpen = false
         let indicator = LeaseIndicator()
         let drawn = DrawnPanels()
         let screenshotter = Screenshotter(panel: panel, indicator: indicator) {
@@ -123,8 +123,9 @@ struct ScreenshotImageTests {
         let hiddenAfter = indicator.isHiddenForCapture
         let with = await screenshotter.capturePanel(to: file, appearance: .light, withIndicator: true)
 
-        #expect(without == .rendered(why: "the panel didn't open within 2 seconds"))
-        #expect(with == .rendered(why: "the panel didn't open within 2 seconds"))
+        #expect(without == .rendered(why: "the panel is closed"))
+        #expect(with == .rendered(why: "the panel is closed"))
+        #expect(panel.calls.isEmpty)
         #expect(drawn.hidden == [true, false])
         #expect(!hiddenAfter)
         #expect(!indicator.isHiddenForCapture)
@@ -137,7 +138,7 @@ struct ScreenshotImageTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         _ = NSApplication.shared
         let panel = ControlServerTests.FakePanel()
-        panel.refusal = PanelRefusal("the panel didn't open within 2 seconds")
+        panel.isOpen = false
         let indicator = LeaseIndicator()
         let drawn = DrawnPanels()
         let screenshotter = Screenshotter(panel: panel, indicator: indicator) {
@@ -150,7 +151,7 @@ struct ScreenshotImageTests {
         async let second = screenshotter.capturePanel(to: folder.appendingPathComponent("second.png"), appearance: .light, withIndicator: false)
         let outcomes = await [first, second]
 
-        #expect(outcomes == Array(repeating: .rendered(why: "the panel didn't open within 2 seconds"), count: 2))
+        #expect(outcomes == Array(repeating: .rendered(why: "the panel is closed"), count: 2))
         #expect(drawn.hidden == [true, true])
         #expect(!indicator.isHiddenForCapture)
     }
