@@ -237,6 +237,7 @@ public enum PanelText {
     /// page a click opens (`MenuSection.pageLinks(for:)`), and its menu's heading. "Open pull
     /// requests on GitHub", "Open Actions on GitHub".
     public static func headerCountPage(_ kind: ItemKind) -> String {
+        if kind == .note { return "Open the notes in Notion" }
         let page = kind == .workflowRun ? "Actions" : kindNoun(kind, plural: true)
         return "Open \(page) on GitHub"
     }

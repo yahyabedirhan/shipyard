@@ -300,13 +300,15 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// `sections` with the new-note icon on each project that shows notes,
-    /// while Notion is connected: starting while a note is being started there.
+    /// while Notion is connected: starting while a note is being started
+    /// there; and each one's notes database, for its notes count.
     private static func newNoteIcons(_ sections: [MenuSection], _ notes: NotesMenuState, configuration: Configuration) -> [MenuSection] {
         guard notes.connected else { return sections }
         return sections.map { section in
             guard showsNotes(section.name, configuration: configuration) else { return section }
             var section = section
             section.newNote = notes.starting.contains(section.name) ? .starting : .ready
+            section.notesDatabase = notes.databases[section.name]
             return section
         }
     }
@@ -386,6 +388,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// The header's new-note icon: on a project that shows notes while
     /// Notion is connected (`MenuModel.build`'s `notes`); `nil` hides it.
     public var newNote: NewNoteButton?
+    /// The project's notes database in Notion, which the notes count opens;
+    /// `nil` before a read matched one.
+    public var notesDatabase: URL?
 
     public var id: String { name }
 
@@ -456,8 +461,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// `/actions`), with how many of the section's rows of that kind are
     /// from it. The configured repositories come first, in order, then any
     /// other a row comes from (`anywhere`), in the order the rows have them.
-    /// One link opens at once; several are a menu to choose from. Empty for
-    /// pings and notes, which have no page, and for a project without
+    /// One link opens at once; several are a menu to choose from. Notes
+    /// have one: the project's notes database in Notion, once known. Empty
+    /// for pings, which have no page, and for a project without
     /// repositories.
     public func pageLinks(for kind: ItemKind) -> [PageLink] {
         let path: String
@@ -465,7 +471,9 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         case .pullRequest: path = "pulls"
         case .issue: path = "issues"
         case .workflowRun: path = "actions"
-        case .ping, .note: return []
+        case .note:
+            return notesDatabase.map { [PageLink(repository: name, count: rows.count { $0.kind == .note }, url: $0)] } ?? []
+        case .ping: return []
         }
         let kindRows = rows.filter { $0.kind == kind && !$0.repository.isEmpty }
         var order = repositories

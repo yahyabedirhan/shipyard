@@ -1,3 +1,5 @@
+import Foundation
+
 /// What the menu shows about notes besides their rows (`MenuModel.build`):
 /// why a project's notes couldn't be read or a note couldn't be started,
 /// and whether the projects' headers carry the new-note icon.
@@ -10,17 +12,22 @@ public struct NotesMenuState: Equatable, Sendable {
     public var startErrors: [String: String]
     /// The projects a note is being started in now.
     public var starting: Set<String>
+    /// Each project's notes database in Notion, by project name, which its
+    /// header's notes count opens.
+    public var databases: [String: URL]
 
     public init(
         connected: Bool = false,
         readErrors: [String: String] = [:],
         startErrors: [String: String] = [:],
-        starting: Set<String> = []
+        starting: Set<String> = [],
+        databases: [String: URL] = [:]
     ) {
         self.connected = connected
         self.readErrors = readErrors
         self.startErrors = startErrors
         self.starting = starting
+        self.databases = databases
     }
 }
 

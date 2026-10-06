@@ -104,6 +104,31 @@ struct NotesTests {
         #expect(harness.stub.unmatched.isEmpty)
     }
 
+    @Test("the header's notes count opens the project's notes database in Notion; a project without a database has no link")
+    func countOpensDatabase() async throws {
+        let harness = try await Harness.withNotes()
+
+        let link = try #require(harness.section("shop")?.pageLinks(for: .note).first)
+        #expect(link.url == URL(string: "https://www.notion.so/27a0c3e18f4b80aab0020000000000d1"))
+        #expect(link.count == 3)
+        #expect(harness.section("blog")?.pageLinks(for: .note).isEmpty == true)
+        #expect(PanelText.headerCountPage(.note) == "Open the notes in Notion")
+    }
+
+    @Test("a Shipyard Notes page with no Projects page yet lists no notes, with no error and no banner: no project has notes yet")
+    func noProjectsPage() async throws {
+        let harness = try await Harness.withNotes()
+        harness.shipyard.disconnectNotion()
+        try harness.notion.save("ntn_token")
+        harness.stub.on(NotionStub.entryChildren, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
+
+        _ = await harness.shipyard.connectNotion(token: "ntn_token")
+
+        #expect(harness.noteRows().isEmpty)
+        #expect(harness.noteErrors("shop").isEmpty)
+        #expect(harness.notesBanner == nil)
+    }
+
     @Test("notes need no attention: they add nothing to any count, and Mark all seen leaves them out")
     func notCounted() async throws {
         let harness = try await Harness.withNotes()
@@ -196,7 +221,7 @@ struct NotesTests {
     @Test("a rejected token shows on every project that shows notes, saying to connect again")
     func rejectedToken() async throws {
         let harness = try await Harness.withNotes()
-        harness.stub.on(NotionStub.entryChildren, try NotionStub.unauthorized())
+        harness.stub.on(NotionStub.projectsChildren, try NotionStub.unauthorized())
 
         await harness.readNotes()
 

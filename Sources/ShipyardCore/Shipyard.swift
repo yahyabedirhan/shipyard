@@ -100,6 +100,9 @@ public final class Shipyard {
     /// Whether the last read found no page titled "Shipyard Notes" shared
     /// with the token: the notes banner says so rather than listing none.
     public private(set) var notesEntryMissing = false
+    /// Each project's notes database in Notion, by project name, as the
+    /// last read matched them: its header's notes count opens it.
+    public private(set) var noteDatabases: [String: URL] = [:]
     /// The projects the new-note icon is starting a note in now.
     public private(set) var startingNotes: Set<String> = []
     /// Why the new-note icon couldn't start a note, by project name, for
@@ -1642,7 +1645,7 @@ public final class Shipyard {
 
     /// What the menu shows about notes besides their rows.
     private var notesMenuState: NotesMenuState {
-        NotesMenuState(connected: notionConnected, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes)
+        NotesMenuState(connected: notionConnected, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes, databases: noteDatabases)
     }
 
     /// Reads every project's open notes from Notion (`NotesReader`): one
@@ -1748,9 +1751,11 @@ public final class Shipyard {
                 }
             }
         }
-        guard read != notes || errors != noteErrors else { return }
+        let databases = notesReader.databases.compactMapValues(NotionClient.pageURL)
+        guard read != notes || errors != noteErrors || databases != noteDatabases else { return }
         notes = read
         noteErrors = errors
+        noteDatabases = databases
         rebuildMenu(configStore.lastValid)
     }
 
@@ -1758,6 +1763,7 @@ public final class Shipyard {
     private func forgetNotes() {
         notesReader.reset()
         if notesEntryMissing { notesEntryMissing = false }
+        noteDatabases = [:]
         guard !notes.isEmpty || !noteErrors.isEmpty else { return }
         notes = [:]
         noteErrors = [:]

@@ -61,11 +61,11 @@ private func json(_ text: String) throws -> NSDictionary {
 @Suite("The new-note icon")
 @MainActor
 struct NewNoteTests {
-    @Test("a project without a database: the icon creates it under the entry page with the fixed core and a free prefix, then an empty page in it, opens the page, and the menu lists it")
+    @Test("a project without a database: the icon creates it under the Projects page with the fixed core and a free prefix, then an empty page in it, opens the page, and the menu lists it")
     func databaseThenPage() async throws {
         let harness = try await Harness.withNewNote()
-        // Once the database is made, the entry page lists `blog`, and its query the new page.
-        let children = try StubHTTP.Answer.fixture("notion-entry-children.json")
+        // Once the database is made, the Projects page lists `blog`, and its query the new page.
+        let children = try StubHTTP.Answer.fixture("notion-projects-children.json")
         var withBlog = children
         withBlog.body = Data(String(decoding: children.body, as: UTF8.self)
             .replacingOccurrences(of: "\"title\": \"Shop\"", with: "\"title\": \"blog\"")
@@ -79,7 +79,7 @@ struct NewNoteTests {
         let listingBlog = withBlog
         stub.onSend { request in
             if request.httpMethod == "POST", request.url == NotionStub.databases {
-                stub.on(NotionStub.entryChildren, listingBlog)
+                stub.on(NotionStub.projectsChildren, listingBlog)
             }
         }
 
@@ -87,7 +87,7 @@ struct NewNoteTests {
 
         #expect(harness.createdDatabases.count == 1)
         #expect(try json(harness.createdDatabases.first) == json("""
-            {"parent": {"type": "page_id", "page_id": "\(NotionStub.entryPage)"},
+            {"parent": {"type": "page_id", "page_id": "\(NotionStub.projectsPage)"},
              "title": [{"text": {"content": "blog"}}],
              "initial_data_source": {"properties": {
                "Name": {"title": {}},
@@ -179,10 +179,37 @@ struct NewNoteTests {
         #expect(harness.newNoteErrors("shop").isEmpty)
     }
 
+    @Test("a Shipyard Notes page without a Projects page: the icon creates Projects under it, then the project's database under Projects, then the note")
+    func projectsPageFirst() async throws {
+        let harness = try Harness(stored: "gho_stored", config: projects)
+        try harness.notion.save("ntn_token")
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer])
+        try harness.stub.onNotion()
+        try harness.stub.onNewNote()
+        harness.stub.on(NotionStub.entryChildren, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
+        await harness.shipyard.start()
+        _ = await harness.notesTimer.fire()
+        #expect(harness.section("shop")?.rows.filter { $0.kind == .note }.isEmpty == true)
+
+        await harness.shipyard.startNote(in: "shop")
+
+        let created = try String(decoding: StubHTTP.Answer.fixture("notion-page-created.json").body, as: UTF8.self)
+        let createdID = try #require(try JSONSerialization.jsonObject(with: Data(created.utf8)) as? NSDictionary)["id"] as? String
+        #expect(try json(harness.createdPages.first) == json("""
+            {"parent": {"type": "page_id", "page_id": "\(NotionStub.entryPage)"},
+             "properties": {"title": {"title": [{"text": {"content": "Projects"}}]}}}
+            """))
+        let database = try json(harness.createdDatabases.first)
+        #expect((database["parent"] as? NSDictionary)?["page_id"] as? String == createdID)
+        #expect(harness.createdPages.count == 2)
+        #expect(harness.actions.opened == [NotionStub.createdPage])
+    }
+
     @Test("Notion out of reach shows as the project's error, and nothing is created")
     func unreachable() async throws {
         let harness = try await Harness.withNewNote()
-        harness.stub.on(NotionStub.entryChildren, .failure())
+        harness.stub.on(NotionStub.projectsChildren, .failure())
 
         await harness.shipyard.startNote(in: "blog")
 
@@ -196,7 +223,8 @@ struct NewNoteTests {
     func noEntryPage() async throws {
         let harness = try await Harness.withNewNote()
         harness.stub.on("POST", NotionStub.search, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
-        // The entry page found by the first read is gone.
+        // The entry page and Projects page found by the first read are gone.
+        harness.stub.on(NotionStub.projectsChildren, .json(#"{"object":"error","status":404,"code":"object_not_found","message":"Could not find block."}"#, status: 404))
         harness.stub.on(NotionStub.entryChildren, .json(#"{"object":"error","status":404,"code":"object_not_found","message":"Could not find block."}"#, status: 404))
 
         await harness.shipyard.startNote(in: "blog")

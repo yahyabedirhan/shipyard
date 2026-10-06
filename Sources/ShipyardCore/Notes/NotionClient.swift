@@ -26,15 +26,22 @@ public enum NotionError: Error, Equatable, Sendable {
 /// holds data sources and pages are queried per data source.
 ///
 /// It reads: who the token is (`me`), pages by title (`searchPages`), a
-/// page's child databases (`childDatabases`), a database's data sources
+/// page's child pages and databases (`childPages`, `childDatabases`), a database's data sources
 /// (`dataSources`), a data source's open notes (`openNotes`) and a page's
 /// first line of text (`firstLine`), and a data source's number prefix
-/// (`notePrefix`). For the new-note icon it creates a notes database
-/// (`createNotesDatabase`) and an empty note (`createEmptyNote`).
+/// (`notePrefix`). For the new-note icon it creates the Projects page
+/// (`createPage`), a notes database (`createNotesDatabase`) and an empty
+/// note (`createEmptyNote`).
 public struct NotionClient: Sendable {
     public static let apiURL = URL(string: "https://api.notion.com/v1")!
     /// The `Notion-Version` every request names.
     public static let version = "2025-09-03"
+    /// The Notion web address of page or database `id`, which opens it in
+    /// the browser, or in Notion's app when it takes its links.
+    public static func pageURL(_ id: String) -> URL? {
+        URL(string: "https://www.notion.so/\(id.replacingOccurrences(of: "-", with: ""))")
+    }
+
     /// The most a list asks for at once: the API's own maximum.
     static let pageSize = 100
     /// How many pages of a list it follows before stopping.
@@ -74,14 +81,26 @@ public struct NotionClient: Sendable {
     /// its `child_database` blocks (`GET /v1/blocks/{id}/children`). A
     /// block's id is its database's id.
     public func childDatabases(of pageID: String) async throws -> [(id: String, title: String)] {
+        try await children(of: pageID, type: "child_database")
+    }
+
+    /// The pages right under page `pageID`, by title, in page order: its
+    /// `child_page` blocks. A block's id is its page's id.
+    public func childPages(of pageID: String) async throws -> [(id: String, title: String)] {
+        try await children(of: pageID, type: "child_page")
+    }
+
+    /// Page `pageID`'s child blocks of `type` (`child_database` or
+    /// `child_page`) that aren't in the trash, with their titles.
+    private func children(of pageID: String, type: String) async throws -> [(id: String, title: String)] {
         var found: [(id: String, title: String)] = []
         var cursor: String?
         for _ in 0..<Self.maxPages {
             var query = [URLQueryItem(name: "page_size", value: String(Self.pageSize))]
             if let cursor { query.append(URLQueryItem(name: "start_cursor", value: cursor)) }
             let list = try await send("GET", "blocks/\(pageID)/children", query: query, as: List<Block>.self)
-            for block in list.results where block.type == "child_database" && block.in_trash != true {
-                found.append((block.id, block.child_database?.title ?? ""))
+            for block in list.results where block.type == type && block.in_trash != true {
+                found.append((block.id, block.childTitle ?? ""))
             }
             guard list.has_more, let next = list.next_cursor else { break }
             cursor = next
@@ -166,6 +185,17 @@ public struct NotionClient: Sendable {
         let database = try await send("POST", "databases", body: body, as: Database.self)
         guard let id = database.id, let source = database.data_sources.first?.id else { throw NotionError.unreadable("POST databases") }
         return (id, source)
+    }
+
+    /// Creates an empty page titled `title` under page `pageID`
+    /// (`POST /v1/pages`), and answers its id.
+    public func createPage(under pageID: String, title: String) async throws -> String {
+        let body: [String: Any] = [
+            "parent": ["type": "page_id", "page_id": pageID],
+            "properties": ["title": ["title": [["text": ["content": title]]]]],
+        ]
+        let page = try await send("POST", "pages", body: body, as: PageObject.self)
+        return page.id
     }
 
     /// Creates an empty note, its `Status` Open, in data source
@@ -284,16 +314,21 @@ private struct RichText: Decodable {
     var plain_text: String
 }
 
-/// A block: a `child_database` with its title, or a block with text.
+/// A block: a `child_database` or `child_page` with its title, or a
+/// block with text.
 private struct Block: Decodable {
-    struct ChildDatabase: Decodable { var title: String }
+    struct Child: Decodable { var title: String }
     struct Text: Decodable { var rich_text: [RichText]? }
 
     var id: String
     var type: String
     var in_trash: Bool?
-    var child_database: ChildDatabase?
+    var child_database: Child?
+    var child_page: Child?
     var text: Text?
+
+    /// A child database's or child page's title.
+    var childTitle: String? { (child_database ?? child_page)?.title }
 
     /// The block's text, whatever its type (a paragraph, a heading, a
     /// list item…): the plain text of its type's `rich_text`.
@@ -301,14 +336,15 @@ private struct Block: Decodable {
         (text?.rich_text ?? []).map(\.plain_text).joined()
     }
 
-    private enum CodingKeys: String, CodingKey { case id, type, in_trash, child_database }
+    private enum CodingKeys: String, CodingKey { case id, type, in_trash, child_database, child_page }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         type = try container.decode(String.self, forKey: .type)
         in_trash = try container.decodeIfPresent(Bool.self, forKey: .in_trash)
-        child_database = try container.decodeIfPresent(ChildDatabase.self, forKey: .child_database)
+        child_database = try container.decodeIfPresent(Child.self, forKey: .child_database)
+        child_page = try container.decodeIfPresent(Child.self, forKey: .child_page)
         // The text sits under the block's own type: {"type":"paragraph","paragraph":{"rich_text":[…]}}.
         let byType = try decoder.container(keyedBy: AnyKey.self)
         text = try? byType.decodeIfPresent(Text.self, forKey: AnyKey(type))
