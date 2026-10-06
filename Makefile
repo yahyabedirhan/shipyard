@@ -3,7 +3,9 @@
 #
 #   make            build the app (release)
 #   make test       run the tests (swift test)
-#   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), with the shipyard CLI, ad-hoc signed
+#   make bundle     build/Shipyard.app, menu-bar-only (LSUIElement), with the shipyard CLI, signed with
+#                   this Mac's local identity when it has one (make signing-identity), else ad-hoc
+#   make signing-identity  make this Mac's local signing identity, once
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
 #                   (bump Version.swift first; README's Development section has the release order)
@@ -33,6 +35,19 @@ ICONSET     := $(BUILD_DIR)/AppIcon.iconset
 # olive-khaki, origami, sailboat, night or sunset.
 ICON        ?= khaki-green
 ALTERNATES  := olive-khaki origami sailboat night sunset
+
+# A local signing identity keeps the app the same app to the Keychain from
+# one build to the next. Ad-hoc signing makes each build a new app, so
+# macOS asks again for the GitHub and Notion tokens after every install.
+# `make signing-identity` makes a self-signed certificate in a keychain of
+# its own, once per Mac; `make bundle` signs with it when it's there. The
+# certificate is trusted by nothing, so its key guards nothing but this
+# Mac's builds, and its keychain's password can sit here. A release is
+# always signed ad-hoc: its zip is for every Mac.
+SIGN_NAME     := Shipyard Local Signing
+SIGN_KEYCHAIN := $(HOME)/Library/Keychains/shipyard-signing.keychain-db
+SIGN_PASSWORD := shipyard-signing
+SIGN_MODE     ?= local
 # make-icon.swift is compiled with the app's sailboat path and logo, so the
 # icon, the menu bar item and the badge draw one figure in the same colours. swiftc runs top-level code only
 # from a main.swift, so the script is copied in under that name.
@@ -60,7 +75,7 @@ MODULE_CACHE := $(HOME)/Library/Caches/shipyard/ModuleCache
 SWIFT_FLAGS  := -Xswiftc -module-cache-path -Xswiftc $(MODULE_CACHE)
 endif
 
-.PHONY: all build test bundle install release run icon icon-alternates icon-exploration agent-logos clean
+.PHONY: all build test bundle install release signing-identity run icon icon-alternates icon-exploration agent-logos clean
 
 all: build
 
@@ -87,13 +102,40 @@ bundle: build
 	@# The logos' MIT notices travel with every copy of them.
 	cp LICENSE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
-	@# Ad-hoc: no Developer ID until the public launch. Signing the whole
-	@# bundle gives it the stable identity notifications and login items need.
-	@# The CLI is signed first: the bundle's signature seals nested code.
-	codesign --force --sign - --timestamp=none $(CONTENTS)/Helpers/shipyard
-	codesign --force --sign - --timestamp=none $(APP_BUNDLE)
+	@# No Developer ID until the public launch: the local identity on a Mac
+	@# that has one (see SIGN_NAME), ad-hoc otherwise and for a release.
+	@# Signing the whole bundle gives it the stable identity notifications
+	@# and login items need. The CLI is signed first: the bundle's
+	@# signature seals nested code.
+	@identity=-; \
+	if [ "$(SIGN_MODE)" = local ] && [ -f "$(SIGN_KEYCHAIN)" ] \
+		&& security unlock-keychain -p "$(SIGN_PASSWORD)" "$(SIGN_KEYCHAIN)" \
+		&& security find-identity -p codesigning "$(SIGN_KEYCHAIN)" | grep -q "$(SIGN_NAME)"; then \
+		identity="$(SIGN_NAME)"; \
+	fi; \
+	echo "signing with $$identity"; \
+	codesign --force --sign "$$identity" --timestamp=none $(CONTENTS)/Helpers/shipyard && \
+	codesign --force --sign "$$identity" --timestamp=none $(APP_BUNDLE)
 	codesign --verify --strict $(APP_BUNDLE)
 	@echo "bundled $(APP_BUNDLE) ($(VERSION))"
+
+# macOS imports only a PKCS#12 made with the legacy algorithms: OpenSSL 3
+# needs -legacy for them, LibreSSL makes them already.
+signing-identity:
+	@if [ -f "$(SIGN_KEYCHAIN)" ]; then echo "$(SIGN_KEYCHAIN) exists already"; exit 0; fi; \
+	set -e; dir=$$(mktemp -d); \
+	printf '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = $(SIGN_NAME)\n[ext]\nkeyUsage = critical, digitalSignature\nextendedKeyUsage = critical, codeSigning\nbasicConstraints = critical, CA:false\n' > $$dir/cert.cnf; \
+	openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -keyout $$dir/key.pem -out $$dir/cert.pem -config $$dir/cert.cnf 2>/dev/null; \
+	openssl pkcs12 -export -legacy -inkey $$dir/key.pem -in $$dir/cert.pem -out $$dir/id.p12 -passout pass:$(SIGN_PASSWORD) 2>/dev/null \
+		|| openssl pkcs12 -export -inkey $$dir/key.pem -in $$dir/cert.pem -out $$dir/id.p12 -passout pass:$(SIGN_PASSWORD); \
+	security create-keychain -p "$(SIGN_PASSWORD)" "$(SIGN_KEYCHAIN)"; \
+	security set-keychain-settings "$(SIGN_KEYCHAIN)"; \
+	security unlock-keychain -p "$(SIGN_PASSWORD)" "$(SIGN_KEYCHAIN)"; \
+	security import $$dir/id.p12 -k "$(SIGN_KEYCHAIN)" -P "$(SIGN_PASSWORD)" -T /usr/bin/codesign >/dev/null; \
+	security set-key-partition-list -S apple-tool:,apple: -s -k "$(SIGN_PASSWORD)" "$(SIGN_KEYCHAIN)" >/dev/null; \
+	security list-keychains -d user -s $$(security list-keychains -d user | tr -d '"') "$(SIGN_KEYCHAIN)"; \
+	rm -f $$dir/cert.cnf $$dir/key.pem $$dir/cert.pem $$dir/id.p12; rmdir $$dir; \
+	echo "made $(SIGN_NAME) in $(SIGN_KEYCHAIN)"
 
 install: bundle
 	@# Only this user's copy; one that hasn't quit after about 10 s is killed.
@@ -111,6 +153,8 @@ install: bundle
 	@echo "installed $(INSTALL_DIR)/$(APP).app"
 	open $(INSTALL_DIR)/$(APP).app
 
+# A release is for every Mac: ad-hoc, whatever this Mac has.
+release: SIGN_MODE := adhoc
 release: test bundle
 	@rm -f $(ZIP)
 	@# Without extended attributes: they're this Mac's (com.apple.provenance),
