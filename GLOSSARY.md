@@ -27,8 +27,16 @@ One GitHub Actions run in a project's repositories. It's shown while it runs and
 _Avoid_: Action, job, build, CI
 
 **Note**:
-The user's own note (an idea, a reminder, a "not now" thought), kept in Notion under its project, with a title, labels, and a number unique in the project that is never given twice. Open until it's archived. An agent writes one only for the user, in the user's words.
+The user's own note (an idea, a reminder, a "not now" thought), kept in Notion in its project's database under the Projects page, with a title, labels, and a number unique in the project that is never given twice. Open until it's archived. An agent writes one only for the user, in the user's words.
 _Avoid_: Idea, memo, issue (an issue is GitHub's)
+
+**Projects page**:
+The Notion page titled "Projects" under the user's "Shipyard Notes" home page. It holds one notes database per project, titled exactly the project's name. The app reads notes only from databases here, and makes the page the first time a new note needs it.
+_Avoid_: Entry page (that's Shipyard Notes), notes folder, workspace
+
+**Agent guide**:
+The Notion page titled "Agent guide" under "Shipyard Notes", beside the Projects page. It holds the rules agents follow when they write notes: the layout, the properties, the label and prefix conventions, and how to start a project's notes. Agents read it; the app never writes it.
+_Avoid_: Entry page, README, notes reference (that's the skill's)
 
 **Panel banner**:
 A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words.
@@ -176,6 +184,10 @@ _Avoid_: Lock, mutex, session
 **Holder**:
 The agent a lease is held by, or refused to: its key (the agent's session, else its own process), its name and its place (a Herdr pane, else its working folder). The `shipyard` command works it out on every call, so agents never pass it; a setup where that key doesn't stay the same names one in `SHIPYARD_CONTROL_KEY`.
 _Avoid_: Owner, client, user
+
+**Notes check**:
+`shipyard notes check` on the Mac: the app reads the notes workspace with its own Notion token, as the menu does, and reports each project's notes and every problem with the layout. An error is something that hides notes from the app or breaks their numbers; a warning is something agents keep tidy. It needs no lease.
+_Avoid_: Notes doctor, lint, validation
 
 ### Setup
 

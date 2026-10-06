@@ -10,7 +10,7 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 | [github-device-flow.md](github-device-flow.md) | Signing in with GitHub's OAuth device flow |
 | [github-search.md](github-search.md) | The review search: `review-requested` and team requests, its 100-result page |
 | [github-repositories.md](github-repositories.md) | Listing and checking repositories for the project picker; listing a repository group's or an owner's repositories (affiliations, `isArchived`, `isFork`, paging) |
-| [notion-api.md](notion-api.md) | Notion's API for notes: versions (`2025-09-03` and data sources), internal connections, unique IDs, data-source queries and filters, Markdown page content, rate limits, and `ntn` |
+| [notion-api.md](notion-api.md) | Notion's API for notes: versions (`2025-09-03` and data sources), internal connections, unique IDs, data-source queries and filters, Markdown page content, child pages and tables, rate limits, and `ntn` |
 | [tailscale-serve.md](tailscale-serve.md) | Notices over the tailnet: `tailscale serve` exposing a loopback port, `--bg`, the identity headers it adds and strips, tagged devices, and the Mac's own login in `tailscale status --json` |
 | [herdr-terminal.md](herdr-terminal.md) | What Herdr's panes expose about the outer terminal app and their named session, and how `shipyard ping --herdr` uses them |
 | [macos-end-to-end-testing.md](macos-end-to-end-testing.md) | End-to-end testing options for a SwiftUI menu bar app without Xcode, and what shipyard adopts |
