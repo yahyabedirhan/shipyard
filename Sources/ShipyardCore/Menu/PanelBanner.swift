@@ -27,13 +27,16 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         case fetch
         /// A remote machine's quiet line (`MachineNotice`).
         case machine
+        /// Notes can't be listed: Notion isn't connected, or its token sees
+        /// no Shipyard Notes page.
+        case notes
         /// macOS doesn't let shipyard post notifications.
         case notificationsOff
     }
 
     /// The banner key: `lease`, `stopped-<holder key>`, `config`,
-    /// `config-warnings`, `delay`, `paused`, `fetch`, `machine-<machine>`
-    /// or `notifications`. A snooze is kept by it, so words that change
+    /// `config-warnings`, `delay`, `paused`, `fetch`, `machine-<machine>`,
+    /// `notes` or `notifications`. A snooze is kept by it, so words that change
     /// (2 min, then 4 min) keep the banner hidden.
     public var id: String
     public var kind: Kind
@@ -87,7 +90,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
     /// lease's banner and each stopped holder's quiet line, in every phase;
     /// then the configuration error, its warnings, then once `ready` the refresh
     /// delay (or pause), the fetch error and one quiet line per remote
-    /// machine; then notifications off, which the app knows
+    /// machine, and the notes banner; then notifications off, which the app knows
     /// (`notificationsOff`).
     public static func list(
         lease: Lease = Lease(),
@@ -95,6 +98,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         configWarnings: [ConfigIssue],
         ready: Bool,
         menu: MenuModel,
+        notes: NotesNotice? = nil,
         notificationsOff: Bool
     ) -> [PanelBanner] {
         var banners: [PanelBanner] = []
@@ -121,6 +125,9 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
             }
             for notice in menu.machineNotices {
                 banners.append(PanelBanner(id: "machine-\(notice.id)", kind: .machine, text: PanelText.machineNotice(notice)))
+            }
+            if let notes {
+                banners.append(PanelBanner(id: "notes", kind: .notes, text: PanelText.notesNotice(notes)))
             }
         }
         if notificationsOff {

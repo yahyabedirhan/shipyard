@@ -52,6 +52,11 @@ public enum ControlRequest: Equatable, Sendable {
     /// that id taken away. Not leased: any agent may post one while
     /// another drives the app.
     case notify(NoticeRequest)
+    /// `shipyard notes check`: the notes workspace read the way the app
+    /// reads it, with the app's own Notion token, and checked against the
+    /// layout the app expects; answered with the report, refused when it
+    /// found an error. Not leased: it reads and changes nothing.
+    case notesCheck
 
     /// The appearance `screenshot` draws in.
     public enum Appearance: String, Equatable, Sendable, CaseIterable {
@@ -77,15 +82,17 @@ public enum ControlRequest: Equatable, Sendable {
     /// lease's own requests.
     public var isLeased: Bool {
         switch self {
-        case .appStatus, .controlTake, .controlRelease, .notify: false
+        case .appStatus, .controlTake, .controlRelease, .notify, .notesCheck: false
         default: true
         }
     }
 
     /// How long the app may keep the request before it answers, past the
-    /// client's usual timeout: a `take`'s wait in line.
+    /// client's usual timeout: a `take`'s wait in line, and the notes
+    /// check's reads, about four per project at Notion's three a second.
     public var wait: TimeInterval {
         if case .controlTake(let seconds?, _) = self { return TimeInterval(seconds) }
+        if case .notesCheck = self { return 45 }
         return 0
     }
 }
@@ -140,6 +147,8 @@ public struct ControlMessage: Equatable, Sendable {
             wire = Wire(command: "control.release")
         case .notify(let notice):
             wire = Wire(command: "notify", notice: notice)
+        case .notesCheck:
+            wire = Wire(command: "notes.check")
         }
         wire.holder = holder
         let encoder = JSONEncoder()
@@ -205,6 +214,7 @@ public struct ControlMessage: Equatable, Sendable {
             }
             return .controlTake(waitSeconds: wire.waitSeconds, purpose: wire.purpose)
         case "control.release": return .controlRelease
+        case "notes.check": return .notesCheck
         case "notify":
             guard let notice = wire.notice else { throw .unreadable("the control command `notify` needs its `notice`") }
             return .notify(notice)

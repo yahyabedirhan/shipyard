@@ -1,6 +1,6 @@
 # Notion's API
 
-What shipyard's notes depend on (ADR 0009): how the app connects, the unique-ID number, the data-source query, page content as Markdown, rate limits and API versions. Shipyard sends `Notion-Version: 2025-09-03`.
+What shipyard's notes depend on (ADRs 0009 and 0011): how the app connects, the pages and tables it reads, the unique-ID number, the data-source query, page content as Markdown, rate limits and API versions. Shipyard sends `Notion-Version: 2025-09-03`.
 
 Checked 2026-10-03 against:
 - [Versioning](https://developers.notion.com/reference/versioning)
@@ -16,6 +16,8 @@ Checked 2026-10-03 against:
 
 Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaway databases since trashed, and through Claude's Notion connector.
 
+Measured 2026-10-06, when the notes workspace moved under a Projects page (ADR 0011): moving and renaming databases, prefixes, page icons, child pages and tables, through the REST API and Claude's Notion connector. These facts are marked (2026-10-06).
+
 ## API versions
 
 - Every request carries a `Notion-Version` header; it's required. A new version comes only with a backwards-incompatible change. New endpoints and fields arrive in every version, so the Markdown endpoints work on `2025-09-03` (measured: a page created with `markdown` on it).
@@ -28,6 +30,8 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 
 - An **internal connection** belongs to one workspace and acts as its own bot user, not as a person. Its token is static: no OAuth flow, created in the Developer portal (Build → Internal connections) by a workspace owner, read from its Configuration tab.
 - It sees nothing until a page is shared with it, from the portal's Content access tab or from the page's ••• → Connections. Sharing a page shares the pages and databases under it. Shipyard's connection is shared with the "Shipyard Notes" entry page only.
+- Its token sees one workspace only. Search with a token whose connection the page isn't shared with answers without that page rather than with an error: observed through the installed app and `shipyard notes check` on 2026-10-06, before the maintainer shared Shipyard Notes. So the app reads "no Shipyard Notes page" as its own case and says so.
+- Its rate budget is its own: the per-connection limit below counts its requests alone, not those of other connections or of `ntn`.
 - **Capabilities** limit what it can call: read content, update content and insert content, independently. Shipyard's needs read (query) and insert (create a database, create a page). Creating a database without insert content is a 403.
 - The token goes in `Authorization: Bearer <token>`. A bad token is 401 `unauthorized`; a page not shared with the connection is 404 `object_not_found`; missing capability is 403 `restricted_resource`.
 
@@ -37,7 +41,19 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 - **Unique ID** (`unique_id`, shown as `auto_increment_id` by the connector): its `prefix` is a string or `null`. "Notion assigns each page a unique number within the data source. You can configure the prefix, but you cannot write a page's number." A page's value is `{"number": 42, "prefix": "TASK"}`. Measured: numbering starts at 1, and the spike saw that a trashed page's number is never given again. A data source has at most one unique ID property.
 - **Multi-select:** option names are unique ignoring case, and can't contain commas; a request sets at most 100. Through the REST API (and so `ntn`), a page written with a new option name adds the option to the schema. Measured: Claude's Notion connector refuses it instead ("Invalid multi_select value … the data source must be updated to add it"), so an agent adds the option to the schema first.
 - `GET /v1/data_sources/{id}` returns a data source's schema: `properties` by name, each with its `type` and that type's settings, so a `No.` reads `{"type": "unique_id", "unique_id": {"prefix": "SHOP"}}`. The app reads each database's prefix this way before it creates one, so a new database's prefix is unique.
-- **Child databases:** `GET /v1/blocks/{page id}/children` lists a page's databases as `child_database` blocks, each with its `title`. That's how a project's database is found under the entry page by name.
+- **Child databases:** `GET /v1/blocks/{page id}/children` lists a page's databases as `child_database` blocks, each with its `title`. That's how a project's database is found under the Projects page by name.
+- **Moving a database** to another parent page (measured with the connector's `notion-move-pages`) keeps its data source, its notes and their unique-ID numbers (2026-10-06).
+- **Renaming and re-prefixing:** `PATCH /v1/data_sources/{id}` with a new `title` and `properties: {"No.": {"unique_id": {"prefix": "HAVO"}}}` renumbers nothing; every note keeps its number and shows the new prefix (RVID-1 became HAVO-1) (2026-10-06).
+
+## Child pages and tables
+
+Measured 2026-10-06.
+
+- `GET /v1/blocks/{page id}/children` lists a page's sub-pages as `child_page` blocks, each with `child_page.title`, in page order. A block's id is its page's id. That's how the app finds the Projects page under the entry page, and the notes check the Agent guide.
+- `POST /v1/pages` with `parent: {"type": "page_id", "page_id": …}`, `properties.title` and an `icon` (`{"type": "emoji", "emoji": "📂"}`) creates a sub-page. `POST /v1/databases` takes the same `icon`.
+- A page's emoji **icon isn't part of its title**: search for "Shipyard Notes" still returns the page after an icon is added, and its `title` property is the plain text.
+- A simple table is a `table` block; its rows are its children, `table_row` blocks, each with `cells`: an array of cells, each an array of rich text. The first row is the header when the table has one. The notes check reads the Projects index this way: the first `table` on the entry page, then its rows' plain text.
+- **Views:** the public API has no view endpoints, so the app can't create or change a database's views. Claude's Notion connector can (`notion-create-view`, `notion-update-view`).
 
 ## Querying a data source
 
@@ -74,3 +90,4 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 - `ntn datasources query <data source or database id> --filter '<json>' --sort "No. desc"` prints one tab-separated row per page; `--json` prints the API's answer. `ntn datasources resolve <database id>` prints its data sources.
 - `ntn pages get <id>` prints the page as Markdown with its properties as frontmatter; `ntn pages edit <id>` replaces the body from standard input, dropping that frontmatter. `ntn pages trash` needs `--yes` without a terminal.
 - `ntn doctor` shows the logged-in workspace.
+- `ntn auth token` prints ntn's own OAuth token, which ntn refreshes. It works against the public API as a bot user, but it follows ntn's login and its default workspace, and it shares one rate budget with everything using ntn. The app doesn't read it (ADR 0011) (2026-10-06).

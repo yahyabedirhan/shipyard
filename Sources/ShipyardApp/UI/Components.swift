@@ -635,14 +635,18 @@ struct NewNoteIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "square.and.pencil")
-                .font(.system(size: 11, weight: .medium))
-                .frame(width: 16, height: 16)
+                .font(.system(size: 9, weight: .semibold))
+                // The symbol draws its ink about half a point low and right
+                // of its box (measured at this size); moved back, it sits
+                // centred in its square, as the open-repository icon does.
+                .offset(x: -0.5, y: -0.5)
                 .opacity(state == .starting ? 0 : 1)
                 .overlay {
-                    if state == .starting { ProgressView().controlSize(.mini) }
+                    if state == .starting { ProgressView().controlSize(.mini).scaleEffect(0.8) }
                 }
         }
-        .buttonStyle(IconButtonStyle())
+        // The compact square of the header's other icons (Mark all seen, open repository).
+        .buttonStyle(IconButtonStyle(compact: true))
         .disabled(state == .starting)
         .hoverHelp(PanelText.newNoteHelp(project))
         .accessibilityLabel(PanelText.newNoteHelp(project))

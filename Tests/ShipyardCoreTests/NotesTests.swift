@@ -53,6 +53,9 @@ private extension Harness {
         section(project)?.errors.map(\.message).filter { $0.hasPrefix("notes: ") } ?? []
     }
 
+    /// The notes banner, when the panel shows one.
+    var notesBanner: PanelBanner? { shipyard.banners(at: clock.now).first { $0.kind == .notes } }
+
     /// The queries sent for `shop`'s notes.
     var shopQueries: [URLRequest] { stub.requests("POST", NotionStub.shopQuery) }
 }
@@ -99,6 +102,31 @@ struct NotesTests {
         #expect(harness.shopQueries.count == 1)
         #expect(harness.stub.requests("POST", NotionStub.search).first?.bodyText.contains("Shipyard Notes") == true)
         #expect(harness.stub.unmatched.isEmpty)
+    }
+
+    @Test("the header's notes count opens the project's notes database in Notion; a project without a database has no link")
+    func countOpensDatabase() async throws {
+        let harness = try await Harness.withNotes()
+
+        let link = try #require(harness.section("shop")?.pageLinks(for: .note).first)
+        #expect(link.url == URL(string: "https://www.notion.so/27a0c3e18f4b80aab0020000000000d1"))
+        #expect(link.count == 3)
+        #expect(harness.section("blog")?.pageLinks(for: .note).isEmpty == true)
+        #expect(PanelText.headerCountPage(.note) == "Open the notes in Notion")
+    }
+
+    @Test("a Shipyard Notes page with no Projects page yet lists no notes, with no error and no banner: no project has notes yet")
+    func noProjectsPage() async throws {
+        let harness = try await Harness.withNotes()
+        harness.shipyard.disconnectNotion()
+        try harness.notion.save("ntn_token")
+        harness.stub.on(NotionStub.entryChildren, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
+
+        _ = await harness.shipyard.connectNotion(token: "ntn_token")
+
+        #expect(harness.noteRows().isEmpty)
+        #expect(harness.noteErrors("shop").isEmpty)
+        #expect(harness.notesBanner == nil)
     }
 
     @Test("notes need no attention: they add nothing to any count, and Mark all seen leaves them out")
@@ -193,7 +221,7 @@ struct NotesTests {
     @Test("a rejected token shows on every project that shows notes, saying to connect again")
     func rejectedToken() async throws {
         let harness = try await Harness.withNotes()
-        harness.stub.on(NotionStub.entryChildren, try NotionStub.unauthorized())
+        harness.stub.on(NotionStub.projectsChildren, try NotionStub.unauthorized())
 
         await harness.readNotes()
 
@@ -203,7 +231,7 @@ struct NotesTests {
         #expect(harness.noteRows().count == 3)
     }
 
-    @Test("without a Notion token, Notion is never asked and no project lists notes")
+    @Test("without a Notion token, Notion is never asked, no project lists notes, and a banner says to connect Notion; with every project's notes hidden it doesn't")
     func noToken() async throws {
         let harness = try await Harness.started(config: projects, graphQL: onePullRequest)
 
@@ -212,6 +240,32 @@ struct NotesTests {
         #expect(harness.notesTimer.armed == nil)
         #expect(harness.stub.notionRequests.isEmpty)
         #expect(harness.noteRows().isEmpty)
+        #expect(harness.notesBanner?.text == "Your notes live in Notion. Choose Connect Notion in the settings menu to list them here.")
+
+        let hidden = try await Harness.started(config: "[defaults.notes]\nshow = false\n\n" + projects, graphQL: onePullRequest)
+        #expect(hidden.notesBanner == nil)
+    }
+
+    @Test("a token that sees no Shipyard Notes page (another workspace's, or the page not shared) lists no notes, with no error rows, and a banner says why; once the page is shared it goes")
+    func noEntryPage() async throws {
+        let harness = try Harness(stored: "gho_stored", config: projects)
+        try harness.notion.save("ntn_token")
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([onePullRequest])
+        try harness.stub.onNotion()
+        harness.stub.on("POST", NotionStub.search, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
+        await harness.shipyard.start()
+        await harness.readNotes()
+
+        #expect(harness.noteRows().isEmpty)
+        #expect(harness.noteErrors("shop").isEmpty)
+        #expect(harness.notesBanner?.text == "Notion connected, but its token sees no Shipyard Notes page. Check the token is for your notes workspace, and share Shipyard Notes with the connection.")
+
+        harness.stub.on("POST", NotionStub.search, try .fixture("notion-search-entry.json"))
+        await harness.readNotes()
+
+        #expect(harness.noteRows().count == 3)
+        #expect(harness.notesBanner == nil)
     }
 
     @Test("the token the user pastes is checked with Notion, kept in the token store, and lists the notes; one Notion refuses is kept nowhere")
@@ -230,6 +284,25 @@ struct NotesTests {
         #expect(harness.shipyard.notionConnected)
         #expect(harness.noteRows().count == 3)
         #expect(harness.stub.requests("GET", NotionStub.me).last?.value(forHTTPHeaderField: "Authorization") == "Bearer ntn_token")
+    }
+
+    @Test("the Notion token is read from the token store once, however many reads and opens follow, since each Keychain read can ask the user's leave; Connect and Disconnect change it without another read")
+    func tokenReadOnce() async throws {
+        let harness = try await Harness.withNotes()
+        let reads = harness.notion.reads
+
+        for _ in 0..<3 {
+            await harness.readNotes()
+            await harness.shipyard.panelOpened()
+        }
+        #expect(harness.notion.reads == reads)
+        #expect(reads <= 1)
+
+        harness.shipyard.disconnectNotion()
+        #expect(harness.noteRows().isEmpty)
+        #expect(await harness.shipyard.connectNotion(token: "ntn_token") == .connected)
+        #expect(harness.noteRows().count == 3)
+        #expect(harness.notion.reads == reads)
     }
 
     @Test("disconnecting deletes the token and takes every note out of the menu")

@@ -18,7 +18,7 @@ public struct ControlStep: Equatable, Sendable {
 
 extension ControlRequest {
     /// The step this request is, for the banner; nil for the lease's own
-    /// requests and notices, which aren't steps in the app.
+    /// requests, notices and the notes check, which aren't steps in the app.
     public var step: ControlStep? {
         switch self {
         case .appStatus: ControlStep(doing: "Reading app state…", done: "Read app state")
@@ -38,7 +38,7 @@ extension ControlRequest {
             menuBarIcon
                 ? ControlStep(doing: "Taking a screenshot of the menu bar icon…", done: "Took a screenshot of the menu bar icon")
                 : ControlStep(doing: "Taking a screenshot…", done: "Took a screenshot")
-        case .controlTake, .controlRelease, .notify: nil
+        case .controlTake, .controlRelease, .notify, .notesCheck: nil
         }
     }
 
