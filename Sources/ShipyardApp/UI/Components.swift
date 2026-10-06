@@ -635,7 +635,11 @@ struct NewNoteIcon: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "square.and.pencil")
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(.system(size: 9, weight: .semibold))
+                // The symbol draws its ink about half a point low and right
+                // of its box (measured at this size); moved back, it sits
+                // centred in its square, as the open-repository icon does.
+                .offset(x: -0.5, y: -0.5)
                 .opacity(state == .starting ? 0 : 1)
                 .overlay {
                     if state == .starting { ProgressView().controlSize(.mini).scaleEffect(0.8) }
