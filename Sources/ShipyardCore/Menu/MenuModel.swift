@@ -658,6 +658,7 @@ public struct MenuErrorRow: Equatable, Sendable, Identifiable {
         message = switch error.kind {
         case .notFound: "\(error.repository): not found, or no access"
         case .forbidden: "\(error.repository): access denied (\(error.message))"
+        case .incomplete: "\(error.repository): couldn't be read whole (\(error.message))"
         case .other: "\(error.repository): \(error.message)"
         }
     }

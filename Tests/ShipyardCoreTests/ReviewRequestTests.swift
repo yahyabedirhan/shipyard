@@ -157,15 +157,15 @@ struct ReviewRequestTests {
 
     @Test("the search goes out once, in the first batch, and pull requests aren't asked for their review requests")
     func searchInFirstBatch() async throws {
-        let repositories = (0..<30).map { String(format: "yahyabedirhan/repo-%02d", $0) }
+        let repositories = (0..<7).map { String(format: "yahyabedirhan/repo-%02d", $0) }
         let config = """
             [[projects]]
             name = "everything"
             repositories = [\(repositories.map { "\"\($0)\"" }.joined(separator: ", "))]
 
             """
-        let first = PullRequestsResponse.answer(repositories[0..<25].map { PullRequestsResponse($0, [pr(1)]) }, cost: 4)
-        let second = PullRequestsResponse.answer(repositories[25..<30].map { PullRequestsResponse($0, [pr(1)]) }, cost: 1)
+        let first = PullRequestsResponse.answer(repositories[0..<5].map { PullRequestsResponse($0, [pr(1)]) }, cost: 4)
+        let second = PullRequestsResponse.answer(repositories[5..<7].map { PullRequestsResponse($0, [pr(1)]) }, cost: 1)
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([first, second])

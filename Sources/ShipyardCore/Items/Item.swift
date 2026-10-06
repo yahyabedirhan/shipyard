@@ -225,6 +225,12 @@ public struct RepositoryError: Equatable, Sendable {
         case notFound
         /// The token may not read it, for example an organisation enforcing SAML.
         case forbidden
+        /// GitHub answered only part of it, even asked about on its own
+        /// (its query exceeded GitHub's resource limits, or its lists came
+        /// back with entries left out). Its pull requests and issues are
+        /// the last ones read whole, where there are any; its runs, from
+        /// REST, still load.
+        case incomplete
         case other
     }
 

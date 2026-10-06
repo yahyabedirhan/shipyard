@@ -81,6 +81,9 @@ public struct GitHubClient: Sendable {
     /// The pull requests the last review search that answered found, for
     /// as long as this client (one sign-in) lives.
     private let reviewSearchCache = ReviewSearchCache()
+    /// Each repository's pull requests and issues as last read whole, for
+    /// as long as this client (one sign-in) lives.
+    private let repositoryCache = RepositoryCache()
 
     /// Repositories per GraphQL request; tests change it to compare batches
     /// with a single request.
@@ -115,6 +118,13 @@ public struct GitHubClient: Sendable {
     /// comes from the last batch's response headers, with the batches' total
     /// `cost`.
     ///
+    /// A batch whose query GitHub cut short (resource limits exceeded) is
+    /// asked again in halves, down to one repository and the review search
+    /// on its own (`ProjectQuery.split`), so its partial answer is never
+    /// taken for the truth. A repository that still can't be read whole is
+    /// an `.incomplete` error for its pull requests and issues, which keep
+    /// the last items read whole; its runs still load.
+    ///
     /// Where a project shows workflow runs, each of its repositories' runs
     /// then come from REST, one conditional request per repository, one after
     /// another (a `304` reuses the runs from before and doesn't count against
@@ -144,9 +154,20 @@ public struct GitHubClient: Sendable {
         let starts = repositories.isEmpty ? [0] : Array(stride(from: 0, to: repositories.count, by: repositoriesPerRequest))
         for start in starts {
             let batch = Array(repositories[start..<min(start + repositoriesPerRequest, repositories.count)])
-            let answer = try await query(batch, reviewSearch: searchesReviews && start == 0, at: fetchedAt)
+            let answer = try await queryWhole(batch, reviewSearch: searchesReviews && start == 0, at: fetchedAt)
             parsed.add(answer.parsed)
             headers = answer.headers ?? headers
+        }
+        // A repository read whole is remembered; one that couldn't be keeps
+        // what was last read whole, so its items don't seem gone.
+        for repository in repositories {
+            if parsed.errors[repository.slug]?.kind == .incomplete {
+                guard let kept = repositoryCache.last(repository.slug) else { continue }
+                parsed.items[repository.slug] = kept.items
+                parsed.branches[repository.slug] = kept.branches
+            } else if let items = parsed.items[repository.slug] {
+                repositoryCache.store(repository.slug, items: items, branches: parsed.branches[repository.slug])
+            }
         }
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
@@ -169,7 +190,9 @@ public struct GitHubClient: Sendable {
         let reviewRequested = Set(searchPullRequests.map(\.id))
 
         let runs = try await workflowRuns(
-            of: repositories.filter { $0.runsWindow != nil && parsed.errors[$0.slug] == nil },
+            // Runs come from REST, so a repository GraphQL answered only in
+            // part still has them.
+            of: repositories.filter { $0.runsWindow != nil && (parsed.errors[$0.slug].map { $0.kind == .incomplete } ?? true) },
             viewer: parsed.viewerLogin,
             at: fetchedAt
         )
@@ -183,12 +206,15 @@ public struct GitHubClient: Sendable {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
                     // Nothing of the repository could be fetched: every kind
-                    // the project shows from it failed.
-                    for kind in project.fetchedKinds {
+                    // the project shows from it failed. Answered only in
+                    // part, its runs (from REST) didn't, and it lists the
+                    // pull requests and issues it kept.
+                    let incomplete = error.kind == .incomplete
+                    for kind in project.fetchedKinds where !(incomplete && kind == .workflowRun) {
                         errors[ItemSource(repository: repository, kind: kind)] =
                             RepositoryError(repository: repository, kind: error.kind, message: error.message)
                     }
-                    continue
+                    if !incomplete { continue }
                 }
                 var found = (parsed.items[slug] ?? []).filter { project.shows($0.kind) }
                 // Runs that couldn't be read leave the pull requests and
@@ -231,6 +257,31 @@ public struct GitHubClient: Sendable {
             repositories: Dictionary(projects.map { ($0.name, $0.repositorySlugs) }, uniquingKeysWith: { first, _ in first }),
             selectorErrors: resolved.filter { !$0.value.errors.isEmpty }.mapValues(\.errors)
         )
+    }
+
+    /// Asks about one batch as `query` does; when GitHub cuts the query
+    /// short (resource limits exceeded), asks again in the smaller requests
+    /// `ProjectQuery.split` gives, each the same way, so only a request as
+    /// small as it gets can come back `.incomplete`. The cut-short answers'
+    /// cost counts too.
+    private func queryWhole(
+        _ batch: [RepositoryRequest],
+        reviewSearch: Bool,
+        at fetchedAt: Date
+    ) async throws -> (parsed: ProjectQuery.Parsed, headers: RateLimit?) {
+        let answer = try await query(batch, reviewSearch: reviewSearch, at: fetchedAt)
+        guard answer.parsed.resourceLimited,
+              let parts = ProjectQuery.split(batch, reviewSearch: reviewSearch)
+        else { return answer }
+        var parsed = ProjectQuery.Parsed()
+        parsed.rateLimit = answer.parsed.rateLimit
+        var headers = answer.headers
+        for part in parts {
+            let next = try await queryWhole(part.repositories, reviewSearch: part.reviewSearch, at: fetchedAt)
+            parsed.add(next.parsed)
+            headers = next.headers ?? headers
+        }
+        return (parsed, headers)
     }
 
     /// Asks GraphQL about one batch of repositories, and with `reviewSearch`
@@ -395,6 +446,31 @@ extension RateLimit {
             used: header("x-ratelimit-used"),
             resetAt: Date(timeIntervalSince1970: TimeInterval(reset))
         )
+    }
+}
+
+/// Each repository's pull requests and issues (and its branches, where
+/// asked) as last read whole, by slug in any case, kept so a repository
+/// GitHub answers only in part lists what it had rather than nothing.
+final class RepositoryCache: @unchecked Sendable {
+    struct Entry {
+        var items: [Item]
+        var branches: RunBranches?
+    }
+
+    private let lock = NSLock()
+    private var entries: [String: Entry] = [:]
+
+    func last(_ slug: String) -> Entry? {
+        lock.lock()
+        defer { lock.unlock() }
+        return entries[slug.lowercased()]
+    }
+
+    func store(_ slug: String, items: [Item], branches: RunBranches?) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[slug.lowercased()] = Entry(items: items, branches: branches)
     }
 }
 

@@ -4,7 +4,7 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 
 | File | Covers |
 |---|---|
-| [github-rate-limits.md](github-rate-limits.md) | GraphQL and REST rate limits, query cost, running out, secondary limits, conditional requests |
+| [github-rate-limits.md](github-rate-limits.md) | GraphQL and REST rate limits, query cost, running out, secondary limits, resource limits (`RESOURCE_LIMITS_EXCEEDED`, an answer cut short), conditional requests |
 | [github-workflow-runs.md](github-workflow-runs.md) | Listing workflow runs over REST |
 | [github-actions-cache.md](github-actions-cache.md) | The `ci` workflow's `.build` cache: key and restore-key matching, which branches can restore which caches, immutability, size and eviction, container jobs, tag triggers |
 | [github-device-flow.md](github-device-flow.md) | Signing in with GitHub's OAuth device flow |
