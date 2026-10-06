@@ -53,7 +53,7 @@ public struct CommandTable: Sendable {
     /// when its command exists on the Mac, so the Mac never answers "runs
     /// on the Mac" for a command it lacks. `notify` isn't one: every build
     /// has a route for it.
-    public static let macOnly: Set<String> = ["app", "panel", "screenshot", "control"]
+    public static let macOnly: Set<String> = ["app", "panel", "screenshot", "control", "notes"]
 }
 
 /// The `shipyard` command line (ADR 0004), bundled in `Shipyard.app` and

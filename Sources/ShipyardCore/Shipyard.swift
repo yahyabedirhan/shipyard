@@ -1697,6 +1697,15 @@ public final class Shipyard {
         return .connected
     }
 
+    /// Checks the notes workspace with the kept Notion token, for each
+    /// project that shows notes (`NotesCheck`); `nil` without a token.
+    public func checkNotes() async -> NotesCheckReport? {
+        guard let token = notionToken() else { return nil }
+        let configuration = configStore.lastValid
+        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
+        return await NotesCheck.run(projects: projects, client: NotionClient(token: token, transport: transport))
+    }
+
     /// Forgets the Notion token (deleting it from the token store) and
     /// every note with it: the menu lists none until the user connects again.
     public func disconnectNotion() {

@@ -161,6 +161,29 @@ public struct NotionClient: Sendable {
         return schema.properties[NoteProperty.number]?.unique_id?.prefix
     }
 
+    /// Data source `dataSourceID`'s properties, by name: each one's type,
+    /// a unique ID's prefix and a select's options (`GET /v1/data_sources/{id}`).
+    public func schema(ofDataSource dataSourceID: String) async throws -> [String: NotesSchemaProperty] {
+        let schema = try await send("GET", "data_sources/\(dataSourceID)", as: DataSource.self)
+        return schema.properties.mapValues { property in
+            NotesSchemaProperty(
+                type: property.type ?? "",
+                prefix: property.unique_id?.prefix,
+                options: (property.select ?? property.multi_select)?.options.map(\.name) ?? []
+            )
+        }
+    }
+
+    /// The rows of the first table on page `pageID`, each its cells' plain
+    /// text; none when the page has no table.
+    public func firstTableRows(onPage pageID: String) async throws -> [[String]] {
+        let query = [URLQueryItem(name: "page_size", value: String(Self.pageSize))]
+        let blocks = try await send("GET", "blocks/\(pageID)/children", query: query, as: List<Block>.self)
+        guard let table = blocks.results.first(where: { $0.type == "table" }) else { return [] }
+        let rows = try await send("GET", "blocks/\(table.id)/children", query: query, as: List<Block>.self)
+        return rows.results.compactMap(\.cells)
+    }
+
     // MARK: - Creates
 
     /// Creates a project's notes database under page `pageID`, titled
@@ -284,6 +307,21 @@ public struct NotionClient: Sendable {
 /// The note properties the app reads, and creates a database with: the
 /// fixed core every project's database has (the shipyard skill's notes
 /// reference defines it).
+/// One property of a notes database's schema, as the structure check
+/// reads it: its type (`title`, `unique_id`, `multi_select`, `select`…),
+/// a unique ID's prefix and a select's or multi-select's option names.
+public struct NotesSchemaProperty: Equatable, Sendable {
+    public var type: String
+    public var prefix: String?
+    public var options: [String]
+
+    public init(type: String, prefix: String? = nil, options: [String] = []) {
+        self.type = type
+        self.prefix = prefix
+        self.options = options
+    }
+}
+
 enum NoteProperty {
     static let name = "Name"
     static let number = "No."
@@ -319,6 +357,7 @@ private struct RichText: Decodable {
 private struct Block: Decodable {
     struct Child: Decodable { var title: String }
     struct Text: Decodable { var rich_text: [RichText]? }
+    struct TableRow: Decodable { var cells: [[RichText]] }
 
     var id: String
     var type: String
@@ -326,6 +365,10 @@ private struct Block: Decodable {
     var child_database: Child?
     var child_page: Child?
     var text: Text?
+    var table_row: TableRow?
+
+    /// A table row's cells, each its plain text; `nil` for another block.
+    var cells: [String]? { table_row?.cells.map { $0.map(\.plain_text).joined() } }
 
     /// A child database's or child page's title.
     var childTitle: String? { (child_database ?? child_page)?.title }
@@ -336,7 +379,7 @@ private struct Block: Decodable {
         (text?.rich_text ?? []).map(\.plain_text).joined()
     }
 
-    private enum CodingKeys: String, CodingKey { case id, type, in_trash, child_database, child_page }
+    private enum CodingKeys: String, CodingKey { case id, type, in_trash, child_database, child_page, table_row }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -345,6 +388,7 @@ private struct Block: Decodable {
         in_trash = try container.decodeIfPresent(Bool.self, forKey: .in_trash)
         child_database = try container.decodeIfPresent(Child.self, forKey: .child_database)
         child_page = try container.decodeIfPresent(Child.self, forKey: .child_page)
+        table_row = try container.decodeIfPresent(TableRow.self, forKey: .table_row)
         // The text sits under the block's own type: {"type":"paragraph","paragraph":{"rich_text":[…]}}.
         let byType = try decoder.container(keyedBy: AnyKey.self)
         text = try? byType.decodeIfPresent(Text.self, forKey: AnyKey(type))
@@ -362,7 +406,14 @@ private struct Database: Decodable {
 private struct DataSource: Decodable {
     struct Property: Decodable {
         struct UniqueID: Decodable { var prefix: String? }
+        struct Options: Decodable {
+            struct Option: Decodable { var name: String }
+            var options: [Option]
+        }
+        var type: String?
         var unique_id: UniqueID?
+        var select: Options?
+        var multi_select: Options?
     }
     var properties: [String: Property]
 }

@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardCommand
 
-/// App control's commands for the Mac's `CommandTable`: `app`, `panel`, `screenshot` and `control`, asking the
+/// App control's commands for the Mac's `CommandTable`: `app`, `panel`, `screenshot`, `control` and `notes`, asking the
 /// app whose support folder is `support` over `transport`, and launching
 /// it with `launcher`. Each request is sent as the holder `Holder.find`
 /// works out from the command's environment and `processes`.
@@ -56,8 +56,26 @@ public enum ControlCommands {
                     return result
                 }
             },
+            CommandTable.Entry(name: "notes", help: notesHelp) { arguments, environment, _ in
+                switch arguments {
+                case ["check"]: ControlCommand.run(.send(.notesCheck), context: context(environment))
+                case ["--help"], ["-h"], ["help"]: CommandResult(output: notesUsage)
+                default: .usage(notesUsage.trimmingCharacters(in: .newlines))
+                }
+            },
         ]
     }
+
+    public static let notesUsage = """
+        usage: shipyard notes check
+
+        Reads the notes workspace in Notion the way the app does, with the
+        app's own Notion connection: each project's database under
+        Shipyard Notes > Projects and its open notes. Prints one line per
+        project, then every problem with the layout. Exits 1 when it finds
+        an error, 0 otherwise.
+
+        """
 
     static let appHelp = """
           app     open, quit or ask the Mac's shipyard app:
@@ -77,6 +95,12 @@ public enum ControlCommands {
                   save the app's panel, or its menu bar icon, as a PNG:
                   shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
                                       [--with-indicator]
+
+        """
+
+    static let notesHelp = """
+          notes   check that the app can read the notes workspace in Notion:
+                  shipyard notes check
 
         """
 

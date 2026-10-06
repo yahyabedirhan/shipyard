@@ -47,6 +47,8 @@ final class ControlServer {
     /// Shows an agent's notice (`shipyard notify`), or withdraws one, and
     /// says what came of it: the app hands it to `Shipyard.receive(_:)`.
     private let notices: @MainActor (NoticeRequest) async -> NoticeVerdict
+    /// Checks the notes workspace with the app's Notion token (`shipyard notes check`).
+    private let notesCheck: @MainActor () async -> NotesCheckAnswer
     /// Ends the lease once it runs out, when no request comes to.
     private var settling: Task<Void, Never>?
     /// The `take`s waiting in line, each holding its connection open until
@@ -74,6 +76,7 @@ final class ControlServer {
         timeZone: TimeZone = .current,
         transitioned: @escaping @MainActor (ControlLease.Transition) -> Void = { _ in },
         notices: @escaping @MainActor (NoticeRequest) async -> NoticeVerdict = { _ in .refused("this app doesn't show notices") },
+        notesCheck: @escaping @MainActor () async -> NotesCheckAnswer = { .refused("this app doesn't read notes") },
         quit: @escaping @MainActor () -> Void
     ) {
         self.socket = socket
@@ -85,6 +88,7 @@ final class ControlServer {
         self.timeZone = timeZone
         self.transitioned = transitioned
         self.notices = notices
+        self.notesCheck = notesCheck
         self.quit = quit
         // `didSet` doesn't run in `init`: a lease a relaunch handed over is
         // shown, and its end looked out for, from the start.
@@ -170,6 +174,12 @@ final class ControlServer {
             // The app shows a notice or refuses it; it never queues one.
             case .shown, .queued: return Answer(reply: .done(""))
             case .refused(let why): return Answer(reply: .refused(why))
+            }
+        case .notesCheck:
+            switch await notesCheck() {
+            case .inOrder(let report): return Answer(reply: .done(report))
+            // A report with errors exits 1; the whole report goes with it.
+            case .refused(let report): return Answer(reply: .refused(report.trimmingCharacters(in: .newlines)))
             }
         }
     }
@@ -458,4 +468,11 @@ private final class Listener: @unchecked Sendable {
             if answer.quits { await quit() }
         }
     }
+}
+
+/// What `shipyard notes check` came to: the report, in order (exit 0), or
+/// refused with the report or why there's none (exit 1).
+enum NotesCheckAnswer: Equatable {
+    case inOrder(String)
+    case refused(String)
 }

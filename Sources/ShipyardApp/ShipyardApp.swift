@@ -229,6 +229,13 @@ final class AppServices {
             // An agent's notice is shown when its project's rules say so,
             // or withdrawn.
             notices: { request in await shipyard.receive(request) },
+            // The notes check reads Notion with the app's own token.
+            notesCheck: {
+                guard let report = await shipyard.checkNotes() else {
+                    return .refused("Notion isn't connected: choose Connect Notion in shipyard's settings menu")
+                }
+                return report.hasErrors ? .refused(report.text) : .inOrder(report.text)
+            },
             quit: { NSApp.terminate(nil) }
         )
         do {

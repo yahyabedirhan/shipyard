@@ -24,9 +24,9 @@ public enum NotesReading: Equatable, Sendable {
 @MainActor
 final class NotesReader {
     /// The page every notes database hangs under, found by its exact title.
-    static let entryPageTitle = "Shipyard Notes"
+    nonisolated static let entryPageTitle = "Shipyard Notes"
     /// The entry page's child page every project's database hangs under.
-    static let projectsPageTitle = "Projects"
+    nonisolated static let projectsPageTitle = "Projects"
 
     /// The entry page's id, once search found it.
     private var entryPage: String?

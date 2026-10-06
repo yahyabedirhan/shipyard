@@ -281,6 +281,28 @@ struct ControlServerTests {
         #expect(server.lease.current(at: clock.now)?.holder == Self.agent)
     }
 
+    @Test("the notes check isn't leased: any agent's is answered with the app's report, in order or refused with it")
+    func notesCheck() async {
+        var answers: [NotesCheckAnswer] = [.inOrder("in order\n"), .refused("1 error, 0 warnings\n")]
+        let server = ControlServer(
+            socket: URL(fileURLWithPath: "/nonexistent/control.sock"),
+            panel: panel,
+            screenshotter: screenshotter,
+            indicator: indicator,
+            now: { [clock] in clock.now },
+            notesCheck: { answers.removeFirst() },
+            quit: {}
+        )
+        _ = await server.reply(to: ControlRequest.panelOpen.sent())
+
+        let inOrder = await server.reply(to: ControlRequest.notesCheck.sent(by: Self.other))
+        let refused = await server.reply(to: ControlRequest.notesCheck.sent(by: Self.other))
+
+        #expect(inOrder == .init(reply: .done("in order\n")))
+        #expect(refused == .init(reply: .refused("1 error, 0 warnings")))
+        #expect(server.lease.current(at: clock.now)?.holder == Self.agent)
+    }
+
     /// The notice requests the server handed the app, in order.
     final class NoticeLog {
         var requests: [NoticeRequest] = []
