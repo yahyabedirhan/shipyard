@@ -1,7 +1,8 @@
 import ShipyardCore
 import SwiftUI
 
-/// Takes the Notion token the notes are read with: a secure field and
+/// Takes the Notion token the notes are read with: the three steps to
+/// make it, a link to Notion's connections, a secure field and
 /// Connect, which checks it with Notion and keeps it in the Keychain
 /// (`Shipyard.connectNotion`), then says how that went. The header's
 /// "Connect Notion…" shows it above the footer, shaped like `CLILinkCard`;
@@ -36,6 +37,21 @@ struct NotionConnectCard: View {
                 .foregroundStyle(.secondary)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 3) {
+                ForEach(Array(PanelText.notionCardSteps.enumerated()), id: \.offset) { index, step in
+                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                        Text("\(index + 1).").monospacedDigit().foregroundStyle(.tertiary)
+                        Text(step).foregroundStyle(.secondary)
+                    }
+                    .font(TypeScale.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Link(destination: PanelText.notionConnectionsURL) {
+                Label(PanelText.notionConnectionsLink, systemImage: "arrow.up.right.square")
+                    .font(TypeScale.captionEmphasis)
+            }
+            .foregroundStyle(Palette.accent)
             SecureField(PanelText.notionTokenPlaceholder, text: $token)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit(connect)

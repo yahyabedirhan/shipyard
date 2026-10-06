@@ -55,7 +55,16 @@ extension PanelText {
 
     /// The Notion card's title and what it asks for.
     public static let notionCardTitle = "Connect Notion"
-    public static let notionCardMessage = "Paste the token of your notes' Notion connection (an internal connection shared with the Shipyard Notes page). Shipyard keeps it in your Keychain and lists each project's open notes."
+    public static let notionCardMessage = "Shipyard reads your notes with a Notion connection of its own, which sees only your Shipyard Notes page."
+    /// The card's steps, in order: make the connection, share the page, paste.
+    public static let notionCardSteps = [
+        "Create an internal connection in your notes workspace.",
+        "On its Access tab, add the Shipyard Notes page.",
+        "Copy its Internal Integration Secret and paste it here.",
+    ]
+    /// The link to Notion's page of connections, and where it goes.
+    public static let notionConnectionsLink = "Open Notion's connections"
+    public static let notionConnectionsURL = URL(string: "https://www.notion.so/profile/integrations")!
     /// The token field's placeholder, and the button that checks and keeps it.
     public static let notionTokenPlaceholder = "Notion token"
     public static let notionConnect = "Connect"
