@@ -42,6 +42,11 @@ public struct NotionClient: Sendable {
         URL(string: "https://www.notion.so/\(id.replacingOccurrences(of: "-", with: ""))")
     }
 
+    /// The icons the workspace's Agent guide gives the Projects page and
+    /// each project's database.
+    public static let projectsIcon = "📂"
+    public static let databaseIcon = "🗂️"
+
     /// The most a list asks for at once: the API's own maximum.
     static let pageSize = 100
     /// How many pages of a list it follows before stopping.
@@ -195,6 +200,7 @@ public struct NotionClient: Sendable {
         let body: [String: Any] = [
             "parent": ["type": "page_id", "page_id": pageID],
             "title": [["text": ["content": title]]],
+            "icon": ["type": "emoji", "emoji": Self.databaseIcon],
             "initial_data_source": ["properties": [
                 NoteProperty.name: ["title": [String: Any]()],
                 NoteProperty.number: ["unique_id": ["prefix": prefix ?? NSNull()]],
@@ -210,11 +216,12 @@ public struct NotionClient: Sendable {
         return (id, source)
     }
 
-    /// Creates an empty page titled `title` under page `pageID`
-    /// (`POST /v1/pages`), and answers its id.
-    public func createPage(under pageID: String, title: String) async throws -> String {
+    /// Creates an empty page titled `title`, with the emoji `icon`, under
+    /// page `pageID` (`POST /v1/pages`), and answers its id.
+    public func createPage(under pageID: String, title: String, icon: String) async throws -> String {
         let body: [String: Any] = [
             "parent": ["type": "page_id", "page_id": pageID],
+            "icon": ["type": "emoji", "emoji": icon],
             "properties": ["title": ["title": [["text": ["content": title]]]]],
         ]
         let page = try await send("POST", "pages", body: body, as: PageObject.self)

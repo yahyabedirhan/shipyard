@@ -89,6 +89,7 @@ struct NewNoteTests {
         #expect(try json(harness.createdDatabases.first) == json("""
             {"parent": {"type": "page_id", "page_id": "\(NotionStub.projectsPage)"},
              "title": [{"text": {"content": "blog"}}],
+             "icon": {"type": "emoji", "emoji": "🗂️"},
              "initial_data_source": {"properties": {
                "Name": {"title": {}},
                "No.": {"unique_id": {"prefix": "BLOG"}},
@@ -198,6 +199,7 @@ struct NewNoteTests {
         let createdID = try #require(try JSONSerialization.jsonObject(with: Data(created.utf8)) as? NSDictionary)["id"] as? String
         #expect(try json(harness.createdPages.first) == json("""
             {"parent": {"type": "page_id", "page_id": "\(NotionStub.entryPage)"},
+             "icon": {"type": "emoji", "emoji": "📂"},
              "properties": {"title": {"title": [{"text": {"content": "Projects"}}]}}}
             """))
         let database = try json(harness.createdDatabases.first)

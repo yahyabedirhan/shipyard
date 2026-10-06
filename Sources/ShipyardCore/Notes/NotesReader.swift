@@ -144,7 +144,7 @@ final class NotesReader {
                 if let known = entry.projects {
                     projects = known
                 } else {
-                    projects = try await client.createPage(under: entry.page, title: Self.projectsPageTitle)
+                    projects = try await client.createPage(under: entry.page, title: Self.projectsPageTitle, icon: NotionClient.projectsIcon)
                     projectsPage = projects
                 }
                 let created = try await client.createNotesDatabase(
