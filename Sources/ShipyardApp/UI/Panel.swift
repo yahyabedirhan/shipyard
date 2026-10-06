@@ -433,6 +433,7 @@ extension PanelBanner {
         case .paused: "pause.circle.fill"
         case .fetch: "wifi.exclamationmark"
         case .machine: "server.rack"
+        case .notes: "note.text"
         case .notificationsOff: "bell.slash.fill"
         }
     }
@@ -445,7 +446,7 @@ extension PanelBanner {
         case .configError, .paused: Palette.red
         case .delay, .fetch: Palette.amber
         case .lease: Palette.lease
-        case .stoppedHolder, .configWarnings, .machine, .notificationsOff: Palette.gray
+        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: Palette.gray
         }
     }
 }

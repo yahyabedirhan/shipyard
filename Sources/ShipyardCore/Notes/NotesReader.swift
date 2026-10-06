@@ -5,6 +5,9 @@ public enum NotesReading: Equatable, Sendable {
     /// Each project that has a notes database, by name: its open notes, or
     /// why its query failed. A project without a database isn't there.
     case read([String: Result<[Note], NotionError>])
+    /// No page shared with the token is titled "Shipyard Notes": a token
+    /// for another workspace, or one the page wasn't shared with.
+    case noEntryPage
     /// Nothing could be read (the token was rejected, Notion out of
     /// reach): every project's notes are unknown.
     case failed(NotionError)
@@ -40,7 +43,7 @@ final class NotesReader {
     /// `client`.
     func read(projects: [String], client: NotionClient) async -> NotesReading {
         do {
-            guard let databases = try await databases(client) else { return .read([:]) }
+            guard let databases = try await databases(client) else { return .noEntryPage }
             var results: [String: Result<[Note], NotionError>] = [:]
             var used: Set<String> = []
             for project in projects {

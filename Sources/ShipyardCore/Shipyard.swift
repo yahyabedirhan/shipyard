@@ -97,6 +97,9 @@ public final class Shipyard {
     /// Whether the user gave shipyard a Notion token (`connectNotion`),
     /// for the settings menu.
     public private(set) var notionConnected = false
+    /// Whether the last read found no page titled "Shipyard Notes" shared
+    /// with the token: the notes banner says so rather than listing none.
+    public private(set) var notesEntryMissing = false
     /// The projects the new-note icon is starting a note in now.
     public private(set) var startingNotes: Set<String> = []
     /// Why the new-note icon couldn't start a note, by project name, for
@@ -1722,7 +1725,12 @@ public final class Shipyard {
         guard notionToken() == token else { return }
         var read: [String: [Note]] = [:]
         var errors: [String: String] = [:]
+        let entryMissing = reading == .noEntryPage
+        if entryMissing != notesEntryMissing { notesEntryMissing = entryMissing }
         switch reading {
+        case .noEntryPage:
+            // Nothing to list; the notes banner says why.
+            break
         case .failed(let error):
             // Nothing is known: every project keeps its notes, with why.
             for project in projects {
@@ -1749,6 +1757,7 @@ public final class Shipyard {
     /// Lists no notes and no notes errors.
     private func forgetNotes() {
         notesReader.reset()
+        if notesEntryMissing { notesEntryMissing = false }
         guard !notes.isEmpty || !noteErrors.isEmpty else { return }
         notes = [:]
         noteErrors = [:]
@@ -1852,8 +1861,19 @@ public final class Shipyard {
             configWarnings: configWarnings,
             ready: phase == .ready,
             menu: menu,
+            notes: notesNotice,
             notificationsOff: notificationsAreOff
         )
+    }
+
+    /// What the notes banner says, when anything: Notion isn't connected
+    /// yet, or its token sees no Shipyard Notes page. Nothing when no
+    /// project shows notes.
+    private var notesNotice: NotesNotice? {
+        let configuration = configStore.lastValid
+        guard configuration.projects.contains(where: { configuration.settings(for: $0).notes.show }) else { return nil }
+        if !notionConnected { return .notConnected }
+        return notesEntryMissing ? .noEntryPage : nil
     }
 
     /// The banners the panel shows at `now`, in order: those whose

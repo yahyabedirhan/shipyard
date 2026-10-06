@@ -31,3 +31,11 @@ public enum NewNoteButton: Equatable, Sendable {
     /// A note is being started; a click does nothing.
     case starting
 }
+
+/// Why notes can't be listed at all, for the panel's notes banner.
+public enum NotesNotice: Equatable, Sendable {
+    /// No Notion token is kept: the settings menu's Connect Notion takes one.
+    case notConnected
+    /// The token sees no page titled "Shipyard Notes".
+    case noEntryPage
+}

@@ -38,6 +38,16 @@ extension PanelText {
         "New note in \(project)"
     }
 
+    /// The notes banner: why no note can be listed.
+    public static func notesNotice(_ notice: NotesNotice) -> String {
+        switch notice {
+        case .notConnected:
+            "Your notes live in Notion. Choose Connect Notion in the settings menu to list them here."
+        case .noEntryPage:
+            "Notion connected, but its token sees no Shipyard Notes page. Check the token is for your notes workspace, and share Shipyard Notes with the connection."
+        }
+    }
+
     /// The settings menu's item that shows the Notion card.
     public static let connectNotion = "Connect Notion…"
     /// The settings menu's item that forgets the token, once connected.

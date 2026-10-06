@@ -18,8 +18,10 @@ private extension Harness {
     /// The banners the panel shows at the clock's time, in order.
     var banners: [PanelBanner] { shipyard.banners(at: clock.now) }
 
-    /// The keys of the banners the panel shows now, in order.
-    var bannerKeys: [String] { banners.map(\.id) }
+    /// The keys of the banners the panel shows now, in order, less the
+    /// notes banner: these harnesses keep no Notion token, so it always
+    /// asks to connect (`NotesTests` owns it).
+    var bannerKeys: [String] { banners.map(\.id).filter { $0 != "notes" } }
 
     /// The words of the banner `key` the panel shows now; `nil` while it's hidden.
     func bannerText(_ key: String) -> String? {
