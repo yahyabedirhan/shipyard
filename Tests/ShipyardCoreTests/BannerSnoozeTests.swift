@@ -142,6 +142,57 @@ struct BannerSnoozeTests {
         #expect(harness.bannerKeys == ["notifications"])
     }
 
+    @Test("a restart keeps the snoozes through the first refresh, the first machine poll and the notifier's first word, and the banners show again when the hour ends")
+    func keptAcrossRestart() async throws {
+        let config = "[remote]\nmachines = [\"netcup-vps\"]\n\n" + shop
+        let harness = try Harness(stored: "gho_stored", config: config)
+        await harness.startWithMachines(graphQL: .failure())
+        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        await harness.poll()
+        harness.shipyard.notificationsAreOff = true
+        #expect(harness.bannerKeys == ["fetch", "machine-netcup-vps", "notifications"])
+        for key in harness.bannerKeys { harness.shipyard.dismissBanner(key) }
+        #expect(harness.bannerKeys.isEmpty)
+
+        // Half an hour later the app quits and starts again over the same
+        // support folder. Until the first refresh, the first poll and the
+        // notifier's first word, none of the conditions is known: their
+        // snoozes must survive the sign-in and the menu changes before them.
+        harness.clock.advance(by: 30 * 60)
+        let relaunched = harness.relaunched()
+        relaunched.herdr.addMachine("netcup-vps")
+        relaunched.herdr.setReach(.unreachable, on: "netcup-vps")
+        relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
+        relaunched.graphQL([.failure()])
+        await relaunched.shipyard.start()
+        await relaunched.poll()
+        relaunched.shipyard.notificationsAreOff = true
+        #expect(relaunched.bannerKeys.isEmpty)
+        let end = Harness.now.addingTimeInterval(3600)
+        #expect(relaunched.shipyard.bannerSnoozeEnds == [end, end, end])
+
+        // At the hour's end all three are back, without a refresh.
+        relaunched.clock.advance(by: 30 * 60)
+        #expect(relaunched.bannerKeys == ["fetch", "machine-netcup-vps", "notifications"])
+        await relaunched.refreshNow(answering: .failure())
+        #expect(relaunched.shipyard.appStateStore.state.bannerSnoozes == BannerSnoozes())
+    }
+
+    @Test("a snooze whose condition stopped before a restart is gone after it")
+    func stoppedBeforeRestart() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        await harness.refreshNow(answering: .failure())
+        harness.shipyard.dismissBanner("fetch")
+        await harness.refreshNow(answering: onePullRequest)
+        #expect(harness.shipyard.appStateStore.state.bannerSnoozes == BannerSnoozes())
+
+        let relaunched = harness.relaunched()
+        relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
+        relaunched.graphQL([.failure()])
+        await relaunched.shipyard.start()
+        #expect(relaunched.bannerKeys == ["fetch"])
+    }
+
     @Test("the configuration error's banner can't be dismissed")
     func configErrorStays() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)

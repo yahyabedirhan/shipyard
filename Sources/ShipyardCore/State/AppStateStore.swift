@@ -31,6 +31,10 @@ public struct AppState: Equatable, Sendable {
     /// numbers them, on the first start of a build that numbers: the pings
     /// already there are then numbered oldest sent first.
     public var pingNumbers: PingNumbers?
+    /// The panel banners the user dismissed, each until its hour ends, so a
+    /// restart keeps them hidden. A snooze that ended, or whose condition
+    /// stopped, is dropped (`Shipyard.followBannerConditions()`).
+    public var bannerSnoozes = BannerSnoozes()
 
     public init(
         attention: Attention = Attention(),
@@ -39,7 +43,8 @@ public struct AppState: Equatable, Sendable {
         known: KnownItems = KnownItems(),
         notified: NotifiedEvents = NotifiedEvents(),
         remotePings: RemotePingMarks = RemotePingMarks(),
-        pingNumbers: PingNumbers? = nil
+        pingNumbers: PingNumbers? = nil,
+        bannerSnoozes: BannerSnoozes = BannerSnoozes()
     ) {
         self.attention = attention
         self.collapsed = collapsed
@@ -48,6 +53,7 @@ public struct AppState: Equatable, Sendable {
         self.notified = notified
         self.remotePings = remotePings
         self.pingNumbers = pingNumbers
+        self.bannerSnoozes = bannerSnoozes
     }
 }
 
@@ -65,7 +71,8 @@ public struct AppState: Equatable, Sendable {
 //       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } },
 //       "remotePings": { "shipyard://ping/netcup-vps/q1": { "instance": "…", "seen": "2026-09-25T12:00:00Z",
 //                                                         "seenSending": { …the ping… }, "dismissed": false } },
-//       "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } }
+//       "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } },
+//       "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "machine-netcup-vps": "2026-09-25T12:40:00Z" }
 //     }
 //
 // `known`, `knownProjects` and `notified` came with notification rules.
@@ -83,7 +90,9 @@ public struct AppState: Equatable, Sendable {
 // until it first numbers them. It's written as its sections, by name; a
 // section that can't be read is dropped, and the pings it lists then are
 // numbered again from 1 there, and a `pingNumbers` that can't be read at
-// all is dropped as a whole. A `version` above `currentVersion` fails the decode, so the
+// all is dropped as a whole. `bannerSnoozes` came with dismissable
+// banners: each banner key with when its snooze ends. It's optional, and a
+// snooze that can't be read is skipped (its banner shows). A `version` above `currentVersion` fails the decode, so the
 // store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
@@ -96,6 +105,7 @@ extension AppState: Codable {
         case notified
         case remotePings
         case pingNumbers
+        case bannerSnoozes
     }
 
     public init(from decoder: any Decoder) throws {
@@ -127,6 +137,8 @@ extension AppState: Codable {
         remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
         let sequences = try? container.decodeIfPresent([String: Lossy<PingNumbers.Sequence>].self, forKey: .pingNumbers)
         pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
+        let snoozes = (try? container.decodeIfPresent([String: Lossy<Date>].self, forKey: .bannerSnoozes)) ?? [:]
+        bannerSnoozes = BannerSnoozes(ends: snoozes.compactMapValues(\.value))
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -140,6 +152,7 @@ extension AppState: Codable {
         try container.encode(notified.records, forKey: .notified)
         try container.encode(remotePings.marks, forKey: .remotePings)
         try container.encodeIfPresent(pingNumbers?.sections, forKey: .pingNumbers)
+        try container.encode(bannerSnoozes.ends, forKey: .bannerSnoozes)
     }
 }
 
@@ -149,7 +162,8 @@ private struct Lossy<Value: Decodable>: Decodable {
     var value: Value?
 
     init(from decoder: any Decoder) throws {
-        value = try? Value(from: decoder)
+        // Through a container, so the decoder's date strategy applies to a `Date`.
+        value = try? decoder.singleValueContainer().decode(Value.self)
     }
 }
 

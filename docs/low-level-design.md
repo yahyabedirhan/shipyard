@@ -315,7 +315,7 @@ Nouns from the requirements, sorted:
 | Notes reader (#192) | **Entity** (`NotesReader`, in Core): finds the entry page, matches projects to databases, queries each, and remembers what it found; answers `NotesReading`; since #196 `startNote(in:client:)` makes a project's database when it has none, then an empty note, answering its URL or a `NewNoteError` |
 | Note prefix (#196) | **Value** (`NotePrefix`, in Core's `Notes/`, pure): the first free prefix for a project's name, given the prefixes taken (NT8) |
 | Notes menu state (#196) | **Value** (`NotesMenuState`, in Core's `Menu/`): what `MenuModel.build` shows about notes besides their rows: connected, read errors, start errors, the projects a note is being started in; a section's icon is `MenuSection.newNote: NewNoteButton?` (`ready`, `starting`) |
-| Panel banner and banner snoozes (#220) | **Values** (`PanelBanner`, `BannerSnoozes`, in Core's `Menu/`, pure): a banner the panel shows above the projects, by its banner key (`config`, `config-warnings`, `delay`, `paused`, `fetch`, `machine-<machine>`, `notifications`), and the snoozes of the ones the user dismissed: each key with the time its snooze ends, an hour after the dismissal. `Shipyard` owns the list and the snoozes (in memory) |
+| Panel banner and banner snoozes (#220) | **Values** (`PanelBanner`, `BannerSnoozes`, in Core's `Menu/`, pure): a banner the panel shows above the projects, by its banner key (`config`, `config-warnings`, `delay`, `paused`, `fetch`, `machine-<machine>`, `notifications`), and the snoozes of the ones the user dismissed: each key with the time its snooze ends, an hour after the dismissal. `Shipyard` owns the list; the snoozes are kept in `AppState.bannerSnoozes` (`state.json`, #221) |
 
 Relationships:
 
@@ -1085,7 +1085,7 @@ Pure: `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, asked on
 
 ### AppStateStore — `ShipyardCore/State/AppStateStore.swift`
 
-One JSON file, `state.json`, in a directory the app provides (its support folder, `AppFiles.support`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks` and `pingNumbers: PingNumbers?` (N14).
+One JSON file, `state.json`, in a directory the app provides (its support folder, `AppFiles.support`; tests pass a temporary one). App-owned, never hand-edited, so Foundation's JSON is enough. `AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks`, `pingNumbers: PingNumbers?` (N14) and `bannerSnoozes: BannerSnoozes` (#221).
 
 ```json
 {
@@ -1096,7 +1096,8 @@ One JSON file, `state.json`, in a directory the app provides (its support folder
   "known": { "https://github.com/o/r/pull/57": { "repository": "o/r", "state": "open", "checks": "pending", "reviewRequested": false, "activity": 0, "fingerprint": "open|…", "present": "2026-09-25T12:00:00Z" } },
   "knownProjects": { "e-commerce": [{ "repository": "o/r", "kind": "pullRequest" }] },
   "notified": { "https://github.com/o/r/pull/57": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } },
-  "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } }
+  "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } },
+  "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "machine-netcup-vps": "2026-09-25T12:40:00Z" }
 }
 ```
 
@@ -1120,7 +1121,9 @@ Pure: `build(listings:snapshot:configuration:state:expanded:now:) -> MenuModel`:
 
 `PanelBanner` is one banner above the projects: `id` (its banner key, which names the condition, never its words), `kind` (the panel picks the symbol and tint by it) and `text` (`PanelText`'s words). `PanelBanner.list(configError:configWarnings:ready:menu:sharePercent:notificationsOff:)` gives every banner whose condition holds, in the panel's order: the configuration error, its warnings, then once ready the refresh delay (`delay`, or `paused` while refreshing can't run), the fetch error and one `machine-<machine>` line per `MenuModel.machineNotices`; then `notifications`. Every one but `config` is `isDismissable`; the lease's banners aren't in the list, the app draws them from the lease.
 
-`BannerSnoozes` is pure, given the time on each call: `ends`, by banner key, when each snooze ends. `snooze(key, at:)` hides a key for `length` (one hour); `shown(banners, at:)` leaves out those snoozed at that time; `endsAfter(now)` lists the ends still to come, soonest first; `follow(current:at:)` drops the snooze of each key not current (its condition stopped) and each that ended. Codable, for keeping it in `state.json` later (#221).
+`BannerSnoozes` is pure, given the time on each call: `ends`, by banner key, when each snooze ends. `snooze(key, at:)` hides a key for `length` (one hour); `shown(banners, at:)` leaves out those snoozed at that time; `endsAfter(now)` lists the ends still to come, soonest first; `follow(current:at:)` drops the snooze of each key not current (its condition stopped) and each that ended. Since #221 it's kept in `AppState.bannerSnoozes` and saved in `state.json` under `bannerSnoozes`, as each banner key with when its snooze ends; optional when read (an older file loads with none, no version bump), and a snooze that can't be read is skipped. `dismissBanner` and `followBannerConditions()` change it through `AppStateStore.update`, so a dismissal saves it and a snooze that ended or whose condition stopped leaves the file.
+
+After a restart, a loaded snooze waits until this launch has looked at its condition before a missing condition clears it (`restoredSnoozes`, `bannerConditionIsKnown`): `delay`, `paused` and `fetch` once a refresh has ended, `machine-<machine>` once that machine's poll answered or failed, `notifications` once the notifier set `notificationsAreOff`, and every other key once `start()` has read the configuration. Without it the sign-in's phase change, before the first refresh, would clear a valid snooze. A snooze whose hour ended is cleared at once. A machine no longer configured is never looked at, so its snooze lasts out its hour.
 
 The flow: a refresh, a poll, a reload or the notifier changes a condition → `Shipyard.followBannerConditions()` clears the snoozes of conditions that stopped → the panel draws `Shipyard.banners(at:)` inside a `TimelineView` over `bannerSnoozeEnds`, so a banner whose hour ends while the panel is open slides back in then, without a refresh → its ✕ calls `dismissBanner(key)` and the banner slides out. Owner test: `BannerSnoozeTests` (`Harness`, manual clock).
 
@@ -1534,7 +1537,7 @@ shipyard/
 │   ├── CLI/
 │   │   └── CLILink.swift             # links ~/.local/bin/shipyard to the app's CLI, or says what's in the way (LinkFileSystem port, FileManagerLinkFileSystem)
 │   ├── State/
-│   │   ├── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers; tolerant, versioned
+│   │   ├── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers, banner snoozes; tolerant, versioned
 │   │   └── AppFiles.swift            # (0.1.0) where the app reads and writes, from its launch environment: config.toml, the support folder, the demo folder in a demo run (which leaves the login item alone)
 │   ├── Notes/                        # (#192) the user's notes in Notion
 │   │   ├── Note.swift                # a note: number and prefix, title or first line, labels, status; as an Item

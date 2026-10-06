@@ -124,11 +124,27 @@ public final class Shipyard {
     /// Whether macOS lets shipyard post notifications, as the app's
     /// notifier last learned: the condition of the notifications-off banner.
     public var notificationsAreOff = false {
-        didSet { followBannerConditions() }
+        didSet {
+            notifierReported = true
+            followBannerConditions()
+        }
     }
     /// The panel banners the user dismissed, each until its hour ends or
-    /// its condition stops (`followBannerConditions()`); in memory only.
-    private(set) var bannerSnoozes = BannerSnoozes()
+    /// its condition stops (`followBannerConditions()`); kept in the app
+    /// state, so a restart keeps them.
+    private var bannerSnoozes: BannerSnoozes { appStateStore.state.bannerSnoozes }
+    /// The snoozes `start()` loaded whose condition this launch hasn't
+    /// looked at yet: each is kept until it has (`bannerConditionIsKnown(_:)`),
+    /// so a launch doesn't clear a snooze only because its condition isn't known.
+    private var restoredSnoozes: Set<String> = []
+    /// Whether `start()` has read the configuration; the banners' other
+    /// conditions are known from then on.
+    private var configurationRead = false
+    /// Whether a refresh has ended since launch, so the refresh delay, the
+    /// pause and the fetch error are known.
+    private var refreshEnded = false
+    /// Whether the app's notifier has said whether notifications are off.
+    private var notifierReported = false
     /// The presets onboarding offers as its first step: all of them while
     /// the file holds nothing but `version` (missing, or the app's header);
     /// none once it has other settings, when onboarding shows the plain
@@ -266,6 +282,7 @@ public final class Shipyard {
         // nearest existing ancestor.
         try? pingStore.createDirectory()
         appStateStore.load(at: clock.now)
+        restoredSnoozes = Set(bannerSnoozes.ends.keys)
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be
         // written leaves the CLI to its own lookup.
@@ -273,6 +290,8 @@ public final class Shipyard {
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
+        configurationRead = true
+        followBannerConditions()
         // Pings sent while the app wasn't running list and notify now,
         // signed in or not, without waiting for GitHub.
         await reloadPings()
@@ -724,6 +743,8 @@ public final class Shipyard {
             built.rateIndicator = menu.rateIndicator
             menu = built
             publishRateStatus()
+            refreshEnded = true
+            followBannerConditions()
             // Recorded (and saved) before posting: a crash in between loses a
             // notification rather than repeating one.
             for notification in notifications {
@@ -743,6 +764,8 @@ public final class Shipyard {
             budget.record(failure, at: clock.now)
             menu.fetchError = failure
             publishRateStatus()
+            refreshEnded = true
+            followBannerConditions()
         }
     }
 
@@ -1831,17 +1854,42 @@ public final class Shipyard {
     public func dismissBanner(_ key: String) {
         let now = clock.now
         guard banners(at: now).contains(where: { $0.id == key && $0.isDismissable }) else { return }
-        bannerSnoozes.snooze(key, at: now)
+        appStateStore.update { $0.bannerSnoozes.snooze(key, at: now) }
     }
 
     /// Clears the snooze of each banner whose condition stopped, and of
-    /// each whose hour ended: run whenever a condition may have changed.
+    /// each whose hour ended, and saves the change: run whenever a
+    /// condition may have changed. A snooze loaded at launch is kept
+    /// until this launch knows its condition.
     private func followBannerConditions() {
-        var next = bannerSnoozes
-        guard !next.ends.isEmpty else { return }
-        next.follow(current: Set(currentBanners.map(\.id)), at: clock.now)
-        if next != bannerSnoozes { bannerSnoozes = next }
+        guard !bannerSnoozes.ends.isEmpty else { return }
+        restoredSnoozes = restoredSnoozes.filter { !bannerConditionIsKnown($0) }
+        let current = Set(currentBanners.map(\.id)).union(restoredSnoozes)
+        let now = clock.now
+        appStateStore.update { $0.bannerSnoozes.follow(current: current, at: now) }
     }
+
+    /// Whether this launch has looked at the condition of the banner
+    /// `key`: the refresh's banners once a refresh ended, a remote
+    /// machine's once its poll answered or failed, notifications off once
+    /// the notifier said, and every other once the configuration is read.
+    private func bannerConditionIsKnown(_ key: String) -> Bool {
+        guard configurationRead else { return false }
+        switch key {
+        case "delay", "paused", "fetch":
+            return refreshEnded
+        case "notifications":
+            return notifierReported
+        case _ where key.hasPrefix(Self.machineBannerPrefix):
+            let label = String(key.dropFirst(Self.machineBannerPrefix.count))
+            return remote.machine(label).map { $0.answered != nil || $0.failure != nil } ?? false
+        default:
+            return true
+        }
+    }
+
+    /// The start of a remote machine's banner key (`PanelBanner.id`).
+    private static let machineBannerPrefix = "machine-"
 
     private func apply(_ event: LifecycleEvent) {
         phase = phase.after(event)
