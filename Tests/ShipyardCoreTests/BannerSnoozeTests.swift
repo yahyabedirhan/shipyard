@@ -66,6 +66,19 @@ struct BannerSnoozeTests {
         #expect(harness.shipyard.bannerSnoozeEnds.isEmpty)
     }
 
+    @Test("[banners] snooze sets how long a dismissal hides the banner: \"10s\" brings it back after 10 seconds")
+    func configuredLength() async throws {
+        let harness = try await Harness.started(config: "[banners]\nsnooze = \"10s\"\n\n" + shop, graphQL: onePullRequest)
+        await harness.refreshNow(answering: .failure())
+        harness.shipyard.dismissBanner("fetch")
+        #expect(harness.shipyard.bannerSnoozeEnds == [Harness.now.addingTimeInterval(10)])
+
+        harness.clock.advance(by: 9)
+        #expect(!harness.bannerKeys.contains("fetch"))
+        harness.clock.advance(by: 1)
+        #expect(harness.bannerKeys.contains("fetch"))
+    }
+
     @Test("a condition that stops clears its snooze, so it shows at once when it starts again")
     func stoppedAndRestarted() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)

@@ -85,7 +85,7 @@ final class ConfigurationReader {
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
             "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
-            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "defaults", "projects",
+            "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "banners", "defaults", "projects",
         ])
 
         if let version = int(node, "version") {
@@ -155,6 +155,17 @@ final class ConfigurationReader {
                     config.notices.port = port
                 } else {
                     error("`port` must be between \(NoticePort.range.lowerBound) and \(NoticePort.range.upperBound) (got \(port))", at: notices.path + [.key("port")])
+                }
+            }
+        }
+
+        if let banners = table(node, "banners") {
+            warnUnknownKeys(in: banners, known: ["snooze"])
+            if let snooze = duration(banners, "snooze") {
+                if snooze > 0 {
+                    config.banners.snooze = snooze
+                } else {
+                    error("`snooze` must be longer than 0, such as \"1h\" or \"10s\"", at: banners.path + [.key("snooze")])
                 }
             }
         }

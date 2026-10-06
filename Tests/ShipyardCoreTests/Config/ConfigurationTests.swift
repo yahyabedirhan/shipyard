@@ -76,6 +76,9 @@ let everyKey = """
     listen = true
     port = 50000
 
+    [banners]
+    snooze = "10s"
+
     [defaults]
     group-by = "repository"
     subsections = true
@@ -232,6 +235,7 @@ struct ConfigurationDecodingTests {
         #expect(config.herdr == .init(terminal: "Ghostty"))
         #expect(config.remote == .init(machines: ["hetzner-vps", "netcup-vps"]))
         #expect(config.notices == .init(listen: true, port: 50000))
+        #expect(config.banners == .init(snooze: 10))
         #expect(config.defaults.pullRequests == .init(
             show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),
