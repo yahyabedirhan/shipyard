@@ -286,6 +286,25 @@ struct NotesTests {
         #expect(harness.stub.requests("GET", NotionStub.me).last?.value(forHTTPHeaderField: "Authorization") == "Bearer ntn_token")
     }
 
+    @Test("the Notion token is read from the token store once, however many reads and opens follow, since each Keychain read can ask the user's leave; Connect and Disconnect change it without another read")
+    func tokenReadOnce() async throws {
+        let harness = try await Harness.withNotes()
+        let reads = harness.notion.reads
+
+        for _ in 0..<3 {
+            await harness.readNotes()
+            await harness.shipyard.panelOpened()
+        }
+        #expect(harness.notion.reads == reads)
+        #expect(reads <= 1)
+
+        harness.shipyard.disconnectNotion()
+        #expect(harness.noteRows().isEmpty)
+        #expect(await harness.shipyard.connectNotion(token: "ntn_token") == .connected)
+        #expect(harness.noteRows().count == 3)
+        #expect(harness.notion.reads == reads)
+    }
+
     @Test("disconnecting deletes the token and takes every note out of the menu")
     func disconnect() async throws {
         let harness = try await Harness.withNotes()

@@ -212,6 +212,9 @@ public final class Shipyard {
     @ObservationIgnored private var notesGate = RefreshGate()
     /// Finds each project's notes database, remembering what it found.
     @ObservationIgnored private let notesReader = NotesReader()
+    /// The Notion token as the token store last gave it (`notionToken`):
+    /// `nil` until the store is first read, then the token or none.
+    @ObservationIgnored private var notionTokenRead: String??
     private let notifier: any Notifying
     /// Learns the Mac's own Tailscale login, the one whose notices the
     /// tailnet listener takes (`receive(_:from:)`).
@@ -1686,6 +1689,7 @@ public final class Shipyard {
         }
         do {
             try store.save(token)
+            notionTokenRead = .some(token)
         } catch {
             return .couldNotSave(String(describing: error))
         }
@@ -1710,6 +1714,7 @@ public final class Shipyard {
     /// every note with it: the menu lists none until the user connects again.
     public func disconnectNotion() {
         try? notionTokenStore?.delete()
+        notionTokenRead = .some(nil)
         notionConnected = false
         newNoteErrors = [:]
         forgetNotes()
@@ -1718,9 +1723,14 @@ public final class Shipyard {
         rebuildMenu(configStore.lastValid)
     }
 
-    /// The Notion token the token store keeps; `nil` with none.
+    /// The Notion token the token store keeps; `nil` with none. The store
+    /// is read once, then the token is remembered until Connect or
+    /// Disconnect changes it: each Keychain read can ask the user's leave
+    /// when the app's signature changed, and the notes are read every minute.
     private func notionToken() -> String? {
-        guard let token = try? notionTokenStore?.token(), !token.isEmpty else { return nil }
+        if let known = notionTokenRead { return known }
+        let token = (try? notionTokenStore?.token()).flatMap { $0.isEmpty ? nil : $0 }
+        notionTokenRead = .some(token)
         return token
     }
 
