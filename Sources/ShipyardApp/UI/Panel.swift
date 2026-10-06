@@ -154,10 +154,17 @@ struct Panel: View {
     /// hour is up slides back in without a refresh.
     private var banners: some View {
         TimelineView(.explicit(shipyard.bannerSnoozeEnds)) { context in
-            // The snooze's end once it's reached, even when its entry fires
-            // a moment early; now for any other draw.
-            bannerStack(shipyard.banners(at: max(context.date, Date())))
+            bannerStack(shipyard.banners(at: Self.bannerDate(context.date, now: Date())))
         }
+    }
+
+    /// The time the banners are drawn for: the entry's date when it fires a
+    /// moment early, so its snooze counts as ended; now otherwise. A draw
+    /// before any entry is due gets the schedule's first date from SwiftUI,
+    /// a snooze that ends in an hour, which would show the banner just
+    /// dismissed.
+    static func bannerDate(_ entry: Date, now: Date) -> Date {
+        entry > now && entry.timeIntervalSince(now) <= 1 ? entry : now
     }
 
     private func bannerStack(_ banners: [PanelBanner]) -> some View {
