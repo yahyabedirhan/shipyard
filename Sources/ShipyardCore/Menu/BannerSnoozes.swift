@@ -8,7 +8,8 @@ import Foundation
 /// next time it starts its banner shows at once. Pure: given the time on
 /// each call.
 public struct BannerSnoozes: Codable, Equatable, Sendable {
-    /// How long a dismissal hides a banner.
+    /// How long a dismissal hides a banner unless `[banners] snooze` says
+    /// otherwise.
     public static let length: TimeInterval = 3600
 
     /// When each snoozed banner key's snooze ends.
@@ -19,8 +20,8 @@ public struct BannerSnoozes: Codable, Equatable, Sendable {
     }
 
     /// Hides the banner `key` for `length` from `now`.
-    public mutating func snooze(_ key: String, at now: Date) {
-        ends[key] = now.addingTimeInterval(Self.length)
+    public mutating func snooze(_ key: String, at now: Date, for length: TimeInterval = Self.length) {
+        ends[key] = now.addingTimeInterval(length)
     }
 
     /// Whether the banner `key` is hidden at `now`.

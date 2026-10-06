@@ -158,6 +158,19 @@
         }
       }
     },
+    "banners": {
+      "description": "The banners above the projects in the panel.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "snooze": {
+          "description": "How long a banner stays hidden after you click its dismiss button: a whole number and one unit, s, m, h or d, such as \"1h\" or \"10s\". After it, the banner shows again if its condition still holds.",
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$",
+          "default": "1h"
+        }
+      }
+    },
     "defaults": {
       "description": "What every project shows and notifies about, unless the project overrides it.",
       "type": "object",

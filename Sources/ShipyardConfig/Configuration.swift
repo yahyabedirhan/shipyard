@@ -23,6 +23,7 @@ public struct Configuration: Equatable, Sendable {
     public var herdr = HerdrSettings()
     public var remote = RemoteSettings()
     public var notices = NoticeSettings()
+    public var banners = BannerSettings()
     /// What every project shows unless it overrides it.
     public var defaults = Defaults()
     /// In the order the file lists them, which is the order of the sections.
@@ -123,6 +124,13 @@ extension Configuration {
             self.listen = listen
             self.port = port
         }
+    }
+
+    /// `[banners]`: how long a dismissed panel banner stays hidden.
+    public struct BannerSettings: Equatable, Sendable {
+        /// `snooze`, in seconds: an hour by default.
+        public var snooze: TimeInterval
+        public init(snooze: TimeInterval = 3600) { self.snooze = snooze }
     }
 
     /// `[attention]`: which reasons make an item need attention.

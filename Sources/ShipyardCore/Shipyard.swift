@@ -1866,12 +1866,13 @@ public final class Shipyard {
     /// panel brings it back at that moment without a refresh.
     public var bannerSnoozeEnds: [Date] { bannerSnoozes.endsAfter(clock.now) }
 
-    /// The banner's dismiss button: hides the banner `key` for an hour
-    /// (`BannerSnoozes.length`). A banner that isn't shown is left alone.
+    /// The banner's dismiss button: hides the banner `key` for `[banners]
+    /// snooze`, an hour by default. A banner that isn't shown is left alone.
     public func dismissBanner(_ key: String) {
         let now = clock.now
         guard banners(at: now).contains(where: { $0.id == key }) else { return }
-        changeBannerSnoozes { $0.snooze(key, at: now) }
+        let length = configStore.lastValid.banners.snooze
+        changeBannerSnoozes { $0.snooze(key, at: now, for: length) }
     }
 
     /// Clears the snooze of each banner whose condition stopped, and of

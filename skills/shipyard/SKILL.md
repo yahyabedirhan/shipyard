@@ -80,6 +80,7 @@ Tables:
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
 | `[notices] listen` | `false` | whether the app takes notices (`shipyard notify`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
 | `[notices] port` | `47420` | the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
+| `[banners] snooze` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
