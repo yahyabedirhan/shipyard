@@ -12,6 +12,9 @@ struct LeaseBannerView: View {
     let lease: AppStatus.Lease
     /// Takes shipyard back from the holder (`ControlServer.stopLease`).
     let stop: () -> Void
+    /// The ✕ after Stop, which hides the banner for an hour
+    /// (`Shipyard.dismissBanner`); the menu bar icon's dot stays.
+    var dismiss: (() -> Void)?
 
     var body: some View {
         let banner = LeaseBanner(lease)
@@ -47,6 +50,9 @@ struct LeaseBannerView: View {
                 .buttonStyle(TextButtonStyle(tint: Palette.red))
                 .fixedSize()
                 .layoutPriority(1)
+            if let dismiss {
+                BannerDismissButton(dismiss: dismiss)
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -54,10 +60,12 @@ struct LeaseBannerView: View {
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
         .help(banner.help)
-        // One element reading both lines as one, with Stop as its action.
+        // One element reading both lines as one, with Stop, and the ✕ when
+        // it's there, as its actions.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)
         .accessibilityAction(named: LeaseBanner.stop, stop)
+        .accessibilityAction(named: PanelText.dismissBanner) { dismiss?() }
     }
 }
 

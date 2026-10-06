@@ -339,6 +339,10 @@ public enum PanelText {
         }
     }
 
+    /// A banner's ✕: hover help and VoiceOver label. The banner comes back
+    /// after the hour if its condition still holds (`BannerSnoozes`).
+    public static let dismissBanner = "Hide for an hour"
+
     // MARK: - Notifications
 
     /// The banner while macOS doesn't let shipyard post notifications.
@@ -357,26 +361,19 @@ public enum PanelText {
         return "\(usage.api.name) \(count(usage.remaining)) / \(count(usage.limit)) · resets \(clockTime(usage.resetAt, locale: locale, timeZone: timeZone))"
     }
 
-    /// The banner for a refresh delay that isn't the configured interval:
-    /// why it's stretched (to stay within `sharePercent`, `[rate-limit]
-    /// max-share-percent`), backed off or paused, and until when; `nil` for
-    /// the configured interval or before the first refresh.
+    /// The banner for a refresh delay the maintainer should know about: why
+    /// it's backed off or paused, and until when; `nil` for the configured
+    /// interval, before the first refresh, and for an interval only
+    /// stretched to stay within `[rate-limit] max-share-percent`, which is
+    /// shipyard working as it should.
     public static func refreshDelay(
         _ delay: RefreshDelay?,
-        sharePercent: Int,
         locale: Locale = .current,
         timeZone: TimeZone = .current
     ) -> String? {
         switch delay {
-        case nil, .configured:
+        case nil, .configured, .stretched:
             return nil
-        case .stretched(let seconds, let api, let cost):
-            let cost = Int(cost.rounded())
-            let unit = switch api {
-            case .graphql: cost == 1 ? "point" : "points"
-            case .rest: cost == 1 ? "request" : "requests"
-            }
-            return "Refreshing every \(interval(seconds)) to stay within \(sharePercent)% of your \(api.name) rate limit (a refresh costs \(cost) \(unit))."
         case .backedOff(let seconds, let api):
             return "Your \(api.name) rate limit is low (other tools are using it). Refreshing every \(interval(seconds))."
         case .paused(let until, let reason):

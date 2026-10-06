@@ -88,6 +88,26 @@ struct CountBadge: View {
     }
 }
 
+/// A banner's ✕ at its trailing edge, which hides it for an hour
+/// (`Shipyard.dismissBanner`): small and quiet, its words from `PanelText`.
+struct BannerDismissButton: View {
+    let dismiss: () -> Void
+
+    var body: some View {
+        Button(action: dismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .buttonStyle(IconButtonStyle(compact: true))
+        .hoverHelp(PanelText.dismissBanner)
+        .accessibilityLabel(PanelText.dismissBanner)
+        // Centred on the first line, its hover fill reaching into the
+        // banner's padding, so the banner keeps its height.
+        .padding(.vertical, -2)
+        .padding(.trailing, -4)
+    }
+}
+
 /// A note above the content: what's wrong or slowed down, tinted by how
 /// much it matters, with an optional link-style action under the words, or
 /// at the right edge, as the lease banner's Stop is, when `trailing`.
@@ -97,6 +117,9 @@ struct Banner: View {
     let tint: Color
     var action: (title: String, run: () -> Void)?
     var trailing = false
+    /// The ✕ at the trailing edge, which hides the banner for an hour
+    /// (`Shipyard.dismissBanner`); `nil` leaves it out.
+    var dismiss: (() -> Void)?
 
     var body: some View {
         HStack(alignment: trailing ? .center : .top, spacing: 8) {
@@ -121,6 +144,9 @@ struct Banner: View {
                 button(action)
                     .fixedSize()
                     .layoutPriority(1)
+            }
+            if let dismiss {
+                BannerDismissButton(dismiss: dismiss)
             }
         }
         .padding(.horizontal, 8)

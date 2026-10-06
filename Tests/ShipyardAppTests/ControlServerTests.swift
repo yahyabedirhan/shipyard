@@ -112,6 +112,14 @@ struct ControlServerTests {
 
     let recorder = NoticeRecorder()
 
+    /// The lease's banners as the indicator last handed them to the core
+    /// (`Shipyard.lease`).
+    final class BannersRecorder {
+        var last = PanelBanner.Lease()
+    }
+
+    let banners = BannersRecorder()
+
     func server(
         socket: URL = URL(fileURLWithPath: "/nonexistent/control.sock"),
         lease: ControlLease = ControlLease()
@@ -119,6 +127,8 @@ struct ControlServerTests {
         let quitter = quitter
         let clock = clock
         let recorder = recorder
+        let banners = banners
+        indicator.onBannersChange = { banners.last = $0 }
         return ControlServer(
             socket: socket,
             panel: panel,
@@ -532,17 +542,17 @@ struct ControlServerTests {
         ] {
             answers.append(await server.reply(to: request.sent()))
         }
-        let quietLines = indicator.stopped(at: clock.now).map(\.holder)
+        let quietLines = banners.last.stopped
         server.allow(Self.agent.key)
         let back = await server.reply(to: ControlRequest.panelOpen.sent())
 
         #expect(answers == Array(repeating: ControlServer.Answer(reply: .refused("the user took shipyard back; ask them before using it again")), count: 6))
-        #expect(quietLines == [Self.agent])
+        #expect(quietLines == [PanelBanner.Lease.Stopped(key: Self.agent.key, text: "You took shipyard back from Claude Code")])
         #expect(back == .init(reply: .done("panel open\n")))
         #expect(panel.calls == ["open"])
         #expect(screenshotter.calls.isEmpty)
         #expect(quitter.quits == 0)
-        #expect(indicator.stopped(at: clock.now).isEmpty)
+        #expect(banners.last.stopped.isEmpty)
         #expect(recorder.notices == [
             .started(agent: "Claude Code", place: "/work"),
             .ended(agent: "Claude Code", reason: .stopped),
@@ -565,7 +575,11 @@ struct ControlServerTests {
 
         #expect(granted == .init(reply: .done("you hold shipyard until 00:05:10\n"), granted: Self.term(Self.other, taken: 10)))
         #expect(indicator.shown(at: clock.now)?.holder == "codex")
-        #expect(indicator.stopped(at: clock.now).map(\.holder) == [Self.agent])
+        // The core gets the next lease, a new one, under the stopped agent's quiet line.
+        #expect(banners.last == PanelBanner.Lease(
+            held: .init(term: "\(Self.other.key)@10.0", headline: "Codex uses shipyard"),
+            stopped: [.init(key: Self.agent.key, text: "You took shipyard back from Claude Code")]
+        ))
         #expect(recorder.notices == [
             .started(agent: "Claude Code", place: "/work"),
             .ended(agent: "Claude Code", reason: .stopped),
@@ -575,6 +589,7 @@ struct ControlServerTests {
         clock.now = Date(timeIntervalSince1970: 310)
         server.settleLease()
         #expect(indicator.lease == ControlLease())
+        #expect(banners.last == PanelBanner.Lease())
     }
 
     // MARK: - The socket

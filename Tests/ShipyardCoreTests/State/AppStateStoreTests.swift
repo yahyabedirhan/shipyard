@@ -193,6 +193,35 @@ struct AppStateStoreTests {
         #expect(store.state.collapsedGroups.isEmpty)
     }
 
+    @Test("banner snoozes read back, one this build can't read is skipped, and a file without them loads with none")
+    func bannerSnoozes() throws {
+        let directory = temporaryDirectory()
+        let store = AppStateStore(directory: directory)
+        store.load(at: now)
+        var snoozes = BannerSnoozes()
+        snoozes.snooze("fetch", at: now)
+        snoozes.snooze("machine-netcup-vps", at: now)
+        store.update { $0.bannerSnoozes = snoozes }
+
+        let reloaded = AppStateStore(directory: directory)
+        #expect(reloaded.load(at: now) == .loaded)
+        #expect(reloaded.state.bannerSnoozes == snoozes)
+
+        let later = """
+            {
+              "version": 1,
+              "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "delay": "soon" }
+            }
+            """
+        try Data(later.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.bannerSnoozes == BannerSnoozes(ends: ["fetch": now.addingTimeInterval(3600)]))
+
+        try Data(#"{"version": 1, "collapsed": ["shop"]}"#.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.bannerSnoozes == BannerSnoozes())
+    }
+
     @Test("a file a newer build wrote with a higher version is set aside, as a first run")
     func newerVersion() throws {
         let directory = temporaryDirectory()

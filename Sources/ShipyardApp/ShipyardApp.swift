@@ -128,6 +128,10 @@ final class AppServices {
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
+        // The notifications-off banner's condition, which only the notifier knows.
+        notifier.onOffChange = { shipyard.notificationsAreOff = $0 }
+        // The lease's banners' conditions, which only the control server knows.
+        leaseIndicator.onBannersChange = { if shipyard.lease != $0 { shipyard.lease = $0 } }
         notifier.onOpen = { [weak self] url in
             // A lease's notification opens the panel, where the banner shows who holds shipyard.
             guard url != ControlNotice.panelURL else {
@@ -321,10 +325,6 @@ final class AppServices {
         panelState.closingByControl = false
         shipyard.panelClosed()
     }
-
-    /// Whether the panel says notifications are off (observed: it's the
-    /// notifier's permission).
-    var notificationsAreOff: Bool { notifier.isOff }
 
     func openNotificationSettings() {
         notifier.openSettings()
