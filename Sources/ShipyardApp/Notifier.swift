@@ -10,7 +10,8 @@ import UserNotifications
 /// at launch), puts the item's URL in each notification's user info, and
 /// hands a click to `onOpen` (the app routes it to
 /// `Shipyard.openNotification(_:)`, which opens the item and marks it seen).
-/// The panel reads `isOff` to say when notifications are turned off.
+/// `onOffChange` tells the app when notifications are turned off or on,
+/// for the panel's banner.
 ///
 /// Run outside a `.app` bundle (`make run`), there is no notification
 /// center to post to, so it only logs.
@@ -29,10 +30,18 @@ final class Notifier: NSObject, Notifying {
         case denied
     }
 
-    private(set) var permission: Permission = .unknown
+    private(set) var permission: Permission = .unknown {
+        didSet {
+            if isOff != (oldValue == .denied) { onOffChange?(isOff) }
+        }
+    }
 
     /// True when the user turned notifications off: the panel says so.
     var isOff: Bool { permission == .denied }
+
+    /// Called with `isOff` whenever it changes: the app hands it to
+    /// `Shipyard.notificationsAreOff`, the notifications-off banner's condition.
+    @ObservationIgnored var onOffChange: (@MainActor (Bool) -> Void)?
 
     /// Called with the item's URL when the user clicks a notification.
     @ObservationIgnored var onOpen: (@MainActor (URL) -> Void)?

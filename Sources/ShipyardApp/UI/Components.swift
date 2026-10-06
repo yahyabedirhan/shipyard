@@ -97,6 +97,9 @@ struct Banner: View {
     let tint: Color
     var action: (title: String, run: () -> Void)?
     var trailing = false
+    /// The ✕ at the trailing edge, which hides the banner for an hour
+    /// (`Shipyard.dismissBanner`); `nil` for a banner that can't be dismissed.
+    var dismiss: (() -> Void)?
 
     var body: some View {
         HStack(alignment: trailing ? .center : .top, spacing: 8) {
@@ -121,6 +124,19 @@ struct Banner: View {
                 button(action)
                     .fixedSize()
                     .layoutPriority(1)
+            }
+            if let dismiss {
+                Button(action: dismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                }
+                .buttonStyle(IconButtonStyle(compact: true))
+                .hoverHelp(PanelText.dismissBanner)
+                .accessibilityLabel(PanelText.dismissBanner)
+                // Centred on the first line, its hover fill reaching into the
+                // banner's padding, so the banner keeps its height.
+                .padding(.vertical, -2)
+                .padding(.trailing, -4)
             }
         }
         .padding(.horizontal, 8)

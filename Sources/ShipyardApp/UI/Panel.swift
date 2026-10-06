@@ -145,60 +145,21 @@ struct Panel: View {
 
     // MARK: - Banners
 
-    private struct BannerItem: Identifiable {
-        let id: String
-        let symbol: String
-        let text: String
-        let tint: Color
-        var action: (title: String, run: () -> Void)?
-    }
-
-    /// Configuration error, configuration warnings (gray), refresh delay (stretched or backed off: amber;
-    /// paused: red), fetch error, each remote machine's quiet line (gray), notifications off: each slides in and out.
-    private var bannerItems: [BannerItem] {
-        var items: [BannerItem] = []
-        if let error = shipyard.configError {
-            items.append(BannerItem(id: "config", symbol: "exclamationmark.octagon.fill", text: PanelText.configError(error), tint: Palette.red))
-        }
-        if let text = PanelText.configWarnings(shipyard.configWarnings) {
-            items.append(BannerItem(id: "config-warnings", symbol: "info.circle.fill", text: text, tint: Palette.gray))
-        }
-        guard shipyard.phase == .ready else { return items }
-        let menu = shipyard.menu
-        if let text = PanelText.refreshDelay(
-            menu.refreshDelay,
-            sharePercent: shipyard.configStore.lastValid.rateLimit.maxSharePercent
-        ) {
-            items.append(menu.canRefreshNow
-                ? BannerItem(id: "delay", symbol: "tortoise.fill", text: text, tint: Palette.amber)
-                : BannerItem(id: "paused", symbol: "pause.circle.fill", text: text, tint: Palette.red))
-        }
-        if let error = menu.bannerFetchError {
-            // The rows are kept; the footer says how old they are.
-            items.append(BannerItem(id: "fetch", symbol: "wifi.exclamationmark", text: PanelText.fetchError(error), tint: Palette.amber))
-        }
-        // One quiet line per remote machine that couldn't be read, or sent less than it has.
-        for notice in menu.machineNotices {
-            items.append(BannerItem(id: "machine-\(notice.id)", symbol: "server.rack", text: PanelText.machineNotice(notice), tint: Palette.gray))
-        }
-        if actions.notificationsAreOff {
-            items.append(BannerItem(
-                id: "notifications",
-                symbol: "bell.slash.fill",
-                text: PanelText.notificationsOff,
-                tint: Palette.gray,
-                action: (PanelText.openNotificationSettings, actions.openNotificationSettings)
-            ))
-        }
-        return items
-    }
-
     /// The lease's banner first, in every phase and layout, then a quiet
-    /// line for each agent the maintainer stopped, then the others. A
+    /// line for each agent the maintainer stopped, then the core's banners
+    /// (`Shipyard.banners(at:)`), each with its ✕ when it can be dismissed. A
     /// stopped agent's line stays under the next holder's banner, so Allow
-    /// is there for the whole bar.
+    /// is there for the whole bar. Redrawn when a snooze ends, so a banner
+    /// whose hour is up slides back in without a refresh.
     private var banners: some View {
-        let items = bannerItems
+        TimelineView(.explicit(shipyard.bannerSnoozeEnds)) { context in
+            // The snooze's end once it's reached, even when its entry fires
+            // a moment early; now for any other draw.
+            bannerStack(shipyard.banners(at: max(context.date, Date())))
+        }
+    }
+
+    private func bannerStack(_ items: [PanelBanner]) -> some View {
         let now = Date()
         let leaseEnds = actions.leaseIndicator.shownEnd(at: now)
         let stopped = actions.leaseIndicator.stopped(at: now)
@@ -218,8 +179,14 @@ struct Panel: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
             ForEach(items) { item in
-                Banner(symbol: item.symbol, text: item.text, tint: item.tint, action: item.action)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                Banner(
+                    symbol: item.symbol,
+                    text: item.text,
+                    tint: item.tint,
+                    action: action(of: item),
+                    dismiss: dismiss(of: item)
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .padding(.horizontal, 8)
@@ -227,6 +194,19 @@ struct Panel: View {
         .animation(Motion.banner, value: items.map(\.id))
         .animation(Motion.banner, value: leaseEnds == nil)
         .animation(Motion.banner, value: stopped.map(\.holder.key))
+    }
+
+    /// A banner's button: notifications off opens System Settings.
+    private func action(of banner: PanelBanner) -> (title: String, run: () -> Void)? {
+        guard banner.kind == .notificationsOff else { return nil }
+        return (PanelText.openNotificationSettings, actions.openNotificationSettings)
+    }
+
+    /// A banner's ✕, which hides it for an hour; none on the configuration error's.
+    private func dismiss(of banner: PanelBanner) -> (() -> Void)? {
+        guard banner.isDismissable else { return nil }
+        let shipyard = shipyard
+        return { shipyard.dismissBanner(banner.id) }
     }
 
     /// While an agent holds the lease: its banner, the countdown ticking
@@ -415,6 +395,33 @@ private struct AccountButton: View {
         }
         // Bytes that aren't an image leave the placeholder.
         avatar = await avatars.image(for: url).flatMap(NSImage.init(data:))
+    }
+}
+
+extension PanelBanner {
+    /// The banner's icon: configuration error, warnings, refresh delay,
+    /// pause, fetch error (the rows are kept; the footer says how old they
+    /// are), a remote machine's quiet line, notifications off.
+    fileprivate var symbol: String {
+        switch kind {
+        case .configError: "exclamationmark.octagon.fill"
+        case .configWarnings: "info.circle.fill"
+        case .delay: "tortoise.fill"
+        case .paused: "pause.circle.fill"
+        case .fetch: "wifi.exclamationmark"
+        case .machine: "server.rack"
+        case .notificationsOff: "bell.slash.fill"
+        }
+    }
+
+    /// Red for the configuration error and a pause, amber for a slower
+    /// refresh and a failed one, gray for the quiet ones.
+    fileprivate var tint: Color {
+        switch kind {
+        case .configError, .paused: Palette.red
+        case .delay, .fetch: Palette.amber
+        case .configWarnings, .machine, .notificationsOff: Palette.gray
+        }
     }
 }
 

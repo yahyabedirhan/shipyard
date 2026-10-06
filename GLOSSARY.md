@@ -30,6 +30,14 @@ _Avoid_: Action, job, build, CI
 The user's own note (an idea, a reminder, a "not now" thought), kept in Notion under its project, with a title, labels, and a number unique in the project that is never given twice. Open until it's archived. An agent writes one only for the user, in the user's words.
 _Avoid_: Idea, memo, issue (an issue is GitHub's)
 
+**Panel banner**:
+A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch or a remote machine Herdr can't reach. Named by its condition, not its words.
+_Avoid_: Notification (that's the macOS banner), alert, warning
+
+**Snooze**:
+What dismissing a panel banner does: hides it for one hour. After the hour, the banner shows again if its condition still holds. A condition that stops clears its snooze, so its next occurrence shows at once.
+_Avoid_: Mute, hide forever, dismissal (a dismissed ping leaves for good)
+
 ### What a project lists
 
 **Repository selector**:

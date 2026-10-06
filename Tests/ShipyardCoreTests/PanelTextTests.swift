@@ -107,6 +107,11 @@ struct PanelTextTests {
         #expect(PanelText.openNotificationSettings == "Open notification settings")
     }
 
+    @Test("a banner's ✕ says it hides the banner for an hour")
+    func dismissBanner() {
+        #expect(PanelText.dismissBanner == "Hide for an hour")
+    }
+
     @Test("a failed refresh says why", arguments: [
         (GitHubError.network("The operation couldn’t be completed. (NSURLErrorDomain error -1009.)"),
          "Can't reach GitHub. Check your connection. Shipyard will try again."),

@@ -339,6 +339,10 @@ public enum PanelText {
         }
     }
 
+    /// A banner's ✕: hover help and VoiceOver label. The banner comes back
+    /// after the hour if its condition still holds (`BannerSnoozes`).
+    public static let dismissBanner = "Hide for an hour"
+
     // MARK: - Notifications
 
     /// The banner while macOS doesn't let shipyard post notifications.

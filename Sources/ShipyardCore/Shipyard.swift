@@ -47,7 +47,9 @@ public final class Shipyard {
     }
 
     /// Where shipyard is in its lifecycle.
-    public private(set) var phase: Phase = .signedOut
+    public private(set) var phase: Phase = .signedOut {
+        didSet { followBannerConditions() }
+    }
     /// Where the current token came from; `nil` when signed out.
     public private(set) var tokenSource: TokenSource?
     /// The signed-in account, once GitHub has told us; `nil` when signed out
@@ -62,7 +64,9 @@ public final class Shipyard {
 
     /// What the panel draws. A failed refresh keeps the rows and sets
     /// `fetchError` and the time they were last updated.
-    public private(set) var menu = MenuModel.empty
+    public private(set) var menu = MenuModel.empty {
+        didSet { followBannerConditions() }
+    }
     /// The groups Show more revealed past their `show-first` cap, until
     /// Show less or the menu closes (`panelClosed()`); never saved.
     private(set) var expandedGroups: Set<GroupID> = []
@@ -108,11 +112,23 @@ public final class Shipyard {
     /// Why the configuration file was rejected, for the panel's banner;
     /// `nil` while it reads cleanly. Shipyard keeps running on the last
     /// valid configuration meanwhile.
-    public private(set) var configError: ConfigError?
+    public private(set) var configError: ConfigError? {
+        didSet { followBannerConditions() }
+    }
     /// Unknown settings the last clean read ignored, and old forms it read,
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
-    public private(set) var configWarnings: [ConfigIssue] = []
+    public private(set) var configWarnings: [ConfigIssue] = [] {
+        didSet { followBannerConditions() }
+    }
+    /// Whether macOS lets shipyard post notifications, as the app's
+    /// notifier last learned: the condition of the notifications-off banner.
+    public var notificationsAreOff = false {
+        didSet { followBannerConditions() }
+    }
+    /// The panel banners the user dismissed, each until its hour ends or
+    /// its condition stops (`followBannerConditions()`); in memory only.
+    private(set) var bannerSnoozes = BannerSnoozes()
     /// The presets onboarding offers as its first step: all of them while
     /// the file holds nothing but `version` (missing, or the app's header);
     /// none once it has other settings, when onboarding shows the plain
@@ -702,6 +718,10 @@ public final class Shipyard {
             appStateStore.update { $0.collapsedGroups = folds }
             built.foldedGroups = folds
             built.machineNotices = MachineNotice.notices(remote)
+            // Kept until `publishRateStatus()` sets the next ones, so the
+            // delay's banner never seems to stop in between and lose its snooze.
+            built.refreshDelay = menu.refreshDelay
+            built.rateIndicator = menu.rateIndicator
             menu = built
             publishRateStatus()
             // Recorded (and saved) before posting: a crash in between loses a
@@ -1779,6 +1799,48 @@ public final class Shipyard {
     private func applyAttention(_ configuration: Configuration) {
         menu.applyAttention(appStateStore.state, configuration: configuration)
         if phase != .ready { menu.menuBarLabel = .hidden }
+    }
+
+    // MARK: - Banners
+
+    /// Every panel banner whose condition holds now, snoozed or not.
+    private var currentBanners: [PanelBanner] {
+        PanelBanner.list(
+            configError: configError,
+            configWarnings: configWarnings,
+            ready: phase == .ready,
+            menu: menu,
+            sharePercent: configStore.lastValid.rateLimit.maxSharePercent,
+            notificationsOff: notificationsAreOff
+        )
+    }
+
+    /// The banners the panel shows at `now`, in order: those whose
+    /// condition holds, less the ones the user snoozed until after `now`.
+    public func banners(at now: Date) -> [PanelBanner] {
+        bannerSnoozes.shown(currentBanners, at: now)
+    }
+
+    /// When a snoozed banner may show again, soonest first, so an open
+    /// panel brings it back at that moment without a refresh.
+    public var bannerSnoozeEnds: [Date] { bannerSnoozes.endsAfter(clock.now) }
+
+    /// The banner's dismiss button: hides the banner `key` for an hour
+    /// (`BannerSnoozes.length`). A banner that isn't shown, or can't be
+    /// dismissed (the configuration error), is left alone.
+    public func dismissBanner(_ key: String) {
+        let now = clock.now
+        guard banners(at: now).contains(where: { $0.id == key && $0.isDismissable }) else { return }
+        bannerSnoozes.snooze(key, at: now)
+    }
+
+    /// Clears the snooze of each banner whose condition stopped, and of
+    /// each whose hour ended: run whenever a condition may have changed.
+    private func followBannerConditions() {
+        var next = bannerSnoozes
+        guard !next.ends.isEmpty else { return }
+        next.follow(current: Set(currentBanners.map(\.id)), at: clock.now)
+        if next != bannerSnoozes { bannerSnoozes = next }
     }
 
     private func apply(_ event: LifecycleEvent) {
