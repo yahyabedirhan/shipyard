@@ -17,7 +17,9 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         case configError
         /// Settings the file has but shipyard ignores, or old forms it read.
         case configWarnings
-        /// Refreshing slower than configured (stretched or backed off).
+        /// Refreshing slower than configured because a rate limit is low
+        /// (backed off); an interval only stretched to stay within the
+        /// rate-limit share has no banner.
         case delay
         /// Refreshing paused until a rate limit resets.
         case paused
@@ -86,15 +88,13 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
     /// then the configuration error, its warnings, then once `ready` the refresh
     /// delay (or pause), the fetch error and one quiet line per remote
     /// machine; then notifications off, which the app knows
-    /// (`notificationsOff`). `sharePercent` is `[rate-limit]
-    /// max-share-percent`, for the delay's words.
+    /// (`notificationsOff`).
     public static func list(
         lease: Lease = Lease(),
         configError: ConfigError?,
         configWarnings: [ConfigIssue],
         ready: Bool,
         menu: MenuModel,
-        sharePercent: Int,
         notificationsOff: Bool
     ) -> [PanelBanner] {
         var banners: [PanelBanner] = []
@@ -111,7 +111,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
             banners.append(PanelBanner(id: "config-warnings", kind: .configWarnings, text: text))
         }
         if ready {
-            if let text = PanelText.refreshDelay(menu.refreshDelay, sharePercent: sharePercent) {
+            if let text = PanelText.refreshDelay(menu.refreshDelay) {
                 banners.append(menu.canRefreshNow
                     ? PanelBanner(id: "delay", kind: .delay, text: text)
                     : PanelBanner(id: "paused", kind: .paused, text: text))

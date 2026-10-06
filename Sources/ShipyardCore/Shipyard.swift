@@ -1852,7 +1852,6 @@ public final class Shipyard {
             configWarnings: configWarnings,
             ready: phase == .ready,
             menu: menu,
-            sharePercent: configStore.lastValid.rateLimit.maxSharePercent,
             notificationsOff: notificationsAreOff
         )
     }

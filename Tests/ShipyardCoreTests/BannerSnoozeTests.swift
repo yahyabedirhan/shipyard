@@ -109,26 +109,23 @@ struct BannerSnoozeTests {
 
     @Test("a refresh delay whose words change stays hidden, since the snooze is the delay's, not its words'")
     func delayWordsChange() async throws {
-        // 3 points a refresh at 1% of 5,000 an hour: one every 216 s.
-        let pullRequests = try Harness.fixture("graphql-pull-requests.json")
-        let projects = """
-            [[projects]]
-            name = "e-commerce"
-            repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
-
-            """
-        let harness = try await Harness.started(config: "[rate-limit]\nmax-share-percent = 1\n\n" + projects, graphQL: pullRequests)
+        // 900 of 5,000 left: backed off to every 10 minutes.
+        let low = try Harness.fixture("graphql-pull-requests.json", remaining: 900)
+        let harness = try await Harness.started(config: shop, graphQL: low)
+        #expect(harness.shipyard.menu.refreshDelay == .backedOff(600, api: .graphql))
         let before = try #require(harness.bannerText("delay"))
         harness.shipyard.dismissBanner("delay")
         #expect(harness.bannerText("delay") == nil)
 
-        // 900 of 5,000 left: backed off to every 10 minutes, other words, still the delay.
-        harness.clock.advance(by: 216)
-        await harness.refreshNow(answering: try Harness.fixture("graphql-pull-requests.json", remaining: 900))
-        #expect(harness.shipyard.menu.refreshDelay == .backedOff(600, api: .graphql))
+        // A 15-minute interval: still backed off, now every 15 minutes, other words, still the delay.
+        try harness.writeConfig("refresh-interval-seconds = 900\n\n" + shop)
+        await harness.shipyard.reloadConfiguration()
+        harness.clock.advance(by: 600)
+        await harness.refreshNow(answering: low)
+        #expect(harness.shipyard.menu.refreshDelay == .backedOff(900, api: .graphql))
         #expect(harness.bannerText("delay") == nil)
 
-        harness.clock.advance(by: 3600 - 216)
+        harness.clock.advance(by: 3600 - 600)
         let after = try #require(harness.bannerText("delay"))
         #expect(after != before)
     }

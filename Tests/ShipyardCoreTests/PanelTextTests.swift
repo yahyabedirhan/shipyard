@@ -423,24 +423,22 @@ struct PanelTextTests {
         #expect(PanelText.rateUsage(rest, locale: british, timeZone: london) == "REST 0 / 5,000 · resets 13:42")
     }
 
-    @Test("the banner says why refreshing is slower or stopped; nothing at the configured interval", arguments: [
+    @Test("the banner says why refreshing is backed off or stopped; nothing at the configured interval or one stretched to stay within the share", arguments: [
         (RefreshDelay?.none, nil),
         (.configured(120), nil),
-        (.stretched(216, api: .graphql, cost: 3),
-         "Refreshing every 4 min to stay within 10% of your GraphQL rate limit (a refresh costs 3 points)."),
-        (.stretched(5400, api: .rest, cost: 1),
-         "Refreshing every 1 h 30 min to stay within 10% of your REST rate limit (a refresh costs 1 request)."),
-        (.stretched(90, api: .rest, cost: 12.4),
-         "Refreshing every 2 min to stay within 10% of your REST rate limit (a refresh costs 12 requests)."),
+        (.stretched(216, api: .graphql, cost: 3), nil),
+        (.stretched(5400, api: .rest, cost: 1), nil),
         (.backedOff(600, api: .graphql),
          "Your GraphQL rate limit is low (other tools are using it). Refreshing every 10 min."),
+        (.backedOff(5400, api: .rest),
+         "Your REST rate limit is low (other tools are using it). Refreshing every 1 h 30 min."),
         (.paused(until: Date(timeIntervalSince1970: 1_790_340_120), reason: .exhausted(.graphql)),
          "GraphQL rate limit reached · updates resume at 13:42"),
         (.paused(until: Date(timeIntervalSince1970: 1_790_340_120), reason: .secondaryLimit),
          "GitHub asked shipyard to slow down · updates resume at 13:42"),
     ] as [(RefreshDelay?, String?)])
     func refreshDelay(delay: RefreshDelay?, text: String?) {
-        #expect(PanelText.refreshDelay(delay, sharePercent: 10, locale: british, timeZone: london) == text)
+        #expect(PanelText.refreshDelay(delay, locale: british, timeZone: london) == text)
     }
 
     // MARK: - The connect screen
