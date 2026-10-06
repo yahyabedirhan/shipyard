@@ -39,6 +39,12 @@ public struct BannerSnoozes: Codable, Equatable, Sendable {
         ends.values.filter { $0 > now }.sorted()
     }
 
+    /// Drops the snooze of `key`, whose condition stopped and started again
+    /// between two looks (one lease handed straight to the next).
+    public mutating func clear(_ key: String) {
+        ends[key] = nil
+    }
+
     /// Drops the snooze of each key not in `current` (its condition
     /// stopped) and each that ended by `now`.
     public mutating func follow(current: Set<String>, at now: Date) {

@@ -193,17 +193,89 @@ struct BannerSnoozeTests {
         #expect(relaunched.bannerKeys == ["fetch"])
     }
 
-    @Test("the configuration error's banner can't be dismissed")
-    func configErrorStays() async throws {
+    @Test("the configuration error's banner snoozes too, and is back after the hour while the file is still rejected")
+    func configErrorSnoozes() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         try harness.writeConfig("version = \n" + shop)
         await harness.shipyard.reloadConfiguration()
-        let banner = try #require(harness.banners.first)
-        #expect(banner.id == "config")
-        #expect(!banner.isDismissable)
+        #expect(harness.bannerKeys.first == "config")
 
         harness.shipyard.dismissBanner("config")
+        #expect(!harness.bannerKeys.contains("config"))
+
+        // Read again at 59 minutes, still rejected: still hidden.
+        harness.clock.advance(by: 59 * 60)
+        await harness.shipyard.reloadConfiguration()
+        #expect(!harness.bannerKeys.contains("config"))
+
+        harness.clock.advance(by: 60)
         #expect(harness.bannerKeys.first == "config")
-        #expect(harness.shipyard.bannerSnoozeEnds.isEmpty)
+    }
+
+    @Test("the lease's banner snoozes through its renewals; a lease that ends, or is handed to the next holder, clears it, so the next lease shows")
+    func lease() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let first = PanelBanner.Lease.Held(term: "agent@0.0", headline: "Checking the header icons")
+        harness.shipyard.lease = PanelBanner.Lease(held: first)
+        #expect(harness.bannerKeys == ["lease"])
+        #expect(harness.bannerText("lease") == "Checking the header icons")
+
+        // Hidden while the same lease is renewed. The menu bar icon's dot is
+        // the app's, read from its lease indicator: no snooze reaches it.
+        harness.shipyard.dismissBanner("lease")
+        #expect(harness.bannerKeys.isEmpty)
+        harness.clock.advance(by: 60)
+        harness.shipyard.lease = PanelBanner.Lease(held: first)
+        #expect(harness.bannerKeys.isEmpty)
+
+        // It ends; the same agent's next lease shows its banner at once.
+        harness.shipyard.lease = PanelBanner.Lease()
+        harness.shipyard.lease = PanelBanner.Lease(held: .init(term: "agent@120.0", headline: "Agent uses shipyard"))
+        #expect(harness.bannerKeys == ["lease"])
+
+        // Handed straight to a waiting agent: its lease shows too.
+        harness.shipyard.dismissBanner("lease")
+        harness.shipyard.lease = PanelBanner.Lease(held: .init(term: "other@180.0", headline: "Codex uses shipyard"))
+        #expect(harness.bannerKeys == ["lease"])
+        #expect(harness.bannerText("lease") == "Codex uses shipyard")
+    }
+
+    @Test("each stopped agent's quiet line snoozes on its own, under the lease's banner, and shows at once when that agent is stopped again")
+    func stoppedHolders() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let claude = PanelBanner.Lease.Stopped(key: "claude", text: "You took shipyard back from Claude Code")
+        let codex = PanelBanner.Lease.Stopped(key: "codex", text: "You took shipyard back from codex")
+        let held = PanelBanner.Lease.Held(term: "other@0.0", headline: "Pi uses shipyard")
+        harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [claude, codex])
+        #expect(harness.bannerKeys == ["lease", "stopped-claude", "stopped-codex"])
+
+        harness.shipyard.dismissBanner("stopped-claude")
+        #expect(harness.bannerKeys == ["lease", "stopped-codex"])
+
+        // Allowed back, then stopped again: its line is back at once.
+        harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [codex])
+        harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [claude, codex])
+        #expect(harness.bannerKeys == ["lease", "stopped-claude", "stopped-codex"])
+    }
+
+    @Test("a restart drops the lease's snoozes: a lease handed over shows its banner, and no stopped holder survives")
+    func leaseAcrossRestart() async throws {
+        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let held = PanelBanner.Lease.Held(term: "agent@0.0", headline: "Checking the header icons")
+        let stopped = PanelBanner.Lease.Stopped(key: "codex", text: "You took shipyard back from codex")
+        harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [stopped])
+        harness.shipyard.dismissBanner("lease")
+        harness.shipyard.dismissBanner("stopped-codex")
+        #expect(harness.bannerKeys.isEmpty)
+
+        // The relaunch is handed the same lease; the bar didn't survive.
+        harness.clock.advance(by: 60)
+        let relaunched = harness.relaunched()
+        relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
+        relaunched.graphQL([onePullRequest])
+        await relaunched.shipyard.start()
+        relaunched.shipyard.lease = PanelBanner.Lease(held: held)
+        #expect(relaunched.bannerKeys == ["lease"])
+        #expect(relaunched.shipyard.appStateStore.state.bannerSnoozes == BannerSnoozes())
     }
 }

@@ -145,12 +145,13 @@ struct Panel: View {
 
     // MARK: - Banners
 
-    /// The lease's banner first, in every phase and layout, then a quiet
-    /// line for each agent the maintainer stopped, then the core's banners
-    /// (`Shipyard.banners(at:)`), each with its ✕ when it can be dismissed. A
-    /// stopped agent's line stays under the next holder's banner, so Allow
-    /// is there for the whole bar. Redrawn when a snooze ends, so a banner
-    /// whose hour is up slides back in without a refresh.
+    /// The core's banners (`Shipyard.banners(at:)`), each with its ✕: the
+    /// lease's banner first, in every phase and layout, then a quiet line
+    /// for each agent the maintainer stopped, then the others. A stopped
+    /// agent's line stays under the next holder's banner, so Allow is there
+    /// for the whole bar. A capture without the indicator leaves the
+    /// lease's banners out. Redrawn when a snooze ends, so a banner whose
+    /// hour is up slides back in without a refresh.
     private var banners: some View {
         TimelineView(.explicit(shipyard.bannerSnoozeEnds)) { context in
             // The snooze's end once it's reached, even when its entry fires
@@ -159,41 +160,53 @@ struct Panel: View {
         }
     }
 
-    private func bannerStack(_ items: [PanelBanner]) -> some View {
-        let now = Date()
-        let leaseEnds = actions.leaseIndicator.shownEnd(at: now)
-        let stopped = actions.leaseIndicator.stopped(at: now)
+    private func bannerStack(_ banners: [PanelBanner]) -> some View {
+        let leaseEnds = actions.leaseIndicator.shownEnd(at: Date())
+        let hidden = actions.leaseIndicator.isHiddenForCapture
+        let items = banners.filter { banner in
+            switch banner.kind {
+            case .lease: leaseEnds != nil
+            case .stoppedHolder: !hidden
+            default: true
+            }
+        }
         return VStack(spacing: 6) {
-            if let leaseEnds {
-                leaseBanner(ends: leaseEnds)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            ForEach(stopped, id: \.holder.key) { bar in
-                Banner(
-                    symbol: "hand.raised.fill",
-                    text: LeaseBanner.tookBack(from: bar.holder.name),
-                    tint: Palette.gray,
-                    action: (LeaseBanner.allow, { actions.allowLeaseHolder(bar.holder.key) }),
-                    trailing: true
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
             ForEach(items) { item in
-                Banner(
-                    symbol: item.symbol,
-                    text: item.text,
-                    tint: item.tint,
-                    action: action(of: item),
-                    dismiss: dismiss(of: item)
-                )
-                .transition(.move(edge: .top).combined(with: .opacity))
+                bannerView(item, leaseEnds: leaseEnds)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .padding(.horizontal, 8)
-        .padding(.bottom, items.isEmpty && leaseEnds == nil && stopped.isEmpty ? 0 : 8)
+        .padding(.bottom, items.isEmpty ? 0 : 8)
         .animation(Motion.banner, value: items.map(\.id))
-        .animation(Motion.banner, value: leaseEnds == nil)
-        .animation(Motion.banner, value: stopped.map(\.holder.key))
+    }
+
+    /// One banner: the lease's with its countdown and Stop, a stopped
+    /// agent's quiet line with Allow, or one of the others.
+    @ViewBuilder
+    private func bannerView(_ item: PanelBanner, leaseEnds: Date?) -> some View {
+        let dismiss = dismiss(of: item)
+        switch item.kind {
+        case .lease:
+            if let leaseEnds { leaseBanner(ends: leaseEnds, dismiss: dismiss) }
+        case .stoppedHolder(let key):
+            Banner(
+                symbol: item.symbol,
+                text: item.text,
+                tint: item.tint,
+                action: (LeaseBanner.allow, { actions.allowLeaseHolder(key) }),
+                trailing: true,
+                dismiss: dismiss
+            )
+        default:
+            Banner(
+                symbol: item.symbol,
+                text: item.text,
+                tint: item.tint,
+                action: action(of: item),
+                dismiss: dismiss
+            )
+        }
     }
 
     /// A banner's button: notifications off opens System Settings.
@@ -202,9 +215,8 @@ struct Panel: View {
         return (PanelText.openNotificationSettings, actions.openNotificationSettings)
     }
 
-    /// A banner's ✕, which hides it for an hour; none on the configuration error's.
-    private func dismiss(of banner: PanelBanner) -> (() -> Void)? {
-        guard banner.isDismissable else { return nil }
+    /// A banner's ✕, which hides it for an hour.
+    private func dismiss(of banner: PanelBanner) -> () -> Void {
         let shipyard = shipyard
         return { shipyard.dismissBanner(banner.id) }
     }
@@ -212,11 +224,11 @@ struct Panel: View {
     /// While an agent holds the lease: its banner, the countdown ticking
     /// each second, on the second the time left changes. The control
     /// server ends the lease when it runs out, which takes the banner away.
-    private func leaseBanner(ends: Date) -> some View {
+    private func leaseBanner(ends: Date, dismiss: @escaping () -> Void) -> some View {
         // Whole seconds before the end: never later than now, since the cap counts from when it was taken.
         TimelineView(.periodic(from: ends.addingTimeInterval(-ControlLease.cap), by: 1)) { context in
             if let lease = actions.leaseIndicator.shown(at: context.date) {
-                LeaseBannerView(lease: lease, stop: actions.stopLease)
+                LeaseBannerView(lease: lease, stop: actions.stopLease, dismiss: dismiss)
             }
         }
     }
@@ -399,11 +411,15 @@ private struct AccountButton: View {
 }
 
 extension PanelBanner {
-    /// The banner's icon: configuration error, warnings, refresh delay,
-    /// pause, fetch error (the rows are kept; the footer says how old they
-    /// are), a remote machine's quiet line, notifications off.
+    /// The banner's icon: a stopped agent's quiet line, configuration
+    /// error, warnings, refresh delay, pause, fetch error (the rows are
+    /// kept; the footer says how old they are), a remote machine's quiet
+    /// line, notifications off. The lease's banner draws the agent's logo
+    /// instead (`LeaseBannerView`).
     fileprivate var symbol: String {
         switch kind {
+        case .lease: "terminal.fill"
+        case .stoppedHolder: "hand.raised.fill"
         case .configError: "exclamationmark.octagon.fill"
         case .configWarnings: "info.circle.fill"
         case .delay: "tortoise.fill"
@@ -415,12 +431,14 @@ extension PanelBanner {
     }
 
     /// Red for the configuration error and a pause, amber for a slower
-    /// refresh and a failed one, gray for the quiet ones.
+    /// refresh and a failed one, the lease's yellow for its banner, gray
+    /// for the quiet ones.
     fileprivate var tint: Color {
         switch kind {
         case .configError, .paused: Palette.red
         case .delay, .fetch: Palette.amber
-        case .configWarnings, .machine, .notificationsOff: Palette.gray
+        case .lease: Palette.lease
+        case .stoppedHolder, .configWarnings, .machine, .notificationsOff: Palette.gray
         }
     }
 }

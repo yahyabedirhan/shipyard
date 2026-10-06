@@ -287,10 +287,10 @@ final class ControlServer {
     /// answered, and its next end (the lease's or a bar's) is looked out
     /// for, the timer set for the last change replaced by one for this one.
     private func leaseChanged() {
-        if indicator.lease != lease { indicator.lease = lease }
+        let time = now()
+        indicator.update(lease, at: time)
         settling?.cancel()
         settling = nil
-        let time = now()
         if let term = lease.current(at: time) {
             for (ticket, waiter) in waiters where waiter.holder.key == term.holder.key {
                 waiters[ticket] = nil

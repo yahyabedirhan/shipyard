@@ -129,6 +129,21 @@ public final class Shipyard {
             followBannerConditions()
         }
     }
+    /// App control's lease as the app's control server last left it: the
+    /// condition of the lease's banner and of the stopped holders' quiet
+    /// lines. A lease that ends, or is handed straight to the next holder,
+    /// clears the lease banner's snooze, so the next lease shows its banner.
+    /// A relaunch starts with no lease known, so a lease it was handed over
+    /// shows its banner again. The menu bar icon's dot is the app's, and a
+    /// snooze never hides it.
+    public var lease = PanelBanner.Lease() {
+        didSet {
+            if lease.held?.term != oldValue.held?.term, bannerSnoozes.ends["lease"] != nil {
+                appStateStore.update { $0.bannerSnoozes.clear("lease") }
+            }
+            followBannerConditions()
+        }
+    }
     /// The panel banners the user dismissed, each until its hour ends or
     /// its condition stops (`followBannerConditions()`); kept in the app
     /// state, so a restart keeps them.
@@ -1829,6 +1844,7 @@ public final class Shipyard {
     /// Every panel banner whose condition holds now, snoozed or not.
     private var currentBanners: [PanelBanner] {
         PanelBanner.list(
+            lease: lease,
             configError: configError,
             configWarnings: configWarnings,
             ready: phase == .ready,
@@ -1849,11 +1865,10 @@ public final class Shipyard {
     public var bannerSnoozeEnds: [Date] { bannerSnoozes.endsAfter(clock.now) }
 
     /// The banner's dismiss button: hides the banner `key` for an hour
-    /// (`BannerSnoozes.length`). A banner that isn't shown, or can't be
-    /// dismissed (the configuration error), is left alone.
+    /// (`BannerSnoozes.length`). A banner that isn't shown is left alone.
     public func dismissBanner(_ key: String) {
         let now = clock.now
-        guard banners(at: now).contains(where: { $0.id == key && $0.isDismissable }) else { return }
+        guard banners(at: now).contains(where: { $0.id == key }) else { return }
         appStateStore.update { $0.bannerSnoozes.snooze(key, at: now) }
     }
 
@@ -1873,6 +1888,8 @@ public final class Shipyard {
     /// `key`: the refresh's banners once a refresh ended, a remote
     /// machine's once its poll answered or failed, notifications off once
     /// the notifier said, and every other once the configuration is read.
+    /// The lease's among them: a relaunch keeps no stopped holder, and a
+    /// lease it was handed over shows again, so their snoozes needn't wait.
     private func bannerConditionIsKnown(_ key: String) -> Bool {
         guard configurationRead else { return false }
         switch key {
