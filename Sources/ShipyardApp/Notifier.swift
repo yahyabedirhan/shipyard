@@ -32,14 +32,17 @@ final class Notifier: NSObject, Notifying {
 
     private(set) var permission: Permission = .unknown {
         didSet {
-            if isOff != (oldValue == .denied) { onOffChange?(isOff) }
+            // Its first reading too, off or not, so the app learns the
+            // banner's condition is known.
+            if oldValue == .unknown || isOff != (oldValue == .denied) { onOffChange?(isOff) }
         }
     }
 
     /// True when the user turned notifications off: the panel says so.
     var isOff: Bool { permission == .denied }
 
-    /// Called with `isOff` whenever it changes: the app hands it to
+    /// Called with `isOff` when the permission is first read and whenever
+    /// `isOff` changes: the app hands it to
     /// `Shipyard.notificationsAreOff`, the notifications-off banner's condition.
     @ObservationIgnored var onOffChange: (@MainActor (Bool) -> Void)?
 

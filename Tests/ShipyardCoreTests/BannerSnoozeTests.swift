@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 @testable import ShipyardCore
 @testable import ShipyardPings
 import Testing
@@ -40,13 +41,17 @@ private extension Harness {
 @Suite("Banner snoozes")
 @MainActor
 struct BannerSnoozeTests {
-    @Test("a dismissed banner stays hidden for 59 minutes and shows at 60 while its condition holds, without a refresh")
+    @Test("a dismissed banner leaves an open panel at once, stays hidden for 59 minutes and shows at 60 while its condition holds, without a refresh")
     func hiddenForAnHour() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         await harness.refreshNow(answering: .failure())
         #expect(harness.bannerKeys.contains("fetch"))
 
+        // The panel redraws on the dismissal itself, as it observes what it read.
+        let redrawn = Locked(false)
+        withObservationTracking { _ = harness.banners } onChange: { redrawn.withValue { $0 = true } }
         harness.shipyard.dismissBanner("fetch")
+        #expect(redrawn.current)
         #expect(!harness.bannerKeys.contains("fetch"))
 
         // Still failing at 59 minutes: still hidden.

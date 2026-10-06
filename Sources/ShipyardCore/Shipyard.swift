@@ -139,15 +139,17 @@ public final class Shipyard {
     public var lease = PanelBanner.Lease() {
         didSet {
             if lease.held?.term != oldValue.held?.term, bannerSnoozes.ends["lease"] != nil {
-                appStateStore.update { $0.bannerSnoozes.clear("lease") }
+                changeBannerSnoozes { $0.clear("lease") }
             }
             followBannerConditions()
         }
     }
     /// The panel banners the user dismissed, each until its hour ends or
     /// its condition stops (`followBannerConditions()`); kept in the app
-    /// state, so a restart keeps them.
-    private var bannerSnoozes: BannerSnoozes { appStateStore.state.bannerSnoozes }
+    /// state, so a restart keeps them. Kept here too, observed, so a
+    /// dismissal redraws the panel at once (the app state store isn't
+    /// observed); changed only through `changeBannerSnoozes(_:)`.
+    private var bannerSnoozes = BannerSnoozes()
     /// The snoozes `start()` loaded whose condition this launch hasn't
     /// looked at yet: each is kept until it has (`bannerConditionIsKnown(_:)`),
     /// so a launch doesn't clear a snooze only because its condition isn't known.
@@ -297,6 +299,7 @@ public final class Shipyard {
         // nearest existing ancestor.
         try? pingStore.createDirectory()
         appStateStore.load(at: clock.now)
+        bannerSnoozes = appStateStore.state.bannerSnoozes
         restoredSnoozes = Set(bannerSnoozes.ends.keys)
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be
@@ -1869,7 +1872,7 @@ public final class Shipyard {
     public func dismissBanner(_ key: String) {
         let now = clock.now
         guard banners(at: now).contains(where: { $0.id == key }) else { return }
-        appStateStore.update { $0.bannerSnoozes.snooze(key, at: now) }
+        changeBannerSnoozes { $0.snooze(key, at: now) }
     }
 
     /// Clears the snooze of each banner whose condition stopped, and of
@@ -1881,7 +1884,17 @@ public final class Shipyard {
         restoredSnoozes = restoredSnoozes.filter { !bannerConditionIsKnown($0) }
         let current = Set(currentBanners.map(\.id)).union(restoredSnoozes)
         let now = clock.now
-        appStateStore.update { $0.bannerSnoozes.follow(current: current, at: now) }
+        changeBannerSnoozes { $0.follow(current: current, at: now) }
+    }
+
+    /// Changes the snoozes and saves them, setting the observed copy only
+    /// when they changed, so a look that changes nothing redraws nothing.
+    private func changeBannerSnoozes(_ body: (inout BannerSnoozes) -> Void) {
+        var next = bannerSnoozes
+        body(&next)
+        guard next != bannerSnoozes else { return }
+        bannerSnoozes = next
+        appStateStore.update { $0.bannerSnoozes = next }
     }
 
     /// Whether this launch has looked at the condition of the banner
