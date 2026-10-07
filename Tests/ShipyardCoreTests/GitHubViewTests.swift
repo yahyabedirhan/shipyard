@@ -69,22 +69,25 @@ struct GitHubViewTests {
 
     // MARK: - The words
 
-    @Test("a gh token's view shows the login, says Sign out leaves gh signed in, and gives gh's own sign-out command")
+    @Test("a gh token's view shows the login, then under the divider says Sign out leaves gh signed in, with gh's own sign-out command")
     func ghWords() {
         let page = PanelText.gitHubStatus(GitHubConnection(login: "yabepa", source: .gh))
         #expect(page.title == "GitHub")
         #expect(page.status == .init(text: "Signed in as @yabepa.", tone: .success))
-        #expect(page.detail?.hasPrefix("Connected through the GitHub CLI `gh`. Sign out in shipyard doesn't sign out `gh`") == true)
-        #expect(page.commands == ["gh auth logout"])
-        #expect(page.primary == nil && page.alternative == nil)
+        #expect(page.detail == "Connected through the GitHub CLI `gh`.")
+        #expect(page.commands.isEmpty && page.primary == nil)
+        #expect(page.alternative?.line.hasPrefix("Sign out in shipyard doesn't sign out `gh`") == true)
+        #expect(page.alternative?.commands == ["gh auth logout"])
+        #expect(page.alternative?.button == nil)
     }
 
-    @Test("a stored token's view shows the login and Sign in with GitHub as the source, with nothing to run")
+    @Test("a stored token's view shows the login and Sign in with GitHub as the source, then under the divider points to Sign out, with nothing to run")
     func storedWords() {
         let page = PanelText.gitHubStatus(GitHubConnection(login: "yabepa", source: .tokenStore))
         #expect(page.status == .init(text: "Signed in as @yabepa.", tone: .success))
-        #expect(page.detail == "Connected with Sign in with GitHub. Sign out, in the settings menu, forgets the sign-in.")
+        #expect(page.detail == "Connected with Sign in with GitHub.")
         #expect(page.commands.isEmpty && page.primary == nil)
+        #expect(page.alternative == .init(line: "To sign out, choose Sign out in the settings menu. Shipyard then forgets the sign-in."))
     }
 
     @Test("before GitHub says which account, the view says so in place of the login")
