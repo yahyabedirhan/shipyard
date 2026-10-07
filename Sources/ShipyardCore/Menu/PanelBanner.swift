@@ -5,8 +5,7 @@ import ShipyardConfig
 /// holds now: its key, which names the condition (never its words), what
 /// kind it is (the panel picks its symbol and tint by it) and its words.
 /// Every banner can be dismissed for an hour (`BannerSnoozes`). The notes
-/// banner and the banner for a rejected GitHub token also open their status
-/// view (`opens`).
+/// banner also opens its status view (`opens`).
 public struct PanelBanner: Equatable, Sendable, Identifiable {
     public enum Kind: Equatable, Sendable {
         /// An agent holds app control's lease: the app draws it from the
@@ -44,8 +43,8 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
     public var kind: Kind
     public var text: String
     /// The status view the banner's Open… opens (`PanelText.openBannerView`):
-    /// the Notion view for the notes banner, the GitHub view for a rejected
-    /// token's; `nil`, no Open…, for every other banner.
+    /// the Notion view for the notes banner; `nil`, no Open…, for every other
+    /// banner.
     public var opens: SetupPart?
 
     public init(id: String, kind: Kind, text: String, opens: SetupPart? = nil) {
@@ -128,10 +127,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
                     : PanelBanner(id: "paused", kind: .paused, text: text))
             }
             if let error = menu.bannerFetchError {
-                banners.append(PanelBanner(
-                    id: "fetch", kind: .fetch, text: PanelText.fetchError(error),
-                    opens: error == .unauthorized ? .github : nil
-                ))
+                banners.append(PanelBanner(id: "fetch", kind: .fetch, text: PanelText.fetchError(error)))
             }
             for notice in menu.machineNotices {
                 banners.append(PanelBanner(id: "machine-\(notice.id)", kind: .machine, text: PanelText.machineNotice(notice)))
