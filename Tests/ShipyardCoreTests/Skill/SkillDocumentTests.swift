@@ -169,7 +169,7 @@ struct SkillDocumentTests {
         #expect(text.contains("shipyard ping withdraw <id>"))
         #expect(text.contains("`\(PingCommand.herdrPaneVariable)`"))
         #expect(text.contains("~/.local/bin/shipyard"))
-        #expect(text.contains("**\(PanelText.statusTitle(.cli))…**"))
+        #expect(text.contains("**\(PanelText.settingsTitle(.cli))**"))
         #expect(text.contains("exit 1") && text.contains("exit 2") && text.contains("exits 0"))
         #expect(CommandResult.failedStatus == 1 && CommandResult.usageStatus == 2)
 

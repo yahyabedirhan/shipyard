@@ -26,13 +26,13 @@ extension PanelText {
     /// The mark on the right of a part's item when the part is set up.
     public static let setUpMark = "✓"
 
-    /// The settings menu: Open configuration file, then each part by name
-    /// (a check mark when it's set up, no mark otherwise), then Sign out
-    /// when `canSignOut`.
+    /// The settings menu: Open configuration file, then each part's Set up
+    /// item (a check mark when it's set up, no mark otherwise), then Sign
+    /// out when `canSignOut`.
     public static func settingsMenu(_ status: SetupStatus, canSignOut: Bool) -> [SettingsItem] {
         var items = [SettingsItem(title: "Open configuration file", action: .openConfiguration)]
         items += SetupPart.allCases.map { part in
-            SettingsItem(title: statusTitle(part) + "…", action: .open(part), isChecked: status.isSetUp(part))
+            SettingsItem(title: settingsTitle(part), action: .open(part), isChecked: status.isSetUp(part))
         }
         if canSignOut { items.append(SettingsItem(title: "Sign out", action: .signOut)) }
         return items
@@ -97,7 +97,17 @@ extension PanelText {
     /// The row at the top of every status view that shows the projects again.
     public static let back = "‹ Back"
 
-    /// A part's name, as its view's title and its settings item (with "…").
+    /// A part's item in the settings menu: "Set up", then the part, then "…".
+    public static func settingsTitle(_ part: SetupPart) -> String {
+        switch part {
+        case .github: "Set up GitHub…"
+        case .notion: "Set up Notion…"
+        case .skill: "Set up /shipyard skill…"
+        case .cli: "Set up shipyard CLI…"
+        }
+    }
+
+    /// A part's name, as its view's title.
     public static func statusTitle(_ part: SetupPart) -> String {
         switch part {
         case .github: "GitHub"

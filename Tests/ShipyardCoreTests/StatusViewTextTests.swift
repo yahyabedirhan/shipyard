@@ -10,17 +10,17 @@ struct StatusViewTextTests {
 
     // MARK: - The settings menu
 
-    @Test("the settings menu lists the configuration file, the four parts by name, then Sign out once signed in")
+    @Test("the settings menu lists the configuration file, the four parts' Set up items, then Sign out once signed in")
     func settingsMenuOrder() {
         let signedIn = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: true)
         #expect(signedIn.map(\.title) == [
-            "Open configuration file", "GitHub…", "Notion…", "Shipyard Skill…", "Shipyard CLI…", "Sign out",
+            "Open configuration file", "Set up GitHub…", "Set up Notion…", "Set up /shipyard skill…", "Set up shipyard CLI…", "Sign out",
         ])
         #expect(signedIn.map(\.action) == [
             .openConfiguration, .open(.github), .open(.notion), .open(.skill), .open(.cli), .signOut,
         ])
         let signedOut = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: false)
-        #expect(signedOut.map(\.title).last == "Shipyard CLI…")
+        #expect(signedOut.map(\.title).last == "Set up shipyard CLI…")
     }
 
     @Test("the Shipyard CLI item has the check mark only while the CLI is linked, and no other item has a mark", arguments: [

@@ -49,13 +49,13 @@ Shipyard lives in the menu bar, with no Dock icon. On first launch the panel ask
 
 ## Configure
 
-Everything lives in `~/.config/shipyard/config.toml`; **Open configuration file** in the gear menu opens it. Every key is optional and each save applies at once. A broken edit keeps the last good configuration and shows the error in the panel. The gear menu lists the parts shipyard uses (**GitHub…**, **Notion…**, **Shipyard Skill…**, **Shipyard CLI…**), with a check mark beside each one that is set up; each opens a view of its status in the panel.
+Everything lives in `~/.config/shipyard/config.toml`; **Open configuration file** in the gear menu opens it. Every key is optional and each save applies at once. A broken edit keeps the last good configuration and shows the error in the panel. The gear menu lists the parts shipyard uses (**Set up GitHub…**, **Set up Notion…**, **Set up /shipyard skill…**, **Set up shipyard CLI…**), with a check mark beside each one that is set up; each opens a view of its status in the panel.
 
 The file sets the projects (each a section of the menu with its repositories), the layout (`list` or `tabs`), what's shown (pull requests, issues, workflow runs, and whose), how items are grouped and sorted, and which events notify you. [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md) lists every key, its default and its allowed values, with worked examples; [`skills/shipyard/presets.md`](skills/shipyard/presets.md) has the three presets in full; and [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code, for maintainers.
 
 ## Use it with an agent
 
-Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal; **Shipyard Skill…** in the gear menu installs or updates it too:
+Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal; **Set up /shipyard skill…** in the gear menu installs or updates it too:
 
 ```sh
 npx skills add yahyabedirhan/shipyard -g -y
@@ -65,7 +65,7 @@ Then ask in your own words: "Watch this repo in shipyard", "Hide dependabot's pu
 
 ### Pings
 
-Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Shipyard CLI…**), which puts it at `~/.local/bin/shipyard`.
+Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Set up shipyard CLI…**), which puts it at `~/.local/bin/shipyard`.
 
 ```sh
 shipyard ping "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57
@@ -96,7 +96,7 @@ One known limit, with Herdr 0.9.3: clicking a machine's ping focuses its pane on
 
 ### Notes
 
-Your own notes, kept in Notion, list under each project too: one database per project, titled with the project's name, under a "Projects" page inside a "Shipyard Notes" page. Dictate a note to any agent and it writes it there; the menu lists each project's open notes, newest first, with their numbers (`SHOP-7`) and labels, and clicking one opens it in Notion, as the project's notes count opens its database. The pencil icon on a project's header starts a note there: it creates the project's database the first time, then an empty note, and opens it in Notion for you to type or dictate. Notes never need attention. The app reads and writes notes through [`ntn`](https://developers.notion.com/cli/get-started/overview), Notion's CLI, with ntn's own login, and keeps no Notion token of its own: install ntn (`curl -fsSL https://ntn.dev | bash`), run `ntn login` in Terminal and choose your notes workspace, and check with `ntn doctor` that it's ntn's default workspace. Notes are opt-in: shipyard runs no `ntn` and lists no notes until you connect. **Notion…** in the settings menu shows whether ntn is installed and logged in, and the name of its workspace; once it is, **Connect with ntn** lists your notes, and shipyard remembers it across restarts. **Disconnect** there stops it. Once connected, the notes are read every minute and whenever you open the menu, and while ntn is missing or logged out, or its workspace has no Shipyard Notes page, a banner says what to do. `shipyard notes check` reads the workspace the way the app does and reports what's wrong with it. `notes = { show = false }` in a project's block keeps its notes out.
+Your own notes, kept in Notion, list under each project too: one database per project, titled with the project's name, under a "Projects" page inside a "Shipyard Notes" page. Dictate a note to any agent and it writes it there; the menu lists each project's open notes, newest first, with their numbers (`SHOP-7`) and labels, and clicking one opens it in Notion, as the project's notes count opens its database. The pencil icon on a project's header starts a note there: it creates the project's database the first time, then an empty note, and opens it in Notion for you to type or dictate. Notes never need attention. The app reads and writes notes through [`ntn`](https://developers.notion.com/cli/get-started/overview), Notion's CLI, with ntn's own login, and keeps no Notion token of its own: install ntn (`curl -fsSL https://ntn.dev | bash`), run `ntn login` in Terminal and choose your notes workspace, and check with `ntn doctor` that it's ntn's default workspace. Notes are opt-in: shipyard runs no `ntn` and lists no notes until you connect. **Set up Notion…** in the settings menu shows whether ntn is installed and logged in, and the name of its workspace; once it is, **Connect with ntn** lists your notes, and shipyard remembers it across restarts. **Disconnect** there stops it. Once connected, the notes are read every minute and whenever you open the menu, and while ntn is missing or logged out, or its workspace has no Shipyard Notes page, a banner says what to do. `shipyard notes check` reads the workspace the way the app does and reports what's wrong with it. `notes = { show = false }` in a project's block keeps its notes out.
 
 ## Examples
 
