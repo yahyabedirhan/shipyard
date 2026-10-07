@@ -90,7 +90,7 @@ public enum NotesCheck {
     private static func check(projects: [String], client: NotionClient, into report: inout NotesCheckReport) async throws {
         let entries = try await client.searchPages(titled: NotesReader.entryPageTitle)
         guard let entry = entries.first else {
-            report.problems.append(.init(.error, "the token sees no page titled \"\(NotesReader.entryPageTitle)\": it's another workspace's token, or the page isn't shared with its connection"))
+            report.problems.append(.init(.error, "ntn's workspace has no page titled \"\(NotesReader.entryPageTitle)\": run ntn doctor and check that its default workspace is the notes workspace"))
             return
         }
         if entries.count > 1 {

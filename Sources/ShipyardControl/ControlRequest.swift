@@ -53,7 +53,7 @@ public enum ControlRequest: Equatable, Sendable {
     /// another drives the app.
     case notify(NoticeRequest)
     /// `shipyard notes check`: the notes workspace read the way the app
-    /// reads it, with the app's own Notion token, and checked against the
+    /// reads it, through ntn, and checked against the
     /// layout the app expects; answered with the report, refused when it
     /// found an error. Not leased: it reads and changes nothing.
     case notesCheck

@@ -4,8 +4,9 @@ import Foundation
 /// why a project's notes couldn't be read or a note couldn't be started,
 /// and whether the projects' headers carry the new-note icon.
 public struct NotesMenuState: Equatable, Sendable {
-    /// Whether a Notion token is kept: the icon shows only then.
-    public var connected: Bool
+    /// Whether notes can be started now (`ntn` is there and logged in):
+    /// the icon shows only then.
+    public var canStartNotes: Bool
     /// Why each project's notes couldn't be read, by project name.
     public var readErrors: [String: String]
     /// Why the icon couldn't start a note, by project name.
@@ -17,13 +18,13 @@ public struct NotesMenuState: Equatable, Sendable {
     public var databases: [String: URL]
 
     public init(
-        connected: Bool = false,
+        canStartNotes: Bool = false,
         readErrors: [String: String] = [:],
         startErrors: [String: String] = [:],
         starting: Set<String> = [],
         databases: [String: URL] = [:]
     ) {
-        self.connected = connected
+        self.canStartNotes = canStartNotes
         self.readErrors = readErrors
         self.startErrors = startErrors
         self.starting = starting
@@ -41,8 +42,26 @@ public enum NewNoteButton: Equatable, Sendable {
 
 /// Why notes can't be listed at all, for the panel's notes banner.
 public enum NotesNotice: Equatable, Sendable {
-    /// No Notion token is kept: the settings menu's Connect Notion takes one.
-    case notConnected
-    /// The token sees no page titled "Shipyard Notes".
+    /// No `ntn` where the app looks for it.
+    case ntnMissing
+    /// ntn isn't logged in, has no workspace, or Notion stopped taking
+    /// its login.
+    case ntnLoggedOut
+    /// ntn's default workspace has no page titled "Shipyard Notes".
     case noEntryPage
+
+    /// Why `reading` could list nothing at all; `nil` when it read, or
+    /// failed in a way each project's error row says.
+    init?(_ reading: NotesReading) {
+        switch reading {
+        case .noEntryPage: self = .noEntryPage
+        case .failed(.ntnMissing): self = .ntnMissing
+        case .failed(.unauthorized): self = .ntnLoggedOut
+        case .failed, .read: return nil
+        }
+    }
+
+    /// Whether it's about ntn itself (missing, logged out), which also
+    /// hides the new-note icons; a workspace without Shipyard Notes isn't.
+    var isNtn: Bool { self != .noEntryPage }
 }

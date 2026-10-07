@@ -38,11 +38,11 @@ private let tableID = "27a0c3e1-8f4b-80aa-b009-0000000000a1"
 
 @MainActor
 private extension Harness {
-    /// Started with a Notion token kept and Notion answering as
+    /// Started with ntn logged in and Notion answering as
     /// `NotionStub` records, both databases' schemas included.
     static func withWorkspace() async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: projects)
-        try harness.notion.save("ntn_token")
+        harness.ntn.set(.loggedIn)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer])
         try harness.stub.onNotion()
@@ -67,7 +67,7 @@ private extension Harness {
 }
 
 /// `shipyard notes check` as the app answers it (`Shipyard.checkNotes`):
-/// the notes workspace read with the app's token, the way the menu reads
+/// the notes workspace read through ntn, the way the menu reads
 /// it, and checked against the layout the app expects; over recorded
 /// Notion answers.
 @Suite("The notes check")
@@ -119,7 +119,7 @@ struct NotesCheckTests {
         #expect(report.text.hasSuffix("3 errors, 5 warnings\n"))
     }
 
-    @Test("a token that sees no Shipyard Notes page is one error and no project lines; without a token there's no report")
+    @Test("ntn's workspace without a Shipyard Notes page is one error and no project lines; ntn logged out is one error too")
     func noEntryPage() async throws {
         let harness = try await Harness.withWorkspace()
         harness.stub.on("POST", NotionStub.search, .json(empty))
@@ -127,10 +127,12 @@ struct NotesCheckTests {
         let report = try await harness.check()
 
         #expect(report.projects.isEmpty)
-        #expect(report.problems == [.init(.error, "the token sees no page titled \"Shipyard Notes\": it's another workspace's token, or the page isn't shared with its connection")])
+        #expect(report.problems == [.init(.error, "ntn's workspace has no page titled \"Shipyard Notes\": run ntn doctor and check that its default workspace is the notes workspace")])
 
-        harness.shipyard.disconnectNotion()
-        #expect(await harness.shipyard.checkNotes() == nil)
+        harness.ntn.set(.loggedOut)
+        let loggedOut = try await harness.check()
+        #expect(loggedOut.projects.isEmpty)
+        #expect(loggedOut.problems.map(\.message) == ["Notion: \(PanelText.noteError(.unauthorized))"])
     }
 
     @Test("a database's No. without a prefix is an error, as is a Status without both options")

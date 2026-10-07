@@ -27,7 +27,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         case fetch
         /// A remote machine's quiet line (`MachineNotice`).
         case machine
-        /// Notes can't be listed: Notion isn't connected, or its token sees
+        /// Notes can't be listed: no ntn, ntn logged out, or ntn's workspace has
         /// no Shipyard Notes page.
         case notes
         /// macOS doesn't let shipyard post notifications.

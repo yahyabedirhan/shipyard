@@ -38,7 +38,7 @@ ALTERNATES  := olive-khaki origami sailboat night sunset
 
 # A local signing identity keeps the app the same app to the Keychain from
 # one build to the next. Ad-hoc signing makes each build a new app, so
-# macOS asks again for the GitHub and Notion tokens after every install.
+# macOS asks again for the GitHub token after every install.
 # `make signing-identity` makes a self-signed certificate in a keychain of
 # its own, once per Mac; `make bundle` signs with it when it's there. The
 # certificate is trusted by nothing, so its key guards nothing but this

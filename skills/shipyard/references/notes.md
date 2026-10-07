@@ -54,6 +54,16 @@ When none reaches the notes workspace, tell the user and keep the note in your r
 
 With `ntn`, pass a JSON body on standard input (`ntn api v1/pages < body.json`) or with `-d '<json>' < /dev/null`, or inline as `key:=<json>`. Redirect standard input on every call (`< /dev/null` when the body doesn't come from it): run without a terminal, `ntn` can otherwise wait on it for good.
 
+## Setting up ntn for the app
+
+The menu and `shipyard notes check` read and write notes through `ntn`, with ntn's own login and its default workspace. The app keeps no Notion token, so there is nothing to paste into it. When the user's notes don't list, check this first:
+
+1. Install ntn: `curl -fsSL https://ntn.dev | bash` (Notion's installer, which puts it in `~/.local/bin`). The app also finds it in `/opt/homebrew/bin`, `/usr/local/bin` or on its `PATH`.
+2. Log in from Terminal with `ntn login`, choosing the notes workspace.
+3. Run `ntn doctor`: it shows the default workspace, which must be the notes workspace. Another workspace has no Shipyard Notes page, so the menu lists no notes.
+
+Until ntn is installed and logged in, the menu lists no notes, shows no error rows, hides the new-note icons, and its notes banner says what to do; with ntn's workspace holding no Shipyard Notes page, the banner says that instead. The app tries again every minute, so a fix shows without a restart.
+
 ## Finding a project's database
 
 The project is the one the user names; otherwise the project in `config.toml` that watches the repository you're working in. On a machine without `config.toml`, the databases under Projects are the projects' names. Ask when none of these settles it.
@@ -158,4 +168,4 @@ A project's database is created the first time a note is added to it, by you or 
 
 ## Checking the structure
 
-After you change the structure, and whenever the user says notes don't show in the menu, run `shipyard notes check` on the user's Mac. The app reads the workspace with its own Notion connection, the way the menu does, and prints one line per project (its prefix and open notes, or no database yet), then every problem. An error, such as a database outside Projects, a missing property or a page the connection can't see, hides notes from the menu; fix it, then run the check again. A warning, such as a database missing from the Projects index, is yours to tidy. It exits 1 on an error, 0 otherwise. On a machine without the app, check the same layout through the connector or `ntn` by hand.
+After you change the structure, and whenever the user says notes don't show in the menu, run `shipyard notes check` on the user's Mac. The app reads the workspace through `ntn`, the way the menu does, and prints one line per project (its prefix and open notes, or no database yet), then every problem. An error, such as a database outside Projects, a missing property or a page ntn can't see, hides notes from the menu; fix it, then run the check again. A warning, such as a database missing from the Projects index, is yours to tidy. It exits 1 on an error, 0 otherwise. On a machine without the app, check the same layout through the connector or `ntn` by hand.

@@ -8,7 +8,7 @@ import ShipyardPings
 /// (`SHIPYARD_SUPPORT_DIR`) that holds everything else it keeps. The app
 /// builds every store on these paths, so a demo run
 /// (`shipyard app open --demo`, which sets both) reads and writes only in
-/// its folder, and leaves the user's login item and Notion token alone.
+/// its folder, and leaves the user's login item and notes alone.
 public struct AppFiles: Equatable, Sendable {
     /// The configuration file.
     public var config: URL
@@ -52,10 +52,11 @@ public struct AppFiles: Equatable, Sendable {
         demo == nil ? item : LeftAlone()
     }
 
-    /// Where the Notion token is kept: `store`, or in a demo run none, so
-    /// a demo never reads the user's token or lists their notes.
-    public func notionTokenStore(_ store: any TokenStore) -> (any TokenStore)? {
-        demo == nil ? store : nil
+    /// What the notes are read through: `transport` (`ntn`), or in a demo
+    /// run none, so a demo never reads through the user's ntn login or
+    /// lists their notes.
+    public func notionRoute(_ transport: any HTTPTransport) -> (any HTTPTransport)? {
+        demo == nil ? transport : nil
     }
 
     /// A login item a demo run leaves as the user set it.

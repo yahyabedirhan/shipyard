@@ -1,6 +1,6 @@
 # Notion's API
 
-What shipyard's notes depend on (ADRs 0009 and 0011): how the app connects, the pages and tables it reads, the unique-ID number, the data-source query, page content as Markdown, rate limits and API versions. Shipyard sends `Notion-Version: 2025-09-03`.
+What shipyard's notes depend on (ADRs 0009, 0011 and 0012): how the app reaches Notion (through `ntn` since ADR 0012), the pages and tables it reads, the unique-ID number, the data-source query, page content as Markdown, rate limits and API versions. Shipyard sends `Notion-Version: 2025-09-03`.
 
 Checked 2026-10-03 against:
 - [Versioning](https://developers.notion.com/reference/versioning)
@@ -18,6 +18,8 @@ Measured the same day against the notes workspace with `ntn` 0.23.17, in throwaw
 
 Measured 2026-10-06, when the notes workspace moved under a Projects page (ADR 0011): moving and renaming databases, prefixes, page icons, child pages and tables, through the REST API and Claude's Notion connector. These facts are marked (2026-10-06).
 
+Measured 2026-10-07 with `ntn` 0.23.17, when the app moved to reading notes through `ntn api` (ADR 0012, #234): its exit codes, its error line, standard input, query parameters and where it keeps its login. These facts are marked (2026-10-07).
+
 ## API versions
 
 - Every request carries a `Notion-Version` header; it's required. A new version comes only with a backwards-incompatible change. New endpoints and fields arrive in every version, so the Markdown endpoints work on `2025-09-03` (measured: a page created with `markdown` on it).
@@ -28,10 +30,13 @@ Measured 2026-10-06, when the notes workspace moved under a Projects page (ADR 0
 
 ## Internal connections
 
+History: the app read notes with an internal connection's token until ADR 0012 (#234); it now goes through `ntn` (below). The facts stay true of internal connections.
+
+
 - An **internal connection** belongs to one workspace and acts as its own bot user, not as a person. Its token is static: no OAuth flow, created in the Developer portal (Build → Internal connections) by a workspace owner, read from its Configuration tab.
 - It sees nothing until a page is shared with it, from the portal's Content access tab or from the page's ••• → Connections. Sharing a page shares the pages and databases under it. Shipyard's connection is shared with the "Shipyard Notes" entry page only.
 - Its token sees one workspace only. Search with a token whose connection the page isn't shared with answers without that page rather than with an error: observed through the installed app and `shipyard notes check` on 2026-10-06, before the maintainer shared Shipyard Notes. So the app reads "no Shipyard Notes page" as its own case and says so.
-- Its rate budget is its own: the per-connection limit below counts its requests alone, not those of other connections or of `ntn`.
+- Its rate budget is its own: the per-connection limit below counts its requests alone, not those of other connections or of `ntn`. Through `ntn`, the app shares ntn's budget with every agent using ntn.
 - **Capabilities** limit what it can call: read content, update content and insert content, independently. Shipyard's needs read (query) and insert (create a database, create a page). Creating a database without insert content is a 403.
 - The token goes in `Authorization: Bearer <token>`. A bad token is 401 `unauthorized`; a page not shared with the connection is 404 `object_not_found`; missing capability is 403 `restricted_resource`.
 
@@ -89,5 +94,14 @@ Measured 2026-10-06.
 - `ntn api <path>` calls any endpoint. The body comes from standard input (`ntn api v1/pages < body.json`), `-d '<json>'`, or inline `key=value` and `key:=<json>` arguments; `name==value` is a query parameter. Without a terminal, redirect standard input (`< /dev/null`) when the body doesn't come from it: `-d @file` with standard input left attached hangs.
 - `ntn datasources query <data source or database id> --filter '<json>' --sort "No. desc"` prints one tab-separated row per page; `--json` prints the API's answer. `ntn datasources resolve <database id>` prints its data sources.
 - `ntn pages get <id>` prints the page as Markdown with its properties as frontmatter; `ntn pages edit <id>` replaces the body from standard input, dropping that frontmatter. `ntn pages trash` needs `--yes` without a terminal.
-- `ntn doctor` shows the logged-in workspace.
-- `ntn auth token` prints ntn's own OAuth token, which ntn refreshes. It works against the public API as a bot user, but it follows ntn's login and its default workspace, and it shares one rate budget with everything using ntn. The app doesn't read it (ADR 0011) (2026-10-06).
+- `ntn doctor` shows the logged-in workspace: ntn's default workspace, the one `ntn api` reads. `NOTION_WORKSPACE_ID` overrides it for one run.
+- `ntn auth token` prints ntn's own OAuth token, which ntn refreshes. It works against the public API as a bot user, but it follows ntn's login and its default workspace, and it shares one rate budget with everything using ntn. The app doesn't read it (ADR 0011) (2026-10-06); since ADR 0012 it runs `ntn api` instead, so ntn signs each request itself.
+
+### The app's route through `ntn api` (2026-10-07)
+
+- The app runs `ntn api <path>` once per Notion request (`NtnCLI`): the path under the API host (`v1/search`), each query parameter as `name==value` (`page_size==100`), `-X <method>`, `--notion-version 2025-09-03` (ntn's own default is `2026-03-11`), and a JSON body as `-d '<json>'`.
+- **Standard input must be empty.** `ntn api` reads a request body from any standard input it's given, and without a terminal waits on it for good. The app gives it the null device.
+- **Exit codes:** 0 is success, the answer on standard output. 4 is ntn logged out, "No workspace selected", or a token Notion stopped taking; the app reads it as a 401. 5 is an error from the API, with one line on standard error, `error: Public API request failed (404 Not Found object_not_found): <message>`: the HTTP status, its reason, Notion's error code, then Notion's message. Any other exit (offline, ntn's own failure) the app reads as Notion out of reach.
+- An `.app` starts with an almost empty `PATH`, so the app looks for `ntn` at `~/.local/bin/ntn` (where Notion's installer, `curl -fsSL https://ntn.dev | bash`, puts it), `/opt/homebrew/bin/ntn`, `/usr/local/bin/ntn`, then `PATH`.
+- **Where ntn keeps its login** (`ntn --help`): in the OS keychain by default, or in `~/.config/notion/auth.json` when `NOTION_KEYRING=0`. `NOTION_API_TOKEN` overrides both. Keychain access is checked against ntn's process and ntn's own item, so rebuilding shipyard doesn't ask for it again.
+- ntn is in beta: its exit codes and error line are a contract the app depends on (ADR 0012).
