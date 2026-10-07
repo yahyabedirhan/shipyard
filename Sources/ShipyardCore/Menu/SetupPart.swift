@@ -33,16 +33,21 @@ public struct SetupStatus: Equatable, Sendable {
     /// Whether shipyard is signed in to GitHub (`Shipyard.gitHubConnection`).
     public var github: Bool
 
-    public init(cli: CLILink.State, github: Bool = false) {
+    /// Whether the agent skill is installed (`SkillDetector`).
+    public var skill: Bool
+
+    public init(cli: CLILink.State, github: Bool = false, skill: Bool = false) {
         self.cli = cli
         self.github = github
+        self.skill = skill
     }
 
     public func isSetUp(_ part: SetupPart) -> Bool {
         switch part {
         case .cli: cli == .linked
         case .github: github
-        case .notion, .skill: false
+        case .skill: skill
+        case .notion: false
         }
     }
 }

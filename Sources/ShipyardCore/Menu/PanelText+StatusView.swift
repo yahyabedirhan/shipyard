@@ -42,7 +42,7 @@ extension PanelText {
 
     /// What a status view shows, top to bottom, under its ‹ Back row: the
     /// logo badge and `title`, the `lead` line, the `status` line, a
-    /// `detail` line on what to do, `commands` each in a box with a copy
+    /// `detail` line on what to do, a command's `output`, `commands` each in a box with a copy
     /// button, the `primary` full-width button, and an `alternative` under
     /// a divider. The words may hold Markdown code spans (`CodeText`).
     public struct StatusPage: Equatable, Sendable {
@@ -56,6 +56,10 @@ extension PanelText {
         public enum Action: Equatable, Sendable {
             /// Links the CLI (`CLILink.makeLink`), or looks again at what's in the way.
             case linkCLI
+            /// Installs or updates the agent skill (`SkillInstallation.start`).
+            case installSkill
+            /// Stops the running skill install (`SkillInstallation.cancel`).
+            case cancelSkillInstall
         }
 
         /// A full-width button.
@@ -76,6 +80,8 @@ extension PanelText {
         public var lead: String
         public var status: Status?
         public var detail: String?
+        /// What a command printed, when it's worth showing, as plain text.
+        public var output: String?
         public var commands: [String] = []
         public var primary: Button?
         public var alternative: Alternative?

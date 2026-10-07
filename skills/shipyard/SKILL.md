@@ -15,6 +15,8 @@ The user's own **notes** live in Notion, one numbered list per project, and the 
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
+This skill installs with `npx -y skills add yahyabedirhan/shipyard -g -y`. The app's settings menu (the gear) marks **Shipyard Skill…** with a check once it's installed, and that view's **Update** runs the same command for its newest version. When the user asks for the newest skill, point them there, or run the command.
+
 ## The file
 
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.

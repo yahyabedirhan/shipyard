@@ -5,11 +5,12 @@ import SwiftUI
 /// while `PanelState.openView` names it: the ‹ Back row, then the page
 /// `PanelText` gives for the part, in the signed-out onboarding view's
 /// shape (`ConnectView`): the logo badge and the title, the lead line, the
-/// status line with its tone's icon, what to do, each command in a box with
-/// a copy button, the full-width button, and an alternative under a
-/// divider. One view draws every part; each part's page and the actions its
-/// buttons run are picked here. The GitHub view, signed out, shows the
-/// signed-out onboarding view (`ConnectView`) under ‹ Back instead.
+/// status line with its tone's icon, what to do, what a command printed,
+/// each command in a box with a copy button, the full-width button, and an
+/// alternative under a divider. One view draws every part; each part's
+/// page and the actions its buttons run are picked here. The GitHub view,
+/// signed out, shows the signed-out onboarding view (`ConnectView`) under
+/// ‹ Back instead.
 struct StatusView: View {
     let part: SetupPart
     let actions: AppServices
@@ -47,7 +48,9 @@ struct StatusView: View {
             PanelText.cliStatus(actions.cliLink.state, command: actions.cliLink.command)
         case .github:
             actions.shipyard.gitHubConnection.map(PanelText.gitHubStatus) ?? PanelText.placeholderStatus(part)
-        case .notion, .skill:
+        case .skill:
+            PanelText.skillStatus(isInstalled: actions.skillDetector.isInstalled, installation: actions.skillInstallation.state)
+        case .notion:
             PanelText.placeholderStatus(part)
         }
     }
@@ -55,13 +58,16 @@ struct StatusView: View {
     private func lookAgain() {
         switch part {
         case .cli: actions.cliLink.check()
-        case .github, .notion, .skill: break
+        case .skill: actions.skillDetector.check()
+        case .github, .notion: break
         }
     }
 
     private func run(_ action: PanelText.StatusPage.Action) {
         switch action {
         case .linkCLI: actions.cliLink.makeLink()
+        case .installSkill: actions.skillInstallation.start()
+        case .cancelSkillInstall: actions.skillInstallation.cancel()
         }
     }
 
@@ -86,6 +92,17 @@ struct StatusView: View {
             }
             if let detail = text.detail {
                 line(detail).padding(.bottom, 8)
+            }
+            if let output = text.output {
+                Text(output)
+                    .font(.system(size: 10.5, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(8)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
+                    .padding(.bottom, 8)
             }
             VStack(alignment: .leading, spacing: 8) {
                 commands(text.commands)
@@ -114,11 +131,17 @@ struct StatusView: View {
         }
     }
 
+    /// A full-width button; Cancel has the running install's spinner beside it.
     private func button(_ button: PanelText.StatusPage.Button, prominent: Bool) -> some View {
-        Button { run(button.action) } label: {
-            Text(button.title).frame(maxWidth: .infinity)
+        HStack(spacing: 8) {
+            if button.action == .cancelSkillInstall {
+                ProgressView().controlSize(.small)
+            }
+            Button { run(button.action) } label: {
+                Text(button.title).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PillButtonStyle(prominent: prominent && button.action != .cancelSkillInstall, height: Self.actionHeight))
         }
-        .buttonStyle(PillButtonStyle(prominent: prominent, height: Self.actionHeight))
     }
 
     /// A line of the page's words, which may hold code spans.

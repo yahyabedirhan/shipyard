@@ -37,6 +37,14 @@ struct StatusViewTextTests {
         #expect(items.filter(\.isChecked).map(\.action) == (checked ? [.open(.cli)] : []))
     }
 
+    @Test("the Shipyard Skill item has the check mark only while the skill is installed")
+    func skillMark() {
+        let installed = PanelText.settingsMenu(SetupStatus(cli: .unlinked, skill: true), canSignOut: true)
+        #expect(installed.filter(\.isChecked).map(\.action) == [.open(.skill)])
+        let notInstalled = PanelText.settingsMenu(SetupStatus(cli: .unlinked, skill: false), canSignOut: true)
+        #expect(notInstalled.filter(\.isChecked).isEmpty)
+    }
+
     // MARK: - Opening a view by name
 
     @Test("a view is named as the panel command takes it, in any case, and projects names none; another name is refused with the names")
@@ -103,9 +111,82 @@ struct StatusViewTextTests {
         #expect(page.primary == nil && page.commands.isEmpty && page.alternative == nil)
     }
 
+    // MARK: - The Shipyard Skill view
+
+    private let skillCommand = "npx -y skills add yahyabedirhan/shipyard -g -y"
+
+    @Test("installed, the skill view says so and offers Update, which runs the install's command")
+    func skillInstalled() {
+        let page = PanelText.skillStatus(isInstalled: true, installation: .idle)
+        #expect(page.title == "Shipyard Skill")
+        #expect(page.status == .init(text: "Installed.", tone: .success))
+        #expect(page.primary == .init(title: "Update", action: .installSkill))
+        #expect(page.alternative == .init(line: "Or update it yourself in a terminal:", commands: [skillCommand]))
+    }
+
+    @Test("not installed, the skill view explains what the skill does and offers Install, and the command under a divider")
+    func skillNotInstalled() {
+        let page = PanelText.skillStatus(isInstalled: false, installation: .idle)
+        #expect(page.lead == "The shipyard skill teaches your agents to edit your configuration, ping you and drive the app.")
+        #expect(page.status == .init(text: "Not installed.", tone: .neutral))
+        #expect(page.detail?.hasPrefix("With it, you can ask an agent to watch a repository for you") == true)
+        #expect(page.primary == .init(title: "Install", action: .installSkill))
+        #expect(page.alternative == .init(line: "Or install it yourself in a terminal:", commands: [skillCommand]))
+    }
+
+    @Test("running, the skill view says it's installing or updating, with Cancel alone", arguments: [
+        (false, "Installing the skill…"),
+        (true, "Updating the skill…"),
+    ])
+    func skillRunning(isInstalled: Bool, status: String) {
+        let page = PanelText.skillStatus(isInstalled: isInstalled, installation: .running)
+        #expect(page.status == .init(text: status, tone: .neutral))
+        #expect(page.primary == .init(title: "Cancel", action: .cancelSkillInstall))
+        #expect(page.commands.isEmpty && page.alternative == nil && page.output == nil)
+    }
+
+    @Test("installed by the view, it shows what npx printed, and Update again")
+    func skillJustInstalled() {
+        let page = PanelText.skillStatus(isInstalled: true, installation: .finished(.installed(output: "Installed 1 skill")))
+        #expect(page.status == .init(text: "Installed.", tone: .success))
+        #expect(page.output == "Installed 1 skill")
+        #expect(page.primary?.title == "Update")
+        let quiet = PanelText.skillStatus(isInstalled: true, installation: .finished(.installed(output: "")))
+        #expect(quiet.output == nil)
+    }
+
+    @Test("failed, the skill view shows the output, the command to copy and Try again")
+    func skillFailed() {
+        let page = PanelText.skillStatus(isInstalled: false, installation: .finished(.failed(output: "npm ERR! network")))
+        #expect(page.status == .init(text: "Couldn't install the skill.", tone: .warning))
+        #expect(page.output == "npm ERR! network")
+        #expect(page.commands == [skillCommand])
+        #expect(page.primary == .init(title: "Try again", action: .installSkill))
+        let update = PanelText.skillStatus(isInstalled: true, installation: .finished(.failed(output: "npm ERR! network")))
+        #expect(update.status?.text == "Couldn't update the skill.")
+    }
+
+    @Test("with no npx, the skill view shows the command in a box to copy")
+    func skillNoNpx() {
+        let page = PanelText.skillStatus(isInstalled: false, installation: .finished(.npxNotFound(command: skillCommand)))
+        #expect(page.status == .init(text: "`npx` wasn't found.", tone: .warning))
+        #expect(page.detail?.hasSuffix("Run this in a terminal instead:") == true)
+        #expect(page.commands == [skillCommand])
+        #expect(page.primary?.title == "Try again")
+    }
+
+    @Test("stopped after the timeout, the skill view says how long it ran, with the command and Try again")
+    func skillTimedOut() {
+        let page = PanelText.skillStatus(isInstalled: false, installation: .timedOut(seconds: 180))
+        #expect(page.status == .init(text: "The install took too long.", tone: .warning))
+        #expect(page.detail == "It was stopped after 3 min. Try again, or run it in a terminal:")
+        #expect(page.commands == [skillCommand])
+        #expect(page.primary?.title == "Try again")
+    }
+
     @Test("the parts not built yet open a placeholder with their name and what they're for")
     func placeholders() {
-        for part in [SetupPart.notion, .skill] {
+        for part in [SetupPart.notion] {
             let page = PanelText.placeholderStatus(part)
             #expect(page.title == PanelText.statusTitle(part))
             #expect(page.lead == PanelText.statusLead(part))

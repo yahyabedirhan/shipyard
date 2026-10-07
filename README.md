@@ -55,7 +55,7 @@ The file sets the projects (each a section of the menu with its repositories), t
 
 ## Use it with an agent
 
-Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal:
+Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal; **Shipyard Skill…** in the gear menu installs or updates it too:
 
 ```sh
 npx skills add yahyabedirhan/shipyard -g -y

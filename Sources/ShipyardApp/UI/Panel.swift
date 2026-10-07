@@ -31,6 +31,9 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
+        // An install that ended, from the Shipyard Skill view or onboarding's
+        // card, may have installed the skill: the view and the menu's mark follow.
+        .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
     }
 
     // MARK: - Header
@@ -109,7 +112,11 @@ struct Panel: View {
         // Once signed in: while `start()` still asks GitHub, the token is
         // picked but the panel says it's connecting.
         let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
-        let status = SetupStatus(cli: actions.cliLink.state, github: shipyard.gitHubConnection != nil)
+        let status = SetupStatus(
+            cli: actions.cliLink.state,
+            github: shipyard.gitHubConnection != nil,
+            skill: actions.skillDetector.isInstalled
+        )
         ForEach(PanelText.settingsMenu(status, canSignOut: canSignOut), id: \.title) { item in
             switch item.action {
             case .openConfiguration:

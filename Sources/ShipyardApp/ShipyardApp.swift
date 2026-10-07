@@ -83,6 +83,9 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
+    /// Whether the agent skill is installed: the Shipyard Skill view and
+    /// the settings menu's mark show it.
+    let skillDetector = SkillDetector(home: FileManager.default.homeDirectoryForCurrentUser)
     /// The link of the bundled CLI into `~/.local/bin`: the Shipyard CLI
     /// view and onboarding's card show it.
     let cliLink = CLILink(
@@ -316,13 +319,15 @@ final class AppServices {
     }
 
     /// Opening the panel rereads the notification permission (the user may
-    /// have changed it in System Settings), the CLI link and the notes, so one just
-    /// written shows. It doesn't refresh GitHub: looking costs no GitHub
+    /// have changed it in System Settings), the CLI link, the skill and the
+    /// notes, so one just written shows. It doesn't refresh GitHub: looking costs no GitHub
     /// request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
-        // The settings menu's mark: the link may have been made or removed by hand.
+        // The settings menu's marks: the link may have been made or removed
+        // by hand, and the skill installed or removed in a terminal.
         cliLink.check()
+        skillDetector.check()
         Task { await notifier.checkPermission() }
         let shipyard = shipyard
         Task { await shipyard.panelOpened() }
