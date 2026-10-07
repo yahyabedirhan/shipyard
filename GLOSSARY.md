@@ -39,11 +39,15 @@ The Notion page titled "Agent guide" under "Shipyard Notes", beside the Projects
 _Avoid_: Entry page, README, notes reference (that's the skill's)
 
 **ntn**:
-Notion's CLI, which the app reads and writes notes through, one `ntn api` run per request, with ntn's own login and its default workspace, which must be the notes workspace. The app keeps no Notion token of its own. Without ntn, logged out, or in a workspace with no Shipyard Notes page, no notes list and the notes banner says what to do.
+Notion's CLI, which the app reads and writes notes through, one `ntn api` run per request, with ntn's own login and its default workspace, which must be the notes workspace. The app keeps no Notion token of its own. The app runs it only after **Connect with ntn**, except for the Notion view's check. Once connected, without ntn, logged out, or in a workspace with no Shipyard Notes page, no notes list and the notes banner says what to do.
 _Avoid_: Notion token, Notion connection, internal connection (the app's route before ntn)
 
+**Connect with ntn**:
+The Notion view's button that opts in to notes. Until the user presses it, the app runs no ntn but the view's own check, and lists no notes. The app state keeps it, so it lasts across restarts, and **Disconnect** undoes it. It holds no secret: ntn keeps its own login.
+_Avoid_: Notion token, sign in to Notion
+
 **Panel banner**:
-A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words.
+A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words. The notes banner and a rejected token's banner also have **Open…**, which opens their status view.
 _Avoid_: Notification (that's the macOS banner), alert, warning
 
 **Snooze**:
@@ -198,6 +202,14 @@ _Avoid_: Notes doctor, lint, validation
 **Onboarding**:
 The flow shown when shipyard isn't connected to GitHub or has no projects: connect the GitHub account, then choose a preset and pick projects. Choosing them here writes the configuration.
 _Avoid_: Setup wizard, welcome
+
+**Setup part**:
+One of the things shipyard uses that the user sets up: GitHub, Notion through ntn, the shipyard agent skill and the `shipyard` CLI. The settings menu lists each as a Set up item (Set up GitHub, Set up Notion, Set up /shipyard skill, Set up shipyard CLI), with a check mark only when it's set up.
+_Avoid_: Integration, service, connection
+
+**Status view**:
+A setup part's own view, opened from the settings menu or with `shipyard panel view`, in place of the projects: whether the part is set up and, when it isn't, how to set it up. The header, the banners and the footer stay; ‹ Back or closing the panel shows the projects again.
+_Avoid_: Settings page, setup screen, onboarding (that's the first-run flow)
 
 **Preset**:
 A ready-made configuration for one main use of shipyard, defined in the app and listed in the skill: `my-agents` (what you and your agents open), `incoming-contributions` (what others open on your repositories), `review-queue` (pull requests waiting on your review).

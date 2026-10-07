@@ -42,6 +42,10 @@ struct ControlServerTests {
             try record("tab \(name)")
             return name == "all" ? "All" : name
         }
+        func showView(_ name: String) throws(PanelRefusal) -> String {
+            try record("view \(name)")
+            return name == "cli" ? "Shipyard CLI" : name
+        }
     }
 
     /// Records each screenshot it's asked for, and answers with `outcome`.
@@ -191,6 +195,8 @@ struct ControlServerTests {
         (.panelUnfold(project: "shop"), "unfold shop", "unfolded shop\n"),
         (.panelShowMore(project: "shop", kind: "issues"), "show-more shop issues", "showing all issues in shop\n"),
         (.panelTab(name: "all"), "tab all", "showing All\n"),
+        (.panelView(name: "cli"), "view cli", "showing Shipyard CLI\n"),
+        (.panelView(name: "projects"), "view projects", "showing projects\n"),
     ])
     func panel(request: ControlRequest, call: String, output: String) async {
         let answer = await server().reply(to: request.sent())
@@ -201,6 +207,7 @@ struct ControlServerTests {
 
     @Test("a panel request the panel refuses is answered with its reason", arguments: [
         ControlRequest.panelOpen, .panelFold(project: "shopp"), .panelShowMore(project: "shop", kind: "prs"), .panelTab(name: "x"),
+        .panelView(name: "gh"),
     ])
     func panelRefused(request: ControlRequest) async {
         panel.refusal = PanelRefusal("what exists is named here")
@@ -342,7 +349,7 @@ struct ControlServerTests {
 
     @Test("a leased request from another holder is refused, naming the holder, with nothing done", arguments: [
         ControlRequest.appQuit, .appOpen, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
-        .panelShowMore(project: "shop", kind: "issues"), .panelTab(name: "All"),
+        .panelShowMore(project: "shop", kind: "issues"), .panelTab(name: "All"), .panelView(name: "cli"),
         .screenshot(path: "/tmp/shop.png", appearance: nil, menuBarIcon: false, withIndicator: false),
         .screenshot(path: "/tmp/shop.png", appearance: .dark, menuBarIcon: true, withIndicator: true),
     ])

@@ -26,6 +26,7 @@ private extension Harness {
     static func withNewNote(config: String = projects) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer])
         try harness.stub.onNotion()
@@ -184,6 +185,7 @@ struct NewNoteTests {
     func projectsPageFirst() async throws {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer])
         try harness.stub.onNotion()

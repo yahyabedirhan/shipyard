@@ -5,7 +5,8 @@ import SwiftUI
 
 /// The panel the menu bar icon opens: the frame every layout shares (the
 /// header, the banners and the footer) around what fits the lifecycle
-/// phase; once ready, the layout `[menu] layout` picks. It draws the core's
+/// phase, once ready the layout `[menu] layout` picks, or around the status
+/// view the settings menu opened (`PanelState.openView`). It draws the core's
 /// `Shipyard` directly (it's observable) and redraws the ages every 30 s.
 struct Panel: View {
     let shipyard: Shipyard
@@ -13,10 +14,6 @@ struct Panel: View {
     /// A panel drawn only for a screenshot's fallback, never on screen: its
     /// appearing and disappearing aren't the panel opening and closing.
     var isSnapshot = false
-    /// The header's "Install agent skill…" shows the install card above the footer.
-    @State private var showsSkillInstall = false
-    /// The header's "Link shipyard CLI…" shows the link card above the footer.
-    @State private var showsCLILink = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -25,16 +22,6 @@ struct Panel: View {
                 banners
                 Hairline()
                 content
-                if showsSkillInstall, shipyard.phase != .needsProjects {
-                    SkillInstallCard(installation: actions.skillInstallation) { showsSkillInstall = false }
-                        .padding(Grid.gutter - 4)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-                if showsCLILink, shipyard.phase != .needsProjects {
-                    CLILinkCard(link: actions.cliLink) { showsCLILink = false }
-                        .padding(Grid.gutter - 4)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
                 Hairline()
                 footer(now: context.date)
             }
@@ -42,10 +29,11 @@ struct Panel: View {
             .hoverHelpHost()
         }
         .frame(width: Grid.panelWidth)
-        .animation(Motion.banner, value: showsSkillInstall)
-        .animation(Motion.banner, value: showsCLILink)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
+        // An install that ended, from the Shipyard Skill view or onboarding's
+        // card, may have installed the skill: the view and the menu's mark follow.
+        .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
     }
 
     // MARK: - Header
@@ -99,19 +87,7 @@ struct Panel: View {
             .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
             Menu {
-                Button("Open configuration file", action: actions.openConfigurationFile)
-                Button(PanelText.installSkill) { showsSkillInstall = true }
-                    // Onboarding shows the card under the picker already.
-                    .disabled(shipyard.phase == .needsProjects)
-                Button(PanelText.linkCLI) { showsCLILink = true }
-                    // Onboarding shows the card under the picker already.
-                    .disabled(shipyard.phase == .needsProjects)
-                // Once signed in: while `start()` still asks GitHub, the
-                // token is picked but the panel says it's connecting.
-                if shipyard.phase != .signedOut, shipyard.tokenSource != nil {
-                    Divider()
-                    Button("Sign out") { shipyard.signOut() }
-                }
+                settingsItems
             } label: {
                 Image(systemName: "gearshape")
             }
@@ -126,6 +102,34 @@ struct Panel: View {
         .padding(.trailing, 8)
         .frame(height: Grid.titleBarHeight)
         .animation(Motion.count, value: attention)
+    }
+
+    /// The settings menu's items (`PanelText.settingsMenu`): the
+    /// configuration file, each part opening its status view, with the set-up
+    /// mark on its right (a menu item's badge), and Sign out under a divider.
+    @ViewBuilder
+    private var settingsItems: some View {
+        // Once signed in: while `start()` still asks GitHub, the token is
+        // picked but the panel says it's connecting.
+        let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
+        let status = SetupStatus(
+            cli: actions.cliLink.state,
+            github: shipyard.gitHubConnection != nil,
+            notion: shipyard.notionIsSetUp,
+            skill: actions.skillDetector.isInstalled
+        )
+        ForEach(PanelText.settingsMenu(status, canSignOut: canSignOut), id: \.title) { item in
+            switch item.action {
+            case .openConfiguration:
+                Button(item.title, action: actions.openConfigurationFile)
+            case .open(let part):
+                Button(item.title) { actions.panelState.openView = part }
+                    .badge(item.isChecked ? Text(PanelText.setUpMark) : nil)
+            case .signOut:
+                Divider()
+                Button(item.title) { shipyard.signOut() }
+            }
+        }
     }
 
     // MARK: - Banners
@@ -201,8 +205,13 @@ struct Panel: View {
         }
     }
 
-    /// A banner's button: notifications off opens System Settings.
+    /// A banner's button: notifications off opens System Settings; the
+    /// notes banner and a rejected token's banner open their status view.
     private func action(of banner: PanelBanner) -> (title: String, run: () -> Void)? {
+        if let part = banner.opens {
+            let panelState = actions.panelState
+            return (PanelText.openBannerView, { panelState.openView = part })
+        }
         guard banner.kind == .notificationsOff else { return nil }
         return (PanelText.openNotificationSettings, actions.openNotificationSettings)
     }
@@ -227,8 +236,19 @@ struct Panel: View {
 
     // MARK: - Content
 
+    /// The status view the settings menu or app control opened, in place
+    /// of what fits the phase; else that.
     @ViewBuilder
     private var content: some View {
+        if let part = actions.panelState.openView {
+            StatusView(part: part, actions: actions) { actions.panelState.openView = nil }
+        } else {
+            phaseContent
+        }
+    }
+
+    @ViewBuilder
+    private var phaseContent: some View {
         switch shipyard.phase {
         case .signedOut, .connecting:
             // Signed out, or the device flow's code waiting for approval.

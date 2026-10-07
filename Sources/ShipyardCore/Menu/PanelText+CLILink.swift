@@ -1,6 +1,6 @@
 import Foundation
 
-// The CLI link card's words (`CLILinkCard`).
+// The CLI link card's words (`CLILinkCard`), which onboarding shows.
 extension PanelText {
     /// What the CLI link card says: a title, what happened or what to do,
     /// the command to copy, and its button.
@@ -21,9 +21,6 @@ extension PanelText {
         /// The card's icon: the offer, a success or a problem (the skill card's tones).
         public var tone: SkillInstall.Tone = .neutral
     }
-
-    /// The gear menu's item for the CLI link card.
-    public static let linkCLI = "Link shipyard CLI…"
 
     /// The CLI link card for `state`, offering `command` when it helps.
     public static func cliLink(_ state: CLILink.State, command: String) -> CLILinkCard {

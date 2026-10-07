@@ -56,13 +56,14 @@ With `ntn`, pass a JSON body on standard input (`ntn api v1/pages < body.json`) 
 
 ## Setting up ntn for the app
 
-The menu and `shipyard notes check` read and write notes through `ntn`, with ntn's own login and its default workspace. The app keeps no Notion token, so there is nothing to paste into it. When the user's notes don't list, check this first:
+The menu and `shipyard notes check` read and write notes through `ntn`, with ntn's own login and its default workspace. The app keeps no Notion token, so there is nothing to paste into it. Notes are opt-in: the app runs no `ntn`, lists no notes and shows no notes banner or new-note icon until the user connects Notion in the app. When the user's notes don't list, check this first:
 
 1. Install ntn: `curl -fsSL https://ntn.dev | bash` (Notion's installer, which puts it in `~/.local/bin`). The app also finds it in `/opt/homebrew/bin`, `/usr/local/bin` or on its `PATH`.
 2. Log in from Terminal with `ntn login`, choosing the notes workspace.
 3. Run `ntn doctor`: it shows the default workspace, which must be the notes workspace. Another workspace has no Shipyard Notes page, so the menu lists no notes.
+4. Connect: in the panel's settings menu (the gear), **Set up Notion** opens the Notion view. It shows whether ntn is installed and logged in, and the name of ntn's workspace; **Check again** looks again after a change in Terminal. Once ntn is logged in, **Connect with ntn** lists the notes, and the app remembers it across restarts. The user presses it; `shipyard panel view notion` opens the view for them. **Set up Notion** has a check mark while Notion is connected and ntn works. **Disconnect** there stops the reads and takes the notes away.
 
-Until ntn is installed and logged in, the menu lists no notes, shows no error rows, hides the new-note icons, and its notes banner says what to do; with ntn's workspace holding no Shipyard Notes page, the banner says that instead. The app tries again every minute, so a fix shows without a restart.
+Once connected, while ntn is missing or logged out the menu lists no notes, shows no error rows, hides the new-note icons, and its notes banner says what to do; with ntn's workspace holding no Shipyard Notes page, the banner says that instead. The app tries again every minute, so a fix shows without a restart.
 
 ## Finding a project's database
 
@@ -168,4 +169,4 @@ A project's database is created the first time a note is added to it, by you or 
 
 ## Checking the structure
 
-After you change the structure, and whenever the user says notes don't show in the menu, run `shipyard notes check` on the user's Mac. The app reads the workspace through `ntn`, the way the menu does, and prints one line per project (its prefix and open notes, or no database yet), then every problem. An error, such as a database outside Projects, a missing property or a page ntn can't see, hides notes from the menu; fix it, then run the check again. A warning, such as a database missing from the Projects index, is yours to tidy. It exits 1 on an error, 0 otherwise. On a machine without the app, check the same layout through the connector or `ntn` by hand.
+After you change the structure, and whenever the user says notes don't show in the menu, run `shipyard notes check` on the user's Mac. The app reads the workspace through `ntn`, the way the menu does, and prints one line per project (its prefix and open notes, or no database yet), then every problem. An error, such as a database outside Projects, a missing property or a page ntn can't see, hides notes from the menu; fix it, then run the check again. A warning, such as a database missing from the Projects index, is yours to tidy. It exits 1 on an error, 0 otherwise. Before the user connects Notion it runs no `ntn`: it exits 1 and says to press Connect with ntn in the Notion view. On a machine without the app, check the same layout through the connector or `ntn` by hand.

@@ -1,8 +1,8 @@
 import Foundation
 import ShipyardCommand
 
-/// How installing the shipyard agent skill ended, for onboarding and the
-/// panel's "Install agent skill…".
+/// How installing the shipyard agent skill ended, for onboarding's card and
+/// the Shipyard Skill view.
 public enum SkillInstallResult: Equatable, Sendable {
     /// The command succeeded; its output, for a details line.
     case installed(output: String)

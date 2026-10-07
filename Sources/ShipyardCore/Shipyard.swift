@@ -21,7 +21,9 @@ import ShipyardPings
 /// Herdr on a timer of their own (`pollMachines()`) and listed with them.
 /// The user's notes are read from Notion through `ntn`, Notion's CLI, with
 /// its own login (`notionRoute`, ADR 0012), every minute and when the menu
-/// opens (`refreshNotes()`), and listed with them too.
+/// opens (`refreshNotes()`), and listed with them too, once the user
+/// connected Notion (`connectNotion()`, ADR 0013): until then no `ntn`
+/// runs but the Notion view's check (`checkNotion()`).
 /// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
@@ -103,6 +105,16 @@ public final class Shipyard {
     public private(set) var noteDatabases: [String: URL] = [:]
     /// The projects the new-note icon is starting a note in now.
     public private(set) var startingNotes: Set<String> = []
+    /// Whether the user connected Notion (Connect with ntn), as the app
+    /// state keeps it: only then are notes read. Kept here too, observed,
+    /// so connecting redraws the panel at once.
+    public private(set) var notionConnected = false
+    /// What the Notion view's latest check found (`checkNotion()`); `nil`
+    /// before one, and while one runs.
+    public private(set) var notionStatus: NotionStatus?
+    /// Bumped whenever a check begins, so an older check finishing late
+    /// doesn't overwrite a newer one's answer.
+    @ObservationIgnored private var notionCheck = 0
     /// Why the new-note icon couldn't start a note, by project name, for
     /// its error row; cleared when the menu opens again or a note starts.
     public private(set) var newNoteErrors: [String: String] = [:]
@@ -305,6 +317,7 @@ public final class Shipyard {
         appStateStore.load(at: clock.now)
         bannerSnoozes = appStateStore.state.bannerSnoozes
         restoredSnoozes = Set(bannerSnoozes.ends.keys)
+        notionConnected = appStateStore.state.notionConnected
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be
         // written leaves the CLI to its own lookup.
@@ -319,7 +332,8 @@ public final class Shipyard {
         await reloadPings()
         // So do the remote machines' pings, from their first poll.
         await followMachines()
-        // And the notes, from their first read, unless this run reads none.
+        // And the notes, from their first read, once Notion is connected and
+        // unless this run reads none.
         if readsNotes {
             // The headers' new-note icons show at once, before any read.
             rebuildMenu(configStore.lastValid)
@@ -1613,7 +1627,7 @@ public final class Shipyard {
     @discardableResult
     public func startNote(in project: String) async -> Bool {
         guard !startingNotes.contains(project) else { return false }
-        guard let notionRoute else {
+        guard readsNotes, let notionRoute else {
             failNewNote(in: project, .notRead)
             return false
         }
@@ -1662,22 +1676,28 @@ public final class Shipyard {
         repeat {
             await readNotes()
         } while notesGate.finish() && notesGate.begin()
-        armNotesTimer(after: Self.notesInterval)
+        // Disconnected meanwhile: the timer stays off.
+        if readsNotes { armNotesTimer(after: Self.notesInterval) }
     }
 
     /// Checks the notes workspace through `ntn`, as the menu reads it, for
-    /// each project that shows notes (`NotesCheck`); `nil` in a run that
-    /// reads no notes.
+    /// each project that shows notes (`NotesCheck`); `nil` while the app
+    /// reads no notes (Notion not connected, or a demo run), which never
+    /// runs `ntn` for it.
     public func checkNotes() async -> NotesCheckReport? {
-        guard let notionRoute else { return nil }
+        guard readsNotes, let notionRoute else { return nil }
         let configuration = configStore.lastValid
         let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
         return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
 
-    /// Whether this run reads the user's notes: always in the app, never in
-    /// a demo run (`AppFiles.notionRoute`).
-    public var readsNotes: Bool { notionRoute != nil }
+    /// Whether the app reads the user's notes now: once Notion is
+    /// connected, never in a demo run (`AppFiles.notionRoute`).
+    public var readsNotes: Bool { canReadNotes && notionConnected }
+
+    /// Whether this run can read notes at all: always in the app, never in
+    /// a demo run, which has no route to Notion.
+    public var canReadNotes: Bool { notionRoute != nil }
 
     /// Whether the projects' headers carry the new-note icon: while notes
     /// are read and ntn is there and logged in.
@@ -1685,16 +1705,71 @@ public final class Shipyard {
         readsNotes && notesBlocked?.isNtn != true
     }
 
+    /// Whether the settings menu marks Notion set up: connected, and ntn
+    /// was there and logged in at the latest read.
+    public var notionIsSetUp: Bool { canStartNotes }
+
+    /// The Notion view's check: whether `ntn` is there and logged in, its
+    /// workspace's name and whether that workspace has the Shipyard Notes
+    /// page (`NotionStatus`), through the route the notes are read
+    /// through. It runs `ntn` whether Notion is connected or not, since the
+    /// user opened the view (or pressed Check again) to ask; nothing else
+    /// does before Connect with ntn. A demo run asks nothing.
+    public func checkNotion() async {
+        notionCheck += 1
+        let check = notionCheck
+        notionStatus = nil
+        guard let notionRoute else {
+            notionStatus = .notRead
+            return
+        }
+        let status = await NotionStatus.check(NotionClient(transport: notionRoute))
+        guard check == notionCheck else { return }
+        notionStatus = status
+    }
+
+    /// Connect with ntn: keeps the flag in the app state, so a restart
+    /// reads the notes too, shows the new-note icons and reads the notes
+    /// at once. A demo run, which reads no notes, changes nothing.
+    public func connectNotion() async {
+        guard canReadNotes, !notionConnected else { return }
+        // ntn's workspace may have changed since a read before a Disconnect.
+        notesReader.reset()
+        setNotionConnected(true)
+        rebuildMenu(configStore.lastValid)
+        await refreshNotes()
+    }
+
+    /// Disconnect: clears the flag, stops the notes' timer and lists no
+    /// notes, notes banner or new-note icons; `ntn` doesn't run again until
+    /// the next Connect with ntn.
+    public func disconnectNotion() {
+        guard notionConnected else { return }
+        setNotionConnected(false)
+        notesTimer.disarm()
+        newNoteErrors = [:]
+        forgetNotes()
+        rebuildMenu(configStore.lastValid)
+    }
+
+    /// Sets the flag here and in the app state, which saves it.
+    private func setNotionConnected(_ connected: Bool) {
+        notionConnected = connected
+        appStateStore.update { $0.notionConnected = connected }
+    }
+
     /// Reads the notes once, and lists them when they changed. A read that
     /// can't reach the workspace at all (no ntn, ntn logged out, no
     /// Shipyard Notes page) lists none, and the notes banner says why.
     private func readNotes() async {
-        guard let notionRoute else { return }
+        guard readsNotes, let notionRoute else { return }
         let configuration = configStore.lastValid
         let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
         let reading = projects.isEmpty
             ? NotesReading.read([:])
             : await notesReader.read(projects: projects, client: NotionClient(transport: notionRoute))
+        // Disconnected while ntn answered: what it read isn't listed.
+        guard readsNotes else { return }
         var read: [String: [Note]] = [:]
         var errors: [String: String] = [:]
         let blocked = NotesNotice(reading)

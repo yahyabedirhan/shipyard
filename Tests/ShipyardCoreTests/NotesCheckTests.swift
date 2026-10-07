@@ -43,6 +43,7 @@ private extension Harness {
     static func withWorkspace() async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer])
         try harness.stub.onNotion()

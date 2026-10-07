@@ -39,6 +39,7 @@ struct PanelCommandTests {
         (["show-more", "shop", "pull-requests"], .panelShowMore(project: "shop", kind: "pull-requests"),
          #"{"command":"panel.showMore",\#(FakeProcessTable.wire()),"kind":"pull-requests","project":"shop","version":2}"#),
         (["tab", "All"], .panelTab(name: "All"), #"{"command":"panel.tab",\#(FakeProcessTable.wire()),"name":"All","version":2}"#),
+        (["view", "cli"], .panelView(name: "cli"), #"{"command":"panel.view",\#(FakeProcessTable.wire()),"name":"cli","version":2}"#),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("done\n"))
@@ -71,6 +72,8 @@ struct PanelCommandTests {
         (["panel"], ""),
         (["panel", "spin"], "shipyard panel: unknown command `spin`\n"),
         (["panel", "tab"], "shipyard panel tab: missing <name>\n"),
+        (["panel", "view"], "shipyard panel view: missing <name>\n"),
+        (["panel", "view", "cli", "now"], "shipyard panel view: unexpected `now`\n"),
         (["panel", "show-more", "shop"], "shipyard panel show-more: missing <kind>\n"),
         (["panel", "show-more"], "shipyard panel show-more: missing <project> <kind>\n"),
         (["panel", "fold", "shop", "blog"], "shipyard panel fold: unexpected `blog`\n"),

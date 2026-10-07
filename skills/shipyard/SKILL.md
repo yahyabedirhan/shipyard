@@ -15,6 +15,8 @@ The user's own **notes** live in Notion, one numbered list per project, and the 
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
+This skill installs with `npx -y skills add yahyabedirhan/shipyard -g -y`. The app's settings menu (the gear) marks **Set up /shipyard skill** with a check once it's installed, and that view's **Update** runs the same command for its newest version. When the user asks for the newest skill, point them there, or run the command.
+
 ## The file
 
 - Path: `$XDG_CONFIG_HOME/shipyard/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, else `~/.config/shipyard/config.toml`.
@@ -103,7 +105,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `pings.seen-window` | `"24h"` | a window: how long a seen ping stays listed, counted from when it was seen; an unseen ping stays until it's seen. A seen ping leaves within one refresh of its window passing, and is deleted |
-| `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page's "Projects" page, matched by the project's exact name. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion, and the header's notes count opens the project's database. The project's header has a new-note icon that creates an empty note in its database (creating the database first, and the Projects page, when there is none) and opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads and writes them through `ntn`, Notion's CLI, with ntn's own login, every minute and when the menu opens; it keeps no Notion token of its own. While `ntn` isn't installed or isn't logged in, or ntn's default workspace has no Shipyard Notes page, no notes list and a banner says what to do, and the new-note icon hides until `ntn` is installed and logged in (see the notes reference's Setting up ntn). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
+| `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page's "Projects" page, matched by the project's exact name. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion, and the header's notes count opens the project's database. The project's header has a new-note icon that creates an empty note in its database (creating the database first, and the Projects page, when there is none) and opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads and writes them through `ntn`, Notion's CLI, with ntn's own login, every minute and when the menu opens; it keeps no Notion token of its own. Nothing lists, and no `ntn` runs, until the user presses **Connect with ntn** in the settings menu's **Set up Notion** view. Once connected, while `ntn` isn't installed or isn't logged in, or ntn's default workspace has no Shipyard Notes page, no notes list and a banner says what to do, and the new-note icon hides until `ntn` is installed and logged in (see the notes reference's Setting up ntn). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
 | `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
@@ -504,7 +506,7 @@ Ping when the user should act or would want to know now: a pull request is ready
 
 ### The command
 
-The app links its command at `~/.local/bin/shipyard` (onboarding, or **Link shipyard CLI…** in the panel's gear menu). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from the gear menu. The app needn't be running: a ping sent meanwhile shows when it starts.
+The app links its command at `~/.local/bin/shipyard` (onboarding, or **Set up shipyard CLI** in the panel's settings menu, the gear). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from **Set up shipyard CLI**, which also says what is in the way when the link can't be made. The app needn't be running: a ping sent meanwhile shows when it starts.
 
 ```sh
 shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
@@ -584,7 +586,7 @@ On the user's Mac, three more commands open, steer and photograph the running ap
 
 ```sh
 shipyard app open [--demo <folder>] | quit | status [--json]
-shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
+shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name> | view <name>
 shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
 shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release [--key <k>]
 ```
@@ -600,6 +602,7 @@ shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release
 | `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
 | `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs`, `pings` or `notes` | `showing all <kind> in <project>` |
 | `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
+| `panel view <name>` | shows a status view in place of the projects, as the settings menu's items do: `github`, `notion`, `skill` or `cli`. `github` shows the signed-in account (`@login`) and how it connected (the GitHub CLI `gh` or Sign in with GitHub), or the sign-in steps when signed out, so a screenshot of it may show the user's login. `projects` shows the projects again, as **‹ Back** does. Closing the panel shows the projects again too | `showing <title>` (`Shipyard CLI`), or `showing projects` |
 | `screenshot <file.png>` | saves the panel as it looks; a closed panel is rendered off screen without opening it (said on standard error), so `panel open` first for the panel as drawn on screen; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
@@ -615,6 +618,7 @@ shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release
 shipyard 0.2.0 is running
 lease: free
 panel: closed
+view: projects
 layout: tabs
 tab: All
 projects: shop, blog
@@ -622,7 +626,7 @@ folded: none
 showing all: pull-requests in shop
 ```
 
-With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
+With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `view` (`projects`, or the status view shown: `github`, `notion`, `skill`, `cli`), `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
 
 What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. Close the panel when you're done. Never run these commands in a loop to wait for something, such as data loading: check `app status` once, and take one screenshot.
 
@@ -710,6 +714,15 @@ shipyard panel show-more shop pull-requests
 ```sh
 shipyard panel tab shop
 shipyard screenshot shop-dark.png --appearance dark
+```
+
+**"Screenshot the Shipyard CLI view."** Open the panel, show the view, capture it, then go back to the projects:
+
+```sh
+shipyard panel open
+shipyard panel view cli
+shipyard screenshot cli-view.png
+shipyard panel view projects
 ```
 
 **"Screenshot the menu bar icon."**

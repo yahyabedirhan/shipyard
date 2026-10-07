@@ -1,11 +1,11 @@
 import Foundation
 
 /// What `shipyard app status` reports about the running app: its version,
-/// the demo folder in a demo run, whether the panel is open, the menu's
-/// layout and the selected tab, the projects in the configuration's order,
-/// which of them are folded, which groups Show more opened, and the lease. The app
-/// fills it; how it reads, as lines or as `--json`, is decided here, so the
-/// format is one contract.
+/// the demo folder in a demo run, whether the panel is open, the view it
+/// shows, the menu's layout and the selected tab, the projects in the
+/// configuration's order, which of them are folded, which groups Show more
+/// opened, and the lease. The app fills it; how it reads, as lines or as
+/// `--json`, is decided here, so the format is one contract.
 public struct AppStatus: Codable, Equatable, Sendable {
     /// A group Show more opened: its project, and its kind as `shipyard
     /// panel show-more` names it (`pull-requests`).
@@ -51,6 +51,10 @@ public struct AppStatus: Codable, Equatable, Sendable {
     public var running = true
     public var version: String
     public var panelOpen: Bool
+    /// What the panel shows: `projects`, or the status view open in their
+    /// place (`github`, `notion`, `skill`, `cli`), as `shipyard panel
+    /// view` takes it.
+    public var view: String
     /// `list` or `tabs`, as `[menu] layout` spells it.
     public var layout: String
     /// The tabs layout's selected tab: a project's name, or `All`; `nil`
@@ -71,6 +75,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     public init(
         version: String,
         panelOpen: Bool,
+        view: String = "projects",
         layout: String,
         tab: String? = nil,
         projects: [String],
@@ -81,6 +86,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     ) {
         self.version = version
         self.panelOpen = panelOpen
+        self.view = view
         self.layout = layout
         self.tab = tab
         self.projects = projects
@@ -97,6 +103,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     ///     demo: /Users/me/demo
     ///     lease: Claude Code in /Users/me/shop, 48s left, 0 waiting
     ///     panel: closed
+    ///     view: projects
     ///     layout: tabs
     ///     tab: All
     ///     projects: shop, blog
@@ -112,6 +119,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
         }
         lines += [
             "panel: \(panelOpen ? "open" : "closed")",
+            "view: \(view)",
             "layout: \(layout)",
         ]
         if let tab { lines.append("tab: \(tab)") }
@@ -136,7 +144,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case running, version, panelOpen, layout, tab, projects, folded, showingAll, demo, lease
+        case running, version, panelOpen, view, layout, tab, projects, folded, showingAll, demo, lease
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -144,6 +152,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
         try container.encode(running, forKey: .running)
         try container.encode(version, forKey: .version)
         try container.encode(panelOpen, forKey: .panelOpen)
+        try container.encode(view, forKey: .view)
         try container.encode(layout, forKey: .layout)
         try container.encode(tab, forKey: .tab)
         try container.encode(projects, forKey: .projects)

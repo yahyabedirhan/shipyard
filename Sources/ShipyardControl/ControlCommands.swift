@@ -86,7 +86,7 @@ public enum ControlCommands {
     static let panelHelp = """
           panel   steer the app's panel:
                   shipyard panel open | close | fold <project> | unfold <project>
-                                 | show-more <project> <kind> | tab <name>
+                                 | show-more <project> <kind> | tab <name> | view <name>
 
         """
 

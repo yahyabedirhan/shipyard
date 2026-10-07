@@ -30,6 +30,10 @@ public enum ControlRequest: Equatable, Sendable {
     /// `shipyard panel tab <name>`: the tabs layout's selected tab, a
     /// project's name or `All`.
     case panelTab(name: String)
+    /// `shipyard panel view <name>`: a status view in place of the
+    /// projects (`github`, `notion`, `skill`, `cli`), or the projects again
+    /// (`projects`). The app checks the name.
+    case panelView(name: String)
     /// `shipyard screenshot <file.png> [--appearance light|dark]
     /// [--menu-bar-icon] [--with-indicator]`: the panel (or the menu bar
     /// icon alone) written as a PNG at `path`, absolute since the app runs
@@ -136,6 +140,8 @@ public struct ControlMessage: Equatable, Sendable {
             wire = Wire(command: "panel.showMore", project: project, kind: kind)
         case .panelTab(let name):
             wire = Wire(command: "panel.tab", name: name)
+        case .panelView(let name):
+            wire = Wire(command: "panel.view", name: name)
         case .screenshot(let path, let appearance, let menuBarIcon, let withIndicator):
             wire = Wire(
                 command: "screenshot", path: path, appearance: appearance?.rawValue,
@@ -187,6 +193,7 @@ public struct ControlMessage: Equatable, Sendable {
         case "panel.showMore":
             return .panelShowMore(project: try wire.field(\.project, "project"), kind: try wire.field(\.kind, "kind"))
         case "panel.tab": return .panelTab(name: try wire.field(\.name, "name"))
+        case "panel.view": return .panelView(name: try wire.field(\.name, "name"))
         case "screenshot":
             let path = try wire.field(\.path, "path")
             guard path.hasPrefix("/") else {

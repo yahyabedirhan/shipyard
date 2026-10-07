@@ -35,6 +35,11 @@ public struct AppState: Equatable, Sendable {
     /// restart keeps them hidden. A snooze that ended, or whose condition
     /// stopped, is dropped (`Shipyard.followBannerConditions()`).
     public var bannerSnoozes = BannerSnoozes()
+    /// Whether the user connected Notion (the Notion view's Connect with
+    /// ntn): only then does the app run `ntn` and list notes. Off until
+    /// then, and in a file written before it existed. It holds no secret:
+    /// ntn keeps its own login.
+    public var notionConnected = false
 
     public init(
         attention: Attention = Attention(),
@@ -44,7 +49,8 @@ public struct AppState: Equatable, Sendable {
         notified: NotifiedEvents = NotifiedEvents(),
         remotePings: RemotePingMarks = RemotePingMarks(),
         pingNumbers: PingNumbers? = nil,
-        bannerSnoozes: BannerSnoozes = BannerSnoozes()
+        bannerSnoozes: BannerSnoozes = BannerSnoozes(),
+        notionConnected: Bool = false
     ) {
         self.attention = attention
         self.collapsed = collapsed
@@ -54,6 +60,7 @@ public struct AppState: Equatable, Sendable {
         self.remotePings = remotePings
         self.pingNumbers = pingNumbers
         self.bannerSnoozes = bannerSnoozes
+        self.notionConnected = notionConnected
     }
 }
 
@@ -72,7 +79,8 @@ public struct AppState: Equatable, Sendable {
 //       "remotePings": { "shipyard://ping/netcup-vps/q1": { "instance": "…", "seen": "2026-09-25T12:00:00Z",
 //                                                         "seenSending": { …the ping… }, "dismissed": false } },
 //       "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } },
-//       "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "machine-netcup-vps": "2026-09-25T12:40:00Z" }
+//       "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "machine-netcup-vps": "2026-09-25T12:40:00Z" },
+//       "notionConnected": true
 //     }
 //
 // `known`, `knownProjects` and `notified` came with notification rules.
@@ -92,8 +100,11 @@ public struct AppState: Equatable, Sendable {
 // numbered again from 1 there, and a `pingNumbers` that can't be read at
 // all is dropped as a whole. `bannerSnoozes` came with dismissable
 // banners: each banner key with when its snooze ends. It's optional, and a
-// snooze that can't be read is skipped (its banner shows). A `version` above `currentVersion` fails the decode, so the
-// store sets the file aside.
+// snooze that can't be read is skipped (its banner shows).
+// `notionConnected` came with the Notion opt-in (ADR 0013): optional, and
+// missing or unreadable means not connected, so a user who never pressed
+// Connect with ntn runs no `ntn`. A `version` above `currentVersion` fails
+// the decode, so the store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version
@@ -106,6 +117,7 @@ extension AppState: Codable {
         case remotePings
         case pingNumbers
         case bannerSnoozes
+        case notionConnected
     }
 
     public init(from decoder: any Decoder) throws {
@@ -139,6 +151,7 @@ extension AppState: Codable {
         pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
         let snoozes = (try? container.decodeIfPresent([String: Lossy<Date>].self, forKey: .bannerSnoozes)) ?? [:]
         bannerSnoozes = BannerSnoozes(ends: snoozes.compactMapValues(\.value))
+        notionConnected = (try? container.decodeIfPresent(Bool.self, forKey: .notionConnected)) == true
     }
 
     public func encode(to encoder: any Encoder) throws {
@@ -153,6 +166,7 @@ extension AppState: Codable {
         try container.encode(remotePings.marks, forKey: .remotePings)
         try container.encodeIfPresent(pingNumbers?.sections, forKey: .pingNumbers)
         try container.encode(bannerSnoozes.ends, forKey: .bannerSnoozes)
+        try container.encode(notionConnected, forKey: .notionConnected)
     }
 }
 
