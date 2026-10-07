@@ -474,16 +474,19 @@ private struct ListRow: View {
             // A ping written before pings were numbered has none (0); the
             // column stays, so titles line up. A note's carries its prefix.
             // Digits of one width make the group's longest number the
-            // widest, since a project's notes share one prefix.
-            ZStack(alignment: .trailing) {
+            // widest, since a project's notes share one prefix. A note's
+            // reference reads from its prefix, so it starts at the left,
+            // a little apart from the icon; a plain number ends at the right.
+            ZStack(alignment: numberAlignment) {
                 Text(widestNumber).hidden()
                 Text(PanelText.number(row))
             }
             .font(TypeScale.meta)
             .monospacedDigit()
             .foregroundStyle(.tertiary)
-            .frame(minWidth: Grid.numberColumn, alignment: .trailing)
+            .frame(minWidth: Grid.numberColumn, alignment: numberAlignment)
             .fixedSize()
+            .padding(.leading, row.kind == .note ? 4 : 0)
             .padding(.trailing, 8)
             Text(row.title)
                 .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
@@ -523,6 +526,10 @@ private struct ListRow: View {
         .padding(.trailing, Grid.gutter)
         .frame(height: Grid.rowHeight)
         .contentShape(Rectangle())
+    }
+
+    private var numberAlignment: Alignment {
+        row.kind == .note ? .leading : .trailing
     }
 
     private var stateIcon: some View {
