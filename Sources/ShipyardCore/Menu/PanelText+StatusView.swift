@@ -42,9 +42,10 @@ extension PanelText {
 
     /// What a status view shows, top to bottom, under its ‹ Back row: the
     /// logo badge and `title`, the `lead` line, the `status` line, a
-    /// `detail` line on what to do, a command's `output`, `commands` each in a box with a copy
-    /// button, the `primary` full-width button, and an `alternative` under
-    /// a divider. The words may hold Markdown code spans (`CodeText`).
+    /// `detail` line on what to do, a command's `output`, `commands` each in
+    /// a box with a copy button, the `primary` full-width button, and an
+    /// `alternative` under a divider. The words may hold Markdown code spans
+    /// (`CodeText`).
     public struct StatusPage: Equatable, Sendable {
         /// Where the part stands, with its tone's icon.
         public struct Status: Equatable, Sendable {
@@ -114,15 +115,6 @@ extension PanelText {
         case .skill: "The shipyard skill teaches your agents to edit your configuration, ping you and drive the app."
         case .cli: "Your agents run the `shipyard` command to ping you, post notices and drive the app."
         }
-    }
-
-    /// The view of a part whose status isn't shown yet: its title and lead alone.
-    public static func placeholderStatus(_ part: SetupPart) -> StatusPage {
-        StatusPage(
-            title: statusTitle(part),
-            lead: statusLead(part),
-            status: .init(text: "Its status shows here in a later version of shipyard.", tone: .neutral)
-        )
     }
 
     // MARK: - The Shipyard CLI view

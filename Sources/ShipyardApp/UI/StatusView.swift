@@ -29,11 +29,11 @@ struct StatusView: View {
             .accessibilityLabel("Back")
             .padding(.horizontal, Grid.gutter)
             .padding(.top, 10)
-            if part == .github, actions.shipyard.gitHubConnection == nil {
-                // Signed out: the signed-out onboarding view's content, its ways in included.
-                ConnectView(shipyard: actions.shipyard)
+            if let text = page {
+                page(text)
             } else {
-                page(page)
+                // GitHub, signed out: the signed-out onboarding view's content, its ways in included.
+                ConnectView(shipyard: actions.shipyard)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -41,13 +41,14 @@ struct StatusView: View {
         .onChange(of: part, initial: true) { lookAgain() }
     }
 
-    /// The part's words, as its state is now.
-    private var page: PanelText.StatusPage {
+    /// The part's words, as its state is now; nil for GitHub while signed
+    /// out, which shows `ConnectView` instead.
+    private var page: PanelText.StatusPage? {
         switch part {
         case .cli:
             PanelText.cliStatus(actions.cliLink.state, command: actions.cliLink.command)
         case .github:
-            actions.shipyard.gitHubConnection.map(PanelText.gitHubStatus) ?? PanelText.placeholderStatus(part)
+            actions.shipyard.gitHubConnection.map(PanelText.gitHubStatus)
         case .skill:
             PanelText.skillStatus(isInstalled: actions.skillDetector.isInstalled, installation: actions.skillInstallation.state)
         case .notion:

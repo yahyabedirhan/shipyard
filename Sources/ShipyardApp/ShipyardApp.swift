@@ -321,8 +321,8 @@ final class AppServices {
 
     /// Opening the panel rereads the notification permission (the user may
     /// have changed it in System Settings), the CLI link, the skill and the
-    /// notes, so one just written shows. It doesn't refresh GitHub: looking costs no GitHub
-    /// request, the timer keeps the data fresh.
+    /// notes, so one just written shows. It doesn't refresh GitHub: looking
+    /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
         // The settings menu's marks: the link may have been made or removed
@@ -336,8 +336,8 @@ final class AppServices {
 
     /// Closing the panel caps every group Show more revealed and closes the
     /// status view, so the menu opens on the projects with every cap back,
-    /// and, unless app control closed it, keeps
-    /// app control from opening it again for a while (`PanelReopenGuard`).
+    /// and, unless app control closed it, keeps app control from opening it
+    /// again for a while (`PanelReopenGuard`).
     func panelClosed() {
         panelState.isOpen = false
         panelState.reopenGuard.panelClosed(byControl: panelState.closingByControl, at: Date())

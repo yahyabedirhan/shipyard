@@ -25,8 +25,7 @@ public enum SetupPart: String, CaseIterable, Equatable, Sendable {
 }
 
 /// Whether each part is set up, as the settings menu marks it: a check mark
-/// only beside a part that is. A part whose view isn't built yet counts as
-/// not set up, so it shows no mark.
+/// only beside a part that is, and no mark otherwise.
 public struct SetupStatus: Equatable, Sendable {
     /// The CLI link's state: set up only when `linked`.
     public var cli: CLILink.State

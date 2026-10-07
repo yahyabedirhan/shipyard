@@ -183,14 +183,4 @@ struct StatusViewTextTests {
         #expect(page.commands == [skillCommand])
         #expect(page.primary?.title == "Try again")
     }
-
-    @Test("the parts not built yet open a placeholder with their name and what they're for")
-    func placeholders() {
-        for part in [SetupPart.notion] {
-            let page = PanelText.placeholderStatus(part)
-            #expect(page.title == PanelText.statusTitle(part))
-            #expect(page.lead == PanelText.statusLead(part))
-            #expect(page.primary == nil)
-        }
-    }
 }

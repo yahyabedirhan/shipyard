@@ -5,9 +5,10 @@ import ShipyardCore
 /// The panel's own state, which the app owns rather than a view, so a
 /// click in the panel and the `shipyard panel` command change the same
 /// value: whether the panel is on screen, the status view open in place
-/// of the projects, and the tabs layout's selected tab. The tab is kept across the panel's closing and opening, so a tab
-/// chosen while it's closed is the one it opens on; the layout shows All
-/// while the tab's project isn't there (`MenuModel.resolved`).
+/// of the projects, and the tabs layout's selected tab. The tab is kept
+/// across the panel's closing and opening, so a tab chosen while it's
+/// closed is the one it opens on; the layout shows All while the tab's
+/// project isn't there (`MenuModel.resolved`).
 @MainActor
 @Observable
 final class PanelState {
