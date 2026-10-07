@@ -257,7 +257,7 @@ struct NotesTests {
         #expect(harness.notesBanner == nil)
     }
 
-    @Test("connected without ntn, Notion is never asked, no project lists notes, and a banner says to install ntn; installed, the next read lists them; with every project's notes hidden there's no banner")
+    @Test("connected without ntn, Notion is never asked, no project lists notes, and a banner says to install ntn, with Open… to the Notion view; installed, the next read lists them; with every project's notes hidden there's no banner")
     func noNtn() async throws {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.connectNotionBeforeStart()
@@ -272,6 +272,7 @@ struct NotesTests {
         #expect(harness.noteRows().isEmpty)
         #expect(harness.noteErrors("shop").isEmpty)
         #expect(harness.notesBanner?.text == "Your notes live in Notion, and shipyard reads them with ntn, Notion's CLI. Install ntn and run ntn login to list them here.")
+        #expect(harness.notesBanner?.opens == .notion)
         #expect(harness.notesTimer.armed == 60)
 
         harness.ntn.set(.loggedIn)

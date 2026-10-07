@@ -205,8 +205,13 @@ struct Panel: View {
         }
     }
 
-    /// A banner's button: notifications off opens System Settings.
+    /// A banner's button: notifications off opens System Settings; the
+    /// notes banner and a rejected token's banner open their status view.
     private func action(of banner: PanelBanner) -> (title: String, run: () -> Void)? {
+        if let part = banner.opens {
+            let panelState = actions.panelState
+            return (PanelText.openBannerView, { panelState.openView = part })
+        }
         guard banner.kind == .notificationsOff else { return nil }
         return (PanelText.openNotificationSettings, actions.openNotificationSettings)
     }
