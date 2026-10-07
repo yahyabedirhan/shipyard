@@ -4,7 +4,7 @@ import SwiftUI
 /// A part's status view (`SetupPart`), in place of the panel's content
 /// while `PanelState.openView` names it: the ‹ Back row, then the page
 /// `PanelText` gives for the part, in the signed-out onboarding view's
-/// shape (`ConnectView`): the logo badge and the title, the lead line, the
+/// shape (`ConnectView`): the part's badge (`SetupBadge`) and the title, the lead line, the
 /// status line with its tone's icon, what to do, what a command printed,
 /// each command in a box with a copy button, the full-width button, and
 /// each alternative under its own divider. One view draws every part; each part's
@@ -93,7 +93,7 @@ struct StatusView: View {
     private func page(_ text: PanelText.StatusPage) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
-                LogoBadge(side: 32)
+                SetupBadge(part: part, side: 32)
                 Text(text.title).font(TypeScale.display)
             }
             .padding(.bottom, 12)

@@ -1,6 +1,6 @@
 # Third-party notices
 
-Shipyard bundles each known agent's logo, shown next to a ping that agent sent, to say which agent sent it. The SVGs are kept as published in `assets/images/agent-logos/` and converted, unaltered, to the PDFs in `Sources/ShipyardApp/Resources/AgentLogos/`. Each logo is its owner's trademark; showing it identifies the agent and implies no endorsement. The licences below cover the drawings' copyright, never the marks.
+Shipyard bundles each known agent's logo, shown next to a ping that agent sent, to say which agent sent it, and GitHub's and Notion's marks, shown in the status views that set up shipyard's GitHub and Notion connections. The SVGs are kept as published in `assets/images/agent-logos/` and `assets/images/service-logos/` and converted, unaltered, to the PDFs in `Sources/ShipyardApp/Resources/AgentLogos/` and `Sources/ShipyardApp/Resources/ServiceLogos/`. Each logo is its owner's trademark; showing it identifies the agent or the service and implies no endorsement. The licences below cover the drawings' copyright, never the marks.
 
 | Logo | Source | Licence |
 |---|---|---|
@@ -13,6 +13,12 @@ Shipyard bundles each known agent's logo, shown next to a ping that agent sent, 
 | GitHub Copilot | [primer/octicons](https://github.com/primer/octicons) at `923a31b34542702800cb90a0fd390e2e60dd92ac`, `icons/copilot-24.svg` | MIT, GitHub (below); GitHub's trademark |
 | Amp | `https://ampcode.com/app-icon.svg`, fetched 2026-10-03 | none published |
 | Droid | `https://factory.com/icon.svg`, fetched 2026-10-03 | none published; Factory's trademark |
+| GitHub (status view) | [primer/octicons](https://github.com/primer/octicons) at `923a31b34542702800cb90a0fd390e2e60dd92ac`, `icons/mark-github-24.svg` | MIT, GitHub (below); GitHub's trademark |
+| Notion (status view) | [simple-icons/simple-icons](https://github.com/simple-icons/simple-icons) at `1089fb7d2bf0e323f834c205ab76265005a6d5e8`, `icons/notion.svg` | CC0 (the project; the Notion entry names no licence); Notion Labs' trademark |
+
+## Trademarks
+
+GitHub and the Invertocat logo are trademarks of GitHub, Inc. Notion and the Notion logo are trademarks of Notion Labs, Inc. Shipyard isn't affiliated with, sponsored or endorsed by either.
 
 ## Codex and Gemini: lobe-icons
 
@@ -66,7 +72,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## GitHub Copilot: octicons
+## GitHub Copilot and GitHub: octicons
 
 ```text
 MIT License

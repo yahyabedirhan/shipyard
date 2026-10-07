@@ -75,7 +75,7 @@ MODULE_CACHE := $(HOME)/Library/Caches/shipyard/ModuleCache
 SWIFT_FLAGS  := -Xswiftc -module-cache-path -Xswiftc $(MODULE_CACHE)
 endif
 
-.PHONY: all build test bundle install release signing-identity run icon icon-alternates icon-exploration agent-logos clean
+.PHONY: all build test bundle install release signing-identity run icon icon-alternates icon-exploration agent-logos service-logos clean
 
 all: build
 
@@ -96,8 +96,9 @@ bundle: build
 	cp "$$(swift build -c release --show-bin-path)/$(CLI)" $(CONTENTS)/Helpers/shipyard
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
 	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
-	@# The app's SwiftPM resources (the agents' logos), where AgentLogoImage
-	@# looks: in Resources, since a bundle at the app's root breaks its signature.
+	@# The app's SwiftPM resources (the agents' logos and GitHub's and Notion's
+	@# marks), where AgentLogoImage and SetupBadge look: in Resources, since a
+	@# bundle at the app's root breaks its signature.
 	cp -R "$$(swift build -c release --show-bin-path)/$(APP)_$(APP)App.bundle" $(CONTENTS)/Resources/
 	@# The logos' MIT notices travel with every copy of them.
 	cp LICENSE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
@@ -203,6 +204,20 @@ agent-logos:
 	@mkdir -p $(AGENT_LOGOS)
 	@for svg in $(AGENT_LOGO_SVGS); do \
 		pdf=$(AGENT_LOGOS)/$$(basename $$svg .svg).pdf; \
+		rsvg-convert --format pdf --output $$pdf $$svg || exit 1; \
+		echo "drew $$pdf"; \
+	done
+
+# GitHub's and Notion's marks for their status views, kept as their makers'
+# SVGs in assets/images/service-logos/ (sources in
+# docs/references/service-icons.md) and converted the same way, unaltered.
+SERVICE_LOGO_SVGS := $(wildcard assets/images/service-logos/*.svg)
+SERVICE_LOGOS     := Sources/ShipyardApp/Resources/ServiceLogos
+
+service-logos:
+	@mkdir -p $(SERVICE_LOGOS)
+	@for svg in $(SERVICE_LOGO_SVGS); do \
+		pdf=$(SERVICE_LOGOS)/$$(basename $$svg .svg).pdf; \
 		rsvg-convert --format pdf --output $$pdf $$svg || exit 1; \
 		echo "drew $$pdf"; \
 	done
