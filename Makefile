@@ -75,7 +75,7 @@ MODULE_CACHE := $(HOME)/Library/Caches/shipyard/ModuleCache
 SWIFT_FLAGS  := -Xswiftc -module-cache-path -Xswiftc $(MODULE_CACHE)
 endif
 
-.PHONY: all build test bundle install release signing-identity run icon icon-alternates icon-exploration agent-logos clean
+.PHONY: all build test bundle install release signing-identity run icon icon-alternates icon-exploration agent-logos service-logos clean
 
 all: build
 
@@ -203,6 +203,20 @@ agent-logos:
 	@mkdir -p $(AGENT_LOGOS)
 	@for svg in $(AGENT_LOGO_SVGS); do \
 		pdf=$(AGENT_LOGOS)/$$(basename $$svg .svg).pdf; \
+		rsvg-convert --format pdf --output $$pdf $$svg || exit 1; \
+		echo "drew $$pdf"; \
+	done
+
+# GitHub's and Notion's marks for their status views, kept as their makers'
+# SVGs in assets/images/service-logos/ (sources in
+# docs/references/service-icons.md) and converted the same way, unaltered.
+SERVICE_LOGO_SVGS := $(wildcard assets/images/service-logos/*.svg)
+SERVICE_LOGOS     := Sources/ShipyardApp/Resources/ServiceLogos
+
+service-logos:
+	@mkdir -p $(SERVICE_LOGOS)
+	@for svg in $(SERVICE_LOGO_SVGS); do \
+		pdf=$(SERVICE_LOGOS)/$$(basename $$svg .svg).pdf; \
 		rsvg-convert --format pdf --output $$pdf $$svg || exit 1; \
 		echo "drew $$pdf"; \
 	done

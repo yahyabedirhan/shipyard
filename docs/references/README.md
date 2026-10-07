@@ -17,3 +17,4 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 | [macos-hover-help.md](macos-hover-help.md) | Hover help in the panel instead of native tooltips: packages, native options (popover, a drawn card, inline text), what menu bar apps do, and each call site |
 | [screencapturekit-own-windows.md](screencapturekit-own-windows.md) | Capturing shipyard's own panel window with ScreenCaptureKit (`SCShareableContent.currentProcess`, macOS 14.4) without the Screen Recording permission, and the first real capture's outcome |
 | [agent-icons.md](agent-icons.md) | Where each coding agent's icon is published and under what terms; why shipyard draws its own marks instead of bundling them |
+| [service-icons.md](service-icons.md) | Where GitHub's and Notion's marks for their status views come from, under what licence and brand terms, and the look the maintainer chose |

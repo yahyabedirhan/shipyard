@@ -132,8 +132,9 @@ targets.append(
         name: "ShipyardApp",
         dependencies: ["ShipyardCommand", "ShipyardPings", "ShipyardNotices", "ShipyardConfig", "ShipyardControl", "ShipyardCore"],
         path: "Sources/ShipyardApp",
-        // The known agents' logos (`make agent-logos`), read by `AgentLogoImage`.
-        resources: [.copy("Resources/AgentLogos")]
+        // The known agents' logos (`make agent-logos`), read by `AgentLogoImage`,
+        // and GitHub's and Notion's marks (`make service-logos`), read by `SetupBadge`.
+        resources: [.copy("Resources/AgentLogos"), .copy("Resources/ServiceLogos")]
     )
 )
 // The app's own pure helpers (how the panel builds its text) and the control
