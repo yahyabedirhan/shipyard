@@ -99,8 +99,8 @@ final class AppServices {
     )
     private let notifier = Notifier()
     private let opener = WorkspaceActions()
-    private var configWatcher: ConfigWatcher?
-    private var pingWatcher: ConfigWatcher?
+    private var configWatcher: ConfigurationWatcher?
+    private var pingWatcher: ConfigurationWatcher?
     private var wake: WakeObserver?
     /// Whether the panel is open, the status view and the tab it shows,
     /// which its views and app control both read and set.
@@ -119,7 +119,7 @@ final class AppServices {
     init() {
         let files = Self.files
         shipyard = Shipyard(
-            configStore: ConfigStore(url: files.config),
+            configStore: ConfigurationStore(url: files.config),
             appStateStore: AppStateStore(directory: files.support),
             configStatusStore: ConfigStatusStore(directory: files.support),
             pingStore: PingStore(directory: files.pings),
@@ -155,7 +155,7 @@ final class AppServices {
 
     func start() {
         let shipyard = shipyard
-        configWatcher = ConfigWatcher(file: shipyard.configStore.url) {
+        configWatcher = ConfigurationWatcher(file: shipyard.configStore.url) {
             Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
@@ -165,7 +165,7 @@ final class AppServices {
         // made before the watch opens (`Shipyard.start()` makes it too),
         // so the watch is on it from the first moment.
         try? shipyard.pingStore.createDirectory()
-        pingWatcher = ConfigWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
+        pingWatcher = ConfigurationWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
             Task { await shipyard.reloadPings() }
         }
         pingWatcher?.start()

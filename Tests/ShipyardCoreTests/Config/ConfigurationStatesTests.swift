@@ -39,7 +39,7 @@ struct ConfigurationStatesTests {
         #expect(rejection("""
             [defaults.pull-requests]
             states = ["open", "merge"]
-            """) == [ConfigIssue(line: 2, message: "unknown pull request state `merge` (did you mean `merged`?)")])
+            """) == [ConfigurationIssue(line: 2, message: "unknown pull request state `merge` (did you mean `merged`?)")])
         #expect(rejection("""
             [[projects]]
             name = "a"
@@ -48,7 +48,7 @@ struct ConfigurationStatesTests {
               "failed",
               "in_progress",
             ] }
-            """) == [ConfigIssue(line: 6, message: "unknown workflow run state `in_progress` (did you mean `in-progress`?)")])
+            """) == [ConfigurationIssue(line: 6, message: "unknown workflow run state `in_progress` (did you mean `in-progress`?)")])
     }
 
     @Test("another kind's state is rejected, with the ones this kind takes")
@@ -60,15 +60,15 @@ struct ConfigurationStatesTests {
             [defaults.workflow-runs]
             states = ["open"]
             """) == [
-                ConfigIssue(line: 2, message: "unknown issue state `merged` (expected `open`, `closed`)"),
-                ConfigIssue(line: 5, message: "unknown workflow run state `open` (expected `in-progress`, `failed`, `succeeded`)"),
+                ConfigurationIssue(line: 2, message: "unknown issue state `merged` (expected `open`, `closed`)"),
+                ConfigurationIssue(line: 5, message: "unknown workflow run state `open` (expected `in-progress`, `failed`, `succeeded`)"),
             ])
     }
 
     @Test("states is a list of strings")
     func statesShape() {
         #expect(rejection("[defaults.issues]\nstates = \"open\"\n")
-            == [ConfigIssue(line: 2, message: "`defaults.issues.states` must be a list of strings")])
+            == [ConfigurationIssue(line: 2, message: "`defaults.issues.states` must be a list of strings")])
     }
 
     @Test("an empty list lists none of that kind's items")

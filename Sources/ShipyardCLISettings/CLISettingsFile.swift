@@ -17,7 +17,7 @@ public struct CLISettingsFile: Equatable, Sendable {
     }
 
     /// `cli.toml` in the folder that holds `config` (the `config.toml` the
-    /// app reads, as `ConfigLocation.current` finds it): the Mac's.
+    /// app reads, as `ConfigurationLocation.current` finds it): the Mac's.
     public static func beside(config: URL) -> CLISettingsFile {
         CLISettingsFile(url: config.deletingLastPathComponent().appendingPathComponent(fileName, isDirectory: false))
     }

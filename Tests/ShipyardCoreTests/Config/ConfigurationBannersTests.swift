@@ -16,7 +16,7 @@ struct ConfigurationBannersTests {
 
     @Test("a snooze of 0, or one that isn't a window, is rejected at its line")
     func rejected() {
-        #expect(rejection("[banners]\nsnooze = \"0\"\n") == [ConfigIssue(line: 2, message: "`snooze` must be longer than 0, such as \"1h\" or \"10s\"")])
+        #expect(rejection("[banners]\nsnooze = \"0\"\n") == [ConfigurationIssue(line: 2, message: "`snooze` must be longer than 0, such as \"1h\" or \"10s\"")])
         #expect(rejection("[banners]\nsnooze = \"10sec\"\n").first?.message.hasPrefix("`snooze` must be a whole number and one unit") == true)
     }
 

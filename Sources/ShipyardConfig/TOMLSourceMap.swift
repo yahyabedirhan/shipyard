@@ -1,13 +1,13 @@
 /// One step in a path through the configuration: a table key or an index
 /// into an array (of tables).
-enum ConfigPathComponent: Hashable, Sendable {
+enum ConfigurationPathComponent: Hashable, Sendable {
     case key(String)
     case index(Int)
 }
 
-typealias ConfigPath = [ConfigPathComponent]
+typealias ConfigPath = [ConfigurationPathComponent]
 
-extension Array where Element == ConfigPathComponent {
+extension Array where Element == ConfigurationPathComponent {
     /// `projects[1].issues.show`
     var dotted: String {
         var out = ""

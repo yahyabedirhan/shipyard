@@ -291,10 +291,10 @@ struct ProjectPickerTests {
     func confirmRejected() async throws {
         let harness = try await signedIn(graphQL: [pullRequests()])
 
-        await #expect(throws: ConfigError([ConfigIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
+        await #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
             try await harness.shipyard.addProjects([NewProject(name: "x", repositories: ["nope"])])
         }
-        await #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project name `x` is already used")])) {
+        await #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project name `x` is already used")])) {
             try await harness.shipyard.addProjects([
                 NewProject(name: "x", repositories: ["o/a"]),
                 NewProject(name: "x", repositories: ["o/b"]),

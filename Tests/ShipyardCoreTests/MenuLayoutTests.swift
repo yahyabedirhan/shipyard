@@ -91,7 +91,7 @@ struct MenuLayoutTests {
         await harness.shipyard.switchToNextLayout()
         #expect(harness.shipyard.menu.layout == .list)
         #expect(harness.shipyard.configError?.issues
-            == [ConfigIssue(line: 5, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
+            == [ConfigurationIssue(line: 5, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
         #expect(try String(contentsOf: harness.configURL, encoding: .utf8) == broken)
     }
 
@@ -118,7 +118,7 @@ struct MenuLayoutTests {
         try harness.writeConfig("[menu]\nlayout = \"grid\"\n\n" + shop)
         await harness.shipyard.reloadConfiguration()
         #expect(harness.shipyard.configError?.issues
-            == [ConfigIssue(line: 2, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
         #expect(harness.shipyard.menu.layout == .tabs)
     }
 }

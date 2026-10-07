@@ -106,7 +106,7 @@ struct Harness {
         pingStore = PingStore(directory: files.pings, now: { clock.now })
         repositoriesStore = ResolvedRepositoriesStore(directory: files.support)
         shipyard = Shipyard(
-            configStore: ConfigStore(url: files.config),
+            configStore: ConfigurationStore(url: files.config),
             appStateStore: AppStateStore(directory: files.support),
             configStatusStore: ConfigStatusStore(directory: files.support),
             pingStore: pingStore,

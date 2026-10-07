@@ -36,7 +36,7 @@ struct PresetTextTests {
     func readsCleanly(preset: Preset, projects: [NewProject]) throws {
         let text = preset.text(projects: projects)
         #expect(text.hasPrefix("#:schema \(Configuration.schemaURL)\n"))
-        do throws(ConfigError) {
+        do throws(ConfigurationError) {
             let result = try Configuration.decode(text)
             #expect(result.warnings.isEmpty, "warnings in:\n\(text)")
             // my-agents is only written once repositories are picked.

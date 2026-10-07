@@ -29,10 +29,10 @@ private let valid = """
     """
 
 @Suite("Configuration store")
-struct ConfigStoreTests {
+struct ConfigurationStoreTests {
     @Test("a missing file means the defaults with no projects")
     func missingFile() {
-        let store = ConfigStore(url: temporaryConfigURL())
+        let store = ConfigurationStore(url: temporaryConfigURL())
         #expect(store.reload() == .unchanged)
         #expect(store.lastValid == Configuration())
         #expect(store.error == nil)
@@ -41,7 +41,7 @@ struct ConfigStoreTests {
     @Test("a broken file keeps the last valid configuration; fixing it clears the error")
     func lastValidFallback() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
 
         try write(valid, to: url)
         let first = store.reload()
@@ -69,7 +69,7 @@ struct ConfigStoreTests {
     @Test("a reload that means the same as before is unchanged")
     func unchangedReload() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
 
         try write(valid, to: url)
         let first = store.reload()
@@ -95,7 +95,7 @@ struct ConfigStoreTests {
     @Test("emptying the file goes back to no projects")
     func emptied() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         try write(valid, to: url)
         store.reload()
         try FileManager.default.removeItem(at: url)
@@ -105,11 +105,11 @@ struct ConfigStoreTests {
 }
 
 @Suite("Configuration store: appending projects")
-struct ConfigStoreAppendTests {
+struct ConfigurationStoreAppendTests {
     @Test("appending to a missing file creates it with a header and the schema line")
     func createsFile() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         let result = try store.append(projects: [
             NewProject(name: "e-commerce", repositories: ["o/frontend", "o/backend"]),
             NewProject(name: "blog", repositories: ["o/blog"]),
@@ -150,7 +150,7 @@ struct ConfigStoreAppendTests {
             repositories = ["o/a"]
             """ // no trailing newline
         try write(existing, to: url)
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         store.reload()
 
         try store.append(projects: [NewProject(name: "b", repositories: ["o/b"])])
@@ -165,7 +165,7 @@ struct ConfigStoreAppendTests {
     @Test("appending escapes names so they read back the same")
     func escapes() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         let name = "quotes \" and \\ backslash"
         try store.append(projects: [NewProject(name: name, repositories: ["o/a"])])
         #expect(store.lastValid.projects.map(\.name) == [name])
@@ -175,16 +175,16 @@ struct ConfigStoreAppendTests {
     func rejects() throws {
         let url = temporaryConfigURL()
         try write(valid, to: url)
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         store.reload()
 
-        #expect(throws: ConfigError([ConfigIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
             try store.append(projects: [NewProject(name: "b", repositories: ["nope"])])
         }
-        #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project name `a` is already used")])) {
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project name `a` is already used")])) {
             try store.append(projects: [NewProject(name: "a", repositories: ["o/b"])])
         }
-        #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project `b` lists repository `O/B` twice (names aren't case-sensitive)")])) {
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project `b` lists repository `O/B` twice (names aren't case-sensitive)")])) {
             try store.append(projects: [NewProject(name: "b", repositories: ["o/b", "O/B"])])
         }
         #expect(try contents(of: url) == valid)
@@ -192,12 +192,12 @@ struct ConfigStoreAppendTests {
 }
 
 @Suite("Configuration store: setting the layout")
-struct ConfigStoreLayoutTests {
+struct ConfigurationStoreLayoutTests {
     /// Writes `text`, reloads, sets the layout and returns the file after.
-    private func setLayout(_ layout: MenuLayout, in text: String) throws -> (text: String, store: ConfigStore) {
+    private func setLayout(_ layout: MenuLayout, in text: String) throws -> (text: String, store: ConfigurationStore) {
         let url = temporaryConfigURL()
         try write(text, to: url)
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         store.reload()
         try store.setLayout(layout)
         return (try contents(of: url), store)
@@ -331,7 +331,7 @@ struct ConfigStoreLayoutTests {
     @Test("a missing file is created with its header, whose example is uncommented")
     func missingFile() throws {
         let url = temporaryConfigURL()
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         try store.setLayout(.tabs)
         #expect(try contents(of: url) == Configuration.header
             .replacingOccurrences(of: "# [menu]\n# layout = \"list\"\n", with: "[menu]\nlayout = \"tabs\"\n"))
@@ -343,8 +343,8 @@ struct ConfigStoreLayoutTests {
         let url = temporaryConfigURL()
         let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"nope\"]\n"
         try write(broken, to: url)
-        let store = ConfigStore(url: url)
-        #expect(throws: ConfigError([ConfigIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {
+        let store = ConfigurationStore(url: url)
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {
             try store.setLayout(.tabs)
         }
         #expect(try contents(of: url) == broken)
@@ -355,9 +355,9 @@ struct ConfigStoreLayoutTests {
         let url = temporaryConfigURL()
         let inline = "menu = { layout = \"list\" }\n"
         try write(inline, to: url)
-        let store = ConfigStore(url: url)
+        let store = ConfigurationStore(url: url)
         store.reload()
-        #expect(throws: ConfigError([ConfigIssue(
+        #expect(throws: ConfigurationError([ConfigurationIssue(
             line: 1,
             message: "can't switch the layout: `[menu]` is written in a form shipyard doesn't edit; set `layout = \"tabs\"` under `[menu]` by hand"
         )])) {
@@ -369,19 +369,19 @@ struct ConfigStoreLayoutTests {
 }
 
 @Suite("Configuration store: location")
-struct ConfigStoreLocationTests {
+struct ConfigurationStoreLocationTests {
     let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
 
     @Test("the file is under XDG_CONFIG_HOME when it's set")
     func xdg() {
-        let url = ConfigStore.defaultURL(environment: ["XDG_CONFIG_HOME": "/tmp/xdg"], home: home)
+        let url = ConfigurationStore.defaultURL(environment: ["XDG_CONFIG_HOME": "/tmp/xdg"], home: home)
         #expect(url.path == "/tmp/xdg/shipyard/config.toml")
     }
 
     @Test("the file is under ~/.config otherwise")
     func fallback() {
         for environment in [[:], ["XDG_CONFIG_HOME": ""], ["XDG_CONFIG_HOME": "relative/path"]] {
-            let url = ConfigStore.defaultURL(environment: environment, home: home)
+            let url = ConfigurationStore.defaultURL(environment: environment, home: home)
             #expect(url.path == "/Users/someone/.config/shipyard/config.toml")
         }
     }

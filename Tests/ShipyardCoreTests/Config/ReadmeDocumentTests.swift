@@ -47,7 +47,7 @@ struct ReadmeDocumentTests {
         #expect(examples.count >= 4)
         let schema = try loadSchema()
         for example in examples {
-            do throws(ConfigError) {
+            do throws(ConfigurationError) {
                 let result = try Configuration.decode(example)
                 #expect(result.warnings.isEmpty, "warnings in:\n\(example)")
             } catch {

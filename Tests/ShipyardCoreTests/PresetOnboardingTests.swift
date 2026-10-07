@@ -121,7 +121,7 @@ struct PresetOnboardingTests {
         #expect(harness.shipyard.phase == .needsProjects)
         #expect(harness.shipyard.presets.isEmpty)
 
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
 
@@ -135,7 +135,7 @@ struct PresetOnboardingTests {
         let broken = "version = \n"
         let harness = try await onboarding(config: broken)
         #expect(harness.shipyard.presets.isEmpty)
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
         #expect(try contents(harness) == broken)
@@ -148,7 +148,7 @@ struct PresetOnboardingTests {
         let edited = Configuration.header + "\n[menu]\nlayout = \"tabs\"\n"
         try harness.writeConfig(edited)
 
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
 
@@ -164,7 +164,7 @@ struct PresetOnboardingTests {
         try await harness.shipyard.choosePreset(.reviewQueue)
         #expect(harness.shipyard.phase == .ready)
 
-        let store = ConfigStore(url: FileManager.default.temporaryDirectory
+        let store = ConfigurationStore(url: FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("config.toml"))
         store.reload()
@@ -176,10 +176,10 @@ struct PresetOnboardingTests {
     @Test("an invalid picked project writes nothing")
     func invalidProject() async throws {
         let harness = try await onboarding()
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.myAgents, projects: [NewProject(name: "shop", repositories: ["not a slug"])])
         }
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(
                 .incomingContributions,
                 projects: [NewProject(name: "Review requests", repositories: ["yabepa/shop"])]

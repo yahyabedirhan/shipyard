@@ -354,11 +354,11 @@ struct ShipyardCLITests {
 
     /// `shipyard <arguments>` as the Mac's `main.swift` assembles it, in an
     /// agent's shell whose environment is `shell` and whose home is
-    /// `home`: the configuration file is the one `ConfigLocation` finds
+    /// `home`: the configuration file is the one `ConfigurationLocation` finds
     /// beside `harness`'s app state, the folder the app writes for the CLI.
     private func shipyard(_ arguments: String..., in harness: Harness, shell: [String: String], home: URL) -> CommandResult {
         let filing = ProjectFiling(
-            configURL: ConfigLocation.current(environment: shell, home: home, support: harness.stateDirectory),
+            configURL: ConfigurationLocation.current(environment: shell, home: home, support: harness.stateDirectory),
             repositories: harness.repositoriesStore
         )
         return ShipyardCLI.run(

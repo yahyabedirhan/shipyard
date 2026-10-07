@@ -6,13 +6,13 @@ import Foundation
 /// in one JSON file, `config-location.json`, in its support folder beside
 /// `repositories.json`, and the command reads that path. Before the app has
 /// ever run there's no record, and the command looks the file up itself,
-/// as `ConfigStore.defaultURL` does. The format is private (ADR 0004): only
+/// as `ConfigurationStore.defaultURL` does. The format is private (ADR 0004): only
 /// the app writes it, only the command reads it.
 ///
 /// It fails safe: a missing file, one that doesn't read, one a newer build
 /// wrote or one whose path isn't absolute reads as no record. Each write
 /// replaces the file atomically, so the command reads a whole file or none.
-public enum ConfigLocation {
+public enum ConfigurationLocation {
     /// The version of the file format this build writes. A file with a
     /// newer one reads as no record.
     public static let currentVersion = 1
@@ -20,13 +20,13 @@ public enum ConfigLocation {
 
     /// The configuration file the command uses: the path the app recorded
     /// in `support` (`SupportFolder.app`; tests pass a temporary folder),
-    /// or `ConfigStore.defaultURL(environment:home:)` when it never has.
+    /// or `ConfigurationStore.defaultURL(environment:home:)` when it never has.
     public static func current(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         home: URL = FileManager.default.homeDirectoryForCurrentUser,
         support: URL
     ) -> URL {
-        recorded(in: support) ?? ConfigStore.defaultURL(environment: environment, home: home)
+        recorded(in: support) ?? ConfigurationStore.defaultURL(environment: environment, home: home)
     }
 
     /// The path the app last recorded in `support`, if any reads.

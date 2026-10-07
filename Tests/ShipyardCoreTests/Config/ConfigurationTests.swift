@@ -15,8 +15,8 @@ func decoded(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) 
 }
 
 /// The problems a rejected file is rejected for; fails the test if it decodes.
-func rejection(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) -> [ConfigIssue] {
-    do throws(ConfigError) {
+func rejection(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) -> [ConfigurationIssue] {
+    do throws(ConfigurationError) {
         _ = try Configuration.decode(text)
         Issue.record("expected the file to be rejected", sourceLocation: sourceLocation)
         return []
@@ -295,7 +295,7 @@ struct ConfigurationDecodingTests {
                 let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
                 let result = try #require(decoded(text))
                 let warned = event.isControl && !authors.isEmpty
-                #expect(result.warnings == (warned ? [ConfigIssue(
+                #expect(result.warnings == (warned ? [ConfigurationIssue(
                     line: 3,
                     message: "`authors` doesn't apply to `\(event.rawValue)`, which no item's author sends; it's ignored"
                 )] : []), "\(event.rawValue) with authors [\(list)]")
@@ -321,8 +321,8 @@ struct ConfigurationDecodingTests {
         ])
         let ignored = "is decided by `[[defaults.notifications]]` only; a project's rule for it is ignored"
         #expect(result.warnings == [
-            ConfigIssue(line: 6, message: "`control.started` \(ignored)"),
-            ConfigIssue(line: 7, message: "`control.ended` \(ignored)"),
+            ConfigurationIssue(line: 6, message: "`control.started` \(ignored)"),
+            ConfigurationIssue(line: 7, message: "`control.ended` \(ignored)"),
         ])
     }
 
@@ -356,7 +356,7 @@ struct ConfigurationValidationTests {
             [[defaults.notifications]]
             event = "pr.openned"
             """)
-        #expect(issues == [ConfigIssue(line: 2, message: "unknown event `pr.openned` (did you mean `pr.opened`?)")])
+        #expect(issues == [ConfigurationIssue(line: 2, message: "unknown event `pr.openned` (did you mean `pr.opened`?)")])
         #expect(issues.first?.description == "line 2: unknown event `pr.openned` (did you mean `pr.opened`?)")
     }
 
@@ -371,7 +371,7 @@ struct ConfigurationValidationTests {
               { event = "run.faild" },
             ]
             """)
-        #expect(issues == [ConfigIssue(line: 6, message: "unknown event `run.faild` (did you mean `run.failed`?)")])
+        #expect(issues == [ConfigurationIssue(line: 6, message: "unknown event `run.faild` (did you mean `run.failed`?)")])
     }
 
     @Test("an event nothing like a valid one lists the valid ones")
@@ -385,21 +385,21 @@ struct ConfigurationValidationTests {
     @Test("a rule without an event, and other unknown choices, are rejected")
     func otherChoices() {
         #expect(rejection("[[defaults.notifications]]\nauthors = \"me\"\n")
-            == [ConfigIssue(line: 1, message: "a notification rule needs an `event`")])
+            == [ConfigurationIssue(line: 1, message: "a notification rule needs an `event`")])
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"bot\"\n")
-            == [ConfigIssue(line: 3, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
+            == [ConfigurationIssue(line: 3, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
         #expect(rejection("[menu-bar]\ncount = \"per_kind\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `per_kind` for `count` (did you mean `per-kind`?)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `per_kind` for `count` (did you mean `per-kind`?)")])
         #expect(rejection("[menu]\nlayout = \"tab\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `tab` for `layout` (did you mean `tabs`?)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `tab` for `layout` (did you mean `tabs`?)")])
         #expect(rejection("[menu]\nlayout = \"grid\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `grid` for `layout` (expected one of `list`, `tabs`)")])
         #expect(rejection("[menu]\nlayout = 2\n")
-            == [ConfigIssue(line: 2, message: "`menu.layout` must be a string")])
+            == [ConfigurationIssue(line: 2, message: "`menu.layout` must be a string")])
         #expect(rejection("[rate-limit]\nshow = \"sometimes\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
         #expect(rejection("[defaults.workflow-runs]\nbranches = \"al\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
     }
 
     @Test("header-counts lists the kinds with a header slot, each once, globally")
@@ -411,36 +411,36 @@ struct ConfigurationValidationTests {
         #expect(subset.configuration.menu.headerCounts == [.ping, .issue])
         #expect(subset.warnings.isEmpty)
         #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pull-request\",\n]\n")
-            == [ConfigIssue(line: 4, message: "unknown kind `pull-request` in `header-counts` (did you mean `pull-requests`?)")])
+            == [ConfigurationIssue(line: 4, message: "unknown kind `pull-request` in `header-counts` (did you mean `pull-requests`?)")])
         #expect(rejection("[menu]\nheader-counts = [\"issues\", \"pings\", \"issues\"]\n")
-            == [ConfigIssue(line: 2, message: "`issues` is listed twice in `header-counts`")])
+            == [ConfigurationIssue(line: 2, message: "`issues` is listed twice in `header-counts`")])
         // Across lines, the error is on the repeated copy's line.
         #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pings\",\n  \"issues\",\n]\n")
-            == [ConfigIssue(line: 5, message: "`issues` is listed twice in `header-counts`")])
+            == [ConfigurationIssue(line: 5, message: "`issues` is listed twice in `header-counts`")])
         // A project can't set it: it's ignored there, with a warning.
         let project = try #require(decoded("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
         #expect(project.configuration.menu.headerCounts == Configuration.Menu().headerCounts)
-        #expect(project.warnings == [ConfigIssue(line: 4, message: "unknown setting `projects[0].header-counts` (ignored)")])
+        #expect(project.warnings == [ConfigurationIssue(line: 4, message: "unknown setting `projects[0].header-counts` (ignored)")])
     }
 
     @Test("an unknown group-by or sort-by is rejected with the nearest valid one")
     func arrangementChoices() {
         #expect(rejection("[defaults]\ngroup-by = \"repo\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `repo` for `group-by` (expected one of `kind`, `repository`, `date`, `author`, `none`)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `repo` for `group-by` (expected one of `kind`, `repository`, `date`, `author`, `none`)")])
         #expect(rejection("[defaults]\ngroup-by = \"repositories\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `repositories` for `group-by` (did you mean `repository`?)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `repositories` for `group-by` (did you mean `repository`?)")])
         #expect(rejection("[defaults]\nsort-by = \"update\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `update` for `sort-by` (did you mean `updated`?)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `update` for `sort-by` (did you mean `updated`?)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\ngroup-by = \"authors\"\n")
-            == [ConfigIssue(line: 4, message: "unknown value `authors` for `group-by` (did you mean `author`?)")])
+            == [ConfigurationIssue(line: 4, message: "unknown value `authors` for `group-by` (did you mean `author`?)")])
         #expect(rejection("[defaults]\nsort-by = \"oldest\"\n")
-            == [ConfigIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
+            == [ConfigurationIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
         #expect(rejection("[defaults]\nsubsections = \"yes\"\n")
-            == [ConfigIssue(line: 2, message: "`defaults.subsections` must be true or false")])
+            == [ConfigurationIssue(line: 2, message: "`defaults.subsections` must be true or false")])
         #expect(rejection("[defaults]\nshow-first = -1\n")
-            == [ConfigIssue(line: 2, message: "`show-first` can't be negative (got -1)")])
+            == [ConfigurationIssue(line: 2, message: "`show-first` can't be negative (got -1)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nshow-first = \"5\"\n")
-            == [ConfigIssue(line: 4, message: "`projects[0].show-first` must be a whole number")])
+            == [ConfigurationIssue(line: 4, message: "`projects[0].show-first` must be a whole number")])
     }
 
     @Test("a project's arrangement merges key by key onto the defaults")
@@ -481,10 +481,10 @@ struct ConfigurationValidationTests {
             ]
             """)
         #expect(issues == [
-            ConfigIssue(line: 5, message: "unknown repository group `just-a-name` (did you mean `just-a-name/*`, or a repository as `just-a-name/name`?)"),
-            ConfigIssue(line: 6, message: "repository `o/b/c` isn't `owner/name` or `owner/*`"),
-            ConfigIssue(line: 7, message: "repository `/x` isn't `owner/name` or `owner/*`"),
-            ConfigIssue(line: 8, message: "repository `o/` isn't `owner/name` or `owner/*`"),
+            ConfigurationIssue(line: 5, message: "unknown repository group `just-a-name` (did you mean `just-a-name/*`, or a repository as `just-a-name/name`?)"),
+            ConfigurationIssue(line: 6, message: "repository `o/b/c` isn't `owner/name` or `owner/*`"),
+            ConfigurationIssue(line: 7, message: "repository `/x` isn't `owner/name` or `owner/*`"),
+            ConfigurationIssue(line: 8, message: "repository `o/` isn't `owner/name` or `owner/*`"),
         ])
         #expect(GitRemote.isRepositorySlug("yahyabedirhan/e-commerce_v2.api"))
     }
@@ -506,21 +506,21 @@ struct ConfigurationValidationTests {
             repositories = ["o/r"]
             """)
         #expect(issues == [
-            ConfigIssue(line: 6, message: "project `a` lists repository `o/r` twice (names aren't case-sensitive)"),
-            ConfigIssue(line: 7, message: "project `a` lists repository `O/R` twice (names aren't case-sensitive)"),
+            ConfigurationIssue(line: 6, message: "project `a` lists repository `o/r` twice (names aren't case-sensitive)"),
+            ConfigurationIssue(line: 7, message: "project `a` lists repository `O/R` twice (names aren't case-sensitive)"),
         ])
     }
 
     @Test("a project needs a name and at least one repository")
     func projectRequirements() {
         #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n")
-            == [ConfigIssue(line: 1, message: "a project needs a `name`")])
+            == [ConfigurationIssue(line: 1, message: "a project needs a `name`")])
         #expect(rejection("[[projects]]\nname = \"a\"\n")
-            == [ConfigIssue(line: 1, message: "project `a` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)")])
+            == [ConfigurationIssue(line: 1, message: "project `a` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = []\n")
-            == [ConfigIssue(line: 3, message: "project `a` needs at least one repository")])
+            == [ConfigurationIssue(line: 3, message: "project `a` needs at least one repository")])
         #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")
-            == [ConfigIssue(line: 2, message: "a project's `name` can't be empty")])
+            == [ConfigurationIssue(line: 2, message: "a project's `name` can't be empty")])
     }
 
     @Test("duplicate project names are rejected")
@@ -534,13 +534,13 @@ struct ConfigurationValidationTests {
             name = "a"
             repositories = ["o/b"]
             """)
-        #expect(issues == [ConfigIssue(line: 6, message: "project name `a` is used twice (first on line 2)")])
+        #expect(issues == [ConfigurationIssue(line: 6, message: "project name `a` is used twice (first on line 2)")])
     }
 
     @Test("review-requested must be true or false, and a project's overrides the default")
     func reviewRequested() throws {
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
-            == [ConfigIssue(line: 4, message: "`projects[0].pull-requests.review-requested` must be true or false")])
+            == [ConfigurationIssue(line: 4, message: "`projects[0].pull-requests.review-requested` must be true or false")])
 
         let config = try #require(decoded("""
             [defaults.pull-requests]
@@ -562,20 +562,20 @@ struct ConfigurationValidationTests {
     @Test("negative windows are rejected")
     func negativeWindows() {
         #expect(rejection("[defaults.pull-requests]\nclosed-window = \"-1d\"\n")
-            == [ConfigIssue(line: 2, message: "`closed-window` can't be negative (got \"-1d\")")])
+            == [ConfigurationIssue(line: 2, message: "`closed-window` can't be negative (got \"-1d\")")])
         #expect(rejection("[defaults.issues]\nclosed-window = \"-2h\"\n")
-            == [ConfigIssue(line: 2, message: "`closed-window` can't be negative (got \"-2h\")")])
+            == [ConfigurationIssue(line: 2, message: "`closed-window` can't be negative (got \"-2h\")")])
         #expect(rejection("[defaults.workflow-runs]\nfinished-window = \"-3m\"\n")
-            == [ConfigIssue(line: 2, message: "`finished-window` can't be negative (got \"-3m\")")])
+            == [ConfigurationIssue(line: 2, message: "`finished-window` can't be negative (got \"-3m\")")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"-4s\" }\n")
-            == [ConfigIssue(line: 4, message: "`closed-window` can't be negative (got \"-4s\")")])
+            == [ConfigurationIssue(line: 4, message: "`closed-window` can't be negative (got \"-4s\")")])
         #expect(decoded("[defaults.pull-requests]\nclosed-window = \"0s\"\n")?.configuration.defaults.pullRequests.closedWindow == 0)
     }
 
     @Test("an interval under 30 seconds is rejected")
     func interval() {
         #expect(rejection("refresh-interval-seconds = 29\n")
-            == [ConfigIssue(line: 1, message: "`refresh-interval-seconds` must be at least 30 (got 29)")])
+            == [ConfigurationIssue(line: 1, message: "`refresh-interval-seconds` must be at least 30 (got 29)")])
         #expect(decoded("refresh-interval-seconds = 30\n")?.configuration.refreshIntervalSeconds == 30)
     }
 
@@ -583,7 +583,7 @@ struct ConfigurationValidationTests {
     func share() {
         for share in [0, 51, -5] {
             #expect(rejection("[rate-limit]\nmax-share-percent = \(share)\n")
-                == [ConfigIssue(line: 2, message: "`max-share-percent` must be between 1 and 50 (got \(share))")])
+                == [ConfigurationIssue(line: 2, message: "`max-share-percent` must be between 1 and 50 (got \(share))")])
         }
         for share in [1, 50] {
             #expect(decoded("[rate-limit]\nmax-share-percent = \(share)\n")?.configuration.rateLimit.maxSharePercent == share)
@@ -593,19 +593,19 @@ struct ConfigurationValidationTests {
     @Test("a value of the wrong type is rejected with its line")
     func wrongTypes() {
         #expect(rejection("version = 1\nlaunch-at-login = \"yes\"\n")
-            == [ConfigIssue(line: 2, message: "`launch-at-login` must be true or false")])
+            == [ConfigurationIssue(line: 2, message: "`launch-at-login` must be true or false")])
         #expect(rejection("refresh-interval-seconds = 90.5\n")
-            == [ConfigIssue(line: 1, message: "`refresh-interval-seconds` must be a whole number")])
+            == [ConfigurationIssue(line: 1, message: "`refresh-interval-seconds` must be a whole number")])
         #expect(rejection("hide-authors = \"dependabot[bot]\"\n")
-            == [ConfigIssue(line: 1, message: "`hide-authors` must be a list of strings")])
+            == [ConfigurationIssue(line: 1, message: "`hide-authors` must be a list of strings")])
         #expect(rejection("menu-bar = 3\n")
-            == [ConfigIssue(line: 1, message: "`menu-bar` must be a table")])
+            == [ConfigurationIssue(line: 1, message: "`menu-bar` must be a table")])
     }
 
     @Test("an unsupported version is rejected")
     func version() {
         #expect(rejection("version = 2\n")
-            == [ConfigIssue(line: 1, message: "`version` 2 isn't supported; this shipyard reads version 1")])
+            == [ConfigurationIssue(line: 1, message: "`version` 2 isn't supported; this shipyard reads version 1")])
     }
 
     @Test("every problem in the file is reported, in order")
@@ -616,7 +616,7 @@ struct ConfigurationValidationTests {
             max-share-percent = 90
             """)
         #expect(issues.map(\.line) == [1, 3])
-        let error = ConfigError(issues)
+        let error = ConfigurationError(issues)
         #expect(error.line == 1)
         #expect(error.message == "`refresh-interval-seconds` must be at least 30 (got 10)")
     }
@@ -642,10 +642,10 @@ struct ConfigurationWarningTests {
         #expect(result.configuration.attention.unseen)
         #expect(result.configuration.projects.map(\.name) == ["a"])
         #expect(Set(result.warnings) == [
-            ConfigIssue(line: 1, message: "unknown setting `refreshIntervalSeconds` (ignored; did you mean `refresh-interval-seconds`?)"),
-            ConfigIssue(line: 2, message: "unknown setting `theme` (ignored)"),
-            ConfigIssue(line: 5, message: "unknown setting `attention.unseeen` (ignored; did you mean `unseen`?)"),
-            ConfigIssue(line: 10, message: "unknown setting `projects[0].colour` (ignored)"),
+            ConfigurationIssue(line: 1, message: "unknown setting `refreshIntervalSeconds` (ignored; did you mean `refresh-interval-seconds`?)"),
+            ConfigurationIssue(line: 2, message: "unknown setting `theme` (ignored)"),
+            ConfigurationIssue(line: 5, message: "unknown setting `attention.unseeen` (ignored; did you mean `unseen`?)"),
+            ConfigurationIssue(line: 10, message: "unknown setting `projects[0].colour` (ignored)"),
         ])
     }
 }

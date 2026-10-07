@@ -84,9 +84,9 @@ struct DemoRunTests {
         #expect(harness.section("shipyard")?.rows.filter { $0.kind == .ping }.map(\.title) == ["In the demo"])
         let written = try FileManager.default.contentsOfDirectory(atPath: demoSupport.path).sorted()
         #expect(written == [
-            AppStateStore.fileName, "Pings", ConfigLocation.fileName, ConfigStatusStore.fileName, ResolvedRepositoriesStore.fileName,
+            AppStateStore.fileName, "Pings", ConfigurationLocation.fileName, ConfigStatusStore.fileName, ResolvedRepositoriesStore.fileName,
         ].sorted())
-        #expect(ConfigLocation.recorded(in: demoSupport) == demoConfig)
+        #expect(ConfigurationLocation.recorded(in: demoSupport) == demoConfig)
         // The socket the command waited at is the one this app listens on, and later commands find it.
         #expect(app.asked.current.last == ControlSocket.url(in: harness.files.support))
         try Data().write(to: ControlSocket.url(in: harness.files.support))   // the app's server listening
@@ -96,7 +96,7 @@ struct DemoRunTests {
         let userPings = PingStore(directory: PingStore.appDirectory(in: userSupport))
         var userTable = CommandTable()
         userTable.add(PingCommands.entries(
-            filing: ProjectFiling(configURL: ConfigLocation.current(environment: [:], home: home, support: userSupport),
+            filing: ProjectFiling(configURL: ConfigurationLocation.current(environment: [:], home: home, support: userSupport),
                                   repositories: ResolvedRepositoriesStore(directory: userSupport)),
             store: userPings
         ))

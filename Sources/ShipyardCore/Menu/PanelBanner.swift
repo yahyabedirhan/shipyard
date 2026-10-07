@@ -100,8 +100,8 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
     /// (`notificationsOff`).
     public static func list(
         lease: Lease = Lease(),
-        configError: ConfigError?,
-        configWarnings: [ConfigIssue],
+        configError: ConfigurationError?,
+        configWarnings: [ConfigurationIssue],
         ready: Bool,
         menu: MenuModel,
         notes: NotesNotice? = nil,

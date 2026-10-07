@@ -679,7 +679,7 @@ public struct ProjectSettings: Equatable, Sendable {
 // MARK: - Problems
 
 /// One problem found in the file, with the line it's on when known.
-public struct ConfigIssue: Hashable, Sendable, CustomStringConvertible {
+public struct ConfigurationIssue: Hashable, Sendable, CustomStringConvertible {
     /// 1-based line in `config.toml`, when the problem can be placed.
     public var line: Int?
     public var message: String
@@ -697,12 +697,12 @@ public struct ConfigIssue: Hashable, Sendable, CustomStringConvertible {
 
 /// Why the file was rejected. The store keeps the last valid configuration
 /// and exposes this for the panel's banner.
-public struct ConfigError: Error, Equatable, Sendable, CustomStringConvertible {
+public struct ConfigurationError: Error, Equatable, Sendable, CustomStringConvertible {
     /// Every problem found, in file order where known; never empty.
-    public var issues: [ConfigIssue]
+    public var issues: [ConfigurationIssue]
 
-    public init(_ issues: [ConfigIssue]) {
-        precondition(!issues.isEmpty, "a ConfigError needs at least one issue")
+    public init(_ issues: [ConfigurationIssue]) {
+        precondition(!issues.isEmpty, "a ConfigurationError needs at least one issue")
         self.issues = issues
     }
 

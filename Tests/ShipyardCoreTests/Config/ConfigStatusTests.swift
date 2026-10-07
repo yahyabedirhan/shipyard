@@ -154,7 +154,7 @@ struct ConfigStatusTests {
             checked: date("2026-09-25T12:00:00Z"),
             config: URL(fileURLWithPath: "/tmp/config.toml"),
             configModified: nil,
-            error: ConfigError([ConfigIssue(line: nil, message: "the file isn't UTF-8 text")]),
+            error: ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")]),
             warnings: []
         )
         let json = try #require(try JSONSerialization.jsonObject(with: ConfigStatusStore.encode(status)) as? [String: Any])

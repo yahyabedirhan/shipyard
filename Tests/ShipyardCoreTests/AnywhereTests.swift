@@ -200,7 +200,7 @@ struct AnywhereTests {
             """)
         await harness.shipyard.reloadConfiguration()
 
-        #expect(harness.shipyard.configError?.issues == [ConfigIssue(
+        #expect(harness.shipyard.configError?.issues == [ConfigurationIssue(
             line: 3,
             message: "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs"
         )])

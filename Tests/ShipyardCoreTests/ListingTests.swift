@@ -378,7 +378,7 @@ struct ListingTests {
         let harness = try await Harness.started(config: shop(), graphQL: shopAnswer(pr(1), pr(2, author: "octocat")))
         try await harness.reconfigure(shop(authors: #"{ hide = ["bot"] }"#), answering: shopAnswer(pr(1), pr(2, author: "octocat")))
         let error = try #require(harness.shipyard.configError)
-        #expect(error.issues == [ConfigIssue(line: 4, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
+        #expect(error.issues == [ConfigurationIssue(line: 4, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
         #expect(harness.numbers("shop")?.sorted() == [1, 2])
     }
 

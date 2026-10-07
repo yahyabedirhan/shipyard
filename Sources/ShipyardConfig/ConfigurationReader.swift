@@ -6,9 +6,9 @@ extension Configuration {
     /// A valid configuration and the warnings found on the way (unknown keys).
     public struct Decoded: Equatable, Sendable {
         public var configuration: Configuration
-        public var warnings: [ConfigIssue]
+        public var warnings: [ConfigurationIssue]
 
-        public init(configuration: Configuration, warnings: [ConfigIssue] = []) {
+        public init(configuration: Configuration, warnings: [ConfigurationIssue] = []) {
             self.configuration = configuration
             self.warnings = warnings
         }
@@ -16,9 +16,9 @@ extension Configuration {
 
     /// Reads and validates `config.toml`. Empty data is the default
     /// configuration with no projects.
-    public static func decode(_ data: Data) throws(ConfigError) -> Decoded {
+    public static func decode(_ data: Data) throws(ConfigurationError) -> Decoded {
         guard let text = String(data: data, encoding: .utf8) else {
-            throw ConfigError([ConfigIssue(line: nil, message: "the file isn't UTF-8 text")])
+            throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
         return try decode(text)
     }
@@ -31,21 +31,21 @@ extension Configuration {
     /// duplicate project names, negative windows, an interval under 30 s, a
     /// rate-limit share outside 1–50 and an unsupported `version`. Unknown
     /// keys are warnings, so a newer file doesn't break an older app.
-    public static func decode(_ text: String) throws(ConfigError) -> Decoded {
+    public static func decode(_ text: String) throws(ConfigurationError) -> Decoded {
         let root: TOMLTable
         do {
             root = try TOMLTable(source: text)
         } catch {
-            throw ConfigError([ConfigIssue(invalidTOML: error)])
+            throw ConfigurationError([ConfigurationIssue(invalidTOML: error)])
         }
         let reader = ConfigurationReader(map: TOMLSourceMap(text))
         let configuration = reader.configuration(from: root)
-        if !reader.errors.isEmpty { throw ConfigError(reader.errors) }
+        if !reader.errors.isEmpty { throw ConfigurationError(reader.errors) }
         return Decoded(configuration: configuration, warnings: reader.warnings)
     }
 }
 
-extension ConfigIssue {
+extension ConfigurationIssue {
     /// TOMLDecoder's parse errors carry the line only in their description,
     /// as "(Line 3) Syntax error: …".
     init(invalidTOML error: any Error) {
@@ -67,8 +67,8 @@ extension ConfigIssue {
 /// collecting errors (which reject the file) and warnings (which don't).
 final class ConfigurationReader {
     private let map: TOMLSourceMap
-    private(set) var errors: [ConfigIssue] = []
-    private(set) var warnings: [ConfigIssue] = []
+    private(set) var errors: [ConfigurationIssue] = []
+    private(set) var warnings: [ConfigurationIssue] = []
 
     init(map: TOMLSourceMap) { self.map = map }
 
@@ -253,10 +253,10 @@ final class ConfigurationReader {
                 selectors.append(selector)
                 // GitHub's names aren't case-sensitive: `o/r` and `O/R` are one repository.
                 if !listed.insert(repository.lowercased()).inserted {
-                    errors.append(ConfigIssue(line: line, message: Self.duplicateRepositoryMessage(repository, project: name ?? "")))
+                    errors.append(ConfigurationIssue(line: line, message: Self.duplicateRepositoryMessage(repository, project: name ?? "")))
                 }
             } catch {
-                errors.append(ConfigIssue(line: line, message: error.message))
+                errors.append(ConfigurationIssue(line: line, message: error.message))
             }
         }
         guard let name, repositories != nil else { return nil }
@@ -275,7 +275,7 @@ final class ConfigurationReader {
         )
         if selectors.contains(.anywhere), !Self.allowsAnywhere(project, defaults: defaults) {
             let line = map.line(for: node.path + [.key("repositories")], value: RepositorySelector.anywhereName, occurrence: 0)
-            errors.append(ConfigIssue(line: line, message: Self.anywhereMessage))
+            errors.append(ConfigurationIssue(line: line, message: Self.anywhereMessage))
         }
         return project
     }
@@ -407,12 +407,12 @@ final class ConfigurationReader {
             guard let kind = ItemKind(commandName: text) else {
                 let hint = Suggestion.nearest(to: text, in: valid).map { "did you mean `\($0)`?" }
                     ?? "expected " + valid.map { "`\($0)`" }.joined(separator: ", ")
-                errors.append(ConfigIssue(line: line, message: "unknown kind `\(text)` in `header-counts` (\(hint))"))
+                errors.append(ConfigurationIssue(line: line, message: "unknown kind `\(text)` in `header-counts` (\(hint))"))
                 readable = false
                 continue
             }
             if kinds.contains(kind) {
-                errors.append(ConfigIssue(line: line, message: "`\(text)` is listed twice in `header-counts`"))
+                errors.append(ConfigurationIssue(line: line, message: "`\(text)` is listed twice in `header-counts`"))
                 readable = false
             }
             kinds.append(kind)
@@ -435,7 +435,7 @@ final class ConfigurationReader {
         defaults.issues.authors.hide += selectors
         defaults.workflowRuns.authors.hide += selectors
         let written = selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ")
-        warnings.append(ConfigIssue(
+        warnings.append(ConfigurationIssue(
             line: map.line(for: path),
             message: "`hide-authors` is the old form: it's read as `authors = { hide = [\(written)] }` "
                 + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
@@ -467,12 +467,12 @@ final class ConfigurationReader {
     private func warnControlRule(_ event: EventKind, at node: Node, inProject: Bool, authors: [AuthorSelector]) {
         let name = "`\(event.rawValue)`"
         if inProject {
-            warnings.append(ConfigIssue(
+            warnings.append(ConfigurationIssue(
                 line: map.line(for: node.path + [.key("event")], value: event.rawValue),
                 message: "\(name) is decided by `[[defaults.notifications]]` only; a project's rule for it is ignored"
             ))
         } else if !authors.isEmpty {
-            warnings.append(ConfigIssue(
+            warnings.append(ConfigurationIssue(
                 line: map.line(for: node.path + [.key("authors")]),
                 message: "`authors` doesn't apply to \(name), which no item's author sends; it's ignored"
             ))
@@ -496,7 +496,7 @@ final class ConfigurationReader {
         let selectors = old == "any" ? [] : [try! AuthorSelector(parsing: old)]
         let written = "[" + selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ") + "]"
         let advice = old == "any" ? "write `authors = []`, or leave it out, for everyone" : "write `authors = \(written)`"
-        warnings.append(ConfigIssue(
+        warnings.append(ConfigurationIssue(
             line: map.line(for: path, value: old),
             message: "`authors = \"\(old)\"` is the old form of a notification rule's authors; \(advice)"
         ))
@@ -533,10 +533,10 @@ final class ConfigurationReader {
             return nil
         }
         guard let count = self.window(node, old),
-              let seconds = WindowDuration.units.first(where: { $0.unit == unit })?.seconds
+              let seconds = ConfigurationDuration.units.first(where: { $0.unit == unit })?.seconds
         else { return nil }
         let written = count == 0 ? "0" : "\(count)\(unit)"
-        warnings.append(ConfigIssue(
+        warnings.append(ConfigurationIssue(
             line: map.line(for: oldPath),
             message: "`\(old)` is the old form: it's read as `\(key) = \(Configuration.tomlString(written))`; write that instead"
         ))
@@ -552,8 +552,8 @@ final class ConfigurationReader {
             error("`\(path.dotted)` must be a string: \(Self.windowForm)", at: path)
             return nil
         }
-        do throws(WindowDuration.Rejection) {
-            return try WindowDuration.parse(text)
+        do throws(ConfigurationDuration.Rejection) {
+            return try ConfigurationDuration.parse(text)
         } catch {
             switch error {
             case .negative:
@@ -586,7 +586,7 @@ final class ConfigurationReader {
             let line = map.line(for: node.path + [.key("name")])
             if let first = firstLine[name] {
                 let earlier = first.map { " (first on line \($0))" } ?? ""
-                errors.append(ConfigIssue(line: line, message: "project name `\(name)` is used twice\(earlier)"))
+                errors.append(ConfigurationIssue(line: line, message: "project name `\(name)` is used twice\(earlier)"))
             } else {
                 firstLine[name] = .some(line)
             }
@@ -706,18 +706,18 @@ final class ConfigurationReader {
         for key in node.table.keys where !known.contains(key) {
             let path = node.path + [.key(key)]
             let hint = Suggestion.nearest(to: key, in: known).map { "; did you mean `\($0)`?" } ?? ""
-            warnings.append(ConfigIssue(line: map.line(for: path), message: "unknown setting `\(path.dotted)` (ignored\(hint))"))
+            warnings.append(ConfigurationIssue(line: map.line(for: path), message: "unknown setting `\(path.dotted)` (ignored\(hint))"))
         }
     }
 
     private func typeError(_ node: Node, _ key: String, expected: String, _ underlying: any Error) {
         let path = node.path + [.key(key)]
-        let (tomlLine, _) = ConfigIssue.splitLine(from: String(describing: underlying))
-        errors.append(ConfigIssue(line: tomlLine ?? map.line(for: path), message: "`\(path.dotted)` must be \(expected)"))
+        let (tomlLine, _) = ConfigurationIssue.splitLine(from: String(describing: underlying))
+        errors.append(ConfigurationIssue(line: tomlLine ?? map.line(for: path), message: "`\(path.dotted)` must be \(expected)"))
     }
 
     private func error(_ message: String, at path: ConfigPath, value: String? = nil) {
-        errors.append(ConfigIssue(line: map.line(for: path, value: value), message: message))
+        errors.append(ConfigurationIssue(line: map.line(for: path, value: value), message: message))
     }
 }
 

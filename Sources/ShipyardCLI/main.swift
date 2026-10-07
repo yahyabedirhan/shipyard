@@ -26,7 +26,7 @@ var table = CommandTable()
 // against the user's own config.toml into their own store, and `app` finds
 // the demo through the pointer `app open --demo` leaves (`ControlSocket.locate`).
 let support = SupportFolder.app(environment: environment)
-let configURL = ConfigLocation.current(environment: environment, support: support)
+let configURL = ConfigurationLocation.current(environment: environment, support: support)
 // The commands that read cli.toml take it with their entries.
 let settings = CLISettingsFile.beside(config: configURL)
 table.add(PingCommands.entries(

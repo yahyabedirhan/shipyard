@@ -13,11 +13,11 @@ public struct ConfigStatus: Equatable, Sendable {
     /// no file (the defaults, accepted).
     public var configModified: Date?
     /// Why the file was rejected; `nil` when it was accepted.
-    public var error: ConfigError?
+    public var error: ConfigurationError?
     /// Unknown settings an accepted file has, which the app ignores, and old forms it still reads.
-    public var warnings: [ConfigIssue]
+    public var warnings: [ConfigurationIssue]
 
-    public init(checked: Date, config: URL, configModified: Date?, error: ConfigError?, warnings: [ConfigIssue]) {
+    public init(checked: Date, config: URL, configModified: Date?, error: ConfigurationError?, warnings: [ConfigurationIssue]) {
         self.checked = checked
         self.config = config
         self.configModified = configModified
@@ -54,7 +54,7 @@ extension ConfigStatus: Encodable {
         var message: String
         var banner: String
 
-        init(_ issue: ConfigIssue) {
+        init(_ issue: ConfigurationIssue) {
             line = issue.line
             message = issue.message
             banner = PanelText.configIssue(issue)

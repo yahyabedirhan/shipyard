@@ -17,15 +17,15 @@ struct ConfigurationRemoteTests {
     @Test("a label starting with -, an empty one, or one listed twice is rejected at its line")
     func badLabels() {
         #expect(rejection("[remote]\nmachines = [\"--help\"]\n") == [
-            ConfigIssue(line: 2, message: "`--help` isn't a Herdr machine label: a label can't start with `-`"),
+            ConfigurationIssue(line: 2, message: "`--help` isn't a Herdr machine label: a label can't start with `-`"),
         ])
         #expect(rejection("[remote]\nmachines = [\" \"]\n") == [
-            ConfigIssue(line: 2, message: "a machine in `machines` is named by its Herdr label, which can't be empty"),
+            ConfigurationIssue(line: 2, message: "a machine in `machines` is named by its Herdr label, which can't be empty"),
         ])
         #expect(rejection("[remote]\nmachines = [\"vps\", \"vps \"]\n") == [
-            ConfigIssue(line: 2, message: "`vps` is listed twice in `machines`"),
+            ConfigurationIssue(line: 2, message: "`vps` is listed twice in `machines`"),
         ])
-        #expect(rejection("[remote]\nmachines = \"vps\"\n") == [ConfigIssue(line: 2, message: "`remote.machines` must be a list of strings")])
+        #expect(rejection("[remote]\nmachines = \"vps\"\n") == [ConfigurationIssue(line: 2, message: "`remote.machines` must be a list of strings")])
     }
 
     @Test("a machine can't share a project's name, since its section is named after it")
@@ -39,14 +39,14 @@ struct ConfigurationRemoteTests {
             repositories = ["o/shop"]
             """)
         #expect(issues == [
-            ConfigIssue(line: 2, message: "`shop` is both a machine in `[remote] machines` and a project's name; rename the project, since a machine's pings list under its label"),
+            ConfigurationIssue(line: 2, message: "`shop` is both a machine in `[remote] machines` and a project's name; rename the project, since a machine's pings list under its label"),
         ])
     }
 
     @Test("an unknown key under [remote] is only a warning")
     func unknownKey() throws {
         let warnings = try #require(decoded("[remote]\nmachine = [\"vps\"]\n")).warnings
-        #expect(warnings == [ConfigIssue(line: 2, message: "unknown setting `remote.machine` (ignored; did you mean `machines`?)")])
+        #expect(warnings == [ConfigurationIssue(line: 2, message: "unknown setting `remote.machine` (ignored; did you mean `machines`?)")])
     }
 
     @Test("the schema rejects what validation rejects")

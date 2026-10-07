@@ -466,7 +466,7 @@ struct RefreshTests {
 
         #expect(harness.shipyard.configError == nil)
         #expect(harness.shipyard.configWarnings == [
-            ConfigIssue(line: 1, message: "unknown setting `refresh-interval-second` (ignored; did you mean `refresh-interval-seconds`?)"),
+            ConfigurationIssue(line: 1, message: "unknown setting `refresh-interval-second` (ignored; did you mean `refresh-interval-seconds`?)"),
         ])
 
         try harness.writeConfig("refresh-interval-seconds = 300\n\n" + projects)

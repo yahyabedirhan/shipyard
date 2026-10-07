@@ -34,7 +34,7 @@ public struct AppFiles: Equatable, Sendable {
         environment: [String: String],
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) {
-        config = ConfigStore.defaultURL(environment: environment, home: home)
+        config = ConfigurationStore.defaultURL(environment: environment, home: home)
         support = SupportFolder.app(environment: environment)
         let configHome = environment["XDG_CONFIG_HOME"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0, isDirectory: true) : nil }
         demo = SupportFolder.moved(environment: environment).map { configHome ?? $0 }

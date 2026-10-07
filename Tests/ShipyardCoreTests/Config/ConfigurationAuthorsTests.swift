@@ -10,7 +10,7 @@ struct ConfigurationAuthorsTests {
         #expect(rejection("""
             [defaults.pull-requests]
             authors = { hide = ["me", "bots2"] }
-            """) == [ConfigIssue(line: 2, message: "unknown author `bots2` (did you mean `bots` or `@bots2`?)")])
+            """) == [ConfigurationIssue(line: 2, message: "unknown author `bots2` (did you mean `bots` or `@bots2`?)")])
         #expect(rejection("""
             [[projects]]
             name = "a"
@@ -19,7 +19,7 @@ struct ConfigurationAuthorsTests {
               "others",
               "dependabot",
             ] } }
-            """) == [ConfigIssue(line: 6, message: "unknown author `dependabot` (did you mean `@dependabot`?)")])
+            """) == [ConfigurationIssue(line: 6, message: "unknown author `dependabot` (did you mean `@dependabot`?)")])
     }
 
     @Test("a repository group or a repository in authors is rejected on its line, with a hint")
@@ -33,17 +33,17 @@ struct ConfigurationAuthorsTests {
             event = "pr.opened"
             authors = ["yahyabedirhan/shipyard"]
             """) == [
-                ConfigIssue(line: 2, message: "`owned` is a repository group; \(takes)"),
-                ConfigIssue(line: 6, message: "`yahyabedirhan/shipyard` is a repository; \(takes)"),
+                ConfigurationIssue(line: 2, message: "`owned` is a repository group; \(takes)"),
+                ConfigurationIssue(line: 6, message: "`yahyabedirhan/shipyard` is a repository; \(takes)"),
             ])
     }
 
     @Test("a kind's authors take only show and hide, as lists")
     func authorsShape() throws {
         #expect(rejection("[defaults.issues]\nauthors = [\"bots\"]\n")
-            == [ConfigIssue(line: 2, message: "`defaults.issues.authors` must be a table")])
+            == [ConfigurationIssue(line: 2, message: "`defaults.issues.authors` must be a table")])
         #expect(rejection("[defaults.issues]\nauthors = { hide = \"bots\" }\n")
-            == [ConfigIssue(line: 2, message: "`defaults.issues.authors.hide` must be a list of strings")])
+            == [ConfigurationIssue(line: 2, message: "`defaults.issues.authors.hide` must be a list of strings")])
         let result = try #require(decoded("[defaults.issues]\nauthors = { mute = [\"bots\"] }\n"))
         #expect(result.warnings.map(\.message) == ["unknown setting `defaults.issues.authors.mute` (ignored)"])
     }
@@ -62,7 +62,7 @@ struct ConfigurationAuthorsTests {
         #expect(defaults.pullRequests.authors == AuthorFilter(hide: hidden))
         #expect(defaults.issues.authors == AuthorFilter(hide: [.me] + hidden))
         #expect(defaults.workflowRuns.authors == AuthorFilter(hide: hidden))
-        #expect(result.warnings == [ConfigIssue(
+        #expect(result.warnings == [ConfigurationIssue(
             line: 2,
             message: "`hide-authors` is the old form: it's read as `authors = { hide = [\"@dependabot[bot]\", \"@Renovate[bot]\"] }` "
                 + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
@@ -95,16 +95,16 @@ struct ConfigurationAuthorsTests {
         ])
         let old = "is the old form of a notification rule's authors"
         #expect(result.warnings == [
-            ConfigIssue(line: 3, message: "`authors = \"any\"` \(old); write `authors = []`, or leave it out, for everyone"),
-            ConfigIssue(line: 7, message: "`authors = \"others\"` \(old); write `authors = [\"others\"]`"),
-            ConfigIssue(line: 12, message: "`authors = \"me\"` \(old); write `authors = [\"me\"]`"),
-            ConfigIssue(line: 12, message: "`authors = \"bots\"` \(old); write `authors = [\"bots\"]`"),
+            ConfigurationIssue(line: 3, message: "`authors = \"any\"` \(old); write `authors = []`, or leave it out, for everyone"),
+            ConfigurationIssue(line: 7, message: "`authors = \"others\"` \(old); write `authors = [\"others\"]`"),
+            ConfigurationIssue(line: 12, message: "`authors = \"me\"` \(old); write `authors = [\"me\"]`"),
+            ConfigurationIssue(line: 12, message: "`authors = \"bots\"` \(old); write `authors = [\"bots\"]`"),
         ])
     }
 
     @Test("a single selector written as a string is rejected: authors is a list")
     func singleStringSelector() {
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"@octocat\"\n")
-            == [ConfigIssue(line: 3, message: "`authors` is a list: write `authors = [\"@octocat\"]`")])
+            == [ConfigurationIssue(line: 3, message: "`authors` is a list: write `authors = [\"@octocat\"]`")])
     }
 }

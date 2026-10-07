@@ -11,17 +11,17 @@ struct ConfigurationWindowsTests {
             ("45s", 45), ("30m", 1800), ("12h", 43_200), ("7d", 604_800), ("0", 0), ("0s", 0), ("0m", 0), ("90m", 5400),
         ]
         for (text, seconds) in cases {
-            #expect(try WindowDuration.parse(text) == seconds, "\(text)")
+            #expect(try ConfigurationDuration.parse(text) == seconds, "\(text)")
         }
     }
 
     @Test("a window is written back in its largest whole unit")
     func text() {
-        #expect(WindowDuration.text(604_800) == "7d")
-        #expect(WindowDuration.text(10_800) == "3h")
-        #expect(WindowDuration.text(5400) == "90m")
-        #expect(WindowDuration.text(45) == "45s")
-        #expect(WindowDuration.text(0) == "0")
+        #expect(ConfigurationDuration.text(604_800) == "7d")
+        #expect(ConfigurationDuration.text(10_800) == "3h")
+        #expect(ConfigurationDuration.text(5400) == "90m")
+        #expect(ConfigurationDuration.text(45) == "45s")
+        #expect(ConfigurationDuration.text(0) == "0")
     }
 
     @Test("closed-window and finished-window set each kind's window, in the defaults and per project")
@@ -57,7 +57,7 @@ struct ConfigurationWindowsTests {
     @Test("a bad window is rejected with its line, what's allowed, and the nearest spelling")
     func rejections() {
         let allowed = "a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\""
-        func rejected(_ value: String, key: String = "closed-window", table: String = "pull-requests") -> [ConfigIssue] {
+        func rejected(_ value: String, key: String = "closed-window", table: String = "pull-requests") -> [ConfigurationIssue] {
             rejection("version = 1\n[defaults.\(table)]\n\(key) = \(value)\n")
         }
         let cases: [(String, String)] = [
@@ -74,12 +74,12 @@ struct ConfigurationWindowsTests {
             ("30", "`defaults.pull-requests.closed-window` must be a string: \(allowed)"),
         ]
         for (value, message) in cases {
-            #expect(rejected(value) == [ConfigIssue(line: 3, message: message)], "\(value)")
+            #expect(rejected(value) == [ConfigurationIssue(line: 3, message: message)], "\(value)")
         }
         #expect(rejected("\"3 hrs\"", key: "finished-window", table: "workflow-runs")
-            == [ConfigIssue(line: 3, message: "`finished-window` must be \(allowed) (got \"3 hrs\"; did you mean \"3h\"?)")])
+            == [ConfigurationIssue(line: 3, message: "`finished-window` must be \(allowed) (got \"3 hrs\"; did you mean \"3h\"?)")])
         #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"7 days\" }\n")
-            == [ConfigIssue(line: 4, message: "`closed-window` must be \(allowed) (got \"7 days\"; did you mean \"7d\"?)")])
+            == [ConfigurationIssue(line: 4, message: "`closed-window` must be \(allowed) (got \"7 days\"; did you mean \"7d\"?)")])
     }
 
     @Test("the old closed-window-days and finished-window-hours still read, with a warning naming the new key")
@@ -101,26 +101,26 @@ struct ConfigurationWindowsTests {
         #expect(config.defaults.workflowRuns.finishedWindow == 4 * 3600)
         #expect(config.settings(for: try #require(config.projects.first)).issues.closedWindow == 0)
         #expect(result.warnings == [
-            ConfigIssue(line: 2, message: "`closed-window-days` is the old form: it's read as `closed-window = \"3d\"`; write that instead"),
-            ConfigIssue(line: 5, message: "`finished-window-hours` is the old form: it's read as `finished-window = \"4h\"`; write that instead"),
-            ConfigIssue(line: 10, message: "`closed-window-days` is the old form: it's read as `closed-window = \"0\"`; write that instead"),
+            ConfigurationIssue(line: 2, message: "`closed-window-days` is the old form: it's read as `closed-window = \"3d\"`; write that instead"),
+            ConfigurationIssue(line: 5, message: "`finished-window-hours` is the old form: it's read as `finished-window = \"4h\"`; write that instead"),
+            ConfigurationIssue(line: 10, message: "`closed-window-days` is the old form: it's read as `closed-window = \"0\"`; write that instead"),
         ])
     }
 
     @Test("an old key that doesn't read is still rejected")
     func badOldKey() {
         #expect(rejection("[defaults.issues]\nclosed-window-days = -2\n")
-            == [ConfigIssue(line: 2, message: "`closed-window-days` can't be negative (got -2)")])
+            == [ConfigurationIssue(line: 2, message: "`closed-window-days` can't be negative (got -2)")])
         #expect(rejection("[defaults.workflow-runs]\nfinished-window-hours = \"3h\"\n")
-            == [ConfigIssue(line: 2, message: "`defaults.workflow-runs.finished-window-hours` must be a whole number")])
+            == [ConfigurationIssue(line: 2, message: "`defaults.workflow-runs.finished-window-hours` must be a whole number")])
     }
 
     @Test("the old and the new key in one table is an error on the old key's line")
     func bothKeys() {
-        #expect(rejection("[defaults.pull-requests]\nclosed-window = \"30m\"\nclosed-window-days = 1\n") == [ConfigIssue(
+        #expect(rejection("[defaults.pull-requests]\nclosed-window = \"30m\"\nclosed-window-days = 1\n") == [ConfigurationIssue(
             line: 3, message: "`closed-window-days` is the old form of `closed-window`, which this table sets too; delete `closed-window-days`"
         )])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigIssue(
+        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigurationIssue(
             line: 4, message: "`finished-window-hours` is the old form of `finished-window`, which this table sets too; delete `finished-window-hours`"
         )])
         // In different tables, the project's new key overrides the defaults' old one.
@@ -142,7 +142,7 @@ struct ConfigurationWindowsTests {
         let pattern = try #require(patterns.first)
         let samples = ["45s", "30m", "12h", "7d", "0", "0s", "007m", "30", "30min", "1h30m", "1.5h", "-5m", "", "30M", "2 h", " 3h", "3h "]
         for sample in samples {
-            let reads = (try? WindowDuration.parse(sample)) != nil
+            let reads = (try? ConfigurationDuration.parse(sample)) != nil
             let validates = sample.range(of: pattern, options: .regularExpression) != nil
             #expect(reads == validates, "`\(sample)`: the reader says \(reads), the schema \(validates)")
         }

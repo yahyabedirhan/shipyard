@@ -111,7 +111,7 @@ struct SkillDocumentTests {
         #expect(blocks.count >= 5)
         let schema = try loadSchema()
         for block in blocks {
-            do throws(ConfigError) {
+            do throws(ConfigurationError) {
                 let result = try Configuration.decode(block)
                 #expect(result.warnings.isEmpty, "warnings in:\n\(block)")
             } catch {
@@ -314,7 +314,7 @@ struct SkillDocumentTests {
         let text = try skill()
         let c = Configuration()
         func literal<T: RawRepresentable>(_ choice: T) -> String where T.RawValue == String { "\"\(choice.rawValue)\"" }
-        func window(_ seconds: TimeInterval) -> String { "\"\(WindowDuration.text(seconds))\"" }
+        func window(_ seconds: TimeInterval) -> String { "\"\(ConfigurationDuration.text(seconds))\"" }
         // A kind's states, in the order the file writes them, when the default is all of them.
         func states(_ kind: ItemKind, _ value: Set<StateGroup>) -> String {
             value == Set(StateGroup.all(for: kind)) ? "[" + StateGroup.all(for: kind).map(literal).joined(separator: ", ") + "]" : "?"

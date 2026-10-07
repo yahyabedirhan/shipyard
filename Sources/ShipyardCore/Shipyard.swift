@@ -128,13 +128,13 @@ public final class Shipyard {
     /// Why the configuration file was rejected, for the panel's banner;
     /// `nil` while it reads cleanly. Shipyard keeps running on the last
     /// valid configuration meanwhile.
-    public private(set) var configError: ConfigError? {
+    public private(set) var configError: ConfigurationError? {
         didSet { followBannerConditions() }
     }
     /// Unknown settings the last clean read ignored, and old forms it read,
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
-    public private(set) var configWarnings: [ConfigIssue] = [] {
+    public private(set) var configWarnings: [ConfigurationIssue] = [] {
         didSet { followBannerConditions() }
     }
     /// Whether macOS lets shipyard post notifications, as the app's
@@ -189,7 +189,7 @@ public final class Shipyard {
     /// refreshing (the menu model says why).
     public var canRefreshNow: Bool { budget.canRefresh(at: clock.now) }
 
-    public let configStore: ConfigStore
+    public let configStore: ConfigurationStore
     /// Seen items and collapsed projects, in `state.json`.
     public let appStateStore: AppStateStore
     /// The verdict on the configuration file after each reload, in
@@ -254,7 +254,7 @@ public final class Shipyard {
     @ObservationIgnored private var forceResolve = true
 
     public init(
-        configStore: ConfigStore,
+        configStore: ConfigurationStore,
         appStateStore: AppStateStore,
         configStatusStore: ConfigStatusStore,
         pingStore: PingStore,
@@ -321,7 +321,7 @@ public final class Shipyard {
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be
         // written leaves the CLI to its own lookup.
-        try? ConfigLocation.record(configStore.url, in: repositoriesStore.directory)
+        try? ConfigurationLocation.record(configStore.url, in: repositoriesStore.directory)
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
@@ -499,7 +499,7 @@ public final class Shipyard {
     /// (the store keeps the last valid configuration and its error). The
     /// app's configuration watcher calls this.
     @discardableResult
-    public func reloadConfiguration() async -> ConfigStore.ReloadResult {
+    public func reloadConfiguration() async -> ConfigurationStore.ReloadResult {
         let result = configStore.reload()
         await follow(result)
         return result
@@ -508,7 +508,7 @@ public final class Shipyard {
     /// Moves the phase with a reload's result, rebuilds the menu from the
     /// last snapshot and refreshes (or stops the timer). Only a valid change
     /// moves anything.
-    private func follow(_ result: ConfigStore.ReloadResult) async {
+    private func follow(_ result: ConfigurationStore.ReloadResult) async {
         publishConfigStatus()
         if case .changed(let configuration) = result {
             // New selectors, or `archived` and `forks` changed: look them up now.
@@ -599,11 +599,11 @@ public final class Shipyard {
     /// `[[projects]]` block each, appended after whatever is there, and
     /// follows the reload that comes after: with projects, the phase moves
     /// to `ready` and the first refresh runs, without a restart. Throws a
-    /// `ConfigError` (and writes nothing) for an empty name, a name already
+    /// `ConfigurationError` (and writes nothing) for an empty name, a name already
     /// used, a project without repositories or a slug that isn't
     /// `owner/name`; throws the file system's error when it can't write.
     @discardableResult
-    public func addProjects(_ projects: [NewProject]) async throws -> ConfigStore.ReloadResult {
+    public func addProjects(_ projects: [NewProject]) async throws -> ConfigurationStore.ReloadResult {
         let result = try configStore.append(projects: projects)
         await follow(result)
         return result
@@ -613,16 +613,16 @@ public final class Shipyard {
     /// `projects` as the repositories picked for it (none for
     /// `review-queue`, or for `incoming-contributions` watching `owned`), and
     /// follows the reload like `addProjects`: the phase moves to `ready` and
-    /// the first refresh runs, without a restart. Throws a `ConfigError`
+    /// the first refresh runs, without a restart. Throws a `ConfigurationError`
     /// (and writes nothing) when the file already holds settings besides
     /// `version`, which also stops offering presets, or when a project is
     /// invalid; throws the file system's error when it can't write.
     @discardableResult
-    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigStore.ReloadResult {
-        let result: ConfigStore.ReloadResult
+    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigurationStore.ReloadResult {
+        let result: ConfigurationStore.ReloadResult
         do {
             result = try configStore.writePreset(preset, projects: projects)
-        } catch let error as ConfigError where error == Configuration.presetRefused {
+        } catch let error as ConfigurationError where error == Configuration.presetRefused {
             // The file changed since the last reload: read it, so the panel
             // shows the plain picker.
             await reloadConfiguration()
@@ -644,10 +644,10 @@ public final class Shipyard {
         let next = configStore.lastValid.menu.layout.next
         do {
             await follow(try configStore.setLayout(next))
-        } catch let error as ConfigError {
+        } catch let error as ConfigurationError {
             configError = error
         } catch {
-            configError = ConfigError([ConfigIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
+            configError = ConfigurationError([ConfigurationIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
         }
     }
 

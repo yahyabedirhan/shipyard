@@ -43,9 +43,9 @@ struct CLISettingsTests {
     func onTheMac() throws {
         let support = root.appendingPathComponent("support", isDirectory: true)
         let home = URL(fileURLWithPath: "/Users/me", isDirectory: true)
-        let mac = { CLISettingsFile.beside(config: ConfigLocation.current(environment: [:], home: home, support: support)) }
+        let mac = { CLISettingsFile.beside(config: ConfigurationLocation.current(environment: [:], home: home, support: support)) }
         #expect(mac().url.path == "/Users/me/.config/shipyard/cli.toml")
-        try ConfigLocation.record(URL(fileURLWithPath: "/Users/me/dotfiles/shipyard/config.toml"), in: support)
+        try ConfigurationLocation.record(URL(fileURLWithPath: "/Users/me/dotfiles/shipyard/config.toml"), in: support)
         #expect(mac().url.path == "/Users/me/dotfiles/shipyard/cli.toml")
     }
 
