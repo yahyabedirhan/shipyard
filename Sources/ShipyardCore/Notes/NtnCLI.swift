@@ -95,13 +95,14 @@ public struct NtnCLI: HTTPTransport {
 
     /// The HTTP answer a run stands for: exit 0 is a 200 with what ntn
     /// printed; exit 4 a 401; exit 5 the status and code in ntn's error
-    /// line, with its message as Notion's error body. Any other exit, or an
-    /// error line without a status, is a 599 `NotionClient` reads as the
-    /// run's own failure.
+    /// line, with its message as Notion's error body. Any other exit, or no
+    /// error line with a status, is a 599 `NotionClient` reads as the run's
+    /// own failure, with ntn's error line.
     static func response(to url: URL, _ output: Output) -> (Data, HTTPURLResponse) {
-        let error = output.standardError
-            .split(whereSeparator: \.isNewline).first.map(String.init)?
-            .trimmingCharacters(in: .whitespaces) ?? "exit \(output.status)"
+        let lines = output.standardError
+            .split(whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
         let status: Int
         var body = Data()
         switch output.status {
@@ -111,10 +112,12 @@ public struct NtnCLI: HTTPTransport {
         case 4:
             status = 401
         default:
-            if output.status == 5, let failure = APIFailure(error) {
+            if output.status == 5, let failure = lines.lazy.compactMap(APIFailure.init).first {
                 status = failure.status
                 body = (try? JSONSerialization.data(withJSONObject: ["code": failure.code, "message": failure.message])) ?? Data()
             } else {
+                // A warning can come first: the error line is the one that says so.
+                let error = lines.first { $0.hasPrefix("error:") } ?? lines.first ?? "exit \(output.status)"
                 status = runFailed
                 body = (try? JSONSerialization.data(withJSONObject: ["message": "ntn: \(error)"])) ?? Data()
             }
@@ -124,8 +127,8 @@ public struct NtnCLI: HTTPTransport {
     }
 
     /// The status `response` gives a run that failed before Notion
-    /// answered (offline, ntn's own error): `NotionClient` reads it as
-    /// `NotionError.network`.
+    /// answered (offline, ntn's own error, a run that timed out):
+    /// `NotionClient` reads it as `NotionError.network`.
     static let runFailed = 599
 
     /// ntn's line for an API error: "error: Public API request failed
@@ -147,29 +150,60 @@ public struct NtnCLI: HTTPTransport {
         }
     }
 
-    /// Runs `ntn` with Foundation's `Process`: standard input empty, since
-    /// `ntn api` reads a request body from any standard input it's given
-    /// and would wait for it; both outputs read before waiting, so a full
-    /// pipe can't block it. Cancelling the task stops the run.
-    public static let runProcess: Run = { executable, arguments in
-        let run = NtnRun(executable: executable, arguments: arguments)
-        return await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    continuation.resume(returning: run.toEnd())
+    /// How long one run may take before it's stopped: a request is a
+    /// second or two, so this is ntn stuck (a prompt of its own, a stalled
+    /// network), and the notes read moves on rather than waiting for good.
+    public static let timeout: TimeInterval = 30
+
+    /// The exit status `processRunner` gives a run it stopped at its timeout.
+    static let timedOut: Int32 = 124
+
+    /// Runs `ntn` with Foundation's `Process` (`processRunner`), stopped
+    /// after `timeout`.
+    public static let runProcess: Run = processRunner(timeout: timeout)
+
+    /// Runs a program with Foundation's `Process`: standard input empty,
+    /// since `ntn api` reads a request body from any standard input it's
+    /// given and would wait for it; both outputs read before waiting, so a
+    /// full pipe can't block it. A run past `timeout` is stopped and ends
+    /// with exit `timedOut` and "error: didn't answer within …". Cancelling
+    /// the task stops the run, before or after its launch, and it ends with
+    /// `nil`. A stopped run gets SIGTERM, then SIGKILL a second later.
+    static func processRunner(timeout: TimeInterval) -> Run {
+        { executable, arguments in
+            let run = NtnRun(executable: executable, arguments: arguments)
+            return await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        continuation.resume(returning: run.toEnd())
+                    }
+                    DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                        run.stop(.timedOut(after: timeout))
+                    }
                 }
+            } onCancel: {
+                run.stop(.cancelled)
             }
-        } onCancel: {
-            run.terminate()
         }
     }
 }
 
-/// One `ntn` run that another thread can stop.
+/// One `ntn` run that another thread can stop, before or after its launch.
 private final class NtnRun: @unchecked Sendable {
+    enum Stop {
+        case cancelled
+        case timedOut(after: TimeInterval)
+    }
+
+    /// How long the run has after SIGTERM before SIGKILL.
+    private static let killDelay: TimeInterval = 1
+
+    private let lock = NSLock()
     private let process = Process()
     private let output = Pipe()
     private let error = Pipe()
+    /// Why the run was stopped, once it was; read and set under `lock`.
+    private var stopped: Stop?
     /// What ntn printed on standard error, read on a thread of its own.
     private var errorData = Data()
 
@@ -181,13 +215,9 @@ private final class NtnRun: @unchecked Sendable {
         process.standardError = error
     }
 
-    /// Runs ntn and waits for it; `nil` when it couldn't start.
+    /// Runs ntn and waits for it; `nil` when it couldn't start or was cancelled.
     func toEnd() -> NtnCLI.Output? {
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
+        guard launch() else { return nil }
         // Standard error is read on its own thread, so neither pipe can fill while the other is read.
         let errorRead = DispatchGroup()
         errorRead.enter()
@@ -198,10 +228,48 @@ private final class NtnRun: @unchecked Sendable {
         let data = output.fileHandleForReading.readDataToEndOfFile()
         errorRead.wait()
         process.waitUntilExit()
-        return NtnCLI.Output(status: process.terminationStatus, standardOutput: data, standardError: String(decoding: errorData, as: UTF8.self))
+        switch locked({ stopped }) {
+        case .cancelled:
+            return nil
+        case .timedOut(let seconds):
+            return NtnCLI.Output(status: NtnCLI.timedOut, standardOutput: Data(), standardError: "error: didn't answer within \(Int(seconds)) seconds")
+        case nil:
+            return NtnCLI.Output(status: process.terminationStatus, standardOutput: data, standardError: String(decoding: errorData, as: UTF8.self))
+        }
     }
 
-    func terminate() {
-        if process.isRunning { process.terminate() }
+    /// Stops the run for `reason`: one not launched yet never launches,
+    /// one running gets SIGTERM, then SIGKILL. A run already stopped, or
+    /// ended, is left alone.
+    func stop(_ reason: Stop) {
+        let pid: pid_t? = locked {
+            guard stopped == nil else { return nil }
+            stopped = reason
+            return process.isRunning ? process.processIdentifier : nil
+        }
+        guard let pid else { return }
+        kill(pid, SIGTERM)
+        DispatchQueue.global().asyncAfter(deadline: .now() + Self.killDelay) {
+            kill(pid, SIGKILL)
+        }
+    }
+
+    /// Launches ntn unless the run was stopped first; false when it wasn't launched.
+    private func launch() -> Bool {
+        locked {
+            guard stopped == nil else { return false }
+            do {
+                try process.run()
+                return true
+            } catch {
+                return false
+            }
+        }
+    }
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
     }
 }

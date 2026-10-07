@@ -122,7 +122,7 @@ struct Harness {
             clock: sleeper.clock,
             timer: timer,
             machineTimer: machineTimer,
-            notion: files.notionRoute(ntn),
+            notionRoute: files.notionRoute(ntn),
             notesTimer: notesTimer,
             tailnet: tailnet,
             sleep: sleeper.sleep,

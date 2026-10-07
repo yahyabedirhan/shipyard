@@ -303,7 +303,7 @@ public struct MenuModel: Equatable, Sendable {
     /// while ntn can start one: starting while a note is being started
     /// there; and each one's notes database, for its notes count.
     private static func newNoteIcons(_ sections: [MenuSection], _ notes: NotesMenuState, configuration: Configuration) -> [MenuSection] {
-        guard notes.connected else { return sections }
+        guard notes.canStartNotes else { return sections }
         return sections.map { section in
             guard showsNotes(section.name, configuration: configuration) else { return section }
             var section = section

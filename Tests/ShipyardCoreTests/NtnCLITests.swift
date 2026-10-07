@@ -86,6 +86,41 @@ struct NtnCLITests {
         await #expect(throws: NotionError.ntnMissing) { try await unstartable.me() }
     }
 
+    @Test("a warning before ntn's error line doesn't hide the status")
+    func warningFirst() async {
+        let answer = output(5, err: "warning: a newer ntn is out\nerror: Public API request failed (404 Not Found object_not_found): gone")
+        let client = NotionClient(transport: ntn(FakeNtn(answer)))
+        await #expect(throws: NotionError.http(404, code: "object_not_found", message: "gone")) { try await client.me() }
+    }
+
+    @Test("a run gets an empty standard input, so a program reading it ends at once rather than waiting")
+    func emptyInput() async throws {
+        let output = try #require(await NtnCLI.processRunner(timeout: 10)("/bin/cat", []))
+        #expect(output.status == 0)
+        #expect(output.standardOutput.isEmpty)
+    }
+
+    @Test("a run past its timeout is stopped, and ends as a failed run saying so")
+    func timeout() async throws {
+        let started = Date()
+        let output = try #require(await NtnCLI.processRunner(timeout: 0.2)("/bin/sleep", ["10"]))
+        #expect(Date().timeIntervalSince(started) < 5)
+        #expect(output.status == NtnCLI.timedOut)
+        let client = NotionClient(transport: NtnCLI(home: "/none", isExecutable: { $0 == "/bin/ntn" }, pathEnvironment: "/bin", run: { _, _ in output }))
+        await #expect(throws: NotionError.network("ntn: error: didn't answer within 0 seconds")) { try await client.me() }
+    }
+
+    @Test("a task cancelled before the run starts never launches it")
+    func cancelledFirst() async {
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await NtnCLI.processRunner(timeout: 10)("/bin/sleep", ["10"])
+        }
+        let started = Date()
+        #expect(await task.value == nil)
+        #expect(Date().timeIntervalSince(started) < 5)
+    }
+
     @Test("ntn is looked for where its installer puts it, then Homebrew's paths, then PATH")
     func locate() {
         let home = "/home/me"

@@ -124,7 +124,7 @@ final class AppServices {
             actions: opener,
             notifier: notifier,
             loginItem: files.loginItem(LaunchAtLogin()),
-            notion: files.notionRoute(NtnCLI())
+            notionRoute: files.notionRoute(NtnCLI())
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard

@@ -6,7 +6,7 @@ import Foundation
 public struct NotesMenuState: Equatable, Sendable {
     /// Whether notes can be started now (`ntn` is there and logged in):
     /// the icon shows only then.
-    public var connected: Bool
+    public var canStartNotes: Bool
     /// Why each project's notes couldn't be read, by project name.
     public var readErrors: [String: String]
     /// Why the icon couldn't start a note, by project name.
@@ -18,13 +18,13 @@ public struct NotesMenuState: Equatable, Sendable {
     public var databases: [String: URL]
 
     public init(
-        connected: Bool = false,
+        canStartNotes: Bool = false,
         readErrors: [String: String] = [:],
         startErrors: [String: String] = [:],
         starting: Set<String> = [],
         databases: [String: URL] = [:]
     ) {
-        self.connected = connected
+        self.canStartNotes = canStartNotes
         self.readErrors = readErrors
         self.startErrors = startErrors
         self.starting = starting
@@ -60,4 +60,8 @@ public enum NotesNotice: Equatable, Sendable {
         case .failed, .read: return nil
         }
     }
+
+    /// Whether it's about ntn itself (missing, logged out), which also
+    /// hides the new-note icons; a workspace without Shipyard Notes isn't.
+    var isNtn: Bool { self != .noEntryPage }
 }

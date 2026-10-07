@@ -20,7 +20,7 @@ import ShipyardPings
 /// pings of the remote machines (`[remote] machines`) are polled through
 /// Herdr on a timer of their own (`pollMachines()`) and listed with them.
 /// The user's notes are read from Notion through `ntn`, Notion's CLI, with
-/// its own login (`notion`, ADR 0012), every minute and when the menu
+/// its own login (`notionRoute`, ADR 0012), every minute and when the menu
 /// opens (`refreshNotes()`), and listed with them too.
 /// Observable, so the panel redraws when what it reads changes.
 @MainActor
@@ -203,7 +203,7 @@ public final class Shipyard {
     @ObservationIgnored private var machineGate = RefreshGate()
     /// What the notes are read and written through: `ntn` in the app
     /// (`NtnCLI`); `nil` reads no notes, as in a demo run.
-    private let notion: (any HTTPTransport)?
+    private let notionRoute: (any HTTPTransport)?
     /// Reads the notes every `notesInterval`, apart from `timer`.
     private let notesTimer: any RefreshTimer
     /// One read of the notes at a time; a call meanwhile makes one more.
@@ -258,7 +258,7 @@ public final class Shipyard {
         clock: any WallClock = SystemClock(),
         timer: any RefreshTimer = TaskRefreshTimer(),
         machineTimer: any RefreshTimer = TaskRefreshTimer(),
-        notion: (any HTTPTransport)? = nil,
+        notionRoute: (any HTTPTransport)? = nil,
         notesTimer: any RefreshTimer = TaskRefreshTimer(),
         tailnet: any TailnetIdentity = TailscaleCLI(),
         sleep: @escaping Sleep = systemSleep,
@@ -274,7 +274,7 @@ public final class Shipyard {
         self.herdr = herdr
         self.remoteReader = remote
         self.machineTimer = machineTimer
-        self.notion = notion
+        self.notionRoute = notionRoute
         self.notesTimer = notesTimer
         self.notifier = notifier
         self.tailnet = tailnet
@@ -1613,14 +1613,14 @@ public final class Shipyard {
     @discardableResult
     public func startNote(in project: String) async -> Bool {
         guard !startingNotes.contains(project) else { return false }
-        guard let notion else {
+        guard let notionRoute else {
             failNewNote(in: project, .notRead)
             return false
         }
         startingNotes.insert(project)
         newNoteErrors[project] = nil
         rebuildMenu(configStore.lastValid)
-        let result = await notesReader.startNote(in: project, client: NotionClient(transport: notion))
+        let result = await notesReader.startNote(in: project, client: NotionClient(transport: notionRoute))
         startingNotes.remove(project)
         switch result {
         case .success(let url):
@@ -1642,7 +1642,7 @@ public final class Shipyard {
 
     /// What the menu shows about notes besides their rows.
     private var notesMenuState: NotesMenuState {
-        NotesMenuState(connected: canStartNotes, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes, databases: noteDatabases)
+        NotesMenuState(canStartNotes: canStartNotes, readErrors: noteErrors, startErrors: newNoteErrors, starting: startingNotes, databases: noteDatabases)
     }
 
     /// Reads every project's open notes from Notion (`NotesReader`): one
@@ -1669,32 +1669,32 @@ public final class Shipyard {
     /// each project that shows notes (`NotesCheck`); `nil` in a run that
     /// reads no notes.
     public func checkNotes() async -> NotesCheckReport? {
-        guard let notion else { return nil }
+        guard let notionRoute else { return nil }
         let configuration = configStore.lastValid
         let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
-        return await NotesCheck.run(projects: projects, client: NotionClient(transport: notion))
+        return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
 
     /// Whether this run reads the user's notes: always in the app, never in
     /// a demo run (`AppFiles.notionRoute`).
-    public var readsNotes: Bool { notion != nil }
+    public var readsNotes: Bool { notionRoute != nil }
 
     /// Whether the projects' headers carry the new-note icon: while notes
     /// are read and ntn is there and logged in.
     private var canStartNotes: Bool {
-        readsNotes && notesBlocked != .ntnMissing && notesBlocked != .ntnLoggedOut
+        readsNotes && notesBlocked?.isNtn != true
     }
 
     /// Reads the notes once, and lists them when they changed. A read that
     /// can't reach the workspace at all (no ntn, ntn logged out, no
     /// Shipyard Notes page) lists none, and the notes banner says why.
     private func readNotes() async {
-        guard let notion else { return }
+        guard let notionRoute else { return }
         let configuration = configStore.lastValid
         let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
         let reading = projects.isEmpty
             ? NotesReading.read([:])
-            : await notesReader.read(projects: projects, client: NotionClient(transport: notion))
+            : await notesReader.read(projects: projects, client: NotionClient(transport: notionRoute))
         var read: [String: [Note]] = [:]
         var errors: [String: String] = [:]
         let blocked = NotesNotice(reading)
@@ -1704,8 +1704,11 @@ public final class Shipyard {
             rebuildMenu(configStore.lastValid)
         }
         switch reading {
-        case .noEntryPage, .failed(.ntnMissing), .failed(.unauthorized):
+        case _ where blocked != nil:
             // Nothing to list; the notes banner says why.
+            break
+        case .noEntryPage:
+            // `NotesNotice` always names it; listed for the switch to be whole.
             break
         case .failed(let error):
             // Nothing is known: every project keeps its notes, with why.
