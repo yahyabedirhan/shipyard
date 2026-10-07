@@ -285,7 +285,7 @@ The record also catches what only the app checks, including the three rules abov
 
 ## Worked requests
 
-**"Watch this repo in shipyard."** Take the `owner/name` slug from the repository's `origin` remote. If a project already lists it, say so and stop. Otherwise append a block whose `slug` is the repository's name in lowercase, each run of other characters one hyphen, unless the user names it (then add their name as its `title`):
+**"Watch this repo in shipyard."** Take the `owner/name` slug from the repository's `origin` remote. If a project already lists it, say so and stop. Otherwise append a block. Its `slug` comes from the repository's name, the part after `/`: in lowercase, each run of other characters one hyphen (`My_Shop` → `my-shop`). When another project already has that slug, make it from the whole `owner/name` the same way (`yahyabedirhan-shipyard`). When the user gives the project a name of their own, make the slug from their name instead, and add their name as the `title` unless it's already the slug (`"My Shop"` → `slug = "my-shop"`, `title = "My Shop"`):
 
 ```toml
 [[projects]]

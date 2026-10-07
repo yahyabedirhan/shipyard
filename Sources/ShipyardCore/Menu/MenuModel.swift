@@ -78,7 +78,7 @@ public struct MenuModel: Equatable, Sendable {
     public static let empty = MenuModel()
 
     /// The model for the projects' `listings` (from `Listing.listings`, by
-    /// project name) under `configuration` and what the user has seen and
+    /// project slug) under `configuration` and what the user has seen and
     /// collapsed; `snapshot` gives the error rows and when it was fetched.
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a

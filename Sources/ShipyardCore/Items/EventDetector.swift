@@ -189,7 +189,7 @@ public struct KnownItem: Codable, Equatable, Sendable {
 public struct KnownItems: Equatable, Sendable {
     /// By item id (its URL).
     public var items: [String: KnownItem]
-    /// By project name: the sources fetched for it at least once.
+    /// By project slug: the sources fetched for it at least once.
     public var sources: [String: Set<ItemSource>]
 
     public init(items: [String: KnownItem] = [:], sources: [String: Set<ItemSource>] = [:]) {

@@ -36,7 +36,8 @@ public enum PingCommand {
                                It notes the terminal app you ran it in, and clicking brings
                                that app forward unless [herdr] terminal names one
           --repo <owner/name>  file it by this repository instead of the working folder's
-          --project <name>     file it under this project (its name in config.toml) only
+          --project <name>     file it under this project only: its slug in config.toml,
+                               or else its title
 
         One action at most; with none, clicking it only marks it seen. The
         argument after --herdr is its id only when it's shaped like one

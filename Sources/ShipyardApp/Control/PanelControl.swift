@@ -26,7 +26,7 @@ protocol PanelControlling: AnyObject {
     /// (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`).
     func showMore(_ project: String, kind: String) throws(PanelRefusal)
     /// Selects the tab `name` names in the tabs layout, and returns its
-    /// title (`All`, or the project's name).
+    /// title (`All`, or the project's title).
     func selectTab(_ name: String) throws(PanelRefusal) -> String
     /// Shows the status view `name` names (`github`, `notion`, `skill`,
     /// `cli`) in place of the projects, or the projects again

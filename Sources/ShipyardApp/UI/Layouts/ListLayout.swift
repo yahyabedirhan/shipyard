@@ -195,7 +195,7 @@ struct ListLayout: View {
 
 // MARK: - A project's header
 
-/// The chevron and the project's name, then right beside the name the
+/// The chevron and the project's title, then right beside the title the
 /// open-in-browser icon, shown on hover while the project has a
 /// repository; then, right-aligned, Mark all seen's check, shown on hover
 /// while anything needs attention; then a count chip per kind the project

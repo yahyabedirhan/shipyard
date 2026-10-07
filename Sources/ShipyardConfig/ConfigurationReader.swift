@@ -77,7 +77,7 @@ final class ConfigurationReader {
     /// A table and where it sits in the file.
     struct Node {
         let table: TOMLTable
-        let path: ConfigPath
+        let path: ConfigurationPath
     }
 
     // MARK: The file's shape
@@ -233,7 +233,7 @@ final class ConfigurationReader {
     /// `[remote] machines`: Herdr labels, trimmed. A label that's empty,
     /// starts with `-` (it would read as a flag of `herdr`), holds a
     /// control character or comes twice is an error.
-    private func readMachines(_ labels: [String], at path: ConfigPath) -> [String] {
+    private func readMachines(_ labels: [String], at path: ConfigurationPath) -> [String] {
         var machines: [String] = []
         for raw in labels {
             let label = raw.trimmingCharacters(in: .whitespaces)
@@ -509,7 +509,7 @@ final class ConfigurationReader {
 
     /// The old top-level `hide-authors`, a list of bare logins, read as a
     /// `hide` of those logins in each kind's defaults, with a warning.
-    private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigPath) {
+    private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigurationPath) {
         let selectors = logins.map { AuthorSelector.login($0.hasPrefix("@") ? String($0.dropFirst()) : $0) }
         defaults.pullRequests.authors.hide += selectors
         defaults.issues.authors.hide += selectors
@@ -805,7 +805,7 @@ final class ConfigurationReader {
         errors.append(ConfigurationIssue(line: tomlLine ?? map.line(for: path), message: "`\(path.dotted)` must be \(expected)"))
     }
 
-    private func error(_ message: String, at path: ConfigPath, value: String? = nil) {
+    private func error(_ message: String, at path: ConfigurationPath, value: String? = nil) {
         errors.append(ConfigurationIssue(line: map.line(for: path, value: value), message: message))
     }
 }

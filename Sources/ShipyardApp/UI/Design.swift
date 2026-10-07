@@ -63,7 +63,7 @@ enum TypeScale {
     static let button = Font.system(size: 12, weight: .medium)
     /// Numbers, authors, ages; banner text.
     static let meta = Font.system(size: 11).monospacedDigit()
-    /// A project's name.
+    /// A project's title.
     static let section = Font.system(size: 11, weight: .semibold)
     /// A small uppercase header over a kind's rows, in the tabs layout.
     static let eyebrow = Font.system(size: 10, weight: .semibold)

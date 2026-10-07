@@ -25,7 +25,7 @@ public enum Listing {
         }
     }
 
-    /// Every project's listing, by project name: the snapshot's items for
+    /// Every project's listing, by project slug: the snapshot's items for
     /// it, then the `pings` filed under it, each passing the project's
     /// filters. A project with neither (added since the snapshot was
     /// fetched, or before any was) has no listing yet; without a snapshot
@@ -40,7 +40,7 @@ public enum Listing {
     /// Each ping's item carries the number `numbers` gave it in that
     /// section (`PingNumbers`), or none (0) before it has one.
     ///
-    /// A project's `notes` (from its Notion database, by project name)
+    /// A project's `notes` (from its Notion database, by project slug)
     /// come last, the archived ones left out; like pings, they list
     /// before GitHub answers.
     public static func listings(
@@ -82,7 +82,7 @@ public enum Listing {
         return listings
     }
 
-    /// The sections `pings` are filed in, by name, before any filter: each
+    /// The sections `pings` are filed in, by project slug or machine label, before any filter: each
     /// project in `projects` its pings name, and each machine in `machines`
     /// its remote pings filed under none of `projects`. A section with no
     /// ping is left out. Where `listings` lists them, and what the Mac

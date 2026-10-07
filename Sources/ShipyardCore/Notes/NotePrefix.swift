@@ -1,6 +1,6 @@
 /// The prefix a new notes database's `No.` gets, as the shipyard skill's
 /// notes reference says to pick one: two to five uppercase letters from
-/// the project's name (`shipyard` → `SHIP`), not already another
+/// the project's title (`shipyard` → `SHIP`), not already another
 /// database's.
 enum NotePrefix {
     /// The lengths tried, in order: four reads best, then shorter, longer,

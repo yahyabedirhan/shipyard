@@ -27,7 +27,7 @@ public struct ResolvedRepositoriesStore: Sendable {
         self.directory = directory
     }
 
-    /// Each project's repositories (`owner/name`) by project name, as last
+    /// Each project's repositories (`owner/name`) by project slug, as last
     /// recorded; empty when there's nothing that reads.
     public func load() -> [String: [String]] {
         guard let data = try? Data(contentsOf: url),
@@ -37,7 +37,7 @@ public struct ResolvedRepositoriesStore: Sendable {
         return file.projects
     }
 
-    /// Records `projects`, each project's repositories by name, replacing
+    /// Records `projects`, each project's repositories by its slug, replacing
     /// what was there; writes nothing when it's what the file already holds.
     public func record(_ projects: [String: [String]]) throws {
         guard projects != load() else { return }

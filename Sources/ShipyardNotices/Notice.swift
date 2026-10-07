@@ -27,13 +27,13 @@ import ShipyardPings
 ///      "repository":"owner/shop","sound":"none","subtitle":"checkout",
 ///      "terminal":"com.mitchellh.ghostty","thread":"orchestration","title":"Tests passed"}
 public struct Notice: Codable, Equatable, Sendable {
-    /// The one line it shows, after the project's name.
+    /// The one line it shows, after the project's title.
     public var title: String
     /// More than the title fits.
     public var body: String?
     /// Who sent it (`--from`), the agent or its task.
     public var sender: String?
-    /// The one project it's filed under (`--project`), by its name.
+    /// The one project it's filed under (`--project`): its slug, or else its title.
     public var project: String?
     /// The repository it's filed by (`--repo`, or the checkout's `origin`), as `owner/name`.
     public var repository: String?

@@ -13,9 +13,9 @@ public struct AppState: Equatable, Sendable {
 
     /// Which version of each item the user has seen.
     public var attention = Attention()
-    /// Projects whose sections are collapsed, by name.
+    /// Projects whose sections are collapsed, by slug.
     public var collapsed: Set<String> = []
-    /// Subsections the user folded: a project's name and a group's key. A
+    /// Subsections the user folded: a project's slug and a group's key. A
     /// fold whose group no longer exists is pruned after a refresh.
     public var collapsedGroups: Set<GroupID> = []
     /// What the refreshes so far found, for finding events: each item's last

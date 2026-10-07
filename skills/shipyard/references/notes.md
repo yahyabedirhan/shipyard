@@ -9,7 +9,7 @@ Notion holds the notes and is their editor. Shipyard's menu lists each project's
 ```text
 Shipyard Notes               the user's home page: how to take and find notes, and the Projects index
 ├── Projects                 the parent of every notes database
-│   ├── <project name>       one database per shipyard project
+│   ├── <project title>      one database per shipyard project
 │   └── …
 └── Agent guide              the rules and conventions for agents
 ```
@@ -19,7 +19,7 @@ These are the **fixed core**. The app reads them, so keep them exactly as writte
 - **The notes workspace:** a Notion workspace of the user's own, holding only notes.
 - **The entry page:** "Shipyard Notes", at the top of that workspace. It's the user's home page; keep agents' rules off it.
 - **The Projects page:** a child page of the entry page titled exactly "Projects". The app looks for databases only here.
-- **One database per project,** directly under Projects, titled exactly the project's `name` in the user's `config.toml`. The app matches a project to its database by that title, so a database with another title, or one anywhere else, is invisible to it.
+- **One database per project,** directly under Projects, titled exactly the project's title: its `title` in the user's `config.toml`, else its `slug`. The app matches a project to its database by that title, so a database with another title, or one anywhere else, is invisible to it.
 - **Its properties:**
 
 | Property | Type | Holds |
@@ -154,7 +154,7 @@ A project's database is created the first time a note is added to it, by you or 
 
      ```json
      {"parent": {"type": "page_id", "page_id": "<Projects page id>"},
-      "title": [{"text": {"content": "<project name>"}}],
+      "title": [{"text": {"content": "<project title>"}}],
       "icon": {"type": "emoji", "emoji": "🗂️"},
       "initial_data_source": {"properties": {
         "Name": {"title": {}},

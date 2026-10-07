@@ -90,17 +90,17 @@ public final class Shipyard {
     /// read from the file, so a remote ping whose machine it doesn't name
     /// has left (`forgetLeftPings`).
     private var followsConfiguredMachines = false
-    /// Each project's open notes, by project name, as Notion last listed
+    /// Each project's open notes, by project slug, as Notion last listed
     /// them; a project whose read failed keeps its last ones.
     public private(set) var notes: [String: [Note]] = [:]
-    /// Why each project's notes couldn't be read, by project name, for its
+    /// Why each project's notes couldn't be read, by project slug, for its
     /// error row; empty once a read works.
     public private(set) var noteErrors: [String: String] = [:]
     /// Why the last read could list no notes at all: no `ntn`, ntn logged
     /// out, or no "Shipyard Notes" page in ntn's workspace. The notes
     /// banner says so rather than listing none; `nil` once a read works.
     public private(set) var notesBlocked: NotesNotice?
-    /// Each project's notes database in Notion, by project name, as the
+    /// Each project's notes database in Notion, by project slug, as the
     /// last read matched them: its header's notes count opens it.
     public private(set) var noteDatabases: [String: URL] = [:]
     /// The projects the new-note icon is starting a note in now.
@@ -115,7 +115,7 @@ public final class Shipyard {
     /// Bumped whenever a check begins, so an older check finishing late
     /// doesn't overwrite a newer one's answer.
     @ObservationIgnored private var notionCheck = 0
-    /// Why the new-note icon couldn't start a note, by project name, for
+    /// Why the new-note icon couldn't start a note, by project slug, for
     /// its error row; cleared when the menu opens again or a note starts.
     public private(set) var newNoteErrors: [String: String] = [:]
     /// How often the notes are read, apart from the refresh; opening the
