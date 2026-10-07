@@ -199,6 +199,14 @@ _Avoid_: Notes doctor, lint, validation
 The flow shown when shipyard isn't connected to GitHub or has no projects: connect the GitHub account, then choose a preset and pick projects. Choosing them here writes the configuration.
 _Avoid_: Setup wizard, welcome
 
+**Setup part**:
+One of the things shipyard uses that the user sets up: GitHub, Notion through ntn, the shipyard agent skill and the `shipyard` CLI. The settings menu lists each by name, with a check mark only when it's set up.
+_Avoid_: Integration, service, connection
+
+**Status view**:
+A setup part's own view, opened from the settings menu or with `shipyard panel view`, in place of the projects: whether the part is set up and, when it isn't, how to set it up. The header, the banners and the footer stay; ‹ Back or closing the panel shows the projects again.
+_Avoid_: Settings page, setup screen, onboarding (that's the first-run flow)
+
 **Preset**:
 A ready-made configuration for one main use of shipyard, defined in the app and listed in the skill: `my-agents` (what you and your agents open), `incoming-contributions` (what others open on your repositories), `review-queue` (pull requests waiting on your review).
 _Avoid_: Template, profile, mode

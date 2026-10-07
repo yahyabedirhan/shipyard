@@ -745,3 +745,28 @@ extension Text {
         self.init(CodeText.attributed(markdown, size: size, weight: weight))
     }
 }
+
+/// A tone's icon (`PanelText.SkillInstall.Tone`), as the onboarding cards'
+/// headings and a status view's status line show it: a green check for
+/// success, an amber triangle for a problem, and `neutral` in
+/// `neutralTint` for neither.
+struct ToneIcon: View {
+    let tone: PanelText.SkillInstall.Tone
+    let neutral: String
+    let neutralTint: Color
+
+    var body: some View {
+        Group {
+            switch tone {
+            case .success:
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.green)
+            case .warning:
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.amber)
+            case .neutral:
+                Image(systemName: neutral).foregroundStyle(neutralTint)
+            }
+        }
+        .symbolRenderingMode(.hierarchical)
+        .font(.system(size: 12, weight: .semibold))
+    }
+}

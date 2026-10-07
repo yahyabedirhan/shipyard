@@ -169,7 +169,7 @@ struct SkillDocumentTests {
         #expect(text.contains("shipyard ping withdraw <id>"))
         #expect(text.contains("`\(PingCommand.herdrPaneVariable)`"))
         #expect(text.contains("~/.local/bin/shipyard"))
-        #expect(text.contains("**\(PanelText.linkCLI)**"))
+        #expect(text.contains("**\(PanelText.statusTitle(.cli))…**"))
         #expect(text.contains("exit 1") && text.contains("exit 2") && text.contains("exits 0"))
         #expect(CommandResult.failedStatus == 1 && CommandResult.usageStatus == 2)
 
@@ -253,7 +253,7 @@ struct SkillDocumentTests {
         }
         let every: Set<String> = [
             "app open", "app --demo", "app quit", "app status", "app --json",
-            "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel tab",
+            "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel tab", "panel view",
             "screenshot", "screenshot --appearance", "screenshot --menu-bar-icon", "screenshot --with-indicator",
             "control take", "control --wait", "control release",
         ]

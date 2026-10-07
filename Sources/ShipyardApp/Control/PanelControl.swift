@@ -10,9 +10,9 @@ import SwiftUI
 /// exist (`PanelRefusal`).
 @MainActor
 protocol PanelControlling: AnyObject {
-    /// The app's status: its version, whether the panel is open, the
-    /// menu's layout and selected tab, the projects, which are folded and
-    /// which groups show every row.
+    /// The app's status: its version, whether the panel is open, the view
+    /// it shows, the menu's layout and selected tab, the projects, which
+    /// are folded and which groups show every row.
     func status() -> AppStatus
     /// Opens the panel, once it's on screen; refused when it didn't open.
     func open() async throws(PanelRefusal)
@@ -28,6 +28,11 @@ protocol PanelControlling: AnyObject {
     /// Selects the tab `name` names in the tabs layout, and returns its
     /// title (`All`, or the project's name).
     func selectTab(_ name: String) throws(PanelRefusal) -> String
+    /// Shows the status view `name` names (`github`, `notion`, `skill`,
+    /// `cli`) in place of the projects, or the projects again
+    /// (`projects`), and returns what it shows: the view's title, or
+    /// `projects`.
+    func showView(_ name: String) throws(PanelRefusal) -> String
 }
 
 /// The panel as app control sees it: `PanelState`, the menu bar window
@@ -53,6 +58,7 @@ final class PanelControl: PanelControlling {
         return AppStatus(
             version: ShipyardVersion.current,
             panelOpen: state.isOpen,
+            view: state.openView?.commandName ?? SetupPart.projectsName,
             layout: configuration.menu.layout.rawValue,
             // As `tab` accepts it: only while the menu draws tabs.
             tab: menu.layout == .tabs ? PanelText.tabTitle(menu.resolved(state.selectedTab)) : nil,
@@ -121,5 +127,11 @@ final class PanelControl: PanelControlling {
             state.select(tab, from: menu.resolved(state.selectedTab), in: menu.tabs)
         }
         return PanelText.tabTitle(tab)
+    }
+
+    func showView(_ name: String) throws(PanelRefusal) -> String {
+        let part = try SetupPart.named(name)
+        state.openView = part
+        return part.map(PanelText.statusTitle) ?? SetupPart.projectsName
     }
 }

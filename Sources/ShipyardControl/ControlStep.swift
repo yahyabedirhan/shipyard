@@ -34,6 +34,7 @@ extension ControlRequest {
                 done: "Showed all \(Self.words(kind)) in \(project)"
             )
         case .panelTab(let name): ControlStep(doing: "Showing the \(name) tab…", done: "Showed the \(name) tab")
+        case .panelView(let name): ControlStep(doing: "Showing the \(name) view…", done: "Showed the \(name) view")
         case .screenshot(_, _, let menuBarIcon, _):
             menuBarIcon
                 ? ControlStep(doing: "Taking a screenshot of the menu bar icon…", done: "Took a screenshot of the menu bar icon")

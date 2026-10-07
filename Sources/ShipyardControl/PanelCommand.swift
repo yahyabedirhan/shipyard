@@ -3,12 +3,12 @@ import ShipyardCommand
 
 /// `shipyard panel …`: its arguments read into the `ControlRequest` the
 /// app answers. Only the arguments' shape is checked here; whether the
-/// project, kind or tab exists is the app's to say, since only it knows
+/// project, kind, tab or view exists is the app's to say, since only it knows
 /// the menu (exit 1 with the valid names).
 public enum PanelCommand {
     public static let usageText = """
         usage: shipyard panel open | close | fold <project> | unfold <project>
-                            | show-more <project> <kind> | tab <name>
+                            | show-more <project> <kind> | tab <name> | view <name>
 
           open        open the menu bar icon's panel
           close       close it
@@ -17,9 +17,11 @@ public enum PanelCommand {
                       show-first cap, until the panel closes; <kind> is
                       pull-requests, issues, workflow-runs or pings
           tab         show a tab of the tabs layout: a project's name, or All
+          view        show a status view in place of the projects: github,
+                      notion, skill or cli; projects shows the projects again
 
-        Each exits 1 when shipyard isn't running, or when the project, kind or
-        tab doesn't exist, naming the ones that do.
+        Each exits 1 when shipyard isn't running, or when the project, kind,
+        tab or view doesn't exist, naming the ones that do.
 
         """
 
@@ -43,6 +45,7 @@ public enum PanelCommand {
         case "unfold": (wanted, request) = (["project"], { .panelUnfold(project: $0[0]) })
         case "show-more": (wanted, request) = (["project", "kind"], { .panelShowMore(project: $0[0], kind: $0[1]) })
         case "tab": (wanted, request) = (["name"], { .panelTab(name: $0[0]) })
+        case "view": (wanted, request) = (["name"], { .panelView(name: $0[0]) })
         default: return .failure(misread("shipyard panel: unknown command `\(subcommand)`"))
         }
         if rest.count < wanted.count {

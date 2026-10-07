@@ -79,10 +79,10 @@ struct AppCommandTests {
         #expect(app.requests == [.appStatus(json: true)])
     }
 
-    @Test("the status reads as lines, or as one JSON object, with the lease's holder, place, time left and waiters")
+    @Test("the status reads as lines, or as one JSON object, with the view shown and the lease's holder, place, time left and waiters")
     func statusFormats() {
         let tabs = AppStatus(
-            version: "0.2.0", panelOpen: false, layout: "tabs", tab: "shop", projects: ["shop", "blog"],
+            version: "0.2.0", panelOpen: false, view: "cli", layout: "tabs", tab: "shop", projects: ["shop", "blog"],
             folded: ["blog"], showingAll: [.init(project: "shop", kind: "pull-requests")],
             lease: .init(holder: "Claude Code", place: "Herdr pane w1-2", secondsLeft: 48, waiting: 1)
         )
@@ -90,6 +90,7 @@ struct AppCommandTests {
             shipyard 0.2.0 is running
             lease: Claude Code in Herdr pane w1-2, 48s left, 1 waiting
             panel: closed
+            view: cli
             layout: tabs
             tab: shop
             projects: shop, blog
@@ -100,13 +101,14 @@ struct AppCommandTests {
         #expect(tabs.json == #"{"demo":null,"folded":["blog"],"layout":"tabs","#
             + #""lease":{"holder":"Claude Code","place":"Herdr pane w1-2","secondsLeft":48,"waiting":1},"#
             + #""panelOpen":false,"projects":["shop","blog"],"#
-            + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.2.0"}"# + "\n")
+            + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.2.0","view":"cli"}"# + "\n")
         // The list layout has no tab: no line, and null in the JSON. A free lease is `free`, and null.
         let list = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: [])
         #expect(list.text == """
             shipyard 0.2.0 is running
             lease: free
             panel: open
+            view: projects
             layout: list
             projects: none
             folded: none
@@ -115,6 +117,7 @@ struct AppCommandTests {
             """)
         #expect(list.json.contains(#""tab":null"#))
         #expect(list.json.contains(#""lease":null"#))
+        #expect(list.json.contains(#""view":"projects""#))
     }
 
     @Test("a demo run's status names its folder, as a line and in the JSON")
@@ -127,6 +130,7 @@ struct AppCommandTests {
             demo: /Users/agent/demo
             lease: free
             panel: closed
+            view: projects
             layout: tabs
             projects: shop, blog
             folded: none
@@ -135,7 +139,7 @@ struct AppCommandTests {
             """)
         #expect(demo.json
             == #"{"demo":"/Users/agent/demo","folded":[],"layout":"tabs","lease":null,"panelOpen":false,"projects":["shop","blog"],"#
-            + #""running":true,"showingAll":[],"tab":null,"version":"0.2.0"}"# + "\n")
+            + #""running":true,"showingAll":[],"tab":null,"version":"0.2.0","view":"projects"}"# + "\n")
     }
 
     // MARK: - Not running, refusals and failures

@@ -504,7 +504,7 @@ Ping when the user should act or would want to know now: a pull request is ready
 
 ### The command
 
-The app links its command at `~/.local/bin/shipyard` (onboarding, or **Link shipyard CLI…** in the panel's gear menu). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from the gear menu. The app needn't be running: a ping sent meanwhile shows when it starts.
+The app links its command at `~/.local/bin/shipyard` (onboarding, or **Shipyard CLI…** in the panel's settings menu, the gear). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from **Shipyard CLI…**, which also says what is in the way when the link can't be made. The app needn't be running: a ping sent meanwhile shows when it starts.
 
 ```sh
 shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
@@ -584,7 +584,7 @@ On the user's Mac, three more commands open, steer and photograph the running ap
 
 ```sh
 shipyard app open [--demo <folder>] | quit | status [--json]
-shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name>
+shipyard panel open | close | fold <project> | unfold <project> | show-more <project> <kind> | tab <name> | view <name>
 shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
 shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release [--key <k>]
 ```
@@ -600,6 +600,7 @@ shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release
 | `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
 | `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs`, `pings` or `notes` | `showing all <kind> in <project>` |
 | `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
+| `panel view <name>` | shows a status view in place of the projects, as the settings menu's items do: `github`, `notion`, `skill` or `cli`; `projects` shows the projects again, as **‹ Back** does. Closing the panel shows the projects again too | `showing <title>` (`Shipyard CLI`), or `showing projects` |
 | `screenshot <file.png>` | saves the panel as it looks; a closed panel is rendered off screen without opening it (said on standard error), so `panel open` first for the panel as drawn on screen; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
 | `--menu-bar-icon` | saves the menu bar icon alone instead of the panel, without opening it | |
@@ -615,6 +616,7 @@ shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release
 shipyard 0.2.0 is running
 lease: free
 panel: closed
+view: projects
 layout: tabs
 tab: All
 projects: shop, blog
@@ -622,7 +624,7 @@ folded: none
 showing all: pull-requests in shop
 ```
 
-With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
+With `--json`, the keys are `running` (always `true`), `version`, `panelOpen`, `view` (`projects`, or the status view shown: `github`, `notion`, `skill`, `cli`), `layout` (`list` or `tabs`), `tab` (`null` in the list layout), `projects` (the projects, then the remote machines listing pings: the names `panel fold` and `panel tab` accept), `folded`, `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`), `demo` (the demo folder, `null` otherwise) and `lease` (`null` when free, else `{"holder", "place", "secondsLeft", "waiting"}`: the agent using shipyard, as the `lease:` line names it); read it rather than the lines when you act on it.
 
 What a command changes, it changes as the user's own click would. A fold is remembered after the panel closes, so unfold what you folded in the user's app; Show more and the panel's appearance come back by themselves. Close the panel when you're done. Never run these commands in a loop to wait for something, such as data loading: check `app status` once, and take one screenshot.
 
@@ -710,6 +712,15 @@ shipyard panel show-more shop pull-requests
 ```sh
 shipyard panel tab shop
 shipyard screenshot shop-dark.png --appearance dark
+```
+
+**"Screenshot the Shipyard CLI view."** Open the panel, show the view, capture it, then go back to the projects:
+
+```sh
+shipyard panel open
+shipyard panel view cli
+shipyard screenshot cli-view.png
+shipyard panel view projects
 ```
 
 **"Screenshot the menu bar icon."**

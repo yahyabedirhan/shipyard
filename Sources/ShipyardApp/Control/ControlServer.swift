@@ -156,6 +156,8 @@ final class ControlServer {
             }
         case .panelTab(let name):
             return await steer { () throws(PanelRefusal) in "showing \(try panel.selectTab(name))" }
+        case .panelView(let name):
+            return await steer { () throws(PanelRefusal) in "showing \(try panel.showView(name))" }
         case .screenshot(let path, let appearance, let menuBarIcon, let withIndicator):
             let file = URL(fileURLWithPath: path)
             let outcome = menuBarIcon

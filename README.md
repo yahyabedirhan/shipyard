@@ -55,7 +55,7 @@ The file sets the projects (each a section of the menu with its repositories), t
 
 ## Use it with an agent
 
-Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it from the panel's gear menu (**Install agent skill…**) or from a terminal:
+Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal:
 
 ```sh
 npx skills add yahyabedirhan/shipyard -g -y
@@ -65,7 +65,7 @@ Then ask in your own words: "Watch this repo in shipyard", "Hide dependabot's pu
 
 ### Pings
 
-Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Link shipyard CLI…**), which puts it at `~/.local/bin/shipyard`.
+Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Shipyard CLI…**), which puts it at `~/.local/bin/shipyard`. The gear menu lists the parts shipyard uses (**GitHub…**, **Notion…**, **Shipyard Skill…**, **Shipyard CLI…**), with a check mark beside each one that is set up; each opens a view of its status in the panel.
 
 ```sh
 shipyard ping "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57

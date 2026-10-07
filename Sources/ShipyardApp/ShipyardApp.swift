@@ -83,7 +83,8 @@ final class AppServices {
     /// The agent skill install, kept for the app's run so an install goes
     /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
-    /// The offer to link the bundled CLI into `~/.local/bin`.
+    /// The link of the bundled CLI into `~/.local/bin`: the Shipyard CLI
+    /// view and onboarding's card show it.
     let cliLink = CLILink(
         cli: CLILink.bundledCLI(in: Bundle.main.bundleURL),
         home: FileManager.default.homeDirectoryForCurrentUser
@@ -98,8 +99,8 @@ final class AppServices {
     private var configWatcher: ConfigWatcher?
     private var pingWatcher: ConfigWatcher?
     private var wake: WakeObserver?
-    /// Whether the panel is open and the tab it shows, which its views and
-    /// app control both read and set.
+    /// Whether the panel is open, the status view and the tab it shows,
+    /// which its views and app control both read and set.
     let panelState = PanelState()
     /// The panel as app control sees it.
     private let panelControl: PanelControl
@@ -315,23 +316,27 @@ final class AppServices {
     }
 
     /// Opening the panel rereads the notification permission (the user may
-    /// have changed it in System Settings) and the notes, so one just
+    /// have changed it in System Settings), the CLI link and the notes, so one just
     /// written shows. It doesn't refresh GitHub: looking costs no GitHub
     /// request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
+        // The settings menu's mark: the link may have been made or removed by hand.
+        cliLink.check()
         Task { await notifier.checkPermission() }
         let shipyard = shipyard
         Task { await shipyard.panelOpened() }
     }
 
-    /// Closing the panel caps every group Show more revealed, so the menu
-    /// opens with every cap back, and, unless app control closed it, keeps
+    /// Closing the panel caps every group Show more revealed and closes the
+    /// status view, so the menu opens on the projects with every cap back,
+    /// and, unless app control closed it, keeps
     /// app control from opening it again for a while (`PanelReopenGuard`).
     func panelClosed() {
         panelState.isOpen = false
         panelState.reopenGuard.panelClosed(byControl: panelState.closingByControl, at: Date())
         panelState.closingByControl = false
+        panelState.openView = nil
         shipyard.panelClosed()
     }
 

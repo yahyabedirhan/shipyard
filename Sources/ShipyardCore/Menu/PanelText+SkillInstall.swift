@@ -28,9 +28,6 @@ extension PanelText {
         public var tone: Tone = .neutral
     }
 
-    /// The footer's button for the skill install card.
-    public static let installSkill = "Install agent skill…"
-
     /// The skill install card for `state`.
     public static func skillInstall(_ state: SkillInstallation.State) -> SkillInstall {
         let command = SkillInstaller.command
