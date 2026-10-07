@@ -29,6 +29,7 @@ private extension Harness {
     static func withNotes(config: String = projects, query: [StubHTTP.Answer]? = nil, workspace: (StubHTTP) throws -> Void = { _ in }) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([onePullRequest])
         try harness.stub.onNotion(query: query)
@@ -36,6 +37,24 @@ private extension Harness {
         await harness.shipyard.start()
         await harness.readNotes()
         return harness
+    }
+
+    /// Started with `config`, GitHub answering one pull request, ntn
+    /// logged in and Notion answering as `NotionStub` records, but Notion
+    /// not connected: as a user who never pressed Connect with ntn.
+    static func notConnected(config: String = projects) async throws -> Harness {
+        let harness = try Harness(stored: "gho_stored", config: config)
+        harness.ntn.set(.loggedIn)
+        try harness.answer()
+        await harness.shipyard.start()
+        return harness
+    }
+
+    /// GitHub answering one pull request, and Notion as `NotionStub` records.
+    func answer() throws {
+        stub.on(Harness.userURL, Harness.viewerAnswer)
+        graphQL([onePullRequest])
+        try stub.onNotion()
     }
 
     /// Fires the notes timer, which must be armed, and waits for the read.
@@ -204,6 +223,7 @@ struct NotesTests {
     func unreachable() async throws {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([onePullRequest])
         harness.stub.on("POST", NotionStub.search, .failure())
@@ -237,10 +257,14 @@ struct NotesTests {
         #expect(harness.notesBanner == nil)
     }
 
-    @Test("without ntn, Notion is never asked, no project lists notes, and a banner says to install ntn; installed, the next read lists them; with every project's notes hidden there's no banner")
+    @Test("connected without ntn, Notion is never asked, no project lists notes, and a banner says to install ntn; installed, the next read lists them; with every project's notes hidden there's no banner")
     func noNtn() async throws {
-        let harness = try await Harness.started(config: projects, graphQL: onePullRequest)
+        let harness = try Harness(stored: "gho_stored", config: projects)
+        harness.connectNotionBeforeStart()
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([onePullRequest])
         try harness.stub.onNotion()
+        await harness.shipyard.start()
 
         await harness.shipyard.panelOpened()
 
@@ -255,7 +279,11 @@ struct NotesTests {
         #expect(harness.noteRows().count == 3)
         #expect(harness.notesBanner == nil)
 
-        let hidden = try await Harness.started(config: "[defaults.notes]\nshow = false\n\n" + projects, graphQL: onePullRequest)
+        let hidden = try Harness(stored: "gho_stored", config: "[defaults.notes]\nshow = false\n\n" + projects)
+        hidden.connectNotionBeforeStart()
+        hidden.stub.on(Harness.userURL, Harness.viewerAnswer)
+        hidden.graphQL([onePullRequest])
+        await hidden.shipyard.start()
         #expect(hidden.notesBanner == nil)
     }
 
@@ -263,6 +291,7 @@ struct NotesTests {
     func noEntryPage() async throws {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(.loggedIn)
+        harness.connectNotionBeforeStart()
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([onePullRequest])
         try harness.stub.onNotion()
@@ -279,5 +308,82 @@ struct NotesTests {
 
         #expect(harness.noteRows().count == 3)
         #expect(harness.notesBanner == nil)
+    }
+
+    // MARK: - Connecting Notion
+
+    @Test("before Connect with ntn no ntn runs, at start, on opening the menu or on a configuration change: no notes, no banner, no new-note icons, no notes timer, and the notes check is refused")
+    func notConnected() async throws {
+        let harness = try await Harness.notConnected()
+        await harness.shipyard.panelOpened()
+        try harness.writeConfig(projects + "[[projects]]\nname = \"docs\"\nrepositories = [\"yahyabedirhan/docs\"]\n")
+        await harness.shipyard.reloadConfiguration()
+
+        #expect(harness.ntn.runs == 0)
+        #expect(harness.stub.notionRequests.isEmpty)
+        #expect(harness.noteRows().isEmpty)
+        #expect(harness.notesBanner == nil)
+        #expect(harness.section("shop")?.newNote == nil)
+        #expect(harness.notesTimer.armed == nil)
+        #expect(!harness.shipyard.notionIsSetUp)
+        #expect(await harness.shipyard.checkNotes() == nil)
+        #expect(harness.ntn.runs == 0)
+        #expect(PanelText.notesCheckRefusal(canReadNotes: harness.shipyard.canReadNotes)
+            == "Notion isn't connected, so shipyard runs no ntn: open Notion… in shipyard's settings menu and press Connect with ntn")
+    }
+
+    @Test("Connect with ntn reads the notes at once, with the new-note icons and the notes timer, and keeps the flag in state.json, so a restart lists them without connecting again")
+    func connect() async throws {
+        let harness = try await Harness.notConnected()
+
+        await harness.shipyard.connectNotion()
+
+        #expect(harness.noteRows().count == 3)
+        #expect(harness.section("shop")?.newNote == .ready)
+        #expect(harness.notesTimer.armed == 60)
+        #expect(harness.shipyard.notionIsSetUp)
+        #expect(harness.shipyard.appStateStore.state.notionConnected)
+        let saved = try String(contentsOf: harness.stateURL, encoding: .utf8)
+        #expect(saved.contains("\"notionConnected\" : true"))
+
+        let relaunched = harness.relaunched()
+        try relaunched.answer()
+        await relaunched.shipyard.start()
+        await relaunched.readNotes()
+
+        #expect(relaunched.shipyard.notionConnected)
+        #expect(relaunched.noteRows().count == 3)
+        #expect(relaunched.section("shop")?.newNote == .ready)
+    }
+
+    @Test("Disconnect takes the notes, the notes banner and the new-note icons away, stops the notes timer and runs no ntn after, across a restart too")
+    func disconnect() async throws {
+        let harness = try await Harness.withNotes()
+        #expect(harness.noteRows().count == 3)
+
+        harness.shipyard.disconnectNotion()
+
+        #expect(harness.noteRows().isEmpty)
+        #expect(harness.section("shop")?.newNote == nil)
+        #expect(harness.notesTimer.armed == nil)
+        #expect(!harness.shipyard.notionIsSetUp)
+        #expect(!harness.shipyard.appStateStore.state.notionConnected)
+        let runs = harness.ntn.runs
+        await harness.shipyard.panelOpened()
+        #expect(harness.ntn.runs == runs)
+
+        let relaunched = harness.relaunched()
+        try relaunched.answer()
+        await relaunched.shipyard.start()
+        await relaunched.shipyard.panelOpened()
+        #expect(relaunched.ntn.runs == 0)
+        #expect(relaunched.noteRows().isEmpty)
+
+        // Connected again with ntn logged out, the banner says to log in; Disconnect takes it away.
+        relaunched.ntn.set(.loggedOut)
+        await relaunched.shipyard.connectNotion()
+        #expect(relaunched.notesBanner?.kind == .notes)
+        relaunched.shipyard.disconnectNotion()
+        #expect(relaunched.notesBanner == nil)
     }
 }

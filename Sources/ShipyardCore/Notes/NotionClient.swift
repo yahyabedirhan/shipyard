@@ -66,9 +66,12 @@ public struct NotionClient: Sendable {
 
     // MARK: - Reads
 
-    /// Checks the login: `GET /v1/users/me`, ntn's own bot user.
-    public func me() async throws {
-        _ = try await send("GET", "users/me", as: Ignored.self)
+    /// Checks the login: `GET /v1/users/me`, ntn's own bot user. Answers
+    /// the name of the workspace ntn reads (its default workspace), the
+    /// bot's `workspace_name`; `nil` when Notion didn't name it.
+    @discardableResult
+    public func me() async throws -> String? {
+        try await send("GET", "users/me", as: BotUser.self).bot?.workspace_name
     }
 
     /// The pages shared with the connection whose title is exactly `title`,
@@ -346,8 +349,14 @@ enum NoteProperty {
 
 // MARK: - What Notion answers
 
-/// A body the app doesn't read.
-private struct Ignored: Decodable {}
+/// `GET /v1/users/me` as ntn's bot user answers it: `{"type":"bot","bot":{"workspace_name":"Notes",…}}`.
+private struct BotUser: Decodable {
+    struct Bot: Decodable {
+        var workspace_name: String?
+    }
+
+    var bot: Bot?
+}
 
 /// Notion's error body: `{"object":"error","status":404,"code":"object_not_found","message":"…"}`.
 private struct ErrorBody: Decodable {

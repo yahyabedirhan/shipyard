@@ -235,10 +235,11 @@ final class AppServices {
             // An agent's notice is shown when its project's rules say so,
             // or withdrawn.
             notices: { request in await shipyard.receive(request) },
-            // The notes check reads Notion through ntn, as the menu does.
+            // The notes check reads Notion through ntn, as the menu does,
+            // and like it runs no ntn before Connect with ntn.
             notesCheck: {
                 guard let report = await shipyard.checkNotes() else {
-                    return .refused("this run doesn't read notes")
+                    return .refused(PanelText.notesCheckRefusal(canReadNotes: shipyard.canReadNotes))
                 }
                 return report.hasErrors ? .refused(report.text) : .inOrder(report.text)
             },

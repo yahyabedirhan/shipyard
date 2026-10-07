@@ -115,6 +115,7 @@ struct Panel: View {
         let status = SetupStatus(
             cli: actions.cliLink.state,
             github: shipyard.gitHubConnection != nil,
+            notion: shipyard.notionIsSetUp,
             skill: actions.skillDetector.isInstalled
         )
         ForEach(PanelText.settingsMenu(status, canSignOut: canSignOut), id: \.title) { item in

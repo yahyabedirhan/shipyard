@@ -222,6 +222,25 @@ struct AppStateStoreTests {
         #expect(store.state.bannerSnoozes == BannerSnoozes())
     }
 
+    @Test("Notion connected reads back; a file from before the flag, or with one this build can't read, loads with Notion not connected")
+    func notionConnected() throws {
+        let directory = temporaryDirectory()
+        let store = AppStateStore(directory: directory)
+        store.load(at: now)
+        store.update { $0.notionConnected = true }
+
+        let reloaded = AppStateStore(directory: directory)
+        #expect(reloaded.load(at: now) == .loaded)
+        #expect(reloaded.state.notionConnected)
+
+        for older in [#"{"version": 1, "collapsed": ["shop"]}"#, #"{"version": 1, "collapsed": ["shop"], "notionConnected": "yes"}"#] {
+            try Data(older.utf8).write(to: store.url)
+            #expect(store.load(at: now) == .loaded)
+            #expect(!store.state.notionConnected)
+            #expect(store.state.collapsed == ["shop"])
+        }
+    }
+
     @Test("a file a newer build wrote with a higher version is set aside, as a first run")
     func newerVersion() throws {
         let directory = temporaryDirectory()

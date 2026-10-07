@@ -18,6 +18,7 @@ final class FakeNtnRoute: HTTPTransport {
     }
 
     private let state: Locked<State>
+    private let sent = Locked(0)
     private let notion: StubHTTP
 
     init(_ state: State = .missing, notion: StubHTTP) {
@@ -28,10 +29,14 @@ final class FakeNtnRoute: HTTPTransport {
     /// How ntn is now.
     var current: State { state.current }
 
+    /// How many times the app ran ntn, whatever ntn's state: once per request.
+    var runs: Int { sent.current }
+
     /// Installs, logs in or logs out ntn, or takes it away.
     func set(_ state: State) { self.state.withValue { $0 = state } }
 
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        sent.withValue { $0 += 1 }
         switch state.current {
         case .missing:
             throw NotionError.ntnMissing

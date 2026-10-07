@@ -33,12 +33,16 @@ public struct SetupStatus: Equatable, Sendable {
     /// Whether shipyard is signed in to GitHub (`Shipyard.gitHubConnection`).
     public var github: Bool
 
+    /// Whether Notion is connected and ntn works (`Shipyard.notionIsSetUp`).
+    public var notion: Bool
+
     /// Whether the agent skill is installed (`SkillDetector`).
     public var skill: Bool
 
-    public init(cli: CLILink.State, github: Bool = false, skill: Bool = false) {
+    public init(cli: CLILink.State, github: Bool = false, notion: Bool = false, skill: Bool = false) {
         self.cli = cli
         self.github = github
+        self.notion = notion
         self.skill = skill
     }
 
@@ -46,8 +50,8 @@ public struct SetupStatus: Equatable, Sendable {
         switch part {
         case .cli: cli == .linked
         case .github: github
+        case .notion: notion
         case .skill: skill
-        case .notion: false
         }
     }
 }

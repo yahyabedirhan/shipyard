@@ -39,7 +39,7 @@ The Notion page titled "Agent guide" under "Shipyard Notes", beside the Projects
 _Avoid_: Entry page, README, notes reference (that's the skill's)
 
 **ntn**:
-Notion's CLI, which the app reads and writes notes through, one `ntn api` run per request, with ntn's own login and its default workspace, which must be the notes workspace. The app keeps no Notion token of its own. Without ntn, logged out, or in a workspace with no Shipyard Notes page, no notes list and the notes banner says what to do.
+Notion's CLI, which the app reads and writes notes through, one `ntn api` run per request, with ntn's own login and its default workspace, which must be the notes workspace. The app keeps no Notion token of its own. The app runs it only once Notion is connected, except for the Notion view's check. Without ntn, logged out, or in a workspace with no Shipyard Notes page, no notes list and the notes banner says what to do.
 _Avoid_: Notion token, Notion connection, internal connection (the app's route before ntn)
 
 **Panel banner**:
@@ -206,6 +206,10 @@ _Avoid_: Integration, service, connection
 **Status view**:
 A setup part's own view, opened from the settings menu or with `shipyard panel view`, in place of the projects: whether the part is set up and, when it isn't, how to set it up. The header, the banners and the footer stay; ‹ Back or closing the panel shows the projects again.
 _Avoid_: Settings page, setup screen, onboarding (that's the first-run flow)
+
+**Connect with ntn**:
+The Notion view's button that opts in to notes. Until the user presses it, the app runs no ntn but the view's own check, and lists no notes. The app state keeps it, so it lasts across restarts, and **Disconnect** undoes it. It holds no secret: ntn keeps its own login.
+_Avoid_: Notion token, sign in to Notion
 
 **Preset**:
 A ready-made configuration for one main use of shipyard, defined in the app and listed in the skill: `my-agents` (what you and your agents open), `incoming-contributions` (what others open on your repositories), `review-queue` (pull requests waiting on your review).

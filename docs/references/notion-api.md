@@ -105,3 +105,4 @@ Measured 2026-10-06.
 - An `.app` starts with an almost empty `PATH`, so the app looks for `ntn` at `~/.local/bin/ntn` (where Notion's installer, `curl -fsSL https://ntn.dev | bash`, puts it), `/opt/homebrew/bin/ntn`, `/usr/local/bin/ntn`, then `PATH`.
 - **Where ntn keeps its login** (`ntn --help`): in the OS keychain by default, or in `~/.config/notion/auth.json` when `NOTION_KEYRING=0`. `NOTION_API_TOKEN` overrides both. Keychain access is checked against ntn's process and ntn's own item, so rebuilding shipyard doesn't ask for it again.
 - ntn is in beta: its exit codes and error line are a contract the app depends on (ADR 0012).
+- `GET /v1/users/me` through ntn answers ntn's own bot user; its `bot.workspace_name` is the name of ntn's default workspace (the recorded answer is `Tests/ShipyardCoreTests/Fixtures/notion-me.json`). The Notion view shows that name before the user connects (#241, ADR 0013).

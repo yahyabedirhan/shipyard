@@ -60,6 +60,12 @@ extension PanelText {
             case installSkill
             /// Stops the running skill install (`SkillInstallation.cancel`).
             case cancelSkillInstall
+            /// Looks at ntn again (`Shipyard.checkNotion()`): Check again.
+            case checkNotion
+            /// Connects Notion, reads the notes and shows the projects (`Shipyard.connectNotion()`).
+            case connectNotion
+            /// Disconnects Notion (`Shipyard.disconnectNotion()`).
+            case disconnectNotion
         }
 
         /// A full-width button.

@@ -150,6 +150,12 @@ struct Harness {
         return next
     }
 
+    /// Notion connected before the app starts, as after Connect with ntn
+    /// in an earlier run: the flag in `state.json`, which `start()` reads.
+    func connectNotionBeforeStart() {
+        shipyard.appStateStore.update { $0.notionConnected = true }
+    }
+
     /// A recorded GraphQL answer from `Fixtures/`, with GitHub's rate-limit headers.
     nonisolated static func fixture(
         _ name: String,

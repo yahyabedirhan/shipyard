@@ -51,7 +51,7 @@ struct StatusView: View {
         case .skill:
             PanelText.skillStatus(isInstalled: actions.skillDetector.isInstalled, installation: actions.skillInstallation.state)
         case .notion:
-            PanelText.placeholderStatus(part)
+            PanelText.notionStatus(actions.shipyard.notionStatus, connected: actions.shipyard.notionConnected)
         }
     }
 
@@ -59,7 +59,9 @@ struct StatusView: View {
         switch part {
         case .cli: actions.cliLink.check()
         case .skill: actions.skillDetector.check()
-        case .github, .notion: break
+        // Opening the view is the user asking: the one time ntn runs before Connect with ntn.
+        case .notion: checkNotion()
+        case .github: break
         }
     }
 
@@ -68,7 +70,19 @@ struct StatusView: View {
         case .linkCLI: actions.cliLink.makeLink()
         case .installSkill: actions.skillInstallation.start()
         case .cancelSkillInstall: actions.skillInstallation.cancel()
+        case .checkNotion: checkNotion()
+        case .connectNotion:
+            // The projects again, where the notes list once read.
+            back()
+            let shipyard = actions.shipyard
+            Task { await shipyard.connectNotion() }
+        case .disconnectNotion: actions.shipyard.disconnectNotion()
         }
+    }
+
+    private func checkNotion() {
+        let shipyard = actions.shipyard
+        Task { await shipyard.checkNotion() }
     }
 
     // MARK: - The page
