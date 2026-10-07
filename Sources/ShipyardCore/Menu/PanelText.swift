@@ -343,8 +343,8 @@ public enum PanelText {
     /// A banner's ✕: hover help and VoiceOver label. The banner comes back
     /// after the hour if its condition still holds (`BannerSnoozes`).
     public static let dismissBanner = "Hide for an hour"
-    /// The button under the notes banner and a rejected token's banner,
-    /// which opens their status view (`PanelBanner.opens`).
+    /// The button under the notes banner, which opens its status view
+    /// (`PanelBanner.opens`).
     public static let openBannerView = "Open…"
 
     // MARK: - Notifications

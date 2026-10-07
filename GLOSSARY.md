@@ -47,7 +47,7 @@ The Notion view's button that opts in to notes. Until the user presses it, the a
 _Avoid_: Notion token, sign in to Notion
 
 **Panel banner**:
-A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words. The notes banner and a rejected token's banner also have **Open…**, which opens their status view.
+A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words. The notes banner also has **Open…**, which opens the Notion view.
 _Avoid_: Notification (that's the macOS banner), alert, warning
 
 **Snooze**:
