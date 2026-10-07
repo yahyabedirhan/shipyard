@@ -149,6 +149,10 @@ struct ListLayout: View {
                     .id(place)
                     .transition(Self.lineTransition)
             }
+            // Every row's number column holds the group's longest number, so
+            // its titles line up even past the column's width: "WORK-27"
+            // over "WORK-1".
+            let widestNumber = group.rows.map(PanelText.number).max { $0.count < $1.count } ?? ""
             // A folded subsection shows its subheader alone.
             ForEach(Array((group.isFolded ? [] : group.rows).enumerated()), id: \.element.id) { position, row in
                 let place = MenuRowPlace(section: section.name, row: row.id)
@@ -158,7 +162,7 @@ struct ListLayout: View {
                         // by default pull requests | issues | runs.
                         GroupDivider()
                     }
-                    ListRow(row: row, showsRepository: section.showsRepository)
+                    ListRow(row: row, showsRepository: section.showsRepository, widestNumber: widestNumber)
                         .itemRow(row, at: place, highlight: $highlight, showsRepository: section.showsRepository, actions: actions)
                 }
                 .id(place)
@@ -457,6 +461,9 @@ private struct ChipButtonBody: View {
 private struct ListRow: View {
     let row: MenuRow
     let showsRepository: Bool
+    /// The longest number in the row's group, which the number column
+    /// keeps room for.
+    let widestNumber: String
     @Environment(\.panelNow) private var now
 
     var body: some View {
@@ -466,12 +473,18 @@ private struct ListRow: View {
             stateIcon
             // A ping written before pings were numbered has none (0); the
             // column stays, so titles line up. A note's carries its prefix.
-            Text(PanelText.number(row))
-                .font(TypeScale.meta)
-                .foregroundStyle(.tertiary)
-                .frame(minWidth: Grid.numberColumn, alignment: .trailing)
-                .fixedSize()
-                .padding(.trailing, 8)
+            // Digits of one width make the group's longest number the
+            // widest, since a project's notes share one prefix.
+            ZStack(alignment: .trailing) {
+                Text(widestNumber).hidden()
+                Text(PanelText.number(row))
+            }
+            .font(TypeScale.meta)
+            .monospacedDigit()
+            .foregroundStyle(.tertiary)
+            .frame(minWidth: Grid.numberColumn, alignment: .trailing)
+            .fixedSize()
+            .padding(.trailing, 8)
             Text(row.title)
                 .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
                 .foregroundStyle(row.state.isActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
