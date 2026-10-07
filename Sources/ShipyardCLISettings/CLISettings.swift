@@ -5,8 +5,17 @@ import TOMLDecoder
 /// The `shipyard` command's own settings, read from `cli.toml` on every
 /// machine. `config.toml` is the app's and `cli.toml` the command's: no
 /// setting appears in both (ADR 0008). Every key is optional, so a missing
-/// or empty file is the defaults.
+/// or empty file is the defaults. `version` is optional too: a file without
+/// it is version 1, with no warning, since a warning would print on every
+/// command that reads the file.
 public struct CLISettings: Equatable, Sendable {
+    /// The `cli.toml` format version this build reads.
+    public static let supportedVersion = 1
+
+    /// The published schema a file's `#:schema` line points at, for `taplo
+    /// check`: `schema/cli.schema.json` on `main`, and that file's `$id`.
+    public static let schemaURL = "https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json"
+
     /// `[notices]`: where `shipyard notify` sends a notice.
     public var notices: NoticeSettings
 
@@ -93,11 +102,20 @@ extension CLISettings {
     final class Reader {
         private(set) var issues: [CLISettingsIssue] = []
 
-        static let rootKeys = ["notices"]
+        static let rootKeys = ["version", "notices"]
         static let noticesKeys = ["app-machine", "app-scheme", "app-port"]
 
         func settings(from root: TOMLTable) -> CLISettings {
             rejectUnknownKeys(in: root, path: [], known: Self.rootKeys)
+            if root.contains(key: "version") {
+                if let version = try? root.integer(forKey: "version") {
+                    if version != CLISettings.supportedVersion {
+                        issue("`version` \(version) isn't supported; this shipyard reads version \(CLISettings.supportedVersion)")
+                    }
+                } else {
+                    issue("`version` must be a whole number")
+                }
+            }
             var settings = CLISettings()
             if let table = table(root, "notices", path: []) {
                 settings.notices = notices(table)

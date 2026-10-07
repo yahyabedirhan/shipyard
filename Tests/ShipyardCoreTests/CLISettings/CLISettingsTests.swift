@@ -57,13 +57,24 @@ struct CLISettingsTests {
         #expect(try read().get() == .defaults)
     }
 
+    @Test("version 1 reads with its settings, and a file without version reads as version 1, as the files written before it do")
+    func version() throws {
+        let notices = "[notices]\napp-machine = \"mac\"\n"
+        try write("#:schema \(CLISettings.schemaURL)\nversion = 1\n\n" + notices)
+        #expect(try read().get().notices.appMachine == "mac")
+        try write(notices)
+        #expect(try read().get().notices.appMachine == "mac")
+    }
+
     @Test(
         "a file that doesn't read is refused with exit 1, its path and what's wrong",
         arguments: [
             ("[notices\n", "line 1: invalid TOML"),
             ("[notices]\napp-machin = \"mac\"\n", "unknown setting `notices.app-machin`"),
-            ("[notces]\n", "unknown setting `notces`; known: `notices`"),
+            ("[notces]\n", "unknown setting `notces`; known: `version`, `notices`"),
             ("notices = 3\n", "`notices` must be a table"),
+            ("version = 2\n[notices]\n", "`version` 2 isn't supported; this shipyard reads version 1"),
+            ("version = \"1\"\n", "`version` must be a whole number"),
         ]
     )
     func malformed(text: String, problem: String) throws {

@@ -20,7 +20,7 @@ private func skill() throws -> String {
 }
 
 /// The body of every ```toml fence in `text`, in order.
-private func tomlBlocks(in text: String) -> [String] {
+func tomlBlocks(in text: String) -> [String] {
     var blocks: [String] = []
     var current: [String]?
     var indent = 0

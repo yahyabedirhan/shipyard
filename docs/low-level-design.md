@@ -8,7 +8,7 @@ Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with th
 ShipyardCommand   foundation: CommandResult, CommandEnvironment, CommandTable, ShipyardVersion, GitRemote, HerdrCommand, RecordStore, SupportFolder,
                   NoticePort (the notices' port both files default to)
 ShipyardPings     agent side: Ping, PingStore, PingCommand, PingList, HerdrEvent, PingFiling + Unfiled
-ShipyardCLISettings  agent side: CLISettings (cli.toml: [notices]), CLISettingsFile (where it is, reading it)
+ShipyardCLISettings  agent side: CLISettings (cli.toml: version, [notices]), CLISettingsFile (where it is, reading it)
 ShipyardNotices   agent side: Notice, NoticeRequest, NoticeVerdict, NoticeRoute, NotifyCommand + NoticeCommands,
                   the other machine's routes: RemoteNoticeRoute (the choice), TailnetNoticeRoute + NoticeHTTP, PluginNoticeRoute
 ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, ConfigurationDuration, LayoutSetting, ConfigurationStore,

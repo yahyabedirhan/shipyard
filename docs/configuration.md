@@ -107,6 +107,24 @@ Two consequences:
 
 The schema is stricter than the reader on purpose: `additionalProperties: false` everywhere, so `taplo check` rejects the unknown keys the app only warns about.
 
+## cli.toml, the command's file
+
+`cli.toml` holds the `shipyard` command's own settings, on every machine (ADR 0008): beside `config.toml` on the Mac, in `$XDG_CONFIG_HOME/shipyard/` (default `~/.config/shipyard/`) elsewhere. `CLISettings.decode`, in `Sources/ShipyardCLISettings/`, reads it; the Linux build links that module and never `ShipyardConfig`. A missing file is the defaults. An unknown key, a value of the wrong type and invalid TOML are errors, not warnings: the command that reads the file fails with exit 1, naming the file and what's wrong.
+
+```toml
+#:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json
+version = 1
+
+[notices]
+app-machine = "my-mac"
+# app-scheme = "http"
+# app-port = 47420
+```
+
+- `version` is the file's format, `CLISettings.supportedVersion` (1). A file without it reads as version 1 with no warning, since a warning would print on every `shipyard notify`; any other version is an error that names the version this build reads. An older `shipyard` rejects `version` as an unknown key, so a machine's `shipyard` is updated before its `cli.toml` gains the line.
+- `schema/cli.schema.json` is published as `config.schema.json` is: its `$id`, `CLISettings.schemaURL` and the `#:schema` line of the examples here and in `skills/shipyard/references/notices.md` are one URL on `main`, and `CLISettingsSchemaTests` keeps them equal. Its `additionalProperties: false` rejects unknown keys as the reader does, and the test checks it declares exactly the keys the reader takes, with its choices and port range.
+- A new `cli.toml` setting is a property on its table's struct, a key in `CLISettings.Reader`'s known list and its read, a property in the schema, a line in `CLISettingsSchemaTests`' `everyCLIKey` and its key list, read and rejection cases in `CLISettingsTests`, and the skill's notices reference.
+
 ## Adding or changing a setting
 
 Do every step in the same change; the tests fail on most of the ones you miss.
