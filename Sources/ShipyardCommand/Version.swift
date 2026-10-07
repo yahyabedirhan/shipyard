@@ -1,5 +1,5 @@
 /// The one place shipyard's version is recorded. The app reads it from here,
 /// and packaging stamps the bundle's Info.plist with the same value.
 public enum ShipyardVersion {
-    public static let current = "0.4.0"
+    public static let current = "0.5.0"
 }
