@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardConfig
 
 /// The words the panel shows for what the menu model and the orchestrator
@@ -301,9 +302,10 @@ public enum PanelText {
 
     /// One problem's line in a configuration banner:
     /// "config.toml line 14: unknown event `pr.openned` …", or without the
-    /// line when it can't be placed. `config-status.json` repeats it.
+    /// line when it can't be placed. `config-status.json` and `shipyard config
+    /// check` repeat it.
     public static func configIssue(_ issue: ConfigurationIssue) -> String {
-        issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
+        ConfigurationCheck.banner(ConfigurationCheck.Issue(issue), in: ConfigurationStore.fileName)
     }
 
     /// The quiet banner for settings the file has but shipyard ignores, each

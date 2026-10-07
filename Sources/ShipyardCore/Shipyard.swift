@@ -544,13 +544,7 @@ public final class Shipyard {
         let notices = configStore.lastValid.notices
         let port = notices.listen ? notices.port : nil
         if noticeListenerPort != port { noticeListenerPort = port }
-        configStatusStore.record(ConfigStatus(
-            checked: clock.now,
-            config: configStore.url,
-            configModified: configStore.modified,
-            error: configError,
-            warnings: configWarnings
-        ))
+        configStatusStore.record(configStore.check(at: clock.now))
     }
 
     /// Registers or removes the login item to match `launch-at-login` in

@@ -6,7 +6,8 @@ Agreed 2026-09-25; the 0.0.2 changes agreed 2026-09-26 (their decisions, with th
 
 ```text
 ShipyardCommand   foundation: CommandResult, CommandEnvironment, CommandTable, ShipyardVersion, GitRemote, HerdrCommand, RecordStore, SupportFolder,
-                  NoticePort (the notices' port both files default to)
+                  NoticePort (the notices' port both files default to), ConfigurationCheck (a settings file's verdict and its JSON),
+                  ConfigurationCommands (`config check`, over the checks the build hands it)
 ShipyardPings     agent side: Ping, PingStore, PingCommand, PingList, HerdrEvent, PingFiling + Unfiled
 ShipyardCLISettings  agent side: CLISettings (cli.toml: version, [notices]), CLISettingsFile (where it is, reading it)
 ShipyardNotices   agent side: Notice, NoticeRequest, NoticeVerdict, NoticeRoute, NotifyCommand + NoticeCommands,
@@ -16,7 +17,7 @@ ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, 
 ShipyardControl   ControlRequest, ControlReply, ControlCommand and PanelCommand (argument parsing), ControlClient (socket), AppLauncher,
                   ControlLease (the lease's rules), Holder (who sends a request), LeaseBanner (the banner's words),
                   ControlNoticeRoute (a notice over the socket)
-ShipyardCore      the app's rules only (GitHub, items, menu, state and AppFiles, onboarding, Presets, ConfigStatus, CLILink, Skill/, Notes/),
+ShipyardCore      the app's rules only (GitHub, items, menu, state and AppFiles, onboarding, Presets, ConfigStatusStore, CLILink, Skill/, Notes/),
                   plus the Mac's side of pings: RemotePingReader, RemoteMachines, RemotePingMarks, PingNumbers, KnownAgent, HerdrFocus,
                   and of notices: NoticeRules, RemotePingReader.takeNotices (the poll), TailscaleCLI (the Mac's own Tailscale login, behind TailnetIdentity)
 ShipyardApp       the Apple-framework layer, plus Control/: ControlServer, LeaseIndicator, PanelControl, PanelState, Screenshotter;
@@ -347,7 +348,7 @@ Shipyard -> GitHubClient           fetch(projects, resolved) -> Snapshot: reposi
 Shipyard -> Listing                items(project, snapshot, viewer, now) -> the project's listed items
 Shipyard -> RateBudget             record(limits) / record(error); nextDelay(configured, share) -> RefreshDelay
 Shipyard -> AppStateStore          owns Attention + known items + notified + collapsed
-Shipyard -> ConfigStatusStore      record(verdict) after every reload, for agents
+Shipyard -> ConfigStatusStore      record(configStore.check(at: now)) after every reload, for agents
 Shipyard -> PingStore              all() at start and on every change the app's watcher sees; markSeen(ping) on a click that works or an ⌥-click; recordFailure(ping, reason, detail) on one that doesn't; remove(id) on a dismiss; removeIfUnchanged(ping) for a seen ping past its seen-window
 Shipyard -> ActionRunning          open(url) for GitHub pages; run(ping's action) -> done | failed(reason, detail) on a ping's click; run(.app([herdr] terminal)) after a Herdr focus
 Shipyard -> HerdrFocus             focus(tab or pane id) -> done | failed(reason, detail) on a Herdr ping's click (#101)
@@ -362,6 +363,7 @@ CLILink -> LinkFileSystem          fileExists(app's CLI), entry(~/.local/bin/shi
 ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories as last resolved
 ShipyardCLI -> ConfigurationLocation      current(environment, support) -> the config.toml the app recorded, else its own lookup (#126)
 ShipyardCLI -> CLISettingsFile     beside(config:) on the Mac, withoutTheApp(environment:) elsewhere: where cli.toml is (#189); read() by the commands that need a setting
+ShipyardCLI -> ConfigurationCommands  entries(checks:): on the Mac ConfigurationStore.check(configURL, at:) and CLISettingsFile.check(at:), elsewhere the latter alone (#256)
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names
@@ -506,13 +508,13 @@ Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side cod
 
 | Module | Owns | Depends on | Linked by |
 |---|---|---|---|
-| **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`, and `workingRepository`, the working folder's `origin` a ping or a notice is filed by, #190), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder`, and `NoticePort` (the port notices travel to, which `config.toml`'s and `cli.toml`'s `[notices] port` both default to, #194) | Foundation only | every build |
+| **ShipyardCommand** | What any command needs on any machine: `CommandResult` (output, error, exit status 0/1/2), `CommandEnvironment` (working folder, variables, the `GitRemoteLookup` port, the synchronous program-run port), `CommandTable` and `ShipyardCLI.run`, `ShipyardVersion`, `GitRemote` (with `isRepositorySlug`, and `workingRepository`, the working folder's `origin` a ping or a notice is filed by, #190), `ProgramRun` and `CommandOutput`, `HerdrCommand` with `ShellRunning` and `ProcessShellRunner`, `Sleep` and `systemSleep`, `RecordStore`, `SupportFolder`, `ConfigurationCheck` (a settings file's verdict and the `config-status.json` shape, #256), `ConfigurationCommands` (`shipyard config check`, #256), and `NoticePort` (the port notices travel to, which `config.toml`'s and `cli.toml`'s `[notices] port` both default to, #194) | Foundation only | every build |
 | **ShipyardPings** | The agent's side of pings: `Ping` and `PingAction` (ids, instance, expiry, `isSameSending`), `PingStore`, `PingCommand` (send, replace, withdraw, list), `PingList` (the `ping list --json` contract), `HerdrEvent`, `PingFiling` with `Unfiled`, and `PingCommands` (its `ping` and `herdr-event` entries for the table) | Command | every build |
-| **ShipyardCLISettings** | The command's own settings, `cli.toml` (ADR 0008, #189): `CLISettings` (its tables; `[notices]`, `NoticeSettings`, which the notice commands fill in), `CLISettingsIssue` and `CLISettingsError`, and `CLISettingsFile` (where it is on each kind of machine, and `read()`) | Command, TOMLDecoder | every build (the app only through Notices, and never reads `cli.toml`) |
+| **ShipyardCLISettings** | The command's own settings, `cli.toml` (ADR 0008, #189): `CLISettings` (its tables; `[notices]`, `NoticeSettings`, which the notice commands fill in), `CLISettingsIssue` and `CLISettingsError`, and `CLISettingsFile` (where it is on each kind of machine, `read()`, and `check(at:)` for `config check`) | Command, TOMLDecoder | every build (the app only through Notices, and never reads `cli.toml`) |
 | **ShipyardNotices** | The agent's side of notices (effort `notes-and-notify`, #190): `Notice` (title, body, sender, and the project or repository it's filed by; since #193 subtitle, `NoticeImage`, `NoticeSound`, thread, `NoticeLevel`, id, a click's `PingAction`, `NoticeButton`s, and the terminal and Herdr session a Herdr action was sent from; its JSON is the one shape every route carries), `NoticeRequest` (show a notice, or withdraw an id, #193), `NoticeVerdict` (done, queued for the Mac's poll, or refused with why), the `NoticeRoute` port a build gives its route through, `QueuedNotice` and `PluginNoticeRoute` (the poll route, #195), `RemoteNoticeRoute` (another machine's choice of route, from `cli.toml`), `TailnetNoticeRoute`, `TailnetWire` and the `NoticeHTTP` port with `URLSessionNoticeHTTP` (the tailnet route, #194), `NotifyCommand` (parsing, the image file, the checkout's `origin`, `withdraw`, the exit codes) and `NoticeCommands` (its `notify` entry for the table). It files nothing: the app does. It reads `cli.toml`'s `[notices]` only, through CLISettings | Command, Pings, CLISettings (FoundationNetworking on Linux) | both `shipyard` builds, the app |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `ConfigurationDuration`, `LayoutSetting`, `ConfigurationStore` (path, reload, last valid, append, set layout), `ConfigurationLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
 | **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlMessage` (a request with its holder, 0.2.0), `ControlReply`, `ControlLease` (the lease's rules, which the app's server drives, 0.2.0), `Holder` with the `ProcessTable` port and `SystemProcessTable` (0.2.0), `LeaseBanner` (the banner's words, 0.2.0), `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand`, `PanelCommand`, `ScreenshotCommand` and `LeaseCommand` (parsing `app`, `panel`, `screenshot` and `control` into an invocation, and a reply into a `CommandResult`; `ControlCommands` reads `notes check` itself, ADR 0011), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), `ControlCommands` (its entries for the table), and `ControlNoticeRoute` (a notice's route on the Mac, the socket, #190) | Command, Notices | the Mac `shipyard`, the app (the wire types and the socket calls) |
-| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatus`, `CLILink`, `Skill/`; the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`); the Mac's side of notices, `Notices/`: `NoticeRules` (#190), `RemotePingReader.takeNotices` (the poll, #195) and `TailscaleCLI` behind the `TailnetIdentity` port (#194); and the user's notes, `Notes/`: `Note`, `NotionClient`, `NotesReader` (#192), `NotePrefix` (#196) and `NotesCheck` (ADR 0011), with `NotesMenuState` and `NotesNotice` in `Menu/` | Command, Pings, Notices, Config | the app |
+| **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatusStore`, `CLILink`, `Skill/`; the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`); the Mac's side of notices, `Notices/`: `NoticeRules` (#190), `RemotePingReader.takeNotices` (the poll, #195) and `TailscaleCLI` behind the `TailnetIdentity` port (#194); and the user's notes, `Notes/`: `Note`, `NotionClient`, `NotesReader` (#192), `NotePrefix` (#196) and `NotesCheck` (ADR 0011), with `NotesMenuState` and `NotesNotice` in `Menu/` | Command, Pings, Notices, Config | the app |
 | **ShipyardApp** | The Apple-framework layer, plus `Control/`: `ControlServer`, `LeaseIndicator`, `LeaseNotices`, `PanelControl` and `PanelState`, `Screenshotter`; and `NoticeListener`, the HTTP listener for notices from other machines (#194) | Command, Pings, Notices, Config, Control, Core (CLISettings through Notices) | the app |
 
 Every module and every edge, as `Package.swift` declares them, lowest first (each arrow points at what a module depends on; no module depends on one below it in this list):
@@ -969,7 +971,7 @@ The app's `ConfigurationWatcher` watches the **directory**, not just the file: e
 
 ### ConfigStatusStore — `ShipyardCore/Config/ConfigStatus.swift`
 
-Writes the latest `ConfigStatus` (`checked`, `config`, `configModified`, `error`, `warnings`) to `config-status.json` in a directory the app provides, the same one as `state.json` (tests pass a temporary one). Not beside `config.toml`: `ConfigurationWatcher` watches that directory, so a write there would reload again. Write-only and replaced atomically; the app never reads it back. Each problem is written with its `line`, `message` and `banner`, the banner's line from `PanelText.configIssue`. The format is in `docs/configuration.md`.
+Writes the latest reload's `ConfigurationCheck` (`ConfigurationStore.check(at:)`: `name`, `checked`, `file`, `modified`, `problems`, `warnings`; in ShipyardCommand since #256, so `shipyard config check --json` encodes the same fields) to `config-status.json` in a directory the app provides, the same one as `state.json` (tests pass a temporary one). Not beside `config.toml`: `ConfigurationWatcher` watches that directory, so a write there would reload again. Write-only and replaced atomically; the app never reads it back. Each problem is written with its `line`, `message` and `banner`, the banner's line from `ConfigurationCheck.banner`, which `PanelText.configIssue` uses too. The format is in `docs/configuration.md`.
 
 ### Presets — `ShipyardCore/Config/Presets.swift` (+ `PresetSetting.swift`)
 
@@ -1424,10 +1426,14 @@ table.add(PingCommands.entries(
     store: PingStore(directory: PingStore.appDirectory(in: support))))
 table.add(NoticeCommands.entries(route: ControlNoticeRoute(support: support)))   // notify over the socket (#190)
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
+table.add(ConfigurationCommands.entries(checks: [   // config check (#256): config.toml as the app reads it, then cli.toml
+    { now in ConfigurationStore.check(configURL, at: now) },
+    { now in settings.check(at: now) }]))
 #else
 let settings = CLISettingsFile.withoutTheApp(environment: environment)   // cli.toml (#189)
 table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
 table.add(NoticeCommands.entries(route: RemoteNoticeRoute(settings: settings)))   // the tailnet with app-machine, else the plugin's poll (#194, #195)
+table.add(ConfigurationCommands.entries(checks: [{ now in settings.check(at: now) }]))   // config check (#256): cli.toml alone
 #endif
 let result = ShipyardCLI.run(arguments, table: table, environment: commandEnvironment, now: Date())
 ```
@@ -1495,6 +1501,8 @@ shipyard/
 │   ├── GitRemote.swift               # (moved from Core's CLI/) the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name, isRepositorySlug; workingRepository, a ping's or notice's origin (moved from PingCommand, #190)
 │   ├── HerdrCommand.swift            # (moved from Core's Pings/) runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
 │   ├── RecordStore.swift             # (0.1.0) one JSON file per record in a folder, atomic replace, remove if unchanged
+│   ├── ConfigurationCheck.swift      # (#256) a settings file's verdict: problems, warnings, the banner's words, the config-status.json shape
+│   ├── ConfigurationCommands.swift   # (#256) shipyard config check [--json]: one check per file the build hands it; exit 1 on a problem
 │   ├── NoticePort.swift              # (#194) the port notices from other machines travel to (47420): config.toml's and cli.toml's [notices] port default, and the range both accept
 │   └── SupportFolder.swift           # (0.1.0) the app's support folder (SHIPYARD_SUPPORT_DIR overrides it) and the XDG data folder without the app
 ├── Sources/ShipyardPings/            # (0.1.0) the agent's side of pings; Command only
@@ -1507,7 +1515,7 @@ shipyard/
 │   └── PingCommands.swift            # (0.1.0) the `ping` and `herdr-event` entries for the CommandTable, over a filing and a store
 ├── Sources/ShipyardCLISettings/      # (#189) the command's own cli.toml; Command and TOMLDecoder
 │   ├── CLISettings.swift             # its tables ([notices]), the reader: unknown keys and tables are errors; CLISettingsIssue, CLISettingsError
-│   └── CLISettingsFile.swift         # where it is (beside config.toml on the Mac, the XDG config folder elsewhere); read(): defaults, or exit 1 with what's wrong
+│   └── CLISettingsFile.swift         # where it is (beside config.toml on the Mac, the XDG config folder elsewhere); read(): defaults, or exit 1 with what's wrong; check(at:) for config check
 ├── Sources/ShipyardNotices/          # (#190) the agent's side of notices; Command, Pings and CLISettings (FoundationNetworking on Linux)
 │   ├── Notice.swift                  # a notice (title, body, sender, project or repository, every option since #193) and its JSON; NoticeImage, NoticeSound, NoticeLevel, NoticeButton; NoticeRequest (show or withdraw); NoticeVerdict; the NoticeRoute port
 │   ├── NotifyCommand.swift           # shipyard notify: arguments → a notice filed by --project, --repo or origin, delivered over a route; the image file; withdraw; the exit codes; NoticeCommands
@@ -1524,7 +1532,7 @@ shipyard/
 │   ├── Selectors.swift               # (moved) AuthorSelector, AuthorFilter, RepositorySelector: parse, the hints (ADR 0002); matching items is Core's
 │   ├── ConfigurationDuration.swift   # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
-│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; Configuration.acceptsPreset (moved from PresetSetting.swift)
+│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; check(at:) and check(_:at:), the verdict (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
 │   ├── ConfigurationLocation.swift   # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
 │   └── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
@@ -1555,7 +1563,7 @@ shipyard/
 │   │   ├── ConfigurationStore+Preset.swift # (moved) writePreset: the third writer
 │   │   ├── Presets.swift             # the three presets: names, what they ask for, their file text
 │   │   ├── PresetSetting.swift       # the third writer's refusal (presetRefused): a preset only into a file whose only live key is version
-│   │   └── ConfigStatus.swift        # ConfigStatus + config-status.json: the verdict after every reload, for agents
+│   │   └── ConfigStatus.swift        # ConfigStatusStore: config-status.json, the verdict (ConfigurationCheck) after every reload, for agents
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer (login, name, avatar, profile), rate-limit headers, ETags

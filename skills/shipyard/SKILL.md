@@ -51,7 +51,7 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    version = 1
    ```
 
-4. Check the edit (see Checking an edit). It is done when `taplo check` exits 0, the rules it can't check hold, and the app's record says `"accepted": true` for your save.
+4. Run `shipyard config check` after each edit, then check the rest (see Checking an edit). It is done when `shipyard config check` exits 0, `taplo check` exits 0, and the app's record says `"accepted": true` for your save.
 
 ## Keys and defaults
 
@@ -218,6 +218,20 @@ Older files write a rule's `authors` as one string: `"any"`, `"me"`, `"others"` 
 
 ## Checking an edit
 
+**The command.** Run `shipyard config check` after each edit. It reads the file as the app reads it, without the app, and also reads the command's own `cli.toml` when there is one:
+
+```sh
+shipyard config check; echo "config check exit status: $?"
+```
+
+```text
+/Users/me/.config/shipyard/config.toml: rejected
+  problem: config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?)
+/Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
+```
+
+Exit status 0 means every file is accepted: fix each `warning` line anyway, usually a misspelled key. Exit status 1 means a file has a `problem`: fix each one at its line and run the command again. `shipyard config check --json` prints each file's result under its name (`config.toml`, `cli.toml`) in the same fields as the app's record below, so you can compare them. It checks the files on disk, not what the app runs on: the app's record says whether the app took your save.
+
 **The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file and print its exit status; it finds the schema through the `#:schema` line:
 
 ```sh
@@ -226,7 +240,7 @@ taplo check ~/.config/shipyard/config.toml; echo "taplo exit status: $?"
 
 Exit status 0 is a pass; anything else is a fail, and the lines above it say why. Don't pipe the output through `tail`, `grep` or `head`: on success Taplo prints only an INFO line, and a pipe hides the exit status. Without Taplo installed, run `npx -y @taplo/cli check <file>` the same way, or `brew install taplo`. When the file has no `#:schema` line, or its schema URL can't be fetched, pass `--schema <url>` with the schema URL above (a local copy works as `file://<absolute path>`). The schema is stricter than the app about unknown keys: it rejects what the app would only warn about and ignore, so fix those too.
 
-The schema can't check three rules; check them by reading the file:
+The schema can't check three rules; `shipyard config check` and the app's record catch them, or check them by reading the file:
 
 - Every project `name` is used once.
 - A project lists each repository, wildcard and group once, ignoring case (`owner/name` and `Owner/Name` are the same repository).

@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardConfig
 @testable import ShipyardCore
 import Testing
@@ -150,11 +151,12 @@ struct ConfigStatusTests {
 
     @Test("a problem without a line records its line as null")
     func problemWithoutLine() throws {
-        let status = ConfigStatus(
+        let status = ConfigurationCheck(
+            name: ConfigurationStore.fileName,
             checked: date("2026-09-25T12:00:00Z"),
-            config: URL(fileURLWithPath: "/tmp/config.toml"),
-            configModified: nil,
-            error: ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")]),
+            file: URL(fileURLWithPath: "/tmp/config.toml"),
+            modified: nil,
+            problems: [ConfigurationCheck.Issue(ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text"))],
             warnings: []
         )
         let json = try #require(try JSONSerialization.jsonObject(with: ConfigStatusStore.encode(status)) as? [String: Any])

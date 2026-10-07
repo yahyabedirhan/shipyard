@@ -442,6 +442,9 @@ struct SkillDocumentTests {
         #expect(text.contains("~/.config/shipyard/config.toml"))
         #expect(text.contains("#:schema \(Configuration.schemaURL)"))
         #expect(text.contains("taplo check"))
+        // The command's check, in the edit steps, so an agent runs it after each edit.
+        let editSteps = try #require(text.components(separatedBy: "## Editing it").dropFirst().first?.components(separatedBy: "\n## ").first)
+        #expect(editSteps.contains("`shipyard config check`"))
         // The app's own check: its error banner, in the words the panel shows.
         #expect(text.contains("Using the last valid configuration."))
         // The app's verdict, where an agent reads it, with the fields it names.

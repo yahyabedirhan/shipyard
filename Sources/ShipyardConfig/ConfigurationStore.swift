@@ -23,6 +23,8 @@ public final class ConfigurationStore: @unchecked Sendable {
         case invalid(ConfigurationError)
     }
 
+    public static let fileName = "config.toml"
+
     public let url: URL
 
     private let lock = NSLock()
@@ -50,7 +52,7 @@ public final class ConfigurationStore: @unchecked Sendable {
         }
         return base
             .appendingPathComponent("shipyard", isDirectory: true)
-            .appendingPathComponent("config.toml", isDirectory: false)
+            .appendingPathComponent(fileName, isDirectory: false)
     }
 
     /// The configuration the app runs on: the last file that read cleanly,
@@ -79,7 +81,7 @@ public final class ConfigurationStore: @unchecked Sendable {
     public func reload() -> ReloadResult {
         // Taken before the bytes: a save in between gets a later time and
         // another reload, so the time never claims a newer file than was read.
-        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        let modified = ConfigurationCheck.modificationDate(of: url)
         let outcome: Result<Configuration.Decoded, ConfigurationError>
         var acceptsPreset = false
         do throws(ConfigurationError) {
@@ -108,6 +110,29 @@ public final class ConfigurationStore: @unchecked Sendable {
                 return .changed(decoded.configuration)
             }
         }
+    }
+
+    /// The latest reload's verdict, as at `checked`: what the app records
+    /// in `config-status.json` and `shipyard config check` prints.
+    public func check(at checked: Date) -> ConfigurationCheck {
+        synchronized {
+            ConfigurationCheck(
+                name: ConfigurationStore.fileName,
+                checked: checked,
+                file: url,
+                modified: _modified,
+                problems: (_error?.issues ?? []).map(ConfigurationCheck.Issue.init),
+                warnings: _warnings.map(ConfigurationCheck.Issue.init)
+            )
+        }
+    }
+
+    /// Reads the file at `url` as the app does, at `now`, for `shipyard
+    /// config check`: the same verdict without the app.
+    public static func check(_ url: URL, at now: Date) -> ConfigurationCheck {
+        let store = ConfigurationStore(url: url)
+        store.reload()
+        return store.check(at: now)
     }
 
     /// Creates the file (and its directory) with the commented header and
@@ -220,5 +245,11 @@ extension Configuration {
     package static func acceptsPreset(_ text: String) -> Bool {
         guard (try? decode(text)) != nil else { return false }
         return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && $0.path == [.key("version")] }
+    }
+}
+
+extension ConfigurationCheck.Issue {
+    public init(_ issue: ConfigurationIssue) {
+        self.init(line: issue.line, message: issue.message)
     }
 }

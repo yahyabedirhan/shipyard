@@ -67,7 +67,7 @@ The core has no file watcher of its own: tests drive the same path by writing th
 
 ## The verdict record, for agents
 
-Agents edit the file but can't see the panel's banner, so after every reload (at launch, on each save the watcher sees, after the picker appends projects, after onboarding writes a preset, and after the layout button sets the layout) `Shipyard` also writes its verdict to `~/Library/Application Support/Shipyard/config-status.json`, through `ConfigStatusStore` (in `ConfigStatus.swift`). The skill's "Checking an edit" tells agents to read it after saving.
+Agents edit the file but can't see the panel's banner, so after every reload (at launch, on each save the watcher sees, after the picker appends projects, after onboarding writes a preset, and after the layout button sets the layout) `Shipyard` also writes its verdict to `~/Library/Application Support/Shipyard/config-status.json`: `ConfigurationStore.check(at:)` gives the latest reload's `ConfigurationCheck` (in `Sources/ShipyardCommand/`), and `ConfigStatusStore` (in `ConfigStatus.swift`) writes it. The skill's "Checking an edit" tells agents to read it after saving.
 
 ```json
 {
@@ -84,8 +84,18 @@ Agents edit the file but can't see the panel's banner, so after every reload (at
 ```
 
 - `checked` is when the app read the file; `configModified` is the file's modification time as it read it (taken before the bytes, so it never claims a newer file than was read), `null` when there was no file. Both are UTC in whole seconds, the form `date -u -r <file> +%Y-%m-%dT%H:%M:%SZ` prints, so an agent can tell the verdict is for its own save.
-- `accepted` is `false` exactly when the banner shows. `problems` then lists every issue of the `ConfigurationError`, in file order; `warnings` lists the unknown settings an accepted file has. Each entry has its `line` (`null` when it can't be placed), the `message`, and `banner`, the entry's line in the panel's banner word for word (`PanelText.configIssue`, which the banners use too).
+- `accepted` is `false` exactly when the banner shows. `problems` then lists every issue of the `ConfigurationError`, in file order; `warnings` lists the unknown settings an accepted file has. Each entry has its `line` (`null` when it can't be placed), the `message`, and `banner`, the entry's line in the panel's banner word for word (`ConfigurationCheck.banner`, which `PanelText.configIssue` and so the banners use too).
 - It sits beside `state.json`, not beside `config.toml`: the watcher watches the configuration's directory, so a write there would trigger another reload. It's app-owned, replaced atomically on every reload (unchanged ones too), and never read back by the app. `version` follows the same rule as `state.json`'s: a new field isn't a new version, a renamed or changed one is.
+
+## Checking without the app: `shipyard config check`
+
+`shipyard config check` gives the record's verdict without the app, so an agent can check an edit when the app isn't running, or on a machine without it. The skill's edit steps tell agents to run it after each edit.
+
+- `ConfigurationCommands` (in `Sources/ShipyardCommand/`) owns the command. The executable hands it one check per file, so the command never links a file's reader: the Mac's build checks `config.toml` with `ConfigurationStore.check(_:at:)`, a fresh store's `reload()`, and `cli.toml` with `CLISettingsFile.check(at:)`; the Linux build checks only `cli.toml` and never links `ShipyardConfig`.
+- On the Mac, `config.toml` is the file `config-location.json` names, as for `shipyard ping` (`ConfigurationLocation.current`), and `cli.toml` is beside it.
+- It prints each file's path and `accepted` or `rejected`, then a `problem:` or `warning:` line for each issue in the banner's words. A missing file is `accepted (no file: the defaults)`. It exits 1 when a file has a problem, else 0; a bad argument exits 2.
+- `--json` prints one object, each file's `ConfigurationCheck` under its name (`config.toml`, `cli.toml`), in the record's fields. Both encode through `ConfigurationCheck`, so the `config.toml` entry and `config-status.json` match field for field when they read the same file at the same time; `ConfigurationCheckTests` holds that.
+- A `cli.toml` has no warnings: what it doesn't know is a problem (see below).
 
 ## Configuration and app state
 
@@ -109,7 +119,7 @@ The schema is stricter than the reader on purpose: `additionalProperties: false`
 
 ## cli.toml, the command's file
 
-`cli.toml` holds the `shipyard` command's own settings, on every machine (ADR 0008): beside `config.toml` on the Mac, in `$XDG_CONFIG_HOME/shipyard/` (default `~/.config/shipyard/`) elsewhere. `CLISettings.decode`, in `Sources/ShipyardCLISettings/`, reads it; the Linux build links that module and never `ShipyardConfig`. A missing file is the defaults. An unknown key, a value of the wrong type and invalid TOML are errors, not warnings: the command that reads the file fails with exit 1, naming the file and what's wrong.
+`cli.toml` holds the `shipyard` command's own settings, on every machine (ADR 0008): beside `config.toml` on the Mac, in `$XDG_CONFIG_HOME/shipyard/` (default `~/.config/shipyard/`) elsewhere. `CLISettings.decode`, in `Sources/ShipyardCLISettings/`, reads it; the Linux build links that module and never `ShipyardConfig`. A missing file is the defaults. An unknown key, a value of the wrong type and invalid TOML are errors, not warnings: the command that reads the file fails with exit 1, naming the file and what's wrong. `shipyard config check` lists the same problems without running a command that needs the file.
 
 ```toml
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json

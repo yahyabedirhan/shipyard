@@ -111,7 +111,7 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
    # app-port = 47420      the port tailscale serve exposes
    ```
 
-   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notices]` has the Mac's `listen` and `port`), and an unknown key in it is an error. The `#:schema` line points Taplo at the file's own schema, so `taplo check ~/.config/shipyard/cli.toml; echo "taplo exit status: $?"` checks it as it checks `config.toml`. `version = 1` is the file's format; a file without it reads as version 1, with no warning, and any other version is an error. An older `shipyard` rejects `version` as an unknown key, so update `shipyard` on the machine before you add it.
+   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notices]` has the Mac's `listen` and `port`), and an unknown key in it is an error. The `#:schema` line points Taplo at the file's own schema, so `taplo check ~/.config/shipyard/cli.toml; echo "taplo exit status: $?"` checks it as it checks `config.toml`. Run `shipyard config check` on the machine after each edit: it prints each problem with its line and exits 1 until the file reads. `version = 1` is the file's format; a file without it reads as version 1, with no warning, and any other version is an error. An older `shipyard` rejects `version` as an unknown key, so update `shipyard` on the machine before you add it.
 5. **A test notice**, from the machine:
 
    ```sh

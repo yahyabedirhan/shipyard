@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCLISettings
 @testable import ShipyardCommand
 import ShipyardConfig
 @testable import ShipyardPings
@@ -243,7 +244,14 @@ struct Harness {
     /// is the Mac's. The Mac's `app` and `panel` commands talk to a running
     /// app over its socket; `ShipyardControlTests` drives them.
     var macCommands: CommandTable {
-        .commands(filing: macFiling, store: pingStore)
+        var table = CommandTable.commands(filing: macFiling, store: pingStore)
+        let configURL = configURL
+        let settings = CLISettingsFile.beside(config: configURL)
+        table.add(ConfigurationCommands.entries(checks: [
+            { now in ConfigurationStore.check(configURL, at: now) },
+            { now in settings.check(at: now) },
+        ]))
+        return table
     }
 
     /// The Mac's filing, against this harness's configuration file and

@@ -45,20 +45,52 @@ public struct CLISettingsFile: Equatable, Sendable {
     /// and what's wrong with it, so a typo never quietly changes what a
     /// command does.
     public func read() throws(CommandResult) -> CLISettings {
+        switch load() {
+        case .success(let settings): return settings
+        case .failure(.unreadable(let reason)): throw .failed("shipyard: can't read \(url.path): \(reason)")
+        case .failure(.invalid(let issues)): throw failure(issues)
+        }
+    }
+
+    /// The file's verdict at `checked`, for `shipyard config check`: what
+    /// `read()` would refuse, as problems. A missing file is the defaults,
+    /// accepted.
+    public func check(at checked: Date) -> ConfigurationCheck {
+        let modified = ConfigurationCheck.modificationDate(of: url)
+        let problems: [ConfigurationCheck.Issue]
+        switch load() {
+        case .success:
+            problems = []
+        case .failure(.unreadable(let reason)):
+            problems = [ConfigurationCheck.Issue(line: nil, message: "can't read \(url.path): \(reason)")]
+        case .failure(.invalid(let issues)):
+            problems = issues.map { ConfigurationCheck.Issue(line: $0.line, message: $0.message) }
+        }
+        return ConfigurationCheck(name: Self.fileName, checked: checked, file: url, modified: modified, problems: problems, warnings: [])
+    }
+
+    private enum LoadFailure: Error {
+        /// The file is there but its bytes don't come.
+        case unreadable(String)
+        /// The bytes come but don't read as settings.
+        case invalid([CLISettingsIssue])
+    }
+
+    private func load() -> Result<CLISettings, LoadFailure> {
         let data: Data
         do {
             data = try Data(contentsOf: url)
         } catch {
-            if !FileManager.default.fileExists(atPath: url.path) { return .defaults }
-            throw .failed("shipyard: can't read \(url.path): \(error.localizedDescription)")
+            if !FileManager.default.fileExists(atPath: url.path) { return .success(.defaults) }
+            return .failure(.unreadable(error.localizedDescription))
         }
         guard let text = String(data: data, encoding: .utf8) else {
-            throw failure([CLISettingsIssue(line: nil, message: "the file isn't UTF-8 text")])
+            return .failure(.invalid([CLISettingsIssue(line: nil, message: "the file isn't UTF-8 text")]))
         }
         do {
-            return try CLISettings.decode(text)
+            return .success(try CLISettings.decode(text))
         } catch {
-            throw failure(error.issues)
+            return .failure(.invalid(error.issues))
         }
     }
 
