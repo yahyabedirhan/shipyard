@@ -1219,10 +1219,10 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               `attentionCount > 0`, shown on hover, kept laid out at opacity 0 while hidden so the
                               chips never move), then one count chip per kind in `headerCounts` (only the kinds this
                               project has rows of), `Grid.chipGap` apart (`HeaderCountChip`: the kind's state-neutral
-                              row icon and its count, accent on a faint accent capsule while it needs attention,
-                              expanded or collapsed, else gray; a pull request's, issue's or run's chip is a button
-                              (`ChipButtonStyle`, a faint capsule on hover) over `pageLinks(for:)`: one link opens at
-                              once; several (a project of several repositories) pop a native menu at the pointer
+                              row icon and its count, accent while it needs attention, expanded or collapsed, else
+                              gray, with no background in either state; a pull request's, issue's or run's chip is a
+                              button (`ChipButtonStyle`, a faint capsule on hover) over `pageLinks(for:)`: one link
+                              opens at once; several (a project of several repositories) pop a native menu at the pointer
                               (`PageLinkMenu`), a heading and one item per repository with its count as the badge; hover help
                               and VoiceOver hint "Open pull requests / issues / Actions on GitHub"; a note's opens the
                               project's notes database in Notion, "Open the notes in Notion", once a read matched it

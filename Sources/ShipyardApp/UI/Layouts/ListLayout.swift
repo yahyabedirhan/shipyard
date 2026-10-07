@@ -360,9 +360,10 @@ private struct OpenRepositoryIcon: View {
 }
 
 /// One kind's count in a project's header: its icon and number, in the
-/// accent on a faint accent capsule while any of its rows needs attention
-/// (expanded or collapsed alike), else secondary gray. As wide as its
-/// content: the model gives no chip at 0.
+/// accent while any of its rows needs attention (expanded or collapsed
+/// alike), else secondary gray, with no background in either state, so the
+/// color alone marks it. As wide as its content: the model gives no chip
+/// at 0.
 private struct HeaderCountChip: View {
     let chip: HeaderCount
 
@@ -378,11 +379,6 @@ private struct HeaderCountChip: View {
         .foregroundStyle(chip.needsAttention ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(.secondary))
         .padding(.horizontal, 4)
         .frame(height: 16)
-        .background {
-            Capsule()
-                .fill(Palette.accent.opacity(0.14))
-                .opacity(chip.needsAttention ? 1 : 0)
-        }
         .animation(Motion.tint, value: chip.needsAttention)
         .animation(Motion.count, value: chip.count)
         .accessibilityElement(children: .ignore)
