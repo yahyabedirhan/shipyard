@@ -22,8 +22,9 @@ private func contents(of url: URL) throws -> String {
 
 private let valid = """
     # my projects
+    version = 1
     [[projects]]
-    name = "a"
+    slug = "a"
     repositories = ["o/a"]
 
     """
@@ -49,14 +50,14 @@ struct ConfigurationStoreTests {
             Issue.record("expected a change, got \(first)")
             return
         }
-        #expect(config.projects.map(\.name) == ["a"])
+        #expect(config.projects.map(\.slug) == ["a"])
         #expect(store.lastValid == config)
 
         try write(valid + "[[defaults.notifications]]\nevent = \"pr.openned\"\n", to: url)
         let broken = store.reload()
         let error = try #require(store.error)
         #expect(broken == .invalid(error))
-        #expect(error.line == 6)
+        #expect(error.line == 7)
         #expect(error.message == "unknown event `pr.openned` (did you mean `pr.opened`?)")
         #expect(store.lastValid == config)
 
@@ -78,17 +79,17 @@ struct ConfigurationStoreTests {
         try write("# a comment changes nothing\n" + valid, to: url)
         #expect(store.reload() == .unchanged)
 
-        try write(valid + "refresh-interval-seconds = 300\n", to: url)
+        try write(valid + "refresh-interval = \"5m\"\n", to: url)
         // A top-level key after a table belongs to that table: an unknown key, so still unchanged.
         #expect(store.reload() == .unchanged)
-        #expect(store.warnings.map(\.message) == ["unknown setting `projects[0].refresh-interval-seconds` (ignored)"])
+        #expect(store.warnings.map(\.message) == ["unknown setting `projects[0].refresh-interval` (ignored)"])
 
-        try write("refresh-interval-seconds = 300\n" + valid, to: url)
+        try write("refresh-interval = \"5m\"\n" + valid, to: url)
         guard case .changed(let config) = store.reload() else {
             Issue.record("expected a change")
             return
         }
-        #expect(config.refreshIntervalSeconds == 300)
+        #expect(config.refreshInterval == 300)
         #expect(store.warnings.isEmpty)
     }
 
@@ -111,8 +112,8 @@ struct ConfigurationStoreAppendTests {
         let url = temporaryConfigURL()
         let store = ConfigurationStore(url: url)
         let result = try store.append(projects: [
-            NewProject(name: "e-commerce", repositories: ["o/frontend", "o/backend"]),
-            NewProject(name: "blog", repositories: ["o/blog"]),
+            NewProject(title: "e-commerce", repositories: ["o/frontend", "o/backend"]),
+            NewProject(title: "blog", repositories: ["o/blog"]),
         ])
 
         let text = try contents(of: url)
@@ -121,11 +122,11 @@ struct ConfigurationStoreAppendTests {
         #expect(text.hasSuffix("""
 
             [[projects]]
-            name = "e-commerce"
+            slug = "e-commerce"
             repositories = ["o/frontend", "o/backend"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["o/blog"]
 
             """))
@@ -133,7 +134,7 @@ struct ConfigurationStoreAppendTests {
             Issue.record("expected a change, got \(result)")
             return
         }
-        #expect(config.projects.map(\.name) == ["e-commerce", "blog"])
+        #expect(config.projects.map(\.slug) == ["e-commerce", "blog"])
         #expect(config.projects[0].repositories == ["o/frontend", "o/backend"])
         #expect(store.warnings.isEmpty)
     }
@@ -146,20 +147,20 @@ struct ConfigurationStoreAppendTests {
             refresh-interval-seconds = 60   # quick
 
             [[projects]]
-            name = "a"   # the first one
+            slug = "a"   # the first one
             repositories = ["o/a"]
             """ // no trailing newline
         try write(existing, to: url)
         let store = ConfigurationStore(url: url)
         store.reload()
 
-        try store.append(projects: [NewProject(name: "b", repositories: ["o/b"])])
+        try store.append(projects: [NewProject(title: "b", repositories: ["o/b"])])
 
         let text = try contents(of: url)
         #expect(text.hasPrefix(existing + "\n"))
-        #expect(text == existing + "\n\n[[projects]]\nname = \"b\"\nrepositories = [\"o/b\"]\n")
-        #expect(store.lastValid.projects.map(\.name) == ["a", "b"])
-        #expect(store.lastValid.refreshIntervalSeconds == 60)
+        #expect(text == existing + "\n\n[[projects]]\nslug = \"b\"\nrepositories = [\"o/b\"]\n")
+        #expect(store.lastValid.projects.map(\.slug) == ["a", "b"])
+        #expect(store.lastValid.refreshInterval == 60)
     }
 
     @Test("appending escapes names so they read back the same")
@@ -167,8 +168,8 @@ struct ConfigurationStoreAppendTests {
         let url = temporaryConfigURL()
         let store = ConfigurationStore(url: url)
         let name = "quotes \" and \\ backslash"
-        try store.append(projects: [NewProject(name: name, repositories: ["o/a"])])
-        #expect(store.lastValid.projects.map(\.name) == [name])
+        try store.append(projects: [NewProject(title: name, repositories: ["o/a"])])
+        #expect(store.lastValid.projects.map(\.title) == [name])
     }
 
     @Test("appending rejects bad slugs, names already used and a repository listed twice, without writing")
@@ -179,13 +180,16 @@ struct ConfigurationStoreAppendTests {
         store.reload()
 
         #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
-            try store.append(projects: [NewProject(name: "b", repositories: ["nope"])])
+            try store.append(projects: [NewProject(title: "b", repositories: ["nope"])])
         }
-        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project name `a` is already used")])) {
-            try store.append(projects: [NewProject(name: "a", repositories: ["o/b"])])
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project slug `a` is already used")])) {
+            try store.append(projects: [NewProject(title: "A", repositories: ["o/b"])])
+        }
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project `!!` needs a letter or digit in its name, for its slug")])) {
+            try store.append(projects: [NewProject(title: "!!", repositories: ["o/b"])])
         }
         #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project `b` lists repository `O/B` twice (names aren't case-sensitive)")])) {
-            try store.append(projects: [NewProject(name: "b", repositories: ["o/b", "O/B"])])
+            try store.append(projects: [NewProject(title: "b", repositories: ["o/b", "O/B"])])
         }
         #expect(try contents(of: url) == valid)
     }
@@ -213,28 +217,28 @@ struct ConfigurationStoreLayoutTests {
             layout = "list"   # or tabs
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
 
             """
         let (after, store) = try setLayout(.tabs, in: before)
         #expect(after == before.replacingOccurrences(of: "layout = \"list\"", with: "layout = \"tabs\""))
         #expect(store.lastValid.menu.layout == .tabs)
-        #expect(store.lastValid.refreshIntervalSeconds == 60)
-        #expect(store.lastValid.projects.map(\.name) == ["a"])
+        #expect(store.lastValid.refreshInterval == 60)
+        #expect(store.lastValid.projects.map(\.slug) == ["a"])
     }
 
     @Test("a [menu] table without the key gets it under its header")
     func addsKeyToTable() throws {
-        let before = "[menu]\n\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n"
+        let before = "[menu]\n\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\n"
         let (after, store) = try setLayout(.tabs, in: before)
-        #expect(after == "[menu]\nlayout = \"tabs\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n")
+        #expect(after == "[menu]\nlayout = \"tabs\"\n\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\n")
         #expect(store.lastValid.menu.layout == .tabs)
     }
 
     @Test("the new-file header's commented [menu] example is uncommented in place, its projects kept")
     func uncommentsHeaderExample() throws {
-        let projects = "\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\n"
+        let projects = "\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\n"
         let before = Configuration.header + projects
         let (after, store) = try setLayout(.tabs, in: before)
         let expected = Configuration.header
@@ -242,7 +246,7 @@ struct ConfigurationStoreLayoutTests {
         #expect(after == expected)
         #expect(after != before)
         #expect(store.lastValid.menu.layout == .tabs)
-        #expect(store.lastValid.projects.map(\.name) == ["a"])
+        #expect(store.lastValid.projects.map(\.slug) == ["a"])
         #expect(store.warnings.isEmpty)
 
         // Back to list: the now-live key is replaced, nothing else moves.
@@ -260,7 +264,7 @@ struct ConfigurationStoreLayoutTests {
 
             # my projects
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
 
             """
@@ -275,12 +279,12 @@ struct ConfigurationStoreLayoutTests {
 
             # my projects
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
 
             """)
         #expect(store.lastValid.menu.layout == .tabs)
-        #expect(store.lastValid.refreshIntervalSeconds == 60)
+        #expect(store.lastValid.refreshInterval == 60)
     }
 
     @Test("a file without [menu] gets one before its first table")
@@ -294,7 +298,7 @@ struct ConfigurationStoreLayoutTests {
             count = "none"
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             """ // no trailing newline
         let (after, store) = try setLayout(.tabs, in: before)
@@ -310,7 +314,7 @@ struct ConfigurationStoreLayoutTests {
             count = "none"
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             """)
         #expect(store.lastValid.menu.layout == .tabs)
@@ -341,7 +345,7 @@ struct ConfigurationStoreLayoutTests {
     @Test("a broken file isn't written: its own error says why")
     func brokenFile() throws {
         let url = temporaryConfigURL()
-        let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nname = \"a\"\nrepositories = [\"nope\"]\n"
+        let broken = "[menu]\nlayout = \"list\"\n\n[[projects]]\nslug = \"a\"\nrepositories = [\"nope\"]\n"
         try write(broken, to: url)
         let store = ConfigurationStore(url: url)
         #expect(throws: ConfigurationError([ConfigurationIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {

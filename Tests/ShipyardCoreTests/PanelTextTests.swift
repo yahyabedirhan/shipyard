@@ -769,8 +769,8 @@ struct PanelTextTests {
     func pickedProjects() {
         #expect(PanelText.pickedProjects([]) == nil)
         #expect(PanelText.pickedProjects([
-            NewProject(name: "e-commerce", repositories: ["a/frontend", "a/backend"]),
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "e-commerce", repositories: ["a/frontend", "a/backend"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
         ]) == "Adds e-commerce (2 repositories), job-search")
     }
 

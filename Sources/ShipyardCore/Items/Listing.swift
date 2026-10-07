@@ -20,7 +20,7 @@ public enum Listing {
     /// `viewer` is the signed-in login, which `me` matches; `now` is what the
     /// windows count back from.
     public static func items(for project: ProjectSettings, in snapshot: Snapshot, viewer: String?, now: Date) -> [Item] {
-        (snapshot.items[project.name] ?? []).filter {
+        (snapshot.items[project.slug] ?? []).filter {
             lists($0, project: project, viewer: viewer, reviewRequested: snapshot.reviewRequested, now: now)
         }
     }
@@ -52,7 +52,7 @@ public enum Listing {
         notes: [String: [Note]] = [:],
         now: Date
     ) -> [String: [Item]] {
-        let sections = sections(of: pings, projects: projects.map(\.name), machines: machines.map(\.name))
+        let sections = sections(of: pings, projects: projects.map(\.slug), machines: machines.map(\.slug))
         func filed(in section: String) -> [Item] {
             (sections[section] ?? []).map { ping in
                 var item = ping.item
@@ -63,19 +63,19 @@ public enum Listing {
         var listings: [String: [Item]] = [:]
         for project in projects {
             let fetched = snapshot.flatMap { snapshot in
-                snapshot.items[project.name] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
+                snapshot.items[project.slug] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
             }
-            let filed = filed(in: project.name)
-            let written = (notes[project.name] ?? []).filter { !$0.isArchived }.map(\.item)
+            let filed = filed(in: project.slug)
+            let written = (notes[project.slug] ?? []).filter { !$0.isArchived }.map(\.item)
             guard fetched != nil || !filed.isEmpty || !written.isEmpty else { continue }
-            listings[project.name] = (fetched ?? []) + (filed + written).filter {
+            listings[project.slug] = (fetched ?? []) + (filed + written).filter {
                 lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
         for machine in machines {
-            let unfiled = filed(in: machine.name)
+            let unfiled = filed(in: machine.slug)
             guard !unfiled.isEmpty else { continue }
-            listings[machine.name] = unfiled.filter {
+            listings[machine.slug] = unfiled.filter {
                 lists($0, project: machine, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }

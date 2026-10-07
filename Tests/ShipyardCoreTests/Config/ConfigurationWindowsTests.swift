@@ -27,6 +27,7 @@ struct ConfigurationWindowsTests {
     @Test("closed-window and finished-window set each kind's window, in the defaults and per project")
     func decodes() throws {
         let result = try #require(decoded("""
+            version = 1
             [defaults.pull-requests]
             closed-window = "30m"
 
@@ -37,7 +38,7 @@ struct ConfigurationWindowsTests {
             finished-window = "45s"
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             pull-requests = { closed-window = "12h" }
             issues = { closed-window = "0" }
@@ -78,13 +79,14 @@ struct ConfigurationWindowsTests {
         }
         #expect(rejected("\"3 hrs\"", key: "finished-window", table: "workflow-runs")
             == [ConfigurationIssue(line: 3, message: "`finished-window` must be \(allowed) (got \"3 hrs\"; did you mean \"3h\"?)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"7 days\" }\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"7 days\" }\n")
             == [ConfigurationIssue(line: 4, message: "`closed-window` must be \(allowed) (got \"7 days\"; did you mean \"7d\"?)")])
     }
 
     @Test("the old closed-window-days and finished-window-hours still read, with a warning naming the new key")
     func oldKeys() throws {
         let result = try #require(decoded("""
+            version = 1
             [defaults.pull-requests]
             closed-window-days = 3
 
@@ -92,7 +94,7 @@ struct ConfigurationWindowsTests {
             finished-window-hours = 4
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             issues = { closed-window-days = 0 }
             """))
@@ -101,9 +103,9 @@ struct ConfigurationWindowsTests {
         #expect(config.defaults.workflowRuns.finishedWindow == 4 * 3600)
         #expect(config.settings(for: try #require(config.projects.first)).issues.closedWindow == 0)
         #expect(result.warnings == [
-            ConfigurationIssue(line: 2, message: "`closed-window-days` is the old form: it's read as `closed-window = \"3d\"`; write that instead"),
-            ConfigurationIssue(line: 5, message: "`finished-window-hours` is the old form: it's read as `finished-window = \"4h\"`; write that instead"),
-            ConfigurationIssue(line: 10, message: "`closed-window-days` is the old form: it's read as `closed-window = \"0\"`; write that instead"),
+            ConfigurationIssue(line: 3, message: "`closed-window-days` is the old form: it's read as `closed-window = \"3d\"`; write that instead"),
+            ConfigurationIssue(line: 6, message: "`finished-window-hours` is the old form: it's read as `finished-window = \"4h\"`; write that instead"),
+            ConfigurationIssue(line: 11, message: "`closed-window-days` is the old form: it's read as `closed-window = \"0\"`; write that instead"),
         ])
     }
 
@@ -120,11 +122,11 @@ struct ConfigurationWindowsTests {
         #expect(rejection("[defaults.pull-requests]\nclosed-window = \"30m\"\nclosed-window-days = 1\n") == [ConfigurationIssue(
             line: 3, message: "`closed-window-days` is the old form of `closed-window`, which this table sets too; delete `closed-window-days`"
         )])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigurationIssue(
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigurationIssue(
             line: 4, message: "`finished-window-hours` is the old form of `finished-window`, which this table sets too; delete `finished-window-hours`"
         )])
         // In different tables, the project's new key overrides the defaults' old one.
-        let result = decoded("[defaults.pull-requests]\nclosed-window-days = 1\n[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { closed-window = \"30m\" }\n")
+        let result = decoded("[defaults.pull-requests]\nclosed-window-days = 1\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { closed-window = \"30m\" }\n")
         let config = result?.configuration
         #expect(config.map { $0.settings(for: $0.projects[0]).pullRequests.closedWindow } == 1800)
     }

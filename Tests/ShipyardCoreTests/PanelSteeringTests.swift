@@ -20,12 +20,12 @@ private func config(layout: MenuLayout = .tabs, blogGroupBy: String = "kind") ->
     show = true
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["\(web)"]
     show-first = 5
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["\(blogRepo)"]
     group-by = "\(blogGroupBy)"
     """
@@ -121,6 +121,19 @@ struct PanelSteeringTests {
         #expect(throws: PanelRefusal("no tab is named `Blog`; the tabs are `All`, `shop`, `blog`")) {
             try menu.tab(named: "Blog")
         }
+    }
+
+    @Test("fold and tab find a project by its title too, and a tab is titled by its project's title")
+    func byTitle() async throws {
+        let titled = config().replacingOccurrences(of: "slug = \"shop\"\n", with: "slug = \"shop\"\ntitle = \"Web shop\"\n")
+        let harness = try await Harness.started(config: titled, graphQL: answer)
+        let menu = harness.shipyard.menu
+
+        #expect(try menu.tab(named: "Web shop") == .project("shop"))
+        #expect(menu.tabTitle(.project("shop")) == "Web shop")
+        #expect(menu.tabs.map(menu.tabTitle) == ["All", "Web shop", "blog"])
+        try harness.shipyard.setCollapsed("Web shop", true)
+        #expect(harness.shipyard.menu.collapsedProjects == ["shop"])
     }
 
     @Test("tab is refused in the list layout, which has no tabs")

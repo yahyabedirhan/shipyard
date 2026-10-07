@@ -89,7 +89,7 @@ public struct Preset: Hashable, Sendable, Identifiable {
             return Preset.myAgentsText(projects)
         case .incomingContributions:
             let incoming = projects.isEmpty
-                ? [NewProject(name: Preset.incomingProjectName, repositories: [RepositoryGroup.owned.rawValue])]
+                ? [NewProject(title: Preset.incomingProjectName, repositories: [RepositoryGroup.owned.rawValue])]
                 : projects
             return Preset.incomingContributionsText(incoming)
         case .reviewQueue:
@@ -177,7 +177,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         # any repository. anywhere lists only those, so this project shows no
         # issues, and it notifies each new request (and ping, and notice) instead.
         [[projects]]
-        name = "Review requests"
+        slug = "review-requests"
+        title = "Review requests"
         repositories = ["anywhere"]
         pull-requests = { review-requested = true }
         issues = { show = false }
@@ -201,7 +202,8 @@ public struct Preset: Hashable, Sendable, Identifiable {
         # any repository, grouped by repository under subheaders. Each new
         # request notifies, and so does each ping and notice your agents send.
         [[projects]]
-        name = "Review queue"
+        slug = "review-queue"
+        title = "Review queue"
         repositories = ["anywhere"]
         pull-requests = { review-requested = true }
         group-by = "repository"

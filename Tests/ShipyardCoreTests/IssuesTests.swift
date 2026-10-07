@@ -16,7 +16,7 @@ private let issuesEverywhere = """
     closed-window = "3d"
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -111,7 +111,7 @@ struct IssuesTests {
             authors = { hide = ["@renovate[bot]"] }
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             """
@@ -123,7 +123,7 @@ struct IssuesTests {
     func offByDefault() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             """
@@ -141,12 +141,12 @@ struct IssuesTests {
     func onlyWhereShown() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             issues = { show = true, closed-window = "3d" }
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
 
             """
@@ -174,16 +174,16 @@ struct IssuesTests {
             show = true
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "shop-code"
+            slug = "shop-code"
             repositories = ["yahyabedirhan/shop"]
             issues = { show = false }
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
             issues = { show = false }
 
@@ -213,7 +213,7 @@ struct IssuesTests {
             count = "per-kind"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             issues = { show = true }
 
@@ -259,7 +259,7 @@ struct IssuesTests {
     func notifications() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             issues = { show = true }
             notifications = [
@@ -305,7 +305,7 @@ struct IssuesTests {
     func turningOnIsSilent() async throws {
         let off = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             notifications = [{ event = "issue.opened" }]
 

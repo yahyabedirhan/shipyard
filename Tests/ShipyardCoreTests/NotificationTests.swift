@@ -11,14 +11,14 @@ private let blogRepository = "yahyabedirhan/blog"
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
 
 private let blog = """
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -125,7 +125,7 @@ struct NotificationTests {
     func twoProjectsOnce() async throws {
         let config = shop + """
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["yahyabedirhan/shop"]
 
             """
@@ -140,7 +140,7 @@ struct NotificationTests {
     func projectOverride() async throws {
         let config = shop + """
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
             notifications = [{ event = "pr.merged" }]
 
@@ -160,7 +160,7 @@ struct NotificationTests {
     func overrideAcrossProjects() async throws {
         let config = """
             [[projects]]
-            name = "quiet"
+            slug = "quiet"
             repositories = ["yahyabedirhan/shop"]
             notifications = []
 

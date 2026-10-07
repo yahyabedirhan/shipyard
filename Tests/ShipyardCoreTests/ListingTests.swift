@@ -41,7 +41,7 @@ private let everyAuthor = [
 private func shop(authors: String? = nil) -> String {
     """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["\(shopRepository)"]
     \(authors.map { "pull-requests = { authors = \($0) }" } ?? "")
 
@@ -69,7 +69,7 @@ struct ListingTests {
 
     @Test("by default a project lists everyone's items, as before authors existed")
     func everyoneByDefault() async throws {
-        let harness = try await Harness.started(config: shop(), graphQL: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3]))
+        let harness = try await Harness.started(config: "version = 1\n" + shop(), graphQL: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3]))
         #expect(harness.numbers("shop")?.sorted() == [1, 2, 3, 4])
         #expect(harness.shipyard.menu.attention.total == 4)
         #expect(harness.shipyard.configWarnings.isEmpty)
@@ -156,7 +156,7 @@ struct ListingTests {
     func ruleOnlyNarrows() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["\(shopRepository)"]
             pull-requests = { authors = { hide = ["bots"] } }
             notifications = [{ event = "pr.opened", authors = ["bots", "others"] }]
@@ -171,12 +171,12 @@ struct ListingTests {
     func anotherProjectLists() async throws {
         let config = """
             [[projects]]
-            name = "quiet"
+            slug = "quiet"
             repositories = ["\(shopRepository)"]
             pull-requests = { authors = { hide = ["bots"] } }
 
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["\(shopRepository)"]
 
             """
@@ -189,7 +189,7 @@ struct ListingTests {
     func hiddenDrafts() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["\(shopRepository)"]
             pull-requests = { drafts = false }
 
@@ -206,12 +206,14 @@ struct ListingTests {
             event = "pr.merged"
 
             [[projects]]
-            name = "open only"
+            slug = "open-only"
+            title = "open only"
             repositories = ["\(shopRepository)"]
             pull-requests = { closed-window = "0" }
 
             [[projects]]
-            name = "with history"
+            slug = "with-history"
+            title = "with history"
             repositories = ["\(shopRepository)"]
 
             """
@@ -232,7 +234,7 @@ struct ListingTests {
             event = "pr.merged"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["\(shopRepository)"]
             pull-requests = { closed-window = "30m" }
 
@@ -261,7 +263,7 @@ struct ListingTests {
     func windowWhilePaused() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["\(shopRepository)"]
             pull-requests = { closed-window = "30m" }
 
@@ -307,12 +309,13 @@ struct ListingTests {
             event = "pr.closed"
 
             [[projects]]
-            name = "open only"
+            slug = "open-only"
+            title = "open only"
             repositories = ["\(shopRepository)"]
             pull-requests = { states = ["open"] }
 
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["\(shopRepository)"]
 
             """
@@ -323,9 +326,9 @@ struct ListingTests {
         closed.state = "CLOSED"
         closed.closedAt = "2026-09-25T11:00:00Z"
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1), merged, closed, pr(4), pr(5)))
-        #expect(harness.numbers("open only")?.sorted() == [1, 4, 5])
+        #expect(harness.numbers("open-only")?.sorted() == [1, 4, 5])
         #expect(harness.numbers("everything")?.sorted() == [1, 2, 3, 4, 5])
-        #expect(harness.section("open only")?.attentionCount == 3)
+        #expect(harness.section("open-only")?.attentionCount == 3)
 
         // #4 is merged and #5 closed: notified only where merged and closed pull requests are listed.
         var mergedNow = pr(4)
@@ -336,14 +339,14 @@ struct ListingTests {
         closedNow.closedAt = "2026-09-25T12:01:00Z"
         await harness.refresh(answering: shopAnswer(pr(1), merged, closed, mergedNow, closedNow))
         #expect(harness.headlines.sorted() == ["everything · Closed PR #5", "everything · Merged PR #4"])
-        #expect(harness.numbers("open only") == [1])
+        #expect(harness.numbers("open-only") == [1])
     }
 
     // MARK: - Old files
 
     @Test("an old hide-authors still hides, with a warning in the banner and the status record")
     func oldHideAuthors() async throws {
-        let config = "hide-authors = [\"dependabot[bot]\"]\n\n" + shop()
+        let config = "version = 1\nhide-authors = [\"dependabot[bot]\"]\n\n" + shop()
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3]))
 
         #expect(harness.numbers("shop")?.sorted() == [1, 2, 4])
@@ -352,7 +355,7 @@ struct ListingTests {
 
         let warning = try #require(harness.shipyard.configWarnings.first)
         #expect(harness.shipyard.configWarnings.count == 1)
-        #expect(warning.line == 1)
+        #expect(warning.line == 2)
         #expect(warning.message.hasPrefix("`hide-authors` is the old form"))
         #expect(PanelText.configWarnings(harness.shipyard.configWarnings)?.contains("`hide-authors` is the old form") == true)
         #expect(try recordedWarnings(harness) == [warning.message])
@@ -361,6 +364,7 @@ struct ListingTests {
     @Test("old notification author strings still select, with a warning")
     func oldNotificationAuthors() async throws {
         let config = """
+            version = 1
             [[defaults.notifications]]
             event = "pr.opened"
             authors = "others"
@@ -369,7 +373,7 @@ struct ListingTests {
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
         await harness.refresh(answering: shopAnswer(pr(1), pr(2), pr(3, author: "octocat"), pr(4, author: "dependabot", type: "Bot")))
         #expect(harness.headlines == ["shop · New PR #3"])
-        #expect(harness.shipyard.configWarnings.map(\.line) == [3])
+        #expect(harness.shipyard.configWarnings.map(\.line) == [4])
         #expect(try recordedWarnings(harness).count == 1)
     }
 
@@ -419,12 +423,12 @@ struct ListingRuleTests {
     }
 
     private func listed(_ items: [Item], _ settings: ProjectSettings, viewer: String? = "yabepa") -> [Int] {
-        let snapshot = Snapshot(fetchedAt: Self.now, items: [settings.name: items])
+        let snapshot = Snapshot(fetchedAt: Self.now, items: [settings.slug: items])
         return Listing.items(for: settings, in: snapshot, viewer: viewer, now: Self.now).map(\.number)
     }
 
     private func project() -> ProjectSettings {
-        Configuration().settings(for: Configuration.Project(name: "p", repositories: ["o/r"]))
+        Configuration().settings(for: Configuration.Project(slug: "p", repositories: ["o/r"]))
     }
 
     @Test("every filter combines with AND")
@@ -502,7 +506,7 @@ struct ListingRuleTests {
     func notFetchedYet() {
         let snapshot = Snapshot(fetchedAt: Self.now, items: ["p": [item(1)]])
         var other = project()
-        other.name = "added since"
+        other.slug = "added since"
         let listings = Listing.listings(for: [project(), other], in: snapshot, now: Self.now)
         #expect(listings.mapValues { $0.map(\.number) } == ["p": [1]])
     }

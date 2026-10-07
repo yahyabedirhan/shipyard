@@ -15,7 +15,7 @@ private func runsConfig(_ runs: String = "workflow-runs = { show = true }", extr
     """
     \(extra)
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
     \(runs)
 
@@ -300,7 +300,7 @@ struct WorkflowRunsTests {
             branches = "all"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop", "yahyabedirhan/blog"]
 
             """
@@ -362,7 +362,7 @@ struct WorkflowRunsTests {
     func runsErrorOnlyWhereShown() async throws {
         let config = runsConfig() + """
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["yahyabedirhan/shop"]
 
             """

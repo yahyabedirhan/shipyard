@@ -59,21 +59,22 @@ public enum NoticeRules {
         "shipyard couldn't learn this Mac's Tailscale login (\(reason)), so it takes no notices from other machines"
     }
 
-    /// The project `notice` is shown under, or why it isn't shown, filed
-    /// against `configuration` and `resolved` (each project's repositories
-    /// as last resolved, by name).
+    /// The title of the project `notice` is shown under, or why it isn't
+    /// shown, filed against `configuration` and `resolved` (each project's
+    /// repositories as last resolved, by slug). `--project` names a project
+    /// by slug, else by title (`Configuration.project(named:)`).
     public static func project(
         for notice: Notice,
         configuration: Configuration,
         resolved: [String: [String]]
     ) -> Result<String, Refusal> {
-        let names = configuration.projects.map(\.name)
+        let names = configuration.projects.map(\.slug)
         let filed: [String]
-        if let project = notice.project {
-            guard names.contains(project) else {
-                return .failure(Refusal("no project is named `\(project)`; \(ProjectFiling.listing(names))"))
+        if let value = notice.project {
+            guard let project = configuration.project(named: value) else {
+                return .failure(Refusal("no project is named `\(value)`; \(ProjectFiling.listing(names))"))
             }
-            filed = [project]
+            filed = [project.slug]
         } else if let slug = notice.repository {
             filed = ProjectFiling.watchers(of: slug, configuration: configuration, resolved: resolved).map(\.project)
             guard !filed.isEmpty else {
@@ -82,12 +83,12 @@ public enum NoticeRules {
         } else {
             return .failure(Refusal("the notice names no project or repository to file it by"))
         }
-        let showing = configuration.projects.filter { filed.contains($0.name) && selects(configuration.settings(for: $0)) }
+        let showing = configuration.projects.filter { filed.contains($0.slug) && selects(configuration.settings(for: $0)) }
         guard let first = showing.first else {
             let named = filed.map { "`\($0)`" }.joined(separator: ", ")
             return .failure(Refusal("notices are off for \(filed.count == 1 ? "project" : "projects") \(named)"))
         }
-        return .success(first.name)
+        return .success(first.title)
     }
 
     /// Whether a project's rules (`settings.notifications`, its own list or

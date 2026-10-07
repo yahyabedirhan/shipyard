@@ -7,7 +7,7 @@ A macOS menu bar app that shows the pull requests, issues and workflow runs on t
 ### What is shown
 
 **Project**:
-A named group of one or more GitHub repositories, shown as one section in the menu. Usually a single repository.
+A named group of one or more GitHub repositories, shown as one section in the menu. Usually a single repository. Its **slug** is its ID (lowercase letters and digits joined by single hyphens), and its **title** is the text the menu shows, by default the slug.
 _Avoid_: Repo (when the group is meant), workspace
 
 **Item**:
@@ -31,7 +31,7 @@ The user's own note (an idea, a reminder, a "not now" thought), kept in Notion i
 _Avoid_: Idea, memo, issue (an issue is GitHub's)
 
 **Projects page**:
-The Notion page titled "Projects" under the user's "Shipyard Notes" home page. It holds one notes database per project, titled exactly the project's name. The app reads notes only from databases here, and makes the page the first time a new note needs it.
+The Notion page titled "Projects" under the user's "Shipyard Notes" home page. It holds one notes database per project, titled exactly the project's title. The app reads notes only from databases here, and makes the page the first time a new note needs it.
 _Avoid_: Entry page (that's Shipyard Notes), notes folder, workspace
 
 **Agent guide**:

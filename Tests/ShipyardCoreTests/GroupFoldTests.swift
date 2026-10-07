@@ -24,7 +24,7 @@ private func config(_ settings: String = "subsections = true", layout: MenuLayou
     show = true
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["\(web)", "\(api)"]
     \(settings)
 
@@ -179,7 +179,7 @@ struct GroupFoldTests {
     func prunedWithItsProject() async throws {
         let blog = """
         [[projects]]
-        name = "blog"
+        slug = "blog"
         repositories = ["yahyabedirhan/blog"]
         subsections = true
         """

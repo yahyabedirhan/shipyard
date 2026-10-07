@@ -112,7 +112,7 @@ struct SkillDocumentTests {
         let schema = try loadSchema()
         for block in blocks {
             do throws(ConfigurationError) {
-                let result = try Configuration.decode(block)
+                let result = try Configuration.decode(asFile(block))
                 #expect(result.warnings.isEmpty, "warnings in:\n\(block)")
             } catch {
                 Issue.record("rejected: \(error)\nin:\n\(block)")
@@ -321,7 +321,7 @@ struct SkillDocumentTests {
         }
         let rows: [(String, String)] = [
             ("version", "\(c.version)"),
-            ("refresh-interval-seconds", "\(c.refreshIntervalSeconds)"),
+            ("refresh-interval", window(c.refreshInterval)),
             ("launch-at-login", "\(c.launchAtLogin)"),
             ("[menu-bar] count", literal(c.menuBar.count)),
             ("[menu] layout", literal(c.menu.layout)),
@@ -388,8 +388,8 @@ struct SkillDocumentTests {
         // The examples the page puts where onboarding's picks go.
         let examples: [String: [NewProject]] = [
             Preset.myAgents.name: [
-                NewProject(name: "hello-world", repositories: ["octocat/hello-world"]),
-                NewProject(name: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
+                NewProject(title: "hello-world", repositories: ["octocat/hello-world"]),
+                NewProject(title: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
             ],
         ]
         // One `## `name`` section per preset, in the app's order, each with its file.

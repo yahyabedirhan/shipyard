@@ -46,7 +46,7 @@ struct DemoRunTests {
         let userSupport = home.appendingPathComponent("support", isDirectory: true)
         try FileManager.default.createDirectory(at: userConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: userSupport, withIntermediateDirectories: true)
-        let userConfigText = Data("[[projects]]\nname = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8)
+        let userConfigText = Data("[[projects]]\nslug = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8)
         let userState = Data(#"{"knownItems":{}}"#.utf8)
         try userConfigText.write(to: userConfig)
         try userState.write(to: userSupport.appendingPathComponent(AppStateStore.fileName))
@@ -55,7 +55,7 @@ struct DemoRunTests {
         let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
         let demoConfig = demo.appendingPathComponent("shipyard/config.toml")
         try FileManager.default.createDirectory(at: demoConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("[[projects]]\nname = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n".utf8).write(to: demoConfig)
+        try Data("[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n".utf8).write(to: demoConfig)
 
         // 1. The agent opens the demo; the user's app isn't running.
         let launcher = Launches()
@@ -80,7 +80,7 @@ struct DemoRunTests {
         // Nor is the user's ntn asked: a demo never lists their notes.
         #expect(!harness.shipyard.readsNotes)
         #expect(harness.stub.notionRequests.isEmpty)
-        #expect(harness.shipyard.configStore.lastValid.projects.map(\.name) == ["shipyard"])
+        #expect(harness.shipyard.configStore.lastValid.projects.map(\.slug) == ["shipyard"])
         #expect(harness.section("shipyard")?.rows.filter { $0.kind == .ping }.map(\.title) == ["In the demo"])
         let written = try FileManager.default.contentsOfDirectory(atPath: demoSupport.path).sorted()
         #expect(written == [

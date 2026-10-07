@@ -80,7 +80,7 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["\(group.rawValue)"]
             """,
             groups: [
@@ -113,7 +113,7 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "org"
+            slug = "org"
             repositories = ["Some-Org/*"]
             archived = true
             forks = false
@@ -140,11 +140,11 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["owned", "yahyabedirhan/*", "yahyabedirhan/retired", "YahyaBedirhan/A"]
 
             [[projects]]
-            name = "also-mine"
+            slug = "also-mine"
             repositories = ["owned"]
             """,
             groups: [RepositoryListResponse.page([Listed("yahyabedirhan/a"), Listed("yahyabedirhan/b")])],
@@ -171,11 +171,11 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "typo"
+            slug = "typo"
             repositories = ["ghost-org/*", "o/r"]
 
             [[projects]]
-            name = "helping"
+            slug = "helping"
             repositories = ["collaborator"]
             """,
             groups: [RepositoryListResponse.page([])],
@@ -206,7 +206,7 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
             """,
             groups: [RepositoryListResponse.page([Listed("o/a")]), .failure()],
@@ -230,7 +230,7 @@ struct RepositoryGroupsTests {
         let fresh = try Harness.withLookups(
             """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned", "o/r"]
             """,
             groups: [.failure()],
@@ -250,7 +250,7 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
             """,
             groups: [RepositoryListResponse.page([Listed("o/a")]), created],
@@ -291,7 +291,7 @@ struct RepositoryGroupsTests {
         let harness = try Harness.withLookups(
             """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
             """,
             groups: [
@@ -310,7 +310,7 @@ struct RepositoryGroupsTests {
         // `forks = false` changes what the group brings in: looked up again at once.
         try harness.writeConfig("""
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
             forks = false
             """)

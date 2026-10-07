@@ -13,8 +13,9 @@ public struct Configuration: Equatable, Sendable {
     public static let supportedVersion = 1
 
     public var version: Int = Configuration.supportedVersion
-    /// A floor in seconds (at least 30); the rate budget may stretch it.
-    public var refreshIntervalSeconds: Int = 120
+    /// `refresh-interval`: a floor in seconds (at least 30); the rate
+    /// budget may stretch it.
+    public var refreshInterval: TimeInterval = 120
     public var launchAtLogin: Bool = true
     public var menuBar = MenuBar()
     public var menu = Menu()
@@ -36,7 +37,7 @@ public struct Configuration: Equatable, Sendable {
     /// What a machine's own section (`[remote] machines`) lists with: the
     /// defaults, as for a project that overrides nothing.
     public func settings(forMachine label: String) -> ProjectSettings {
-        settings(for: Project(name: label, repositories: []))
+        settings(for: Project(slug: label, repositories: []))
     }
 
     /// A project's effective settings: each of its tables merges key by key
@@ -44,7 +45,8 @@ public struct Configuration: Equatable, Sendable {
     /// the default list.
     public func settings(for project: Project) -> ProjectSettings {
         ProjectSettings(
-            name: project.name,
+            slug: project.slug,
+            title: project.title,
             repositories: project.repositories,
             pullRequests: project.pullRequests.applied(to: defaults.pullRequests),
             issues: project.issues.applied(to: defaults.issues),
@@ -128,9 +130,9 @@ extension Configuration {
 
     /// `[banners]`: how long a dismissed panel banner stays hidden.
     public struct BannerSettings: Equatable, Sendable {
-        /// `snooze`, in seconds: an hour by default.
-        public var snooze: TimeInterval
-        public init(snooze: TimeInterval = 3600) { self.snooze = snooze }
+        /// `snooze-duration`, in seconds: an hour by default.
+        public var snoozeDuration: TimeInterval
+        public init(snoozeDuration: TimeInterval = 3600) { self.snoozeDuration = snoozeDuration }
     }
 
     /// `[attention]`: which reasons make an item need attention.
@@ -174,10 +176,15 @@ extension Configuration {
         public init() {}
     }
 
-    /// One `[[projects]]` block: a name, its repositories, and only the keys
-    /// it overrides.
+    /// One `[[projects]]` block: its slug and title, its repositories, and
+    /// only the keys it overrides.
     public struct Project: Equatable, Sendable {
-        public var name: String
+        /// `slug`: the project's ID, unique in the file: lowercase letters,
+        /// digits and single hyphens (`Configuration.slugPattern`). The app
+        /// keys what it keeps about the project by it.
+        public var slug: String
+        /// `title`: the text the app shows for it; the slug when unset.
+        public var title: String
         /// Repository selectors: `owner/name`, `owner/*` and repository groups.
         public var repositories: [RepositorySelector]
         public var pullRequests = PullRequestOverrides()
@@ -194,7 +201,8 @@ extension Configuration {
         public var forks: Bool?
 
         public init(
-            name: String,
+            slug: String,
+            title: String? = nil,
             repositories: [RepositorySelector],
             pullRequests: PullRequestOverrides = .init(),
             issues: IssueOverrides = .init(),
@@ -206,7 +214,8 @@ extension Configuration {
             archived: Bool? = nil,
             forks: Bool? = nil
         ) {
-            self.name = name
+            self.slug = slug
+            self.title = title ?? slug
             self.repositories = repositories
             self.pullRequests = pullRequests
             self.issues = issues
@@ -218,6 +227,36 @@ extension Configuration {
             self.archived = archived
             self.forks = forks
         }
+    }
+
+    /// What a `slug` takes: runs of lowercase letters and digits joined by
+    /// single hyphens (`e-commerce`).
+    public static let slugPattern = "^[a-z0-9]+(-[a-z0-9]+)*$"
+
+    /// The slug `text` (an old `name`) stands for: lowercased, with each
+    /// run of characters other than `a`–`z` and `0`–`9` changed to one
+    /// hyphen, and no hyphen at either end. Empty when `text` holds none of
+    /// those letters and digits.
+    public static func slug(from text: String) -> String {
+        var slug = ""
+        var hyphen = false
+        for scalar in text.lowercased().unicodeScalars {
+            if ("a"..."z").contains(scalar) || ("0"..."9").contains(scalar) {
+                if hyphen && !slug.isEmpty { slug += "-" }
+                hyphen = false
+                slug.unicodeScalars.append(scalar)
+            } else {
+                hyphen = true
+            }
+        }
+        return slug
+    }
+
+    /// The project `value` names (`--project`, or a ping filed under it):
+    /// the one whose slug it is, else the first whose title it is, so the
+    /// name an older `shipyard` sends still finds its project.
+    public func project(named value: String) -> Project? {
+        projects.first { $0.slug == value } ?? projects.first { $0.title == value }
     }
 }
 
@@ -590,7 +629,10 @@ public struct ArrangementOverrides: Equatable, Sendable {
 /// A project with defaults and its overrides merged: what the refresh, the
 /// menu model and the notification rules read.
 public struct ProjectSettings: Equatable, Sendable {
-    public var name: String
+    /// The project's `slug`: what the app keys the project's state by.
+    public var slug: String
+    /// The project's `title`: what the menu shows.
+    public var title: String
     /// As configured; `resolved(by:)` turns the groups and wildcards into
     /// the repositories they stand for.
     public var repositories: [RepositorySelector]
@@ -607,7 +649,8 @@ public struct ProjectSettings: Equatable, Sendable {
     public var forks: Bool
 
     public init(
-        name: String,
+        slug: String,
+        title: String? = nil,
         repositories: [RepositorySelector],
         pullRequests: PullRequestSettings,
         issues: IssueSettings,
@@ -619,7 +662,8 @@ public struct ProjectSettings: Equatable, Sendable {
         archived: Bool = false,
         forks: Bool = true
     ) {
-        self.name = name
+        self.slug = slug
+        self.title = title ?? slug
         self.repositories = repositories
         self.pullRequests = pullRequests
         self.issues = issues
@@ -718,14 +762,19 @@ public struct ConfigurationError: Error, Equatable, Sendable, CustomStringConver
 
 // MARK: - Appending projects
 
-/// A project the picker adds: just a name and its repositories.
+/// A project the picker adds: just a title and its repositories. Its slug
+/// is made from the title (`Configuration.slug(from:)`).
 public struct NewProject: Equatable, Sendable {
-    public var name: String
+    /// The name the user gave it, written as its `title` when it isn't its slug.
+    public var title: String
     public var repositories: [String]
-    public init(name: String, repositories: [String]) {
-        self.name = name
+    public init(title: String, repositories: [String]) {
+        self.title = title
         self.repositories = repositories
     }
+
+    /// Its `slug`: the title's (`Configuration.slug(from:)`).
+    public var slug: String { Configuration.slug(from: title) }
 }
 
 extension Configuration {
@@ -748,6 +797,10 @@ extension Configuration {
         # The settings below are commented out at their defaults: uncomment one
         # and change its value to use it.
         version = \(supportedVersion)
+
+        # How often shipyard refreshes, at least "30s": a floor it stretches
+        # when a refresh would spend more than max-share-percent (below).
+        # refresh-interval = "2m"
 
         # How the menu draws your projects: "list" (every project in one
         # scrolling list) or "tabs" (one project at a time).
@@ -825,9 +878,11 @@ extension Configuration {
         # max-share-percent = 10
 
         # Projects: one [[projects]] block each, below. The project picker
-        # appends them here. A project's repositories can be owner/name,
-        # owner/* (everything an owner has) or a group: owned, organizations
-        # or collaborator.
+        # appends them here. A project's slug is its ID: lowercase letters
+        # and digits joined by single hyphens, such as "e-commerce". Its
+        # title is what the menu shows (the slug when unset). Its
+        # repositories can be owner/name, owner/* (everything an owner has)
+        # or a group: owned, organizations or collaborator.
 
         """
 
@@ -837,17 +892,14 @@ extension Configuration {
         projects.map { "\n" + projectBlock($0) }.joined()
     }
 
-    /// One project's `[[projects]]` block: its header, name and
-    /// repositories, ending in a newline. The picker's appends and the
-    /// presets both build on it, each adding the blank lines around it.
+    /// One project's `[[projects]]` block: its header, slug, title (when
+    /// it isn't the slug) and repositories, ending in a newline. The
+    /// picker's appends and the presets both build on it, each adding the
+    /// blank lines around it.
     package static func projectBlock(_ project: NewProject) -> String {
         let repositories = project.repositories.map(tomlString).joined(separator: ", ")
-        return """
-            [[projects]]
-            name = \(tomlString(project.name))
-            repositories = [\(repositories)]
-
-            """
+        let title = project.title == project.slug ? "" : "title = \(tomlString(project.title))\n"
+        return "[[projects]]\nslug = \(tomlString(project.slug))\n" + title + "repositories = [\(repositories)]\n"
     }
 
     /// A TOML basic string with `"`, `\` and control characters escaped.

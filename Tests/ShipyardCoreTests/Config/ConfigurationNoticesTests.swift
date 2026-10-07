@@ -24,7 +24,7 @@ struct ConfigurationNoticesTests {
 
     @Test("cli.toml's keys under [notices] are only a warning here, saying where they go")
     func cliKeys() throws {
-        let warnings = try #require(decoded("[notices]\napp-machine = \"mac\"\n")).warnings
+        let warnings = try #require(decoded("version = 1\n[notices]\napp-machine = \"mac\"\n")).warnings
         #expect(warnings.count == 1)
         #expect(warnings.first?.message.hasPrefix("unknown setting `notices.app-machine`") == true)
     }

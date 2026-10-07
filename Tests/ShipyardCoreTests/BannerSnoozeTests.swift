@@ -6,10 +6,13 @@ import Testing
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
+
+/// `shop` as a whole file, with its `version`.
+private let shopFile = "version = 1\n\n" + shop
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
@@ -45,7 +48,7 @@ private extension Harness {
 struct BannerSnoozeTests {
     @Test("a dismissed banner leaves an open panel at once, stays hidden for 59 minutes and shows at 60 while its condition holds, without a refresh")
     func hiddenForAnHour() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         await harness.refreshNow(answering: .failure())
         #expect(harness.bannerKeys.contains("fetch"))
 
@@ -68,9 +71,9 @@ struct BannerSnoozeTests {
         #expect(harness.shipyard.bannerSnoozeEnds.isEmpty)
     }
 
-    @Test("[banners] snooze sets how long a dismissal hides the banner: \"10s\" brings it back after 10 seconds")
+    @Test("[banners] snooze-duration sets how long a dismissal hides the banner: \"10s\" brings it back after 10 seconds")
     func configuredLength() async throws {
-        let harness = try await Harness.started(config: "[banners]\nsnooze = \"10s\"\n\n" + shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: "version = 1\n[banners]\nsnooze-duration = \"10s\"\n\n" + shop, graphQL: onePullRequest)
         await harness.refreshNow(answering: .failure())
         harness.shipyard.dismissBanner("fetch")
         #expect(harness.shipyard.bannerSnoozeEnds == [Harness.now.addingTimeInterval(10)])
@@ -83,7 +86,7 @@ struct BannerSnoozeTests {
 
     @Test("a condition that stops clears its snooze, so it shows at once when it starts again")
     func stoppedAndRestarted() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         await harness.refreshNow(answering: .failure())
         harness.shipyard.dismissBanner("fetch")
         #expect(!harness.bannerKeys.contains("fetch"))
@@ -99,7 +102,7 @@ struct BannerSnoozeTests {
 
     @Test("one machine's snooze hides only its own line, whatever its words become")
     func oneMachine() async throws {
-        let harness = try Harness(stored: "gho_stored", config: "[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"]\n\n" + shop)
+        let harness = try Harness(stored: "gho_stored", config: "version = 1\n[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"]\n\n" + shop)
         await harness.startWithMachines(graphQL: onePullRequest)
         harness.herdr.setReach(.unreachable, on: "hetzner-vps")
         harness.herdr.setReach(.unreachable, on: "netcup-vps")
@@ -126,14 +129,14 @@ struct BannerSnoozeTests {
     func delayWordsChange() async throws {
         // 900 of 5,000 left: backed off to every 10 minutes.
         let low = try Harness.fixture("graphql-pull-requests.json", remaining: 900)
-        let harness = try await Harness.started(config: shop, graphQL: low)
+        let harness = try await Harness.started(config: shopFile, graphQL: low)
         #expect(harness.shipyard.menu.refreshDelay == .backedOff(600, api: .graphql))
         let before = try #require(harness.bannerText("delay"))
         harness.shipyard.dismissBanner("delay")
         #expect(harness.bannerText("delay") == nil)
 
         // A 15-minute interval: still backed off, now every 15 minutes, other words, still the delay.
-        try harness.writeConfig("refresh-interval-seconds = 900\n\n" + shop)
+        try harness.writeConfig("version = 1\nrefresh-interval = \"15m\"\n\n" + shop)
         await harness.shipyard.reloadConfiguration()
         harness.clock.advance(by: 600)
         await harness.refreshNow(answering: low)
@@ -147,7 +150,7 @@ struct BannerSnoozeTests {
 
     @Test("the notifications-off banner, which the app's notifier reports, snoozes and follows its condition too")
     func notificationsOff() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         harness.shipyard.notificationsAreOff = true
         #expect(harness.bannerKeys == ["notifications"])
 
@@ -161,7 +164,7 @@ struct BannerSnoozeTests {
 
     @Test("a restart keeps the snoozes through the first refresh, the first machine poll and the notifier's first word, and the banners show again when the hour ends")
     func keptAcrossRestart() async throws {
-        let config = "[remote]\nmachines = [\"netcup-vps\"]\n\n" + shop
+        let config = "version = 1\n[remote]\nmachines = [\"netcup-vps\"]\n\n" + shop
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: .failure())
         harness.herdr.setReach(.unreachable, on: "netcup-vps")
@@ -197,7 +200,7 @@ struct BannerSnoozeTests {
 
     @Test("a snooze whose condition stopped before a restart is gone after it")
     func stoppedBeforeRestart() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         await harness.refreshNow(answering: .failure())
         harness.shipyard.dismissBanner("fetch")
         await harness.refreshNow(answering: onePullRequest)
@@ -212,7 +215,7 @@ struct BannerSnoozeTests {
 
     @Test("the configuration error's banner snoozes too, and is back after the hour while the file is still rejected")
     func configErrorSnoozes() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         try harness.writeConfig("version = \n" + shop)
         await harness.shipyard.reloadConfiguration()
         #expect(harness.bannerKeys.first == "config")
@@ -231,7 +234,7 @@ struct BannerSnoozeTests {
 
     @Test("the lease's banner snoozes through its renewals; a lease that ends, or is handed to the next holder, clears it, so the next lease shows")
     func lease() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         let first = PanelBanner.Lease.Held(term: "agent@0.0", headline: "Checking the header icons")
         harness.shipyard.lease = PanelBanner.Lease(held: first)
         #expect(harness.bannerKeys == ["lease"])
@@ -259,7 +262,7 @@ struct BannerSnoozeTests {
 
     @Test("each stopped agent's quiet line snoozes on its own, under the lease's banner, and shows at once when that agent is stopped again")
     func stoppedHolders() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         let claude = PanelBanner.Lease.Stopped(key: "claude", text: "You took shipyard back from Claude Code")
         let codex = PanelBanner.Lease.Stopped(key: "codex", text: "You took shipyard back from codex")
         let held = PanelBanner.Lease.Held(term: "other@0.0", headline: "Pi uses shipyard")
@@ -277,7 +280,7 @@ struct BannerSnoozeTests {
 
     @Test("a restart drops the lease's snoozes: a lease handed over shows its banner, and no stopped holder survives")
     func leaseAcrossRestart() async throws {
-        let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
+        let harness = try await Harness.started(config: shopFile, graphQL: onePullRequest)
         let held = PanelBanner.Lease.Held(term: "agent@0.0", headline: "Checking the header icons")
         let stopped = PanelBanner.Lease.Stopped(key: "codex", text: "You took shipyard back from codex")
         harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [stopped])

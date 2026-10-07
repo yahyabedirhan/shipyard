@@ -25,6 +25,14 @@ func rejection(_ text: String, sourceLocation: SourceLocation = #_sourceLocation
     }
 }
 
+/// A documentation snippet as part of a whole file: one that sets keys
+/// without `version` is read below the `version = 1` a file starts with,
+/// so a fragment such as one `[[projects]]` block reads without the
+/// missing-version warning.
+func asFile(_ snippet: String) -> String {
+    snippet.components(separatedBy: "\n").contains { $0.hasPrefix("version = ") } ? snippet : "version = 1\n" + snippet
+}
+
 /// The repository root, for the design document and the schema.
 let repositoryRoot = URL(fileURLWithPath: #filePath)
     .deletingLastPathComponent() // Config
@@ -46,7 +54,7 @@ func designExample() throws -> String {
 let everyKey = """
     #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
     version = 1
-    refresh-interval-seconds = 300
+    refresh-interval = "5m"
     launch-at-login = false
 
     [menu-bar]
@@ -77,7 +85,7 @@ let everyKey = """
     port = 50000
 
     [banners]
-    snooze = "10s"
+    snooze-duration = "10s"
 
     [defaults]
     group-by = "repository"
@@ -123,7 +131,8 @@ let everyKey = """
     event = "run.failed"
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
+    title = "Blog"
     repositories = ["yahyabedirhan/blog-frontend", "yahyabedirhan/blog.api", "my-org/*", "owned", "organizations", "collaborator"]
     archived = false
     forks = true
@@ -157,7 +166,7 @@ struct ConfigurationDecodingTests {
     func defaults() {
         let config = Configuration()
         #expect(config.version == 1)
-        #expect(config.refreshIntervalSeconds == 120)
+        #expect(config.refreshInterval == 120)
         #expect(config.launchAtLogin)
         #expect(config.menuBar.count == .total)
         #expect(config.menu.layout == .list)
@@ -196,7 +205,7 @@ struct ConfigurationDecodingTests {
         var expected = Configuration()
         expected.projects = [
             Configuration.Project(
-                name: "e-commerce",
+                slug: "e-commerce",
                 repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"],
                 issues: IssueOverrides(show: true),
                 notifications: [
@@ -204,15 +213,16 @@ struct ConfigurationDecodingTests {
                     NotificationRule(event: .runFailed),
                 ]
             ),
-            Configuration.Project(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            Configuration.Project(slug: "job-search", repositories: ["yahyabedirhan/job-search"]),
             Configuration.Project(
-                name: "contributions",
+                slug: "contributions",
                 repositories: ["owned", "my-org/*", "cobanov/ghbar"],
                 pullRequests: PullRequestOverrides(authors: AuthorFilterOverrides(hide: [.me, .bots])),
                 arrangement: ArrangementOverrides(groupBy: .repository, subsections: true)
             ),
             Configuration.Project(
-                name: "review queue",
+                slug: "review-queue",
+                title: "Review queue",
                 repositories: ["anywhere"],
                 pullRequests: PullRequestOverrides(reviewRequested: true)
             ),
@@ -225,7 +235,7 @@ struct ConfigurationDecodingTests {
         let result = try #require(decoded(everyKey))
         #expect(result.warnings.isEmpty)
         let config = result.configuration
-        #expect(config.refreshIntervalSeconds == 300)
+        #expect(config.refreshInterval == 300)
         #expect(!config.launchAtLogin)
         #expect(config.menuBar.count == .perKind)
         #expect(config.menu.layout == .tabs)
@@ -235,7 +245,7 @@ struct ConfigurationDecodingTests {
         #expect(config.herdr == .init(terminal: "Ghostty"))
         #expect(config.remote == .init(machines: ["hetzner-vps", "netcup-vps"]))
         #expect(config.notices == .init(listen: true, port: 50000))
-        #expect(config.banners == .init(snooze: 10))
+        #expect(config.banners == .init(snoozeDuration: 10))
         #expect(config.defaults.pullRequests == .init(
             show: false, states: [.open], closedWindow: 14 * 86_400, drafts: false,
             authors: AuthorFilter(show: [.others, .login("dependabot[bot]")], hide: [.login("octocat")]),
@@ -254,7 +264,8 @@ struct ConfigurationDecodingTests {
         #expect(config.defaults.archived)
         #expect(!config.defaults.forks)
         let project = try #require(config.projects.first)
-        #expect(project.name == "blog")
+        #expect(project.slug == "blog")
+        #expect(project.title == "Blog")
         #expect(project.repositories == [
             .repository("yahyabedirhan/blog-frontend"), .repository("yahyabedirhan/blog.api"),
             .owner("my-org"), .group(.owned), .group(.organizations), .group(.collaborator),
@@ -292,11 +303,11 @@ struct ConfigurationDecodingTests {
         for event in EventKind.allCases {
             for authors in [[], selectors] {
                 let list = authors.map { "\"\($0)\"" }.joined(separator: ", ")
-                let text = "[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
+                let text = "version = 1\n[[defaults.notifications]]\nevent = \"\(event.rawValue)\"\nauthors = [\(list)]\n"
                 let result = try #require(decoded(text))
                 let warned = event.isControl && !authors.isEmpty
                 #expect(result.warnings == (warned ? [ConfigurationIssue(
-                    line: 3,
+                    line: 4,
                     message: "`authors` doesn't apply to `\(event.rawValue)`, which no item's author sends; it's ignored"
                 )] : []), "\(event.rawValue) with authors [\(list)]")
                 #expect(result.configuration.defaults.notifications == [NotificationRule(event: event, authors: authors)])
@@ -307,8 +318,9 @@ struct ConfigurationDecodingTests {
     @Test("an app control event in a project's own list is read with a warning: only the top-level rules decide it")
     func controlEventInProject() throws {
         let result = try #require(decoded("""
+            version = 1
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             notifications = [
               { event = "pr.opened" },
@@ -321,21 +333,21 @@ struct ConfigurationDecodingTests {
         ])
         let ignored = "is decided by `[[defaults.notifications]]` only; a project's rule for it is ignored"
         #expect(result.warnings == [
-            ConfigurationIssue(line: 6, message: "`control.started` \(ignored)"),
-            ConfigurationIssue(line: 7, message: "`control.ended` \(ignored)"),
+            ConfigurationIssue(line: 7, message: "`control.started` \(ignored)"),
+            ConfigurationIssue(line: 8, message: "`control.ended` \(ignored)"),
         ])
     }
 
     @Test("projects and notification rules may be written inline or as blocks")
     func inlineAndBlocks() throws {
         let text = """
-            projects = [{ name = "a", repositories = ["o/a"] }]
+            projects = [{ slug = "a", repositories = ["o/a"] }]
 
             [defaults]
             notifications = []
             """
         let config = try #require(decoded(text)).configuration
-        #expect(config.projects.map(\.name) == ["a"])
+        #expect(config.projects.map(\.slug) == ["a"])
         #expect(config.defaults.notifications.isEmpty)
     }
 }
@@ -364,7 +376,7 @@ struct ConfigurationValidationTests {
     func unknownEventInList() {
         let issues = rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             notifications = [
               { event = "pr.opened" },
@@ -407,7 +419,7 @@ struct ConfigurationValidationTests {
         // Without the key, every kind.
         #expect(try #require(decoded("[menu]\nlayout = \"list\"\n")).configuration.menu.headerCounts
             == [.pullRequest, .issue, .workflowRun, .ping, .note])
-        let subset = try #require(decoded("[menu]\nheader-counts = [\"pings\", \"issues\"]\n"))
+        let subset = try #require(decoded("version = 1\n[menu]\nheader-counts = [\"pings\", \"issues\"]\n"))
         #expect(subset.configuration.menu.headerCounts == [.ping, .issue])
         #expect(subset.warnings.isEmpty)
         #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pull-request\",\n]\n")
@@ -418,9 +430,9 @@ struct ConfigurationValidationTests {
         #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pings\",\n  \"issues\",\n]\n")
             == [ConfigurationIssue(line: 5, message: "`issues` is listed twice in `header-counts`")])
         // A project can't set it: it's ignored there, with a warning.
-        let project = try #require(decoded("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
+        let project = try #require(decoded("version = 1\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
         #expect(project.configuration.menu.headerCounts == Configuration.Menu().headerCounts)
-        #expect(project.warnings == [ConfigurationIssue(line: 4, message: "unknown setting `projects[0].header-counts` (ignored)")])
+        #expect(project.warnings == [ConfigurationIssue(line: 5, message: "unknown setting `projects[0].header-counts` (ignored)")])
     }
 
     @Test("an unknown group-by or sort-by is rejected with the nearest valid one")
@@ -431,7 +443,7 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 2, message: "unknown value `repositories` for `group-by` (did you mean `repository`?)")])
         #expect(rejection("[defaults]\nsort-by = \"update\"\n")
             == [ConfigurationIssue(line: 2, message: "unknown value `update` for `sort-by` (did you mean `updated`?)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\ngroup-by = \"authors\"\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\ngroup-by = \"authors\"\n")
             == [ConfigurationIssue(line: 4, message: "unknown value `authors` for `group-by` (did you mean `author`?)")])
         #expect(rejection("[defaults]\nsort-by = \"oldest\"\n")
             == [ConfigurationIssue(line: 2, message: "unknown value `oldest` for `sort-by` (expected one of `updated`, `created`, `title`)")])
@@ -439,7 +451,7 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 2, message: "`defaults.subsections` must be true or false")])
         #expect(rejection("[defaults]\nshow-first = -1\n")
             == [ConfigurationIssue(line: 2, message: "`show-first` can't be negative (got -1)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nshow-first = \"5\"\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nshow-first = \"5\"\n")
             == [ConfigurationIssue(line: 4, message: "`projects[0].show-first` must be a whole number")])
     }
 
@@ -452,12 +464,12 @@ struct ConfigurationValidationTests {
             show-first = 5
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             sort-by = "title"
 
             [[projects]]
-            name = "b"
+            slug = "b"
             repositories = ["o/b"]
             group-by = "none"
             subsections = false
@@ -471,7 +483,7 @@ struct ConfigurationValidationTests {
     func repositorySlugs() {
         let issues = rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = [
               "o/good",
               "just-a-name",
@@ -493,7 +505,7 @@ struct ConfigurationValidationTests {
     func duplicateRepositories() {
         let issues = rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = [
               "o/r",
               "o/other",
@@ -502,7 +514,7 @@ struct ConfigurationValidationTests {
             ]
 
             [[projects]]
-            name = "b"
+            slug = "b"
             repositories = ["o/r"]
             """)
         #expect(issues == [
@@ -511,35 +523,121 @@ struct ConfigurationValidationTests {
         ])
     }
 
-    @Test("a project needs a name and at least one repository")
+    @Test("a project needs a slug and at least one repository")
     func projectRequirements() {
-        #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n")
-            == [ConfigurationIssue(line: 1, message: "a project needs a `name`")])
-        #expect(rejection("[[projects]]\nname = \"a\"\n")
+        #expect(rejection("[[projects]]\nrepositories = [\"o/a\"]\n") == [ConfigurationIssue(
+            line: 1, message: "a project needs a `slug`, its ID: lowercase letters and digits joined by single hyphens, such as \"e-commerce\""
+        )])
+        #expect(rejection("[[projects]]\nslug = \"a\"\n")
             == [ConfigurationIssue(line: 1, message: "project `a` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = []\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = []\n")
             == [ConfigurationIssue(line: 3, message: "project `a` needs at least one repository")])
-        #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")
-            == [ConfigurationIssue(line: 2, message: "a project's `name` can't be empty")])
     }
 
-    @Test("duplicate project names are rejected")
-    func duplicateNames() {
-        let issues = rejection("""
+    @Test("a slug is lowercase letters and digits joined by single hyphens; anything else is rejected with the slug it likely meant")
+    func slugPattern() {
+        let allowed = "lowercase letters and digits joined by single hyphens, such as \"e-commerce\""
+        let cases: [(String, String)] = [
+            ("E-Commerce", " (got \"E-Commerce\"; did you mean \"e-commerce\"?)"),
+            ("job search", " (got \"job search\"; did you mean \"job-search\"?)"),
+            ("a--b", " (got \"a--b\"; did you mean \"a-b\"?)"),
+            ("-a", " (got \"-a\"; did you mean \"a\"?)"),
+            ("", " (got \"\")"),
+            ("ü", " (got \"ü\")"),
+        ]
+        for (slug, got) in cases {
+            #expect(rejection("[[projects]]\nslug = \"\(slug)\"\nrepositories = [\"o/a\"]\n")
+                == [ConfigurationIssue(line: 2, message: "`slug` must be \(allowed)\(got)")], "\(slug)")
+        }
+        #expect(rejection("[[projects]]\nslug = 7\nrepositories = [\"o/a\"]\n")
+            == [ConfigurationIssue(line: 2, message: "`projects[0].slug` must be a string")])
+        for slug in ["a", "e-commerce", "web3", "a-1-b"] {
+            #expect(decoded("version = 1\n[[projects]]\nslug = \"\(slug)\"\nrepositories = [\"o/a\"]\n")?.warnings == [], "\(slug)")
+        }
+    }
+
+    @Test("a title is what the menu shows; unset, it's the slug; empty, it's rejected")
+    func title() throws {
+        let result = try #require(decoded("""
+            version = 1
             [[projects]]
-            name = "a"
+            slug = "shop"
+            title = "Shop · front and back"
             repositories = ["o/a"]
 
             [[projects]]
-            name = "a"
+            slug = "blog"
+            repositories = ["o/b"]
+            """))
+        #expect(result.warnings == [])
+        #expect(result.configuration.projects.map(\.slug) == ["shop", "blog"])
+        #expect(result.configuration.projects.map(\.title) == ["Shop · front and back", "blog"])
+        #expect(result.configuration.settings(for: result.configuration.projects[0]).title == "Shop · front and back")
+        #expect(rejection("[[projects]]\nslug = \"a\"\ntitle = \" \"\nrepositories = [\"o/a\"]\n")
+            == [ConfigurationIssue(line: 3, message: "a project's `title` can't be empty; leave it out to show the slug")])
+    }
+
+    @Test("two projects with one slug are rejected on the second one's line")
+    func duplicateSlugs() {
+        let issues = rejection("""
+            [[projects]]
+            slug = "a"
+            repositories = ["o/a"]
+
+            [[projects]]
+            slug = "a"
+            title = "Another"
             repositories = ["o/b"]
             """)
-        #expect(issues == [ConfigurationIssue(line: 6, message: "project name `a` is used twice (first on line 2)")])
+        #expect(issues == [ConfigurationIssue(line: 6, message: "project slug `a` is used twice (first on line 2)")])
+        // Two titles may be the same: only the slug is the project's ID.
+        #expect(decoded("[[projects]]\nslug = \"a\"\ntitle = \"T\"\nrepositories = [\"o/a\"]\n[[projects]]\nslug = \"b\"\ntitle = \"T\"\nrepositories = [\"o/b\"]\n") != nil)
+    }
+
+    @Test("an old name still reads, with a warning: its title is the name, its slug the name made into one")
+    func oldName() throws {
+        let result = try #require(decoded("""
+            version = 1
+            [[projects]]
+            name = "Review queue"
+            repositories = ["anywhere"]
+            pull-requests = { review-requested = true }
+
+            [[projects]]
+            name = "shop"
+            repositories = ["o/shop"]
+
+            [[projects]]
+            name = "  C++ & Rust: tools!  "
+            repositories = ["o/tools"]
+            """))
+        #expect(result.configuration.projects.map(\.slug) == ["review-queue", "shop", "c-rust-tools"])
+        #expect(result.configuration.projects.map(\.title) == ["Review queue", "shop", "  C++ & Rust: tools!  "])
+        #expect(result.warnings == [
+            ConfigurationIssue(line: 3, message: "`name` is the old form: it's read as `slug = \"review-queue\"` and `title = \"Review queue\"`; write those instead"),
+            ConfigurationIssue(line: 8, message: "`name` is the old form: it's read as `slug = \"shop\"`; write that instead"),
+            ConfigurationIssue(line: 12, message: "`name` is the old form: it's read as `slug = \"c-rust-tools\"` and `title = \"  C++ & Rust: tools!  \"`; write those instead"),
+        ])
+    }
+
+    @Test("an old name is rejected when it's empty, makes no slug, sits beside slug or title, or makes another project's slug")
+    func oldNameRejected() {
+        #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")
+            == [ConfigurationIssue(line: 2, message: "a project's `name` can't be empty")])
+        #expect(rejection("[[projects]]\nname = \"!!\"\nrepositories = [\"o/a\"]\n")
+            == [ConfigurationIssue(line: 2, message: "`name` \"!!\" has no letter or digit to make a `slug` of; write `slug` and `title` instead")])
+        for key in ["slug = \"a\"", "title = \"A\""] {
+            #expect(rejection("[[projects]]\nname = \"a\"\n\(key)\nrepositories = [\"o/a\"]\n")
+                == [ConfigurationIssue(line: 2, message: "`name` is the old form of `slug` and `title`, which this project sets too; delete `name`")], "\(key)")
+        }
+        // "Shop" and "shop" both make the slug `shop`: the second is the one rejected.
+        #expect(rejection("[[projects]]\nslug = \"shop\"\nrepositories = [\"o/a\"]\n[[projects]]\nname = \"Shop\"\nrepositories = [\"o/b\"]\n")
+            == [ConfigurationIssue(line: 5, message: "project slug `shop` is used twice (first on line 2)")])
     }
 
     @Test("review-requested must be true or false, and a project's overrides the default")
     func reviewRequested() throws {
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
             == [ConfigurationIssue(line: 4, message: "`projects[0].pull-requests.review-requested` must be true or false")])
 
         let config = try #require(decoded("""
@@ -547,11 +645,11 @@ struct ConfigurationValidationTests {
             review-requested = true
 
             [[projects]]
-            name = "queue"
+            slug = "queue"
             repositories = ["o/a"]
 
             [[projects]]
-            name = "all"
+            slug = "all"
             repositories = ["o/a"]
             pull-requests = { review-requested = false }
             """)).configuration
@@ -567,16 +665,51 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 2, message: "`closed-window` can't be negative (got \"-2h\")")])
         #expect(rejection("[defaults.workflow-runs]\nfinished-window = \"-3m\"\n")
             == [ConfigurationIssue(line: 2, message: "`finished-window` can't be negative (got \"-3m\")")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"-4s\" }\n")
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nissues = { closed-window = \"-4s\" }\n")
             == [ConfigurationIssue(line: 4, message: "`closed-window` can't be negative (got \"-4s\")")])
         #expect(decoded("[defaults.pull-requests]\nclosed-window = \"0s\"\n")?.configuration.defaults.pullRequests.closedWindow == 0)
     }
 
-    @Test("an interval under 30 seconds is rejected")
-    func interval() {
+    @Test("refresh-interval is a duration, 2 minutes by default; under 30 seconds is rejected")
+    func interval() throws {
+        #expect(try #require(decoded("version = 1\nrefresh-interval = \"90s\"\n")).configuration.refreshInterval == 90)
+        #expect(try #require(decoded("version = 1\nrefresh-interval = \"30s\"\n")).warnings == [])
+        #expect(try #require(decoded("version = 1\nrefresh-interval = \"1h\"\n")).configuration.refreshInterval == 3600)
+        #expect(try #require(decoded("")).configuration.refreshInterval == 120)
+        for text in ["29s", "0"] {
+            #expect(rejection("refresh-interval = \"\(text)\"\n")
+                == [ConfigurationIssue(line: 1, message: "`refresh-interval` must be at least \"30s\" (got \"\(text)\")")], "\(text)")
+        }
+        #expect(rejection("refresh-interval = \"2 min\"\n").first?.message.hasPrefix("`refresh-interval` must be a whole number and one unit") == true)
+        #expect(rejection("refresh-interval = 120\n")
+            == [ConfigurationIssue(line: 1, message: "`refresh-interval` must be a string: \(ConfigurationReader.windowForm)")])
+    }
+
+    @Test("the old refresh-interval-seconds still reads, with a warning giving the new key; both together is an error")
+    func oldInterval() throws {
+        let result = try #require(decoded("version = 1\nrefresh-interval-seconds = 90\n"))
+        #expect(result.configuration.refreshInterval == 90)
+        #expect(result.warnings == [ConfigurationIssue(
+            line: 2, message: "`refresh-interval-seconds` is the old form: it's read as `refresh-interval = \"90s\"`; write that instead"
+        )])
         #expect(rejection("refresh-interval-seconds = 29\n")
             == [ConfigurationIssue(line: 1, message: "`refresh-interval-seconds` must be at least 30 (got 29)")])
-        #expect(decoded("refresh-interval-seconds = 30\n")?.configuration.refreshIntervalSeconds == 30)
+        #expect(rejection("refresh-interval = \"2m\"\nrefresh-interval-seconds = 120\n") == [ConfigurationIssue(
+            line: 2, message: "`refresh-interval-seconds` is the old form of `refresh-interval`, which this table sets too; delete `refresh-interval-seconds`"
+        )])
+    }
+
+    @Test("a file that sets keys without version reads, with a warning; an empty one, or one of comments, has none")
+    func missingVersion() throws {
+        let result = try #require(decoded("[menu]\nlayout = \"tabs\"\n"))
+        #expect(result.configuration.menu.layout == .tabs)
+        #expect(result.warnings == [ConfigurationIssue(
+            line: nil, message: "the file sets no `version`: add `version = 1` at the top; from version 2, a file without it is an error"
+        )])
+        #expect(try #require(decoded("version = 1\n[menu]\nlayout = \"tabs\"\n")).warnings == [])
+        for text in ["", "# a comment\n", "version = 1\n"] {
+            #expect(try #require(decoded(text)).warnings == [], "\(text)")
+        }
     }
 
     @Test("a rate-limit share outside 1–50 is rejected")
@@ -611,14 +744,14 @@ struct ConfigurationValidationTests {
     @Test("every problem in the file is reported, in order")
     func severalProblems() {
         let issues = rejection("""
-            refresh-interval-seconds = 10
+            refresh-interval = "10s"
             [rate-limit]
             max-share-percent = 90
             """)
         #expect(issues.map(\.line) == [1, 3])
         let error = ConfigurationError(issues)
         #expect(error.line == 1)
-        #expect(error.message == "`refresh-interval-seconds` must be at least 30 (got 10)")
+        #expect(error.message == "`refresh-interval` must be at least \"30s\" (got \"10s\")")
     }
 }
 
@@ -627,22 +760,23 @@ struct ConfigurationWarningTests {
     @Test("unknown keys are warnings, not errors, and are ignored")
     func unknownKeys() throws {
         let result = try #require(decoded("""
-            refreshIntervalSeconds = 60
+            refreshInterval = "60s"
             theme = "dark"
 
             [attention]
             unseeen = false
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             colour = "red"
             """))
-        #expect(result.configuration.refreshIntervalSeconds == 120)
+        #expect(result.configuration.refreshInterval == 120)
         #expect(result.configuration.attention.unseen)
-        #expect(result.configuration.projects.map(\.name) == ["a"])
+        #expect(result.configuration.projects.map(\.slug) == ["a"])
         #expect(Set(result.warnings) == [
-            ConfigurationIssue(line: 1, message: "unknown setting `refreshIntervalSeconds` (ignored; did you mean `refresh-interval-seconds`?)"),
+            ConfigurationIssue(line: nil, message: ConfigurationReader.missingVersionMessage),
+            ConfigurationIssue(line: 1, message: "unknown setting `refreshInterval` (ignored; did you mean `refresh-interval`?)"),
             ConfigurationIssue(line: 2, message: "unknown setting `theme` (ignored)"),
             ConfigurationIssue(line: 5, message: "unknown setting `attention.unseeen` (ignored; did you mean `unseen`?)"),
             ConfigurationIssue(line: 10, message: "unknown setting `projects[0].colour` (ignored)"),
@@ -675,7 +809,7 @@ struct ConfigurationMergeTests {
             authors = ["me"]
 
             [[projects]]
-            name = "overrides"
+            slug = "overrides"
             repositories = ["o/a", "o/b"]
             pull-requests = { drafts = true, authors = { hide = ["@octocat"] } }
             issues = { show = true }
@@ -683,11 +817,11 @@ struct ConfigurationMergeTests {
             notifications = [{ event = "pr.merged", authors = ["others"] }]
 
             [[projects]]
-            name = "plain"
+            slug = "plain"
             repositories = ["o/c"]
 
             [[projects]]
-            name = "quiet"
+            slug = "quiet"
             repositories = ["o/d"]
             notifications = []
             """).configuration
@@ -696,7 +830,7 @@ struct ConfigurationMergeTests {
     @Test("a project's tables merge key by key onto the defaults")
     func tablesMerge() {
         let settings = config.settings(for: config.projects[0])
-        #expect(settings.name == "overrides")
+        #expect(settings.slug == "overrides")
         #expect(settings.repositories == ["o/a", "o/b"])
         // `authors` merges key by key too: the project's `hide`, the default `show`.
         #expect(settings.pullRequests == PullRequestSettings(

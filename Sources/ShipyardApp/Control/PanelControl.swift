@@ -61,7 +61,7 @@ final class PanelControl: PanelControlling {
             view: state.openView?.commandName ?? SetupPart.projectsName,
             layout: configuration.menu.layout.rawValue,
             // As `tab` accepts it: only while the menu draws tabs.
-            tab: menu.layout == .tabs ? PanelText.tabTitle(menu.resolved(state.selectedTab)) : nil,
+            tab: menu.layout == .tabs ? menu.tabTitle(menu.resolved(state.selectedTab)) : nil,
             // As `fold` and `tab` accept them, remote machines included.
             projects: menu.projectNames,
             folded: menu.collapsedProjects,
@@ -126,7 +126,7 @@ final class PanelControl: PanelControlling {
         withAnimation(Motion.tab) {
             state.select(tab, from: menu.resolved(state.selectedTab), in: menu.tabs)
         }
-        return PanelText.tabTitle(tab)
+        return menu.tabTitle(tab)
     }
 
     func showView(_ name: String) throws(PanelRefusal) -> String {

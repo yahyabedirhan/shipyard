@@ -13,7 +13,7 @@ private let config = """
     machines = ["hetzner-vps", "netcup-vps"]
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """

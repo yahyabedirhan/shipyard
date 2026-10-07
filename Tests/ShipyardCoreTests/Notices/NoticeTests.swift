@@ -6,7 +6,7 @@ import Testing
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -18,7 +18,7 @@ private func rules(_ events: [String]) -> String {
 
 /// A project watching `yahyabedirhan/shop` with its own notification list, `list`.
 private func project(_ name: String, notifying list: String? = nil) -> String {
-    "[[projects]]\nname = \"\(name)\"\nrepositories = [\"yahyabedirhan/shop\"]\n" + (list.map { "notifications = \($0)\n" } ?? "") + "\n"
+    "[[projects]]\nslug = \"\(name)\"\nrepositories = [\"yahyabedirhan/shop\"]\n" + (list.map { "notifications = \($0)\n" } ?? "") + "\n"
 }
 
 /// An agent's notice handed to the app as the control socket hands it
@@ -106,10 +106,19 @@ struct NoticeTests {
         #expect(harness.notifier.posted.map(\.title) == ["shop · Done"])
     }
 
+    @Test("--project finds a project by its title too, as an older shipyard names it, and the notification is titled with the project's title")
+    func byProjectTitle() async throws {
+        let harness = try await app("version = 1\n[[projects]]\nslug = \"shop\"\ntitle = \"Web shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n")
+
+        #expect(await harness.shipyard.show(Notice(title: "Done", project: "Web shop")) == .shown)
+        #expect(await harness.shipyard.show(Notice(title: "Again", project: "shop")) == .shown)
+        #expect(harness.notifier.posted.map(\.title) == ["Web shop · Done", "Web shop · Again"])
+    }
+
     @Test("a repository no project watches is refused with the projects; one a group brought in, as last resolved, is filed")
     func byRepository() async throws {
         let harness = try await app(
-            shop + "[[projects]]\nname = \"mine\"\nrepositories = [\"owned\"]\n",
+            shop + "[[projects]]\nslug = \"mine\"\nrepositories = [\"owned\"]\n",
             resolved: ["mine": ["yahyabedirhan/blog"]]
         )
 

@@ -20,8 +20,8 @@ struct ProjectChoicesTests {
         #expect(choices.isChosen(jobSearch.slug))
         #expect(!choices.isChosen(backend.slug))
         #expect(choices.projects == [
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
-            NewProject(name: "e-commerce-frontend", repositories: ["yahyabedirhan/e-commerce-frontend"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "e-commerce-frontend", repositories: ["yahyabedirhan/e-commerce-frontend"]),
         ])
         #expect(choices.canConfirm)
     }
@@ -38,15 +38,15 @@ struct ProjectChoicesTests {
         choices.rename(backend.slug, to: "e-commerce")
 
         #expect(choices.projects == [
-            NewProject(name: "e-commerce", repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]),
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "e-commerce", repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
         ])
         #expect(choices.projectNames == ["e-commerce", "job-search"])
 
         choices.toggle(frontend)
         #expect(choices.projects == [
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
-            NewProject(name: "e-commerce", repositories: ["yahyabedirhan/e-commerce-backend"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "e-commerce", repositories: ["yahyabedirhan/e-commerce-backend"]),
         ])
     }
 
@@ -70,8 +70,8 @@ struct ProjectChoicesTests {
         choices.toggle(jobSearch)
         choices.toggle(fork)
         #expect(choices.projects == [
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
-            NewProject(name: "friend/job-search", repositories: ["friend/job-search"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "friend/job-search", repositories: ["friend/job-search"]),
         ])
     }
 
@@ -86,8 +86,8 @@ struct ProjectChoicesTests {
 
         #expect(choices.offered.map(\.slug) == ["acme/storefront", "yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"])
         #expect(choices.projects == [
-            NewProject(name: "storefront", repositories: ["acme/storefront"]),
-            NewProject(name: "e-commerce-backend", repositories: ["yahyabedirhan/e-commerce-backend"]),
+            NewProject(title: "storefront", repositories: ["acme/storefront"]),
+            NewProject(title: "e-commerce-backend", repositories: ["yahyabedirhan/e-commerce-backend"]),
         ])
     }
 
@@ -101,6 +101,6 @@ struct ProjectChoicesTests {
         choices.setSuggestions([frontend, jobSearch])
 
         #expect(choices.offered.map(\.slug) == ["acme/storefront", "yahyabedirhan/e-commerce-frontend", "yahyabedirhan/job-search"])
-        #expect(choices.projects.map(\.name) == ["storefront", "job-search"])
+        #expect(choices.projects.map(\.title) == ["storefront", "job-search"])
     }
 }

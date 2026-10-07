@@ -19,7 +19,7 @@ private func pr(_ number: Int, author: String = "octocat") -> PR {
 /// A project of pull requests waiting on the user's review anywhere.
 private let reviews = """
     [[projects]]
-    name = "reviews"
+    slug = "reviews"
     repositories = ["anywhere"]
     pull-requests = { review-requested = true }
     notifications = [{ event = "pr.opened" }, { event = "pr.review_requested" }]
@@ -84,7 +84,7 @@ struct AnywhereTests {
     func laterChangesNotify() async throws {
         let config = """
             [[projects]]
-            name = "reviews"
+            slug = "reviews"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true }
             notifications = [{ event = "pr.commented" }]
@@ -114,7 +114,7 @@ struct AnywhereTests {
     func otherFiltersApply() async throws {
         let config = """
             [[projects]]
-            name = "reviews"
+            slug = "reviews"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true, drafts = false, authors = { hide = ["bots"] } }
 
@@ -133,7 +133,7 @@ struct AnywhereTests {
     func besideRepositories() async throws {
         let config = """
             [[projects]]
-            name = "reviews"
+            slug = "reviews"
             repositories = ["o/watched", "anywhere"]
             pull-requests = { review-requested = true }
 
@@ -194,7 +194,7 @@ struct AnywhereTests {
         let harness = try await Harness.started(config: reviews, graphQL: searchAnswer([("someone/else", pr(5))]))
         try harness.writeConfig("""
             [[projects]]
-            name = "reviews"
+            slug = "reviews"
             repositories = ["anywhere"]
             issues = { show = true }
             """)

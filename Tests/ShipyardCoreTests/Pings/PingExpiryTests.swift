@@ -7,11 +7,11 @@ import Testing
 
 private let shopAndBlog = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -121,11 +121,11 @@ struct PingExpiryTests {
             seen-window = "30m"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
             pings = { seen-window = "2h" }
 
@@ -150,12 +150,12 @@ struct PingExpiryTests {
     func filedTwice() async throws {
         let harness = try await Harness.started(config: """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             pings = { seen-window = "1h" }
 
             [[projects]]
-            name = "shop-too"
+            slug = "shop-too"
             repositories = ["yahyabedirhan/shop"]
 
             """, graphQL: onePullRequest)
@@ -181,7 +181,7 @@ struct PingExpiryTests {
             seen-window = "0"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             """, graphQL: onePullRequest)
@@ -248,11 +248,11 @@ struct PingExpiryTests {
     func dismissEverywhere() async throws {
         let harness = try await Harness.started(config: """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "shop-too"
+            slug = "shop-too"
             repositories = ["yahyabedirhan/shop"]
 
             """, graphQL: onePullRequest)

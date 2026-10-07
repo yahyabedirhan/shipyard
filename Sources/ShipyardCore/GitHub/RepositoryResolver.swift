@@ -100,7 +100,7 @@ public final class RepositoryResolver {
 
         var resolved: [String: ResolvedRepositories] = [:]
         for project in projects {
-            resolved[project.name] = resolution(of: project)
+            resolved[project.slug] = resolution(of: project)
         }
         return resolved
     }

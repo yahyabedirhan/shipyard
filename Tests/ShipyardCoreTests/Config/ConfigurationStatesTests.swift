@@ -15,13 +15,13 @@ struct ConfigurationStatesTests {
             states = ["failed"]
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             pull-requests = { states = ["open"] }
             issues = { states = ["open"] }
 
             [[projects]]
-            name = "b"
+            slug = "b"
             repositories = ["o/b"]
             """)).configuration
         let a = config.settings(for: config.projects[0])
@@ -42,7 +42,7 @@ struct ConfigurationStatesTests {
             """) == [ConfigurationIssue(line: 2, message: "unknown pull request state `merge` (did you mean `merged`?)")])
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             workflow-runs = { states = [
               "failed",

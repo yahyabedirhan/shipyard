@@ -14,7 +14,7 @@ struct ConfigurationPingsTests {
             authors = { hide = ["bots"] }
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             pings = { drafts = false, review-requested = true }
             """)
@@ -34,15 +34,15 @@ struct ConfigurationPingsTests {
             ConfigurationIssue(line: 2, message: "`terminal` names your terminal app, by name or bundle id; leave it out to only focus the tab"),
         ])
         #expect(rejection("[herdr]\nterminal = true\n") == [ConfigurationIssue(line: 2, message: "`herdr.terminal` must be a string")])
-        let warnings = try #require(decoded("[herdr]\nterminl = \"Ghostty\"\n")).warnings
-        #expect(warnings == [ConfigurationIssue(line: 2, message: "unknown setting `herdr.terminl` (ignored; did you mean `terminal`?)")])
+        let warnings = try #require(decoded("version = 1\n[herdr]\nterminl = \"Ghostty\"\n")).warnings
+        #expect(warnings == [ConfigurationIssue(line: 3, message: "unknown setting `herdr.terminl` (ignored; did you mean `terminal`?)")])
     }
 
     @Test("show must be true or false; another key under pings is only a warning")
     func showTypeAndUnknownKeys() throws {
         #expect(rejection("[defaults.pings]\nshow = \"yes\"\n") == [ConfigurationIssue(line: 2, message: "`defaults.pings.show` must be true or false")])
-        let warnings = try #require(decoded("[defaults.pings]\nshwo = false\n")).warnings
-        #expect(warnings == [ConfigurationIssue(line: 2, message: "unknown setting `defaults.pings.shwo` (ignored; did you mean `show`?)")])
+        let warnings = try #require(decoded("version = 1\n[defaults.pings]\nshwo = false\n")).warnings
+        #expect(warnings == [ConfigurationIssue(line: 3, message: "unknown setting `defaults.pings.shwo` (ignored; did you mean `show`?)")])
     }
 
     @Test("seen-window is written like closed-window, and a bad one is rejected on its line with the nearest spelling")

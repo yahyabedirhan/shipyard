@@ -23,7 +23,7 @@ private func config(_ settings: String = "show-first = 5", layout: MenuLayout = 
     show = true
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["\(web)"]
     \(settings)
     """
@@ -158,7 +158,7 @@ struct ShowMoreTests {
     func headerCountKinds() async throws {
         let docs = "yahyabedirhan/shop-docs"
         let config = config(
-            "show-first = 5\n\n[[projects]]\nname = \"docs\"\nrepositories = [\"\(docs)\"]",
+            "show-first = 5\n\n[[projects]]\nslug = \"docs\"\nrepositories = [\"\(docs)\"]",
             menu: "header-counts = [\"notes\", \"pings\", \"pull-requests\"]"
         )
         let harness = try await Harness.started(config: config, graphQL: PullRequestsResponse.answer([

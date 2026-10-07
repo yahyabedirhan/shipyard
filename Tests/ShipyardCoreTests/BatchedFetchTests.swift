@@ -13,7 +13,7 @@ private let missing = "yahyabedirhan/repo-06"
 
 private let config = """
     [[projects]]
-    name = "everything"
+    slug = "everything"
     repositories = [\(repositories.map { "\"\($0)\"" }.joined(separator: ", "))]
 
     """
@@ -88,7 +88,7 @@ struct BatchedFetchTests {
     func fewRepositoriesInOneRequest() async throws {
         let harness = try Harness(stored: "gho_stored", config: """
             [[projects]]
-            name = "few"
+            slug = "few"
             repositories = ["yahyabedirhan/repo-00", "yahyabedirhan/repo-01"]
 
             """)
@@ -225,7 +225,7 @@ private let shop = """
     show = true
 
     [[projects]]
-    name = "e-commerce"
+    slug = "e-commerce"
     repositories = ["\(frontendRepository)", "\(backendRepository)"]
 
     """

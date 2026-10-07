@@ -245,13 +245,9 @@ public enum PanelText {
 
     // MARK: - The tabs layout
 
-    /// A tab's title: "All", or its project's name.
-    public static func tabTitle(_ tab: MenuTab) -> String {
-        switch tab {
-        case .all: "All"
-        case .project(let name): name
-        }
-    }
+    /// The All tab's title; a project's tab is titled by its project's
+    /// title (`MenuModel.tabTitle`).
+    public static let allTabTitle = "All"
 
     /// The line under the tab strip: "5 need attention · 4 projects" on
     /// All, "2 need attention" on a project's tab, and "All caught up" in

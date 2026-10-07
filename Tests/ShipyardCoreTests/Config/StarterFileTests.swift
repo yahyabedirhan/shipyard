@@ -9,7 +9,7 @@ import Testing
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["acme/shop"]
 
     """

@@ -726,7 +726,7 @@ public final class Shipyard {
             let repositories = resolved.mapValues(\.repositories)
             resolvedRepositories = repositories
             try? repositoriesStore.record(repositories)
-            let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
+            let projects = configured.map { $0.resolved(by: resolved[$0.slug]) }
             let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
             self.snapshot = snapshot
@@ -836,7 +836,7 @@ public final class Shipyard {
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
-        let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        let settings = Dictionary(projects.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let listed = listings.mapValues { Set($0.map(\.id)) }
         var byID: [String: [Event]] = [:]
         var order: [String] = []
@@ -855,7 +855,12 @@ public final class Shipyard {
             let selected = filed.first { event in
                 settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, viewer: viewer) } ?? false
             }
-            if let selected { notifications.append(NotificationRules.notification(for: selected)) }
+            if let selected {
+                var notification = NotificationRules.notification(for: selected)
+                // Titled by the project's title; the event knows its slug.
+                notification.project = settings[selected.project]?.title ?? selected.project
+                notifications.append(notification)
+            }
             if unfiled && selected == nil {
                 state.notified.passOverUnfiled(first, at: now)
             } else {
@@ -869,7 +874,7 @@ public final class Shipyard {
     private func nextDelay() -> RefreshDelay {
         let configuration = configStore.lastValid
         return budget.nextDelay(
-            configured: TimeInterval(configuration.refreshIntervalSeconds),
+            configured: configuration.refreshInterval,
             sharePercent: configuration.rateLimit.maxSharePercent,
             at: clock.now
         )
@@ -902,7 +907,7 @@ public final class Shipyard {
         }
         let delay = publishRateStatus()
         var seconds = delay.seconds(from: clock.now)
-        if delay.isPaused { seconds = min(seconds, TimeInterval(configStore.lastValid.refreshIntervalSeconds)) }
+        if delay.isPaused { seconds = min(seconds, configStore.lastValid.refreshInterval) }
         timer.arm(after: seconds) { [weak self] in
             await self?.refresh()
         }
@@ -1309,10 +1314,14 @@ public final class Shipyard {
 
     /// The listed pings, the remote ones filed against `configuration` and
     /// the repositories last resolved (`ProjectFiling.filed(remote:)`), as
-    /// the CLI files a local one when it's sent.
+    /// the CLI files a local one when it's sent, and each one's projects
+    /// named by slug (`ProjectFiling.named`).
     private func filedPings(_ configuration: Configuration) -> [Ping] {
         let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
-        guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
+        let pings = pings.map { ProjectFiling.named($0, configuration: configuration) }
+        guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else {
+            return pings + remotePings.map { ProjectFiling.named($0, configuration: configuration) }
+        }
         let resolved = resolvedRepositories ?? repositoriesStore.load()
         resolvedRepositories = resolved
         return pings + remotePings.map { ProjectFiling.filed(remote: $0, configuration: configuration, resolved: resolved) }
@@ -1324,7 +1333,7 @@ public final class Shipyard {
     /// (`numberPings`).
     private func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, configuration: Configuration) -> [String: [Item]] {
         let pings = filedPings(configuration)
-        numberPings(pings, projects: projects.map(\.name), configuration: configuration)
+        numberPings(pings, projects: projects.map(\.slug), configuration: configuration)
         return Listing.listings(
             for: projects,
             in: snapshot,
@@ -1580,7 +1589,7 @@ public final class Shipyard {
         guard ping.seen != nil else { return false }
         let names = ping.machine != nil && ping.projects.isEmpty ? [ping.machine ?? ""] : ping.projects
         let windows = names.map { name in
-            configuration.projects.first { $0.name == name }
+            configuration.project(named: name)
                 .map { configuration.settings(for: $0).pings.seenWindow }
                 ?? configuration.defaults.pings.seenWindow
         }
@@ -1628,7 +1637,8 @@ public final class Shipyard {
         startingNotes.insert(project)
         newNoteErrors[project] = nil
         rebuildMenu(configStore.lastValid)
-        let result = await notesReader.startNote(in: project, client: NotionClient(transport: notionRoute))
+        let title = configStore.lastValid.projects.first { $0.slug == project }?.title ?? project
+        let result = await notesReader.startNote(in: project, titled: title, client: NotionClient(transport: notionRoute))
         startingNotes.remove(project)
         switch result {
         case .success(let url):
@@ -1681,7 +1691,8 @@ public final class Shipyard {
     public func checkNotes() async -> NotesCheckReport? {
         guard readsNotes, let notionRoute else { return nil }
         let configuration = configStore.lastValid
-        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
+        // Notion knows a project by its database's title: the project's title.
+        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.title)
         return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
 
@@ -1758,10 +1769,11 @@ public final class Shipyard {
     private func readNotes() async {
         guard readsNotes, let notionRoute else { return }
         let configuration = configStore.lastValid
-        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
-        let reading = projects.isEmpty
+        let shown = configuration.projects.filter { configuration.settings(for: $0).notes.show }
+        let projects = shown.map(\.slug)
+        let reading = shown.isEmpty
             ? NotesReading.read([:])
-            : await notesReader.read(projects: projects, client: NotionClient(transport: notionRoute))
+            : await notesReader.read(projects: shown.map { ($0.slug, $0.title) }, client: NotionClient(transport: notionRoute))
         // Disconnected while ntn answered: what it read isn't listed.
         guard readsNotes else { return }
         var read: [String: [Note]] = [:]
@@ -1940,7 +1952,7 @@ public final class Shipyard {
     public func dismissBanner(_ key: String) {
         let now = clock.now
         guard banners(at: now).contains(where: { $0.id == key }) else { return }
-        let length = configStore.lastValid.banners.snooze
+        let length = configStore.lastValid.banners.snoozeDuration
         changeBannerSnoozes { $0.snooze(key, at: now, for: length) }
     }
 

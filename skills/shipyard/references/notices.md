@@ -18,12 +18,12 @@ shipyard notify withdraw <id>
 
 | Flag | What it does |
 |---|---|
-| `"<title>"` | the one line the notification shows after the project's name; quote it, it's one argument |
+| `"<title>"` | the one line the notification shows after the project's title; quote it, it's one argument |
 | `--subtitle <text>` | a line between the title and the body |
 | `--body <text>` | more than the title fits, shown under it |
 | `--from <label>` | who sent it, such as your name and the task (`"claude · checkout"`), shown under the body as "from <label>" |
 | `--repo <owner/name>` | file it by this repository instead of the working folder's |
-| `--project <name>` | file it under this one project, by its `name` in `config.toml` |
+| `--project <name>` | file it under this one project, by its `slug` in `config.toml`, or else its `title` |
 | `--image <path>` | a PNG, JPEG or GIF shown with it, 5 MB at most; a relative path is from the working folder |
 | `--sound <sound>` | `default` (without the flag too), `none` for a quiet update, or a sound's name such as `Glass` |
 | `--thread <key>` | stacks it in Notification Center with the other notices of this key, such as one orchestration's; without it, it stacks with its project's |

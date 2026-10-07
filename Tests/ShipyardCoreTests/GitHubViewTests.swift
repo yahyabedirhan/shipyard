@@ -10,7 +10,7 @@ import Testing
 struct GitHubViewTests {
     private let withProjects = """
         [[projects]]
-        name = "shipyard"
+        slug = "shipyard"
         repositories = ["yahyabedirhan/shipyard"]
 
         """

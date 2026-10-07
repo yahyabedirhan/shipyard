@@ -39,14 +39,14 @@ public struct ProjectFiling: PingFiling {
         case .success(let read): configuration = read
         case .failure(let failure): return .failure(failure)
         }
-        let names = configuration.projects.map(\.name)
+        let names = configuration.projects.map(\.slug)
         let slug: String
         switch target {
-        case .project(let project):
-            guard names.contains(project) else {
-                return .failure(.failed("shipyard ping: no project is named `\(project)`; \(Self.listing(names))"))
+        case .project(let value):
+            guard let project = configuration.project(named: value) else {
+                return .failure(.failed("shipyard ping: no project is named `\(value)`; \(Self.listing(names))"))
             }
-            return shown(Filing(projects: [project], repository: nil), configuration: configuration, whenNoProject: whenNoProject)
+            return shown(Filing(projects: [project.slug], repository: nil), configuration: configuration, whenNoProject: whenNoProject)
         case .none(let why):
             guard whenNoProject == .keepUnfiled else {
                 return .failure(.failed("shipyard ping: \(why); pass --repo <owner/name> or --project <name>; \(Self.listing(names))"))
@@ -73,7 +73,7 @@ public struct ProjectFiling: PingFiling {
     /// hidden as the configuration asks, since a refusal would reach no one.
     private func shown(_ filing: Filing, configuration: Configuration, whenNoProject: NoProject) -> Result<Filing, CommandResult> {
         guard whenNoProject == .refuse else { return .success(filing) }
-        let showing = configuration.projects.filter { configuration.settings(for: $0).pings.show }.map(\.name)
+        let showing = configuration.projects.filter { configuration.settings(for: $0).pings.show }.map(\.slug)
         let hiding = filing.projects.filter { !showing.contains($0) }
         guard hiding.count == filing.projects.count else { return .success(filing) }
         let named = hiding.map { "`\($0)`" }.joined(separator: ", ")
@@ -91,17 +91,30 @@ public struct ProjectFiling: PingFiling {
     /// (`Ping.machine`), filed as a local one is against `configuration`
     /// and `resolved`: under every project that watches its repository,
     /// with the repository spelled as the first of them knows it. One that
-    /// names projects (`--project`) keeps them; a name the configuration
-    /// lacks lists it by its machine (`Listing`), as does a repository no
-    /// project watches.
+    /// names projects (`--project`) goes under the projects they name, by
+    /// slug or else title (`Configuration.project(named:)`), since an
+    /// older `shipyard` sends a project's old name; a name the
+    /// configuration lacks lists it by its machine (`Listing`), as does a
+    /// repository no project watches.
     public static func filed(remote ping: Ping, configuration: Configuration, resolved: [String: [String]]) -> Ping {
-        guard ping.projects.isEmpty, let slug = ping.repository else { return ping }
+        guard ping.projects.isEmpty else { return named(ping, configuration: configuration) }
+        guard let slug = ping.repository else { return ping }
         let watching = watchers(of: slug, configuration: configuration, resolved: resolved)
         guard let first = watching.first else { return ping }
         var filed = ping
         filed.projects = watching.map(\.project)
         filed.repository = first.spelling
         return filed
+    }
+
+    /// `ping` with each project it's filed under named by its slug: a name
+    /// that's a title (a remote ping from an older `shipyard`, or one filed
+    /// before projects had slugs) becomes its project's slug
+    /// (`Configuration.project(named:)`); a name no project has stays.
+    public static func named(_ ping: Ping, configuration: Configuration) -> Ping {
+        var named = ping
+        named.projects = ping.projects.map { configuration.project(named: $0)?.slug ?? $0 }
+        return named
     }
 
     /// The projects that watch `slug`, in the configuration's order, each
@@ -115,9 +128,9 @@ public struct ProjectFiling: PingFiling {
     ) -> [(project: String, spelling: String)] {
         configuration.projects.compactMap { project in
             let named = project.repositories.compactMap(\.slug)
-            let known = named + (resolved[project.name] ?? [])
+            let known = named + (resolved[project.slug] ?? [])
             guard let spelling = known.first(where: { $0.caseInsensitiveCompare(slug) == .orderedSame }) else { return nil }
-            return (project.name, spelling)
+            return (project.slug, spelling)
         }
     }
 

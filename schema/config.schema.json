@@ -7,13 +7,20 @@
   "additionalProperties": false,
   "properties": {
     "version": {
-      "description": "The configuration format version. Only 1 exists.",
+      "description": "The configuration format version. Only 1 exists. Set it in every file that sets a key: a file without it reads with a warning, and from version 2 it is an error.",
       "type": "integer",
       "enum": [1],
       "default": 1
     },
+    "refresh-interval": {
+      "description": "How often to refresh: a whole number and one unit, s, m, h or d, such as \"2m\", at least 30 seconds. A floor: shipyard stretches it when a refresh at this interval would spend more than max-share-percent of a GitHub rate limit.",
+      "type": "string",
+      "pattern": "^0*([3-9][0-9]|[1-9][0-9]{2,})s$|^0*[1-9][0-9]*[mhd]$",
+      "default": "2m"
+    },
     "refresh-interval-seconds": {
-      "description": "How often to refresh, in seconds. A floor: shipyard stretches it when a refresh at this interval would spend more than max-share-percent of a GitHub rate limit.",
+      "description": "Deprecated: write refresh-interval = \"<n>s\" instead. How often to refresh, in seconds; still read, with a warning.",
+      "deprecated": true,
       "type": "integer",
       "minimum": 30,
       "default": 120
@@ -131,7 +138,7 @@
       "additionalProperties": false,
       "properties": {
         "machines": {
-          "description": "The machines to ask for their pings, by the labels your Herdr knows them by as saved machines (\"netcup-vps\"): never a host or an address. Each machine's pings list in a section named after it, after the projects. A label can't start with \"-\" or be a project's name.",
+          "description": "The machines to ask for their pings, by the labels your Herdr knows them by as saved machines (\"netcup-vps\"): never a host or an address. Each machine's pings list in a section named after it, after the projects. A label can't start with \"-\" or be a project's slug or title.",
           "type": "array",
           "items": { "type": "string", "pattern": "^\\s*[^\\s-]" },
           "uniqueItems": true,
@@ -163,11 +170,17 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "snooze": {
+        "snooze-duration": {
           "description": "How long a banner stays hidden after you click its dismiss button: a whole number and one unit, s, m, h or d, such as \"1h\" or \"10s\". After it, the banner shows again if its condition still holds.",
           "type": "string",
           "pattern": "^[1-9][0-9]*[smhd]$",
           "default": "1h"
+        },
+        "snooze": {
+          "description": "Deprecated: write snooze-duration instead. The same duration; still read, with a warning.",
+          "deprecated": true,
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[smhd]$"
         }
       }
     },
@@ -244,12 +257,24 @@
       "description": "A named group of one or more GitHub repositories, shown as one section. Tables here merge key by key onto [defaults]; notifications replaces the default list.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "repositories"],
+      "required": ["repositories"],
+      "anyOf": [{ "required": ["slug"] }, { "required": ["name"] }],
       "properties": {
-        "name": {
-          "description": "The section's title; unique across projects.",
+        "slug": {
+          "description": "The project's ID, unique across projects: lowercase letters and digits joined by single hyphens, such as \"e-commerce\". Required. shipyard ping --project and shipyard notify --project find a project by its slug, then by its title.",
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "title": {
+          "description": "The text the menu shows for the project: its section's and its tab's title. Unset: the slug.",
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "description": "Deprecated: write slug and title instead. The project's old name; still read, with a warning, as its title, with a slug made of it in lowercase, each run of other characters changed to one hyphen.",
+          "deprecated": true,
+          "type": "string",
+          "pattern": "[A-Za-z0-9]"
         },
         "repositories": {
           "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you), \"anywhere\" (open pull requests waiting on your review in any repository, from GitHub's search; the project must set pull-requests.review-requested = true and show no issues or runs). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",

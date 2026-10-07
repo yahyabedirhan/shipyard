@@ -28,25 +28,25 @@ struct ConfigurationRemoteTests {
         #expect(rejection("[remote]\nmachines = \"vps\"\n") == [ConfigurationIssue(line: 2, message: "`remote.machines` must be a list of strings")])
     }
 
-    @Test("a machine can't share a project's name, since its section is named after it")
+    @Test("a machine can't share a project's slug or title, since its section is named after it")
     func projectName() {
         let issues = rejection("""
             [remote]
             machines = ["shop"]
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["o/shop"]
             """)
         #expect(issues == [
-            ConfigurationIssue(line: 2, message: "`shop` is both a machine in `[remote] machines` and a project's name; rename the project, since a machine's pings list under its label"),
+            ConfigurationIssue(line: 2, message: "`shop` is both a machine in `[remote] machines` and a project's slug or title; rename the project, since a machine's pings list under its label"),
         ])
     }
 
     @Test("an unknown key under [remote] is only a warning")
     func unknownKey() throws {
-        let warnings = try #require(decoded("[remote]\nmachine = [\"vps\"]\n")).warnings
-        #expect(warnings == [ConfigurationIssue(line: 2, message: "unknown setting `remote.machine` (ignored; did you mean `machines`?)")])
+        let warnings = try #require(decoded("version = 1\n[remote]\nmachine = [\"vps\"]\n")).warnings
+        #expect(warnings == [ConfigurationIssue(line: 3, message: "unknown setting `remote.machine` (ignored; did you mean `machines`?)")])
     }
 
     @Test("the schema rejects what validation rejects")

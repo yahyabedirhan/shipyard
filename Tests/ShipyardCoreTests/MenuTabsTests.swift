@@ -165,10 +165,14 @@ struct MenuTabsTests {
 
     // MARK: - Words
 
-    @Test("a tab's title is All or its project's name")
+    @Test("a tab's title is All or its project's title")
     func titles() {
-        #expect(PanelText.tabTitle(.all) == "All")
-        #expect(PanelText.tabTitle(.project("e-commerce")) == "e-commerce")
+        var titled = section("e-commerce", [])
+        titled.title = "E-commerce"
+        let menu = model([titled, section("shipyard", [])])
+        #expect(menu.tabTitle(.all) == "All")
+        #expect(menu.tabTitle(.project("e-commerce")) == "E-commerce")
+        #expect(menu.tabTitle(.project("shipyard")) == "shipyard")
     }
 
     @Test("the line under the tabs counts what needs attention, and All its projects")

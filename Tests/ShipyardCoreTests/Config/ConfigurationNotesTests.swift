@@ -13,7 +13,7 @@ struct ConfigurationNotesTests {
             seen-window = "1d"
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             notes = { authors = { hide = ["bots"] } }
             """)
@@ -27,7 +27,7 @@ struct ConfigurationNotesTests {
     @Test("show must be true or false; another key under notes is only a warning")
     func showTypeAndUnknownKeys() throws {
         #expect(rejection("[defaults.notes]\nshow = 1\n") == [ConfigurationIssue(line: 2, message: "`defaults.notes.show` must be true or false")])
-        let warnings = try #require(decoded("[defaults.notes]\nshwo = false\n")).warnings
-        #expect(warnings == [ConfigurationIssue(line: 2, message: "unknown setting `defaults.notes.shwo` (ignored; did you mean `show`?)")])
+        let warnings = try #require(decoded("version = 1\n[defaults.notes]\nshwo = false\n")).warnings
+        #expect(warnings == [ConfigurationIssue(line: 3, message: "unknown setting `defaults.notes.shwo` (ignored; did you mean `show`?)")])
     }
 }

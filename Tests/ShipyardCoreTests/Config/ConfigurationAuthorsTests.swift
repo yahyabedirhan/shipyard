@@ -13,7 +13,7 @@ struct ConfigurationAuthorsTests {
             """) == [ConfigurationIssue(line: 2, message: "unknown author `bots2` (did you mean `bots` or `@bots2`?)")])
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             issues = { authors = { show = [
               "others",
@@ -44,7 +44,7 @@ struct ConfigurationAuthorsTests {
             == [ConfigurationIssue(line: 2, message: "`defaults.issues.authors` must be a table")])
         #expect(rejection("[defaults.issues]\nauthors = { hide = \"bots\" }\n")
             == [ConfigurationIssue(line: 2, message: "`defaults.issues.authors.hide` must be a list of strings")])
-        let result = try #require(decoded("[defaults.issues]\nauthors = { mute = [\"bots\"] }\n"))
+        let result = try #require(decoded("version = 1\n[defaults.issues]\nauthors = { mute = [\"bots\"] }\n"))
         #expect(result.warnings.map(\.message) == ["unknown setting `defaults.issues.authors.mute` (ignored)"])
     }
 
@@ -72,6 +72,7 @@ struct ConfigurationAuthorsTests {
     @Test("old notification author strings are read as selectors, with a warning each")
     func oldNotificationAuthors() throws {
         let result = try #require(decoded("""
+            version = 1
             [[defaults.notifications]]
             event = "pr.opened"
             authors = "any"
@@ -81,7 +82,7 @@ struct ConfigurationAuthorsTests {
             authors = "others"
 
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["o/a"]
             notifications = [{ event = "run.failed", authors = "me" }, { event = "pr.opened", authors = "bots" }]
             """))
@@ -95,10 +96,10 @@ struct ConfigurationAuthorsTests {
         ])
         let old = "is the old form of a notification rule's authors"
         #expect(result.warnings == [
-            ConfigurationIssue(line: 3, message: "`authors = \"any\"` \(old); write `authors = []`, or leave it out, for everyone"),
-            ConfigurationIssue(line: 7, message: "`authors = \"others\"` \(old); write `authors = [\"others\"]`"),
-            ConfigurationIssue(line: 12, message: "`authors = \"me\"` \(old); write `authors = [\"me\"]`"),
-            ConfigurationIssue(line: 12, message: "`authors = \"bots\"` \(old); write `authors = [\"bots\"]`"),
+            ConfigurationIssue(line: 4, message: "`authors = \"any\"` \(old); write `authors = []`, or leave it out, for everyone"),
+            ConfigurationIssue(line: 8, message: "`authors = \"others\"` \(old); write `authors = [\"others\"]`"),
+            ConfigurationIssue(line: 13, message: "`authors = \"me\"` \(old); write `authors = [\"me\"]`"),
+            ConfigurationIssue(line: 13, message: "`authors = \"bots\"` \(old); write `authors = [\"bots\"]`"),
         ])
     }
 

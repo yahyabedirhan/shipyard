@@ -8,11 +8,11 @@ import Testing
 /// The projects `graphql-pull-requests.json` answers for.
 private let projects = """
     [[projects]]
-    name = "e-commerce"
+    slug = "e-commerce"
     repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
     [[projects]]
-    name = "job-search"
+    slug = "job-search"
     repositories = ["yahyabedirhan/job-search"]
 
     """
@@ -116,11 +116,11 @@ struct RateLimitTests {
 
         try harness.writeConfig("""
             [[projects]]
-            name = "e-commerce"
+            slug = "e-commerce"
             repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
 
             """)

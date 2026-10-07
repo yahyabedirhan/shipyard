@@ -9,7 +9,7 @@ private let twoMachines = """
     machines = ["hetzner-vps", "netcup-vps"]
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -20,7 +20,7 @@ private let quietShop = """
     machines = ["hetzner-vps", "netcup-vps"]
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
     notifications = []
 
@@ -128,7 +128,7 @@ struct RemotePingNotificationTests {
             machines = ["hetzner-vps", "netcup-vps"]
 
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
             notifications = [{ event = "ping.sent" }]
 

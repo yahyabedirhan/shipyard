@@ -5,8 +5,10 @@ import ShipyardConfig
 import Testing
 
 private let projects = """
+    version = 1
+
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["o/r"]
 
     """
@@ -60,7 +62,7 @@ struct ConfigStatusTests {
     func rejectedThenFixed() async throws {
         let harness = try await Harness.started(config: projects, graphQL: Harness.fixture("graphql-pull-requests.json"))
 
-        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects + "[[projects]]\nname = \"shop\"\nrepositories = [\"o/s\"]\n")
+        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects + "[[projects]]\nslug = \"shop\"\nrepositories = [\"o/s\"]\n")
         try touch(harness, at: date("2026-09-25T12:05:00Z"))
         harness.clock.set(date("2026-09-25T12:05:01Z"))
         await harness.shipyard.reloadConfiguration()
@@ -120,6 +122,22 @@ struct ConfigStatusTests {
         #expect(warning["banner"] as? String == PanelText.configWarnings(harness.shipyard.configWarnings))
     }
 
+    @Test("a file that sets keys without version is accepted, and the record lists the warning")
+    func missingVersionRecorded() async throws {
+        let harness = try await Harness.started(config: projects, graphQL: Harness.fixture("graphql-pull-requests.json"))
+
+        try harness.writeConfig(projects.replacingOccurrences(of: "version = 1\n", with: ""))
+        await harness.shipyard.reloadConfiguration()
+
+        let record = try Record(harness)
+        #expect(record.accepted == true)
+        #expect(record.problems.isEmpty)
+        #expect(record.warnings.map { $0["message"] as? String } == [
+            "the file sets no `version`: add `version = 1` at the top; from version 2, a file without it is an error",
+        ])
+        #expect(harness.shipyard.configStore.lastValid.projects.map(\.slug) == ["shop"])
+    }
+
     @Test("a file deleted while running is accepted as the defaults, with no modification time")
     func missingFile() async throws {
         let harness = try Harness(stored: nil, config: nil)
@@ -142,7 +160,7 @@ struct ConfigStatusTests {
         await harness.shipyard.start()
         harness.graphQL([try Harness.fixture("graphql-pull-requests.json")])
 
-        try await harness.shipyard.addProjects([NewProject(name: "shop", repositories: ["o/r"])])
+        try await harness.shipyard.addProjects([NewProject(title: "shop", repositories: ["o/r"])])
 
         let record = try Record(harness)
         #expect(record.accepted == true)

@@ -7,11 +7,11 @@ import Testing
 
 private let projects = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -317,7 +317,7 @@ struct NotesTests {
     func notConnected() async throws {
         let harness = try await Harness.notConnected()
         await harness.shipyard.panelOpened()
-        try harness.writeConfig(projects + "[[projects]]\nname = \"docs\"\nrepositories = [\"yahyabedirhan/docs\"]\n")
+        try harness.writeConfig(projects + "[[projects]]\nslug = \"docs\"\nrepositories = [\"yahyabedirhan/docs\"]\n")
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.ntn.runs == 0)

@@ -228,9 +228,9 @@ private struct ListSectionHeader: View {
                 }
                 .buttonStyle(.plain)
                 // No hover help: the chevron says it collapses. VoiceOver hears what a click does.
-                .accessibilityLabel(section.name)
+                .accessibilityLabel(section.title)
                 .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
-                .accessibilityHint(PanelText.sectionFoldHelp(section.name, isCollapsed: section.isCollapsed))
+                .accessibilityHint(PanelText.sectionFoldHelp(section.title, isCollapsed: section.isCollapsed))
                 HStack(spacing: 6) {
                     Group {
                         Image(systemName: "chevron.right")
@@ -242,7 +242,7 @@ private struct ListSectionHeader: View {
                             .symbolRenderingMode(.hierarchical)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
-                        Text(section.name)
+                        Text(section.title)
                             .font(TypeScale.section)
                             .foregroundStyle(.primary.opacity(0.9))
                             .lineLimit(1)
@@ -296,7 +296,7 @@ private struct ListSectionHeader: View {
                 }
             }
             if let newNote = section.newNote {
-                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+                NewNoteIcon(project: section.title, state: newNote) { actions.startNote(section) }
             }
         }
         .padding(.leading, 6)

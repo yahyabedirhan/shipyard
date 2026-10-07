@@ -150,12 +150,12 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// Adds `projects` as `[[projects]]` blocks at the end of the file,
     /// creating it (and its directory) with a commented header and the
     /// `#:schema` line when it's missing. Existing text is never rewritten.
-    /// Rejects slugs that aren't `owner/name`, a repository listed twice in
-    /// one project and names already used, before writing anything. Returns
-    /// the reload that follows.
+    /// Rejects repositories that aren't `owner/name`, a repository listed
+    /// twice in one project and project slugs already used, before writing
+    /// anything. Returns the reload that follows.
     @discardableResult
     public func append(projects: [NewProject]) throws -> ReloadResult {
-        try validate(projects, against: lastValid.projects.map(\.name))
+        try validate(projects, against: lastValid.projects.map(\.slug))
         try createIfMissing()
         let existing = try Data(contentsOf: url)
         var addition = Configuration.appendText(projects: projects)
@@ -191,27 +191,30 @@ public final class ConfigurationStore: @unchecked Sendable {
         return reload()
     }
 
-    /// Checks the picker's projects before a write: names not empty and not
-    /// among `existing` or each other, at least one `owner/name` each, none
-    /// twice. Package-wide for the core's preset writer.
+    /// Checks the picker's projects before a write: names not empty, each
+    /// making a slug that isn't among `existing` (slugs) or each other's,
+    /// at least one `owner/name` each, none twice. Package-wide for the
+    /// core's preset writer.
     package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigurationError) {
         var issues: [ConfigurationIssue] = []
-        var names = Set(existing)
+        var slugs = Set(existing)
         for project in projects {
-            if project.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                issues.append(ConfigurationIssue(line: nil, message: "a project's `name` can't be empty"))
-            } else if !names.insert(project.name).inserted {
-                issues.append(ConfigurationIssue(line: nil, message: "project name `\(project.name)` is already used"))
+            if project.title.trimmingCharacters(in: .whitespaces).isEmpty {
+                issues.append(ConfigurationIssue(line: nil, message: "a project's name can't be empty"))
+            } else if project.slug.isEmpty {
+                issues.append(ConfigurationIssue(line: nil, message: "project `\(project.title)` needs a letter or digit in its name, for its slug"))
+            } else if !slugs.insert(project.slug).inserted {
+                issues.append(ConfigurationIssue(line: nil, message: "project slug `\(project.slug)` is already used"))
             }
             if project.repositories.isEmpty {
-                issues.append(ConfigurationIssue(line: nil, message: "project `\(project.name)` needs at least one repository"))
+                issues.append(ConfigurationIssue(line: nil, message: "project `\(project.title)` needs at least one repository"))
             }
             var repositories = Set<String>()
             for repository in project.repositories {
                 if !GitRemote.isRepositorySlug(repository) {
                     issues.append(ConfigurationIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
                 } else if !repositories.insert(repository.lowercased()).inserted {
-                    issues.append(ConfigurationIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.name)))
+                    issues.append(ConfigurationIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.title)))
                 }
             }
         }

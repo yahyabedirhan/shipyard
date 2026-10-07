@@ -10,15 +10,15 @@ private let shopAndBlog = """
     machines = ["netcup-vps"]
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "everything"
+    slug = "everything"
     repositories = ["yahyabedirhan/shop", "yahyabedirhan/blog"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -75,7 +75,7 @@ struct RemotePingFilingTests {
             machines = ["netcup-vps"]
 
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
 
             """)
@@ -117,11 +117,23 @@ struct RemotePingFilingTests {
         #expect(harness.pingTitles("netcup-vps") == ["For a typo"])
     }
 
+    @Test("a remote ping from an older shipyard, naming a project by its old name, files under the project with that title")
+    func byOldName() async throws {
+        let config = shopAndBlog.replacingOccurrences(of: "slug = \"blog\"\n", with: "slug = \"blog\"\ntitle = \"My Blog\"\n")
+        let harness = try await Harness.polled(config, pings: [
+            remotePing("q1", "For the blog", projects: ["My Blog"]),
+        ])
+
+        #expect(harness.pingTitles("blog") == ["For the blog"])
+        #expect(harness.pingTitles("netcup-vps").isEmpty)
+        #expect(harness.section("blog")?.title == "My Blog")
+    }
+
     @Test("a project's pings.show = false hides a remote ping filed there, as it does a local one")
     func hidden() async throws {
         let config = shopAndBlog.replacingOccurrences(
-            of: "name = \"everything\"\n",
-            with: "name = \"everything\"\npings.show = false\n"
+            of: "slug = \"everything\"\n",
+            with: "slug = \"everything\"\npings.show = false\n"
         )
         let harness = try await Harness.polled(config, pings: [remotePing("q1", "Deploy?", repository: "yahyabedirhan/shop")])
 

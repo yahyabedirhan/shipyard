@@ -28,9 +28,11 @@ extension Configuration {
     /// Rejects, with a line and a message: invalid TOML, a value of the wrong
     /// type, an unknown choice (event, author filter, count style…) with the
     /// nearest valid one suggested, a repository that isn't `owner/name`,
-    /// duplicate project names, negative windows, an interval under 30 s, a
-    /// rate-limit share outside 1–50 and an unsupported `version`. Unknown
-    /// keys are warnings, so a newer file doesn't break an older app.
+    /// a project slug that isn't one or is used twice, negative windows, an
+    /// interval under 30 s, a rate-limit share outside 1–50 and an
+    /// unsupported `version`. Unknown keys are warnings, so a newer file
+    /// doesn't break an older app; so are old keys (read as their new
+    /// form) and a file that sets keys without `version`.
     public static func decode(_ text: String) throws(ConfigurationError) -> Decoded {
         let root: TOMLTable
         do {
@@ -84,9 +86,9 @@ final class ConfigurationReader {
         let node = Node(table: root, path: [])
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
-            "version", "refresh-interval-seconds", "launch-at-login", "hide-authors",
+            "version", "refresh-interval", "launch-at-login", "hide-authors",
             "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "banners", "defaults", "projects",
-        ])
+        ], old: ["refresh-interval-seconds"])
 
         if let version = int(node, "version") {
             if version == Configuration.supportedVersion {
@@ -94,12 +96,19 @@ final class ConfigurationReader {
             } else {
                 error("`version` \(version) isn't supported; this shipyard reads version \(Configuration.supportedVersion)", at: node.path + [.key("version")])
             }
+        } else if !node.table.contains(key: "version"), !node.table.keys.isEmpty {
+            warnings.append(ConfigurationIssue(line: nil, message: Self.missingVersionMessage))
         }
-        if let interval = int(node, "refresh-interval-seconds") {
-            if interval < 30 {
-                error("`refresh-interval-seconds` must be at least 30 (got \(interval))", at: node.path + [.key("refresh-interval-seconds")])
+        if let interval = duration(node, "refresh-interval", old: "refresh-interval-seconds", unit: "s") {
+            if interval < Self.shortestRefreshInterval {
+                // Named as the file sets it: the new key's text, else the old key's number.
+                if let text = try? node.table.string(forKey: "refresh-interval") {
+                    error("`refresh-interval` must be at least \"30s\" (got \(Configuration.tomlString(text)))", at: node.path + [.key("refresh-interval")])
+                } else {
+                    error("`refresh-interval-seconds` must be at least 30 (got \(Int(interval)))", at: node.path + [.key("refresh-interval-seconds")])
+                }
             } else {
-                config.refreshIntervalSeconds = interval
+                config.refreshInterval = interval
             }
         }
         if let value = bool(node, "launch-at-login") { config.launchAtLogin = value }
@@ -160,12 +169,13 @@ final class ConfigurationReader {
         }
 
         if let banners = table(node, "banners") {
-            warnUnknownKeys(in: banners, known: ["snooze"])
-            if let snooze = duration(banners, "snooze") {
+            warnUnknownKeys(in: banners, known: ["snooze-duration"], old: ["snooze"])
+            if let snooze = duration(banners, "snooze-duration", renamedFrom: "snooze") {
                 if snooze > 0 {
-                    config.banners.snooze = snooze
+                    config.banners.snoozeDuration = snooze
                 } else {
-                    error("`snooze` must be longer than 0, such as \"1h\" or \"10s\"", at: banners.path + [.key("snooze")])
+                    let key = banners.table.contains(key: "snooze-duration") ? "snooze-duration" : "snooze"
+                    error("`\(key)` must be longer than 0, such as \"1h\" or \"10s\"", at: banners.path + [.key(key)])
                 }
             }
         }
@@ -193,14 +203,32 @@ final class ConfigurationReader {
         if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
         if let projects = tables(node, "projects") {
-            config.projects = projects.compactMap { project($0, defaults: config.defaults) }
-            rejectDuplicateNames(projects)
+            var firstLine: [String: Int?] = [:]
+            for node in projects {
+                guard let project = project(node, defaults: config.defaults) else { continue }
+                // The slug's line, or the old `name`'s it was made from.
+                let line = map.line(for: node.path + [.key(node.table.contains(key: "slug") ? "slug" : "name")])
+                if let first = firstLine[project.slug] {
+                    let earlier = first.map { " (first on line \($0))" } ?? ""
+                    errors.append(ConfigurationIssue(line: line, message: "project slug `\(project.slug)` is used twice\(earlier)"))
+                } else {
+                    firstLine[project.slug] = .some(line)
+                    config.projects.append(project)
+                }
+            }
         }
-        for label in config.remote.machines where config.projects.contains(where: { $0.name == label }) {
-            error("`\(label)` is both a machine in `[remote] machines` and a project's name; rename the project, since a machine's pings list under its label", at: [.key("remote"), .key("machines")])
+        for label in config.remote.machines where config.projects.contains(where: { $0.slug == label || $0.title == label }) {
+            error("`\(label)` is both a machine in `[remote] machines` and a project's slug or title; rename the project, since a machine's pings list under its label", at: [.key("remote"), .key("machines")])
         }
         return config
     }
+
+    /// The warning for a file that sets keys without `version`.
+    static let missingVersionMessage = "the file sets no `version`: add `version = \(Configuration.supportedVersion)` at the top; "
+        + "from version 2, a file without it is an error"
+
+    /// The shortest `refresh-interval`, in seconds.
+    static let shortestRefreshInterval: TimeInterval = 30
 
     /// `[remote] machines`: Herdr labels, trimmed. A label that's empty,
     /// starts with `-` (it would read as a flag of `herdr`), holds a
@@ -226,15 +254,12 @@ final class ConfigurationReader {
 
     private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
         warnUnknownKeys(in: node, known: [
-            "name", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks",
-        ] + Self.arrangementKeys)
-        let name = string(node, "name")
+            "slug", "title", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks",
+        ] + Self.arrangementKeys, old: ["name"])
+        let identity = projectIdentity(node)
+        // How the messages below name the project.
+        let name = identity?.slug ?? (try? node.table.string(forKey: "slug")) ?? (try? node.table.string(forKey: "name"))
         let repositories = strings(node, "repositories")
-        if name == nil && !node.table.contains(key: "name") {
-            error("a project needs a `name`", at: node.path)
-        } else if let name, name.trimmingCharacters(in: .whitespaces).isEmpty {
-            error("a project's `name` can't be empty", at: node.path + [.key("name")])
-        }
         if repositories == nil && !node.table.contains(key: "repositories") {
             error("project `\(name ?? "")` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)", at: node.path)
         } else if let repositories, repositories.isEmpty {
@@ -259,9 +284,10 @@ final class ConfigurationReader {
                 errors.append(ConfigurationIssue(line: line, message: error.message))
             }
         }
-        guard let name, repositories != nil else { return nil }
+        guard let identity, repositories != nil else { return nil }
         let project = Configuration.Project(
-            name: name,
+            slug: identity.slug,
+            title: identity.title,
             repositories: selectors,
             pullRequests: pullRequests(node),
             issues: issues(node),
@@ -278,6 +304,60 @@ final class ConfigurationReader {
             errors.append(ConfigurationIssue(line: line, message: Self.anywhereMessage))
         }
         return project
+    }
+
+    /// A project's `slug` and `title` (the slug when unset); `nil`, with
+    /// the errors recorded, when they don't read. The old `name` still
+    /// reads in their place, with a warning: its title is the name, and its
+    /// slug the name made into one (`Configuration.slug(from:)`).
+    private func projectIdentity(_ node: Node) -> (slug: String, title: String)? {
+        if node.table.contains(key: "name") { return oldProjectName(node) }
+        guard node.table.contains(key: "slug") else {
+            error("a project needs a `slug`, its ID: lowercase letters and digits joined by single hyphens, such as \"e-commerce\"", at: node.path)
+            return nil
+        }
+        guard let slug = string(node, "slug") else { return nil }
+        let validSlug = slug.range(of: Configuration.slugPattern, options: .regularExpression) != nil
+        if !validSlug {
+            let suggestion = Configuration.slug(from: slug)
+            let hint = suggestion.isEmpty ? "" : "; did you mean \(Configuration.tomlString(suggestion))?"
+            error("`slug` must be lowercase letters and digits joined by single hyphens, such as \"e-commerce\" (got \(Configuration.tomlString(slug))\(hint))", at: node.path + [.key("slug")])
+        }
+        var title = slug
+        if node.table.contains(key: "title") {
+            guard let written = string(node, "title") else { return nil }
+            if written.trimmingCharacters(in: .whitespaces).isEmpty {
+                error("a project's `title` can't be empty; leave it out to show the slug", at: node.path + [.key("title")])
+                return nil
+            }
+            title = written
+        }
+        return validSlug ? (slug, title) : nil
+    }
+
+    /// The old `name` of a project, as its slug and title, with a warning
+    /// giving them; with `slug` or `title` beside it, an error on its line.
+    private func oldProjectName(_ node: Node) -> (slug: String, title: String)? {
+        let path = node.path + [.key("name")]
+        if node.table.contains(key: "slug") || node.table.contains(key: "title") {
+            error("`name` is the old form of `slug` and `title`, which this project sets too; delete `name`", at: path)
+            return nil
+        }
+        guard let name = string(node, "name") else { return nil }
+        if name.trimmingCharacters(in: .whitespaces).isEmpty {
+            error("a project's `name` can't be empty", at: path)
+            return nil
+        }
+        let slug = Configuration.slug(from: name)
+        if slug.isEmpty {
+            error("`name` \(Configuration.tomlString(name)) has no letter or digit to make a `slug` of; write `slug` and `title` instead", at: path)
+            return nil
+        }
+        let written = name == slug
+            ? "`slug = \(Configuration.tomlString(slug))`; write that instead"
+            : "`slug = \(Configuration.tomlString(slug))` and `title = \(Configuration.tomlString(name))`; write those instead"
+        warnings.append(ConfigurationIssue(line: map.line(for: path), message: "`name` is the old form: it's read as \(written)"))
+        return (slug, name)
     }
 
     /// `anywhere` finds only pull requests waiting on the user, so a project
@@ -520,27 +600,47 @@ final class ConfigurationReader {
         return valid ? selectors : nil
     }
 
-    /// A closed or finished window (`closed-window = "30m"`), in seconds.
-    /// The old key, a whole number of `unit`s (`closed-window-days = 7`),
-    /// still reads, with a warning naming the new one; both in one table is
-    /// an error on the old key's line.
+    /// A duration (`closed-window = "30m"`), in seconds. The old key, a
+    /// whole number of `unit`s (`closed-window-days = 7`), still reads,
+    /// with a warning naming the new one; both in one table is an error on
+    /// the old key's line.
     private func duration(_ node: Node, _ key: String, old: String, unit: Character) -> TimeInterval? {
-        let window = duration(node, key)
-        guard node.table.contains(key: old) else { return window }
-        let oldPath = node.path + [.key(old)]
-        if node.table.contains(key: key) {
-            error("`\(old)` is the old form of `\(key)`, which this table sets too; delete `\(old)`", at: oldPath)
-            return nil
-        }
-        guard let count = self.window(node, old),
+        guard node.table.contains(key: old) else { return duration(node, key) }
+        guard !setsBoth(node, key, old: old),
+              let count = self.window(node, old),
               let seconds = ConfigurationDuration.units.first(where: { $0.unit == unit })?.seconds
         else { return nil }
-        let written = count == 0 ? "0" : "\(count)\(unit)"
-        warnings.append(ConfigurationIssue(
-            line: map.line(for: oldPath),
-            message: "`\(old)` is the old form: it's read as `\(key) = \(Configuration.tomlString(written))`; write that instead"
-        ))
+        warnOldForm(node, old, readAs: key, value: count == 0 ? "0" : "\(count)\(unit)")
         return TimeInterval(count) * TimeInterval(seconds)
+    }
+
+    /// A duration (`snooze-duration = "1h"`), in seconds, whose old key
+    /// was only named differently (`snooze`): it still reads, with a
+    /// warning naming the new one; both in one table is an error on the
+    /// old key's line.
+    private func duration(_ node: Node, _ key: String, renamedFrom old: String) -> TimeInterval? {
+        guard node.table.contains(key: old) else { return duration(node, key) }
+        guard !setsBoth(node, key, old: old), let value = duration(node, old),
+              let written = try? node.table.string(forKey: old)
+        else { return nil }
+        warnOldForm(node, old, readAs: key, value: written)
+        return value
+    }
+
+    /// Whether the table sets `key` and its old form `old` both, which is
+    /// an error on the old key's line.
+    private func setsBoth(_ node: Node, _ key: String, old: String) -> Bool {
+        guard node.table.contains(key: key) else { return false }
+        error("`\(old)` is the old form of `\(key)`, which this table sets too; delete `\(old)`", at: node.path + [.key(old)])
+        return true
+    }
+
+    /// The warning on an old key, giving the new key and value it's read as.
+    private func warnOldForm(_ node: Node, _ old: String, readAs key: String, value: String) {
+        warnings.append(ConfigurationIssue(
+            line: map.line(for: node.path + [.key(old)]),
+            message: "`\(old)` is the old form: it's read as `\(key) = \(Configuration.tomlString(value))`; write that instead"
+        ))
     }
 
     /// A window written as a whole number and one unit, in seconds; one that
@@ -577,20 +677,6 @@ final class ConfigurationReader {
             return nil
         }
         return value
-    }
-
-    private func rejectDuplicateNames(_ nodes: [Node]) {
-        var firstLine: [String: Int?] = [:]
-        for node in nodes {
-            guard let name = try? node.table.string(forKey: "name") else { continue }
-            let line = map.line(for: node.path + [.key("name")])
-            if let first = firstLine[name] {
-                let earlier = first.map { " (first on line \($0))" } ?? ""
-                errors.append(ConfigurationIssue(line: line, message: "project name `\(name)` is used twice\(earlier)"))
-            } else {
-                firstLine[name] = .some(line)
-            }
-        }
     }
 
     /// Why a project can't list `repository` again (in any letter case).
@@ -702,8 +788,11 @@ final class ConfigurationReader {
 
     // MARK: Recording
 
-    private func warnUnknownKeys(in node: Node, known: [String]) {
-        for key in node.table.keys where !known.contains(key) {
+    /// Warns about each key that's neither `known` nor an `old` form the
+    /// reader still takes; a misspelling is pointed at a `known` key only,
+    /// never at an old one.
+    private func warnUnknownKeys(in node: Node, known: [String], old: [String] = []) {
+        for key in node.table.keys where !known.contains(key) && !old.contains(key) {
             let path = node.path + [.key(key)]
             let hint = Suggestion.nearest(to: key, in: known).map { "; did you mean `\($0)`?" } ?? ""
             warnings.append(ConfigurationIssue(line: map.line(for: path), message: "unknown setting `\(path.dotted)` (ignored\(hint))"))

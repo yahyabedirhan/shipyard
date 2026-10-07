@@ -72,12 +72,14 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
             return inBranch.isEmpty
         }
         if !passes { found.append("\(path): matches none of anyOf") }
-        return
+        // A project's `anyOf` only adds a requirement to its other keywords.
+        guard schema["type"] != nil else { return }
     }
     let type = schema["type"] as? String
     switch value {
     case .object(let object):
-        guard type == "object" else { return found.append("\(path): expected \(type ?? "?"), got a table") }
+        // No `type` (an `anyOf` branch of requirements alone) takes any table.
+        guard type == nil || type == "object" else { return found.append("\(path): expected \(type ?? "?"), got a table") }
         let properties = schema["properties"] as? [String: Any] ?? [:]
         for key in schema["required"] as? [String] ?? [] where object[key] == nil {
             found.append("\(path): missing \(key)")
@@ -209,7 +211,7 @@ struct ConfigSchemaTests {
         // still reads with a warning.
         let deprecated = deprecatedPaths(schema, root: schema)
         #expect(deprecated == [
-            "hide-authors",
+            "hide-authors", "refresh-interval-seconds", "banners.snooze", "projects[].name",
             "defaults.pull-requests.closed-window-days", "defaults.issues.closed-window-days", "defaults.workflow-runs.finished-window-hours",
             "projects[].pull-requests.closed-window-days", "projects[].issues.closed-window-days", "projects[].workflow-runs.finished-window-hours",
         ])
@@ -219,7 +221,14 @@ struct ConfigSchemaTests {
     @Test("the old forms still validate, so taplo passes every file shipyard reads")
     func oldFormsValidate() throws {
         let old = """
+            refresh-interval-seconds = 90
             hide-authors = ["dependabot[bot]"]
+            [banners]
+            snooze = "1h"
+            [[projects]]
+            name = "Review queue"
+            repositories = ["anywhere"]
+            pull-requests = { review-requested = true }
             [defaults.pull-requests]
             closed-window-days = 3
             [defaults.issues]
@@ -252,6 +261,22 @@ struct ConfigSchemaTests {
             let validates = sample.range(of: pattern, options: .regularExpression) != nil
             #expect(reads == validates, "`\(sample)`: the reader says \(reads), the schema \(validates)")
         }
+    }
+
+    @Test("the schema's refresh-interval and slug patterns take exactly what the reader takes")
+    func intervalAndSlugPatterns() throws {
+        let schema = try loadSchema()
+        let properties = try #require(schema["properties"] as? [String: Any])
+        let interval = try #require((properties["refresh-interval"] as? [String: Any])?["pattern"] as? String)
+        let samples = ["30s", "29s", "0", "0s", "45s", "100s", "030s", "1m", "2m", "007m", "1h", "1d", "0m", "2 m", "2min", "-2m", "90"]
+        for sample in samples {
+            let reads = (try? Configuration.decode("refresh-interval = \"\(sample)\"\n")) != nil
+            let validates = sample.range(of: interval, options: .regularExpression) != nil
+            #expect(reads == validates, "`\(sample)`: the reader says \(reads), the schema \(validates)")
+        }
+        let definitions = try #require(schema["definitions"] as? [String: Any])
+        let project = try #require((definitions["project"] as? [String: Any])?["properties"] as? [String: Any])
+        #expect((project["slug"] as? [String: Any])?["pattern"] as? String == Configuration.slugPattern)
     }
 
     @Test("every key in the schema has a description")
@@ -310,6 +335,7 @@ struct ConfigSchemaTests {
     func schemaRejects() throws {
         let schema = try loadSchema()
         let bad = """
+            refresh-interval = "10s"
             refresh-interval-seconds = 10
             colour = "red"
             [rate-limit]
@@ -318,13 +344,23 @@ struct ConfigSchemaTests {
             event = "pr.openned"
             authors = "everyone"
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["not-a-slug", "o/r", "o/r"]
             issues = { closed-window = "-1d", authors = { hide = ["bots2"] } }
+            [[projects]]
+            slug = "Bad Slug"
+            title = ""
+            repositories = ["o/b"]
+            [[projects]]
+            repositories = ["o/c"]
             """
         let found = Set(try violations(bad, schema: schema))
         #expect(found == [
+            ".refresh-interval: 10s doesn't match ^0*([3-9][0-9]|[1-9][0-9]{2,})s$|^0*[1-9][0-9]*[mhd]$",
             ".refresh-interval-seconds: below 30",
+            ".projects[1].slug: Bad Slug doesn't match \(Configuration.slugPattern)",
+            ".projects[1].title:  doesn't match \\S",
+            ".projects[2]: matches none of anyOf",
             ": unknown key colour",
             ".rate-limit.max-share-percent: above 50",
             ".defaults.notifications[0].event: pr.openned not in enum",
