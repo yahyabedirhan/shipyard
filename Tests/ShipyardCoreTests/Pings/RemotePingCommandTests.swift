@@ -126,7 +126,7 @@ struct RemotePingCommandTests {
         try Data("[[projects]\nname = ".utf8).write(to: configURL)
         #expect(shipyard("ping", "Broken config", "--id", "one").status == 0)
 
-        try Data("[[projects]]\nname = \"blog\"\nrepositories = [\"yahyabedirhan/blog\"]\n".utf8).write(to: configURL)
+        try Data("[[projects]]\nslug = \"blog\"\nrepositories = [\"yahyabedirhan/blog\"]\n".utf8).write(to: configURL)
         #expect(shipyard("ping", "Unwatched", "--id", "two", origin: "https://github.com/yahyabedirhan/shop").status == 0)
         #expect(store.ping(id: "two")?.projects == [])
         #expect(store.ping(id: "two")?.repository == "yahyabedirhan/shop")
@@ -274,7 +274,7 @@ struct RemotePingCommandTests {
     @Test("with the Mac's filing a ping is filed against the configuration and never expires")
     func macFiles() throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try Data("[[projects]]\nname = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8).write(to: configURL)
+        try Data("[[projects]]\nslug = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8).write(to: configURL)
 
         #expect(shipyard("ping", "Ready", filing: macFiling, origin: "git@github.com:yahyabedirhan/shop.git", herdrPane: "w1:p3").status == 0)
 

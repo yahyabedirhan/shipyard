@@ -10,7 +10,7 @@ private let viewerAnswer = Harness.viewerAnswer
 private let unauthorized = Harness.unauthorized
 private let withProjects = """
     [[projects]]
-    name = "shipyard"
+    slug = "shipyard"
     repositories = ["yahyabedirhan/shipyard"]
 
     """

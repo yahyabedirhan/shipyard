@@ -10,7 +10,7 @@ private let repository = "yahyabedirhan/shop"
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -18,11 +18,11 @@ private let shop = """
 /// The projects `graphql-pull-requests.json` answers for.
 private let twoProjects = """
     [[projects]]
-    name = "e-commerce"
+    slug = "e-commerce"
     repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
     [[projects]]
-    name = "job-search"
+    slug = "job-search"
     repositories = ["yahyabedirhan/job-search"]
 
     """
@@ -289,11 +289,11 @@ struct AttentionTests {
     func sharedRepositoryCountsOnce() async throws {
         let config = """
             [[projects]]
-            name = "job-search"
+            slug = "job-search"
             repositories = ["yahyabedirhan/job-search"]
 
             [[projects]]
-            name = "archive"
+            slug = "archive"
             repositories = ["yahyabedirhan/job-search", "yahyabedirhan/gone"]
 
             """

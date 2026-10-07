@@ -96,7 +96,7 @@ One known limit, with Herdr 0.9.3: clicking a machine's ping focuses its pane on
 
 ### Notes
 
-Your own notes, kept in Notion, list under each project too: one database per project, titled with the project's name, under a "Projects" page inside a "Shipyard Notes" page. Dictate a note to any agent and it writes it there; the menu lists each project's open notes, newest first, with their numbers (`SHOP-7`) and labels, and clicking one opens it in Notion, as the project's notes count opens its database. The pencil icon on a project's header starts a note there: it creates the project's database the first time, then an empty note, and opens it in Notion for you to type or dictate. Notes never need attention. The app reads and writes notes through [`ntn`](https://developers.notion.com/cli/get-started/overview), Notion's CLI, with ntn's own login, and keeps no Notion token of its own: install ntn (`curl -fsSL https://ntn.dev | bash`), run `ntn login` in Terminal and choose your notes workspace, and check with `ntn doctor` that it's ntn's default workspace. Notes are opt-in: shipyard runs no `ntn` and lists no notes until you connect. **Set up Notion** in the settings menu shows whether ntn is installed and logged in, and the name of its workspace; once it is, **Connect with ntn** lists your notes, and shipyard remembers it across restarts. **Disconnect** there stops it. Once connected, the notes are read every minute and whenever you open the menu, and while ntn is missing or logged out, or its workspace has no Shipyard Notes page, a banner says what to do. `shipyard notes check` reads the workspace the way the app does and reports what's wrong with it. `notes = { show = false }` in a project's block keeps its notes out.
+Your own notes, kept in Notion, list under each project too: one database per project, titled with the project's title, under a "Projects" page inside a "Shipyard Notes" page. Dictate a note to any agent and it writes it there; the menu lists each project's open notes, newest first, with their numbers (`SHOP-7`) and labels, and clicking one opens it in Notion, as the project's notes count opens its database. The pencil icon on a project's header starts a note there: it creates the project's database the first time, then an empty note, and opens it in Notion for you to type or dictate. Notes never need attention. The app reads and writes notes through [`ntn`](https://developers.notion.com/cli/get-started/overview), Notion's CLI, with ntn's own login, and keeps no Notion token of its own: install ntn (`curl -fsSL https://ntn.dev | bash`), run `ntn login` in Terminal and choose your notes workspace, and check with `ntn doctor` that it's ntn's default workspace. Notes are opt-in: shipyard runs no `ntn` and lists no notes until you connect. **Set up Notion** in the settings menu shows whether ntn is installed and logged in, and the name of its workspace; once it is, **Connect with ntn** lists your notes, and shipyard remembers it across restarts. **Disconnect** there stops it. Once connected, the notes are read every minute and whenever you open the menu, and while ntn is missing or logged out, or its workspace has no Shipyard Notes page, a banner says what to do. `shipyard notes check` reads the workspace the way the app does and reports what's wrong with it. `notes = { show = false }` in a project's block keeps its notes out.
 
 ## Examples
 
@@ -105,6 +105,7 @@ Each configuration below produced the screenshot under it, trimmed to the lines 
 The list layout, grouped by repository under subheaders, four rows a group:
 
 ```toml
+version = 1
 [menu]
 layout = "list"
 [defaults]
@@ -114,7 +115,7 @@ show-first = 4
 [defaults.issues]
 show = true
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
@@ -123,6 +124,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 The same file in the tabs layout. The All tab always groups by kind; each project's tab follows its configuration:
 
 ```toml
+version = 1
 [menu]
 layout = "tabs"
 [defaults]
@@ -132,7 +134,7 @@ show-first = 4
 [defaults.issues]
 show = true
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 
@@ -141,6 +143,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 Grouped by date, three rows a group:
 
 ```toml
+version = 1
 [menu]
 layout = "list"
 [defaults]
@@ -150,7 +153,7 @@ show-first = 3
 [defaults.issues]
 show = true
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 ```
 

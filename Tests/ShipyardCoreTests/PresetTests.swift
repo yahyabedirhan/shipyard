@@ -26,7 +26,8 @@ struct PresetTests {
             graphQL: PullRequestsResponse.answer([], reviewSearch: .pullRequests([("someone/else", waiting(5))], total: nil))
         )
         #expect(harness.shipyard.configError == nil)
-        let queue = try #require(harness.section("Review queue"))
+        let queue = try #require(harness.section("review-queue"))
+        #expect(queue.title == "Review queue")
         #expect(queue.groups.map(\.title) == ["someone/else"])
         #expect(queue.groups.map(\.showsHeader) == [true])
 
@@ -36,7 +37,7 @@ struct PresetTests {
         harness.clock.advance(by: 120)
         await harness.shipyard.refresh()
 
-        let refreshed = try #require(harness.section("Review queue"))
+        let refreshed = try #require(harness.section("review-queue"))
         #expect(refreshed.groups.map(\.title) == ["another/place", "someone/else"])
         #expect(harness.notifier.posted.map(\.title) == ["Review queue · Review requested on PR #9"])
     }

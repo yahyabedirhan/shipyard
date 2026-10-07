@@ -299,7 +299,7 @@ public struct RateLimits: Equatable, Sendable {
 /// failed, and the rate limits GitHub reported.
 public struct Snapshot: Equatable, Sendable {
     public var fetchedAt: Date
-    /// Items per project name. A repository in two projects appears in both.
+    /// Items per project slug. A repository in two projects appears in both.
     public var items: [String: [Item]]
     /// Failures per source: a repository (`owner/name` as configured) and
     /// the kind of item that couldn't be fetched from it. A repository GitHub
@@ -322,10 +322,10 @@ public struct Snapshot: Equatable, Sendable {
     /// Why the review search failed, when it did; `reviewRequested` is then
     /// the last set it found.
     public var reviewSearchError: RepositoryError?
-    /// Per project name, the repositories fetched for it (`owner/name`, each
+    /// Per project slug, the repositories fetched for it (`owner/name`, each
     /// once): the ones it names and the ones its groups and wildcards resolved to.
     public var repositories: [String: [String]]
-    /// Per project name, its selectors that couldn't be resolved (an owner
+    /// Per project slug, its selectors that couldn't be resolved (an owner
     /// that doesn't exist or can't be seen, or a failed lookup with no
     /// earlier list), each an error row named after the selector.
     public var selectorErrors: [String: [RepositoryError]]

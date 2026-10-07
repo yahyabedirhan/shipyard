@@ -26,7 +26,7 @@ protocol PanelControlling: AnyObject {
     /// (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`).
     func showMore(_ project: String, kind: String) throws(PanelRefusal)
     /// Selects the tab `name` names in the tabs layout, and returns its
-    /// title (`All`, or the project's name).
+    /// title (`All`, or the project's title).
     func selectTab(_ name: String) throws(PanelRefusal) -> String
     /// Shows the status view `name` names (`github`, `notion`, `skill`,
     /// `cli`) in place of the projects, or the projects again
@@ -61,7 +61,7 @@ final class PanelControl: PanelControlling {
             view: state.openView?.commandName ?? SetupPart.projectsName,
             layout: configuration.menu.layout.rawValue,
             // As `tab` accepts it: only while the menu draws tabs.
-            tab: menu.layout == .tabs ? PanelText.tabTitle(menu.resolved(state.selectedTab)) : nil,
+            tab: menu.layout == .tabs ? menu.tabTitle(menu.resolved(state.selectedTab)) : nil,
             // As `fold` and `tab` accept them, remote machines included.
             projects: menu.projectNames,
             folded: menu.collapsedProjects,
@@ -126,7 +126,7 @@ final class PanelControl: PanelControlling {
         withAnimation(Motion.tab) {
             state.select(tab, from: menu.resolved(state.selectedTab), in: menu.tabs)
         }
-        return PanelText.tabTitle(tab)
+        return menu.tabTitle(tab)
     }
 
     func showView(_ name: String) throws(PanelRefusal) -> String {

@@ -4,7 +4,7 @@ import Foundation
 /// a whole number and one unit, `s`, `m`, `h` or `d` (`"45s"`, `"30m"`,
 /// `"12h"`, `"7d"`), or a bare `"0"`. No fractions, signs, spaces or
 /// combined units. The configuration holds the window in seconds.
-enum WindowDuration {
+enum ConfigurationDuration {
     /// The units a window takes, largest first, and their seconds.
     static let units: [(unit: Character, seconds: Int)] = [("d", 86_400), ("h", 3600), ("m", 60), ("s", 1)]
 

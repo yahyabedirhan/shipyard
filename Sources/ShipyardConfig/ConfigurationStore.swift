@@ -4,14 +4,14 @@ import ShipyardCommand
 /// Owns `config.toml`: where it is, the last valid configuration read from
 /// it, and the error when the latest read failed.
 ///
-/// The core doesn't watch the file. The app's `ConfigWatcher` watches the
+/// The core doesn't watch the file. The app's `ConfigurationWatcher` watches the
 /// directory and calls `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
 /// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
 /// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and the
 /// core's `writePreset(_:projects:)` writes a whole file only over one that
 /// holds nothing but `version`.
-public final class ConfigStore: @unchecked Sendable {
+public final class ConfigurationStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
         /// The file is valid and either differs from the last valid
@@ -20,15 +20,17 @@ public final class ConfigStore: @unchecked Sendable {
         /// The file is valid and means the same as before.
         case unchanged
         /// The file was rejected; the last valid configuration stays.
-        case invalid(ConfigError)
+        case invalid(ConfigurationError)
     }
+
+    public static let fileName = "config.toml"
 
     public let url: URL
 
     private let lock = NSLock()
     private var _lastValid = Configuration()
-    private var _error: ConfigError?
-    private var _warnings: [ConfigIssue] = []
+    private var _error: ConfigurationError?
+    private var _warnings: [ConfigurationIssue] = []
     private var _modified: Date?
     private var _acceptsPreset = true
 
@@ -50,7 +52,7 @@ public final class ConfigStore: @unchecked Sendable {
         }
         return base
             .appendingPathComponent("shipyard", isDirectory: true)
-            .appendingPathComponent("config.toml", isDirectory: false)
+            .appendingPathComponent(fileName, isDirectory: false)
     }
 
     /// The configuration the app runs on: the last file that read cleanly,
@@ -58,10 +60,10 @@ public final class ConfigStore: @unchecked Sendable {
     public var lastValid: Configuration { synchronized { _lastValid } }
 
     /// Why the latest reload failed; `nil` once a reload succeeds.
-    public var error: ConfigError? { synchronized { _error } }
+    public var error: ConfigurationError? { synchronized { _error } }
 
     /// Unknown keys found by the latest reload; empty when it failed.
-    public var warnings: [ConfigIssue] { synchronized { _warnings } }
+    public var warnings: [ConfigurationIssue] { synchronized { _warnings } }
 
     /// The file's modification time as the latest reload read it; `nil`
     /// before any reload and when there was no file.
@@ -79,10 +81,10 @@ public final class ConfigStore: @unchecked Sendable {
     public func reload() -> ReloadResult {
         // Taken before the bytes: a save in between gets a later time and
         // another reload, so the time never claims a newer file than was read.
-        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
-        let outcome: Result<Configuration.Decoded, ConfigError>
+        let modified = ConfigurationCheck.modificationDate(of: url)
+        let outcome: Result<Configuration.Decoded, ConfigurationError>
         var acceptsPreset = false
-        do throws(ConfigError) {
+        do throws(ConfigurationError) {
             let data = try read()
             outcome = .success(try Configuration.decode(data))
             acceptsPreset = String(data: data, encoding: .utf8).map(Configuration.acceptsPreset) ?? false
@@ -110,6 +112,29 @@ public final class ConfigStore: @unchecked Sendable {
         }
     }
 
+    /// The latest reload's verdict, as at `checked`: what the app records
+    /// in `config-status.json` and `shipyard config check` prints.
+    public func check(at checked: Date) -> ConfigurationCheck {
+        synchronized {
+            ConfigurationCheck(
+                name: ConfigurationStore.fileName,
+                checked: checked,
+                file: url,
+                modified: _modified,
+                problems: (_error?.issues ?? []).map(ConfigurationCheck.Issue.init),
+                warnings: _warnings.map(ConfigurationCheck.Issue.init)
+            )
+        }
+    }
+
+    /// Reads the file at `url` as the app does, at `now`, for `shipyard
+    /// config check`: the same verdict without the app.
+    public static func check(_ url: URL, at now: Date) -> ConfigurationCheck {
+        let store = ConfigurationStore(url: url)
+        store.reload()
+        return store.check(at: now)
+    }
+
     /// Creates the file (and its directory) with the commented header and
     /// the `#:schema` line when it's missing: at every start, on the Refresh
     /// button, and before "Open configuration file" opens it. An existing
@@ -125,12 +150,12 @@ public final class ConfigStore: @unchecked Sendable {
     /// Adds `projects` as `[[projects]]` blocks at the end of the file,
     /// creating it (and its directory) with a commented header and the
     /// `#:schema` line when it's missing. Existing text is never rewritten.
-    /// Rejects slugs that aren't `owner/name`, a repository listed twice in
-    /// one project and names already used, before writing anything. Returns
-    /// the reload that follows.
+    /// Rejects repositories that aren't `owner/name`, a repository listed
+    /// twice in one project and project slugs already used, before writing
+    /// anything. Returns the reload that follows.
     @discardableResult
     public func append(projects: [NewProject]) throws -> ReloadResult {
-        try validate(projects, against: lastValid.projects.map(\.name))
+        try validate(projects, against: lastValid.projects.map(\.slug))
         try createIfMissing()
         let existing = try Data(contentsOf: url)
         var addition = Configuration.appendText(projects: projects)
@@ -146,7 +171,7 @@ public final class ConfigStore: @unchecked Sendable {
     /// replaces the key's value, or uncomments the new-file header's
     /// `# [menu]` example, or adds a `[menu]` table before the first table,
     /// leaving every other line and comment as it was. Creates the file
-    /// with its header when it's missing. Throws the file's `ConfigError`
+    /// with its header when it's missing. Throws the file's `ConfigurationError`
     /// when it doesn't read, one saying why when the edit can't be made,
     /// or the file system's error, and then writes nothing. Returns the
     /// reload that follows.
@@ -154,7 +179,7 @@ public final class ConfigStore: @unchecked Sendable {
     public func setLayout(_ layout: MenuLayout) throws -> ReloadResult {
         try createIfMissing()
         guard let text = String(data: try read(), encoding: .utf8) else {
-            throw ConfigError([ConfigIssue(line: nil, message: "the file isn't UTF-8 text")])
+            throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
         let edited = try Configuration.settingLayout(layout, in: text)
         // In place, not by renaming a new file over it: a symlinked file
@@ -166,31 +191,34 @@ public final class ConfigStore: @unchecked Sendable {
         return reload()
     }
 
-    /// Checks the picker's projects before a write: names not empty and not
-    /// among `existing` or each other, at least one `owner/name` each, none
-    /// twice. Package-wide for the core's preset writer.
-    package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigError) {
-        var issues: [ConfigIssue] = []
-        var names = Set(existing)
+    /// Checks the picker's projects before a write: names not empty, each
+    /// making a slug that isn't among `existing` (slugs) or each other's,
+    /// at least one `owner/name` each, none twice. Package-wide for the
+    /// core's preset writer.
+    package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigurationError) {
+        var issues: [ConfigurationIssue] = []
+        var slugs = Set(existing)
         for project in projects {
-            if project.name.trimmingCharacters(in: .whitespaces).isEmpty {
-                issues.append(ConfigIssue(line: nil, message: "a project's `name` can't be empty"))
-            } else if !names.insert(project.name).inserted {
-                issues.append(ConfigIssue(line: nil, message: "project name `\(project.name)` is already used"))
+            if project.title.trimmingCharacters(in: .whitespaces).isEmpty {
+                issues.append(ConfigurationIssue(line: nil, message: "a project's name can't be empty"))
+            } else if project.slug.isEmpty {
+                issues.append(ConfigurationIssue(line: nil, message: "project `\(project.title)` needs a letter or digit in its name, for its slug"))
+            } else if !slugs.insert(project.slug).inserted {
+                issues.append(ConfigurationIssue(line: nil, message: "project slug `\(project.slug)` is already used"))
             }
             if project.repositories.isEmpty {
-                issues.append(ConfigIssue(line: nil, message: "project `\(project.name)` needs at least one repository"))
+                issues.append(ConfigurationIssue(line: nil, message: "project `\(project.title)` needs at least one repository"))
             }
             var repositories = Set<String>()
             for repository in project.repositories {
                 if !GitRemote.isRepositorySlug(repository) {
-                    issues.append(ConfigIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
+                    issues.append(ConfigurationIssue(line: nil, message: "repository `\(repository)` isn't `owner/name`"))
                 } else if !repositories.insert(repository.lowercased()).inserted {
-                    issues.append(ConfigIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.name)))
+                    issues.append(ConfigurationIssue(line: nil, message: ConfigurationReader.duplicateRepositoryMessage(repository, project: project.title)))
                 }
             }
         }
-        if !issues.isEmpty { throw ConfigError(issues) }
+        if !issues.isEmpty { throw ConfigurationError(issues) }
     }
 
     private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
@@ -201,12 +229,12 @@ public final class ConfigStore: @unchecked Sendable {
 
     /// The file's bytes; a missing file reads as empty. Package-wide for
     /// the core's preset writer.
-    package func read() throws(ConfigError) -> Data {
+    package func read() throws(ConfigurationError) -> Data {
         guard FileManager.default.fileExists(atPath: url.path) else { return Data() }
         do {
             return try Data(contentsOf: url)
         } catch {
-            throw ConfigError([ConfigIssue(line: nil, message: "can't read \(url.path): \(error.localizedDescription)")])
+            throw ConfigurationError([ConfigurationIssue(line: nil, message: "can't read \(url.path): \(error.localizedDescription)")])
         }
     }
 }
@@ -215,10 +243,16 @@ extension Configuration {
     /// Whether a preset may replace `text`: it reads, and its only live key
     /// is `version`, as in the commented header the app creates. Comments
     /// and blank lines don't count; any table, even an empty one, does.
-    /// `ConfigStore.reload()` records it, and the core's preset writer
+    /// `ConfigurationStore.reload()` records it, and the core's preset writer
     /// checks it again before writing.
     package static func acceptsPreset(_ text: String) -> Bool {
         guard (try? decode(text)) != nil else { return false }
         return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && $0.path == [.key("version")] }
+    }
+}
+
+extension ConfigurationCheck.Issue {
+    public init(_ issue: ConfigurationIssue) {
+        self.init(line: issue.line, message: issue.message)
     }
 }

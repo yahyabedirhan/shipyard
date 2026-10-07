@@ -6,7 +6,7 @@ import Testing
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -88,7 +88,7 @@ struct NoticeOptionsTests {
 
     @Test("withdrawing an id no notice was shown under is no error, and needs no project or rules")
     func withdrawUnknown() async throws {
-        let harness = try await app(#"[[projects]]"# + "\nname = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\nnotifications = []\n")
+        let harness = try await app(#"[[projects]]"# + "\nslug = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\nnotifications = []\n")
 
         #expect(await harness.shipyard.receive(.withdraw(id: "never")) == .shown)
         #expect(harness.notifier.removed == ["agent.notice never"])

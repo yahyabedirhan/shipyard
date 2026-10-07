@@ -38,7 +38,8 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
 
 1. Read the whole file: the user writes comments in it and edits it by hand. Change or add only the lines the request needs, keeping every comment, blank line and the existing order.
 2. Put what you add where TOML reads it:
-   - A top-level key (`refresh-interval-seconds`, `launch-at-login`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
+   - A top-level key (`refresh-interval`, `launch-at-login`, …) goes **above the first `[table]` header**: below one, TOML reads it as a key of that table.
+   - Keep `version = 1` at the top. A file that sets keys without it still reads, with a warning; a later version will reject it.
    - A table (`[menu]`, `[menu-bar]`, `[rate-limit]`, `[attention]`, `[defaults.issues]`, …) goes **above the first `[[projects]]` block**, once: when the table already exists, add the key to it. A table header written twice is invalid TOML.
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
@@ -51,7 +52,7 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    version = 1
    ```
 
-4. Check the edit (see Checking an edit). It is done when `taplo check` exits 0, the rules it can't check hold, and the app's record says `"accepted": true` for your save.
+4. Run `shipyard config check` after each edit, then check the rest (see Checking an edit). It is done when `shipyard config check` exits 0, `taplo check` exits 0, and the app's record says `"accepted": true` for your save.
 
 ## Keys and defaults
 
@@ -60,10 +61,12 @@ Top level:
 | Key | Default | Allowed |
 |---|---|---|
 | `version` | `1` | only `1` |
-| `refresh-interval-seconds` | `120` | whole number, at least `30`; a floor the app stretches to stay within its rate-limit share |
+| `refresh-interval` | `"2m"` | a window (below), at least `"30s"`: how often the app refreshes; a floor it stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
 
 `hide-authors` (a top-level list of logins) is the old way to hide authors. The app still reads it, as a `hide` in each kind's defaults, with a warning; replace it with `authors` (see Whose items).
+
+`refresh-interval-seconds` (a whole number of seconds) is the old form of `refresh-interval`. The app still reads it, with a warning that gives the new key: replace `refresh-interval-seconds = 90` with `refresh-interval = "90s"`. The two together are an error.
 
 Tables:
 
@@ -79,10 +82,10 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
-| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's name |
+| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's slug or title |
 | `[notices] listen` | `false` | whether the app takes notices (`shipyard notify`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
 | `[notices] port` | `47420` | the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
-| `[banners] snooze` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back |
+| `[banners] snooze-duration` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back. `[banners] snooze` is its old name: the app still reads it, with a warning; rename it to `snooze-duration` |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
@@ -105,7 +108,7 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `workflow-runs.authors` | `{ show = [], hide = [] }` | whose runs are listed (a run's author is the account that started it) |
 | `pings.show` | `true` | boolean; list the pings agents send with `shipyard ping`, each under the projects that watch its repository, or the one project it names. Pings take no `states`, `authors`, `drafts` or `review-requested`: setting one is an error |
 | `pings.seen-window` | `"24h"` | a window: how long a seen ping stays listed, counted from when it was seen; an unseen ping stays until it's seen. A seen ping leaves within one refresh of its window passing, and is deleted |
-| `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page's "Projects" page, matched by the project's exact name. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion, and the header's notes count opens the project's database. The project's header has a new-note icon that creates an empty note in its database (creating the database first, and the Projects page, when there is none) and opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads and writes them through `ntn`, Notion's CLI, with ntn's own login, every minute and when the menu opens; it keeps no Notion token of its own. Nothing lists, and no `ntn` runs, until the user presses **Connect with ntn** in the settings menu's **Set up Notion** view. Once connected, while `ntn` isn't installed or isn't logged in, or ntn's default workspace has no Shipyard Notes page, no notes list and a banner says what to do, and the new-note icon hides until `ntn` is installed and logged in (see the notes reference's Setting up ntn). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
+| `notes.show` | `true` | boolean; list the user's open notes from Notion, newest first, in a "Notes" group: the notes in the project's database under the "Shipyard Notes" page's "Projects" page, matched by the project's exact title. Each row shows its number with its prefix (`SHOP-7`), its title (or its body's first line) and its labels; clicking it opens it in Notion, and the header's notes count opens the project's database. The project's header has a new-note icon that creates an empty note in its database (creating the database first, and the Projects page, when there is none) and opens it in Notion. Notes never need attention, so they add nothing to any count. A project without a database lists none. The app reads and writes them through `ntn`, Notion's CLI, with ntn's own login, every minute and when the menu opens; it keeps no Notion token of its own. Nothing lists, and no `ntn` runs, until the user presses **Connect with ntn** in the settings menu's **Set up Notion** view. Once connected, while `ntn` isn't installed or isn't logged in, or ntn's default workspace has no Shipyard Notes page, no notes list and a banner says what to do, and the new-note icon hides until `ntn` is installed and logged in (see the notes reference's Setting up ntn). Notes take only `show`: `states`, `authors`, `drafts`, `review-requested` or `seen-window` is an error |
 | `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
@@ -134,12 +137,15 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 
 | Key | Required | Allowed |
 |---|---|---|
-| `name` | yes | non-empty, unique across projects; the section's title |
+| `slug` | yes | the project's ID, unique across projects: lowercase letters and digits joined by single hyphens, such as `"e-commerce"`. `--project`, `panel fold` and `panel tab` take it |
+| `title` | no | the text the menu shows for the project, its section's and its tab's title, such as `"E-commerce"`; unset, the slug |
 | `repositories` | yes | at least one repository selector: `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere` (see Which repositories); no URLs |
 | `pull-requests`, `issues`, `workflow-runs`, `pings`, `notes` | no | inline tables with the keys above |
 | `group-by`, `subsections`, `sort-by`, `show-first` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
+
+A `[[projects]]` block's `name` is the old form of `slug` and `title`. The app still reads it, with a warning that gives both: the title is the name, and the slug is the name in lowercase, with each run of other characters changed to one hyphen (`name = "Review queue"` reads as `slug = "review-queue"` and `title = "Review queue"`). Replace `name` with the two keys; `name` beside `slug` or `title` is an error.
 
 ## Overrides
 
@@ -218,6 +224,20 @@ Older files write a rule's `authors` as one string: `"any"`, `"me"`, `"others"` 
 
 ## Checking an edit
 
+**The command.** Run `shipyard config check` after each edit. It reads the file as the app reads it, without the app, and also reads the command's own `cli.toml` when there is one:
+
+```sh
+shipyard config check; echo "config check exit status: $?"
+```
+
+```text
+/Users/me/.config/shipyard/config.toml: rejected
+  problem: config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?)
+/Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
+```
+
+Exit status 0 means every file is accepted: fix each `warning` line anyway, usually a misspelled key. Exit status 1 means a file has a `problem`: fix each one at its line and run the command again. `shipyard config check --json` prints each file's result under its name (`config.toml`, `cli.toml`) in the same fields as the app's record below, so you can compare them. It checks the files on disk, not what the app runs on: the app's record says whether the app took your save.
+
 **The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file and print its exit status; it finds the schema through the `#:schema` line:
 
 ```sh
@@ -226,9 +246,9 @@ taplo check ~/.config/shipyard/config.toml; echo "taplo exit status: $?"
 
 Exit status 0 is a pass; anything else is a fail, and the lines above it say why. Don't pipe the output through `tail`, `grep` or `head`: on success Taplo prints only an INFO line, and a pipe hides the exit status. Without Taplo installed, run `npx -y @taplo/cli check <file>` the same way, or `brew install taplo`. When the file has no `#:schema` line, or its schema URL can't be fetched, pass `--schema <url>` with the schema URL above (a local copy works as `file://<absolute path>`). The schema is stricter than the app about unknown keys: it rejects what the app would only warn about and ignore, so fix those too.
 
-The schema can't check three rules; check them by reading the file:
+The schema can't check three rules; `shipyard config check` and the app's record catch them, or check them by reading the file:
 
-- Every project `name` is used once.
+- Every project `slug` is used once.
 - A project lists each repository, wildcard and group once, ignoring case (`owner/name` and `Owner/Name` are the same repository).
 - Top-level keys sit above the first `[table]` header.
 
@@ -265,11 +285,11 @@ The record also catches what only the app checks, including the three rules abov
 
 ## Worked requests
 
-**"Watch this repo in shipyard."** Take the `owner/name` slug from the repository's `origin` remote. If a project already lists it, say so and stop. Otherwise append a block named after the repository, unless the user names it:
+**"Watch this repo in shipyard."** Take the `owner/name` slug from the repository's `origin` remote. If a project already lists it, say so and stop. Otherwise append a block. Its `slug` comes from the repository's name, the part after `/`: in lowercase, each run of other characters one hyphen (`My_Shop` → `my-shop`). When another project already has that slug, make it from the whole `owner/name` the same way (`yahyabedirhan-shipyard`). When the user gives the project a name of their own, make the slug from their name instead, and add their name as the `title` unless it's already the slug (`"My Shop"` → `slug = "my-shop"`, `title = "My Shop"`):
 
 ```toml
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 ```
 
@@ -277,7 +297,7 @@ repositories = ["yahyabedirhan/shipyard"]
 
 ```toml
 [[projects]]
-name = "e-commerce"
+slug = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 ```
 
@@ -285,7 +305,7 @@ repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-b
 
 ```toml
 [[projects]]
-name = "mine"
+slug = "mine"
 repositories = ["owned"]
 ```
 
@@ -293,7 +313,7 @@ repositories = ["owned"]
 
 ```toml
 [[projects]]
-name = "my-org"
+slug = "my-org"
 repositories = ["my-org/*", "yahyabedirhan/shipyard"]
 ```
 
@@ -301,7 +321,7 @@ repositories = ["my-org/*", "yahyabedirhan/shipyard"]
 
 ```toml
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 notifications = [
   { event = "pr.opened", authors = ["others"] },
@@ -333,7 +353,7 @@ closed-window = "30m"
 
 ```toml
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 pull-requests = { authors = { hide = ["me", "bots"] } }
 issues = { show = true, authors = { hide = ["me", "bots"] } }
@@ -345,7 +365,8 @@ For only one account's items (say a project for dependency updates), use `show` 
 
 ```toml
 [[projects]]
-name = "shipyard reviews"
+slug = "shipyard-reviews"
+title = "shipyard reviews"
 repositories = ["yahyabedirhan/shipyard"]
 pull-requests = { review-requested = true }
 ```
@@ -354,7 +375,8 @@ pull-requests = { review-requested = true }
 
 ```toml
 [[projects]]
-name = "review queue"
+slug = "review-queue"
+title = "Review queue"
 repositories = ["anywhere"]
 pull-requests = { review-requested = true }
 group-by = "repository"
@@ -368,7 +390,7 @@ notifications = [
 
 ```toml
 [[projects]]
-name = "contributions"
+slug = "contributions"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 group-by = "repository"
 subsections = true
@@ -380,7 +402,7 @@ For the most recently opened first, add `sort-by = "created"`; for what changed 
 
 ```toml
 [[projects]]
-name = "contributions"
+slug = "contributions"
 repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 show-first = 5
 ```
@@ -389,7 +411,7 @@ show-first = 5
 
 ```toml
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 pull-requests = { states = ["open"] }
 issues = { show = true, states = ["open"] }
@@ -408,7 +430,7 @@ layout = "tabs"
 
 ```toml
 [[projects]]
-name = "e-commerce"
+slug = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 issues = { show = true }
 ```
@@ -424,7 +446,7 @@ show = true
 
 ```toml
 [[projects]]
-name = "shipyard"
+slug = "shipyard"
 repositories = ["yahyabedirhan/shipyard"]
 workflow-runs = { show = true }
 notifications = [
@@ -525,7 +547,7 @@ shipyard ping withdraw <id>
 | `--app <bundle id or name>` | clicking it brings the app forward, by name (`"Claude"`) or bundle id (`com.anthropic.claudefordesktop`) |
 | `--herdr [<id>]` | clicking it focuses a Herdr tab. Alone, your own pane's tab (from `HERDR_PANE_ID`, so only inside Herdr); or a tab or pane id as Herdr prints them, such as `w1:t2` or `w1:p3`. The argument after `--herdr` is its id only when it has that shape |
 | `--repo <owner/name>` | file the ping by this repository instead of the working folder's |
-| `--project <name>` | file it under this one project, by its `name` in `config.toml` |
+| `--project <name>` | file it under this one project, by its `slug` in `config.toml`, or else its `title` |
 | `--` | ends the flags: everything after it is the title, even `withdraw`, `list` or a word starting with `--` |
 
 - **One action at most.** With none, clicking the ping only marks it seen. When an action fails (the pane closed, no such app), the ping stays unseen and its row says why.
@@ -599,9 +621,9 @@ shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>] | release
 | `app status` | whether shipyard runs, and what its panel shows | the status (below) |
 | `app status --json` | the same, as one JSON object on one line | the status as JSON |
 | `panel open`, `panel close` | opens or closes the menu bar icon's panel, waiting until it has. For 30 seconds after the user closes the panel (by clicking elsewhere too), `panel open` is refused with the time it can open it again; wait for that time and don't retry sooner | `panel open`, `panel closed` |
-| `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `name` in `config.toml` | `folded <project>`, `unfolded <project>` |
+| `panel fold <project>`, `panel unfold <project>` | collapses or expands a project's section, by its `slug` in `config.toml`, or else its `title` | `folded <project>`, `unfolded <project>` |
 | `panel show-more <project> <kind>` | shows every row of the project's group of one kind past its `show-first` cap, until the panel closes; `<kind>` is `pull-requests`, `issues`, `workflow-runs`, `pings` or `notes` | `showing all <kind> in <project>` |
-| `panel tab <name>` | selects a tab of the tabs layout: a project's name, or `All` | `showing <name>` |
+| `panel tab <name>` | selects a tab of the tabs layout: a project's slug or title, or `All` | `showing <title>` |
 | `panel view <name>` | shows a status view in place of the projects, as the settings menu's items do: `github`, `notion`, `skill` or `cli`. `github` shows the signed-in account (`@login`) and how it connected (the GitHub CLI `gh` or Sign in with GitHub), or the sign-in steps when signed out, so a screenshot of it may show the user's login. `projects` shows the projects again, as **‹ Back** does. Closing the panel shows the projects again too | `showing <title>` (`Shipyard CLI`), or `showing projects` |
 | `screenshot <file.png>` | saves the panel as it looks; a closed panel is rendered off screen without opening it (said on standard error), so `panel open` first for the panel as drawn on screen; a relative path is taken from the folder you run in | the file's absolute path |
 | `--appearance light` or `dark` | draws the panel in that appearance for the screenshot, then goes back to the Mac's | |
@@ -696,7 +718,7 @@ shipyard panel open
 shipyard panel close
 ```
 
-**"Collapse the blog project."** By its `name`; unfold it the same way:
+**"Collapse the blog project."** By its `slug`; unfold it the same way:
 
 ```sh
 shipyard panel fold blog
@@ -755,7 +777,7 @@ cat > ~/shipyard-demo/shipyard/config.toml <<'TOML'
 version = 1
 
 [[projects]]
-name = "swift"
+slug = "swift"
 repositories = ["swiftlang/swift"]
 TOML
 shipyard app open --demo ~/shipyard-demo

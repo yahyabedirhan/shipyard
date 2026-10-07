@@ -122,7 +122,7 @@ struct PresetPicker: View {
                 // for the list; a refusal empties `presets`, and the panel
                 // shows the plain picker.
                 try await shipyard.choosePreset(preset, projects: choice.projects(from: []))
-            } catch let error as ConfigError {
+            } catch let error as ConfigurationError {
                 writeError = error.description
             } catch {
                 writeError = PanelText.couldNotWrite(error.localizedDescription)

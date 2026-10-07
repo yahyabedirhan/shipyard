@@ -90,17 +90,17 @@ public final class Shipyard {
     /// read from the file, so a remote ping whose machine it doesn't name
     /// has left (`forgetLeftPings`).
     private var followsConfiguredMachines = false
-    /// Each project's open notes, by project name, as Notion last listed
+    /// Each project's open notes, by project slug, as Notion last listed
     /// them; a project whose read failed keeps its last ones.
     public private(set) var notes: [String: [Note]] = [:]
-    /// Why each project's notes couldn't be read, by project name, for its
+    /// Why each project's notes couldn't be read, by project slug, for its
     /// error row; empty once a read works.
     public private(set) var noteErrors: [String: String] = [:]
     /// Why the last read could list no notes at all: no `ntn`, ntn logged
     /// out, or no "Shipyard Notes" page in ntn's workspace. The notes
     /// banner says so rather than listing none; `nil` once a read works.
     public private(set) var notesBlocked: NotesNotice?
-    /// Each project's notes database in Notion, by project name, as the
+    /// Each project's notes database in Notion, by project slug, as the
     /// last read matched them: its header's notes count opens it.
     public private(set) var noteDatabases: [String: URL] = [:]
     /// The projects the new-note icon is starting a note in now.
@@ -115,7 +115,7 @@ public final class Shipyard {
     /// Bumped whenever a check begins, so an older check finishing late
     /// doesn't overwrite a newer one's answer.
     @ObservationIgnored private var notionCheck = 0
-    /// Why the new-note icon couldn't start a note, by project name, for
+    /// Why the new-note icon couldn't start a note, by project slug, for
     /// its error row; cleared when the menu opens again or a note starts.
     public private(set) var newNoteErrors: [String: String] = [:]
     /// How often the notes are read, apart from the refresh; opening the
@@ -128,13 +128,13 @@ public final class Shipyard {
     /// Why the configuration file was rejected, for the panel's banner;
     /// `nil` while it reads cleanly. Shipyard keeps running on the last
     /// valid configuration meanwhile.
-    public private(set) var configError: ConfigError? {
+    public private(set) var configError: ConfigurationError? {
         didSet { followBannerConditions() }
     }
     /// Unknown settings the last clean read ignored, and old forms it read,
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
-    public private(set) var configWarnings: [ConfigIssue] = [] {
+    public private(set) var configWarnings: [ConfigurationIssue] = [] {
         didSet { followBannerConditions() }
     }
     /// Whether macOS lets shipyard post notifications, as the app's
@@ -189,7 +189,7 @@ public final class Shipyard {
     /// refreshing (the menu model says why).
     public var canRefreshNow: Bool { budget.canRefresh(at: clock.now) }
 
-    public let configStore: ConfigStore
+    public let configStore: ConfigurationStore
     /// Seen items and collapsed projects, in `state.json`.
     public let appStateStore: AppStateStore
     /// The verdict on the configuration file after each reload, in
@@ -254,7 +254,7 @@ public final class Shipyard {
     @ObservationIgnored private var forceResolve = true
 
     public init(
-        configStore: ConfigStore,
+        configStore: ConfigurationStore,
         appStateStore: AppStateStore,
         configStatusStore: ConfigStatusStore,
         pingStore: PingStore,
@@ -321,7 +321,7 @@ public final class Shipyard {
         // For the CLI, beside `repositories.json`: which config.toml this
         // app reads, whatever the agent's shell says. A file that can't be
         // written leaves the CLI to its own lookup.
-        try? ConfigLocation.record(configStore.url, in: repositoriesStore.directory)
+        try? ConfigurationLocation.record(configStore.url, in: repositoriesStore.directory)
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
@@ -499,7 +499,7 @@ public final class Shipyard {
     /// (the store keeps the last valid configuration and its error). The
     /// app's configuration watcher calls this.
     @discardableResult
-    public func reloadConfiguration() async -> ConfigStore.ReloadResult {
+    public func reloadConfiguration() async -> ConfigurationStore.ReloadResult {
         let result = configStore.reload()
         await follow(result)
         return result
@@ -508,7 +508,7 @@ public final class Shipyard {
     /// Moves the phase with a reload's result, rebuilds the menu from the
     /// last snapshot and refreshes (or stops the timer). Only a valid change
     /// moves anything.
-    private func follow(_ result: ConfigStore.ReloadResult) async {
+    private func follow(_ result: ConfigurationStore.ReloadResult) async {
         publishConfigStatus()
         if case .changed(let configuration) = result {
             // New selectors, or `archived` and `forks` changed: look them up now.
@@ -544,13 +544,7 @@ public final class Shipyard {
         let notices = configStore.lastValid.notices
         let port = notices.listen ? notices.port : nil
         if noticeListenerPort != port { noticeListenerPort = port }
-        configStatusStore.record(ConfigStatus(
-            checked: clock.now,
-            config: configStore.url,
-            configModified: configStore.modified,
-            error: configError,
-            warnings: configWarnings
-        ))
+        configStatusStore.record(configStore.check(at: clock.now))
     }
 
     /// Registers or removes the login item to match `launch-at-login` in
@@ -599,11 +593,11 @@ public final class Shipyard {
     /// `[[projects]]` block each, appended after whatever is there, and
     /// follows the reload that comes after: with projects, the phase moves
     /// to `ready` and the first refresh runs, without a restart. Throws a
-    /// `ConfigError` (and writes nothing) for an empty name, a name already
+    /// `ConfigurationError` (and writes nothing) for an empty name, a name already
     /// used, a project without repositories or a slug that isn't
     /// `owner/name`; throws the file system's error when it can't write.
     @discardableResult
-    public func addProjects(_ projects: [NewProject]) async throws -> ConfigStore.ReloadResult {
+    public func addProjects(_ projects: [NewProject]) async throws -> ConfigurationStore.ReloadResult {
         let result = try configStore.append(projects: projects)
         await follow(result)
         return result
@@ -613,16 +607,16 @@ public final class Shipyard {
     /// `projects` as the repositories picked for it (none for
     /// `review-queue`, or for `incoming-contributions` watching `owned`), and
     /// follows the reload like `addProjects`: the phase moves to `ready` and
-    /// the first refresh runs, without a restart. Throws a `ConfigError`
+    /// the first refresh runs, without a restart. Throws a `ConfigurationError`
     /// (and writes nothing) when the file already holds settings besides
     /// `version`, which also stops offering presets, or when a project is
     /// invalid; throws the file system's error when it can't write.
     @discardableResult
-    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigStore.ReloadResult {
-        let result: ConfigStore.ReloadResult
+    public func choosePreset(_ preset: Preset, projects: [NewProject] = []) async throws -> ConfigurationStore.ReloadResult {
+        let result: ConfigurationStore.ReloadResult
         do {
             result = try configStore.writePreset(preset, projects: projects)
-        } catch let error as ConfigError where error == Configuration.presetRefused {
+        } catch let error as ConfigurationError where error == Configuration.presetRefused {
             // The file changed since the last reload: read it, so the panel
             // shows the plain picker.
             await reloadConfiguration()
@@ -644,10 +638,10 @@ public final class Shipyard {
         let next = configStore.lastValid.menu.layout.next
         do {
             await follow(try configStore.setLayout(next))
-        } catch let error as ConfigError {
+        } catch let error as ConfigurationError {
             configError = error
         } catch {
-            configError = ConfigError([ConfigIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
+            configError = ConfigurationError([ConfigurationIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
         }
     }
 
@@ -732,7 +726,7 @@ public final class Shipyard {
             let repositories = resolved.mapValues(\.repositories)
             resolvedRepositories = repositories
             try? repositoriesStore.record(repositories)
-            let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
+            let projects = configured.map { $0.resolved(by: resolved[$0.slug]) }
             let snapshot = try await request { try await $0.fetch(projects: configured, resolved: resolved, at: now) }
             guard current == session else { return }
             self.snapshot = snapshot
@@ -842,7 +836,7 @@ public final class Shipyard {
         state: inout AppState,
         at now: Date
     ) -> [PostedNotification] {
-        let settings = Dictionary(projects.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+        let settings = Dictionary(projects.map { ($0.slug, $0) }, uniquingKeysWith: { first, _ in first })
         let listed = listings.mapValues { Set($0.map(\.id)) }
         var byID: [String: [Event]] = [:]
         var order: [String] = []
@@ -861,7 +855,12 @@ public final class Shipyard {
             let selected = filed.first { event in
                 settings[event.project].map { NotificationRules.shouldNotify(event, settings: $0, viewer: viewer) } ?? false
             }
-            if let selected { notifications.append(NotificationRules.notification(for: selected)) }
+            if let selected {
+                var notification = NotificationRules.notification(for: selected)
+                // Titled by the project's title; the event knows its slug.
+                notification.project = settings[selected.project]?.title ?? selected.project
+                notifications.append(notification)
+            }
             if unfiled && selected == nil {
                 state.notified.passOverUnfiled(first, at: now)
             } else {
@@ -875,7 +874,7 @@ public final class Shipyard {
     private func nextDelay() -> RefreshDelay {
         let configuration = configStore.lastValid
         return budget.nextDelay(
-            configured: TimeInterval(configuration.refreshIntervalSeconds),
+            configured: configuration.refreshInterval,
             sharePercent: configuration.rateLimit.maxSharePercent,
             at: clock.now
         )
@@ -908,7 +907,7 @@ public final class Shipyard {
         }
         let delay = publishRateStatus()
         var seconds = delay.seconds(from: clock.now)
-        if delay.isPaused { seconds = min(seconds, TimeInterval(configStore.lastValid.refreshIntervalSeconds)) }
+        if delay.isPaused { seconds = min(seconds, configStore.lastValid.refreshInterval) }
         timer.arm(after: seconds) { [weak self] in
             await self?.refresh()
         }
@@ -1315,10 +1314,14 @@ public final class Shipyard {
 
     /// The listed pings, the remote ones filed against `configuration` and
     /// the repositories last resolved (`ProjectFiling.filed(remote:)`), as
-    /// the CLI files a local one when it's sent.
+    /// the CLI files a local one when it's sent, and each one's projects
+    /// named by slug (`ProjectFiling.named`).
     private func filedPings(_ configuration: Configuration) -> [Ping] {
         let remotePings = appStateStore.state.remotePings.apply(to: remote.pings)
-        guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else { return pings + remotePings }
+        let pings = pings.map { ProjectFiling.named($0, configuration: configuration) }
+        guard remotePings.contains(where: { $0.projects.isEmpty && $0.repository != nil }) else {
+            return pings + remotePings.map { ProjectFiling.named($0, configuration: configuration) }
+        }
         let resolved = resolvedRepositories ?? repositoriesStore.load()
         resolvedRepositories = resolved
         return pings + remotePings.map { ProjectFiling.filed(remote: $0, configuration: configuration, resolved: resolved) }
@@ -1330,7 +1333,7 @@ public final class Shipyard {
     /// (`numberPings`).
     private func listings(for projects: [ProjectSettings], in snapshot: Snapshot?, configuration: Configuration) -> [String: [Item]] {
         let pings = filedPings(configuration)
-        numberPings(pings, projects: projects.map(\.name), configuration: configuration)
+        numberPings(pings, projects: projects.map(\.slug), configuration: configuration)
         return Listing.listings(
             for: projects,
             in: snapshot,
@@ -1586,7 +1589,7 @@ public final class Shipyard {
         guard ping.seen != nil else { return false }
         let names = ping.machine != nil && ping.projects.isEmpty ? [ping.machine ?? ""] : ping.projects
         let windows = names.map { name in
-            configuration.projects.first { $0.name == name }
+            configuration.project(named: name)
                 .map { configuration.settings(for: $0).pings.seenWindow }
                 ?? configuration.defaults.pings.seenWindow
         }
@@ -1634,7 +1637,8 @@ public final class Shipyard {
         startingNotes.insert(project)
         newNoteErrors[project] = nil
         rebuildMenu(configStore.lastValid)
-        let result = await notesReader.startNote(in: project, client: NotionClient(transport: notionRoute))
+        let title = configStore.lastValid.projects.first { $0.slug == project }?.title ?? project
+        let result = await notesReader.startNote(in: project, titled: title, client: NotionClient(transport: notionRoute))
         startingNotes.remove(project)
         switch result {
         case .success(let url):
@@ -1687,7 +1691,8 @@ public final class Shipyard {
     public func checkNotes() async -> NotesCheckReport? {
         guard readsNotes, let notionRoute else { return nil }
         let configuration = configStore.lastValid
-        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
+        // Notion knows a project by its database's title: the project's title.
+        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.title)
         return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
 
@@ -1764,10 +1769,11 @@ public final class Shipyard {
     private func readNotes() async {
         guard readsNotes, let notionRoute else { return }
         let configuration = configStore.lastValid
-        let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.name)
-        let reading = projects.isEmpty
+        let shown = configuration.projects.filter { configuration.settings(for: $0).notes.show }
+        let projects = shown.map(\.slug)
+        let reading = shown.isEmpty
             ? NotesReading.read([:])
-            : await notesReader.read(projects: projects, client: NotionClient(transport: notionRoute))
+            : await notesReader.read(projects: shown.map { ($0.slug, $0.title) }, client: NotionClient(transport: notionRoute))
         // Disconnected while ntn answered: what it read isn't listed.
         guard readsNotes else { return }
         var read: [String: [Note]] = [:]
@@ -1946,7 +1952,7 @@ public final class Shipyard {
     public func dismissBanner(_ key: String) {
         let now = clock.now
         guard banners(at: now).contains(where: { $0.id == key }) else { return }
-        let length = configStore.lastValid.banners.snooze
+        let length = configStore.lastValid.banners.snoozeDuration
         changeBannerSnoozes { $0.snooze(key, at: now, for: length) }
     }
 

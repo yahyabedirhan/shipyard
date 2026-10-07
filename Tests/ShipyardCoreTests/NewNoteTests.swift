@@ -2,16 +2,17 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
 private let projects = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -135,10 +136,11 @@ struct NewNoteTests {
         ("x", "XA"),
     ])
     func prefix(project: String, expected: String) async throws {
-        let config = projects + "[[projects]]\nname = \"\(project)\"\nrepositories = [\"yahyabedirhan/other\"]\n"
+        let slug = Configuration.slug(from: project)
+        let config = projects + "[[projects]]\nslug = \"\(slug)\"\ntitle = \"\(project)\"\nrepositories = [\"yahyabedirhan/other\"]\n"
         let harness = try await Harness.withNewNote(config: config)
 
-        await harness.shipyard.startNote(in: project)
+        await harness.shipyard.startNote(in: slug)
 
         let body = try json(harness.createdDatabases.first)
         let properties = (body["initial_data_source"] as? NSDictionary)?["properties"] as? NSDictionary

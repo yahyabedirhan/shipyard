@@ -8,8 +8,8 @@ import Testing
 // warnings, passes the schema, and configures what the preset says.
 
 private let picked = [
-    NewProject(name: "hello-world", repositories: ["octocat/hello-world"]),
-    NewProject(name: "spoon-knife", repositories: ["octocat/Spoon-Knife", "octocat/linguist"]),
+    NewProject(title: "hello-world", repositories: ["octocat/hello-world"]),
+    NewProject(title: "spoon-knife", repositories: ["octocat/Spoon-Knife", "octocat/linguist"]),
 ]
 
 private func decoded(_ preset: Preset, _ projects: [NewProject] = []) throws -> Configuration {
@@ -36,7 +36,7 @@ struct PresetTextTests {
     func readsCleanly(preset: Preset, projects: [NewProject]) throws {
         let text = preset.text(projects: projects)
         #expect(text.hasPrefix("#:schema \(Configuration.schemaURL)\n"))
-        do throws(ConfigError) {
+        do throws(ConfigurationError) {
             let result = try Configuration.decode(text)
             #expect(result.warnings.isEmpty, "warnings in:\n\(text)")
             // my-agents is only written once repositories are picked.
@@ -57,7 +57,7 @@ struct PresetTextTests {
         #expect(config.defaults.issues.show)
         #expect(config.defaults.arrangement.groupBy == .kind)
         #expect(config.defaults.notifications == Configuration().defaults.notifications)
-        #expect(config.projects.map(\.name) == ["hello-world", "spoon-knife"])
+        #expect(config.projects.map(\.title) == ["hello-world", "spoon-knife"])
         #expect(config.projects.map(\.repositories) == [
             [.repository("octocat/hello-world")],
             [.repository("octocat/Spoon-Knife"), .repository("octocat/linguist")],
@@ -67,7 +67,7 @@ struct PresetTextTests {
     @Test("incoming-contributions lists others' items by repository, owned unless picked, and review requests anywhere")
     func incomingContributions() throws {
         let config = try decoded(.incomingContributions)
-        #expect(config.projects.map(\.name) == ["Incoming", "Review requests"])
+        #expect(config.projects.map(\.title) == ["Incoming", "Review requests"])
         #expect(config.projects.map(\.repositories) == [[.group(.owned)], [.anywhere]])
 
         let incoming = config.settings(for: config.projects[0])
@@ -93,7 +93,7 @@ struct PresetTextTests {
         #expect(reviews.notifications == [.prReviewRequested, .pingSent, .agentNotice].map { NotificationRule(event: $0) })
 
         // Picked repositories take owned's place.
-        let chosen = try decoded(.incomingContributions, [NewProject(name: "Incoming", repositories: ["octocat/hello-world"])])
+        let chosen = try decoded(.incomingContributions, [NewProject(title: "Incoming", repositories: ["octocat/hello-world"])])
         #expect(chosen.projects.map(\.repositories) == [[.repository("octocat/hello-world")], [.anywhere]])
     }
 
@@ -102,7 +102,7 @@ struct PresetTextTests {
         // It asks for no repositories, and ignores any it's given.
         #expect(Preset.reviewQueue.text(projects: picked) == Preset.reviewQueue.text())
         let config = try decoded(.reviewQueue)
-        #expect(config.projects.map(\.name) == ["Review queue"])
+        #expect(config.projects.map(\.title) == ["Review queue"])
         let queue = config.settings(for: config.projects[0])
         #expect(queue.repositories == [.anywhere])
         #expect(queue.pullRequests.reviewRequested)

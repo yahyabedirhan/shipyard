@@ -12,12 +12,12 @@ struct ConfigurationRepositoriesTests {
             archived = true
 
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned", "organizations", "collaborator", "Some-Org/*", "o/r"]
             forks = false
 
             [[projects]]
-            name = "plain"
+            slug = "plain"
             repositories = ["o/r"]
             archived = false
             """)).configuration
@@ -40,7 +40,7 @@ struct ConfigurationRepositoriesTests {
     func authorsInRepositories() {
         let issues = rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = [
               "me",
               "others",
@@ -49,31 +49,31 @@ struct ConfigurationRepositoriesTests {
             """)
         let takes = "`repositories` takes `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere`"
         #expect(issues == [
-            ConfigIssue(line: 4, message: "`me` is an author group; \(takes)"),
-            ConfigIssue(line: 5, message: "`others` is an author group; \(takes)"),
-            ConfigIssue(line: 6, message: "`@yahyabedirhan` is a login; \(takes); for their repositories write `yahyabedirhan/*`"),
+            ConfigurationIssue(line: 4, message: "`me` is an author group; \(takes)"),
+            ConfigurationIssue(line: 5, message: "`others` is an author group; \(takes)"),
+            ConfigurationIssue(line: 6, message: "`@yahyabedirhan` is a login; \(takes); for their repositories write `yahyabedirhan/*`"),
         ])
     }
 
     @Test("a misspelt group suggests the group; a bad wildcard is refused")
     func misspeltGroups() {
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"ownd\"]\n")
-            == [ConfigIssue(line: 3, message: "unknown repository group `ownd` (did you mean `owned`?)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"organisations\"]\n")
-            == [ConfigIssue(line: 3, message: "unknown repository group `organisations` (did you mean `organizations`?)")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"*/*\", \"o/r*\"]\n") == [
-            ConfigIssue(line: 3, message: "repository `*/*` isn't `owner/name` or `owner/*`"),
-            ConfigIssue(line: 3, message: "repository `o/r*` isn't `owner/name` or `owner/*`"),
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"ownd\"]\n")
+            == [ConfigurationIssue(line: 3, message: "unknown repository group `ownd` (did you mean `owned`?)")])
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"organisations\"]\n")
+            == [ConfigurationIssue(line: 3, message: "unknown repository group `organisations` (did you mean `organizations`?)")])
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"*/*\", \"o/r*\"]\n") == [
+            ConfigurationIssue(line: 3, message: "repository `*/*` isn't `owner/name` or `owner/*`"),
+            ConfigurationIssue(line: 3, message: "repository `o/r*` isn't `owner/name` or `owner/*`"),
         ])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"a b\"]\n")
-            == [ConfigIssue(line: 3, message: "repository `a b` isn't `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere`")])
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"a b\"]\n")
+            == [ConfigurationIssue(line: 3, message: "repository `a b` isn't `owner/name`, `owner/*`, `owned`, `organizations`, `collaborator` or `anywhere`")])
     }
 
     @Test("a group or a wildcard listed twice in one project is rejected, whatever its case")
     func duplicateSelectors() {
         let issues = rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = [
               "owned",
               "my-org/*",
@@ -82,8 +82,8 @@ struct ConfigurationRepositoriesTests {
             ]
             """)
         #expect(issues == [
-            ConfigIssue(line: 6, message: "project `a` lists repository `owned` twice (names aren't case-sensitive)"),
-            ConfigIssue(line: 7, message: "project `a` lists repository `My-Org/*` twice (names aren't case-sensitive)"),
+            ConfigurationIssue(line: 6, message: "project `a` lists repository `owned` twice (names aren't case-sensitive)"),
+            ConfigurationIssue(line: 7, message: "project `a` lists repository `My-Org/*` twice (names aren't case-sensitive)"),
         ])
     }
 
@@ -91,12 +91,12 @@ struct ConfigurationRepositoriesTests {
     func anywhereDecodes() throws {
         let config = try #require(decoded("""
             [[projects]]
-            name = "reviews"
+            slug = "reviews"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true }
 
             [[projects]]
-            name = "queue"
+            slug = "queue"
             repositories = ["anywhere", "o/r"]
             """ + "\n[defaults.pull-requests]\nreview-requested = true\n")).configuration
 
@@ -119,43 +119,43 @@ struct ConfigurationRepositoriesTests {
         let message = "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs"
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["anywhere"]
-            """) == [ConfigIssue(line: 3, message: message)])
+            """) == [ConfigurationIssue(line: 3, message: message)])
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = [
               "o/r",
               "anywhere",
             ]
             pull-requests = { review-requested = true }
             issues = { show = true }
-            """) == [ConfigIssue(line: 5, message: message)])
+            """) == [ConfigurationIssue(line: 5, message: message)])
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true }
             workflow-runs = { show = true }
-            """) == [ConfigIssue(line: 3, message: message)])
+            """) == [ConfigurationIssue(line: 3, message: message)])
         #expect(rejection("""
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["anywhere"]
             pull-requests = { show = false, review-requested = true }
-            """) == [ConfigIssue(line: 3, message: message)])
+            """) == [ConfigurationIssue(line: 3, message: message)])
         // Issues the defaults show count too; the project can turn them off.
         let defaults = "[defaults.issues]\nshow = true\n\n"
         #expect(rejection(defaults + """
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true }
-            """) == [ConfigIssue(line: 6, message: message)])
+            """) == [ConfigurationIssue(line: 6, message: message)])
         #expect(decoded(defaults + """
             [[projects]]
-            name = "a"
+            slug = "a"
             repositories = ["anywhere"]
             pull-requests = { review-requested = true }
             issues = { show = false }
@@ -164,9 +164,9 @@ struct ConfigurationRepositoriesTests {
 
     @Test("archived and forks must be true or false")
     func archivedAndForksTypes() {
-        #expect(rejection("[defaults]\narchived = \"yes\"\n") == [ConfigIssue(line: 2, message: "`defaults.archived` must be true or false")])
-        #expect(rejection("[[projects]]\nname = \"a\"\nrepositories = [\"owned\"]\nforks = 0\n")
-            == [ConfigIssue(line: 4, message: "`projects[0].forks` must be true or false")])
+        #expect(rejection("[defaults]\narchived = \"yes\"\n") == [ConfigurationIssue(line: 2, message: "`defaults.archived` must be true or false")])
+        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"owned\"]\nforks = 0\n")
+            == [ConfigurationIssue(line: 4, message: "`projects[0].forks` must be true or false")])
     }
 
     @Test("the file's selectors, and those a preset writes in code, parse the same")

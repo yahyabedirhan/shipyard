@@ -20,12 +20,12 @@ public enum Listing {
     /// `viewer` is the signed-in login, which `me` matches; `now` is what the
     /// windows count back from.
     public static func items(for project: ProjectSettings, in snapshot: Snapshot, viewer: String?, now: Date) -> [Item] {
-        (snapshot.items[project.name] ?? []).filter {
+        (snapshot.items[project.slug] ?? []).filter {
             lists($0, project: project, viewer: viewer, reviewRequested: snapshot.reviewRequested, now: now)
         }
     }
 
-    /// Every project's listing, by project name: the snapshot's items for
+    /// Every project's listing, by project slug: the snapshot's items for
     /// it, then the `pings` filed under it, each passing the project's
     /// filters. A project with neither (added since the snapshot was
     /// fetched, or before any was) has no listing yet; without a snapshot
@@ -40,7 +40,7 @@ public enum Listing {
     /// Each ping's item carries the number `numbers` gave it in that
     /// section (`PingNumbers`), or none (0) before it has one.
     ///
-    /// A project's `notes` (from its Notion database, by project name)
+    /// A project's `notes` (from its Notion database, by project slug)
     /// come last, the archived ones left out; like pings, they list
     /// before GitHub answers.
     public static func listings(
@@ -52,7 +52,7 @@ public enum Listing {
         notes: [String: [Note]] = [:],
         now: Date
     ) -> [String: [Item]] {
-        let sections = sections(of: pings, projects: projects.map(\.name), machines: machines.map(\.name))
+        let sections = sections(of: pings, projects: projects.map(\.slug), machines: machines.map(\.slug))
         func filed(in section: String) -> [Item] {
             (sections[section] ?? []).map { ping in
                 var item = ping.item
@@ -63,26 +63,26 @@ public enum Listing {
         var listings: [String: [Item]] = [:]
         for project in projects {
             let fetched = snapshot.flatMap { snapshot in
-                snapshot.items[project.name] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
+                snapshot.items[project.slug] != nil ? items(for: project, in: snapshot, viewer: snapshot.viewerLogin, now: now) : nil
             }
-            let filed = filed(in: project.name)
-            let written = (notes[project.name] ?? []).filter { !$0.isArchived }.map(\.item)
+            let filed = filed(in: project.slug)
+            let written = (notes[project.slug] ?? []).filter { !$0.isArchived }.map(\.item)
             guard fetched != nil || !filed.isEmpty || !written.isEmpty else { continue }
-            listings[project.name] = (fetched ?? []) + (filed + written).filter {
+            listings[project.slug] = (fetched ?? []) + (filed + written).filter {
                 lists($0, project: project, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
         for machine in machines {
-            let unfiled = filed(in: machine.name)
+            let unfiled = filed(in: machine.slug)
             guard !unfiled.isEmpty else { continue }
-            listings[machine.name] = unfiled.filter {
+            listings[machine.slug] = unfiled.filter {
                 lists($0, project: machine, viewer: snapshot?.viewerLogin, reviewRequested: [], now: now)
             }
         }
         return listings
     }
 
-    /// The sections `pings` are filed in, by name, before any filter: each
+    /// The sections `pings` are filed in, by project slug or machine label, before any filter: each
     /// project in `projects` its pings name, and each machine in `machines`
     /// its remote pings filed under none of `projects`. A section with no
     /// ping is left out. Where `listings` lists them, and what the Mac

@@ -38,7 +38,7 @@ extension PanelText {
     public static func pickedProjects(_ projects: [NewProject]) -> String? {
         guard !projects.isEmpty else { return nil }
         let names = projects.map { project in
-            project.repositories.count > 1 ? "\(project.name) (\(project.repositories.count) repositories)" : project.name
+            project.repositories.count > 1 ? "\(project.title) (\(project.repositories.count) repositories)" : project.title
         }
         return "Adds " + names.joined(separator: ", ")
     }

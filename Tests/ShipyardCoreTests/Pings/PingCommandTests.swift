@@ -7,11 +7,11 @@ import Testing
 
 private let twoProjects = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -87,6 +87,34 @@ struct PingCommandTests {
         #expect(store.all().map(\.projects) == [["blog"]])
     }
 
+    @Test("--project finds a project by its slug, then by its title, and files the ping under its slug")
+    func projectBySlugThenTitle() throws {
+        let config = """
+            version = 1
+            [[projects]]
+            slug = "shop"
+            title = "Storefront"
+            repositories = ["yahyabedirhan/shop"]
+
+            [[projects]]
+            slug = "storefront"
+            title = "Shop"
+            repositories = ["yahyabedirhan/storefront"]
+
+            [[projects]]
+            slug = "blog"
+            title = "My blog"
+            repositories = ["yahyabedirhan/blog"]
+
+            """
+        // A title, as an older shipyard sends a project's old name.
+        #expect(try ping("Published", "--project", "My blog", config: config).status == 0)
+        // A slug wins over another project's title.
+        #expect(try ping("Ready", "--project", "shop", config: config, id: "a2b3c4").status == 0)
+        #expect(try ping("Ready", "--project", "Shop", config: config, id: "d5e6f7").status == 0)
+        #expect(store.all().map(\.projects).sorted { $0[0] < $1[0] } == [["blog"], ["shop"], ["storefront"]])
+    }
+
     @Test("an unknown project fails, listing the projects, and stores nothing")
     func unknownProject() throws {
         let result = try ping("Ready", "--project", "shopp")
@@ -110,7 +138,7 @@ struct PingCommandTests {
         let config = twoProjects + """
 
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["yahyabedirhan/blog", "YahyaBedirhan/Shop"]
 
             """
@@ -164,11 +192,11 @@ struct PingCommandTests {
     func resolvedRepository() throws {
         let config = """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
 
             [[projects]]
-            name = "org"
+            slug = "org"
             repositories = ["some-org/*"]
 
             """
@@ -330,13 +358,13 @@ struct ShipyardCLITests {
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")
     func brokenConfiguration() throws {
-        let harness = try Harness(config: twoProjects + "\n[[projects]]\nname = \"shop\"\nrepositories = [\"o/r\"]\n")
+        let harness = try Harness(config: twoProjects + "\n[[projects]]\nslug = \"shop\"\nrepositories = [\"o/r\"]\n")
 
         let result = harness.cli("ping", "Ready", "--project", "shop")
 
         #expect(result.status == 1)
         #expect(result.error.hasPrefix("shipyard: config.toml doesn't read (line "))
-        #expect(result.error.contains("project name `shop` is used twice"))
+        #expect(result.error.contains("project slug `shop` is used twice"))
         #expect(harness.pingStore.all().isEmpty)
     }
 
@@ -354,11 +382,11 @@ struct ShipyardCLITests {
 
     /// `shipyard <arguments>` as the Mac's `main.swift` assembles it, in an
     /// agent's shell whose environment is `shell` and whose home is
-    /// `home`: the configuration file is the one `ConfigLocation` finds
+    /// `home`: the configuration file is the one `ConfigurationLocation` finds
     /// beside `harness`'s app state, the folder the app writes for the CLI.
     private func shipyard(_ arguments: String..., in harness: Harness, shell: [String: String], home: URL) -> CommandResult {
         let filing = ProjectFiling(
-            configURL: ConfigLocation.current(environment: shell, home: home, support: harness.stateDirectory),
+            configURL: ConfigurationLocation.current(environment: shell, home: home, support: harness.stateDirectory),
             repositories: harness.repositoriesStore
         )
         return ShipyardCLI.run(
@@ -376,7 +404,7 @@ struct ShipyardCLITests {
             .appendingPathComponent("shipyard-shell-\(UUID().uuidString)", isDirectory: true)
         let config = folder.appendingPathComponent("shipyard/config.toml")
         try FileManager.default.createDirectory(at: config.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("[[projects]]\nname = \"elsewhere\"\nrepositories = [\"o/elsewhere\"]\n".utf8).write(to: config)
+        try Data("[[projects]]\nslug = \"elsewhere\"\nrepositories = [\"o/elsewhere\"]\n".utf8).write(to: config)
         return folder
     }
 
@@ -413,20 +441,20 @@ struct ShipyardCLITests {
             show = false
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "store"
+            slug = "store"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog", "yahyabedirhan/shop"]
             pings = { show = true }
 
             [[projects]]
-            name = "docs"
+            slug = "docs"
             repositories = ["yahyabedirhan/docs"]
 
             """)
@@ -452,11 +480,11 @@ struct ShipyardCLITests {
             show = false
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "store"
+            slug = "store"
             repositories = ["yahyabedirhan/shop"]
 
             """)

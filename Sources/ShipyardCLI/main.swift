@@ -26,7 +26,7 @@ var table = CommandTable()
 // against the user's own config.toml into their own store, and `app` finds
 // the demo through the pointer `app open --demo` leaves (`ControlSocket.locate`).
 let support = SupportFolder.app(environment: environment)
-let configURL = ConfigLocation.current(environment: environment, support: support)
+let configURL = ConfigurationLocation.current(environment: environment, support: support)
 // The commands that read cli.toml take it with their entries.
 let settings = CLISettingsFile.beside(config: configURL)
 table.add(PingCommands.entries(
@@ -40,6 +40,11 @@ table.add(PingCommands.entries(
 // says whether it was shown.
 table.add(NoticeCommands.entries(route: ControlNoticeRoute(support: support)))
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
+// `config check` reads both files as the app and the commands do.
+table.add(ConfigurationCommands.entries(checks: [
+    { now in ConfigurationStore.check(configURL, at: now) },
+    { now in settings.check(at: now) },
+]))
 #else
 // The commands that read cli.toml take it with their entries.
 let settings = CLISettingsFile.withoutTheApp(environment: environment)
@@ -50,6 +55,8 @@ table.add(PingCommands.entries(
 // A notice goes over the tailnet to the Mac cli.toml names, or else to the
 // herdr-shipyard plugin for the Mac's poll (RemoteNoticeRoute decides).
 table.add(NoticeCommands.entries(route: RemoteNoticeRoute(settings: settings)))
+// No config.toml here: `config check` reads cli.toml alone.
+table.add(ConfigurationCommands.entries(checks: [{ now in settings.check(at: now) }]))
 #endif
 let result = ShipyardCLI.run(
     Array(CommandLine.arguments.dropFirst()),

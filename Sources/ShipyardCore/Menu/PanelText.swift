@@ -1,4 +1,5 @@
 import Foundation
+import ShipyardCommand
 import ShipyardConfig
 
 /// The words the panel shows for what the menu model and the orchestrator
@@ -244,13 +245,9 @@ public enum PanelText {
 
     // MARK: - The tabs layout
 
-    /// A tab's title: "All", or its project's name.
-    public static func tabTitle(_ tab: MenuTab) -> String {
-        switch tab {
-        case .all: "All"
-        case .project(let name): name
-        }
-    }
+    /// The All tab's title; a project's tab is titled by its project's
+    /// title (`MenuModel.tabTitle`).
+    public static let allTabTitle = "All"
 
     /// The line under the tab strip: "5 need attention · 4 projects" on
     /// All, "2 need attention" on a project's tab, and "All caught up" in
@@ -295,20 +292,21 @@ public enum PanelText {
 
     /// The banner for a rejected configuration file: each problem with its
     /// line, then that the last valid configuration is still in use.
-    public static func configError(_ error: ConfigError) -> String {
+    public static func configError(_ error: ConfigurationError) -> String {
         (error.issues.map(configIssue) + ["Using the last valid configuration."]).joined(separator: "\n")
     }
 
     /// One problem's line in a configuration banner:
     /// "config.toml line 14: unknown event `pr.openned` …", or without the
-    /// line when it can't be placed. `config-status.json` repeats it.
-    public static func configIssue(_ issue: ConfigIssue) -> String {
-        issue.line.map { "config.toml line \($0): \(issue.message)" } ?? "config.toml: \(issue.message)"
+    /// line when it can't be placed. `config-status.json` and `shipyard config
+    /// check` repeat it.
+    public static func configIssue(_ issue: ConfigurationIssue) -> String {
+        ConfigurationCheck.banner(ConfigurationCheck.Issue(issue), in: ConfigurationStore.fileName)
     }
 
     /// The quiet banner for settings the file has but shipyard ignores, each
     /// with its line; `nil` when there are none.
-    public static func configWarnings(_ warnings: [ConfigIssue]) -> String? {
+    public static func configWarnings(_ warnings: [ConfigurationIssue]) -> String? {
         guard !warnings.isEmpty else { return nil }
         return warnings.map(configIssue).joined(separator: "\n")
     }

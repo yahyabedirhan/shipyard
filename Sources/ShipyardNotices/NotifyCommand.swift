@@ -65,7 +65,8 @@ public enum NotifyCommand {
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
           --repo <owner/name>  file it by this repository instead of the working folder's
-          --project <name>     file it under this project (its name in config.toml) only
+          --project <name>     file it under this project only: its slug in config.toml,
+                               or else its title
           --image <path>       show this PNG, JPEG or GIF with it (5 MB at most)
           --sound <sound>      default, none, or a sound's name such as Glass
           --thread <key>       stack it with the other notices of this thread

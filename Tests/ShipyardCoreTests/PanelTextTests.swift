@@ -77,9 +77,9 @@ struct PanelTextTests {
 
     @Test("a configuration error names the file and line, and says the last valid one is used")
     func configError() {
-        let error = ConfigError([
-            ConfigIssue(line: 14, message: "unknown event `pr.openned` (did you mean `pr.opened`?)"),
-            ConfigIssue(line: nil, message: "can't read the file"),
+        let error = ConfigurationError([
+            ConfigurationIssue(line: 14, message: "unknown event `pr.openned` (did you mean `pr.opened`?)"),
+            ConfigurationIssue(line: nil, message: "can't read the file"),
         ])
 
         #expect(PanelText.configError(error) == """
@@ -93,8 +93,8 @@ struct PanelTextTests {
     func configWarnings() {
         #expect(PanelText.configWarnings([]) == nil)
         #expect(PanelText.configWarnings([
-            ConfigIssue(line: 1, message: "unknown setting `future-key` (ignored)"),
-            ConfigIssue(line: nil, message: "unknown setting `theme` (ignored; did you mean `them`?)"),
+            ConfigurationIssue(line: 1, message: "unknown setting `future-key` (ignored)"),
+            ConfigurationIssue(line: nil, message: "unknown setting `theme` (ignored; did you mean `them`?)"),
         ]) == """
             config.toml line 1: unknown setting `future-key` (ignored)
             config.toml: unknown setting `theme` (ignored; did you mean `them`?)
@@ -769,8 +769,8 @@ struct PanelTextTests {
     func pickedProjects() {
         #expect(PanelText.pickedProjects([]) == nil)
         #expect(PanelText.pickedProjects([
-            NewProject(name: "e-commerce", repositories: ["a/frontend", "a/backend"]),
-            NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+            NewProject(title: "e-commerce", repositories: ["a/frontend", "a/backend"]),
+            NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
         ]) == "Adds e-commerce (2 repositories), job-search")
     }
 

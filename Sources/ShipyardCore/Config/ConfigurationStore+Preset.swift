@@ -3,11 +3,11 @@ import ShipyardConfig
 
 // The third writer (ADR 0001, amended): presets are the app's, so writing
 // one is the core's, over the store ShipyardConfig owns (ADR 0006).
-extension ConfigStore {
+extension ConfigurationStore {
     /// Writes `preset`'s whole file, with `projects` as its picked
     /// repositories, for onboarding's first step: only when the file is
     /// missing or its only live key is `version`. Creates the directory when
-    /// it's missing. Throws a `ConfigError` (and writes nothing) when the
+    /// it's missing. Throws a `ConfigurationError` (and writes nothing) when the
     /// file holds anything else or doesn't read, when a project is invalid
     /// (as for `append(projects:)`), or when the preset's file wouldn't read
     /// with these projects; throws the file system's error when it can't

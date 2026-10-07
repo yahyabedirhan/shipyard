@@ -23,7 +23,7 @@ private func config(_ settings: String = "", layout: MenuLayout = .list) -> Stri
     show = true
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["\(web)", "\(api)"]
     \(settings)
 

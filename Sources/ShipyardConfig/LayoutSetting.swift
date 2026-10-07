@@ -6,16 +6,16 @@ import Foundation
 extension Configuration {
     /// `text` with `[menu] layout` set to `layout`.
     ///
-    /// Throws the file's own `ConfigError` when `text` doesn't read, and a
-    /// `ConfigError` saying so when the edit wouldn't read back as the same
+    /// Throws the file's own `ConfigurationError` when `text` doesn't read, and a
+    /// `ConfigurationError` saying so when the edit wouldn't read back as the same
     /// configuration with only the layout changed (a `[menu]` written in a
     /// form this doesn't edit, such as an inline table).
-    static func settingLayout(_ layout: MenuLayout, in text: String) throws(ConfigError) -> String {
+    static func settingLayout(_ layout: MenuLayout, in text: String) throws(ConfigurationError) -> String {
         let current = try decode(text).configuration
         let map = TOMLSourceMap(text)
         var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let value = tomlString(layout.rawValue)
-        let menu: ConfigPath = [.key("menu")]
+        let menu: ConfigurationPath = [.key("menu")]
 
         if let key = map.entries.first(where: { !$0.isHeader && $0.path == menu + [.key("layout")] }) {
             guard key.line == key.endLine, let replaced = replacingValue(of: lines[key.line - 1], with: value) else {
@@ -114,8 +114,8 @@ extension Configuration {
         return match.output.1 + value + match.output.3
     }
 
-    private static func cantSetLayout(_ layout: MenuLayout, line: Int?) -> ConfigError {
-        ConfigError([ConfigIssue(
+    private static func cantSetLayout(_ layout: MenuLayout, line: Int?) -> ConfigurationError {
+        ConfigurationError([ConfigurationIssue(
             line: line,
             message: "can't switch the layout: `[menu]` is written in a form shipyard doesn't edit; set `layout = \"\(layout.rawValue)\"` under `[menu]` by hand"
         )])

@@ -189,7 +189,7 @@ public struct KnownItem: Codable, Equatable, Sendable {
 public struct KnownItems: Equatable, Sendable {
     /// By item id (its URL).
     public var items: [String: KnownItem]
-    /// By project name: the sources fetched for it at least once.
+    /// By project slug: the sources fetched for it at least once.
     public var sources: [String: Set<ItemSource>]
 
     public init(items: [String: KnownItem] = [:], sources: [String: Set<ItemSource>] = [:]) {
@@ -225,11 +225,11 @@ public struct KnownItems: Equatable, Sendable {
             var sources = Set<ItemSource>()
             for source in project.fetchedSources {
                 fetched.insert(source.repository.lowercased())
-                if !failed.contains(source) || knows(source, in: project.name) {
+                if !failed.contains(source) || knows(source, in: project.slug) {
                     sources.insert(source)
                 }
             }
-            if !sources.isEmpty { next.sources[project.name] = sources }
+            if !sources.isEmpty { next.sources[project.slug] = sources }
         }
         let now = snapshot.fetchedAt
         let cutoff = now.addingTimeInterval(-Attention.retention)
@@ -290,9 +290,9 @@ public enum EventDetector {
     /// the snapshot's order.
     public static func events(known: KnownItems, snapshot: Snapshot, projects: [ProjectSettings]) -> [Event] {
         projects.flatMap { project in
-            (snapshot.items[project.name] ?? []).flatMap { item -> [Event] in
+            (snapshot.items[project.slug] ?? []).flatMap { item -> [Event] in
                 let source = project.source(of: item)
-                guard known.knows(source, in: project.name) else { return [] }
+                guard known.knows(source, in: project.slug) else { return [] }
                 let before = known.items[item.id]
                 var found = changes(from: before, to: item)
                 // A pull request the search finds for the first time is a
@@ -302,7 +302,7 @@ public enum EventDetector {
                 }
                 return found.compactMap { change in
                     EventKind.of(change, for: item.kind).map {
-                        Event(kind: $0, project: project.name, item: item, occurrence: change.happensOnce ? "" : item.fingerprint)
+                        Event(kind: $0, project: project.slug, item: item, occurrence: change.happensOnce ? "" : item.fingerprint)
                     }
                 }
             }
@@ -320,9 +320,9 @@ public enum EventDetector {
     /// own listing is passed in `projects` with the machine's settings.
     public static func pingEvents(listings: [String: [Item]], projects: [ProjectSettings]) -> [Event] {
         projects.flatMap { project in
-            (listings[project.name] ?? [])
+            (listings[project.slug] ?? [])
                 .filter { $0.kind == .ping && $0.ping?.seen == nil }
-                .map { Event(kind: .pingSent, project: project.name, item: $0, occurrence: $0.ping?.instance ?? "") }
+                .map { Event(kind: .pingSent, project: project.slug, item: $0, occurrence: $0.ping?.instance ?? "") }
         }
     }
 

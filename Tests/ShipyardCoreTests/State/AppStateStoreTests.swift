@@ -50,7 +50,7 @@ struct AppStateStoreTests {
         let directory = temporaryDirectory()
         let store = AppStateStore(directory: directory)
         let project = ProjectSettings(
-            name: "shop", repositories: ["o/r"], pullRequests: PullRequestSettings(), issues: IssueSettings(),
+            slug: "shop", repositories: ["o/r"], pullRequests: PullRequestSettings(), issues: IssueSettings(),
             workflowRuns: WorkflowRunSettings(), notifications: []
         )
         let event = Event(kind: .prOpened, project: "shop", item: item)

@@ -14,7 +14,7 @@ import Foundation
 /// now. When the directory doesn't exist (yet), its nearest existing
 /// ancestor is watched instead, so creating it is noticed.
 @MainActor
-final class ConfigWatcher {
+final class ConfigurationWatcher {
     /// What to watch: a file in its directory, or a folder alone, which
     /// says where it is each time the watch opens (it may have been created).
     private enum Target {

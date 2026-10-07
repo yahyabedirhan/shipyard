@@ -9,7 +9,7 @@ Notion holds the notes and is their editor. Shipyard's menu lists each project's
 ```text
 Shipyard Notes               the user's home page: how to take and find notes, and the Projects index
 ├── Projects                 the parent of every notes database
-│   ├── <project name>       one database per shipyard project
+│   ├── <project title>      one database per shipyard project
 │   └── …
 └── Agent guide              the rules and conventions for agents
 ```
@@ -19,7 +19,7 @@ These are the **fixed core**. The app reads them, so keep them exactly as writte
 - **The notes workspace:** a Notion workspace of the user's own, holding only notes.
 - **The entry page:** "Shipyard Notes", at the top of that workspace. It's the user's home page; keep agents' rules off it.
 - **The Projects page:** a child page of the entry page titled exactly "Projects". The app looks for databases only here.
-- **One database per project,** directly under Projects, titled exactly the project's `name` in the user's `config.toml`. The app matches a project to its database by that title, so a database with another title, or one anywhere else, is invisible to it.
+- **One database per project,** directly under Projects, titled exactly the project's title: its `title` in the user's `config.toml`, else its `slug`. The app matches a project to its database by that title, so a database with another title, or one anywhere else, is invisible to it.
 - **Its properties:**
 
 | Property | Type | Holds |
@@ -67,9 +67,9 @@ Once connected, while ntn is missing or logged out the menu lists no notes, show
 
 ## Finding a project's database
 
-The project is the one the user names; otherwise the project in `config.toml` that watches the repository you're working in. On a machine without `config.toml`, the databases under Projects are the projects' names. Ask when none of these settles it.
+The project is the one the user names; otherwise the project in `config.toml` that watches the repository you're working in. On a machine without `config.toml`, the databases under Projects are titled with the projects' titles. Ask when none of these settles it.
 
-- **Connector or MCP:** `notion-fetch` the entry page (find it once with `notion-search` for "Shipyard Notes"), then the Projects page it lists. The Projects page's content lists each database with its `data-source-url` (`collection://…`): pick the one titled the project's name. Fetch that `collection://` URL for the schema and the current `Labels` options.
+- **Connector or MCP:** `notion-fetch` the entry page (find it once with `notion-search` for "Shipyard Notes"), then the Projects page it lists. The Projects page's content lists each database with its `data-source-url` (`collection://…`): pick the one titled the project's title (its `title` in `config.toml`, else its `slug`). Fetch that `collection://` URL for the schema and the current `Labels` options.
 - **`ntn`:** find the entry page, the result whose parent is the workspace, then its Projects page, then that page's databases:
 
   ```sh
@@ -147,14 +147,14 @@ Drop the `Labels` condition for every open note. Notes the user wrote straight i
 
 A project's database is created the first time a note is added to it, by you or by the menu's new-note icon. The icon creates the Projects page too when it's missing, and gives the database its icon, but it doesn't add views or touch the Projects index. When you find a database the index lacks, add its row and its views.
 
-1. Pick a prefix: two to five uppercase letters from the project's name, the first four when they're free (`shipyard` → `SHIP`), not used by another database's `No.` (the Projects index lists them; each database's schema shows `unique_id` with its prefix).
-2. Create the database under **Projects**, titled exactly the project's name, with the icon 🗂️:
+1. Pick a prefix: two to five uppercase letters from the project's title, the first four when they're free (`shipyard` → `SHIP`), not used by another database's `No.` (the Projects index lists them; each database's schema shows `unique_id` with its prefix).
+2. Create the database under **Projects**, titled exactly the project's title, with the icon 🗂️:
    - Connector: `notion-create-database` with the Projects page as parent and `CREATE TABLE ("Name" TITLE, "No." UNIQUE_ID PREFIX 'SHIP', "Labels" MULTI_SELECT(), "Status" SELECT('Open':green, 'Archived':gray))`, then set its icon.
    - `ntn`: `ntn api v1/databases < database.json` with
 
      ```json
      {"parent": {"type": "page_id", "page_id": "<Projects page id>"},
-      "title": [{"text": {"content": "<project name>"}}],
+      "title": [{"text": {"content": "<project title>"}}],
       "icon": {"type": "emoji", "emoji": "🗂️"},
       "initial_data_source": {"properties": {
         "Name": {"title": {}},

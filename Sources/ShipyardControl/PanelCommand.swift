@@ -16,7 +16,8 @@ public enum PanelCommand {
           show-more   show every row of a project's group of one kind, past its
                       show-first cap, until the panel closes; <kind> is
                       pull-requests, issues, workflow-runs or pings
-          tab         show a tab of the tabs layout: a project's name, or All
+          tab         show a tab of the tabs layout: a project's slug, or else its
+                      title, or All
           view        show a status view in place of the projects: github,
                       notion, skill or cli; projects shows the projects again
 

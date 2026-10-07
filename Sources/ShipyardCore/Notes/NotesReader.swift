@@ -2,7 +2,7 @@ import Foundation
 
 /// What one read of the notes came to.
 public enum NotesReading: Equatable, Sendable {
-    /// Each project that has a notes database, by name: its open notes, or
+    /// Each project that has a notes database, by slug: its open notes, or
     /// why its query failed. A project without a database isn't there.
     case read([String: Result<[Note], NotionError>])
     /// No page in ntn's workspace is titled "Shipyard Notes": ntn's
@@ -16,7 +16,7 @@ public enum NotesReading: Equatable, Sendable {
 /// Reads each project's open notes from Notion: finds the entry page
 /// ("Shipyard Notes") by search, then its child page "Projects", lists
 /// that page's child databases, matches each project to the one titled
-/// exactly its name, and queries that database's data source. The entry
+/// exactly its title, and queries that database's data source. The entry
 /// page, the Projects page, each database's data source and each untitled
 /// note's first line are remembered between reads, so a read costs one
 /// children listing and one query per project with a database; a page or
@@ -32,7 +32,7 @@ final class NotesReader {
     private var entryPage: String?
     /// The Projects page's id, once found under the entry page.
     private var projectsPage: String?
-    /// Each project's database, by project name, as the last read matched them.
+    /// Each project's database, by slug, as the last read matched them.
     private(set) var databases: [String: String] = [:]
     /// Each database's data source, by database id.
     private var dataSources: [String: String] = [:]
@@ -48,9 +48,9 @@ final class NotesReader {
         firstLines = [:]
     }
 
-    /// The open notes of each of `projects` that has a database, through
-    /// `client`.
-    func read(projects: [String], client: NotionClient) async -> NotesReading {
+    /// The open notes of each of `projects` that has a database, by slug,
+    /// through `client`.
+    func read(projects: [(slug: String, title: String)], client: NotionClient) async -> NotesReading {
         do {
             guard let databases = try await databases(client) else {
                 self.databases = [:]
@@ -59,9 +59,9 @@ final class NotesReader {
             var results: [String: Result<[Note], NotionError>] = [:]
             var used: Set<String> = []
             var matched: [String: String] = [:]
-            for project in projects {
-                // The first database titled exactly the project's name.
-                guard let database = databases.first(where: { $0.title == project })?.id else { continue }
+            for (project, title) in projects {
+                // The first database titled exactly the project's title.
+                guard let database = databases.first(where: { $0.title == title })?.id else { continue }
                 used.insert(database)
                 matched[project] = database
                 results[project] = await notes(in: database, client: client)
@@ -121,18 +121,18 @@ final class NotesReader {
         return (page, projects, try await client.childDatabases(of: projects))
     }
 
-    /// Starts a note in `project`: creates its database under the Projects
-    /// page (and that page under the entry page, the first time) when none
-    /// is titled exactly its name (with the fixed core and a prefix from
-    /// its name that no other database's `No.` uses), then
-    /// an empty note in the database's data source. Answers the note's
-    /// Notion URL. A new database's data source is remembered, so the next
-    /// read finds it without asking.
-    func startNote(in project: String, client: NotionClient) async -> Result<URL, NewNoteError> {
+    /// Starts a note in `project` (a slug), titled `title`: creates its
+    /// database under the Projects page (and that page under the entry
+    /// page, the first time) when none is titled exactly `title` (with the
+    /// fixed core and a prefix from the title that no other database's
+    /// `No.` uses), then an empty note in the database's data source.
+    /// Answers the note's Notion URL. A new database's data source is
+    /// remembered, so the next read finds it without asking.
+    func startNote(in project: String, titled title: String, client: NotionClient) async -> Result<URL, NewNoteError> {
         do {
             guard let entry = try await entry(client) else { return .failure(.noEntryPage) }
             let source: String
-            if let database = entry.databases.first(where: { $0.title == project })?.id {
+            if let database = entry.databases.first(where: { $0.title == title })?.id {
                 source = try await dataSource(of: database, client: client)
             } else {
                 var taken: Set<String> = []
@@ -149,8 +149,8 @@ final class NotesReader {
                 }
                 let created = try await client.createNotesDatabase(
                     under: projects,
-                    title: project,
-                    prefix: NotePrefix.choose(for: project, taken: taken)
+                    title: title,
+                    prefix: NotePrefix.choose(for: title, taken: taken)
                 )
                 dataSources[created.database] = created.dataSource
                 databases[project] = created.database

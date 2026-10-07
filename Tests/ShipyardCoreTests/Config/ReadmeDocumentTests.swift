@@ -47,8 +47,8 @@ struct ReadmeDocumentTests {
         #expect(examples.count >= 4)
         let schema = try loadSchema()
         for example in examples {
-            do throws(ConfigError) {
-                let result = try Configuration.decode(example)
+            do throws(ConfigurationError) {
+                let result = try Configuration.decode(asFile(example))
                 #expect(result.warnings.isEmpty, "warnings in:\n\(example)")
             } catch {
                 Issue.record("rejected: \(error)\nin:\n\(example)")
@@ -82,7 +82,7 @@ struct ReadmeDocumentTests {
         #expect(subsections.menu.layout == .list)
         #expect(subsections.defaults.arrangement == ArrangementSettings(groupBy: .repository, subsections: true, showFirst: 4))
         #expect(subsections.defaults.issues.show)
-        #expect(subsections.projects.map(\.name) == ["shipyard"])
+        #expect(subsections.projects.map(\.slug) == ["shipyard"])
         #expect(subsections.projects.first?.repositories.map(\.description) == twoRepositories)
 
         // The same file in tabs.

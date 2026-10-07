@@ -144,7 +144,7 @@ public struct GitHubClient: Sendable {
         resolved: [String: ResolvedRepositories] = [:],
         at fetchedAt: Date
     ) async throws -> Snapshot {
-        let projects = configured.map { $0.resolved(by: resolved[$0.name]) }
+        let projects = configured.map { $0.resolved(by: resolved[$0.slug]) }
         let repositories = ProjectQuery.plan(projects)
         // The review search is only worth its cost where pull requests show.
         let searchesReviews = projects.contains { $0.pullRequests.show }
@@ -242,7 +242,7 @@ public struct GitHubClient: Sendable {
                 let listed = Set(projectItems.map(\.id))
                 projectItems += searchPullRequests.filter { !listed.contains($0.id) }
             }
-            items[project.name] = projectItems
+            items[project.slug] = projectItems
         }
         return Snapshot(
             fetchedAt: fetchedAt,
@@ -254,7 +254,7 @@ public struct GitHubClient: Sendable {
             searchPullRequests: searchPullRequests,
             reviewSearchTotal: search.total,
             reviewSearchError: reviewSearchError,
-            repositories: Dictionary(projects.map { ($0.name, $0.repositorySlugs) }, uniquingKeysWith: { first, _ in first }),
+            repositories: Dictionary(projects.map { ($0.slug, $0.repositorySlugs) }, uniquingKeysWith: { first, _ in first }),
             selectorErrors: resolved.filter { !$0.value.errors.isEmpty }.mapValues(\.errors)
         )
     }

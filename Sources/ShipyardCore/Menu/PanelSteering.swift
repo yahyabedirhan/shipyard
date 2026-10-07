@@ -15,9 +15,10 @@ public struct PanelRefusal: Error, Equatable, Sendable {
 // a project's section, its group of one kind, a tab. Each refusal names
 // what exists, so an agent can try again without asking the status.
 extension MenuModel {
-    /// The section of the project named `project`.
+    /// The section of the project named `project`: by its slug (or a
+    /// machine's label), else by its title.
     public func section(named project: String) throws(PanelRefusal) -> MenuSection {
-        guard let section = sections.first(where: { $0.name == project }) else {
+        guard let section = sections.first(where: { $0.name == project }) ?? sections.first(where: { $0.title == project }) else {
             let names = sections.map(\.name)
             throw PanelRefusal(names.isEmpty
                 ? "no project is named `\(project)`; there are no projects"
@@ -44,19 +45,31 @@ extension MenuModel {
             : "`\(project)` lists no \(name); its kinds are \(Self.quoted(listed))")
     }
 
-    /// The tab `name` names: a project's, or `All` (in any case) unless a
-    /// project has that name. Refused in the list layout, which has no tabs.
+    /// The tab `name` names: a project's, by its slug or else its title, or
+    /// `All` (in any case) unless a project has that name. Refused in the
+    /// list layout, which has no tabs.
     public func tab(named name: String) throws(PanelRefusal) -> MenuTab {
         guard layout == .tabs else {
             throw PanelRefusal("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`")
         }
-        if sections.contains(where: { $0.name == name }) { return .project(name) }
+        if let section = sections.first(where: { $0.name == name }) ?? sections.first(where: { $0.title == name }) {
+            return .project(section.name)
+        }
         if name.lowercased() == "all" { return .all }
-        throw PanelRefusal("no tab is named `\(name)`; the tabs are \(Self.quoted(tabs.map(PanelText.tabTitle)))")
+        throw PanelRefusal("no tab is named `\(name)`; the tabs are \(Self.quoted(tabs.map(tabTitle)))")
     }
 
-    /// Every section's name, in menu order, as `fold`, `unfold` and `tab`
-    /// accept them: the projects', then the remote machines'.
+    /// A tab's title: "All", or its project's title.
+    public func tabTitle(_ tab: MenuTab) -> String {
+        switch tab {
+        case .all: PanelText.allTabTitle
+        case .project(let name): sections.first { $0.name == name }?.title ?? name
+        }
+    }
+
+    /// Every section's name (a project's slug, a machine's label), in menu
+    /// order, as `fold`, `unfold` and `tab` accept them: the projects',
+    /// then the remote machines'.
     public var projectNames: [String] {
         sections.map(\.name)
     }
@@ -89,7 +102,7 @@ extension Shipyard {
     public func setCollapsed(_ project: String, _ collapsed: Bool) throws(PanelRefusal) {
         let section = try menu.section(named: project)
         guard section.isCollapsed != collapsed else { return }
-        toggleCollapsed(project)
+        toggleCollapsed(section.name)
     }
 
     /// Shows every row of `project`'s group of `kind`, through

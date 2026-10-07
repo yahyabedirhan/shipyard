@@ -345,7 +345,7 @@ struct RateLimitResponseTests {
         )
         let client = GitHubClient(token: "gho_test", transport: stub)
         let project = ProjectSettings(
-            name: "job-search",
+            slug: "job-search",
             repositories: ["yahyabedirhan/job-search"],
             pullRequests: .init(),
             issues: .init(),

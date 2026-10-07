@@ -12,7 +12,7 @@ A preset is a ready-made configuration for one main use of shipyard. The app off
 
 1. Pick the preset whose use matches the request, and ask the user which one when none clearly does.
 2. Write the preset's file as the whole of `config.toml` only when the file is missing or holds nothing live but `version` (the app's commented header). Otherwise the file is the user's: make the request's change with the keys in the skill instead, taking from the preset only the lines the request needs.
-3. Put the user's repositories in place of the examples: in `my-agents`, one `[[projects]]` block per repository, named after it; in `incoming-contributions`, the "Incoming" project's `repositories` (keep `owned` for all of the user's own).
+3. Put the user's repositories in place of the examples: in `my-agents`, one `[[projects]]` block per repository, its `slug` the repository's name in lowercase (each run of other characters one hyphen) and its `title` the name as written when that differs; in `incoming-contributions`, the "Incoming" project's `repositories` (keep `owned` for all of the user's own).
 4. Check the edit as the skill says.
 
 ## `my-agents`
@@ -38,11 +38,12 @@ show = true
 
 # Projects: one [[projects]] block per repository. Add more at the end.
 [[projects]]
-name = "hello-world"
+slug = "hello-world"
 repositories = ["octocat/hello-world"]
 
 [[projects]]
-name = "Spoon-Knife"
+slug = "spoon-knife"
+title = "Spoon-Knife"
 repositories = ["octocat/Spoon-Knife"]
 ```
 
@@ -100,14 +101,16 @@ event = "control.ended"
 # Projects: one [[projects]] block each. owned is every repository
 # your account owns, including ones you create later.
 [[projects]]
-name = "Incoming"
+slug = "incoming"
+title = "Incoming"
 repositories = ["owned"]
 
 # The pull requests waiting on your review, or a team's you're in, in
 # any repository. anywhere lists only those, so this project shows no
 # issues, and it notifies each new request (and ping, and notice) instead.
 [[projects]]
-name = "Review requests"
+slug = "review-requests"
+title = "Review requests"
 repositories = ["anywhere"]
 pull-requests = { review-requested = true }
 issues = { show = false }
@@ -134,7 +137,8 @@ version = 1
 # any repository, grouped by repository under subheaders. Each new
 # request notifies, and so does each ping and notice your agents send.
 [[projects]]
-name = "Review queue"
+slug = "review-queue"
+title = "Review queue"
 repositories = ["anywhere"]
 pull-requests = { review-requested = true }
 group-by = "repository"

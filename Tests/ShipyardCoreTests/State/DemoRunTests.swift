@@ -46,7 +46,7 @@ struct DemoRunTests {
         let userSupport = home.appendingPathComponent("support", isDirectory: true)
         try FileManager.default.createDirectory(at: userConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: userSupport, withIntermediateDirectories: true)
-        let userConfigText = Data("[[projects]]\nname = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8)
+        let userConfigText = Data("[[projects]]\nslug = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8)
         let userState = Data(#"{"knownItems":{}}"#.utf8)
         try userConfigText.write(to: userConfig)
         try userState.write(to: userSupport.appendingPathComponent(AppStateStore.fileName))
@@ -55,7 +55,7 @@ struct DemoRunTests {
         let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
         let demoConfig = demo.appendingPathComponent("shipyard/config.toml")
         try FileManager.default.createDirectory(at: demoConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("[[projects]]\nname = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n".utf8).write(to: demoConfig)
+        try Data("[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n".utf8).write(to: demoConfig)
 
         // 1. The agent opens the demo; the user's app isn't running.
         let launcher = Launches()
@@ -80,13 +80,13 @@ struct DemoRunTests {
         // Nor is the user's ntn asked: a demo never lists their notes.
         #expect(!harness.shipyard.readsNotes)
         #expect(harness.stub.notionRequests.isEmpty)
-        #expect(harness.shipyard.configStore.lastValid.projects.map(\.name) == ["shipyard"])
+        #expect(harness.shipyard.configStore.lastValid.projects.map(\.slug) == ["shipyard"])
         #expect(harness.section("shipyard")?.rows.filter { $0.kind == .ping }.map(\.title) == ["In the demo"])
         let written = try FileManager.default.contentsOfDirectory(atPath: demoSupport.path).sorted()
         #expect(written == [
-            AppStateStore.fileName, "Pings", ConfigLocation.fileName, ConfigStatusStore.fileName, ResolvedRepositoriesStore.fileName,
+            AppStateStore.fileName, "Pings", ConfigurationLocation.fileName, ConfigStatusStore.fileName, ResolvedRepositoriesStore.fileName,
         ].sorted())
-        #expect(ConfigLocation.recorded(in: demoSupport) == demoConfig)
+        #expect(ConfigurationLocation.recorded(in: demoSupport) == demoConfig)
         // The socket the command waited at is the one this app listens on, and later commands find it.
         #expect(app.asked.current.last == ControlSocket.url(in: harness.files.support))
         try Data().write(to: ControlSocket.url(in: harness.files.support))   // the app's server listening
@@ -96,7 +96,7 @@ struct DemoRunTests {
         let userPings = PingStore(directory: PingStore.appDirectory(in: userSupport))
         var userTable = CommandTable()
         userTable.add(PingCommands.entries(
-            filing: ProjectFiling(configURL: ConfigLocation.current(environment: [:], home: home, support: userSupport),
+            filing: ProjectFiling(configURL: ConfigurationLocation.current(environment: [:], home: home, support: userSupport),
                                   repositories: ResolvedRepositoriesStore(directory: userSupport)),
             store: userPings
         ))

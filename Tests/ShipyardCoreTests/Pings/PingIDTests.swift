@@ -9,11 +9,11 @@ import Testing
 
 private let shopAndBlog = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """

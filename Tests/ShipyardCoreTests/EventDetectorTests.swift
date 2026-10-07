@@ -59,7 +59,7 @@ private func settings(
     rules: [NotificationRule] = [NotificationRule(event: .prOpened)]
 ) -> ProjectSettings {
     ProjectSettings(
-        name: name,
+        slug: name,
         repositories: repositories,
         pullRequests: PullRequestSettings(show: pullRequests),
         issues: IssueSettings(show: issues),
@@ -252,7 +252,7 @@ struct EventDetectorTests {
     @Test("a source that failed holds back only itself: runs that can't be read don't hold back pull requests")
     func failedSourceOnly() {
         let withRuns = ProjectSettings(
-            name: "blog",
+            slug: "blog",
             repositories: ["o/r"],
             pullRequests: PullRequestSettings(),
             issues: IssueSettings(),

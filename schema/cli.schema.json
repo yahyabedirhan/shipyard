@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json",
+  "title": "shipyard command settings",
+  "description": "cli.toml for the shipyard command, on every machine that runs it. On the Mac it sits beside the config.toml the app reads; elsewhere it lives in $XDG_CONFIG_HOME/shipyard/ (default ~/.config/shipyard/). Every key is optional; a missing file means the defaults. Keys are kebab-case. Unlike config.toml, an unknown key is an error: the command that reads the file fails until it's fixed.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "The cli.toml format version. Only 1 exists; a file without it is version 1.",
+      "type": "integer",
+      "enum": [1],
+      "default": 1
+    },
+    "notices": {
+      "description": "Where this machine's shipyard notify sends a notice. With app-machine set, straight to the app on that Mac over your tailnet, at <app-scheme>://<app-machine>:<app-port>; without it, through the herdr-shipyard plugin for the Mac's poll.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "app-machine": {
+          "description": "The Mac running the app, by its MagicDNS name alone, short or full, such as \"my-mac\" or \"my-mac.tail1234.ts.net\": no scheme and no port. None by default.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]*$"
+        },
+        "app-scheme": {
+          "description": "How the request travels, as tailscale serve exposes the app's port on the Mac (--http or --https).",
+          "type": "string",
+          "enum": ["http", "https"],
+          "default": "http"
+        },
+        "app-port": {
+          "description": "The port tailscale serve exposes on the Mac.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 47420
+        }
+      }
+    }
+  }
+}

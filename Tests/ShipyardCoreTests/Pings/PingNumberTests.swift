@@ -10,11 +10,11 @@ import Testing
 /// `shop` and `blog`, each watching its own repository and a shared one.
 private let shopAndBlog = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop", "yahyabedirhan/shared"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog", "yahyabedirhan/shared"]
 
     """
@@ -22,7 +22,7 @@ private let shopAndBlog = """
 /// `shop` alone.
 private let shopOnly = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """

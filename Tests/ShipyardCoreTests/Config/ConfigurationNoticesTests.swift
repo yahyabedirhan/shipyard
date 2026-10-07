@@ -17,14 +17,14 @@ struct ConfigurationNoticesTests {
 
     @Test("a port out of range, or a listen that isn't true or false, is rejected at its line")
     func rejected() {
-        #expect(rejection("[notices]\nport = 0\n") == [ConfigIssue(line: 2, message: "`port` must be between 1 and 65535 (got 0)")])
-        #expect(rejection("[notices]\nport = 65536\n") == [ConfigIssue(line: 2, message: "`port` must be between 1 and 65535 (got 65536)")])
-        #expect(rejection("[notices]\nlisten = \"yes\"\n") == [ConfigIssue(line: 2, message: "`notices.listen` must be true or false")])
+        #expect(rejection("[notices]\nport = 0\n") == [ConfigurationIssue(line: 2, message: "`port` must be between 1 and 65535 (got 0)")])
+        #expect(rejection("[notices]\nport = 65536\n") == [ConfigurationIssue(line: 2, message: "`port` must be between 1 and 65535 (got 65536)")])
+        #expect(rejection("[notices]\nlisten = \"yes\"\n") == [ConfigurationIssue(line: 2, message: "`notices.listen` must be true or false")])
     }
 
     @Test("cli.toml's keys under [notices] are only a warning here, saying where they go")
     func cliKeys() throws {
-        let warnings = try #require(decoded("[notices]\napp-machine = \"mac\"\n")).warnings
+        let warnings = try #require(decoded("version = 1\n[notices]\napp-machine = \"mac\"\n")).warnings
         #expect(warnings.count == 1)
         #expect(warnings.first?.message.hasPrefix("unknown setting `notices.app-machine`") == true)
     }

@@ -9,11 +9,11 @@ import Testing
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "blog"
+    slug = "blog"
     repositories = ["yahyabedirhan/blog"]
 
     """
@@ -133,11 +133,11 @@ struct PingNotificationTests {
             event = "pr.opened"
 
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
             notifications = [{ event = "ping.sent" }]
 

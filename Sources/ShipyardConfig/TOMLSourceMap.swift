@@ -1,13 +1,13 @@
 /// One step in a path through the configuration: a table key or an index
 /// into an array (of tables).
-enum ConfigPathComponent: Hashable, Sendable {
+enum ConfigurationPathComponent: Hashable, Sendable {
     case key(String)
     case index(Int)
 }
 
-typealias ConfigPath = [ConfigPathComponent]
+typealias ConfigurationPath = [ConfigurationPathComponent]
 
-extension Array where Element == ConfigPathComponent {
+extension Array where Element == ConfigurationPathComponent {
     /// `projects[1].issues.show`
     var dotted: String {
         var out = ""
@@ -34,7 +34,7 @@ extension Array where Element == ConfigPathComponent {
 struct TOMLSourceMap {
     /// A table header or a `key = value` the pass recorded.
     struct Entry {
-        var path: ConfigPath
+        var path: ConfigurationPath
         var line: Int
         /// The last line of the entry: the value's last line for a key, the
         /// line before the next header for a header.
@@ -49,7 +49,7 @@ struct TOMLSourceMap {
     init(_ text: String) {
         lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         var scanner = Scanner(Array(text.unicodeScalars))
-        var section: ConfigPath = []
+        var section: ConfigurationPath = []
         var arrayIndex: [String: Int] = [:]
 
         while true {
@@ -62,7 +62,7 @@ struct TOMLSourceMap {
                 if isArray { scanner.advance() }
                 let keys = scanner.readKey(until: "]")
                 scanner.skipToLineEnd()
-                var path: ConfigPath = []
+                var path: ConfigurationPath = []
                 for (position, key) in keys.enumerated() {
                     path.append(.key(key))
                     if isArray && position == keys.count - 1 {
@@ -105,7 +105,7 @@ struct TOMLSourceMap {
     /// that entry's span where `value` appears as a quoted string, which
     /// places an element of a multi-line array; with `occurrence`, the line
     /// of that appearance counting from 0 (a value listed twice).
-    func line(for path: ConfigPath, value: String? = nil, occurrence: Int = 0) -> Int? {
+    func line(for path: ConfigurationPath, value: String? = nil, occurrence: Int = 0) -> Int? {
         var prefix = path
         while !prefix.isEmpty {
             let match = entries.first { $0.path == prefix }

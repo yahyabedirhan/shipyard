@@ -61,7 +61,7 @@ struct PresetOnboardingTests {
         }
         #expect(try contents(harness) == Preset.reviewQueue.text())
         #expect(harness.shipyard.phase == .ready)
-        #expect(harness.shipyard.menu.sections.map(\.name) == ["Review queue"])
+        #expect(harness.shipyard.menu.sections.map(\.title) == ["Review queue"])
         #expect(harness.graphQLRequests.count == 1)
         #expect(harness.shipyard.configError == nil)
         #expect(harness.shipyard.configWarnings.isEmpty)
@@ -83,7 +83,7 @@ struct PresetOnboardingTests {
         try await harness.shipyard.choosePreset(.incomingContributions, projects: choice.projects(from: []))
 
         #expect(harness.shipyard.phase == .ready)
-        #expect(harness.shipyard.menu.sections.map(\.name) == ["Incoming", "Review requests"])
+        #expect(harness.shipyard.menu.sections.map(\.title) == ["Incoming", "Review requests"])
         let projects = harness.shipyard.configStore.lastValid.projects
         #expect(projects.map(\.repositories) == [[.group(.owned)], [.anywhere]])
         #expect(harness.stub.requests("POST", GitHubClient.graphQLURL, body: RepositoryListResponse.groupQuery).count == 1)
@@ -91,11 +91,11 @@ struct PresetOnboardingTests {
 
     @Test("my-agents and incoming-contributions with picking write the picked repositories")
     func pickedRepositories() async throws {
-        let picked = [NewProject(name: "shop", repositories: ["yabepa/shop"])]
+        let picked = [NewProject(title: "shop", repositories: ["yabepa/shop"])]
         let agents = try await onboarding()
         try await agents.shipyard.choosePreset(.myAgents, projects: picked)
         #expect(agents.shipyard.phase == .ready)
-        #expect(agents.shipyard.menu.sections.map(\.name) == ["shop"])
+        #expect(agents.shipyard.menu.sections.map(\.title) == ["shop"])
         #expect(try contents(agents) == Preset.myAgents.text(projects: picked))
 
         let incoming = try await onboarding()
@@ -104,7 +104,7 @@ struct PresetOnboardingTests {
         let proceeded = choice.proceed()
         #expect(!proceeded)
         try await incoming.shipyard.choosePreset(.incomingContributions, projects: choice.projects(from: picked))
-        #expect(incoming.shipyard.menu.sections.map(\.name) == ["shop", "Review requests"])
+        #expect(incoming.shipyard.menu.sections.map(\.title) == ["shop", "Review requests"])
     }
 
     @Test(
@@ -121,7 +121,7 @@ struct PresetOnboardingTests {
         #expect(harness.shipyard.phase == .needsProjects)
         #expect(harness.shipyard.presets.isEmpty)
 
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
 
@@ -135,7 +135,7 @@ struct PresetOnboardingTests {
         let broken = "version = \n"
         let harness = try await onboarding(config: broken)
         #expect(harness.shipyard.presets.isEmpty)
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
         #expect(try contents(harness) == broken)
@@ -148,7 +148,7 @@ struct PresetOnboardingTests {
         let edited = Configuration.header + "\n[menu]\nlayout = \"tabs\"\n"
         try harness.writeConfig(edited)
 
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(.reviewQueue)
         }
 
@@ -164,25 +164,25 @@ struct PresetOnboardingTests {
         try await harness.shipyard.choosePreset(.reviewQueue)
         #expect(harness.shipyard.phase == .ready)
 
-        let store = ConfigStore(url: FileManager.default.temporaryDirectory
+        let store = ConfigurationStore(url: FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
             .appendingPathComponent("config.toml"))
         store.reload()
         #expect(store.acceptsPreset)
         try store.writePreset(.reviewQueue)
-        #expect(store.lastValid.projects.map(\.name) == ["Review queue"])
+        #expect(store.lastValid.projects.map(\.title) == ["Review queue"])
     }
 
     @Test("an invalid picked project writes nothing")
     func invalidProject() async throws {
         let harness = try await onboarding()
-        await #expect(throws: ConfigError.self) {
-            try await harness.shipyard.choosePreset(.myAgents, projects: [NewProject(name: "shop", repositories: ["not a slug"])])
+        await #expect(throws: ConfigurationError.self) {
+            try await harness.shipyard.choosePreset(.myAgents, projects: [NewProject(title: "shop", repositories: ["not a slug"])])
         }
-        await #expect(throws: ConfigError.self) {
+        await #expect(throws: ConfigurationError.self) {
             try await harness.shipyard.choosePreset(
                 .incomingContributions,
-                projects: [NewProject(name: "Review requests", repositories: ["yabepa/shop"])]
+                projects: [NewProject(title: "Review requests", repositories: ["yabepa/shop"])]
             )
         }
         #expect(try contents(harness) == Configuration.header)

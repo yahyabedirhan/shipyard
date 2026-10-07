@@ -11,11 +11,11 @@ private let twoMachines = """
     machines = ["hetzner-vps", "netcup-vps"]
 
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     [[projects]]
-    name = "quiet"
+    slug = "quiet"
     repositories = ["yahyabedirhan/quiet"]
     notifications = [{ event = "pr.opened" }]
 

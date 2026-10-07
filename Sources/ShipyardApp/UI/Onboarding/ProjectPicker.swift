@@ -17,7 +17,7 @@ struct ProjectPicker: View {
     /// The preset the repositories are for; `nil` for the plain picker.
     var preset: Preset?
     /// What Add does with the projects; `nil` appends them (`addProjects`).
-    var add: (([NewProject]) async throws -> ConfigStore.ReloadResult)?
+    var add: (([NewProject]) async throws -> ConfigurationStore.ReloadResult)?
     /// Back to the presets; `nil` for the plain picker.
     var back: (() -> Void)?
 
@@ -291,7 +291,7 @@ struct ProjectPicker: View {
                     choices = ProjectChoices(suggestions: choices.offered)
                     addError = PanelText.addedToBrokenFile
                 }
-            } catch let error as ConfigError {
+            } catch let error as ConfigurationError {
                 addError = error.description
             } catch {
                 addError = PanelText.couldNotWrite(error.localizedDescription)

@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardConfig
 
-/// One tab of the tabs layout: every project, or one of them by name.
+/// One tab of the tabs layout: every project, or one of them by slug.
 public enum MenuTab: Hashable, Sendable {
     case all
     case project(String)

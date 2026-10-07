@@ -9,18 +9,18 @@ import Testing
 /// What the picker writes for the projects `graphql-pull-requests.json`
 /// answers for (repo0 and repo1 are e-commerce's, repo2 is job-search's).
 private let chosen = [
-    NewProject(name: "e-commerce", repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]),
-    NewProject(name: "job-search", repositories: ["yahyabedirhan/job-search"]),
+    NewProject(title: "e-commerce", repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]),
+    NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
 ]
 
 private let chosenText = """
 
     [[projects]]
-    name = "e-commerce"
+    slug = "e-commerce"
     repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
     [[projects]]
-    name = "job-search"
+    slug = "job-search"
     repositories = ["yahyabedirhan/job-search"]
 
     """
@@ -239,7 +239,7 @@ struct ProjectPickerTests {
             Issue.record("expected a change, got \(result)")
             return
         }
-        #expect(configuration.projects.map(\.name) == ["e-commerce", "job-search"])
+        #expect(configuration.projects.map(\.slug) == ["e-commerce", "job-search"])
         #expect(harness.shipyard.phase == .ready)
         #expect(harness.graphQLRequests.count == 2)
         #expect(harness.shipyard.menu.sections.map(\.name) == ["e-commerce", "job-search"])
@@ -283,7 +283,7 @@ struct ProjectPickerTests {
         let text = try String(contentsOf: harness.configURL, encoding: .utf8)
         #expect(text == existing + "\n" + chosenText)
         #expect(harness.shipyard.phase == .ready)
-        #expect(harness.shipyard.configStore.lastValid.refreshIntervalSeconds == 300)
+        #expect(harness.shipyard.configStore.lastValid.refreshInterval == 300)
         #expect(harness.timer.armed == 300)
     }
 
@@ -291,13 +291,13 @@ struct ProjectPickerTests {
     func confirmRejected() async throws {
         let harness = try await signedIn(graphQL: [pullRequests()])
 
-        await #expect(throws: ConfigError([ConfigIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
-            try await harness.shipyard.addProjects([NewProject(name: "x", repositories: ["nope"])])
+        await #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "repository `nope` isn't `owner/name`")])) {
+            try await harness.shipyard.addProjects([NewProject(title: "x", repositories: ["nope"])])
         }
-        await #expect(throws: ConfigError([ConfigIssue(line: nil, message: "project name `x` is already used")])) {
+        await #expect(throws: ConfigurationError([ConfigurationIssue(line: nil, message: "project slug `x` is already used")])) {
             try await harness.shipyard.addProjects([
-                NewProject(name: "x", repositories: ["o/a"]),
-                NewProject(name: "x", repositories: ["o/b"]),
+                NewProject(title: "x", repositories: ["o/a"]),
+                NewProject(title: "x", repositories: ["o/b"]),
             ])
         }
 

@@ -18,15 +18,15 @@ struct PingFilingTests {
     func twoProjects() async throws {
         let config = """
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
 
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = ["yahyabedirhan/shop", "yahyabedirhan/blog"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
 
             """
@@ -52,7 +52,7 @@ struct PingFilingTests {
     func groupMatchesOnceResolved() async throws {
         let harness = try Harness(stored: "gho_stored", config: """
             [[projects]]
-            name = "mine"
+            slug = "mine"
             repositories = ["owned"]
 
             """)
@@ -87,7 +87,7 @@ struct PingFilingTests {
                 group-by = "repository"
 
                 [[projects]]
-                name = "shop"
+                slug = "shop"
                 repositories = ["yahyabedirhan/shop"]
 
                 """,

@@ -74,7 +74,7 @@ struct TabsLayout: View {
             }
             // A project's tab stands for its header: its new-note icon is here.
             if let section = section(for: tab), let newNote = section.newNote {
-                NewNoteIcon(project: section.name, state: newNote) { actions.startNote(section) }
+                NewNoteIcon(project: section.title, state: newNote) { actions.startNote(section) }
             }
         }
         .font(TypeScale.meta)
@@ -207,7 +207,7 @@ private struct TabStrip: View {
                 HStack(spacing: 2) {
                     ForEach(model.tabs, id: \.self) { tab in
                         TabPill(
-                            title: PanelText.tabTitle(tab),
+                            title: model.tabTitle(tab),
                             count: model.attentionCount(for: tab),
                             isOn: tab == selection,
                             namespace: pill

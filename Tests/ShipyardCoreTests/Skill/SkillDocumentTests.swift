@@ -20,7 +20,7 @@ private func skill() throws -> String {
 }
 
 /// The body of every ```toml fence in `text`, in order.
-private func tomlBlocks(in text: String) -> [String] {
+func tomlBlocks(in text: String) -> [String] {
     var blocks: [String] = []
     var current: [String]?
     var indent = 0
@@ -111,8 +111,8 @@ struct SkillDocumentTests {
         #expect(blocks.count >= 5)
         let schema = try loadSchema()
         for block in blocks {
-            do throws(ConfigError) {
-                let result = try Configuration.decode(block)
+            do throws(ConfigurationError) {
+                let result = try Configuration.decode(asFile(block))
                 #expect(result.warnings.isEmpty, "warnings in:\n\(block)")
             } catch {
                 Issue.record("rejected: \(error)\nin:\n\(block)")
@@ -314,14 +314,14 @@ struct SkillDocumentTests {
         let text = try skill()
         let c = Configuration()
         func literal<T: RawRepresentable>(_ choice: T) -> String where T.RawValue == String { "\"\(choice.rawValue)\"" }
-        func window(_ seconds: TimeInterval) -> String { "\"\(WindowDuration.text(seconds))\"" }
+        func window(_ seconds: TimeInterval) -> String { "\"\(ConfigurationDuration.text(seconds))\"" }
         // A kind's states, in the order the file writes them, when the default is all of them.
         func states(_ kind: ItemKind, _ value: Set<StateGroup>) -> String {
             value == Set(StateGroup.all(for: kind)) ? "[" + StateGroup.all(for: kind).map(literal).joined(separator: ", ") + "]" : "?"
         }
         let rows: [(String, String)] = [
             ("version", "\(c.version)"),
-            ("refresh-interval-seconds", "\(c.refreshIntervalSeconds)"),
+            ("refresh-interval", window(c.refreshInterval)),
             ("launch-at-login", "\(c.launchAtLogin)"),
             ("[menu-bar] count", literal(c.menuBar.count)),
             ("[menu] layout", literal(c.menu.layout)),
@@ -388,8 +388,8 @@ struct SkillDocumentTests {
         // The examples the page puts where onboarding's picks go.
         let examples: [String: [NewProject]] = [
             Preset.myAgents.name: [
-                NewProject(name: "hello-world", repositories: ["octocat/hello-world"]),
-                NewProject(name: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
+                NewProject(title: "hello-world", repositories: ["octocat/hello-world"]),
+                NewProject(title: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
             ],
         ]
         // One `## `name`` section per preset, in the app's order, each with its file.
@@ -442,6 +442,9 @@ struct SkillDocumentTests {
         #expect(text.contains("~/.config/shipyard/config.toml"))
         #expect(text.contains("#:schema \(Configuration.schemaURL)"))
         #expect(text.contains("taplo check"))
+        // The command's check, in the edit steps, so an agent runs it after each edit.
+        let editSteps = try #require(text.components(separatedBy: "## Editing it").dropFirst().first?.components(separatedBy: "\n## ").first)
+        #expect(editSteps.contains("`shipyard config check`"))
         // The app's own check: its error banner, in the words the panel shows.
         #expect(text.contains("Using the last valid configuration."))
         // The app's verdict, where an agent reads it, with the fields it names.

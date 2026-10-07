@@ -15,7 +15,7 @@ import Testing
 struct TailnetNoticeTests {
     static let shop = """
         [[projects]]
-        name = "shop"
+        slug = "shop"
         repositories = ["yahyabedirhan/shop"]
 
         """
@@ -95,7 +95,7 @@ struct TailnetNoticeTests {
     func noticesOff() async throws {
         let harness = try await app("""
             [[projects]]
-            name = "shop"
+            slug = "shop"
             repositories = ["yahyabedirhan/shop"]
             notifications = [{ event = "pr.opened" }]
 

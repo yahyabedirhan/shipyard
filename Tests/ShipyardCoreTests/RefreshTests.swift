@@ -9,12 +9,14 @@ import Testing
 /// The projects `graphql-pull-requests.json` answers for: repo0 and repo1
 /// are e-commerce's, repo2 is job-search's.
 private let projects = """
+    version = 1
+
     [[projects]]
-    name = "e-commerce"
+    slug = "e-commerce"
     repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
     [[projects]]
-    name = "job-search"
+    slug = "job-search"
     repositories = ["yahyabedirhan/job-search"]
 
     """
@@ -23,11 +25,11 @@ private let projects = """
 /// job-search, repo1 doesn't exist.
 private let withMissingRepository = """
     [[projects]]
-    name = "job-search"
+    slug = "job-search"
     repositories = ["yahyabedirhan/job-search"]
 
     [[projects]]
-    name = "archive"
+    slug = "archive"
     repositories = ["yahyabedirhan/job-search", "yahyabedirhan/gone"]
 
     """
@@ -129,12 +131,12 @@ struct RefreshTests {
     func closedWindowZero() async throws {
         let config = """
             [[projects]]
-            name = "e-commerce"
+            slug = "e-commerce"
             repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
             pull-requests = { closed-window = "0" }
 
             [[projects]]
-            name = "job-search"
+            slug = "job-search"
             repositories = ["yahyabedirhan/job-search"]
 
             """
@@ -271,11 +273,11 @@ struct RefreshTests {
 
         try harness.writeConfig("""
             [[projects]]
-            name = "e-commerce"
+            slug = "e-commerce"
             repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
 
             [[projects]]
-            name = "blog"
+            slug = "blog"
             repositories = ["yahyabedirhan/blog"]
 
             """)
@@ -321,7 +323,7 @@ struct RefreshTests {
     @Test("after each refresh the timer is armed with the configured interval, and firing it refreshes")
     func timer() async throws {
         let harness = try await Harness.started(
-            config: "refresh-interval-seconds = 300\n\n" + projects,
+            config: "refresh-interval = \"5m\"\n\n" + projects,
             graphQL: pullRequests()
         )
         #expect(harness.graphQLRequests.count == 1)
@@ -427,7 +429,7 @@ struct RefreshTests {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
         let before = harness.shipyard.menu
 
-        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects)
+        try harness.writeConfig("refresh-interval = \"5s\"\n\n" + projects)
         let result = await harness.shipyard.reloadConfiguration()
 
         guard case .invalid = result else {
@@ -444,7 +446,7 @@ struct RefreshTests {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
         #expect(harness.shipyard.configError == nil)
 
-        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects)
+        try harness.writeConfig("refresh-interval = \"5s\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         let error = try #require(harness.shipyard.configError)
@@ -461,15 +463,15 @@ struct RefreshTests {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
         #expect(harness.shipyard.configWarnings.isEmpty)
 
-        try harness.writeConfig("refresh-interval-second = 300\n\n" + projects)
+        try harness.writeConfig("refresh-intervl = \"5m\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.shipyard.configError == nil)
         #expect(harness.shipyard.configWarnings == [
-            ConfigIssue(line: 1, message: "unknown setting `refresh-interval-second` (ignored; did you mean `refresh-interval-seconds`?)"),
+            ConfigurationIssue(line: 1, message: "unknown setting `refresh-intervl` (ignored; did you mean `refresh-interval`?)"),
         ])
 
-        try harness.writeConfig("refresh-interval-seconds = 300\n\n" + projects)
+        try harness.writeConfig("refresh-interval = \"5m\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.shipyard.configWarnings.isEmpty)
@@ -479,19 +481,19 @@ struct RefreshTests {
     func warningClearedByBrokenFile() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
 
-        try harness.writeConfig("refresh-interval-second = 300\n\n" + projects)
+        try harness.writeConfig("refresh-intervl = \"5m\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.shipyard.configError == nil)
         #expect(harness.shipyard.configWarnings.count == 1)
 
-        try harness.writeConfig("refresh-interval-second = 300\nrefresh-interval-seconds = 5\n\n" + projects)
+        try harness.writeConfig("refresh-intervl = \"5m\"\nrefresh-interval = \"5s\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.shipyard.configError != nil)
         #expect(harness.shipyard.configWarnings.isEmpty)
 
-        try harness.writeConfig("refresh-interval-seconds = 300\n\n" + projects)
+        try harness.writeConfig("refresh-interval = \"5m\"\n\n" + projects)
         await harness.shipyard.reloadConfiguration()
 
         #expect(harness.shipyard.configError == nil)

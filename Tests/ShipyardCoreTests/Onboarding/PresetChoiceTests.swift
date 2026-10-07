@@ -2,7 +2,7 @@ import ShipyardConfig
 import ShipyardCore
 import Testing
 
-private let picked = [NewProject(name: "shop", repositories: ["yabepa/shop"])]
+private let picked = [NewProject(title: "shop", repositories: ["yabepa/shop"])]
 
 @Suite("Preset choice")
 struct PresetChoiceTests {

@@ -57,7 +57,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
     public var view: String
     /// `list` or `tabs`, as `[menu] layout` spells it.
     public var layout: String
-    /// The tabs layout's selected tab: a project's name, or `All`; `nil`
+    /// The tabs layout's selected tab, by its title: a project's title, or `All`; `nil`
     /// (`null` in the JSON) in the list layout.
     public var tab: String?
     public var projects: [String]

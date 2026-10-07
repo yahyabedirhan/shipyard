@@ -7,13 +7,13 @@ public struct NotesMenuState: Equatable, Sendable {
     /// Whether notes can be started now (`ntn` is there and logged in):
     /// the icon shows only then.
     public var canStartNotes: Bool
-    /// Why each project's notes couldn't be read, by project name.
+    /// Why each project's notes couldn't be read, by project slug.
     public var readErrors: [String: String]
-    /// Why the icon couldn't start a note, by project name.
+    /// Why the icon couldn't start a note, by project slug.
     public var startErrors: [String: String]
     /// The projects a note is being started in now.
     public var starting: Set<String>
-    /// Each project's notes database in Notion, by project name, which its
+    /// Each project's notes database in Notion, by project slug, which its
     /// header's notes count opens.
     public var databases: [String: URL]
 

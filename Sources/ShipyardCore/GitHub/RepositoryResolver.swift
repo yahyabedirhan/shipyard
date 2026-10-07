@@ -55,7 +55,7 @@ public final class RepositoryResolver {
         entries = [:]
     }
 
-    /// Each project's repositories, by project name. Looks up every group
+    /// Each project's repositories, by project slug. Looks up every group
     /// and `owner/*` the projects use that wasn't answered within the hour,
     /// or failed last time, or all of them when `force`; each lookup once,
     /// however many projects share it.
@@ -100,7 +100,7 @@ public final class RepositoryResolver {
 
         var resolved: [String: ResolvedRepositories] = [:]
         for project in projects {
-            resolved[project.name] = resolution(of: project)
+            resolved[project.slug] = resolution(of: project)
         }
         return resolved
     }

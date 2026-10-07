@@ -28,7 +28,7 @@ public enum ControlRequest: Equatable, Sendable {
     /// as the command names it (`pull-requests`); the app checks it.
     case panelShowMore(project: String, kind: String)
     /// `shipyard panel tab <name>`: the tabs layout's selected tab, a
-    /// project's name or `All`.
+    /// project's slug, or else its title, or `All`.
     case panelTab(name: String)
     /// `shipyard panel view <name>`: a status view in place of the
     /// projects (`github`, `notion`, `skill`, `cli`), or the projects again

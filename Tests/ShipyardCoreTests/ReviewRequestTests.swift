@@ -10,7 +10,7 @@ private let blogRepository = "yahyabedirhan/blog"
 
 private let shop = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
 
     """
@@ -18,12 +18,12 @@ private let shop = """
 /// Two projects over the same repository: everything, and only what waits on the user.
 private let shopAndQueue = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["yahyabedirhan/shop"]
     issues = { show = true }
 
     [[projects]]
-    name = "queue"
+    slug = "queue"
     repositories = ["yahyabedirhan/shop"]
     pull-requests = { review-requested = true }
     issues = { show = true }
@@ -124,7 +124,7 @@ struct ReviewRequestTests {
     func leftOutNeitherCountsNorNotifies() async throws {
         let config = """
             [[projects]]
-            name = "queue"
+            slug = "queue"
             repositories = ["yahyabedirhan/shop"]
             pull-requests = { review-requested = true }
             notifications = [{ event = "pr.opened" }]
@@ -160,7 +160,7 @@ struct ReviewRequestTests {
         let repositories = (0..<7).map { String(format: "yahyabedirhan/repo-%02d", $0) }
         let config = """
             [[projects]]
-            name = "everything"
+            slug = "everything"
             repositories = [\(repositories.map { "\"\($0)\"" }.joined(separator: ", "))]
 
             """

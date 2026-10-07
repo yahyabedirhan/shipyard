@@ -76,7 +76,7 @@ public struct ProjectChoices: Equatable, Sendable {
 
     /// The projects' names, once each, in order: what a repository can be grouped with.
     public var projectNames: [String] {
-        projects.map(\.name)
+        projects.map(\.title)
     }
 
     /// The projects to add: one per distinct name, in the order each name
@@ -84,10 +84,10 @@ public struct ProjectChoices: Equatable, Sendable {
     public var projects: [NewProject] {
         var result: [NewProject] = []
         for choice in chosen {
-            if let index = result.firstIndex(where: { $0.name == choice.name }) {
+            if let index = result.firstIndex(where: { $0.title == choice.name }) {
                 result[index].repositories.append(choice.repository.slug)
             } else {
-                result.append(NewProject(name: choice.name, repositories: [choice.repository.slug]))
+                result.append(NewProject(title: choice.name, repositories: [choice.repository.slug]))
             }
         }
         return result

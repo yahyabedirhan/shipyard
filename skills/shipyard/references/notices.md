@@ -18,12 +18,12 @@ shipyard notify withdraw <id>
 
 | Flag | What it does |
 |---|---|
-| `"<title>"` | the one line the notification shows after the project's name; quote it, it's one argument |
+| `"<title>"` | the one line the notification shows after the project's title; quote it, it's one argument |
 | `--subtitle <text>` | a line between the title and the body |
 | `--body <text>` | more than the title fits, shown under it |
 | `--from <label>` | who sent it, such as your name and the task (`"claude · checkout"`), shown under the body as "from <label>" |
 | `--repo <owner/name>` | file it by this repository instead of the working folder's |
-| `--project <name>` | file it under this one project, by its `name` in `config.toml` |
+| `--project <name>` | file it under this one project, by its `slug` in `config.toml`, or else its `title` |
 | `--image <path>` | a PNG, JPEG or GIF shown with it, 5 MB at most; a relative path is from the working folder |
 | `--sound <sound>` | `default` (without the flag too), `none` for a quiet update, or a sound's name such as `Glass` |
 | `--thread <key>` | stacks it in Notification Center with the other notices of this key, such as one orchestration's; without it, it stacks with its project's |
@@ -102,13 +102,16 @@ A notice from another machine goes straight to the Mac over the user's tailnet (
 4. **The machine names its Mac** in its own `cli.toml` (`~/.config/shipyard/cli.toml`, or under `$XDG_CONFIG_HOME`), by the Mac's MagicDNS name, short or full (`tailscale status` on the machine lists it):
 
    ```toml
+   #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json
+   version = 1
+
    [notices]
    app-machine = "my-mac"
    # app-scheme = "http"   http or https, as tailscale serve exposes it
    # app-port = 47420      the port tailscale serve exposes
    ```
 
-   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notices]` has the Mac's `listen` and `port`), and an unknown key in it is an error.
+   `cli.toml` is the command's own file, not the app's: `app-machine`, `app-scheme` and `app-port` go there, never in `config.toml` (whose `[notices]` has the Mac's `listen` and `port`), and an unknown key in it is an error. The `#:schema` line points Taplo at the file's own schema, so `taplo check ~/.config/shipyard/cli.toml; echo "taplo exit status: $?"` checks it as it checks `config.toml`. Run `shipyard config check` on the machine after each edit: it prints each problem with its line and exits 1 until the file reads. `version = 1` is the file's format; a file without it reads as version 1, with no warning, and any other version is an error. An older `shipyard` rejects `version` as an unknown key, so update `shipyard` on the machine before you add it.
 5. **A test notice**, from the machine:
 
    ```sh

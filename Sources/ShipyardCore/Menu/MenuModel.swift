@@ -78,7 +78,7 @@ public struct MenuModel: Equatable, Sendable {
     public static let empty = MenuModel()
 
     /// The model for the projects' `listings` (from `Listing.listings`, by
-    /// project name) under `configuration` and what the user has seen and
+    /// project slug) under `configuration` and what the user has seen and
     /// collapsed; `snapshot` gives the error rows and when it was fetched.
     /// Without a snapshot (no refresh has succeeded yet) every configured
     /// project still gets a section, empty and not loaded yet; so does a
@@ -101,17 +101,18 @@ public struct MenuModel: Equatable, Sendable {
             // Not loaded yet, but its pings (the listing's only items) show.
             let sections = configuration.projects.map { project in
                 MenuSection(
-                    name: project.name,
+                    name: project.slug,
+                    title: project.title,
                     groups: Arrangement.groups(
-                        listings[project.name] ?? [],
-                        project: project.name,
+                        listings[project.slug] ?? [],
+                        project: project.slug,
                         settings: configuration.settings(for: project).arrangement,
                         layout: configuration.menu.layout,
                         folded: state.collapsedGroups,
                         expanded: expanded,
                         now: now
                     ),
-                    errors: noteErrorRows(notes, project: project.name, configuration: configuration),
+                    errors: noteErrorRows(notes, project: project.slug, configuration: configuration),
                     showsRepository: project.repositories.count > 1,
                     isLoaded: false,
                     repositories: project.repositories.compactMap(\.slug)
@@ -126,14 +127,15 @@ public struct MenuModel: Equatable, Sendable {
         }
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
-            let items = listings[project.name] ?? []
+            let items = listings[project.slug] ?? []
             // What the refresh watched for it: its groups and wildcards resolved.
-            let repositories = snapshot.repositories[project.name] ?? settings.repositorySlugs
+            let repositories = snapshot.repositories[project.slug] ?? settings.repositorySlugs
             return MenuSection(
-                name: project.name,
+                name: project.slug,
+                title: project.title,
                 groups: Arrangement.groups(
                     items,
-                    project: project.name,
+                    project: project.slug,
                     settings: settings.arrangement,
                     layout: configuration.menu.layout,
                     folded: state.collapsedGroups,
@@ -143,19 +145,19 @@ public struct MenuModel: Equatable, Sendable {
                 // One row per selector that couldn't be resolved, then one
                 // per repository, for a kind this project shows: a runs
                 // failure isn't an error where runs are off.
-                errors: (snapshot.selectorErrors[project.name] ?? []).map(MenuErrorRow.init)
+                errors: (snapshot.selectorErrors[project.slug] ?? []).map(MenuErrorRow.init)
                     + repositories.compactMap { repository in
                         settings.fetchedKinds.lazy
                             .compactMap { snapshot.errors[ItemSource(repository: repository, kind: $0)] }
                             .first
                             .map(MenuErrorRow.init)
                     } + reviewSearchErrors(snapshot, settings: settings)
-                    + noteErrorRows(notes, project: project.name, configuration: configuration),
+                    + noteErrorRows(notes, project: project.slug, configuration: configuration),
                 notes: reviewSearchNotes(snapshot, settings: settings),
                 // `anywhere` brings in pull requests from any repository.
                 showsRepository: repositories.count > 1 || settings.usesAnywhere,
                 // A project added since the snapshot was fetched isn't in it yet.
-                isLoaded: snapshot.items[project.name] != nil,
+                isLoaded: snapshot.items[project.slug] != nil,
                 repositories: repositories
             )
         }
@@ -242,7 +244,7 @@ public struct MenuModel: Equatable, Sendable {
             let settings: ProjectSettings
             if let machine = sections[index].machine {
                 settings = configuration.settings(forMachine: machine)
-            } else if let project = configuration.projects.first(where: { $0.name == sections[index].name }) {
+            } else if let project = configuration.projects.first(where: { $0.slug == sections[index].name }) {
                 settings = configuration.settings(for: project)
             } else {
                 continue
@@ -315,7 +317,7 @@ public struct MenuModel: Equatable, Sendable {
 
     /// Whether the project named `project` lists notes.
     private static func showsNotes(_ project: String, configuration: Configuration) -> Bool {
-        configuration.projects.first { $0.name == project }.map { configuration.settings(for: $0).notes.show } ?? false
+        configuration.projects.first { $0.slug == project }.map { configuration.settings(for: $0).notes.show } ?? false
     }
 
     /// The note in a project using `anywhere` when the review search
@@ -347,8 +349,11 @@ public struct MenuModel: Equatable, Sendable {
 
 /// One project in the panel.
 public struct MenuSection: Equatable, Sendable, Identifiable {
-    /// The project's name, unique in the configuration.
+    /// What identifies the section: the project's slug, unique in the
+    /// configuration, or a remote machine's label.
     public var name: String
+    /// What its header and tab show: the project's title, or the machine's label.
+    public var title: String
     /// Its listed items as `Arrangement` groups and sorts them: by default
     /// pull requests, then pings, then issues, then workflow runs, then
     /// notes; within each kind, open
@@ -401,6 +406,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// A section whose rows are one group, as `group-by = "none"` makes.
     public init(
         name: String,
+        title: String? = nil,
         rows: [MenuRow],
         errors: [MenuErrorRow] = [],
         notes: [String] = [],
@@ -412,6 +418,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     ) {
         self.init(
             name: name,
+            title: title,
             groups: rows.isEmpty ? [] : [RowGroup(
                 id: GroupID(project: name, key: .ungrouped),
                 title: "",
@@ -430,6 +437,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
 
     public init(
         name: String,
+        title: String? = nil,
         groups: [RowGroup],
         errors: [MenuErrorRow] = [],
         notes: [String] = [],
@@ -440,6 +448,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
         repositories: [String] = []
     ) {
         self.name = name
+        self.title = title ?? name
         self.groups = groups
         self.errors = errors
         self.notes = notes
