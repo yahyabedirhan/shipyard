@@ -100,10 +100,10 @@ extension PanelText {
     /// A part's item in the settings menu: "Set up", then the part, then "…".
     public static func settingsTitle(_ part: SetupPart) -> String {
         switch part {
-        case .github: "Set up GitHub…"
-        case .notion: "Set up Notion…"
-        case .skill: "Set up /shipyard skill…"
-        case .cli: "Set up shipyard CLI…"
+        case .github: "Set up GitHub"
+        case .notion: "Set up Notion"
+        case .skill: "Set up /shipyard skill"
+        case .cli: "Set up shipyard CLI"
         }
     }
 

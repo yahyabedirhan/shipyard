@@ -204,7 +204,7 @@ The flow shown when shipyard isn't connected to GitHub or has no projects: conne
 _Avoid_: Setup wizard, welcome
 
 **Setup part**:
-One of the things shipyard uses that the user sets up: GitHub, Notion through ntn, the shipyard agent skill and the `shipyard` CLI. The settings menu lists each as a Set up item (Set up GitHub…, Set up Notion…, Set up /shipyard skill…, Set up shipyard CLI…), with a check mark only when it's set up.
+One of the things shipyard uses that the user sets up: GitHub, Notion through ntn, the shipyard agent skill and the `shipyard` CLI. The settings menu lists each as a Set up item (Set up GitHub, Set up Notion, Set up /shipyard skill, Set up shipyard CLI), with a check mark only when it's set up.
 _Avoid_: Integration, service, connection
 
 **Status view**:

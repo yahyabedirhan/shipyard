@@ -14,13 +14,13 @@ struct StatusViewTextTests {
     func settingsMenuOrder() {
         let signedIn = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: true)
         #expect(signedIn.map(\.title) == [
-            "Open configuration file", "Set up GitHub…", "Set up Notion…", "Set up /shipyard skill…", "Set up shipyard CLI…", "Sign out",
+            "Open configuration file", "Set up GitHub", "Set up Notion", "Set up /shipyard skill", "Set up shipyard CLI", "Sign out",
         ])
         #expect(signedIn.map(\.action) == [
             .openConfiguration, .open(.github), .open(.notion), .open(.skill), .open(.cli), .signOut,
         ])
         let signedOut = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: false)
-        #expect(signedOut.map(\.title).last == "Set up shipyard CLI…")
+        #expect(signedOut.map(\.title).last == "Set up shipyard CLI")
     }
 
     @Test("the Shipyard CLI item has the check mark only while the CLI is linked, and no other item has a mark", arguments: [

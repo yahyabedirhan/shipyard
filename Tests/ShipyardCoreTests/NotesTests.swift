@@ -330,7 +330,7 @@ struct NotesTests {
         #expect(await harness.shipyard.checkNotes() == nil)
         #expect(harness.ntn.runs == 0)
         #expect(PanelText.notesCheckRefusal(canReadNotes: harness.shipyard.canReadNotes)
-            == "Notion isn't connected, so shipyard runs no ntn: open Set up Notion… in shipyard's settings menu and press Connect with ntn")
+            == "Notion isn't connected, so shipyard runs no ntn: open Set up Notion in shipyard's settings menu and press Connect with ntn")
     }
 
     @Test("Connect with ntn reads the notes at once, with the new-note icons and the notes timer, and keeps the flag in state.json, so a restart lists them without connecting again")

@@ -70,7 +70,7 @@ extension PanelText {
     /// notes; otherwise Notion isn't connected yet.
     public static func notesCheckRefusal(canReadNotes: Bool) -> String {
         canReadNotes
-            ? "Notion isn't connected, so shipyard runs no ntn: open Set up Notion… in shipyard's settings menu and press Connect with ntn"
+            ? "Notion isn't connected, so shipyard runs no ntn: open Set up Notion in shipyard's settings menu and press Connect with ntn"
             : "this run doesn't read notes"
     }
 
