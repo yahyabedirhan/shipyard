@@ -17,12 +17,12 @@ extension PanelText {
             page.status = .init(text: "Installed.", tone: .success)
             page.detail = "Update gets the newest skill. Shipyard runs `npx` in your login shell."
             page.primary = .init(title: "Update", action: .installSkill)
-            page.alternative = .init(line: "Or update it yourself in a terminal:", commands: [command])
+            page.alternatives = [.init(line: "Or update it yourself in a terminal:", commands: [command])]
         case .idle:
             page.status = .init(text: "Not installed.", tone: .neutral)
             page.detail = "With it, you can ask an agent to watch a repository for you, or to ping you when its pull request is ready. Shipyard installs it with `npx` in your login shell."
             page.primary = .init(title: "Install", action: .installSkill)
-            page.alternative = .init(line: "Or install it yourself in a terminal:", commands: [command])
+            page.alternatives = [.init(line: "Or install it yourself in a terminal:", commands: [command])]
         case .running:
             page.status = .init(text: isInstalled ? "Updating the skill…" : "Installing the skill…", tone: .neutral)
             page.detail = "Running `npx` in your login shell. It can take a minute."

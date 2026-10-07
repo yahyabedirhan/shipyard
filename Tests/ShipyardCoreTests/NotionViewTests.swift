@@ -101,7 +101,7 @@ struct NotionViewTests {
         #expect(page.status == .init(text: "ntn isn't installed.", tone: .neutral))
         #expect(page.commands == ["curl -fsSL https://ntn.dev | bash", "ntn login"])
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
-        #expect(page.alternative == nil)
+        #expect(page.alternatives.isEmpty)
     }
 
     @Test("ntn logged out: ntn login in a box, and Check again")
@@ -112,17 +112,26 @@ struct NotionViewTests {
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
     }
 
-    @Test("logged in: the workspace's name and Connect with ntn; once connected, the workspace and Disconnect")
+    @Test("logged in: the workspace's name and Connect with ntn; once connected, the workspace, Disconnect under a divider, then under another that ntn stays logged in, with ntn logout")
     func readyPage() {
         let ready = PanelText.notionStatus(.ready(workspace: "Notes"), connected: false)
         #expect(ready.status == .init(text: "ntn is logged in to \u{201C}Notes\u{201D}.", tone: .success))
         #expect(ready.primary == .init(title: "Connect with ntn", action: .connectNotion))
-        #expect(ready.commands.isEmpty && ready.alternative == nil)
+        #expect(ready.commands.isEmpty && ready.alternatives.isEmpty)
 
         let connected = PanelText.notionStatus(.ready(workspace: "Notes"), connected: true)
         #expect(connected.status == .init(text: "Connected to \u{201C}Notes\u{201D} through ntn.", tone: .success))
         #expect(connected.primary == nil)
-        #expect(connected.alternative?.button == .init(title: "Disconnect", action: .disconnectNotion))
+        #expect(connected.alternatives == [
+            .init(
+                line: "Disconnect to stop reading your notes. Shipyard then runs no ntn.",
+                button: .init(title: "Disconnect", action: .disconnectNotion)
+            ),
+            .init(
+                line: "Disconnecting leaves `ntn` logged in for your other tools. To log out of `ntn` too, run this in a terminal:",
+                commands: ["ntn logout"]
+            ),
+        ])
 
         #expect(PanelText.notionStatus(.ready(workspace: nil), connected: false).status?.text == "ntn is logged in.")
     }
@@ -136,12 +145,12 @@ struct NotionViewTests {
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
     }
 
-    @Test("connected but ntn broke: what's left to do is a warning, with Disconnect under the divider")
+    @Test("connected but ntn logged out: what's left to do is a warning, with Disconnect under the divider and no ntn logout")
     func connectedBroken() {
         let page = PanelText.notionStatus(.ntnLoggedOut, connected: true)
         #expect(page.status?.tone == .warning)
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
-        #expect(page.alternative?.button?.action == .disconnectNotion)
+        #expect(page.alternatives.map(\.button?.action) == [.disconnectNotion])
     }
 
     @Test("while looking, out of reach, and in a demo run")

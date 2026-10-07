@@ -43,9 +43,9 @@ extension PanelText {
     /// What a status view shows, top to bottom, under its ‹ Back row: the
     /// logo badge and `title`, the `lead` line, the `status` line, a
     /// `detail` line on what to do, a command's `output`, `commands` each in
-    /// a box with a copy button, the `primary` full-width button, and an
-    /// `alternative` under a divider. The words may hold Markdown code spans
-    /// (`CodeText`).
+    /// a box with a copy button, the `primary` full-width button, then each
+    /// of `alternatives` in order, each under its own divider. The words may
+    /// hold Markdown code spans (`CodeText`).
     public struct StatusPage: Equatable, Sendable {
         /// Where the part stands, with its tone's icon.
         public struct Status: Equatable, Sendable {
@@ -67,6 +67,8 @@ extension PanelText {
             case connectNotion
             /// Disconnects Notion (`Shipyard.disconnectNotion()`).
             case disconnectNotion
+            /// Signs out of GitHub (`Shipyard.signOut()`), as the settings menu's Sign out does.
+            case signOut
         }
 
         /// A full-width button.
@@ -75,8 +77,9 @@ extension PanelText {
             public var action: Action
         }
 
-        /// Another way to the same end, under a divider: a line, the
-        /// commands it means and, optionally, its own button.
+        /// A segment under its own divider, such as another way to the
+        /// same end: a line, the commands it means and, optionally, its own
+        /// button.
         public struct Alternative: Equatable, Sendable {
             public var line: String
             public var commands: [String] = []
@@ -91,7 +94,8 @@ extension PanelText {
         public var output: String?
         public var commands: [String] = []
         public var primary: Button?
-        public var alternative: Alternative?
+        /// The segments under the page's top part, in order, each under its own divider.
+        public var alternatives: [Alternative] = []
     }
 
     /// The row at the top of every status view that shows the projects again.
@@ -144,7 +148,7 @@ extension PanelText {
             page.status = .init(text: "Not linked yet.", tone: .neutral)
             page.detail = "Shipyard links its command at \(path), where your agents find it."
             page.primary = .init(title: "Link", action: .linkCLI)
-            page.alternative = .init(line: "Or link it yourself in a terminal:", commands: [command])
+            page.alternatives = [.init(line: "Or link it yourself in a terminal:", commands: [command])]
         case .occupied(let destination):
             let found = destination.map { "\(path) already links to `\($0)`." } ?? "Something else is already at \(path)."
             page.status = .init(text: found, tone: .warning)

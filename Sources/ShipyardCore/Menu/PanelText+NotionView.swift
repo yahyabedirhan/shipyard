@@ -7,13 +7,16 @@ extension PanelText {
     public static let ntnInstall = "curl -fsSL https://ntn.dev | bash"
     /// ntn's login, run in Terminal, where the user picks the notes workspace.
     public static let ntnLogin = "ntn login"
+    /// ntn's logout, which shipyard's Disconnect doesn't run.
+    public static let ntnLogout = "ntn logout"
 
     /// The Notion view for `status` (`nil` while it's being looked at),
     /// `connected` or not: no ntn, the install command and `ntn login`;
     /// logged out, `ntn login`; logged in, the workspace's name and Connect
     /// with ntn; a workspace without Shipyard Notes, how to change it. Check
-    /// again looks again while something is left to do, and once connected
-    /// Disconnect shows under a divider.
+    /// again looks again while something is left to do. Once connected,
+    /// Disconnect shows under a divider and, while ntn is logged in, under
+    /// another, that ntn stays logged in, with `ntn logout`.
     public static func notionStatus(_ status: NotionStatus?, connected: Bool) -> StatusPage {
         var page = StatusPage(title: statusTitle(.notion), lead: statusLead(.notion))
         let checkAgain = StatusPage.Button(title: "Check again", action: .checkNotion)
@@ -58,10 +61,19 @@ extension PanelText {
             page.primary = checkAgain
         }
         if connected {
-            page.alternative = .init(
+            page.alternatives = [.init(
                 line: "Disconnect to stop reading your notes. Shipyard then runs no ntn.",
                 button: .init(title: "Disconnect", action: .disconnectNotion)
-            )
+            )]
+            switch status {
+            case .ready, .noEntryPage:
+                page.alternatives.append(.init(
+                    line: "Disconnecting leaves `ntn` logged in for your other tools. To log out of `ntn` too, run this in a terminal:",
+                    commands: [ntnLogout]
+                ))
+            default:
+                break
+            }
         }
         return page
     }

@@ -69,25 +69,35 @@ struct GitHubViewTests {
 
     // MARK: - The words
 
-    @Test("a gh token's view shows the login, then under the divider says Sign out leaves gh signed in, with gh's own sign-out command")
+    private let signOutSegment = PanelText.StatusPage.Alternative(
+        line: "Sign out to stop listing your pull requests, issues and workflow runs.",
+        button: .init(title: "Sign out", action: .signOut)
+    )
+
+    @Test("a gh token's view shows the login, then Sign out under a divider, then under another that gh stays signed in, with gh's own sign-out command")
     func ghWords() {
         let page = PanelText.gitHubStatus(GitHubConnection(login: "yabepa", source: .gh))
         #expect(page.title == "GitHub")
         #expect(page.status == .init(text: "Signed in as @yabepa.", tone: .success))
         #expect(page.detail == "Connected through the GitHub CLI `gh`.")
         #expect(page.commands.isEmpty && page.primary == nil)
-        #expect(page.alternative?.line.hasPrefix("Sign out in shipyard doesn't sign out `gh`") == true)
-        #expect(page.alternative?.commands == ["gh auth logout"])
-        #expect(page.alternative?.button == nil)
+        #expect(page.alternatives == [
+            signOutSegment,
+            .init(
+                line: "Signing out here leaves `gh` signed in, so shipyard connects through it again at its next launch. "
+                    + "To sign out of `gh` too, run this in a terminal:",
+                commands: ["gh auth logout"]
+            ),
+        ])
     }
 
-    @Test("a stored token's view shows the login and Sign in with GitHub as the source, then under the divider points to Sign out, with nothing to run")
+    @Test("a stored token's view shows the login and Sign in with GitHub as the source, then Sign out under a divider, and nothing about gh")
     func storedWords() {
         let page = PanelText.gitHubStatus(GitHubConnection(login: "yabepa", source: .tokenStore))
         #expect(page.status == .init(text: "Signed in as @yabepa.", tone: .success))
         #expect(page.detail == "Connected with Sign in with GitHub.")
         #expect(page.commands.isEmpty && page.primary == nil)
-        #expect(page.alternative == .init(line: "To sign out, choose Sign out in the settings menu. Shipyard then forgets the sign-in."))
+        #expect(page.alternatives == [signOutSegment])
     }
 
     @Test("before GitHub says which account, the view says so in place of the login")

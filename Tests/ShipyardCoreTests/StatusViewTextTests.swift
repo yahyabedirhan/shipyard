@@ -65,7 +65,7 @@ struct StatusViewTextTests {
         let page = PanelText.cliStatus(.linked, command: command)
         #expect(page.title == "Shipyard CLI")
         #expect(page.status == .init(text: "Linked at `~/.local/bin/shipyard`.", tone: .success))
-        #expect(page.primary == nil && page.commands.isEmpty && page.alternative == nil)
+        #expect(page.primary == nil && page.commands.isEmpty && page.alternatives.isEmpty)
     }
 
     @Test("unlinked, the CLI view offers Link, and the manual command in a box under a divider")
@@ -73,7 +73,7 @@ struct StatusViewTextTests {
         let page = PanelText.cliStatus(.unlinked, command: command)
         #expect(page.status?.tone == .neutral)
         #expect(page.primary == .init(title: "Link", action: .linkCLI))
-        #expect(page.alternative == .init(line: "Or link it yourself in a terminal:", commands: [command]))
+        #expect(page.alternatives == [.init(line: "Or link it yourself in a terminal:", commands: [command])])
     }
 
     @Test("occupied, the CLI view says what's at the path and why shipyard leaves it, with the command that replaces it")
@@ -108,7 +108,7 @@ struct StatusViewTextTests {
         let page = PanelText.cliStatus(state, command: command)
         #expect(page.status?.tone == .warning)
         #expect(page.detail == detail)
-        #expect(page.primary == nil && page.commands.isEmpty && page.alternative == nil)
+        #expect(page.primary == nil && page.commands.isEmpty && page.alternatives.isEmpty)
     }
 
     // MARK: - The Shipyard Skill view
@@ -121,7 +121,7 @@ struct StatusViewTextTests {
         #expect(page.title == "Shipyard Skill")
         #expect(page.status == .init(text: "Installed.", tone: .success))
         #expect(page.primary == .init(title: "Update", action: .installSkill))
-        #expect(page.alternative == .init(line: "Or update it yourself in a terminal:", commands: [skillCommand]))
+        #expect(page.alternatives == [.init(line: "Or update it yourself in a terminal:", commands: [skillCommand])])
     }
 
     @Test("not installed, the skill view explains what the skill does and offers Install, and the command under a divider")
@@ -131,7 +131,7 @@ struct StatusViewTextTests {
         #expect(page.status == .init(text: "Not installed.", tone: .neutral))
         #expect(page.detail?.hasPrefix("With it, you can ask an agent to watch a repository for you") == true)
         #expect(page.primary == .init(title: "Install", action: .installSkill))
-        #expect(page.alternative == .init(line: "Or install it yourself in a terminal:", commands: [skillCommand]))
+        #expect(page.alternatives == [.init(line: "Or install it yourself in a terminal:", commands: [skillCommand])])
     }
 
     @Test("running, the skill view says it's installing or updating, with Cancel alone", arguments: [
@@ -142,7 +142,7 @@ struct StatusViewTextTests {
         let page = PanelText.skillStatus(isInstalled: isInstalled, installation: .running)
         #expect(page.status == .init(text: status, tone: .neutral))
         #expect(page.primary == .init(title: "Cancel", action: .cancelSkillInstall))
-        #expect(page.commands.isEmpty && page.alternative == nil && page.output == nil)
+        #expect(page.commands.isEmpty && page.alternatives.isEmpty && page.output == nil)
     }
 
     @Test("installed by the view, it shows what npx printed, and Update again")

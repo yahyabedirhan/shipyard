@@ -6,8 +6,8 @@ import SwiftUI
 /// `PanelText` gives for the part, in the signed-out onboarding view's
 /// shape (`ConnectView`): the logo badge and the title, the lead line, the
 /// status line with its tone's icon, what to do, what a command printed,
-/// each command in a box with a copy button, the full-width button, and an
-/// alternative under a divider. One view draws every part; each part's
+/// each command in a box with a copy button, the full-width button, and
+/// each alternative under its own divider. One view draws every part; each part's
 /// page and the actions its buttons run are picked here. The GitHub view,
 /// signed out, shows the signed-out onboarding view (`ConnectView`) under
 /// ‹ Back instead.
@@ -78,6 +78,8 @@ struct StatusView: View {
             let shipyard = actions.shipyard
             Task { await shipyard.connectNotion() }
         case .disconnectNotion: actions.shipyard.disconnectNotion()
+        // With no connection left, the view shows the signed-out content (`ConnectView`).
+        case .signOut: actions.shipyard.signOut()
         }
     }
 
@@ -124,7 +126,8 @@ struct StatusView: View {
                 if let primary = text.primary {
                     button(primary, prominent: true)
                 }
-                if let alternative = text.alternative {
+                ForEach(text.alternatives.indices, id: \.self) { index in
+                    let alternative = text.alternatives[index]
                     Divider().padding(.vertical, 4)
                     line(alternative.line)
                     commands(alternative.commands)
