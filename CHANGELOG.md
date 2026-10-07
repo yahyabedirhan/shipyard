@@ -2,9 +2,9 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
-## Unreleased
+## 0.6.0 (2026-10-07)
 
-`config.toml` follows the shared configuration convention: its keys take their shared names, each project has a `slug` and a `title`, and `shipyard config check` checks the file without the app. `cli.toml` gets a version and a schema of its own. It builds [#253](https://github.com/yahyabedirhan/shipyard/issues/253) "Spec: Follow the shared config.toml convention".
+`config.toml` follows the shared configuration convention: its keys take their shared names, each project has a `slug` and a `title`, and `shipyard config check` checks the file without the app. `cli.toml` gets a version and a schema of its own. It builds [#253](https://github.com/yahyabedirhan/shipyard/issues/253) "Spec: Follow the shared config.toml convention", in [#259](https://github.com/yahyabedirhan/shipyard/pull/259).
 
 - **Shared config.toml names.** `refresh-interval = "2m"` replaces `refresh-interval-seconds`, and `[banners] snooze-duration` replaces `snooze`. A project's `slug`, its required ID, and its `title`, the name the menu shows (the slug by default), replace `name`. The old keys still read, each with a warning that gives its new form, and the schema marks them deprecated; an old key beside its new one is an error. `--project`, `shipyard panel fold` and `shipyard panel tab` take a project's slug, or else its title, so older `shipyard` builds on your other machines keep filing pings and notices. A project's notes database is the one titled with the project's title. A `config.toml` that sets keys without `version` reads with a warning, and from version 2 it will be an error: [#255](https://github.com/yahyabedirhan/shipyard/issues/255) "Chore: Rename config.toml keys to the shared convention".
 - **Some project state starts fresh once.** A project whose old `name` isn't already a slug (`"My Shop"` becomes `my-shop`) starts its folded sections, ping numbers and first-sight state again once, since shipyard now keeps them by slug.
