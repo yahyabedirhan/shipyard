@@ -17,8 +17,6 @@ struct Panel: View {
     @State private var showsSkillInstall = false
     /// The header's "Link shipyard CLI…" shows the link card above the footer.
     @State private var showsCLILink = false
-    /// The header's "Connect Notion…" shows the Notion card above the footer.
-    @State private var showsNotionConnect = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -37,11 +35,6 @@ struct Panel: View {
                         .padding(Grid.gutter - 4)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                if showsNotionConnect {
-                    NotionConnectCard(shipyard: shipyard) { showsNotionConnect = false }
-                        .padding(Grid.gutter - 4)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
                 Hairline()
                 footer(now: context.date)
             }
@@ -51,7 +44,6 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .animation(Motion.banner, value: showsSkillInstall)
         .animation(Motion.banner, value: showsCLILink)
-        .animation(Motion.banner, value: showsNotionConnect)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
     }
@@ -114,13 +106,6 @@ struct Panel: View {
                 Button(PanelText.linkCLI) { showsCLILink = true }
                     // Onboarding shows the card under the picker already.
                     .disabled(shipyard.phase == .needsProjects)
-                Divider()
-                // The notes' token: entered here once, kept in the Keychain.
-                if shipyard.notionConnected {
-                    Button(PanelText.disconnectNotion) { shipyard.disconnectNotion() }
-                } else {
-                    Button(PanelText.connectNotion) { showsNotionConnect = true }
-                }
                 // Once signed in: while `start()` still asks GitHub, the
                 // token is picked but the panel says it's connecting.
                 if shipyard.phase != .signedOut, shipyard.tokenSource != nil {

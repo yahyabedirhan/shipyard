@@ -5,7 +5,11 @@ import FoundationNetworking
 
 /// Why a request to Notion failed.
 public enum NotionError: Error, Equatable, Sendable {
-    /// 401: Notion doesn't take the token (revoked, or never valid).
+    /// No `ntn` to read Notion with: it isn't installed where the app
+    /// looks (`NtnCLI.locate`), or it couldn't be started.
+    case ntnMissing
+    /// 401: ntn isn't logged in, has no workspace, or Notion stopped
+    /// taking its token.
     case unauthorized
     /// 429 (or 529, Notion overloaded): too many requests; `Retry-After`
     /// seconds, when Notion said.
@@ -14,18 +18,20 @@ public enum NotionError: Error, Equatable, Sendable {
     /// gave them: a 404 is a page or database not shared with the
     /// connection, or gone.
     case http(Int, code: String?, message: String?)
-    /// The request never reached Notion (offline, timeout).
+    /// The request never reached Notion (offline, timeout, ntn's own failure).
     case network(String)
     /// A 200 whose body isn't what the API documents.
     case unreadable(String)
 }
 
 /// Notion's REST API, as the notes need it, over the same `HTTPTransport`
-/// seam GitHub's client uses, so tests answer from recorded responses.
-/// Every request is sent as API version `2025-09-03`, where a database
-/// holds data sources and pages are queried per data source.
+/// seam GitHub's client uses, so tests answer from recorded responses. The
+/// app's transport is `NtnCLI`: ntn signs each request with its own login,
+/// so the client holds no token. Every request is sent as API version
+/// `2025-09-03`, where a database holds data sources and pages are queried
+/// per data source.
 ///
-/// It reads: who the token is (`me`), pages by title (`searchPages`), a
+/// It reads: who ntn is logged in as (`me`), pages by title (`searchPages`), a
 /// page's child pages and databases (`childPages`, `childDatabases`), a database's data sources
 /// (`dataSources`), a data source's open notes (`openNotes`) and a page's
 /// first line of text (`firstLine`), and a data source's number prefix
@@ -52,17 +58,15 @@ public struct NotionClient: Sendable {
     /// How many pages of a list it follows before stopping.
     static let maxPages = 10
 
-    private let token: String
     private let transport: any HTTPTransport
 
-    public init(token: String, transport: any HTTPTransport) {
-        self.token = token
+    public init(transport: any HTTPTransport) {
         self.transport = transport
     }
 
     // MARK: - Reads
 
-    /// Checks the token: `GET /v1/users/me`, the connection's own bot user.
+    /// Checks the login: `GET /v1/users/me`, ntn's own bot user.
     public func me() async throws {
         _ = try await send("GET", "users/me", as: Ignored.self)
     }
@@ -256,7 +260,6 @@ public struct NotionClient: Sendable {
         if !query.isEmpty { components.queryItems = query }
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(Self.version, forHTTPHeaderField: "Notion-Version")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
@@ -269,6 +272,8 @@ public struct NotionClient: Sendable {
             (data, response) = try await transport.send(request)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let error as NotionError {
+            throw error
         } catch {
             throw NotionError.network(error.localizedDescription)
         }
@@ -284,6 +289,9 @@ public struct NotionClient: Sendable {
         case 429, 529:
             let retryAfter = response.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
             throw NotionError.rateLimited(retryAfter: retryAfter)
+        case NtnCLI.runFailed:
+            let failure = try? JSONDecoder().decode(ErrorBody.self, from: data)
+            throw NotionError.network(failure?.message ?? "ntn failed")
         default:
             let failure = try? JSONDecoder().decode(ErrorBody.self, from: data)
             throw NotionError.http(response.statusCode, code: failure?.code, message: failure?.message)

@@ -20,12 +20,12 @@ private typealias PR = PullRequestsResponse.PullRequest
 
 @MainActor
 private extension Harness {
-    /// Started with `config`, a Notion token kept, Notion answering a read
+    /// Started with `config`, ntn logged in, Notion answering a read
     /// as `NotionStub` records and the icon's schema reads and creates,
     /// after the notes' first read.
     static func withNewNote(config: String = projects) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        try harness.notion.save("ntn_token")
+        harness.ntn.set(.loggedIn)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer])
         try harness.stub.onNotion()
@@ -164,7 +164,7 @@ struct NewNoteTests {
         #expect(harness.section("shop")?.newNote == .ready)
     }
 
-    @Test("a rejected token shows as the project's error and opens nothing; the error goes when the menu opens again")
+    @Test("ntn logged out shows as the project's error and opens nothing; the error goes when the menu opens again")
     func rejected() async throws {
         let harness = try await Harness.withNewNote()
         harness.stub.on("POST", NotionStub.pages, try NotionStub.unauthorized())
@@ -172,7 +172,7 @@ struct NewNoteTests {
         await harness.shipyard.startNote(in: "shop")
 
         #expect(harness.actions.opened.isEmpty)
-        #expect(harness.newNoteErrors("shop") == ["new note: Notion rejected the token; connect Notion again from the settings menu"])
+        #expect(harness.newNoteErrors("shop") == ["new note: ntn isn't logged in; run ntn login in Terminal"])
         #expect(harness.newNoteErrors("blog").isEmpty)
         #expect(harness.section("shop")?.newNote == .ready)
 
@@ -183,7 +183,7 @@ struct NewNoteTests {
     @Test("a Shipyard Notes page without a Projects page: the icon creates Projects under it, then the project's database under Projects, then the note")
     func projectsPageFirst() async throws {
         let harness = try Harness(stored: "gho_stored", config: projects)
-        try harness.notion.save("ntn_token")
+        harness.ntn.set(.loggedIn)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer])
         try harness.stub.onNotion()
@@ -221,7 +221,7 @@ struct NewNoteTests {
         #expect(harness.newNoteErrors("blog").first?.hasPrefix("new note: can't reach Notion") == true)
     }
 
-    @Test("without a Shipyard Notes page shared with the connection, the icon says so and creates nothing")
+    @Test("without a Shipyard Notes page in ntn's workspace, the icon says so and creates nothing")
     func noEntryPage() async throws {
         let harness = try await Harness.withNewNote()
         harness.stub.on("POST", NotionStub.search, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
@@ -233,10 +233,10 @@ struct NewNoteTests {
 
         #expect(harness.createdDatabases.isEmpty)
         #expect(harness.actions.opened.isEmpty)
-        #expect(harness.newNoteErrors("blog") == ["new note: no page titled Shipyard Notes is shared with shipyard's Notion connection"])
+        #expect(harness.newNoteErrors("blog") == ["new note: ntn's workspace has no page titled Shipyard Notes"])
     }
 
-    @Test("the icon is on each project that shows notes once Notion is connected, and nowhere else")
+    @Test("the icon is on each project that shows notes while ntn is logged in, and nowhere else")
     func shown() async throws {
         let config = projects.replacingOccurrences(
             of: "repositories = [\"yahyabedirhan/blog\"]\n",
@@ -246,7 +246,15 @@ struct NewNoteTests {
         #expect(harness.section("shop")?.newNote == .ready)
         #expect(harness.section("blog")?.newNote == nil)
 
-        harness.shipyard.disconnectNotion()
+        // ntn logged out, or gone: no icon, until the next read finds it back.
+        harness.ntn.set(.loggedOut)
+        _ = await harness.notesTimer.fire()
         #expect(harness.section("shop")?.newNote == nil)
+        harness.ntn.set(.missing)
+        _ = await harness.notesTimer.fire()
+        #expect(harness.section("shop")?.newNote == nil)
+        harness.ntn.set(.loggedIn)
+        _ = await harness.notesTimer.fire()
+        #expect(harness.section("shop")?.newNote == .ready)
     }
 }

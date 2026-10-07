@@ -5,10 +5,10 @@ public enum NotesReading: Equatable, Sendable {
     /// Each project that has a notes database, by name: its open notes, or
     /// why its query failed. A project without a database isn't there.
     case read([String: Result<[Note], NotionError>])
-    /// No page shared with the token is titled "Shipyard Notes": a token
-    /// for another workspace, or one the page wasn't shared with.
+    /// No page in ntn's workspace is titled "Shipyard Notes": ntn's
+    /// default workspace isn't the notes workspace, or the page is gone.
     case noEntryPage
-    /// Nothing could be read (the token was rejected, Notion out of
+    /// Nothing could be read (no ntn, ntn logged out, Notion out of
     /// reach): every project's notes are unknown.
     case failed(NotionError)
 }
@@ -39,7 +39,7 @@ final class NotesReader {
     /// Each untitled note's first line, by page id, with the edit it was read at.
     private var firstLines: [String: (edited: Date, line: String?)] = [:]
 
-    /// Forgets everything found, as when the token changes.
+    /// Forgets everything found.
     func reset() {
         entryPage = nil
         projectsPage = nil
@@ -79,15 +79,15 @@ final class NotesReader {
     }
 
     /// The project databases, under the entry page's Projects page; `nil`
-    /// when no page shared with the connection is titled "Shipyard Notes",
+    /// when no page in ntn's workspace is titled "Shipyard Notes",
     /// none when it has no Projects page yet.
     private func databases(_ client: NotionClient) async throws -> [(id: String, title: String)]? {
         try await entry(client)?.databases
     }
 
     /// The entry page, its Projects page (`nil` while there's none) and that
-    /// page's child databases; `nil` when no page shared with the connection
-    /// is titled "Shipyard Notes". A remembered page that's gone (404) is
+    /// page's child databases; `nil` when no page in ntn's workspace is
+    /// titled "Shipyard Notes". A remembered page that's gone (404) is
     /// looked for again, once.
     private func entry(_ client: NotionClient) async throws -> (page: String, projects: String?, databases: [(id: String, title: String)])? {
         if let page = entryPage, let projects = projectsPage {
@@ -216,24 +216,10 @@ final class NotesReader {
 
 /// Why the new-note icon couldn't start a note (`Shipyard.startNote`).
 public enum NewNoteError: Error, Equatable, Sendable {
-    /// No Notion token is kept.
-    case notConnected
-    /// No page titled "Shipyard Notes" is shared with the connection.
+    /// This run reads no notes (a demo run).
+    case notRead
+    /// ntn's workspace has no page titled "Shipyard Notes".
     case noEntryPage
     /// A request to Notion failed.
     case notion(NotionError)
-}
-
-/// What giving shipyard a Notion token came to (`Shipyard.connectNotion`).
-public enum NotionConnection: Equatable, Sendable {
-    /// Notion took it, and it's kept.
-    case connected
-    /// Nothing was pasted.
-    case empty
-    /// Notion said it isn't a token (401); nothing is kept.
-    case rejected
-    /// Notion couldn't be asked; nothing is kept.
-    case couldNotCheck(NotionError)
-    /// Notion took it, but the token store couldn't keep it.
-    case couldNotSave(String)
 }

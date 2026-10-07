@@ -124,7 +124,7 @@ final class AppServices {
             actions: opener,
             notifier: notifier,
             loginItem: files.loginItem(LaunchAtLogin()),
-            notionTokenStore: files.notionTokenStore(Keychain.notion)
+            notion: files.notionRoute(NtnCLI())
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
@@ -175,6 +175,8 @@ final class AppServices {
         followNoticeListening()
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
+        // A build before notes went through ntn kept a Notion token: delete it once, off the main thread.
+        if Self.files.demo == nil { Task.detached { Keychain.removeOldNotionToken() } }
         startControl()
     }
 
@@ -229,10 +231,10 @@ final class AppServices {
             // An agent's notice is shown when its project's rules say so,
             // or withdrawn.
             notices: { request in await shipyard.receive(request) },
-            // The notes check reads Notion with the app's own token.
+            // The notes check reads Notion through ntn, as the menu does.
             notesCheck: {
                 guard let report = await shipyard.checkNotes() else {
-                    return .refused("Notion isn't connected: choose Connect Notion in shipyard's settings menu")
+                    return .refused("this run doesn't read notes")
                 }
                 return report.hasErrors ? .refused(report.text) : .inOrder(report.text)
             },

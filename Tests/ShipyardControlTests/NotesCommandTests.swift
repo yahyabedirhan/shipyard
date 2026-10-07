@@ -5,7 +5,7 @@ import Testing
 
 /// `shipyard notes check` as an agent runs it, through `ShipyardCLI.run`
 /// with the Mac's table and an in-memory app at the end of the socket: the
-/// app reads Notion with its own token and answers with the report.
+/// app reads Notion through ntn and answers with the report.
 @Suite("The notes command")
 struct NotesCommandTests {
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {
@@ -39,7 +39,7 @@ struct NotesCommandTests {
         #expect(ControlRequest.notesCheck.wait == 45)
     }
 
-    @Test("a report with errors, or no Notion connection, exits 1 with the app's words")
+    @Test("a report with errors, or a run that reads no notes, exits 1 with the app's words")
     func errors() {
         let app = FakeTransport(reply: .refused("error: \"Shop\" has no Status property (select)\n\n1 error, 0 warnings"))
 

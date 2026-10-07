@@ -69,8 +69,8 @@ public enum ControlCommands {
     public static let notesUsage = """
         usage: shipyard notes check
 
-        Reads the notes workspace in Notion the way the app does, with the
-        app's own Notion connection: each project's database under
+        Reads the notes workspace in Notion the way the app does, through
+        ntn's default workspace: each project's database under
         Shipyard Notes > Projects and its open notes. Prints one line per
         project, then every problem with the layout. Exits 1 when it finds
         an error, 0 otherwise.

@@ -86,8 +86,8 @@ public struct MenuModel: Equatable, Sendable {
     /// `expanded` holds the groups Show more revealed past their cap.
     /// `notes` says why a project's notes couldn't be read or a note
     /// couldn't be started (error rows after its others, loaded or not),
-    /// and gives each project showing notes its new-note icon once Notion
-    /// is connected.
+    /// and gives each project showing notes its new-note icon while ntn
+    /// can start one.
     public static func build(
         listings: [String: [Item]],
         snapshot: Snapshot?,
@@ -300,7 +300,7 @@ public struct MenuModel: Equatable, Sendable {
     }
 
     /// `sections` with the new-note icon on each project that shows notes,
-    /// while Notion is connected: starting while a note is being started
+    /// while ntn can start one: starting while a note is being started
     /// there; and each one's notes database, for its notes count.
     private static func newNoteIcons(_ sections: [MenuSection], _ notes: NotesMenuState, configuration: Configuration) -> [MenuSection] {
         guard notes.connected else { return sections }
@@ -386,7 +386,7 @@ public struct MenuSection: Equatable, Sendable, Identifiable {
     /// filed under no project); `nil` for a project's.
     public var machine: String?
     /// The header's new-note icon: on a project that shows notes while
-    /// Notion is connected (`MenuModel.build`'s `notes`); `nil` hides it.
+    /// ntn can start one (`MenuModel.build`'s `notes`); `nil` hides it.
     public var newNote: NewNoteButton?
     /// The project's notes database in Notion, which the notes count opens;
     /// `nil` before a read matched one.

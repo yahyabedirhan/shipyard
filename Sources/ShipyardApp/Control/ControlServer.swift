@@ -47,7 +47,7 @@ final class ControlServer {
     /// Shows an agent's notice (`shipyard notify`), or withdraws one, and
     /// says what came of it: the app hands it to `Shipyard.receive(_:)`.
     private let notices: @MainActor (NoticeRequest) async -> NoticeVerdict
-    /// Checks the notes workspace with the app's Notion token (`shipyard notes check`).
+    /// Checks the notes workspace through ntn, as the menu reads it (`shipyard notes check`).
     private let notesCheck: @MainActor () async -> NotesCheckAnswer
     /// Ends the lease once it runs out, when no request comes to.
     private var settling: Task<Void, Never>?
