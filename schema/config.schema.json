@@ -409,7 +409,7 @@
       }
     },
     "notes": {
-      "description": "Your own notes, kept in Notion: one database per project, titled with the project's name, under the \"Shipyard Notes\" page. The menu lists a project's open notes, newest first, once the app has your Notion token. Notes take only show.",
+      "description": "Your own notes, kept in Notion: one database per project, titled with the project's name, under the \"Shipyard Notes\" page. The menu lists a project's open notes, newest first, read through ntn, Notion's CLI, once it's installed and logged in to your notes workspace. Notes take only show.",
       "type": "object",
       "additionalProperties": false,
       "properties": {

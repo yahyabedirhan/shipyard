@@ -38,6 +38,10 @@ _Avoid_: Entry page (that's Shipyard Notes), notes folder, workspace
 The Notion page titled "Agent guide" under "Shipyard Notes", beside the Projects page. It holds the rules agents follow when they write notes: the layout, the properties, the label and prefix conventions, and how to start a project's notes. Agents read it; the app never writes it.
 _Avoid_: Entry page, README, notes reference (that's the skill's)
 
+**ntn**:
+Notion's CLI, which the app reads and writes notes through, one `ntn api` run per request, with ntn's own login and its default workspace, which must be the notes workspace. The app keeps no Notion token of its own. Without ntn, logged out, or in a workspace with no Shipyard Notes page, no notes list and the notes banner says what to do.
+_Avoid_: Notion token, Notion connection, internal connection (the app's route before ntn)
+
 **Panel banner**:
 A line above the projects in the panel about a condition that holds now, such as a slower refresh, a failed fetch, a remote machine Herdr can't reach or an agent holding the lease. Named by its condition, not its words.
 _Avoid_: Notification (that's the macOS banner), alert, warning
@@ -186,7 +190,7 @@ The agent a lease is held by, or refused to: its key (the agent's session, else 
 _Avoid_: Owner, client, user
 
 **Notes check**:
-`shipyard notes check` on the Mac: the app reads the notes workspace with its own Notion token, as the menu does, and reports each project's notes and every problem with the layout. An error is something that hides notes from the app or breaks their numbers; a warning is something agents keep tidy. It needs no lease.
+`shipyard notes check` on the Mac: the app reads the notes workspace through ntn, as the menu does, and reports each project's notes and every problem with the layout. An error is something that hides notes from the app or breaks their numbers; a warning is something agents keep tidy. It needs no lease.
 _Avoid_: Notes doctor, lint, validation
 
 ### Setup
