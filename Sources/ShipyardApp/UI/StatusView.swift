@@ -8,7 +8,8 @@ import SwiftUI
 /// status line with its tone's icon, what to do, each command in a box with
 /// a copy button, the full-width button, and an alternative under a
 /// divider. One view draws every part; each part's page and the actions its
-/// buttons run are picked here.
+/// buttons run are picked here. The GitHub view, signed out, shows the
+/// signed-out onboarding view (`ConnectView`) under ‹ Back instead.
 struct StatusView: View {
     let part: SetupPart
     let actions: AppServices
@@ -27,7 +28,12 @@ struct StatusView: View {
             .accessibilityLabel("Back")
             .padding(.horizontal, Grid.gutter)
             .padding(.top, 10)
-            page(page)
+            if part == .github, actions.shipyard.gitHubConnection == nil {
+                // Signed out: the signed-out onboarding view's content, its ways in included.
+                ConnectView(shipyard: actions.shipyard)
+            } else {
+                page(page)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         // The user may have changed the part by hand since it was last looked at.
@@ -39,7 +45,9 @@ struct StatusView: View {
         switch part {
         case .cli:
             PanelText.cliStatus(actions.cliLink.state, command: actions.cliLink.command)
-        case .github, .notion, .skill:
+        case .github:
+            actions.shipyard.gitHubConnection.map(PanelText.gitHubStatus) ?? PanelText.placeholderStatus(part)
+        case .notion, .skill:
             PanelText.placeholderStatus(part)
         }
     }

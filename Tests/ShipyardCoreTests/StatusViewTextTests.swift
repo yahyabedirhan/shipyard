@@ -105,7 +105,7 @@ struct StatusViewTextTests {
 
     @Test("the parts not built yet open a placeholder with their name and what they're for")
     func placeholders() {
-        for part in [SetupPart.github, .notion, .skill] {
+        for part in [SetupPart.notion, .skill] {
             let page = PanelText.placeholderStatus(part)
             #expect(page.title == PanelText.statusTitle(part))
             #expect(page.lead == PanelText.statusLead(part))

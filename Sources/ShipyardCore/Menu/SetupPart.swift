@@ -30,15 +30,19 @@ public enum SetupPart: String, CaseIterable, Equatable, Sendable {
 public struct SetupStatus: Equatable, Sendable {
     /// The CLI link's state: set up only when `linked`.
     public var cli: CLILink.State
+    /// Whether shipyard is signed in to GitHub (`Shipyard.gitHubConnection`).
+    public var github: Bool
 
-    public init(cli: CLILink.State) {
+    public init(cli: CLILink.State, github: Bool = false) {
         self.cli = cli
+        self.github = github
     }
 
     public func isSetUp(_ part: SetupPart) -> Bool {
         switch part {
         case .cli: cli == .linked
-        case .github, .notion, .skill: false
+        case .github: github
+        case .notion, .skill: false
         }
     }
 }

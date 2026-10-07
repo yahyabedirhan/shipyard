@@ -109,7 +109,7 @@ struct Panel: View {
         // Once signed in: while `start()` still asks GitHub, the token is
         // picked but the panel says it's connecting.
         let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
-        let status = SetupStatus(cli: actions.cliLink.state)
+        let status = SetupStatus(cli: actions.cliLink.state, github: shipyard.gitHubConnection != nil)
         ForEach(PanelText.settingsMenu(status, canSignOut: canSignOut), id: \.title) { item in
             switch item.action {
             case .openConfiguration:
