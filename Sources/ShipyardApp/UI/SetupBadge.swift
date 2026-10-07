@@ -79,7 +79,7 @@ struct SetupBadge: View {
             case .github:
                 // GitHub's dark (#24292F) with the white Invertocat, the
                 // colours GitHub's logo terms allow.
-                self.init(resource: "github", fill: Color(red: 0x24 / 255, green: 0x29 / 255, blue: 0x2F / 255), mark: .white, hairline: .white.opacity(0.10), markShare: 0.66)
+                self.init(resource: "github", fill: LogoBadge.color(0x24292F), mark: .white, hairline: .white.opacity(0.10), markShare: 0.66)
             case .notion:
                 // White with Notion's black cube, as Notion's own app icon.
                 self.init(resource: "notion", fill: .white, mark: .black, hairline: .black.opacity(0.12), markShare: 0.64)

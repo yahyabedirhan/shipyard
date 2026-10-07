@@ -96,8 +96,9 @@ bundle: build
 	cp "$$(swift build -c release --show-bin-path)/$(CLI)" $(CONTENTS)/Helpers/shipyard
 	sed 's/__VERSION__/$(VERSION)/g' Packaging/Info.plist > $(CONTENTS)/Info.plist
 	cp $(ICON_FILE) $(CONTENTS)/Resources/AppIcon.icns
-	@# The app's SwiftPM resources (the agents' logos), where AgentLogoImage
-	@# looks: in Resources, since a bundle at the app's root breaks its signature.
+	@# The app's SwiftPM resources (the agents' logos and GitHub's and Notion's
+	@# marks), where AgentLogoImage and SetupBadge look: in Resources, since a
+	@# bundle at the app's root breaks its signature.
 	cp -R "$$(swift build -c release --show-bin-path)/$(APP)_$(APP)App.bundle" $(CONTENTS)/Resources/
 	@# The logos' MIT notices travel with every copy of them.
 	cp LICENSE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
