@@ -6,6 +6,6 @@ import Testing
 struct VersionTests {
     @Test("the version is 0.3.0")
     func version() {
-        #expect(ShipyardVersion.current == "0.4.0")
+        #expect(ShipyardVersion.current == "0.5.0")
     }
 }
