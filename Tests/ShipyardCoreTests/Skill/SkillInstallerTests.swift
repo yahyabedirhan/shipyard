@@ -34,6 +34,13 @@ struct SkillInstallerTests {
         #expect(result == .installed(output: "✓ Installed 1 skill: shipyard"))
     }
 
+    @Test("keeps only the last frame when terminal output redraws a line")
+    func redrawOutput() async {
+        let output = "Cloning…◐\r\u{1B}[2K\u{1B}[1GCloning repository…◓\rCloning repository…◑\n"
+        let result = await SkillInstaller(environment: ["SHELL": "/bin/zsh"], runner: FakeShell(ShellOutput(status: 0, output: output))).install()
+        #expect(result == .installed(output: "Cloning repository…◑"))
+    }
+
     @Test("a failing command reports what it printed")
     func failed() async {
         let output = "npm ERR! code ENOTFOUND\nnpm ERR! network request failed\n"
