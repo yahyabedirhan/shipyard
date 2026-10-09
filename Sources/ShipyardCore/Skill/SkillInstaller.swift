@@ -62,8 +62,13 @@ public struct SkillInstaller: Sendable {
     /// The output without terminal colour codes and surrounding blank space,
     /// so the panel can show it as plain text.
     static func clean(_ output: String) -> String {
-        output
+        let withoutCursorControls = output
             .replacingOccurrences(of: "\u{1B}\\[[0-9;?]*[A-Za-z]", with: "", options: .regularExpression)
+        let lastFrames = withoutCursorControls
+            .components(separatedBy: "\n")
+            .map { $0.components(separatedBy: "\r").last ?? "" }
+            .joined(separator: "\n")
+        return lastFrames
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
