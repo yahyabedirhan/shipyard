@@ -62,10 +62,10 @@ struct SailboatTests {
         let makefile = try String(contentsOf: Self.root.appendingPathComponent("Makefile"), encoding: .utf8)
         #expect(makefile.contains("BRAND       := Sources/ShipyardApp/Brand/Sailboat.swift Sources/ShipyardApp/Brand/Logo.swift"))
         #expect(makefile.contains("swiftc -o $@ $(dir $@)main.swift $(BRAND)"))
-        #expect(makefile.contains("ICON        ?= green-graphite"))
+        #expect(makefile.contains("ICON        ?= graphite"))
         let script = try String(contentsOf: Self.root.appendingPathComponent("Packaging/Icon/make-icon.swift"), encoding: .utf8)
         #expect(script.contains("Sailboat.path"))
-        #expect(script.contains("rgb(Logo.top), rgb(Logo.bottom)"))
+        #expect(script.contains("hue: (top: UInt32, bottom: UInt32) = (Logo.top, Logo.bottom)"))
         #expect(script.contains("Logo.figurePath"))
         #expect(script.contains("Logo.foldsPath"))
         #expect(script.contains("Logo.rims"))
@@ -127,10 +127,11 @@ struct SailboatTests {
         #expect(Self.near(iconBody, badgeBody))
         #expect(Self.near(iconFigure, badgeFigure))
         #expect(Self.near(iconFold, badgeFold))
-        // And they are the logo's: a dark body with green over red and blue, a
+        // And they are the logo's: a dark, neutral graphite body (no channel
+        // more than a few levels from the others, so no tint), a
         // white figure, and a grey fold between them.
         #expect(badgeBody.greenComponent < 0.25)
-        #expect(badgeBody.greenComponent > badgeBody.redComponent && badgeBody.greenComponent > badgeBody.blueComponent)
+        #expect(abs(badgeBody.greenComponent - badgeBody.redComponent) < 0.03 && abs(badgeBody.blueComponent - badgeBody.greenComponent) < 0.03)
         #expect(badgeFigure.redComponent > 0.95 && badgeFigure.greenComponent > 0.95 && badgeFigure.blueComponent > 0.95)
         #expect(badgeFold.greenComponent > 0.6 && badgeFold.greenComponent < badgeFigure.greenComponent - 0.1)
     }

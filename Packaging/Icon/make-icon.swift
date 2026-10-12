@@ -1,6 +1,7 @@
-// Draws Shipyard's app icon in one of seven variants (see README.md here):
+// Draws Shipyard's app icon in one of eight variants (see README.md here):
 //
-//   green-graphite  shipyard's logo: the folded white sailboat on green graphite (the app's icon)
+//   graphite        shipyard's logo: the folded white sailboat on graphite (the app's icon)
+//   green-graphite  the same on graphite with a trace of green
 //   khaki-green  the sailboat in cream on khaki green, the logo until 0.6.0
 //   olive-khaki  the sailboat in cream on olive khaki
 //   origami      the menu bar's sailboat folded from paper, on amber
@@ -8,7 +9,7 @@
 //   night        the sailboat under a crescent moon and stars
 //   sunset       the sailboat in silhouette against a low sun
 //
-//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (green-graphite by default)
+//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (graphite by default)
 //   make-icon --sheet <out.png>                  a contact sheet of every variant, for review
 //   make-icon --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
 //
@@ -493,23 +494,27 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
     }
 }
 
-// MARK: - Green graphite: shipyard's logo
+// MARK: - Graphite: shipyard's logo
 
-/// The folded white sailboat on green graphite, all from `Logo`: the body's
-/// gradient, the figure with its sails' shaded faces, and the double rim, the
-/// outer one alone below 64 pixels. No sheen: the rims catch the light instead.
-func drawGreenGraphite(_ ctx: CGContext, pixels: Int) {
+/// green-graphite's body: graphite with a trace of green.
+let greenGraphiteHue: (top: UInt32, bottom: UInt32) = (0x252A1E, 0x13160F)
+
+/// The folded white sailboat on a body of `hue` (the logo's graphite unless
+/// given), the rest all from `Logo`: the figure with its sails' shaded faces,
+/// and the double rim, the outer one alone below 64 pixels. No sheen: the rims
+/// catch the light instead.
+func drawFolded(_ ctx: CGContext, pixels: Int, hue: (top: UInt32, bottom: UInt32) = (Logo.top, Logo.bottom)) {
     let small = pixels < 64
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
     let shape = Logo.squircle(in: body)
     ctx.saveGState()
     shadow(ctx, dy: -10, blur: 22, color: rgb(0x000000, 0.35))
-    fillSolid(ctx, shape, rgb(Logo.bottom))
+    fillSolid(ctx, shape, rgb(hue.bottom))
     ctx.restoreGState()
 
     ctx.saveGState()
     ctx.addPath(shape); ctx.clip()
-    ctx.drawLinearGradient(grad([rgb(Logo.top), rgb(Logo.bottom)]), start: CGPoint(x: 0, y: body.maxY), end: CGPoint(x: 0, y: body.minY), options: [])
+    ctx.drawLinearGradient(grad([rgb(hue.top), rgb(hue.bottom)]), start: CGPoint(x: 0, y: body.maxY), end: CGPoint(x: 0, y: body.minY), options: [])
     fillSolid(ctx, Logo.figurePath(inBody: body, small: small), rgb(Logo.figure))
     fillSolid(ctx, Logo.foldsPath(inBody: body, small: small), rgb(Logo.shade))
     ctx.restoreGState()
@@ -604,11 +609,12 @@ enum Minimal: String, CaseIterable {
 // MARK: - Variants
 
 enum Variant: String, CaseIterable {
-    case greenGraphite = "green-graphite", khakiGreen = "khaki-green", oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
+    case graphite, greenGraphite = "green-graphite", khakiGreen = "khaki-green", oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
 
     func draw(_ ctx: CGContext, pixels: Int) {
         switch self {
-        case .greenGraphite: drawGreenGraphite(ctx, pixels: pixels)
+        case .graphite: drawFolded(ctx, pixels: pixels)
+        case .greenGraphite: drawFolded(ctx, pixels: pixels, hue: greenGraphiteHue)
         case .khakiGreen: Minimal.draw(ctx, pixels: pixels, hue: khakiGreenHue, figure: khakiCream, onWhite: false)
         case .oliveKhaki: Minimal.solidOliveKhaki.draw(ctx, pixels: pixels)
         case .origami: drawOrigami(ctx, pixels: pixels)
@@ -862,7 +868,7 @@ func fail(_ message: String) -> Never {
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
-var variant = Variant.greenGraphite
+var variant = Variant.graphite
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }
     guard let chosen = Variant(rawValue: arguments[flag + 1]) else { fail("unknown variant \(arguments[flag + 1])") }
