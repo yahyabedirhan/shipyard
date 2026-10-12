@@ -2,6 +2,10 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
+## Unreleased
+
+- **The green graphite logo.** The app icon, the README's logo and the welcome and status views' badge are a white sailboat on a dark green graphite tile with a double rim, in place of the cream sailboat on khaki green. Each sail folds like paper, its forward face grey, in the style of Swift Lab's and the skills repository's logos. The sailboat's shape, and the menu bar item, don't change.
+
 ## 0.6.0 (2026-10-07)
 
 `config.toml` follows the shared configuration convention: its keys take their shared names, each project has a `slug` and a `title`, and `shipyard config check` checks the file without the app. `cli.toml` gets a version and a schema of its own. It builds [#253](https://github.com/yahyabedirhan/shipyard/issues/253) "Spec: Follow the shared config.toml convention", in [#259](https://github.com/yahyabedirhan/shipyard/pull/259).
