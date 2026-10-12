@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// shipyard's logo as the welcome screens show it: the app icon's squircle,
-/// green graphite gradient and double rim, with the folded white sailboat
+/// graphite gradient and double rim, with the folded white sailboat
 /// sized against the body as the icon sizes it. All from `Logo` and `Sailboat.path`.
 struct LogoBadge: View {
     var side: CGFloat = 32

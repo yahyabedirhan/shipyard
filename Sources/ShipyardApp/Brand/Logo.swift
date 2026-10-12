@@ -1,18 +1,18 @@
 import CoreGraphics
 
 /// shipyard's logo: the sailboat (`Sailboat.path`) folded like paper, white on
-/// a green graphite squircle with a double rim, in the style of Swift Lab's
+/// a graphite squircle with a double rim, in the style of Swift Lab's
 /// and the skills repository's logos. Each sail folds along a crease from its
 /// head to its foot: the face ahead of the crease is shaded, the face behind it
 /// lit, as if from the right. The app icon (`make-icon.swift`'s
-/// `green-graphite`) and the welcome screens' badge both draw it from here, so
+/// `graphite`) and the welcome screens' badge both draw it from here, so
 /// their shape, colours and figure can't drift apart.
 ///
 /// CoreGraphics only, so the icon script compiles this same file.
 enum Logo {
-    /// The body's gradient, top to bottom: graphite with a trace of green.
-    static let top: UInt32 = 0x252A1E
-    static let bottom: UInt32 = 0x13160F
+    /// The body's gradient, top to bottom: Swift Lab's graphite tile.
+    static let top: UInt32 = 0x222529
+    static let bottom: UInt32 = 0x131417
     /// The figure's lit faces, and the sails' shaded faces (`folds`).
     static let figure: UInt32 = 0xFFFFFF
     static let shade: UInt32 = 0xB9BEC4

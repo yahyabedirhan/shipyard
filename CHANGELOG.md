@@ -4,7 +4,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 ## Unreleased
 
-- **The green graphite logo.** The app icon, the README's logo and the welcome and status views' badge are a white sailboat on a dark green graphite tile with a double rim, in place of the cream sailboat on khaki green. Each sail folds like paper, its forward face grey, in the style of Swift Lab's and the skills repository's logos. The sailboat's shape, and the menu bar item, don't change.
+- **The graphite logo.** The app icon, the README's logo and the welcome and status views' badge are a white sailboat on Swift Lab's dark graphite tile with a double rim, in place of the cream sailboat on khaki green. Each sail folds like paper, its forward face grey, in the style of Swift Lab's and the skills repository's logos. The sailboat's shape, and the menu bar item, don't change.
 
 ## 0.6.0 (2026-10-07)
 
