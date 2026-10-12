@@ -1,19 +1,41 @@
 import CoreGraphics
 
-/// shipyard's logo: the sailboat (`Sailboat.path`) in cream on a khaki green
-/// squircle. The app icon (`make-icon.swift`'s `khaki-green`) and the welcome
-/// screens' badge both draw it from here, so their shape, colours and figure
-/// can't drift apart.
+/// shipyard's logo: the sailboat (`Sailboat.path`) folded like paper, white on
+/// a green graphite squircle with a double rim, in the style of Swift Lab's
+/// and the skills repository's logos. Each sail folds along a crease from its
+/// head to its foot: the face ahead of the crease is shaded, the face behind it
+/// lit, as if from the right. The app icon (`make-icon.swift`'s
+/// `green-graphite`) and the welcome screens' badge both draw it from here, so
+/// their shape, colours and figure can't drift apart.
 ///
 /// CoreGraphics only, so the icon script compiles this same file.
 enum Logo {
-    /// The body's gradient, top to bottom, and the figure's colour. The
-    /// gradient runs either side of the logo's khaki green, 0x72873A.
-    static let top: UInt32 = 0x809741
-    static let bottom: UInt32 = 0x637532
-    static let figure: UInt32 = 0xFBF6EA
-    /// A white sheen over the body's top half, fading out at the middle.
-    static let sheen: CGFloat = 0.14
+    /// The body's gradient, top to bottom: graphite with a trace of green.
+    static let top: UInt32 = 0x252A1E
+    static let bottom: UInt32 = 0x13160F
+    /// The figure's lit faces, and the sails' shaded faces (`folds`).
+    static let figure: UInt32 = 0xFFFFFF
+    static let shade: UInt32 = 0xB9BEC4
+
+    /// One of the body's two rims: a squircle `inset` inside the body's edge,
+    /// stroked `width` wide in white that fades from `topAlpha` to
+    /// `bottomAlpha` down the body. Inset and width are fractions of the body's side.
+    struct Rim {
+        let inset: CGFloat, width: CGFloat, topAlpha: CGFloat, bottomAlpha: CGFloat
+    }
+
+    /// A bright outer rim and a faint inner one. Below 64 pixels the icon
+    /// draws the outer one alone (`smallRims`): the inner one would blur into it.
+    static let rims = [
+        Rim(inset: 4 / 256, width: 2 / 256, topAlpha: 0.32, bottomAlpha: 0.08),
+        Rim(inset: 12 / 256, width: 1.5 / 256, topAlpha: 0.14, bottomAlpha: 0.03),
+    ]
+    static var smallRims: [Rim] { Array(rims.prefix(1)) }
+
+    /// The rim's squircle in a body filling `body`, ready to stroke.
+    static func rimPath(_ rim: Rim, inBody body: CGRect) -> CGPath {
+        squircle(in: body.insetBy(dx: rim.inset * body.width, dy: rim.inset * body.width))
+    }
 
     static func color(_ hex: UInt32, alpha: CGFloat = 1) -> CGColor {
         CGColor(
@@ -48,6 +70,28 @@ enum Logo {
         return path
     }
 
+    /// The sails' shaded faces on `Sailboat.path`'s own grid: the part of the
+    /// figure ahead of each sail's crease, above the deck. The jib's crease runs
+    /// from its head (482, 734) and the mainsail's from its head (548, 808),
+    /// each to a point on its foot; the mainsail's face starts aft of the mast,
+    /// so the mast stays lit.
+    /// A `CGPath` is immutable once built, so sharing it across threads is safe.
+    nonisolated(unsafe) static let folds: CGPath = {
+        let deck: CGFloat = 401
+        let faces = CGMutablePath()
+        faces.addLines(between: [
+            CGPoint(x: 0, y: deck), CGPoint(x: 413.6, y: deck), CGPoint(x: 482, y: 734),
+            CGPoint(x: 482, y: 1024), CGPoint(x: 0, y: 1024),
+        ])
+        faces.closeSubpath()
+        faces.addLines(between: [
+            CGPoint(x: 512, y: deck), CGPoint(x: 605.5, y: deck), CGPoint(x: 548, y: 808),
+            CGPoint(x: 548, y: 1024), CGPoint(x: 512, y: 1024),
+        ])
+        faces.closeSubpath()
+        return Sailboat.path.intersection(faces)
+    }()
+
     /// Maps `Sailboat.path` onto a body filling `body`: centred, and sized
     /// against the body as the icon sizes it. `yDown` for top-left-origin drawing.
     static func figureTransform(inBody body: CGRect, small: Bool = false, yDown: Bool = false) -> CGAffineTransform {
@@ -58,5 +102,11 @@ enum Logo {
     static func figurePath(inBody body: CGRect, small: Bool = false, yDown: Bool = false) -> CGPath {
         var t = figureTransform(inBody: body, small: small, yDown: yDown)
         return Sailboat.path.copy(using: &t)!
+    }
+
+    /// `folds` on a body filling `body`, placed as `figurePath` places the figure.
+    static func foldsPath(inBody body: CGRect, small: Bool = false, yDown: Bool = false) -> CGPath {
+        var t = figureTransform(inBody: body, small: small, yDown: yDown)
+        return folds.copy(using: &t)!
     }
 }

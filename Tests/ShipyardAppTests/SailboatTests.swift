@@ -62,11 +62,13 @@ struct SailboatTests {
         let makefile = try String(contentsOf: Self.root.appendingPathComponent("Makefile"), encoding: .utf8)
         #expect(makefile.contains("BRAND       := Sources/ShipyardApp/Brand/Sailboat.swift Sources/ShipyardApp/Brand/Logo.swift"))
         #expect(makefile.contains("swiftc -o $@ $(dir $@)main.swift $(BRAND)"))
-        #expect(makefile.contains("ICON        ?= khaki-green"))
+        #expect(makefile.contains("ICON        ?= green-graphite"))
         let script = try String(contentsOf: Self.root.appendingPathComponent("Packaging/Icon/make-icon.swift"), encoding: .utf8)
         #expect(script.contains("Sailboat.path"))
-        #expect(script.contains("(Logo.top, Logo.bottom)"))
-        #expect(script.contains("Logo.figure"))
+        #expect(script.contains("rgb(Logo.top), rgb(Logo.bottom)"))
+        #expect(script.contains("Logo.figurePath"))
+        #expect(script.contains("Logo.foldsPath"))
+        #expect(script.contains("Logo.rims"))
         #expect(!script.contains("enum Sailboat"))
         #expect(!script.contains("enum Logo"))
     }
@@ -85,13 +87,17 @@ struct SailboatTests {
     /// The 1024-grid icon body, and a spot on it clear of the figure and the rim.
     private static let iconBody = CGRect(x: 100, y: 100, width: 824, height: 824)
     private static let backgroundSpot = CGPoint(x: 160, y: 300)
-    /// A spot inside the mainsail, on `Sailboat.path`'s own grid.
+    /// A spot inside the mainsail's lit face, and one inside its shaded face
+    /// (`Logo.folds`), on `Sailboat.path`'s own grid.
     private static let sailSpot = CGPoint(x: 640, y: 600)
+    private static let foldSpot = CGPoint(x: 540, y: 600)
 
     @Test("the app icon and the welcome screens' badge show the same colours")
     @MainActor
     func iconAndBadgeColours() throws {
         #expect(Sailboat.path.contains(Self.sailSpot))
+        #expect(!Logo.folds.contains(Self.sailSpot))
+        #expect(Logo.folds.contains(Self.foldSpot))
         // The committed icon, at 512 pixels (half the 1024 grid), y up.
         let icns = try #require(NSImage(contentsOf: Self.root.appendingPathComponent("Packaging/Icon/AppIcon.icns")))
         let icon = try #require(icns.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == 512 })
@@ -107,7 +113,7 @@ struct SailboatTests {
             badge.colorAt(x: Int(p.x), y: Int(p.y))!.usingColorSpace(.sRGB)!
         }
 
-        // The same body colour and the same cream figure, spot for spot. Both
+        // The same body colour, the same white figure and the same shaded fold, spot for spot. Both
         // go through the same colour management, so they're compared with
         // each other rather than with the raw hex values.
         let inBadgeBody = CGPoint(x: Self.backgroundSpot.x - Self.iconBody.minX, y: Self.iconBody.maxY - Self.backgroundSpot.y)
@@ -115,11 +121,18 @@ struct SailboatTests {
         let inBadge = Self.sailSpot.applying(Logo.figureTransform(inBody: CGRect(x: 0, y: 0, width: side, height: side), yDown: true))
         let iconBody = iconColour(Self.backgroundSpot), badgeBody = badgeColour(inBadgeBody)
         let iconFigure = iconColour(inIcon), badgeFigure = badgeColour(inBadge)
+        let foldInIcon = Self.foldSpot.applying(Logo.figureTransform(inBody: Self.iconBody))
+        let foldInBadge = Self.foldSpot.applying(Logo.figureTransform(inBody: CGRect(x: 0, y: 0, width: side, height: side), yDown: true))
+        let iconFold = iconColour(foldInIcon), badgeFold = badgeColour(foldInBadge)
         #expect(Self.near(iconBody, badgeBody))
         #expect(Self.near(iconFigure, badgeFigure))
-        // And they are the logo's: a khaki green body (red and green over blue) and a cream figure.
-        #expect(badgeBody.redComponent > badgeBody.blueComponent + 0.1 && badgeBody.greenComponent > badgeBody.blueComponent + 0.1)
-        #expect(badgeFigure.redComponent > 0.95 && badgeFigure.blueComponent < badgeFigure.redComponent)
+        #expect(Self.near(iconFold, badgeFold))
+        // And they are the logo's: a dark body with green over red and blue, a
+        // white figure, and a grey fold between them.
+        #expect(badgeBody.greenComponent < 0.25)
+        #expect(badgeBody.greenComponent > badgeBody.redComponent && badgeBody.greenComponent > badgeBody.blueComponent)
+        #expect(badgeFigure.redComponent > 0.95 && badgeFigure.greenComponent > 0.95 && badgeFigure.blueComponent > 0.95)
+        #expect(badgeFold.greenComponent > 0.6 && badgeFold.greenComponent < badgeFigure.greenComponent - 0.1)
     }
 
     private static func near(_ a: NSColor, _ b: NSColor) -> Bool {

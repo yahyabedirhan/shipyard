@@ -31,10 +31,10 @@ ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
 ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
-# The variant make-icon.swift draws for the app: khaki-green (shipyard's logo),
-# olive-khaki, origami, sailboat, night or sunset.
-ICON        ?= khaki-green
-ALTERNATES  := olive-khaki origami sailboat night sunset
+# The variant make-icon.swift draws for the app: green-graphite (shipyard's logo),
+# khaki-green, olive-khaki, origami, sailboat, night or sunset.
+ICON        ?= green-graphite
+ALTERNATES  := khaki-green olive-khaki origami sailboat night sunset
 
 # A local signing identity keeps the app the same app to the Keychain from
 # one build to the next. Ad-hoc signing makes each build a new app, so
