@@ -2,7 +2,9 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
-## Unreleased
+## 0.7.0 (2026-10-13)
+
+The `shipyard` command is regrouped as `shipyard <group> <verb>`, with help made from one command table, and the old forms are gone. The tabs layout stays fast with many projects, and the logo is the folded sailboat on graphite. It gathers [#263](https://github.com/yahyabedirhan/shipyard/pull/263), [#266](https://github.com/yahyabedirhan/shipyard/pull/266), [#267](https://github.com/yahyabedirhan/shipyard/pull/267), [#268](https://github.com/yahyabedirhan/shipyard/pull/268), [#270](https://github.com/yahyabedirhan/shipyard/pull/270) and [#271](https://github.com/yahyabedirhan/shipyard/pull/271).
 
 - **A fast tabs layout with many projects.** The All tab stays smooth however much it lists. A tab builds only the rows in view, so switching to All takes about a tenth of the time it did with 11 projects, and stays well under a second with ten times as many items. Moving the pointer over rows, and scrolling, no longer redraw the whole tab. An open panel with a running workflow run stops keeping the processor busy. In the list layout, moving the pointer over rows and scrolling no longer skip frames. Measured before and after in `swift-lab/perf/FINDINGS.md`.
 - **The graphite logo.** The app icon, the README's logo and the welcome and status views' badge are a white sailboat on Swift Lab's dark graphite tile with a double rim, in place of the cream sailboat on khaki green. Each sail folds like paper, its forward face grey, in the style of Swift Lab's and the skills repository's logos. The sailboat's shape, and the menu bar item, don't change.
