@@ -35,7 +35,7 @@ struct PingFilingTests {
             graphQL: PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", []), PullRequestsResponse("yahyabedirhan/blog", [])])
         )
 
-        let result = harness.cli("ping", "Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
+        let result = harness.cli("ping", "send", "Ready for review", origin: "git@github.com:yahyabedirhan/shop.git")
         try #require(result.status == 0, "\(result.error)")
         await harness.shipyard.reloadPings()
 
@@ -66,13 +66,13 @@ struct PingFilingTests {
         harness.graphQL([PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", [])])])
         let origin = "https://github.com/yahyabedirhan/shop.git"
 
-        let before = harness.cli("ping", "Too early", origin: origin)
+        let before = harness.cli("ping", "send", "Too early", origin: origin)
         #expect(before.status == 1)
         #expect(before.error.contains("no project watches `yahyabedirhan/shop`"))
         #expect(before.error.contains("the projects are `mine`"))
 
         await harness.shipyard.start()
-        let after = harness.cli("ping", "Ready", origin: origin)
+        let after = harness.cli("ping", "send", "Ready", origin: origin)
         try #require(after.status == 0, "\(after.error)")
         await harness.shipyard.reloadPings()
 
@@ -93,7 +93,7 @@ struct PingFilingTests {
                 """,
             graphQL: PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)])])
         )
-        try #require(harness.cli("ping", "Ready", origin: "git@github.com:YahyaBedirhan/Shop.git").status == 0)
+        try #require(harness.cli("ping", "send", "Ready", origin: "git@github.com:YahyaBedirhan/Shop.git").status == 0)
         await harness.shipyard.reloadPings()
 
         let groups = try #require(harness.section("shop")?.groups)

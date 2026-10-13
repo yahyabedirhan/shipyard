@@ -209,7 +209,7 @@ struct ControlLeaseTests {
 
         guard case .failure(let refusal) = refused.answer else { Issue.record("not refused"); return }
         #expect(refusal.message(at: Self.at(12.5), timeZone: try #require(TimeZone(identifier: "UTC")))
-            == "shipyard is in use by codex in Herdr pane w1-2 until 00:01:00 (48s left); `shipyard control take --wait <seconds>` to queue")
+            == "shipyard is in use by codex in Herdr pane w1-2 until 00:01:00 (48s left); `shipyard lease take --wait <seconds>` to queue")
     }
 
     @Test("take says until when it holds the lease; a wait that runs out says how long it waited and who still holds it")

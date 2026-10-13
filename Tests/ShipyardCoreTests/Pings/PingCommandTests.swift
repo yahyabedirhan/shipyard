@@ -121,7 +121,7 @@ struct PingCommandTests {
 
         #expect(result.status == 1)
         #expect(result.output.isEmpty)
-        #expect(result.error == "shipyard ping: no project is named `shopp`; the projects are `shop`, `blog`\n")
+        #expect(result.error == "shipyard ping send: no project is named `shopp`; the projects are `shop`, `blog`\n")
         #expect(store.all().isEmpty)
     }
 
@@ -174,7 +174,7 @@ struct PingCommandTests {
         let result = try ping("Ready", "--repo", "yahyabedirhan/shop", "--project", "shop")
 
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: pass --repo or --project, not both\n")
+        #expect(result.error == "shipyard ping send: pass --repo or --project, not both\n")
         #expect(store.all().isEmpty)
     }
 
@@ -183,7 +183,7 @@ struct PingCommandTests {
         for value in ["shop", "yahyabedirhan/*", "https://github.com/yahyabedirhan/shop"] {
             let result = try ping("Ready", "--repo", value)
             #expect(result.status == 2, "\(value)")
-            #expect(result.error == "shipyard ping: `--repo` takes a repository as owner/name, not `\(value)`\n")
+            #expect(result.error == "shipyard ping send: `--repo` takes a repository as owner/name, not `\(value)`\n")
         }
         #expect(store.all().isEmpty)
     }
@@ -222,7 +222,7 @@ struct PingCommandTests {
         ] {
             #expect(result.status == 1)
             #expect(result.output.isEmpty)
-            #expect(result.error == "shipyard ping: no project watches `someone/else`; pass --project <name> to file it under one; the projects are `shop`, `blog`\n")
+            #expect(result.error == "shipyard ping send: no project watches `someone/else`; pass --project <name> to file it under one; the projects are `shop`, `blog`\n")
         }
         #expect(store.all().isEmpty)
     }
@@ -232,7 +232,7 @@ struct PingCommandTests {
         let result = try ping("Ready")
 
         #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: the working folder (/work/shop) isn't a git repository with a remote `origin` to file the ping by; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
+        #expect(result.error == "shipyard ping send: the working folder (/work/shop) isn't a git repository with a remote `origin` to file the ping by; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
         #expect(store.all().isEmpty)
     }
 
@@ -241,7 +241,7 @@ struct PingCommandTests {
         let result = try ping("Ready", origin: "/srv/git/shop")
 
         #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: the working folder's remote `origin` (/srv/git/shop) doesn't name a repository as owner/name; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
+        #expect(result.error == "shipyard ping send: the working folder's remote `origin` (/srv/git/shop) doesn't name a repository as owner/name; pass --repo <owner/name> or --project <name>; the projects are `shop`, `blog`\n")
     }
 
     @Test(
@@ -269,12 +269,12 @@ struct PingCommandTests {
     @Test("a missing or empty title, a second title, an unknown flag or a flag without its value is a usage error")
     func usageErrors() throws {
         let cases: [([String], String)] = [
-            (["--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"),
-            (["  ", "--project", "shop"], "shipyard ping: give the ping a title: shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"),
-            (["Ready", "now", "--project", "shop"], "shipyard ping: one title only; quote it: shipyard ping \"Ready now\""),
-            (["Ready", "--projcet", "shop"], "shipyard ping: unknown option `--projcet`"),
-            (["Ready", "--project"], "shipyard ping: `--project` needs a value"),
-            (["Ready", "--repo"], "shipyard ping: `--repo` needs a value"),
+            (["--project", "shop"], "shipyard ping send: give the ping a title: shipyard ping send <title> [options] (shipyard ping --help lists them)"),
+            (["  ", "--project", "shop"], "shipyard ping send: give the ping a title: shipyard ping send <title> [options] (shipyard ping --help lists them)"),
+            (["Ready", "now", "--project", "shop"], "shipyard ping send: one title only; quote it: shipyard ping send \"Ready now\""),
+            (["Ready", "--projcet", "shop"], "shipyard ping send: unknown option `--projcet`"),
+            (["Ready", "--project"], "shipyard ping send: `--project` needs a value"),
+            (["Ready", "--repo"], "shipyard ping send: `--repo` needs a value"),
         ]
         for (arguments, message) in cases {
             let result = PingCommand.run(
@@ -322,21 +322,16 @@ struct PingCommandTests {
 @Suite("The shipyard CLI")
 @MainActor
 struct ShipyardCLITests {
-    @Test("help and no arguments print the usage; an unknown command fails with it")
+    @Test("help prints the usage on standard output, no arguments on standard error with exit 2")
     func usage() throws {
         let harness = try Harness(config: twoProjects)
 
         let help = harness.cli("--help")
         #expect(help.status == 0)
-        #expect(help.output.contains("shipyard ping \"<title>\" [--body <text>] [--from <label>]"))
+        #expect(help.output.contains("ping send <title> [options]"))
 
         let bare = harness.cli()
-        #expect(bare.status == 2)
-        #expect(bare.error.contains("[--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]"))
-
-        let unknown = harness.cli("pnig", "Ready")
-        #expect(unknown.status == 2)
-        #expect(unknown.error.hasPrefix("shipyard: unknown command `pnig`\n"))
+        #expect(bare == CommandResult(error: help.output, status: 2))
     }
 
     @Test("--version prints shipyard's version")
@@ -345,22 +340,24 @@ struct ShipyardCLITests {
         #expect(result == CommandResult(output: "shipyard \(ShipyardVersion.current)\n"))
     }
 
-    @Test("ping help prints the ping usage, with --id, withdraw and --; the main help lists withdraw too")
+    @Test("ping help prints the ping usage, with send, --id, withdraw, list and --; the main help lists withdraw too")
     func pingHelp() throws {
         let harness = try Harness(config: twoProjects)
         let result = harness.cli("ping", "--help")
-        #expect(result.status == 0)
-        #expect(result.output.hasPrefix("usage: shipyard ping \"<title>\" [--body <text>] [--from <label>] [--id <id>]\n"))
+        #expect(result == CommandResult(output: PingCommand.usageText))
+        #expect(result.output.contains("Usage: shipyard ping send <title> [options]\n"))
+        #expect(result.output.contains("--id <id>"))
         #expect(result.output.contains("shipyard ping withdraw <id>"))
-        #expect(result.output.contains("shipyard ping -- withdraw"))
-        #expect(harness.cli("--help").output.contains("shipyard ping withdraw <id>"))
+        #expect(result.output.contains("shipyard ping list [--json]"))
+        #expect(result.output.contains("Everything after -- is the title"))
+        #expect(harness.cli("--help").output.contains("ping withdraw <id>"))
     }
 
     @Test("a configuration that doesn't read fails the ping with its first problem, storing nothing")
     func brokenConfiguration() throws {
         let harness = try Harness(config: twoProjects + "\n[[projects]]\nslug = \"shop\"\nrepositories = [\"o/r\"]\n")
 
-        let result = harness.cli("ping", "Ready", "--project", "shop")
+        let result = harness.cli("ping", "send", "Ready", "--project", "shop")
 
         #expect(result.status == 1)
         #expect(result.error.hasPrefix("shipyard: config.toml doesn't read (line "))
@@ -372,10 +369,10 @@ struct ShipyardCLITests {
     func noConfigurationFile() throws {
         let harness = try Harness()
 
-        let result = harness.cli("ping", "Ready", "--project", "shop")
+        let result = harness.cli("ping", "send", "Ready", "--project", "shop")
 
         #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: no project is named `shop`; config.toml has no projects yet\n")
+        #expect(result.error == "shipyard ping send: no project is named `shop`; config.toml has no projects yet\n")
     }
 
     // MARK: - Which config.toml
@@ -415,12 +412,12 @@ struct ShipyardCLITests {
         let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
         let home = harness.workingFolder
 
-        let filed = shipyard("ping", "Ready", "--project", "shop", in: harness, shell: shell, home: home)
-        let refused = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: home)
+        let filed = shipyard("ping", "send", "Ready", "--project", "shop", in: harness, shell: shell, home: home)
+        let refused = shipyard("ping", "send", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: home)
 
         #expect(filed.status == 0, "\(filed.error)")
         #expect(harness.pingStore.all().map(\.projects) == [["shop"]])
-        #expect(refused.error == "shipyard ping: no project is named `elsewhere`; the projects are `shop`, `blog`\n")
+        #expect(refused.error == "shipyard ping send: no project is named `elsewhere`; the projects are `shop`, `blog`\n")
     }
 
     @Test("before the app has ever run, a ping files against the config.toml the agent's shell points at")
@@ -428,7 +425,7 @@ struct ShipyardCLITests {
         let harness = try Harness(config: twoProjects)
         let shell = ["XDG_CONFIG_HOME": try shellConfigHome().path]
 
-        let filed = shipyard("ping", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: harness.workingFolder)
+        let filed = shipyard("ping", "send", "Ready", "--project", "elsewhere", in: harness, shell: shell, home: harness.workingFolder)
 
         #expect(filed.status == 0, "\(filed.error)")
         #expect(harness.pingStore.all().map(\.projects) == [["elsewhere"]])
@@ -459,16 +456,16 @@ struct ShipyardCLITests {
 
             """)
 
-        let hidden = harness.cli("ping", "Ready", "--repo", "yahyabedirhan/docs")
+        let hidden = harness.cli("ping", "send", "Ready", "--repo", "yahyabedirhan/docs")
         #expect(hidden.status == 1)
         #expect(hidden.output.isEmpty)
-        #expect(hidden.error == "shipyard ping: no project shows the ping: `docs` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+        #expect(hidden.error == "shipyard ping send: no project shows the ping: `docs` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
 
-        let named = harness.cli("ping", "Ready", "--project", "shop")
-        #expect(named.error == "shipyard ping: no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
+        let named = harness.cli("ping", "send", "Ready", "--project", "shop")
+        #expect(named.error == "shipyard ping send: no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`\n")
         #expect(harness.pingStore.all().isEmpty)
 
-        let shown = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+        let shown = harness.cli("ping", "send", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
         #expect(shown.status == 0)
         #expect(harness.pingStore.all().map(\.projects) == [["shop", "store", "blog"]])
     }
@@ -489,10 +486,10 @@ struct ShipyardCLITests {
 
             """)
 
-        let result = harness.cli("ping", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
+        let result = harness.cli("ping", "send", "Ready", origin: "git@github.com:yahyabedirhan/shop.git")
 
         #expect(result.status == 1)
-        #expect(result.error == "shipyard ping: no project shows the ping: `shop`, `store` hide pings (pings.show = false); no project shows pings\n")
+        #expect(result.error == "shipyard ping send: no project shows the ping: `shop`, `store` hide pings (pings.show = false); no project shows pings\n")
         #expect(harness.pingStore.all().isEmpty)
     }
 }

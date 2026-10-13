@@ -22,7 +22,7 @@ private extension Harness {
     /// pane `pane`, and returns its id, then lets the app see the store change.
     @discardableResult
     func send(_ title: String, _ flags: String..., pane: String? = nil, variables: [String: String] = [:]) async throws -> String {
-        let result = cli(["ping", title, "--project", "shop"] + flags, herdrPane: pane, variables: variables)
+        let result = cli(["ping", "send", title, "--project", "shop"] + flags, herdrPane: pane, variables: variables)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
         return result.pingID
@@ -58,11 +58,11 @@ struct HerdrActionTests {
     @Test("--herdr with no id outside Herdr is a usage error, and nothing is stored")
     func outsideHerdr() throws {
         let harness = try Harness(config: shop)
-        let result = harness.cli("ping", "Waiting", "--project", "shop", "--herdr")
+        let result = harness.cli("ping", "send", "Waiting", "--project", "shop", "--herdr")
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: `--herdr` without an id focuses your own pane, but HERDR_PANE_ID isn't set (you're not in Herdr); pass a tab or pane id such as w1:t2\n")
+        #expect(result.error == "shipyard ping send: `--herdr` without an id focuses your own pane, but HERDR_PANE_ID isn't set (you're not in Herdr); pass a tab or pane id such as w1:t2\n")
         #expect(harness.pingStore.all().isEmpty)
-        #expect(harness.cli("ping", "Waiting", "--project", "shop", "--herdr", herdrPane: " ").status == 2)
+        #expect(harness.cli("ping", "send", "Waiting", "--project", "shop", "--herdr", herdrPane: " ").status == 2)
     }
 
     @Test("--herdr takes a tab or pane id, wherever the agent runs")
@@ -77,7 +77,7 @@ struct HerdrActionTests {
     @Test("only an argument shaped like a Herdr id is --herdr's; another is the title, or the next flag")
     func followingArgument() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        let result = harness.cli("ping", "--herdr", "Ready: w1", "--project", "shop", herdrPane: "w1:p3")
+        let result = harness.cli("ping", "send", "--herdr", "Ready: w1", "--project", "shop", herdrPane: "w1:p3")
         try #require(result.status == 0, "\(result.error)")
         let ping = try #require(harness.pingStore.ping(id: result.pingID))
         #expect(ping.title == "Ready: w1")
@@ -96,9 +96,9 @@ struct HerdrActionTests {
     @Test("--herdr with another action flag is a usage error")
     func oneAction() throws {
         let harness = try Harness(config: shop)
-        let result = harness.cli("ping", "Ready", "--project", "shop", "--herdr", "w1:t2", "--app", "Claude")
+        let result = harness.cli("ping", "send", "Ready", "--project", "shop", "--herdr", "w1:t2", "--app", "Claude")
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr\n")
+        #expect(result.error == "shipyard ping send: a ping has one action at most; pass one of --open, --app, --herdr\n")
         #expect(harness.pingStore.all().isEmpty)
     }
 

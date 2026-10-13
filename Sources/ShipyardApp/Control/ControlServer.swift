@@ -14,7 +14,7 @@ import ShipyardNotices
 @MainActor
 final class ControlServer {
     /// A reply, whether the app quits once it's written, and the lease a
-    /// `control take`'s reply grants, released when the reply can't be
+    /// `lease take`'s reply grants, released when the reply can't be
     /// written (`undelivered`).
     struct Answer: Equatable {
         var reply: ControlReply
@@ -44,7 +44,7 @@ final class ControlServer {
     /// Told each change in who holds the lease, in order: the app posts
     /// the lease's notifications from them. A relaunch's handover isn't one.
     private let transitioned: @MainActor (ControlLease.Transition) -> Void
-    /// Shows an agent's notice (`shipyard notify`), or withdraws one, and
+    /// Shows an agent's notice (`shipyard notice send`), or withdraws one, and
     /// says what came of it: the app hands it to `Shipyard.receive(_:)`.
     private let notices: @MainActor (NoticeRequest) async -> NoticeVerdict
     /// Checks the notes workspace through ntn, as the menu reads it (`shipyard notes check`).
@@ -195,7 +195,7 @@ final class ControlServer {
 
     // MARK: - Taking turns
 
-    /// `control take`: held to the cap at once when the lease is the
+    /// `lease take`: held to the cap at once when the lease is the
     /// holder's or free. While another holds it, refused at once without a
     /// wait; with one, the take waits in line, suspended so the main actor
     /// answers other requests (the holder's release among them), until

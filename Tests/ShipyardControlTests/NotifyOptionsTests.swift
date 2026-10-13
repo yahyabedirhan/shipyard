@@ -5,7 +5,7 @@ import ShipyardNotices
 import ShipyardPings
 import Testing
 
-/// A notice's options through `shipyard notify` on the Mac: every flag
+/// A notice's options through `shipyard notice send` on the Mac: every flag
 /// lands in the one JSON shape every route carries, `withdraw` goes over
 /// the same route, and misuse exits 2. What the app makes of each option
 /// is `NoticeOptionsTests`'.
@@ -25,7 +25,7 @@ extension NotifyCommandTests {
         defer { try? FileManager.default.removeItem(at: folder) }
 
         let result = shipyard([
-            "notify", "Tests passed", "--subtitle", "checkout", "--body", "40 of 40", "--from", "claude",
+            "notice", "send", "Tests passed", "--subtitle", "checkout", "--body", "40 of 40", "--from", "claude",
             "--image", "chart.png", "--sound", "none", "--thread", "orchestration", "--level", "passive", "--id", "tests",
             "--herdr", "--button", "Open PR=open:https://github.com/owner/shop/pull/7?tab=files",
             "--button", "Claude=app:Claude", "--button", "Tab=herdr:w1:t2",
@@ -60,7 +60,7 @@ extension NotifyCommandTests {
     func clickAction(flag: String, value: String, action: PingAction) {
         let app = FakeTransport(reply: .done(""))
 
-        _ = shipyard(["notify", "Done", flag, value], variables: ["HERDR_SESSION": "work", "TERM_PROGRAM": "ghostty"], transport: app)
+        _ = shipyard(["notice", "send", "Done", flag, value], variables: ["HERDR_SESSION": "work", "TERM_PROGRAM": "ghostty"], transport: app)
 
         #expect(app.requests == [.notify(.show(Notice(title: "Done", repository: "owner/shop", action: action)))])
     }
@@ -69,7 +69,7 @@ extension NotifyCommandTests {
     func herdrIDs() {
         let app = FakeTransport(reply: .done(""))
 
-        _ = shipyard(["notify", "--herdr", "w2:t4", "Done", "--button", "Mine=herdr"], variables: ["HERDR_PANE_ID": "w1:p3"], transport: app)
+        _ = shipyard(["notice", "send", "--herdr", "w2:t4", "Done", "--button", "Mine=herdr"], variables: ["HERDR_PANE_ID": "w1:p3"], transport: app)
 
         #expect(app.requests == [.notify(.show(Notice(
             title: "Done", repository: "owner/shop", action: .herdr("w2:t4"), buttons: [NoticeButton(label: "Mine", action: .herdr("w1:p3"))]
@@ -80,8 +80,8 @@ extension NotifyCommandTests {
     func sounds() {
         let app = FakeTransport(reply: .done(""))
 
-        _ = shipyard(["notify", "Done", "--sound", "default"], transport: app)
-        _ = shipyard(["notify", "Done", "--sound", "Glass"], transport: app)
+        _ = shipyard(["notice", "send", "Done", "--sound", "default"], transport: app)
+        _ = shipyard(["notice", "send", "Done", "--sound", "Glass"], transport: app)
 
         #expect(app.requests == [
             .notify(.show(Notice(title: "Done", repository: "owner/shop", sound: .default))),
@@ -96,15 +96,15 @@ extension NotifyCommandTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         try Data("text".utf8).write(to: folder.appendingPathComponent("notes.txt"))
 
-        let missing = shipyard(["notify", "Done", "--image", "gone.png"], folder: folder, transport: app)
-        let notAnImage = shipyard(["notify", "Done", "--image", folder.appendingPathComponent("notes.txt").path], folder: folder, transport: app)
-        let tooLarge = shipyard(["notify", "Done", "--image", "chart.png"], folder: folder, transport: app)
+        let missing = shipyard(["notice", "send", "Done", "--image", "gone.png"], folder: folder, transport: app)
+        let notAnImage = shipyard(["notice", "send", "Done", "--image", folder.appendingPathComponent("notes.txt").path], folder: folder, transport: app)
+        let tooLarge = shipyard(["notice", "send", "Done", "--image", "chart.png"], folder: folder, transport: app)
 
-        #expect(missing == CommandResult(error: "shipyard notify: `--image` can't read `gone.png`\n", status: 2))
+        #expect(missing == CommandResult(error: "shipyard notice send: `--image` can't read `gone.png`\n", status: 2))
         #expect(notAnImage == CommandResult(
-            error: "shipyard notify: `--image` takes a PNG, JPEG or GIF file, not `\(folder.appendingPathComponent("notes.txt").path)`\n", status: 2
+            error: "shipyard notice send: `--image` takes a PNG, JPEG or GIF file, not `\(folder.appendingPathComponent("notes.txt").path)`\n", status: 2
         ))
-        #expect(tooLarge == CommandResult(error: "shipyard notify: `--image` `chart.png` is larger than a notice's 5 MB\n", status: 2))
+        #expect(tooLarge == CommandResult(error: "shipyard notice send: `--image` `chart.png` is larger than a notice's 5 MB\n", status: 2))
         #expect(app.requests.isEmpty)
     }
 
@@ -130,9 +130,9 @@ extension NotifyCommandTests {
     func misusedOptions(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["notify", "Done"] + arguments, transport: app)
+        let result = shipyard(["notice", "send", "Done"] + arguments, transport: app)
 
-        #expect(result == CommandResult(error: "shipyard notify: \(line)\n", status: 2))
+        #expect(result == CommandResult(error: "shipyard notice send: \(line)\n", status: 2))
         #expect(app.requests.isEmpty)
     }
 
@@ -142,7 +142,7 @@ extension NotifyCommandTests {
     func withdraw() throws {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["notify", "withdraw", "tests"], origin: nil, transport: app)
+        let result = shipyard(["notice", "withdraw", "tests"], origin: nil, transport: app)
 
         #expect(result == CommandResult(output: "withdrawn\n"))
         #expect(app.requests == [.notify(.withdraw(id: "tests"))])
@@ -150,23 +150,23 @@ extension NotifyCommandTests {
     }
 
     @Test("a withdrawal the app can't take exits 1 saying so; one that doesn't read exits 2", arguments: [
-        (["withdraw", "tests"], FakeTransport.nothingListens, "shipyard notify withdraw: shipyard isn't running, so the notice wasn't withdrawn\n", 1),
-        (["withdraw"], FakeTransport(reply: .done("")), "shipyard notify withdraw: give the id of one notice: shipyard notify withdraw <id>\n", 2),
-        (["withdraw", "a", "b"], FakeTransport(reply: .done("")), "shipyard notify withdraw: give the id of one notice: shipyard notify withdraw <id>\n", 2),
+        (["withdraw", "tests"], FakeTransport.nothingListens, "shipyard notice withdraw: shipyard isn't running, so the notice wasn't withdrawn\n", 1),
+        (["withdraw"], FakeTransport(reply: .done("")), "shipyard notice withdraw: give the id of one notice: shipyard notice withdraw <id>\n", 2),
+        (["withdraw", "a", "b"], FakeTransport(reply: .done("")), "shipyard notice withdraw: give the id of one notice: shipyard notice withdraw <id>\n", 2),
         (["withdraw", "A"], FakeTransport(reply: .done("")),
-         "shipyard notify withdraw: an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `A`\n", 2),
+         "shipyard notice withdraw: an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `A`\n", 2),
     ] as [([String], FakeTransport, String, Int32)])
     func withdrawRefused(arguments: [String], transport: FakeTransport, error: String, status: Int32) {
-        let result = shipyard(["notify"] + arguments, transport: transport)
+        let result = shipyard(["notice"] + arguments, transport: transport)
 
         #expect(result == CommandResult(error: error, status: status))
     }
 
-    @Test("after --, withdraw is a notice's title")
+    @Test("withdraw after send is a notice's title")
     func withdrawAsTitle() {
         let app = FakeTransport(reply: .done(""))
 
-        _ = shipyard(["notify", "--", "withdraw"], transport: app)
+        _ = shipyard(["notice", "send", "withdraw"], transport: app)
 
         #expect(app.requests == [.notify(.show(Notice(title: "withdraw", repository: "owner/shop")))])
     }

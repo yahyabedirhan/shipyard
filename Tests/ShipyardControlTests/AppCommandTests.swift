@@ -422,7 +422,7 @@ struct AppCommandTests {
             try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
 
             let missing = shipyard(["app", "open", "--demo", "/nonexistent"], transport: app, support: support)
-            #expect(missing == CommandResult(error: "shipyard app open: no folder at /nonexistent\n" + ControlCommand.usageText, status: 2))
+            #expect(missing == CommandResult(error: "shipyard app open: no folder at /nonexistent. Run `shipyard app --help` for usage.\n", status: 2))
             #expect(shipyard(["app", "open", "--demo", file.path], transport: app, support: support).status == 2)
             let tooDeep = shipyard(["app", "open", "--demo", deep.path], transport: app, support: support)
             #expect(tooDeep.status == 2)
@@ -461,22 +461,23 @@ struct AppCommandTests {
 
     // MARK: - Arguments
 
-    @Test("arguments that don't read exit 2 with the usage and send nothing", arguments: [
+    @Test("arguments that don't read exit 2 with one line pointing at the app help, and send nothing; none prints the usage", arguments: [
         (["app"], ""),
-        (["app", "spin"], "shipyard app: unknown command `spin`\n"),
-        (["app", "status", "--yaml"], "shipyard app status: unexpected `--yaml`\n"),
-        (["app", "status", "--json", "now"], "shipyard app status: unexpected `now`\n"),
-        (["app", "quit", "now"], "shipyard app quit: unexpected `now`\n"),
-        (["app", "open", "--fast"], "shipyard app open: unexpected `--fast`\n"),
-        (["app", "open", "--demo"], "shipyard app open: --demo needs a folder\n"),
-        (["app", "open", "--demo", "/tmp", "now"], "shipyard app open: unexpected `now`\n"),
+        (["app", "spin"], "shipyard app: unknown command `spin`"),
+        (["app", "status", "--yaml"], "shipyard app status: unexpected `--yaml`"),
+        (["app", "status", "--json", "now"], "shipyard app status: unexpected `now`"),
+        (["app", "quit", "now"], "shipyard app quit: unexpected `now`"),
+        (["app", "open", "--fast"], "shipyard app open: unexpected `--fast`"),
+        (["app", "open", "--demo"], "shipyard app open: --demo needs a folder"),
+        (["app", "open", "--demo", "/tmp", "now"], "shipyard app open: unexpected `now`"),
     ])
     func misread(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
 
         let result = shipyard(arguments, transport: app)
 
-        #expect(result == CommandResult(error: line + ControlCommand.usageText, status: 2))
+        let expected = line.isEmpty ? ControlCommand.usageText : line + ". Run `shipyard app --help` for usage.\n"
+        #expect(result == CommandResult(error: expected, status: 2))
         #expect(app.exchanges.current.isEmpty)
     }
 
@@ -486,7 +487,7 @@ struct AppCommandTests {
 
         #expect(shipyard("app", "--help", transport: app) == CommandResult(output: ControlCommand.usageText))
         #expect(shipyard("app", "status", "-h", transport: app) == CommandResult(output: ControlCommand.usageText))
-        #expect(shipyard("--help", transport: app).output.contains("shipyard app open [--demo <folder>] | quit | status [--json]"))
+        #expect(shipyard("--help", transport: app).output.contains("app open [--demo <folder>]"))
         #expect(app.exchanges.current.isEmpty)
     }
 

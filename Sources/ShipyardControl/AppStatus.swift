@@ -28,7 +28,7 @@ public struct AppStatus: Codable, Equatable, Sendable {
         public var place: String
         public var secondsLeft: Int
         public var waiting: Int
-        /// Why the holder took shipyard (`control take --for`); left out of
+        /// Why the holder took shipyard (`lease take --for`); left out of
         /// the JSON when it didn't say.
         public var purpose: String?
         /// What the holder is doing ("Taking a screenshot…"), or last did

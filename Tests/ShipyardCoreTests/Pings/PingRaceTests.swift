@@ -119,7 +119,7 @@ struct PingRaceTests {
     @Test("a ping replaced while its action runs stays unseen, as the replacement")
     func replacedWhileRunning() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-        harness.cli("ping", "Waiting for your input", "--project", "shop", "--id", "input", "--app", "Claude")
+        harness.cli("ping", "send", "Waiting for your input", "--project", "shop", "--id", "input", "--app", "Claude")
         await harness.shipyard.reloadPings()
         let store = harness.pingStore
         harness.actions.whileRunning = {
@@ -139,7 +139,7 @@ struct PingRaceTests {
     func withdrawnWhileRunning() async throws {
         for failure in [nil, "No app named Claude"] {
             let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
-            harness.cli("ping", "Waiting for your input", "--project", "shop", "--id", "input", "--app", "Claude")
+            harness.cli("ping", "send", "Waiting for your input", "--project", "shop", "--id", "input", "--app", "Claude")
             await harness.shipyard.reloadPings()
             let store = harness.pingStore
             harness.actions.failure = failure
@@ -158,7 +158,7 @@ struct PingRaceTests {
     @Test("a ping sent while the app was closed notifies at start, signed out and without GitHub")
     func notifiesAtStartSignedOut() async throws {
         let harness = try Harness(config: shop)
-        harness.cli("ping", "Published", "--project", "shop")
+        harness.cli("ping", "send", "Published", "--project", "shop")
 
         await harness.shipyard.start()
 
@@ -175,7 +175,7 @@ struct PingRaceTests {
     func expiresSignedOut() async throws {
         let harness = try Harness(config: shop)
         await harness.shipyard.start()
-        harness.cli("ping", "Ready", "--project", "shop", "--id", "ready")
+        harness.cli("ping", "send", "Ready", "--project", "shop", "--id", "ready")
         await harness.shipyard.reloadPings()
         let banner = try #require(harness.pingNotifications.first)
         try harness.pingStore.markSeen(try #require(harness.pingStore.ping(id: "ready")), at: harness.clock.now)

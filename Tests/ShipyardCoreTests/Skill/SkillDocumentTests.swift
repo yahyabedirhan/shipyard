@@ -178,18 +178,24 @@ struct SkillDocumentTests {
         #expect(examples.count >= 4)
         var withdrawn = 0
         for words in examples {
-            let arguments = Array(words.dropFirst(2))
-            if arguments.first == "withdraw" {
+            let arguments = Array(words.dropFirst(3))
+            switch words[2] {
+            case "withdraw":
                 withdrawn += 1
-                #expect(arguments.count == 2 && PingCommand.isID(arguments[1]), "\(words)")
-                continue
-            }
-            if case .failure(let error) = PingCommand.Request.parse(arguments, herdrPane: "w1:p3") {
-                Issue.record("\(words) doesn't read: \(error.message)")
+                #expect(arguments.count == 1 && PingCommand.isID(arguments[0]), "\(words)")
+            case "list":
+                #expect(arguments == [] || arguments == ["--json"], "\(words)")
+            case "send":
+                if case .failure(let error) = PingCommand.Request.parse(arguments, herdrPane: "w1:p3") {
+                    Issue.record("\(words) doesn't read: \(error.message)")
+                }
+            default:
+                Issue.record("\(words) isn't `ping send`, `withdraw` or `list`")
             }
         }
         #expect(withdrawn > 0)
-        let actions = examples.compactMap { try? PingCommand.Request.parse(Array($0.dropFirst(2)), herdrPane: "w1:p3").get() }
+        let actions = examples.filter { $0[2] == "send" }
+            .compactMap { try? PingCommand.Request.parse(Array($0.dropFirst(3)), herdrPane: "w1:p3").get() }
         #expect(actions.contains { $0.action == .herdr("w1:p3") && $0.id != nil })
         #expect(actions.contains { if case .url = $0.action { true } else { false } })
     }
@@ -200,10 +206,8 @@ struct SkillDocumentTests {
         let flowing = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
         // The synopsis is the commands' own, word for word.
         for usage in [ControlCommand.usageText, PanelCommand.usageText, ScreenshotCommand.usageText, LeaseCommand.usageText] {
-            let synopsis = usage.components(separatedBy: "\n\n")[0]
-                .replacingOccurrences(of: "usage: ", with: "")
-                .split(whereSeparator: \.isWhitespace).joined(separator: " ")
-            #expect(flowing.contains(synopsis), "`\(synopsis)` isn't taught")
+            let wanted = synopsis(of: usage)
+            #expect(flowing.contains(wanted), "`\(wanted)` isn't taught")
         }
         // The refusals and the fallback's note, in the command's words.
         for line in [
@@ -233,29 +237,31 @@ struct SkillDocumentTests {
         defer { try? FileManager.default.removeItem(at: demo) }
         let environment = CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: [:])
         var taught: Set<String> = []
-        for command in ["app", "panel", "screenshot", "control"] {
+        for command in ["app", "panel", "lease"] {
             for words in shellExamples(in: text, command: command) {
                 var arguments = Array(words.dropFirst(2))
                 // A demo folder must exist to read; the example's own is made by its block.
                 if let flag = arguments.firstIndex(of: "--demo"), flag + 1 < arguments.count { arguments[flag + 1] = demo.path }
-                let reads = switch command {
-                case "app": (try? ControlCommand.parse(arguments, environment: environment).get()) != nil
-                case "panel": (try? PanelCommand.parse(arguments).get()) != nil
-                case "control": (try? LeaseCommand.parse(arguments).get()) != nil
-                default: (try? ScreenshotCommand.parse(arguments, workingDirectory: environment.workingDirectory).get()) != nil
+                let verb = arguments.first ?? ""
+                let reads = switch (command, verb) {
+                case ("app", "capture"):
+                    (try? ScreenshotCommand.parse(Array(arguments.dropFirst()), workingDirectory: environment.workingDirectory).get()) != nil
+                case ("app", _): (try? ControlCommand.parse(arguments, environment: environment).get()) != nil
+                case ("panel", _): (try? PanelCommand.parse(arguments).get()) != nil
+                default: (try? LeaseCommand.parse(arguments).get()) != nil
                 }
                 #expect(reads, "\(words) doesn't read")
-                taught.insert(command == "screenshot" ? command : "\(command) \(arguments.first ?? "")")
+                taught.insert("\(command) \(verb)")
                 for option in ["--demo", "--json", "--appearance", "--menu-bar-icon", "--with-indicator", "--wait"] where arguments.contains(option) {
-                    taught.insert("\(command) \(option)")
+                    taught.insert("\(command) \(verb) \(option)")
                 }
             }
         }
         let every: Set<String> = [
-            "app open", "app --demo", "app quit", "app status", "app --json",
-            "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel tab", "panel view",
-            "screenshot", "screenshot --appearance", "screenshot --menu-bar-icon", "screenshot --with-indicator",
-            "control take", "control --wait", "control release",
+            "app open", "app open --demo", "app quit", "app status", "app status --json",
+            "app capture", "app capture --appearance", "app capture --menu-bar-icon", "app capture --with-indicator",
+            "panel open", "panel close", "panel fold", "panel unfold", "panel show-more", "panel show-tab", "panel show-view",
+            "lease take", "lease take --wait", "lease release",
         ]
         #expect(every.subtracting(taught).isEmpty, "no example for \(every.subtracting(taught).sorted())")
     }
@@ -407,30 +413,31 @@ struct SkillDocumentTests {
         }
     }
 
-    @Test("its notices reference teaches the notify command as it's built: the synopsis, every flag, the refusals, and examples that read")
+    @Test("its notices reference teaches the notice command as it's built: the synopsis, every flag, the refusals, and examples that read")
     func notifyCommand() throws {
         let page = try String(contentsOf: noticesURL, encoding: .utf8)
         #expect(try skill().contains("[references/notices.md](references/notices.md)"))
         let flowing = page.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        let synopsis = NotifyCommand.usageText.components(separatedBy: "\n\n")[0]
-            .replacingOccurrences(of: "usage: ", with: "")
-            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        #expect(flowing.contains(synopsis), "`\(synopsis)` isn't taught")
+        let wanted = synopsis(of: NotifyCommand.usageText)
+        #expect(flowing.contains(wanted), "`\(wanted)` isn't taught")
         for flag in Set(NotifyCommand.usageText.matches(of: /--[a-z]+/).map { String($0.output) }) {
             #expect(page.contains("`\(flag)"), "`\(flag)` isn't named")
         }
         #expect(page.contains(ControlNoticeRoute.notRunning))
         #expect(page.contains("notices are off for project `<name>`"))
         #expect(page.contains("**0**") && page.contains("**1**") && page.contains("**2**"))
-        let examples = shellExamples(in: page, command: "notify")
+        let examples = shellExamples(in: page, command: "notice")
         #expect(examples.count >= 3)
         for words in examples {
-            if words.count > 2, words[2] == "withdraw" {
+            switch words.count > 2 ? words[2] : "" {
+            case "withdraw":
                 #expect(words.count == 4 && PingCommand.isID(words[3]), "\(words) doesn't read")
-                continue
-            }
-            if case .failure(let error) = NotifyCommand.parse(Array(words.dropFirst(2))) {
-                Issue.record("\(words) doesn't read: \(error.message)")
+            case "send":
+                if case .failure(let error) = NotifyCommand.parse(Array(words.dropFirst(3))) {
+                    Issue.record("\(words) doesn't read: \(error.message)")
+                }
+            default:
+                Issue.record("\(words) isn't `notice send` or `notice withdraw`")
             }
         }
     }
@@ -457,6 +464,12 @@ struct SkillDocumentTests {
     }
 }
 
+/// A command's synopsis, its help's `Usage:` block, as one line of words.
+private func synopsis(of usage: String) -> String {
+    let block = usage.components(separatedBy: "\n\n").first { $0.hasPrefix("Usage: ") } ?? ""
+    return block.replacingOccurrences(of: "Usage: ", with: "").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+}
+
 /// The `shipyard <command>` lines of the ```sh fences in `text`, each split
 /// into words: a line ending in `\` continues on the next, `||` and `&&`
 /// separate commands, and a synopsis (with `<placeholders>`) is skipped.
@@ -474,7 +487,8 @@ private func shellExamples(in text: String, command: String) -> [[String]] {
         pending = ""
         for part in joined.components(separatedBy: "||").flatMap({ $0.components(separatedBy: "&&") }) {
             let words = shellWords(part.trimmingCharacters(in: .whitespaces))
-            guard words.count > 1, words[0] == "shipyard", words[1] == command, !part.contains("<") else { continue }
+            // A synopsis line, with `<placeholders>` or `[options]`, isn't an example.
+            guard words.count > 1, words[0] == "shipyard", words[1] == command, !part.contains("<"), !part.contains(" [") else { continue }
             examples.append(words)
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardCommand
 
-/// `shipyard control …`: holding and giving up the lease on purpose, its
+/// `shipyard lease …`: holding and giving up the lease on purpose, its
 /// arguments read into the `ControlRequest` the app answers and the holder
 /// key the command is sent as, when `--key` names one.
 public enum LeaseCommand {
@@ -19,11 +19,17 @@ public enum LeaseCommand {
     }
 
     public static let usageText = """
-        usage: shipyard control take [--wait <seconds>] [--for <purpose>] [--key <k>]
-                                | release [--key <k>]
+        Hold app control for a run of steps, or give it up.
+
+        Usage: shipyard lease take [--wait <seconds>] [--for <purpose>] [--key <k>]
+               shipyard lease release [--key <k>]
+
+        Examples:
+          shipyard lease take --wait 120 --for "checking the header icons"
+          shipyard lease release
 
           take      hold shipyard until 5 minutes after you took it, so other
-                    agents' app, panel and screenshot commands are refused
+                    agents' app, panel and lease commands are refused
                     meanwhile; prints "you hold shipyard until <HH:mm:ss>"
                     --wait <seconds>: while another agent holds it, wait in
                     line, first come first served, up to that long (0 to
@@ -37,15 +43,15 @@ public enum LeaseCommand {
                     of the agent shipyard works out; pass the same key to
                     release
 
-        To send every app, panel, screenshot and control command as <k>,
-        export SHIPYARD_CONTROL_KEY=<k> for the run; --key still wins.
+        To send every app, panel and lease command as <k>, export
+        SHIPYARD_CONTROL_KEY=<k> for the run; --key still wins.
 
-        Each exits 1 when shipyard isn't running; take also when another agent
+        Exit codes: 1 when shipyard isn't running; take also when another agent
         holds it, or still holds it once the wait runs out.
 
         """
 
-    /// Reads the arguments after `control`. `--help` is the usage on
+    /// Reads the arguments after `lease`. `--help` is the usage on
     /// standard output; anything that doesn't read is the usage on standard
     /// error, exit 2.
     public static func parse(_ arguments: [String]) -> Result<Invocation, CommandResult> {
@@ -59,43 +65,43 @@ public enum LeaseCommand {
         switch subcommand {
         case "take": options = ["--wait", "--for", "--key"]
         case "release": options = ["--key"]
-        default: return .failure(misread("shipyard control: unknown command `\(subcommand)`"))
+        default: return .failure(misread("shipyard lease: unknown command `\(subcommand)`"))
         }
         var values: [String: String] = [:]
         var rest = arguments.dropFirst()
         while let option = rest.popFirst() {
             guard options.contains(option), values[option] == nil else {
-                return .failure(misread("shipyard control \(subcommand): unexpected `\(option)`"))
+                return .failure(misread("shipyard lease \(subcommand): unexpected `\(option)`"))
             }
             guard let value = rest.popFirst() else {
                 let what = option == "--wait" ? "a number of seconds" : option == "--for" ? "a purpose" : "a key"
-                return .failure(misread("shipyard control \(subcommand): \(option) needs \(what)"))
+                return .failure(misread("shipyard lease \(subcommand): \(option) needs \(what)"))
             }
             values[option] = value
         }
         if let key = values["--key"], key.isEmpty {
-            return .failure(misread("shipyard control \(subcommand): --key needs a key"))
+            return .failure(misread("shipyard lease \(subcommand): --key needs a key"))
         }
         guard subcommand == "take" else { return .success(Invocation(.controlRelease, key: values["--key"])) }
         var wait: Int?
         if let seconds = values["--wait"] {
             guard let whole = Int(seconds), (0...ControlRequest.longestWait).contains(whole) else {
                 return .failure(misread(
-                    "shipyard control take: --wait takes whole seconds from 0 to \(ControlRequest.longestWait), not `\(seconds)`"
+                    "shipyard lease take: --wait takes whole seconds from 0 to \(ControlRequest.longestWait), not `\(seconds)`"
                 ))
             }
             wait = whole
         }
         if let purpose = values["--for"], !ControlLease.readsAsPurpose(purpose) {
             return .failure(misread(
-                "shipyard control take: --for takes one line of at most \(ControlLease.longestPurpose) characters"
+                "shipyard lease take: --for takes one line of at most \(ControlLease.longestPurpose) characters"
             ))
         }
         return .success(Invocation(.controlTake(waitSeconds: wait, purpose: values["--for"]), key: values["--key"]))
     }
 
-    /// `line`, then the usage, on standard error: exit 2.
+    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
-        CommandResult(error: line + "\n" + usageText, status: CommandResult.usageStatus)
+        .usage(line + ". Run `shipyard lease --help` for usage.")
     }
 }

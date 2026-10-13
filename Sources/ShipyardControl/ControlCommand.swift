@@ -103,7 +103,18 @@ public enum ControlCommand {
     static let lookTimeout: TimeInterval = 1
 
     public static let usageText = """
-        usage: shipyard app open [--demo <folder>] | quit | status [--json]
+        Open, quit, ask and capture the Mac's shipyard app.
+
+        Usage: shipyard app open [--demo <folder>]
+               shipyard app quit
+               shipyard app status [--json]
+               shipyard app capture <file.png> [--appearance light|dark] [--menu-bar-icon] [--with-indicator]
+
+        Examples:
+          shipyard app open
+          shipyard app open --demo .scratch/demo
+          shipyard app status --json
+          shipyard app capture .scratch/panel.png --appearance dark
 
           open     launch shipyard in the background, unless it runs, and wait
                    until it answers (about 10 seconds at most)
@@ -113,8 +124,10 @@ public enum ControlCommand {
           quit     quit shipyard, and wait until it's gone
           status   whether shipyard runs: its version, whether the panel is
                    open, its layout and its projects (--json: one JSON object)
+          capture  save the panel as it looks, or its menu bar icon, as a PNG;
+                   `shipyard app capture --help` lists its options
 
-        Every command but open exits 1 when shipyard isn't running.
+        Exit codes: 1 when shipyard isn't running, for every command but open.
 
         """
 
@@ -185,9 +198,9 @@ public enum ControlCommand {
             : directory.appendingPathComponent(path, isDirectory: true)
     }
 
-    /// `line`, then the usage, on standard error: exit 2.
+    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
-        CommandResult(error: line + "\n" + usageText, status: CommandResult.usageStatus)
+        .usage(line + ". Run `shipyard app --help` for usage.")
     }
 
     /// Runs `invocation` in `context`.

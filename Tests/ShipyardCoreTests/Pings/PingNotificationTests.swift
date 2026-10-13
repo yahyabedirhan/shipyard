@@ -28,7 +28,7 @@ private extension Harness {
     /// Sends a ping through the CLI and returns its id.
     @discardableResult
     func ping(_ title: String, project: String = "shop") throws -> String {
-        let result = cli("ping", title, "--project", project)
+        let result = cli("ping", "send", title, "--project", project)
         try #require(result.status == 0, "\(result.error)")
         return result.pingID
     }

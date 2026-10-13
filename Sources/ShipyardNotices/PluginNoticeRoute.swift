@@ -14,7 +14,7 @@ import ShipyardCommand
 /// on standard input: exit 0 stored, 1 too large, 2 misused. A notice is
 /// stored under its `--id` when it has one, so a replace sent before the
 /// Mac's poll overwrites the one waiting, and `notices.sh remove <id>`
-/// takes a waiting one away for `shipyard notify withdraw <id>`. A notice's
+/// takes a waiting one away for `shipyard notice withdraw <id>`. A notice's
 /// image isn't carried on this route: the plugin's listing is too small
 /// for one, so it's dropped before the notice is stored.
 public struct PluginNoticeRoute: NoticeRoute {

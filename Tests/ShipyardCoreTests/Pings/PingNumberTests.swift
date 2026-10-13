@@ -48,10 +48,10 @@ private func listed(_ pings: [(id: String, title: String, projects: [String], mi
 
 @MainActor
 private extension Harness {
-    /// Runs `shipyard ping` with `arguments`, requires it to print only the
+    /// Runs `shipyard ping send` with `arguments`, requires it to print only the
     /// id `id`, and lets the app see the store change.
     func send(_ id: String, _ arguments: String...) async throws {
-        let result = cli(["ping"] + arguments + ["--id", id])
+        let result = cli(["ping", "send"] + arguments + ["--id", id])
         try #require(result == CommandResult(output: id + "\n"), "\(result.error)")
         await shipyard.reloadPings()
     }

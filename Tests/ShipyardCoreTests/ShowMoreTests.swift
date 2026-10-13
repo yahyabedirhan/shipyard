@@ -137,7 +137,7 @@ struct ShowMoreTests {
         failed.conclusion = "failure"
         harness.stub.on("GET", WorkflowRunsResponse.url(web), WorkflowRunsResponse(web, [failed, WorkflowRunsResponse.Run(10)]).answer())
         await harness.shipyard.start()
-        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
+        try #require(harness.cli("ping", "send", "Ready", "--project", "shop").status == 0)
         await harness.shipyard.reloadPings()
         let runs = GroupID(project: "shop", key: .kind(.workflowRun))
         harness.shipyard.toggleGroup(runs)
@@ -165,8 +165,8 @@ struct ShowMoreTests {
             PullRequestsResponse(web, (1...7).map { PR($0) }, issues: [Issue(8)]),
             PullRequestsResponse(docs, [], issues: []),
         ]))
-        try #require(harness.cli("ping", "Ready", "--project", "shop").status == 0)
-        try #require(harness.cli("ping", "Ready", "--project", "docs").status == 0)
+        try #require(harness.cli("ping", "send", "Ready", "--project", "shop").status == 0)
+        try #require(harness.cli("ping", "send", "Ready", "--project", "docs").status == 0)
         await harness.shipyard.reloadPings()
 
         let chips = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }

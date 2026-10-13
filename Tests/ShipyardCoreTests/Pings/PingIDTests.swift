@@ -25,11 +25,11 @@ private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)])
 
 @MainActor
 private extension Harness {
-    /// Runs `shipyard ping` with `arguments`, requires it to work, lets the
+    /// Runs `shipyard ping send` with `arguments`, requires it to work, lets the
     /// app see the store change, and returns the id it printed.
     @discardableResult
     func send(_ arguments: String...) async throws -> String {
-        let result = cli(["ping"] + arguments)
+        let result = cli(["ping", "send"] + arguments)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
         return result.pingID
@@ -83,10 +83,10 @@ struct PingIDTests {
     func badID(id: String) throws {
         let harness = try Harness(config: shopAndBlog)
 
-        let result = harness.cli("ping", "Ready", "--project", "shop", "--id", id)
+        let result = harness.cli("ping", "send", "Ready", "--project", "shop", "--id", id)
 
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: `--id`: an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`\n")
+        #expect(result.error == "shipyard ping send: `--id`: an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`\n")
         #expect(harness.pingStore.all().isEmpty)
     }
 
@@ -94,9 +94,9 @@ struct PingIDTests {
     func idBounds() throws {
         let harness = try Harness(config: shopAndBlog)
 
-        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id").error == "shipyard ping: `--id` needs a value\n")
+        #expect(harness.cli("ping", "send", "Ready", "--project", "shop", "--id").error == "shipyard ping send: `--id` needs a value\n")
         let long = String(repeating: "a", count: 64)
-        #expect(harness.cli("ping", "Ready", "--project", "shop", "--id", long) == CommandResult(output: long + "\n"))
+        #expect(harness.cli("ping", "send", "Ready", "--project", "shop", "--id", long) == CommandResult(output: long + "\n"))
     }
 
     @Test("without --id, a generated id is printed and names the ping")
@@ -265,7 +265,7 @@ struct PingIDTests {
         let first = try #require(harness.pingNotifications.first)
 
         #expect(harness.cli("ping", "withdraw", "input").status == 0)
-        #expect(harness.cli("ping", "Waiting again", "--project", "shop", "--id", "input").status == 0)
+        #expect(harness.cli("ping", "send", "Waiting again", "--project", "shop", "--id", "input").status == 0)
         let relaunched = harness.relaunched()
         relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
         relaunched.graphQL([onePullRequest])
@@ -328,9 +328,9 @@ struct PingIDTests {
     func endOfOptionsOneTitle() throws {
         let harness = try Harness(config: shopAndBlog)
 
-        let result = harness.cli("ping", "--project", "shop", "--", "--", "--id")
+        let result = harness.cli("ping", "send", "--project", "shop", "--", "--", "--id")
 
         #expect(result.status == 2)
-        #expect(result.error == "shipyard ping: one title only; quote it: shipyard ping \"-- --id\"\n")
+        #expect(result.error == "shipyard ping send: one title only; quote it: shipyard ping send \"-- --id\"\n")
     }
 }

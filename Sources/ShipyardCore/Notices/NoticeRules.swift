@@ -173,7 +173,7 @@ public enum NoticeRules {
     }
 
     /// Why a notice isn't shown, as the agent reads it after
-    /// `shipyard notify: `.
+    /// `shipyard notice send: `.
     public struct Refusal: Error, Equatable, Sendable {
         public var message: String
         public init(_ message: String) { self.message = message }

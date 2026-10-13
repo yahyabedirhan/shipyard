@@ -70,7 +70,7 @@ struct DemoRunTests {
         harness.graphQL([PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shipyard", [])])])
         await harness.shipyard.start()
         harness.shipyard.toggleCollapsed("shipyard")
-        let demoPing = harness.cli("ping", "In the demo", origin: "git@github.com:yahyabedirhan/shipyard.git")
+        let demoPing = harness.cli("ping", "send", "In the demo", origin: "git@github.com:yahyabedirhan/shipyard.git")
         try #require(demoPing.status == 0, "\(demoPing.error)")
         await harness.shipyard.reloadPings()
 
@@ -101,7 +101,7 @@ struct DemoRunTests {
             store: userPings
         ))
         let agentPing = ShipyardCLI.run(
-            ["ping", "Outside the demo", "--repo", "yahyabedirhan/shop"],
+            ["ping", "send", "Outside the demo", "--repo", "yahyabedirhan/shop"],
             table: userTable,
             environment: CommandEnvironment(workingDirectory: root, variables: [:]),
             now: Harness.now

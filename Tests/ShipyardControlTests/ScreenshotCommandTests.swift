@@ -3,11 +3,11 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard screenshot …` as an agent runs it, through `ShipyardCLI.run`
+/// `shipyard app capture …` as an agent runs it, through `ShipyardCLI.run`
 /// with the Mac's table and an in-memory app at the end of the socket: the
 /// request it sends (its path made absolute against the working folder),
 /// what it prints and how it exits.
-@Suite("The screenshot command")
+@Suite("The app capture command")
 struct ScreenshotCommandTests {
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {
         shipyard(arguments, transport: transport)
@@ -47,7 +47,7 @@ struct ScreenshotCommandTests {
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("/tmp/x.png\n"))
 
-        let result = shipyard(["screenshot"] + arguments, transport: app)
+        let result = shipyard(["app", "capture"] + arguments, transport: app)
 
         #expect(result == CommandResult(output: "/tmp/x.png\n"))
         let exchange = try #require(app.exchanges.current.only)
@@ -59,7 +59,7 @@ struct ScreenshotCommandTests {
     func rendered() {
         let app = FakeTransport(reply: .done("/tmp/x.png\n", note: "captured by rendering: ScreenCaptureKit: declined\n"))
 
-        let result = shipyard("screenshot", "/tmp/x.png", transport: app)
+        let result = shipyard("app", "capture", "/tmp/x.png", transport: app)
 
         #expect(result == CommandResult(output: "/tmp/x.png\n", error: "captured by rendering: ScreenCaptureKit: declined\n"))
     }
@@ -68,46 +68,45 @@ struct ScreenshotCommandTests {
     func failed() {
         let app = FakeTransport(reply: .refused("couldn't capture the panel (no window) or render it"))
 
-        #expect(shipyard("screenshot", "/tmp/x.png", transport: app)
+        #expect(shipyard("app", "capture", "/tmp/x.png", transport: app)
             == CommandResult(error: "couldn't capture the panel (no window) or render it\n", status: 1))
-        #expect(shipyard("screenshot", "/tmp/x.png", transport: .nothingListens)
+        #expect(shipyard("app", "capture", "/tmp/x.png", transport: .nothingListens)
             == CommandResult(error: "shipyard isn't running; `shipyard app open`\n", status: 1))
     }
 
-    @Test("arguments that don't read exit 2 with the screenshot usage and send nothing", arguments: [
-        ([String](), "shipyard screenshot: missing <file.png>\n"),
-        (["x.jpg"], "shipyard screenshot: `x.jpg` isn't a .png file\n"),
-        (["x.png", "y.png"], "shipyard screenshot: unexpected `y.png`\n"),
-        (["x.png", "--appearance"], "shipyard screenshot: --appearance needs light or dark\n"),
-        (["x.png", "--appearance", "sepia"], "shipyard screenshot: no appearance `sepia`; it's light or dark\n"),
-        (["x.png", "--dark"], "shipyard screenshot: unknown option `--dark`\n"),
+    @Test("arguments that don't read exit 2 with one line pointing at the capture help, and send nothing", arguments: [
+        ([String](), "shipyard app capture: missing <file.png>"),
+        (["x.jpg"], "shipyard app capture: `x.jpg` isn't a .png file"),
+        (["x.png", "y.png"], "shipyard app capture: unexpected `y.png`"),
+        (["x.png", "--appearance"], "shipyard app capture: --appearance needs light or dark"),
+        (["x.png", "--appearance", "sepia"], "shipyard app capture: no appearance `sepia`; it's light or dark"),
+        (["x.png", "--dark"], "shipyard app capture: unknown option `--dark`"),
     ])
     func misread(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["screenshot"] + arguments, transport: app)
+        let result = shipyard(["app", "capture"] + arguments, transport: app)
 
-        #expect(result == CommandResult(error: line + ScreenshotCommand.usageText, status: 2))
+        #expect(result == CommandResult(error: line + ". Run `shipyard app capture --help` for usage.\n", status: 2))
         #expect(app.exchanges.current.isEmpty)
     }
 
-    @Test("screenshot --help prints its usage; shipyard --help lists screenshot")
+    @Test("app capture --help prints its usage; shipyard --help lists app capture")
     func help() {
         let app = FakeTransport(reply: .done(""))
 
-        #expect(shipyard("screenshot", "--help", transport: app) == CommandResult(output: ScreenshotCommand.usageText))
+        #expect(shipyard("app", "capture", "--help", transport: app) == CommandResult(output: ScreenshotCommand.usageText))
         let help = shipyard("--help", transport: app).output
-        #expect(help.contains("shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]\n"))
-        #expect(help.contains("[--with-indicator]"))
+        #expect(help.contains("app capture <file.png> [options]"))
         #expect(app.exchanges.current.isEmpty)
     }
 
-    @Test("a build without app control refuses screenshot with a pointer to the Mac, exit 2")
+    @Test("a build without app control refuses app capture with a pointer to the Mac, exit 2")
     func withoutControl() {
         let environment = CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/work"), variables: [:])
 
-        let result = ShipyardCLI.run(["screenshot", "x.png"], table: CommandTable(), environment: environment, now: Date())
+        let result = ShipyardCLI.run(["app", "capture", "x.png"], table: CommandTable(), environment: environment, now: Date())
 
-        #expect(result == CommandResult(error: "shipyard: `shipyard screenshot` runs on the Mac, where the app is\n", status: 2))
+        #expect(result == CommandResult(error: "shipyard: `shipyard app` runs on the Mac, where the app is\n", status: 2))
     }
 }

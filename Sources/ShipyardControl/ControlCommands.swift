@@ -1,7 +1,7 @@
 import Foundation
 import ShipyardCommand
 
-/// App control's commands for the Mac's `CommandTable`: `app`, `panel`, `screenshot`, `control` and `notes`, asking the
+/// App control's groups for the Mac's `CommandTable`: `app`, `panel`, `lease` and `notes`, asking the
 /// app whose support folder is `support` over `transport`, and launching
 /// it with `launcher`. Each request is sent as the holder `Holder.find`
 /// works out from the command's environment and `processes`.
@@ -26,25 +26,26 @@ public enum ControlCommands {
             )
         }
         return [
-            CommandTable.Entry(name: "app", help: appHelp) { arguments, environment, _ in
+            CommandTable.Entry(name: "app", section: .app, commands: appCommands) { arguments, environment, _ in
+                // `capture` reads its own options, a path among them.
+                if arguments.first == "capture" {
+                    switch ScreenshotCommand.parse(Array(arguments.dropFirst()), workingDirectory: environment.workingDirectory) {
+                    case .success(let request): return ControlCommand.run(.send(request), context: context(environment))
+                    case .failure(let result): return result
+                    }
+                }
                 switch ControlCommand.parse(arguments, environment: environment) {
-                case .success(let invocation): ControlCommand.run(invocation, context: context(environment))
-                case .failure(let result): result
+                case .success(let invocation): return ControlCommand.run(invocation, context: context(environment))
+                case .failure(let result): return result
                 }
             },
-            CommandTable.Entry(name: "panel", help: panelHelp) { arguments, environment, _ in
+            CommandTable.Entry(name: "panel", section: .app, commands: panelCommands) { arguments, environment, _ in
                 switch PanelCommand.parse(arguments) {
                 case .success(let request): ControlCommand.run(.send(request), context: context(environment))
                 case .failure(let result): result
                 }
             },
-            CommandTable.Entry(name: "screenshot", help: screenshotHelp) { arguments, environment, _ in
-                switch ScreenshotCommand.parse(arguments, workingDirectory: environment.workingDirectory) {
-                case .success(let request): ControlCommand.run(.send(request), context: context(environment))
-                case .failure(let result): result
-                }
-            },
-            CommandTable.Entry(name: "control", help: controlHelp) { arguments, environment, _ in
+            CommandTable.Entry(name: "lease", section: .app, commands: leaseCommands) { arguments, environment, _ in
                 switch LeaseCommand.parse(arguments) {
                 case .success(let invocation):
                     var context = context(environment)
@@ -56,57 +57,54 @@ public enum ControlCommands {
                     return result
                 }
             },
-            CommandTable.Entry(name: "notes", help: notesHelp) { arguments, environment, _ in
+            CommandTable.Entry(name: "notes", section: .checks, commands: notesCommands) { arguments, environment, _ in
                 switch arguments {
                 case ["check"]: ControlCommand.run(.send(.notesCheck), context: context(environment))
-                case ["--help"], ["-h"], ["help"]: CommandResult(output: notesUsage)
-                default: .usage(notesUsage.trimmingCharacters(in: .newlines))
+                case ["--help"], ["-h"], ["check", "--help"], ["check", "-h"]: CommandResult(output: notesUsage)
+                case []: CommandResult(error: notesUsage, status: CommandResult.usageStatus)
+                default: .usage("shipyard notes: unexpected `\(arguments.joined(separator: " "))`. Run `shipyard notes --help` for usage.")
                 }
             },
         ]
     }
 
     public static let notesUsage = """
-        usage: shipyard notes check
+        Check that the app can read the notes workspace in Notion.
 
-        Reads the notes workspace in Notion the way the app does, through
-        ntn's default workspace: each project's database under
-        Shipyard Notes > Projects and its open notes. Prints one line per
-        project, then every problem with the layout. Exits 1 when it finds
-        an error, 0 otherwise.
+        Usage: shipyard notes check
 
-        """
+        Reads the notes workspace the way the app does, through ntn's default
+        workspace: each project's database under Shipyard Notes > Projects and
+        its open notes. Prints one line per project, then every problem with
+        the layout. It needs no lease.
 
-    static let appHelp = """
-          app     open, quit or ask the Mac's shipyard app:
-                  shipyard app open [--demo <folder>] | quit | status [--json]
+        Exit codes: 1 when it finds an error, or shipyard isn't running.
 
         """
 
-    static let panelHelp = """
-          panel   steer the app's panel:
-                  shipyard panel open | close | fold <project> | unfold <project>
-                                 | show-more <project> <kind> | tab <name> | view <name>
+    static let appCommands = [
+        CommandTable.Command("open [--demo <folder>]", "launch the app, or a demo run, and wait until it answers"),
+        CommandTable.Command("quit", "quit the app and wait until it's gone"),
+        CommandTable.Command("status [--json]", "print whether the app runs, its version, layout and projects"),
+        CommandTable.Command("capture <file.png> [options]", "save the panel, or the menu bar icon, as a PNG"),
+    ]
 
-        """
+    static let panelCommands = [
+        CommandTable.Command("open", "open the menu bar icon's panel"),
+        CommandTable.Command("close", "close the panel"),
+        CommandTable.Command("fold <project>", "collapse a project's section"),
+        CommandTable.Command("unfold <project>", "expand a project's section"),
+        CommandTable.Command("show-more <project> <kind>", "show every row of a project's group past its cap"),
+        CommandTable.Command("show-tab <name>", "show a tab of the tabs layout"),
+        CommandTable.Command("show-view <name>", "show a status view, or the projects again"),
+    ]
 
-    static let screenshotHelp = """
-          screenshot
-                  save the app's panel, or its menu bar icon, as a PNG:
-                  shipyard screenshot <file.png> [--appearance light|dark] [--menu-bar-icon]
-                                      [--with-indicator]
+    static let leaseCommands = [
+        CommandTable.Command("take [options]", "hold app control for a run of steps, waiting in line with --wait"),
+        CommandTable.Command("release [--key <k>]", "give app control up to the next agent"),
+    ]
 
-        """
-
-    static let notesHelp = """
-          notes   check that the app can read the notes workspace in Notion:
-                  shipyard notes check
-
-        """
-
-    static let controlHelp = """
-          control hold shipyard for a run of app control steps, or give it up:
-                  shipyard control take [--wait <seconds>] [--key <k>] | release [--key <k>]
-
-        """
+    static let notesCommands = [
+        CommandTable.Command("check", "check that the app can read the notes workspace in Notion"),
+    ]
 }

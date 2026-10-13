@@ -362,7 +362,7 @@ struct ControlServerTests {
         let answer = await server.reply(to: request.sent(by: Self.other))
 
         #expect(answer == .init(reply: .refused(
-            "shipyard is in use by Claude Code in /work until 00:01:00 (48s left); `shipyard control take --wait <seconds>` to queue"
+            "shipyard is in use by Claude Code in /work until 00:01:00 (48s left); `shipyard lease take --wait <seconds>` to queue"
         )))
         #expect(panel.calls == ["open"])
         #expect(screenshotter.calls.isEmpty)
@@ -512,7 +512,7 @@ struct ControlServerTests {
 
         #expect(taken == .init(reply: .done("you hold shipyard until 00:05:00\n"), granted: Self.term(Self.agent, taken: 0)))
         #expect(refused == .init(reply: .refused(
-            "shipyard is in use by Claude Code in /work until 00:05:00 (290s left); `shipyard control take --wait <seconds>` to queue"
+            "shipyard is in use by Claude Code in /work until 00:05:00 (290s left); `shipyard lease take --wait <seconds>` to queue"
         )))
         #expect(notTheirs == .init(reply: .done("released shipyard\n")))
         #expect(stillHeld == Self.agent)
@@ -716,7 +716,7 @@ struct ControlServerTests {
         // Another agent's quit is refused over the socket, and the app stays.
         let refused = await Self.sending { another.send(.appQuit) }
         #expect(refused == .success(.refused(
-            "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard control take --wait <seconds>` to queue"
+            "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard lease take --wait <seconds>` to queue"
         )))
         let quit = await Self.sending { client.send(.appQuit) }
         let lease = ControlLease.Term(holder: Self.agent, taken: Date(timeIntervalSince1970: 0), ends: Date(timeIntervalSince1970: 60))

@@ -2,30 +2,39 @@ import Foundation
 import ShipyardCommand
 import ShipyardPings
 
-/// The notices' commands for a `shipyard` build's `CommandTable`:
-/// `notify`, handing each notice request to the app over `route`.
+/// The notices' commands for a `shipyard` build's `CommandTable`: the
+/// `notice` group (`send`, `withdraw`), handing each notice request to the
+/// app over `route`.
 public enum NoticeCommands {
     public static func entries(route: any NoticeRoute) -> [CommandTable.Entry] {
         [
-            CommandTable.Entry(name: "notify", help: notifyHelp) { arguments, environment, _ in
-                NotifyCommand.run(arguments, environment: environment, route: route)
+            CommandTable.Entry(name: "notice", section: .messages, commands: commands) { arguments, environment, _ in
+                guard let verb = arguments.first else {
+                    return CommandResult(error: NotifyCommand.usageText, status: CommandResult.usageStatus)
+                }
+                let flags = arguments.prefix { $0 != "--" }
+                if flags.contains("--help") || flags.contains("-h") { return CommandResult(output: NotifyCommand.usageText) }
+                let rest = Array(arguments.dropFirst())
+                switch verb {
+                case "send": return NotifyCommand.run(rest, environment: environment, route: route)
+                case "withdraw": return NotifyCommand.withdraw(rest, environment: environment, route: route)
+                default:
+                    return .usage("shipyard notice: unknown command `\(verb)`. Run `shipyard notice --help` for usage.")
+                }
             },
         ]
     }
 
-    static let notifyHelp = """
-          notify  show the user a notice, a status message that isn't kept:
-                  shipyard notify "<title>" [--subtitle <text>] [--body <text>] [--from <label>]
-                                  [--repo <owner/name> | --project <name>] [--id <id>] …
-                  shipyard notify withdraw <id>
-
-        """
+    static let commands = [
+        CommandTable.Command("send <title> [options]", "show the user a notice, a status message that isn't kept"),
+        CommandTable.Command("withdraw <id>", "take a shown notice away"),
+    ]
 }
 
-/// `shipyard notify`: reads its arguments into a `Notice`, filed by the
+/// `shipyard notice send`: reads its arguments into a `Notice`, filed by the
 /// one project `--project` names or by its repository (`--repo`, else the
 /// working folder's `origin`), hands it to the app over a `NoticeRoute`
-/// and says what came of it; `shipyard notify withdraw <id>` asks the app
+/// and says what came of it; `shipyard notice withdraw <id>` asks the app
 /// to take the notice shown under `id` away, over the same route. Exit 0:
 /// done, or queued for the Mac's poll (`PluginNoticeRoute`, which says
 /// so); 1: refused, with why (notices off for the project, no project
@@ -33,33 +42,25 @@ public enum NoticeCommands {
 /// Mac unreachable over the tailnet); 2: the arguments don't read, or the
 /// route can't carry the notice (`NoticeRoute.unfit(_:)`).
 public enum NotifyCommand {
-    /// What `shipyard notify --help` prints.
+    /// What `shipyard notice --help` prints.
     public static let usageText = """
-        usage: shipyard notify "<title>" [--subtitle <text>] [--body <text>] [--from <label>]
-                               [--repo <owner/name> | --project <name>]
-                               [--image <path>] [--sound default|none|<name>]
-                               [--thread <key>] [--level passive|active] [--id <id>]
-                               [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
-                               [--button "<label>=<action>"]…
-               shipyard notify withdraw <id>
+        Show the user notices: status messages that aren't kept.
 
-        Shows the user a notice: a macOS notification titled with the project
-        and the title, for a status update such as "tests running" or "done".
-        Unlike a ping it isn't listed, counted or kept. It's filed under the
-        projects that watch the working folder's repository (its git remote
-        `origin`), and shown when the user's notification rules select
-        `agent.notice` for one of them.
+        Usage: shipyard notice send <title> [options]
+               shipyard notice withdraw <id>
 
-        Where it runs decides its route. On the Mac, it goes to the running app,
-        and prints `shown` once the app showed it. On another machine whose
-        cli.toml sets [notices] app-machine (with app-scheme and app-port when
-        tailscale serve needs others), it goes over the tailnet to the app on
-        that Mac, and prints `shown` the same way; a --herdr click or a herdr
-        button can't go that way (the Mac would focus its own Herdr). Otherwise
-        it's left with the herdr-shipyard plugin for the Mac's next poll, and
-        prints `queued`: the Mac shows it by the same rules when it arrives, or
-        drops it when it arrives more than ten minutes late. That route carries
-        no image.
+        Examples:
+          shipyard notice send "tests running" --from claude --id run-1
+          shipyard notice send "tests passed" --from claude --id run-1 --open https://github.com/o/r/pull/7
+          shipyard notice withdraw run-1
+
+        send <title> [options]
+          Shows the user a notice: a macOS notification titled with the project
+          and the title, for a status update such as "tests running" or "done".
+          Unlike a ping it isn't listed, counted or kept. It's filed under the
+          projects that watch the working folder's repository (its git remote
+          `origin`), and shown when the user's notification rules select
+          `agent.notice` for one of them.
 
           --subtitle <text>    a line between the title and the body
           --body <text>        say more than the title fits
@@ -84,28 +85,40 @@ public enum NotifyCommand {
                                app:<bundle id or name>, herdr:<tab or pane id>, or
                                herdr alone for your own pane
 
-        One of --open, --app and --herdr at most. Everything after -- is the
-        title, even a word starting with --.
+          One of --open, --app and --herdr at most. Everything after -- is the
+          title, even a word starting with --.
 
-        withdraw <id> takes the notice shown under that id away and prints
-        `withdrawn`; one already gone is no error. Through the plugin it takes
-        away only a notice still waiting for the Mac's poll.
+          Where it runs decides its route. On the Mac, it goes to the running
+          app, and prints `shown` once the app showed it. On another machine
+          whose cli.toml sets [notices] app-machine (with app-scheme and
+          app-port when tailscale serve needs others), it goes over the tailnet
+          to the app on that Mac, and prints `shown` the same way; a --herdr
+          click or a herdr button can't go that way (the Mac would focus its own
+          Herdr). Otherwise it's left with the herdr-shipyard plugin for the
+          Mac's next poll, and prints `queued`: the Mac shows it by the same
+          rules when it arrives, or drops it when it arrives more than ten
+          minutes late. That route carries no image.
 
-        Exits 1, with one line saying why, when it isn't shown or queued: notices
-        are off for its projects, no project takes it, shipyard isn't running
-        (it's never started for a notice), or the herdr-shipyard plugin is
-        missing or refuses it. Over the tailnet, also when the Mac can't be
+        withdraw <id>
+          Takes the notice shown under that id away and prints `withdrawn`; one
+          already gone is no error. Through the plugin it takes away only a
+          notice still waiting for the Mac's poll.
+
+        Exit codes: 1, with one line saying why, when it isn't shown or queued:
+        notices are off for its projects, no project takes it, shipyard isn't
+        running (it's never started for a notice), or the herdr-shipyard plugin
+        is missing or refuses it. Over the tailnet, also when the Mac can't be
         reached, doesn't answer in time, or refuses the sender's Tailscale
-        login, or when cli.toml doesn't read. Exits 2 when the arguments don't
-        read, or carry a Herdr action over the tailnet.
+        login, or when cli.toml doesn't read. 2 when the arguments don't read,
+        or carry a Herdr action over the tailnet.
 
         """
 
     /// The usage line errors point at.
-    static let usageLine = "shipyard notify \"<title>\" [options] (shipyard notify --help lists them)"
+    static let usageLine = "shipyard notice send <title> [options] (shipyard notice --help lists them)"
 
     /// How a run's errors start.
-    static let prefix = "shipyard notify: "
+    static let prefix = "shipyard notice send: "
 
     /// The flags that give a notice its click; it takes one at most.
     static let actionFlags = ["--open", "--app", "--herdr"]
@@ -116,12 +129,9 @@ public enum NotifyCommand {
     /// Every flag that takes a value (`--herdr` takes one only when it's an id).
     static let valueFlags = textFlags + ["--project", "--repo", "--image", "--sound", "--thread", "--level", "--id", "--open", "--app", "--button"]
 
-    /// Runs `shipyard notify` with `arguments` (those after `notify`) in
+    /// Runs `shipyard notice send` with `arguments` (those after `send`) in
     /// `environment`, delivering over `route`.
     public static func run(_ arguments: [String], environment: CommandEnvironment, route: any NoticeRoute) -> CommandResult {
-        let flags = arguments.prefix { $0 != "--" }
-        if flags.contains("--help") || flags.contains("-h") { return CommandResult(output: usageText) }
-        if arguments.first == "withdraw" { return withdraw(Array(arguments.dropFirst()), environment: environment, route: route) }
         let request: Request
         switch parse(arguments, herdrPane: environment.variables[PingCommand.herdrPaneVariable]) {
         case .success(let parsed): request = parsed
@@ -152,13 +162,13 @@ public enum NotifyCommand {
         }
     }
 
-    /// `shipyard notify withdraw <id>`, with `arguments` those after
+    /// `shipyard notice withdraw <id>`, with `arguments` those after
     /// `withdraw`: asks the app over `route` to take the notice shown under
     /// the id away, and prints `withdrawn`.
     static func withdraw(_ arguments: [String], environment: CommandEnvironment, route: any NoticeRoute) -> CommandResult {
-        let prefix = "shipyard notify withdraw: "
+        let prefix = "shipyard notice withdraw: "
         guard arguments.count == 1, let id = arguments.first else {
-            return .usage(prefix + "give the id of one notice: shipyard notify withdraw <id>")
+            return .usage(prefix + "give the id of one notice: shipyard notice withdraw <id>")
         }
         guard PingCommand.isID(id) else { return .usage(prefix + PingCommand.idRule(id)) }
         switch route.deliver(.withdraw(id: id), environment: environment) {
@@ -264,7 +274,7 @@ public enum NotifyCommand {
             }
         }
         if titles.count > 1 {
-            return .failure(ParseError("one title only; quote it: shipyard notify \"\(titles.joined(separator: " "))\""))
+            return .failure(ParseError("one title only; quote it: shipyard notice send \"\(titles.joined(separator: " "))\""))
         }
         notice.title = titles.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !notice.title.isEmpty else { return .failure(ParseError("give the notice a title: \(usageLine)")) }

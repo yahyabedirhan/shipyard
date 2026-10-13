@@ -111,7 +111,7 @@ struct RemotePingsTests {
     @Test("a remote ping is known as shipyard://ping/<machine>/<id>, so the same id on two machines, and here, stays apart")
     func identity() async throws {
         let harness = try await Harness.withMachines(hetzner: [remotePing("q1", "From hetzner")], netcup: [remotePing("q1", "From netcup")])
-        harness.cli("ping", "From the Mac", "--project", "shop", "--id", "q1")
+        harness.cli("ping", "send", "From the Mac", "--project", "shop", "--id", "q1")
         await harness.shipyard.reloadPings()
         await harness.poll()
         #expect(harness.section("hetzner-vps")?.rows.map(\.id) == ["shipyard://ping/hetzner-vps/q1"])
@@ -231,7 +231,7 @@ struct RemotePingsTests {
     @Test("clicking, marking or dismissing a remote ping never touches a local ping with its id")
     func leavesLocalPings() async throws {
         let harness = try await Harness.withMachines(netcup: [remotePing("q1", "Remote")])
-        harness.cli("ping", "Local", "--project", "shop", "--id", "q1", "--open", "https://example.com")
+        harness.cli("ping", "send", "Local", "--project", "shop", "--id", "q1", "--open", "https://example.com")
         await harness.shipyard.reloadPings()
         await harness.poll()
         let row = try #require(harness.section("netcup-vps")?.rows.first)

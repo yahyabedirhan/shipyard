@@ -8,7 +8,7 @@ import SwiftUI
 ///
 /// More projects than fit: the strip scrolls sideways, and choosing a tab
 /// scrolls it into view, with the cut-off edges faded. The selected tab is
-/// `PanelState`'s, which `shipyard panel tab` sets too; it's kept while the
+/// `PanelState`'s, which `shipyard panel show-tab` sets too; it's kept while the
 /// menu closes and opens, and goes back to All when its project is removed
 /// from the configuration.
 struct TabsLayout: View {

@@ -27,32 +27,32 @@ public enum ControlRequest: Equatable, Sendable {
     /// project's group of that kind, past its `show-first` cap. The kind is
     /// as the command names it (`pull-requests`); the app checks it.
     case panelShowMore(project: String, kind: String)
-    /// `shipyard panel tab <name>`: the tabs layout's selected tab, a
+    /// `shipyard panel show-tab <name>`: the tabs layout's selected tab, a
     /// project's slug, or else its title, or `All`.
     case panelTab(name: String)
-    /// `shipyard panel view <name>`: a status view in place of the
+    /// `shipyard panel show-view <name>`: a status view in place of the
     /// projects (`github`, `notion`, `skill`, `cli`), or the projects again
     /// (`projects`). The app checks the name.
     case panelView(name: String)
-    /// `shipyard screenshot <file.png> [--appearance light|dark]
+    /// `shipyard app capture <file.png> [--appearance light|dark]
     /// [--menu-bar-icon] [--with-indicator]`: the panel (or the menu bar
     /// icon alone) written as a PNG at `path`, absolute since the app runs
     /// in another folder; in `appearance` when it's set, as the Mac shows
     /// it otherwise. The lease's dot and banner are left out of it unless
     /// `withIndicator` keeps them.
     case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
-    /// `shipyard control take [--wait <seconds>] [--for <purpose>]`: the
+    /// `shipyard lease take [--wait <seconds>] [--for <purpose>]`: the
     /// lease held until its cap. While another agent holds it, refused at
     /// once, or with `waitSeconds` (0 to `longestWait`), answered once it's
     /// this agent's or the wait runs out. `purpose` says why, for the
     /// lease banner.
     case controlTake(waitSeconds: Int?, purpose: String? = nil)
-    /// `shipyard control release`: the lease given up, when this agent
+    /// `shipyard lease release`: the lease given up, when this agent
     /// holds it.
     case controlRelease
-    /// `shipyard notify "<title>" …`: an agent's notice, shown when the
+    /// `shipyard notice send "<title>" …`: an agent's notice, shown when the
     /// user's rules select it for its project, answered with the app's
-    /// verdict; or `shipyard notify withdraw <id>`, the notice shown under
+    /// verdict; or `shipyard notice withdraw <id>`, the notice shown under
     /// that id taken away. Not leased: any agent may post one while
     /// another drives the app.
     case notify(NoticeRequest)
