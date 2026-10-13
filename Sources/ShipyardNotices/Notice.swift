@@ -3,7 +3,7 @@ import ShipyardCommand
 import ShipyardPings
 
 /// An agent's notice: a disposable status message ("tests running",
-/// "done") it posts with `shipyard notify`, which the app shows as a
+/// "done") it posts with `shipyard notice send`, which the app shows as a
 /// macOS notification when the user's rules let it (`agent.notice`), and
 /// never keeps, counts or lists. Not a ping, which waits for the user.
 ///
@@ -49,7 +49,7 @@ public struct Notice: Codable, Equatable, Sendable {
     /// How much it interrupts (`--level`); `nil` is `active`, macOS's default.
     public var level: NoticeLevel?
     /// The id it's shown under (`--id`): a notice with the id of one still
-    /// shown replaces it in place, and `shipyard notify withdraw <id>`
+    /// shown replaces it in place, and `shipyard notice withdraw <id>`
     /// takes it away. `nil`: an id of its own, which nothing replaces.
     public var id: String?
     /// What clicking it does (`--open`, `--app`, `--herdr`), as a ping's
@@ -196,9 +196,9 @@ public struct NoticeButton: Codable, Equatable, Hashable, Sendable {
 /// notice to show is the notice's own JSON, unchanged; a withdrawal is
 /// `{"withdraw":"<id>"}`.
 public enum NoticeRequest: Codable, Equatable, Sendable {
-    /// `shipyard notify "<title>" …`.
+    /// `shipyard notice send "<title>" …`.
     case show(Notice)
-    /// `shipyard notify withdraw <id>`: the notice shown under `id` leaves
+    /// `shipyard notice withdraw <id>`: the notice shown under `id` leaves
     /// Notification Center. One that's gone already, or never was, is no error.
     case withdraw(id: String)
 

@@ -27,7 +27,7 @@ private extension Harness {
     /// store change, and returns its id.
     @discardableResult
     func send(_ title: String, _ flags: String...) async throws -> String {
-        let result = cli(["ping", title] + (flags.contains("--project") || flags.contains("--repo") ? [] : ["--project", "shop"]) + flags)
+        let result = cli(["ping", "send", title] + (flags.contains("--project") || flags.contains("--repo") ? [] : ["--project", "shop"]) + flags)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
         return result.pingID

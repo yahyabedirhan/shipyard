@@ -11,7 +11,7 @@ public enum ConfigurationCommands {
 
     public static func entries(checks: [Check]) -> [CommandTable.Entry] {
         [
-            CommandTable.Entry(name: "config", help: help) { arguments, _, now in
+            CommandTable.Entry(name: "config", section: .checks, commands: commands) { arguments, _, now in
                 run(arguments, checks: checks, now: now)
             },
         ]
@@ -19,13 +19,14 @@ public enum ConfigurationCommands {
 
     private static func run(_ arguments: [String], checks: [Check], now: Date) -> CommandResult {
         if arguments.contains("--help") || arguments.contains("-h") { return CommandResult(output: usageText) }
-        guard arguments.first == "check" else {
-            return .usage("shipyard config: expected `check`\n" + usageText)
+        guard let verb = arguments.first else { return CommandResult(error: usageText, status: CommandResult.usageStatus) }
+        guard verb == "check" else {
+            return .usage("shipyard config: unknown command `\(verb)`. Run `shipyard config --help` for usage.")
         }
         var json = false
         for argument in arguments.dropFirst() {
             guard argument == "--json" else {
-                return .usage("shipyard config check: unknown argument `\(argument)`\n" + usageText)
+                return .usage("shipyard config check: unknown option `\(argument)`. Run `shipyard config --help` for usage.")
             }
             json = true
         }
@@ -54,19 +55,26 @@ public enum ConfigurationCommands {
     }
 
     static let usageText = """
-        usage: shipyard config check [--json]
+        Check the settings files after an edit.
+
+        Usage: shipyard config check [--json]
+
+        Examples:
+          shipyard config check
+          shipyard config check --json
 
         Reads each settings file this shipyard uses, config.toml as the app
         reads it, and prints whether it's accepted, with each problem and
-        warning and its line. Exits 1 when a file has a problem.
+        warning and its line.
 
+        Options:
           --json  print each file's result by its name, in config-status.json's fields
 
-        """
-
-    static let help = """
-          config  check the settings files after an edit, each problem and warning with its line:
-                  shipyard config check [--json]
+        Exit codes: 1 when a file has a problem.
 
         """
+
+    static let commands = [
+        CommandTable.Command("check [--json]", "check the settings files, each problem and warning with its line"),
+    ]
 }

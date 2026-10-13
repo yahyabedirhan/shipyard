@@ -994,7 +994,7 @@ public final class Shipyard {
         await notifier.post(NotificationRules.notification(for: notice, at: clock.now))
     }
 
-    /// Answers an agent's notice request (`shipyard notify`) with the
+    /// Answers an agent's notice request (`shipyard notice send`) with the
     /// verdict its command exits by: a notice is shown (`show(_:)`), a
     /// withdrawal done (`withdrawNotice(id:)`).
     public func receive(_ request: NoticeRequest) async -> NoticeVerdict {
@@ -1004,7 +1004,7 @@ public final class Shipyard {
         }
     }
 
-    /// Shows an agent's `notice` (`shipyard notify`) when the last valid
+    /// Shows an agent's `notice` (`shipyard notice send`) when the last valid
     /// configuration files it under a project whose rules select
     /// `agent.notice` (`NoticeRules`), and says what came of it: the
     /// verdict the agent's command exits by. Nothing is stored, counted or
@@ -1029,7 +1029,7 @@ public final class Shipyard {
     }
 
     /// Takes the notice shown under `id` (its `--id`) out of Notification
-    /// Center (`shipyard notify withdraw <id>`). Nothing is kept of a
+    /// Center (`shipyard notice withdraw <id>`). Nothing is kept of a
     /// notice, so one gone already, or never shown, is no error: always `.shown`.
     public func withdrawNotice(id: String) async -> NoticeVerdict {
         await notifier.removeDelivered(id: NoticeRules.notificationID(id))

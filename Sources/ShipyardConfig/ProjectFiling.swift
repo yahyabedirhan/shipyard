@@ -44,12 +44,12 @@ public struct ProjectFiling: PingFiling {
         switch target {
         case .project(let value):
             guard let project = configuration.project(named: value) else {
-                return .failure(.failed("shipyard ping: no project is named `\(value)`; \(Self.listing(names))"))
+                return .failure(.failed("shipyard ping send: no project is named `\(value)`; \(Self.listing(names))"))
             }
             return shown(Filing(projects: [project.slug], repository: nil), configuration: configuration, whenNoProject: whenNoProject)
         case .none(let why):
             guard whenNoProject == .keepUnfiled else {
-                return .failure(.failed("shipyard ping: \(why); pass --repo <owner/name> or --project <name>; \(Self.listing(names))"))
+                return .failure(.failed("shipyard ping send: \(why); pass --repo <owner/name> or --project <name>; \(Self.listing(names))"))
             }
             return .success(Filing(projects: [], repository: nil))
         case .repository(let repository):
@@ -60,7 +60,7 @@ public struct ProjectFiling: PingFiling {
             return shown(Filing(projects: watching.map(\.project), repository: first.spelling), configuration: configuration, whenNoProject: whenNoProject)
         }
         guard whenNoProject == .keepUnfiled else {
-            return .failure(.failed("shipyard ping: no project watches `\(slug)`; pass --project <name> to file it under one; \(Self.listing(names))"))
+            return .failure(.failed("shipyard ping send: no project watches `\(slug)`; pass --project <name> to file it under one; \(Self.listing(names))"))
         }
         return .success(Filing(projects: [], repository: slug))
     }
@@ -80,7 +80,7 @@ public struct ProjectFiling: PingFiling {
         let hide = hiding.count == 1 ? "hides" : "hide"
         let wayOut = showing.isEmpty ? "no project shows pings"
             : "pass --project <name> to file it under one that shows them; the projects that show pings are " + showing.map { "`\($0)`" }.joined(separator: ", ")
-        return .failure(.failed("shipyard ping: no project shows the ping: \(named) \(hide) pings (pings.show = false); \(wayOut)"))
+        return .failure(.failed("shipyard ping send: no project shows the ping: \(named) \(hide) pings (pings.show = false); \(wayOut)"))
     }
 
     public func expiry(sentAt sent: Date) -> Date? { nil }

@@ -121,7 +121,7 @@
       }
     },
     "herdr": {
-      "description": "How a ping's Herdr action (shipyard ping --herdr) takes you there: clicking it focuses the Herdr tab, then brings this terminal forward.",
+      "description": "How a ping's Herdr action (shipyard ping send --herdr) takes you there: clicking it focuses the Herdr tab, then brings this terminal forward.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -147,7 +147,7 @@
       }
     },
     "notices": {
-      "description": "Notices from your other machines' agents (shipyard notify), straight to this Mac over your tailnet. Off by default: nothing listens unless listen is true. The app listens on 127.0.0.1 only and takes only notices sent from this Mac's own Tailscale login; you expose the port with tailscale serve, and each other machine names this Mac in its own cli.toml.",
+      "description": "Notices from your other machines' agents (shipyard notice send), straight to this Mac over your tailnet. Off by default: nothing listens unless listen is true. The app listens on 127.0.0.1 only and takes only notices sent from this Mac's own Tailscale login; you expose the port with tailscale serve, and each other machine names this Mac in its own cli.toml.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -261,7 +261,7 @@
       "anyOf": [{ "required": ["slug"] }, { "required": ["name"] }],
       "properties": {
         "slug": {
-          "description": "The project's ID, unique across projects: lowercase letters and digits joined by single hyphens, such as \"e-commerce\". Required. shipyard ping --project and shipyard notify --project find a project by its slug, then by its title.",
+          "description": "The project's ID, unique across projects: lowercase letters and digits joined by single hyphens, such as \"e-commerce\". Required. shipyard ping send --project and shipyard notice send --project find a project by its slug, then by its title.",
           "type": "string",
           "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
         },
@@ -481,7 +481,7 @@
       "required": ["event"],
       "properties": {
         "event": {
-          "description": "The change to notify about. agent.notice is an agent's notice (shipyard notify), refused for a project whose rules leave it out. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
+          "description": "The change to notify about. agent.notice is an agent's notice (shipyard notice send), refused for a project whose rules leave it out. control.started and control.ended (an agent starting and ending its lease on the app) are decided by the top-level rules only: a project's rule for one is ignored.",
           "type": "string",
           "enum": [
             "pr.opened",

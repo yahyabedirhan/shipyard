@@ -4,7 +4,7 @@ import ShipyardCommand
 import ShipyardNotices
 import Testing
 
-/// `shipyard notify` as an agent runs it on a machine without the app,
+/// `shipyard notice send` as an agent runs it on a machine without the app,
 /// through `ShipyardCLI.run` with that build's table: `cli.toml`'s
 /// `[notices]` decides the route, and with `app-machine` set the notice goes
 /// to the Mac over the tailnet, one HTTP request answered with the app's
@@ -46,7 +46,7 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
-        let result = shipyard(["notify", "Tests running", "--body", "12 of 40 passed", "--from", "claude"], http: http)
+        let result = shipyard(["notice", "send", "Tests running", "--body", "12 of 40 passed", "--from", "claude"], http: http)
 
         #expect(result == CommandResult(output: "shown\n"))
         let post = try #require(http.posts.current.first)
@@ -62,7 +62,7 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
-        let result = shipyard(["notify", "withdraw", "tests"], http: http)
+        let result = shipyard(["notice", "withdraw", "tests"], http: http)
 
         #expect(result == CommandResult(output: "withdrawn\n"))
         #expect(http.posts.current.map { String(decoding: $0.body, as: UTF8.self) } == [#"{"withdraw":"tests"}"#])
@@ -80,7 +80,7 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac.tail1234.ts.net\"\napp-scheme = \"https\"\napp-port = 443\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
-        _ = shipyard(["notify", "Done"], http: http)
+        _ = shipyard(["notice", "send", "Done"], http: http)
 
         #expect(http.posts.current.map(\.url.absoluteString) == ["https://my-mac.tail1234.ts.net:443/notify"])
     }
@@ -90,9 +90,9 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: status, body: Data(#"{"refused":"notices are off for project `shop`"}"#.utf8)))
 
-        let result = shipyard(["notify", "Done"], http: http)
+        let result = shipyard(["notice", "send", "Done"], http: http)
 
-        #expect(result == CommandResult(error: "shipyard notify: notices are off for project `shop`\n", status: 1))
+        #expect(result == CommandResult(error: "shipyard notice send: notices are off for project `shop`\n", status: 1))
     }
 
     @Test("an app machine that can't be reached, doesn't answer in time, or answers without a verdict exits 1 saying so", arguments: [
@@ -106,9 +106,9 @@ struct TailnetNotifyCommandTests {
     func unreachable(outcome: RecordingHTTP.Outcome, line: String) throws {
         try write("[notices]\napp-machine = \"my-mac\"\n")
 
-        let result = shipyard(["notify", "Done"], http: RecordingHTTP(outcome))
+        let result = shipyard(["notice", "send", "Done"], http: RecordingHTTP(outcome))
 
-        #expect(result == CommandResult(error: "shipyard notify: \(line)\n", status: 1))
+        #expect(result == CommandResult(error: "shipyard notice send: \(line)\n", status: 1))
     }
 
     @Test("without app-machine, or without cli.toml, the notice takes the poll route instead, and nothing goes over the tailnet", arguments: [nil, "", "[notices]\napp-port = 8080\n"])
@@ -117,7 +117,7 @@ struct TailnetNotifyCommandTests {
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
         let poll = RecordingRoute()
 
-        let result = shipyard(["notify", "Done"], http: http, poll: poll)
+        let result = shipyard(["notice", "send", "Done"], http: http, poll: poll)
 
         #expect(result == CommandResult(output: PluginNoticeRoute.queuedLine + "\n"))
         #expect(poll.notices.current == [.show(Notice(title: "Done", repository: "owner/shop"))])
@@ -130,11 +130,11 @@ struct TailnetNotifyCommandTests {
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
         let poll = RecordingRoute()
 
-        let result = shipyard(["notify", "Done"], http: http, poll: poll)
+        let result = shipyard(["notice", "send", "Done"], http: http, poll: poll)
         #expect(poll.notices.current.isEmpty)
 
         #expect(result.status == 1)
-        #expect(result.error.hasPrefix("shipyard notify: \(settings.url.path) doesn't read (unknown setting `notices.app-machin`"), "\(result.error)")
+        #expect(result.error.hasPrefix("shipyard notice send: \(settings.url.path) doesn't read (unknown setting `notices.app-machin`"), "\(result.error)")
         #expect(http.posts.current.isEmpty)
     }
 
@@ -146,9 +146,9 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
-        let result = shipyard(["notify", "Done"] + flags, http: http)
+        let result = shipyard(["notice", "send", "Done"] + flags, http: http)
 
-        #expect(result == CommandResult(error: "shipyard notify: \(TailnetWire.herdrRefusal)\n", status: 2))
+        #expect(result == CommandResult(error: "shipyard notice send: \(TailnetWire.herdrRefusal)\n", status: 2))
         #expect(http.posts.current.isEmpty)
     }
 
@@ -157,7 +157,7 @@ struct TailnetNotifyCommandTests {
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
         let poll = RecordingRoute()
 
-        let result = shipyard(["notify", "Done", "--herdr", "w1:p3"], http: http, poll: poll)
+        let result = shipyard(["notice", "send", "Done", "--herdr", "w1:p3"], http: http, poll: poll)
 
         #expect(result == CommandResult(output: PluginNoticeRoute.queuedLine + "\n"))
         #expect(poll.notices.current.count == 1)
@@ -169,9 +169,9 @@ struct TailnetNotifyCommandTests {
         try write("[notices]\napp-machine = \"my-mac\"\n")
         let http = RecordingHTTP(.answered(status: 200, body: Data(#"{"shown":true}"#.utf8)))
 
-        let result = shipyard(["notify", "Done", "--colour", "red"], http: http)
+        let result = shipyard(["notice", "send", "Done", "--colour", "red"], http: http)
 
-        #expect(result == CommandResult(error: "shipyard notify: unknown option `--colour`\n", status: 2))
+        #expect(result == CommandResult(error: "shipyard notice send: unknown option `--colour`\n", status: 2))
         #expect(http.posts.current.isEmpty)
     }
 }

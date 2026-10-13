@@ -13,7 +13,7 @@
       "default": 1
     },
     "notices": {
-      "description": "Where this machine's shipyard notify sends a notice. With app-machine set, straight to the app on that Mac over your tailnet, at <app-scheme>://<app-machine>:<app-port>; without it, through the herdr-shipyard plugin for the Mac's poll.",
+      "description": "Where this machine's shipyard notice send delivers a notice. With app-machine set, straight to the app on that Mac over your tailnet, at <app-scheme>://<app-machine>:<app-port>; without it, through the herdr-shipyard plugin for the Mac's poll.",
       "type": "object",
       "additionalProperties": false,
       "properties": {

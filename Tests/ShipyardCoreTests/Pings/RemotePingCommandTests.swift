@@ -67,8 +67,8 @@ struct RemotePingCommandTests {
 
     @Test("a ping is one file in the store, as on the Mac")
     func oneFilePerPing() throws {
-        shipyard("ping", "First", "--id", "first")
-        shipyard("ping", "Second", "--id", "second")
+        shipyard("ping", "send", "First", "--id", "first")
+        shipyard("ping", "send", "Second", "--id", "second")
 
         let files = try FileManager.default.contentsOfDirectory(atPath: store.directory.path).sorted()
         #expect(files == ["first.json", "second.json"])
@@ -78,7 +78,7 @@ struct RemotePingCommandTests {
 
     @Test("without a configuration, a ping keeps its working folder's repository, prints its id and expires a day later")
     func savedByOrigin() throws {
-        let result = shipyard("ping", "Which cache?", "--id", "cache", origin: "git@github.com:yahyabedirhan/shop.git")
+        let result = shipyard("ping", "send", "Which cache?", "--id", "cache", origin: "git@github.com:yahyabedirhan/shop.git")
 
         #expect(result == CommandResult(output: "cache\n"))
         let ping = try stored()
@@ -90,13 +90,13 @@ struct RemotePingCommandTests {
 
     @Test("--repo names the repository instead of origin")
     func savedByRepo() throws {
-        #expect(shipyard("ping", "Ready", "--repo", "yahyabedirhan/blog", origin: "git@github.com:yahyabedirhan/shop.git").status == 0)
+        #expect(shipyard("ping", "send", "Ready", "--repo", "yahyabedirhan/blog", origin: "git@github.com:yahyabedirhan/shop.git").status == 0)
         #expect(try stored().repository == "yahyabedirhan/blog")
     }
 
     @Test("--project is kept as given, whatever projects exist, and without a repository, as on the Mac")
     func projectAsGiven() throws {
-        let result = shipyard("ping", "Ready", "--project", "shop", origin: "git@github.com:yahyabedirhan/shop.git")
+        let result = shipyard("ping", "send", "Ready", "--project", "shop", origin: "git@github.com:yahyabedirhan/shop.git")
 
         #expect(result.status == 0)
         let ping = try stored()
@@ -106,7 +106,7 @@ struct RemotePingCommandTests {
 
     @Test("with no --repo, --project or origin, the ping is still saved")
     func savedWithNothing() throws {
-        let result = shipyard("ping", "Done", "--id", "done")
+        let result = shipyard("ping", "send", "Done", "--id", "done")
 
         #expect(result == CommandResult(output: "done\n"))
         let ping = try stored()
@@ -116,7 +116,7 @@ struct RemotePingCommandTests {
 
     @Test("an origin that isn't owner/name is no repository, and the ping is still saved")
     func unreadableOrigin() throws {
-        #expect(shipyard("ping", "Done", origin: "/srv/repos/shop").status == 0)
+        #expect(shipyard("ping", "send", "Done", origin: "/srv/repos/shop").status == 0)
         #expect(try stored().repository == nil)
     }
 
@@ -124,10 +124,10 @@ struct RemotePingCommandTests {
     func configurationNotRead() throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data("[[projects]\nname = ".utf8).write(to: configURL)
-        #expect(shipyard("ping", "Broken config", "--id", "one").status == 0)
+        #expect(shipyard("ping", "send", "Broken config", "--id", "one").status == 0)
 
         try Data("[[projects]]\nslug = \"blog\"\nrepositories = [\"yahyabedirhan/blog\"]\n".utf8).write(to: configURL)
-        #expect(shipyard("ping", "Unwatched", "--id", "two", origin: "https://github.com/yahyabedirhan/shop").status == 0)
+        #expect(shipyard("ping", "send", "Unwatched", "--id", "two", origin: "https://github.com/yahyabedirhan/shop").status == 0)
         #expect(store.ping(id: "two")?.projects == [])
         #expect(store.ping(id: "two")?.repository == "yahyabedirhan/shop")
     }
@@ -136,19 +136,19 @@ struct RemotePingCommandTests {
 
     @Test("sent from a Herdr pane without an action, clicking it focuses that pane")
     func herdrPaneWithoutTheFlag() throws {
-        #expect(shipyard("ping", "Which cache?", herdrPane: "w1:p3").status == 0)
+        #expect(shipyard("ping", "send", "Which cache?", herdrPane: "w1:p3").status == 0)
         #expect(try stored().action == .herdr("w1:p3"))
     }
 
     @Test("an action the agent gives stays its action, from a Herdr pane too")
     func givenActionWins() throws {
-        #expect(shipyard("ping", "PR ready", "--open", "https://github.com/yahyabedirhan/shop/pull/7", herdrPane: "w1:p3").status == 0)
+        #expect(shipyard("ping", "send", "PR ready", "--open", "https://github.com/yahyabedirhan/shop/pull/7", herdrPane: "w1:p3").status == 0)
         #expect(try stored().action == .url(URL(string: "https://github.com/yahyabedirhan/shop/pull/7")!))
     }
 
     @Test("outside Herdr, a ping without an action has none")
     func outsideHerdr() throws {
-        #expect(shipyard("ping", "Done", herdrPane: "  ").status == 0)
+        #expect(shipyard("ping", "send", "Done", herdrPane: "  ").status == 0)
         #expect(try stored().action == nil)
     }
 
@@ -156,11 +156,11 @@ struct RemotePingCommandTests {
 
     @Test("sending an id again replaces it: its age and its day start again, and its instance stays")
     func replace() throws {
-        shipyard("ping", "Building", "--id", "build")
+        shipyard("ping", "send", "Building", "--id", "build")
         let first = try stored()
         let later = Self.now.addingTimeInterval(3600)
 
-        #expect(shipyard("ping", "Built", "--id", "build", at: later) == CommandResult(output: "build\n"))
+        #expect(shipyard("ping", "send", "Built", "--id", "build", at: later) == CommandResult(output: "build\n"))
 
         let replaced = try stored()
         #expect(replaced.title == "Built")
@@ -176,7 +176,7 @@ struct RemotePingCommandTests {
 
     @Test("a ping is listed until a day after its sending, then it's gone from the store")
     func expiry() throws {
-        shipyard("ping", "Which cache?", "--id", "cache")
+        shipyard("ping", "send", "Which cache?", "--id", "cache")
 
         let justBefore = try PingList.decode(shipyard("ping", "list", "--json", at: Self.now.addingTimeInterval(Self.day - 1)).output)
         #expect(justBefore.pings.map(\.id) == ["cache"])
@@ -188,8 +188,8 @@ struct RemotePingCommandTests {
 
     @Test("a replace keeps a ping a day from the replace")
     func replaceRenews() throws {
-        shipyard("ping", "Building", "--id", "build")
-        shipyard("ping", "Still building", "--id", "build", at: Self.now.addingTimeInterval(Self.day - 60))
+        shipyard("ping", "send", "Building", "--id", "build")
+        shipyard("ping", "send", "Still building", "--id", "build", at: Self.now.addingTimeInterval(Self.day - 60))
 
         let list = try PingList.decode(shipyard("ping", "list", "--json", at: Self.now.addingTimeInterval(Self.day + 60)).output)
         #expect(list.pings.map(\.title) == ["Still building"])
@@ -197,13 +197,13 @@ struct RemotePingCommandTests {
 
     @Test("an expired ping can't be withdrawn, and its id sent again is a new ping")
     func expiredIsGone() throws {
-        shipyard("ping", "Which cache?", "--id", "cache")
+        shipyard("ping", "send", "Which cache?", "--id", "cache")
         let first = try stored()
         let later = Self.now.addingTimeInterval(Self.day + 1)
 
         #expect(shipyard("ping", "withdraw", "cache", at: later).status == CommandResult.failedStatus)
 
-        shipyard("ping", "Which cache, again?", "--id", "cache", at: later)
+        shipyard("ping", "send", "Which cache, again?", "--id", "cache", at: later)
         let again = try stored()
         #expect(again.sent == later)
         #expect(again.instance != first.instance)
@@ -220,8 +220,8 @@ struct RemotePingCommandTests {
 
     @Test("list --json prints the contract on one line, newest first, with every field a ping is sent with and no expiry")
     func listContract() throws {
-        shipyard("ping", "Older", "--id", "older", "--from", "claude", "--body", "more", origin: "git@github.com:yahyabedirhan/shop.git")
-        shipyard("ping", "Newer", "--id", "newer", "--project", "blog", at: Self.now.addingTimeInterval(60))
+        shipyard("ping", "send", "Older", "--id", "older", "--from", "claude", "--body", "more", origin: "git@github.com:yahyabedirhan/shop.git")
+        shipyard("ping", "send", "Newer", "--id", "newer", "--project", "blog", at: Self.now.addingTimeInterval(60))
 
         let result = shipyard("ping", "list", "--json", at: Self.now.addingTimeInterval(120))
 
@@ -263,9 +263,9 @@ struct RemotePingCommandTests {
         #expect(list.pings.first?.id == "p\(PingList.maxPings)")
     }
 
-    @Test("list without --json, or with more, is exit 2")
-    func listNeedsJSON() {
-        #expect(shipyard("ping", "list").status == CommandResult.usageStatus)
+    @Test("list with anything but --json is exit 2")
+    func listTakesOnlyJSON() {
+        #expect(shipyard("ping", "list", "--yaml").status == CommandResult.usageStatus)
         #expect(shipyard("ping", "list", "--json", "extra").status == CommandResult.usageStatus)
     }
 
@@ -276,7 +276,7 @@ struct RemotePingCommandTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data("[[projects]]\nslug = \"shop\"\nrepositories = [\"yahyabedirhan/shop\"]\n".utf8).write(to: configURL)
 
-        #expect(shipyard("ping", "Ready", filing: macFiling, origin: "git@github.com:yahyabedirhan/shop.git", herdrPane: "w1:p3").status == 0)
+        #expect(shipyard("ping", "send", "Ready", filing: macFiling, origin: "git@github.com:yahyabedirhan/shop.git", herdrPane: "w1:p3").status == 0)
 
         let ping = try stored()
         #expect(ping.projects == ["shop"])
@@ -288,10 +288,10 @@ struct RemotePingCommandTests {
 
     @Test("with the Mac's filing a ping no project watches is still refused, and one with no configuration too")
     func macRefuses() {
-        let unwatched = shipyard("ping", "Ready", filing: macFiling, origin: "git@github.com:yahyabedirhan/shop.git")
+        let unwatched = shipyard("ping", "send", "Ready", filing: macFiling, origin: "git@github.com:yahyabedirhan/shop.git")
         #expect(unwatched.status == CommandResult.failedStatus)
-        #expect(unwatched.error == "shipyard ping: no project watches `yahyabedirhan/shop`; pass --project <name> to file it under one; config.toml has no projects yet\n")
-        #expect(shipyard("ping", "Ready", "--project", "shop", filing: macFiling).status == CommandResult.failedStatus)
+        #expect(unwatched.error == "shipyard ping send: no project watches `yahyabedirhan/shop`; pass --project <name> to file it under one; config.toml has no projects yet\n")
+        #expect(shipyard("ping", "send", "Ready", "--project", "shop", filing: macFiling).status == CommandResult.failedStatus)
         #expect(store.all().isEmpty)
     }
 }

@@ -4,12 +4,12 @@ import ShipyardControl
 import ShipyardNotices
 import Testing
 
-/// `shipyard notify` as an agent runs it on the Mac, through
+/// `shipyard notice send` as an agent runs it on the Mac, through
 /// `ShipyardCLI.run` with the Mac's table, an in-memory app at the end of
 /// the socket and a recording launcher: the notice it sends, what it
 /// prints and how it exits. Whether the notice is shown is the app's to
 /// say (`NoticeTests`); its verdict comes back as the reply.
-@Suite("The notify command")
+@Suite("The notice command")
 struct NotifyCommandTests {
     static let support = URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true)
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
@@ -51,7 +51,7 @@ struct NotifyCommandTests {
     func shown() throws {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["notify", "Tests running", "--body", "12 of 40 passed", "--from", "claude"], transport: app)
+        let result = shipyard(["notice", "send", "Tests running", "--body", "12 of 40 passed", "--from", "claude"], transport: app)
 
         #expect(result == CommandResult(output: "shown\n"))
         let exchange = try #require(app.exchanges.current.only)
@@ -62,9 +62,9 @@ struct NotifyCommandTests {
     }
 
     @Test("--project and --repo say where it's filed instead of the checkout, which then needn't be one", arguments: [
-        (["notify", "Done", "--project", "my shop"], Notice(title: "Done", project: "my shop")),
-        (["notify", "--repo", "owner/blog", "Done"], Notice(title: "Done", repository: "owner/blog")),
-        (["notify", "--", "--repo"], nil),
+        (["notice", "send", "Done", "--project", "my shop"], Notice(title: "Done", project: "my shop")),
+        (["notice", "send", "--repo", "owner/blog", "Done"], Notice(title: "Done", repository: "owner/blog")),
+        (["notice", "send", "--", "--repo"], nil),
     ])
     func filedBy(arguments: [String], notice: Notice?) {
         let app = FakeTransport(reply: .done(""))
@@ -85,28 +85,28 @@ struct NotifyCommandTests {
     func refused() {
         let app = FakeTransport(reply: .refused("notices are off for project `shop`"))
 
-        let result = shipyard(["notify", "Done"], transport: app)
+        let result = shipyard(["notice", "send", "Done"], transport: app)
 
-        #expect(result == CommandResult(error: "shipyard notify: notices are off for project `shop`\n", status: 1))
+        #expect(result == CommandResult(error: "shipyard notice send: notices are off for project `shop`\n", status: 1))
     }
 
     @Test("with the app not running it exits 1 saying the notice wasn't shown, and never launches the app")
     func notRunning() {
         let launcher = RecordingLauncher()
 
-        let result = shipyard(["notify", "Done"], transport: .nothingListens, launcher: launcher)
+        let result = shipyard(["notice", "send", "Done"], transport: .nothingListens, launcher: launcher)
 
-        #expect(result == CommandResult(error: "shipyard notify: shipyard isn't running, so this notice wasn't shown\n", status: 1))
+        #expect(result == CommandResult(error: "shipyard notice send: shipyard isn't running, so this notice wasn't shown\n", status: 1))
         #expect(launcher.launches.current.isEmpty)
     }
 
     @Test("an app that doesn't answer in time, or can't be asked, exits 1 saying so")
     func unanswered() {
-        #expect(shipyard(["notify", "Done"], transport: FakeTransport { _, _ in .failure(.timedOut) }) == CommandResult(
-            error: "shipyard notify: shipyard didn't answer within 5 seconds, so this notice may not have been shown\n", status: 1
+        #expect(shipyard(["notice", "send", "Done"], transport: FakeTransport { _, _ in .failure(.timedOut) }) == CommandResult(
+            error: "shipyard notice send: shipyard didn't answer within 5 seconds, so this notice may not have been shown\n", status: 1
         ))
-        #expect(shipyard(["notify", "Done"], transport: FakeTransport { _, _ in .failure(.failed("connection reset")) }) == CommandResult(
-            error: "shipyard notify: couldn't reach shipyard, so this notice wasn't shown: connection reset\n", status: 1
+        #expect(shipyard(["notice", "send", "Done"], transport: FakeTransport { _, _ in .failure(.failed("connection reset")) }) == CommandResult(
+            error: "shipyard notice send: couldn't reach shipyard, so this notice wasn't shown: connection reset\n", status: 1
         ))
     }
 
@@ -114,10 +114,10 @@ struct NotifyCommandTests {
     func noRepository() {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["notify", "Done"], origin: nil, transport: app)
+        let result = shipyard(["notice", "send", "Done"], origin: nil, transport: app)
 
         #expect(result == CommandResult(
-            error: "shipyard notify: the working folder (/work/shop) isn't a git repository with a remote `origin` to file the notice by; "
+            error: "shipyard notice send: the working folder (/work/shop) isn't a git repository with a remote `origin` to file the notice by; "
                 + "pass --repo <owner/name> or --project <name>\n",
             status: 1
         ))
@@ -125,9 +125,9 @@ struct NotifyCommandTests {
     }
 
     @Test("arguments that don't read exit 2 with what's wrong and send nothing", arguments: [
-        ([], "give the notice a title: shipyard notify \"<title>\" [options] (shipyard notify --help lists them)"),
-        (["  "], "give the notice a title: shipyard notify \"<title>\" [options] (shipyard notify --help lists them)"),
-        (["Tests", "running"], "one title only; quote it: shipyard notify \"Tests running\""),
+        ([], "give the notice a title: shipyard notice send <title> [options] (shipyard notice --help lists them)"),
+        (["  "], "give the notice a title: shipyard notice send <title> [options] (shipyard notice --help lists them)"),
+        (["Tests", "running"], "one title only; quote it: shipyard notice send \"Tests running\""),
         (["Done", "--loud"], "unknown option `--loud`"),
         (["Done", "--body"], "`--body` needs a value"),
         (["Done", "--repo", "shop"], "`--repo` takes a repository as owner/name, not `shop`"),
@@ -137,9 +137,9 @@ struct NotifyCommandTests {
     func misread(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
 
-        let result = shipyard(["notify"] + arguments, transport: app)
+        let result = shipyard(["notice", "send"] + arguments, transport: app)
 
-        #expect(result == CommandResult(error: "shipyard notify: \(line)\n", status: 2))
+        #expect(result == CommandResult(error: "shipyard notice send: \(line)\n", status: 2))
         #expect(app.requests.isEmpty)
     }
 
@@ -147,11 +147,11 @@ struct NotifyCommandTests {
     func help() {
         let app = FakeTransport(reply: .done(""))
 
-        let usage = shipyard(["notify", "Done", "--help"], transport: app)
+        let usage = shipyard(["notice", "send", "Done", "--help"], transport: app)
         let all = shipyard(["--help"], transport: app)
 
         #expect(usage == CommandResult(output: NotifyCommand.usageText))
-        #expect(all.output.contains("  notify  show the user a notice"))
+        #expect(all.output.contains("notice send <title> [options]"))
         #expect(app.requests.isEmpty)
     }
 }

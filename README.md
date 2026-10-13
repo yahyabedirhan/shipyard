@@ -68,9 +68,9 @@ Then ask in your own words: "Watch this repo in shipyard", "Hide dependabot's pu
 Agents can also ping you: a short message listed under the project they're working in, with a notification, that takes you where they mean when you click it. It opens a link, brings an app forward, or focuses the agent's Herdr tab. They send it with the `shipyard` command that comes inside the app; link it onto your PATH from onboarding or the gear menu (**Set up shipyard command**), which puts it at `~/.local/bin/shipyard`.
 
 ```sh
-shipyard ping "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57
-shipyard ping "Waiting for your input" --herdr --id shop-question   # brings you back to this Herdr pane
-shipyard ping withdraw shop-question                                # takes it back once you've answered
+shipyard ping send "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57
+shipyard ping send "Waiting for your input" --herdr --id shop-question   # brings you back to this Herdr pane
+shipyard ping withdraw shop-question                                     # takes it back once you've answered
 ```
 
 A ping is filed under the projects that watch the repository of the agent's working folder, needs attention until you click it, and leaves a day after you've seen it (`seen-window`), or when you dismiss it with its ✕. Pings never reach GitHub. With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest; `shipyard ping --help` lists every flag. If your `config.toml` lists its own notification rules, add `{ event = "ping.sent" }` to hear about pings.

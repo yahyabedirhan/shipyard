@@ -334,7 +334,7 @@ public enum EventKind: String, CaseIterable, Sendable {
     case runSucceeded = "run.succeeded"
     /// An agent sent a new ping (`shipyard ping`).
     case pingSent = "ping.sent"
-    /// An agent posted a notice (`shipyard notify`): shown, never listed.
+    /// An agent posted a notice (`shipyard notice send`): shown, never listed.
     case agentNotice = "agent.notice"
     /// An agent took app control's lease: it's using shipyard.
     case controlStarted = "control.started"

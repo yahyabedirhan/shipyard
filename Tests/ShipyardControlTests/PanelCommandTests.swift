@@ -38,8 +38,8 @@ struct PanelCommandTests {
         (["unfold", "my shop"], .panelUnfold(project: "my shop"), #"{"command":"panel.unfold",\#(FakeProcessTable.wire()),"project":"my shop","version":2}"#),
         (["show-more", "shop", "pull-requests"], .panelShowMore(project: "shop", kind: "pull-requests"),
          #"{"command":"panel.showMore",\#(FakeProcessTable.wire()),"kind":"pull-requests","project":"shop","version":2}"#),
-        (["tab", "All"], .panelTab(name: "All"), #"{"command":"panel.tab",\#(FakeProcessTable.wire()),"name":"All","version":2}"#),
-        (["view", "cli"], .panelView(name: "cli"), #"{"command":"panel.view",\#(FakeProcessTable.wire()),"name":"cli","version":2}"#),
+        (["show-tab", "All"], .panelTab(name: "All"), #"{"command":"panel.tab",\#(FakeProcessTable.wire()),"name":"All","version":2}"#),
+        (["show-view", "cli"], .panelView(name: "cli"), #"{"command":"panel.view",\#(FakeProcessTable.wire()),"name":"cli","version":2}"#),
     ])
     func sends(arguments: [String], request: ControlRequest, wire: String) throws {
         let app = FakeTransport(reply: .done("done\n"))
@@ -56,7 +56,7 @@ struct PanelCommandTests {
     func refused() {
         let app = FakeTransport(reply: .refused("no tab is named `x`; the tabs are `All`, `shop`"))
 
-        let result = shipyard("panel", "tab", "x", transport: app)
+        let result = shipyard("panel", "show-tab", "x", transport: app)
 
         #expect(result == CommandResult(error: "no tab is named `x`; the tabs are `All`, `shop`\n", status: 1))
     }
@@ -68,23 +68,24 @@ struct PanelCommandTests {
         #expect(result == CommandResult(error: "shipyard isn't running; `shipyard app open`\n", status: 1))
     }
 
-    @Test("arguments that don't read exit 2 with the panel usage and send nothing", arguments: [
+    @Test("arguments that don't read exit 2 with one line pointing at the panel help, and send nothing; none prints the usage", arguments: [
         (["panel"], ""),
-        (["panel", "spin"], "shipyard panel: unknown command `spin`\n"),
-        (["panel", "tab"], "shipyard panel tab: missing <name>\n"),
-        (["panel", "view"], "shipyard panel view: missing <name>\n"),
-        (["panel", "view", "cli", "now"], "shipyard panel view: unexpected `now`\n"),
-        (["panel", "show-more", "shop"], "shipyard panel show-more: missing <kind>\n"),
-        (["panel", "show-more"], "shipyard panel show-more: missing <project> <kind>\n"),
-        (["panel", "fold", "shop", "blog"], "shipyard panel fold: unexpected `blog`\n"),
-        (["panel", "open", "now"], "shipyard panel open: unexpected `now`\n"),
+        (["panel", "spin"], "shipyard panel: unknown command `spin`"),
+        (["panel", "show-tab"], "shipyard panel show-tab: missing <name>"),
+        (["panel", "show-view"], "shipyard panel show-view: missing <name>"),
+        (["panel", "show-view", "cli", "now"], "shipyard panel show-view: unexpected `now`"),
+        (["panel", "show-more", "shop"], "shipyard panel show-more: missing <kind>"),
+        (["panel", "show-more"], "shipyard panel show-more: missing <project> <kind>"),
+        (["panel", "fold", "shop", "blog"], "shipyard panel fold: unexpected `blog`"),
+        (["panel", "open", "now"], "shipyard panel open: unexpected `now`"),
     ])
     func misread(arguments: [String], line: String) {
         let app = FakeTransport(reply: .done(""))
 
         let result = shipyard(arguments, transport: app)
 
-        #expect(result == CommandResult(error: line + PanelCommand.usageText, status: 2))
+        let expected = line.isEmpty ? PanelCommand.usageText : line + ". Run `shipyard panel --help` for usage.\n"
+        #expect(result == CommandResult(error: expected, status: 2))
         #expect(app.exchanges.current.isEmpty)
     }
 
@@ -94,7 +95,7 @@ struct PanelCommandTests {
 
         #expect(shipyard("panel", "--help", transport: app) == CommandResult(output: PanelCommand.usageText))
         #expect(shipyard("panel", "fold", "-h", transport: app) == CommandResult(output: PanelCommand.usageText))
-        #expect(shipyard("--help", transport: app).output.contains("shipyard panel open | close | fold <project>"))
+        #expect(shipyard("--help", transport: app).output.contains("panel show-tab <name>"))
         #expect(app.exchanges.current.isEmpty)
     }
 

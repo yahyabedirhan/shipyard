@@ -12,16 +12,23 @@ import ShipyardCommand
 public enum PingCommand {
     /// What `shipyard ping --help` prints.
     public static let usageText = """
-        usage: shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]
-                             [--open <url> | --app <bundle id or name> | --herdr [<tab or pane id>]]
-                             [--repo <owner/name> | --project <name>]
-               shipyard ping withdraw <id>
+        Send the user pings: messages that wait until they click them.
 
-        Sends the user a ping: it's listed under the projects that watch the
-        repository of the working folder (its git remote `origin`), needs
-        their attention until they click it, and prints its id, such as
-        `k7qm2x`. Clicking it runs its action, if it has one, and marks it
-        seen. The Mac's shipyard numbers it in each project it's listed in.
+        Usage: shipyard ping send <title> [options]
+               shipyard ping withdraw <id>
+               shipyard ping list [--json]
+
+        Examples:
+          shipyard ping send "PR ready for review" --open https://github.com/o/r/pull/7
+          shipyard ping send "Which option?" --from claude --id ask-1 --herdr
+          shipyard ping withdraw ask-1
+
+        send <title> [options]
+          Sends the user a ping and prints its id, such as `k7qm2x`. It's
+          listed under the projects that watch the repository of the working
+          folder (its git remote `origin`), and needs their attention until
+          they click it. Clicking it runs its action, if it has one, and marks
+          it seen. The Mac's shipyard numbers it in each project it's listed in.
 
           --body <text>        say more than the title fits
           --from <label>       who sent it: the agent or the task
@@ -39,29 +46,32 @@ public enum PingCommand {
           --project <name>     file it under this project only: its slug in config.toml,
                                or else its title
 
-        One action at most; with none, clicking it only marks it seen. The
-        argument after --herdr is its id only when it's shaped like one
-        (workspace:tab or workspace:pane, as Herdr prints them). An id is 1 to
-        64 lowercase letters, digits, - and _, starting with a letter or digit.
-        Everything after -- is the title, even `withdraw`, `list` or a word
-        starting with --: shipyard ping -- withdraw
+          One action at most; with none, clicking it only marks it seen. The
+          argument after --herdr is its id only when it's shaped like one
+          (workspace:tab or workspace:pane, as Herdr prints them). An id is 1 to
+          64 lowercase letters, digits, - and _, starting with a letter or digit.
+          Everything after -- is the title, even a word starting with --.
 
-        `shipyard ping withdraw <id>` takes the ping back: it leaves the menu,
-        and its notification leaves Notification Center. It prints the id, or
-        fails when no ping has it.
+        withdraw <id>
+          Takes the ping back: it leaves the menu, and its notification leaves
+          Notification Center. Prints the id; exits 1 when no ping has it.
 
-        `shipyard ping list --json` prints this computer's pings as one line
-        of JSON, newest first, for the Mac's shipyard to read through Herdr.
+        list [--json]
+          Lists this machine's live pings, newest first: id, age, title and
+          where it's filed. --json prints them as one line of JSON, the shape
+          the Mac's shipyard reads through Herdr.
 
         On Linux, a computer without the app, a ping isn't filed there: it
         keeps its repository (or --project) as given, and the Mac files it.
         Sent from a Herdr pane without an action, clicking it focuses that
         pane. It leaves a day after its sending or its last replace.
 
+        Exit codes: 1 when no project takes the ping, or no ping has the id.
+
         """
 
     /// The usage line errors point at.
-    static let usageLine = "shipyard ping \"<title>\" [options] (shipyard ping --help lists them)"
+    static let usageLine = "shipyard ping send <title> [options] (shipyard ping --help lists them)"
 
     /// The flags that give a ping its action; it takes one at most.
     static let actionFlags = ["--open", "--app", "--herdr"]
@@ -134,7 +144,7 @@ public enum PingCommand {
         let request: Request
         switch Request.parse(arguments, herdrPane: environment.variables[herdrPaneVariable]) {
         case .success(let parsed): request = parsed
-        case .failure(let error): return .usage("shipyard ping: \(error.message)")
+        case .failure(let error): return .usage("shipyard ping send: \(error.message)")
         }
         var sending = request
         // An action the agent gives wins over the filing's.
@@ -213,7 +223,7 @@ public enum PingCommand {
                 expires: filing.expiry(sentAt: now)
             ))
         } catch {
-            return .failed("shipyard ping: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
+            return .failed("shipyard ping send: couldn't save the ping in \(store.directory.path) (\(error.localizedDescription))")
         }
         return CommandResult(output: "\(id)\n")
     }
@@ -230,15 +240,35 @@ public enum PingCommand {
         }
     }
 
-    /// `shipyard ping list --json`, with `arguments` those after `list`:
-    /// prints the store's live pings at `now` as the remote ping list
-    /// (`PingList`), newest first and capped, on one line. Only `--json`
-    /// is accepted, so the contract is always asked for by name.
+    /// `shipyard ping list [--json]`, with `arguments` those after `list`:
+    /// the store's live pings at `now`, newest first. Plain, one line each
+    /// for a person; with `--json`, the remote ping list (`PingList`),
+    /// capped, on one line: the contract the Mac reads through Herdr.
     public static func list(_ arguments: [String], store: PingStore, now: Date) -> CommandResult {
-        guard arguments == ["--json"] else {
-            return .usage("shipyard ping list: it prints JSON only; run shipyard ping list --json")
+        let live = store.all().filter { $0.isLive(at: now) }
+        switch arguments {
+        case ["--json"]:
+            return CommandResult(output: PingList.encode(live) + "\n")
+        case []:
+            let rows = live.sorted { ($0.sent, $0.id) > ($1.sent, $1.id) }.map { ping in
+                let place = ping.projects.isEmpty ? ping.repository ?? "unfiled" : ping.projects.joined(separator: ", ")
+                return [ping.id, age(of: ping.sent, at: now), ping.title, "(\(place))"].joined(separator: "  ")
+            }
+            return CommandResult(output: rows.isEmpty ? "no pings\n" : rows.joined(separator: "\n") + "\n")
+        default:
+            return .usage("shipyard ping list: unexpected `\(arguments[0])`. Usage: shipyard ping list [--json]")
         }
-        return CommandResult(output: PingList.encode(store.all().filter { $0.isLive(at: now) }) + "\n")
+    }
+
+    /// How long ago `date` was at `now`, shortest first: `40s`, `12m`, `3h`, `2d`.
+    static func age(of date: Date, at now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        switch seconds {
+        case ..<60: return "\(seconds)s"
+        case ..<3600: return "\(seconds / 60)m"
+        case ..<86400: return "\(seconds / 3600)h"
+        default: return "\(seconds / 86400)d"
+        }
     }
 
     /// `shipyard ping withdraw <id>`, with `arguments` those after
@@ -372,7 +402,7 @@ public enum PingCommand {
                 }
             }
             if titles.count > 1 {
-                return .failure(ParseError("one title only; quote it: shipyard ping \"\(titles.joined(separator: " "))\""))
+                return .failure(ParseError("one title only; quote it: shipyard ping send \"\(titles.joined(separator: " "))\""))
             }
             let title = titles.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !title.isEmpty else { return .failure(ParseError("give the ping a title: \(usageLine)")) }

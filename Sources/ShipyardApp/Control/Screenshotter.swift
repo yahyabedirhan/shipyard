@@ -16,7 +16,7 @@ enum ScreenshotOutcome: Equatable {
     case failed(why: String)
 }
 
-/// What the control server asks for a `shipyard screenshot`. Both leave
+/// What the control server asks for a `shipyard app capture`. Both leave
 /// the lease's dot and banner out unless `withIndicator` keeps them.
 @MainActor
 protocol Screenshotting: AnyObject {

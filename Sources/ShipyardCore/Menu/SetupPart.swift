@@ -4,11 +4,11 @@
 public enum SetupPart: String, CaseIterable, Equatable, Sendable {
     case github, notion, skill, cli
 
-    /// The name `shipyard panel view` takes and `shipyard app status`
+    /// The name `shipyard panel show-view` takes and `shipyard app status`
     /// reports: `github`, `notion`, `skill`, `cli`.
     public var commandName: String { rawValue }
 
-    /// The part `name` names, as `shipyard panel view` takes it, in any
+    /// The part `name` names, as `shipyard panel show-view` takes it, in any
     /// case; nil for `projects`, no view. Refused, naming the views, when
     /// it names none.
     public static func named(_ name: String) throws(PanelRefusal) -> SetupPart? {
@@ -19,7 +19,7 @@ public enum SetupPart: String, CaseIterable, Equatable, Sendable {
         throw PanelRefusal("no view is named `\(name)`; the views are \(names), or `\(projectsName)` for the projects")
     }
 
-    /// What `shipyard panel view` takes, and `app status` reports, for the
+    /// What `shipyard panel show-view` takes, and `app status` reports, for the
     /// projects: no status view open.
     public static let projectsName = "projects"
 }

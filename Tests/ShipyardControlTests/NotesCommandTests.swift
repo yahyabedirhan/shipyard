@@ -55,7 +55,7 @@ struct NotesCommandTests {
         #expect(shipyard("notes", "--help", transport: app) == CommandResult(output: ControlCommands.notesUsage))
         #expect(shipyard("notes", "list", transport: app).status == CommandResult.usageStatus)
         #expect(shipyard("notes", transport: app).status == CommandResult.usageStatus)
-        #expect(shipyard("--help", transport: app).output.contains("shipyard notes check"))
+        #expect(shipyard("--help", transport: app).output.contains("notes check"))
         #expect(app.exchanges.current.isEmpty)
     }
 

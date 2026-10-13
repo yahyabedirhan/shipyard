@@ -26,7 +26,7 @@ private extension Harness {
     /// then lets the app see the store change.
     @discardableResult
     func send(_ title: String, _ flags: String...) async throws -> String {
-        let result = cli(["ping", title, "--project", "shop"] + flags)
+        let result = cli(["ping", "send", title, "--project", "shop"] + flags)
         try #require(result.status == 0, "\(result.error)")
         await shipyard.reloadPings()
         return result.pingID
@@ -82,18 +82,18 @@ struct PingActionTests {
     @Test(
         "more than one action flag, a URL without a scheme or an empty app is a usage error, and nothing is stored",
         arguments: [
-            (["--open", "https://example.com", "--app", "Claude"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
-            (["--app", "Claude", "--open", "https://example.com"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
-            (["--open", "https://a.example", "--open", "https://b.example"], "shipyard ping: a ping has one action at most; pass one of --open, --app, --herdr"),
-            (["--open", "example.com"], "shipyard ping: `--open` takes a URL with its scheme, such as https://example.com, not `example.com`"),
-            (["--app", " "], "shipyard ping: `--app` takes an app's bundle id or name"),
-            (["--open"], "shipyard ping: `--open` needs a value"),
-            (["--body"], "shipyard ping: `--body` needs a value"),
+            (["--open", "https://example.com", "--app", "Claude"], "shipyard ping send: a ping has one action at most; pass one of --open, --app, --herdr"),
+            (["--app", "Claude", "--open", "https://example.com"], "shipyard ping send: a ping has one action at most; pass one of --open, --app, --herdr"),
+            (["--open", "https://a.example", "--open", "https://b.example"], "shipyard ping send: a ping has one action at most; pass one of --open, --app, --herdr"),
+            (["--open", "example.com"], "shipyard ping send: `--open` takes a URL with its scheme, such as https://example.com, not `example.com`"),
+            (["--app", " "], "shipyard ping send: `--app` takes an app's bundle id or name"),
+            (["--open"], "shipyard ping send: `--open` needs a value"),
+            (["--body"], "shipyard ping send: `--body` needs a value"),
         ]
     )
     func actionUsageErrors(flags: [String], message: String) throws {
         let harness = try Harness(config: shop)
-        let result = harness.cli(["ping", "Ready", "--project", "shop"] + flags)
+        let result = harness.cli(["ping", "send", "Ready", "--project", "shop"] + flags)
         #expect(result.status == 2)
         #expect(result.error == message + "\n")
         #expect(harness.pingStore.all().isEmpty)

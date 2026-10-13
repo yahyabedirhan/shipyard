@@ -3,7 +3,7 @@ import ShipyardCommand
 import ShipyardNotices
 import Testing
 
-/// `shipyard notify` on a machine that leaves its notices with the
+/// `shipyard notice send` on a machine that leaves its notices with the
 /// herdr-shipyard plugin for the Mac's poll (`PluginNoticeRoute`), through
 /// `ShipyardCLI.run`: a home folder with the plugin linked at
 /// `~/.local/bin/shipyard` as its install does, and a stand-in for the
@@ -86,7 +86,7 @@ struct QueuedNoticeCommandTests {
         let home = try Home()
         defer { home.remove() }
 
-        let result = shipyard(["notify", "Tests running", "--body", "12 of 40 passed", "--from", "claude", "--repo", "owner/shop"], home: home)
+        let result = shipyard(["notice", "send", "Tests running", "--body", "12 of 40 passed", "--from", "claude", "--repo", "owner/shop"], home: home)
 
         #expect(result == CommandResult(output: "queued; shown within about 30 seconds if the Mac is awake\n"))
         let arguments = try #require(home.arguments).split(separator: "\n").map(String.init)
@@ -103,9 +103,9 @@ struct QueuedNoticeCommandTests {
     func idsDiffer() throws {
         let home = try Home()
         defer { home.remove() }
-        _ = shipyard(["notify", "One", "--project", "shop"], home: home)
+        _ = shipyard(["notice", "send", "One", "--project", "shop"], home: home)
         let first = try #require(home.arguments)
-        _ = shipyard(["notify", "Two", "--project", "shop"], home: home)
+        _ = shipyard(["notice", "send", "Two", "--project", "shop"], home: home)
         #expect(try #require(home.arguments) != first)
     }
 
@@ -114,17 +114,17 @@ struct QueuedNoticeCommandTests {
         let home = try Home(script: Home.tooLarge)
         defer { home.remove() }
 
-        let result = shipyard(["notify", "Done", "--project", "shop"], home: home)
+        let result = shipyard(["notice", "send", "Done", "--project", "shop"], home: home)
 
-        #expect(result == .failed("shipyard notify: the herdr-shipyard plugin didn't queue this notice: the notice is 50000 bytes, more than a listing can carry (49108 bytes)"))
+        #expect(result == .failed("shipyard notice send: the herdr-shipyard plugin didn't queue this notice: the notice is 50000 bytes, more than a listing can carry (49108 bytes)"))
     }
 
     @Test("a plugin failing without a word exits 1 with its status")
     func failedSilently() throws {
         let home = try Home(script: "exit 3")
         defer { home.remove() }
-        #expect(shipyard(["notify", "Done", "--project", "shop"], home: home)
-            == .failed("shipyard notify: the herdr-shipyard plugin didn't queue this notice (exit 3)"))
+        #expect(shipyard(["notice", "send", "Done", "--project", "shop"], home: home)
+            == .failed("shipyard notice send: the herdr-shipyard plugin didn't queue this notice (exit 3)"))
     }
 
     @Test("without the plugin's link, or with a link elsewhere, it exits 1 saying to install the plugin")
@@ -132,22 +132,22 @@ struct QueuedNoticeCommandTests {
         let unlinked = try Home(linked: false)
         defer { unlinked.remove() }
         let link = unlinked.root.appendingPathComponent(".local/bin/shipyard").path
-        #expect(shipyard(["notify", "Done", "--project", "shop"], home: unlinked)
-            == .failed("shipyard notify: \(link) isn't the herdr-shipyard plugin's link, so this notice can't wait for the Mac; install the plugin (herdr plugin install yahyabedirhan/herdr-shipyard)"))
+        #expect(shipyard(["notice", "send", "Done", "--project", "shop"], home: unlinked)
+            == .failed("shipyard notice send: \(link) isn't the herdr-shipyard plugin's link, so this notice can't wait for the Mac; install the plugin (herdr plugin install yahyabedirhan/herdr-shipyard)"))
 
         let elsewhere = try Home(linkTo: "/usr/local/lib/shipyard")
         defer { elsewhere.remove() }
         let other = elsewhere.root.appendingPathComponent(".local/bin/shipyard").path
-        #expect(shipyard(["notify", "Done", "--project", "shop"], home: elsewhere)
-            == .failed("shipyard notify: \(other) links to /usr/local/lib/shipyard, not a herdr-shipyard plugin's shipyard, so this notice can't wait for the Mac; install the plugin (herdr plugin install yahyabedirhan/herdr-shipyard)"))
+        #expect(shipyard(["notice", "send", "Done", "--project", "shop"], home: elsewhere)
+            == .failed("shipyard notice send: \(other) links to /usr/local/lib/shipyard, not a herdr-shipyard plugin's shipyard, so this notice can't wait for the Mac; install the plugin (herdr plugin install yahyabedirhan/herdr-shipyard)"))
     }
 
     @Test("a plugin too old to hold notices exits 1 saying to update it")
     func pluginTooOld() throws {
         let home = try Home(script: nil)
         defer { home.remove() }
-        #expect(shipyard(["notify", "Done", "--project", "shop"], home: home)
-            == .failed("shipyard notify: the herdr-shipyard plugin at \(home.plugin.path) can't hold notices; update it (herdr plugin install yahyabedirhan/herdr-shipyard)"))
+        #expect(shipyard(["notice", "send", "Done", "--project", "shop"], home: home)
+            == .failed("shipyard notice send: the herdr-shipyard plugin at \(home.plugin.path) can't hold notices; update it (herdr plugin install yahyabedirhan/herdr-shipyard)"))
     }
 
     @Test("a notice with an id is queued under it, so a replace overwrites the one waiting, and its image is left behind, too large for the plugin's listing")
@@ -157,7 +157,7 @@ struct QueuedNoticeCommandTests {
         let image = home.root.appendingPathComponent("chart.png")
         try Data([0x89, 0x50]).write(to: image)
 
-        let result = shipyard(["notify", "Tests 3/10", "--project", "shop", "--id", "tests", "--image", image.path, "--subtitle", "checkout"], home: home)
+        let result = shipyard(["notice", "send", "Tests 3/10", "--project", "shop", "--id", "tests", "--image", image.path, "--subtitle", "checkout"], home: home)
 
         #expect(result == CommandResult(output: "queued; shown within about 30 seconds if the Mac is awake\n"))
         #expect(home.arguments == "add\ntests\n")
@@ -170,7 +170,7 @@ struct QueuedNoticeCommandTests {
         let home = try Home()
         defer { home.remove() }
 
-        let result = shipyard(["notify", "withdraw", "tests"], home: home)
+        let result = shipyard(["notice", "withdraw", "tests"], home: home)
 
         #expect(result == CommandResult(output: "withdrawn if it was still waiting; one the Mac already showed stays\n"))
         #expect(home.arguments == "remove\ntests\n")
@@ -180,7 +180,7 @@ struct QueuedNoticeCommandTests {
     func usage() throws {
         let home = try Home()
         defer { home.remove() }
-        #expect(shipyard(["notify"], home: home).status == CommandResult.usageStatus)
+        #expect(shipyard(["notice", "send"], home: home).status == CommandResult.usageStatus)
         #expect(home.arguments == nil)
     }
 }

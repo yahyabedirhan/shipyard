@@ -5,7 +5,7 @@ import Foundation
 /// it's free, takes or renews it; one from another holder is refused. It
 /// ends by itself `renewal` after the holder's last request, and `cap`
 /// after it was taken at most, so a crashed agent can't keep it.
-/// `control take` holds it to the cap on purpose and `control release`
+/// `lease take` holds it to the cap on purpose and `lease release`
 /// gives it up. A `take` that may wait queues behind the holder, first
 /// come, first served, and the first waiter whose wait hasn't run out gets
 /// the lease when it frees. The maintainer's Stop ends the lease and bars
@@ -22,7 +22,7 @@ public struct ControlLease: Equatable, Sendable {
     /// How long a holder the maintainer stopped is refused, unless allowed back.
     public static let bar: TimeInterval = 5 * 60
 
-    /// The longest purpose `control take --for` takes, in characters.
+    /// The longest purpose `lease take --for` takes, in characters.
     public static let longestPurpose = 80
 
     /// Whether `purpose` can be a lease's purpose: one line, not blank, at
@@ -39,7 +39,7 @@ public struct ControlLease: Equatable, Sendable {
         public var holder: Holder
         public var taken: Date
         public var ends: Date
-        /// Why the holder took shipyard (`control take --for`), for the banner.
+        /// Why the holder took shipyard (`lease take --for`), for the banner.
         public var purpose: String?
         /// The holder's latest step, running or ended.
         public var activity: Activity?
@@ -60,7 +60,7 @@ public struct ControlLease: Equatable, Sendable {
             max(0, Int(ends.timeIntervalSince(now).rounded(.up)))
         }
 
-        /// What `control take` prints once it holds the lease, its end in
+        /// What `lease take` prints once it holds the lease, its end in
         /// `timeZone`: `you hold shipyard until 12:05:00`.
         public func held(timeZone: TimeZone) -> String {
             "you hold shipyard until \(ControlLease.clock(ends, timeZone))"
@@ -104,7 +104,7 @@ public struct ControlLease: Equatable, Sendable {
         case expired
         /// It reached `cap`.
         case capped
-        /// Its holder gave it up (`control release`).
+        /// Its holder gave it up (`lease release`).
         case released
         /// The maintainer took shipyard back (the banner's Stop).
         case stopped
@@ -131,7 +131,7 @@ public struct ControlLease: Equatable, Sendable {
                 return "the user took shipyard back; ask them before using it again"
             case .inUse(let term), .queued(let term):
                 return "shipyard is in use by \(term.holder.name) in \(term.holder.place) until \(clock(term.ends, timeZone)) "
-                    + "(\(term.secondsLeft(at: now))s left); `shipyard control take --wait <seconds>` to queue"
+                    + "(\(term.secondsLeft(at: now))s left); `shipyard lease take --wait <seconds>` to queue"
             case .waitedOut(let seconds, let term):
                 return "waited \(seconds)s; shipyard is still in use by \(term.holder.name) in \(term.holder.place) "
                     + "until \(clock(term.ends, timeZone)) (\(term.secondsLeft(at: now))s left)"
@@ -263,7 +263,7 @@ public struct ControlLease: Equatable, Sendable {
         return Decision(answer: .success(term), transitions: transitions)
     }
 
-    /// `control take` from `holder` at `now`: when `holder` holds the lease,
+    /// `lease take` from `holder` at `now`: when `holder` holds the lease,
     /// or it's free, it's held until the cap (`renewed` or `started`), with
     /// `purpose` as its purpose when one is given (a renewal without one
     /// keeps the last).
@@ -302,7 +302,7 @@ public struct ControlLease: Equatable, Sendable {
         return Decision(answer: .success(term), transitions: transitions)
     }
 
-    /// `control release` from `holder` at `now`: the holder's lease ends
+    /// `lease release` from `holder` at `now`: the holder's lease ends
     /// (`released`) and the first waiter gets it; from anyone else it
     /// changes nothing.
     public mutating func release(by holder: Holder, at now: Date) -> [Transition] {

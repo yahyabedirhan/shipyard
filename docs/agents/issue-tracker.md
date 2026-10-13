@@ -27,9 +27,9 @@ Write each prefix the way its maker writes it. Use a semantic prefix before a ge
 
 ### Semantic prefixes
 
-- `Notices`: agents' notices from `shipyard notify`, on the Mac, over the tailnet and on the poll route.
+- `Notices`: agents' notices from `shipyard notice send`, on the Mac, over the tailnet and on the poll route.
 - `Demo`: demo runs from `shipyard app open --demo`.
-- `Screenshots`: captures of the app from `shipyard screenshot`.
+- `Screenshots`: captures of the app from `shipyard app capture`.
 - `Lease`: the agent lease, which lets one agent at a time hold app control.
 - `Tailscale`: Tailscale and the tailnet between the Mac and other machines.
 

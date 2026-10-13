@@ -21,7 +21,7 @@ final class PanelState {
     /// App control's wait after the user closes the panel.
     var reopenGuard = PanelReopenGuard()
     /// The status view shown in place of the projects (the settings menu's
-    /// items, ‹ Back, `shipyard panel view`); nil shows the projects. The
+    /// items, ‹ Back, `shipyard panel show-view`); nil shows the projects. The
     /// panel's closing clears it, so it opens on the projects.
     var openView: SetupPart?
     /// The tabs layout's selected tab.

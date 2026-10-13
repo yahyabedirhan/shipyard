@@ -16,7 +16,7 @@ public struct CLISettings: Equatable, Sendable {
     /// check`: `schema/cli.schema.json` on `main`, and that file's `$id`.
     public static let schemaURL = "https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json"
 
-    /// `[notices]`: where `shipyard notify` sends a notice.
+    /// `[notices]`: where `shipyard notice send` sends a notice.
     public var notices: NoticeSettings
 
     public init(notices: NoticeSettings = NoticeSettings()) {
@@ -27,7 +27,7 @@ public struct CLISettings: Equatable, Sendable {
     public static let defaults = CLISettings()
 }
 
-/// `cli.toml`'s `[notices]` table: where this machine's `shipyard notify`
+/// `cli.toml`'s `[notices]` table: where this machine's `shipyard notice send`
 /// sends a notice. With `app-machine` set, straight to the app on that Mac
 /// over the user's tailnet, at `<app-scheme>://<app-machine>:<app-port>` (ADR
 /// 0010). A new setting is a property, a key in
