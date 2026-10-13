@@ -1,0 +1,5 @@
+# Swift Lab wrote this file. It keeps each session's generated files out of Git.
+/sessions/*/Package.swift
+/sessions/*/Package.resolved
+/sessions/*/.lab/
+/sessions/*/.build/
