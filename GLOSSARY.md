@@ -126,7 +126,7 @@ A short message an agent sends the user through shipyard, filed under every proj
 _Avoid_: Notification (that's the macOS banner), message, alert
 
 **Notice**:
-An agent's disposable status message, such as "tests running" or "done", posted with `shipyard notify`. Filed like a ping, it's shown as a notification when its project's rules select `agent.notice`, and never kept, counted or listed. The agent learns whether it was shown. It is not a ping, which waits for the user, and not a notification, the macOS banner it may cause.
+An agent's disposable status message, such as "tests running" or "done", posted with `shipyard notice send`. Filed like a ping, it's shown as a notification when its project's rules select `agent.notice`, and never kept, counted or listed. The agent learns whether it was shown. It is not a ping, which waits for the user, and not a notification, the macOS banner it may cause.
 _Avoid_: Ping, notification, status ping, toast
 
 **App machine**:
@@ -186,7 +186,7 @@ The app running on a folder of example configuration and state, so that screensh
 _Avoid_: Sandbox, test mode, fixture
 
 **Lease**:
-The right to use app control, held by one agent at a time. An agent's first app control command takes it and each later one renews it. It ends by itself a minute after the holder's last command, and five minutes after it was taken at most. The app refuses another agent's command while it's held. `shipyard control take` holds it to the five minutes on purpose, `release` gives it up, and a `take --wait` waits in line for it, first come, first served. The maintainer can stop it from the panel, which keeps that agent out for five minutes unless they allow it back. Asking for the app's status needs no lease.
+The right to use app control, held by one agent at a time. An agent's first app control command takes it and each later one renews it. It ends by itself a minute after the holder's last command, and five minutes after it was taken at most. The app refuses another agent's command while it's held. `shipyard lease take` holds it to the five minutes on purpose, `release` gives it up, and a `take --wait` waits in line for it, first come, first served. The maintainer can stop it from the panel, which keeps that agent out for five minutes unless they allow it back. Asking for the app's status needs no lease.
 _Avoid_: Lock, mutex, session
 
 **Holder**:
@@ -208,7 +208,7 @@ One of the things shipyard uses that the user sets up: GitHub, Notion through nt
 _Avoid_: Integration, service, connection
 
 **Status view**:
-A setup part's own view, opened from the settings menu or with `shipyard panel view`, in place of the projects: whether the part is set up and, when it isn't, how to set it up. The header, the banners and the footer stay; ‹ Back or closing the panel shows the projects again.
+A setup part's own view, opened from the settings menu or with `shipyard panel show-view`, in place of the projects: whether the part is set up and, when it isn't, how to set it up. The header, the banners and the footer stay; ‹ Back or closing the panel shows the projects again.
 _Avoid_: Settings page, setup screen, onboarding (that's the first-run flow)
 
 **Preset**:
