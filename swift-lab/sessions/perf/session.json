@@ -2,7 +2,7 @@
   "components" : [
     {
       "kind" : "app",
-      "lastLabel" : 3,
+      "lastLabel" : 6,
       "size" : {
         "height" : 790,
         "width" : 740
@@ -13,23 +13,38 @@
         {
           "keep" : false,
           "label" : "V1",
-          "title" : "Maintainer volume"
+          "title" : "Before, maintainer volume"
         },
         {
           "keep" : false,
           "label" : "V2",
-          "title" : "Heavy volume"
+          "title" : "Before, heavy volume"
         },
         {
           "keep" : false,
           "label" : "V3",
-          "title" : "Extreme volume"
+          "title" : "Before, extreme volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V4",
+          "title" : "After, maintainer volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V5",
+          "title" : "After, heavy volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V6",
+          "title" : "After, extreme volume"
         }
       ]
     },
     {
       "kind" : "app",
-      "lastLabel" : 1,
+      "lastLabel" : 2,
       "size" : {
         "height" : 790,
         "width" : 740
@@ -40,7 +55,12 @@
         {
           "keep" : false,
           "label" : "V1",
-          "title" : "List layout, heavy volume"
+          "title" : "Before, heavy volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V2",
+          "title" : "After, heavy volume"
         }
       ]
     }

@@ -10,7 +10,7 @@ This folder is the `shipyard` project of [Swift Lab](https://github.com/yahyabed
 | `building-blocks` | Count badges, state symbols with check and attention dots, agent marks, buttons, subheaders and Show more, error, note, empty and loading rows, hover cards. |
 | `components` | The tab strip (3, 11 and 30 projects), the tabs layout's row, the list layout's row, the list's project header, and a project's tab. |
 | `app` | The whole panel in the tabs layout and in the list layout at a light volume, and the tabs layout at about the maintainer's volume, with nothing measuring it. |
-| `perf` | The tabs panel under load beside a meter of what drawing it costs, at three volumes, and the list layout at the heavy one for contrast. See [perf/FINDINGS.md](perf/FINDINGS.md). |
+| `perf` | The tabs panel under load beside a meter of what drawing it costs: `V1` to `V3` before the performance fix and `V4` to `V6` after it, at the maintainer's, a heavy and an extreme volume, and the list layout at the heavy volume, before (`list-panel` `V1`) and after (`V2`). See [perf/FINDINGS.md](perf/FINDINGS.md). |
 
 Open one from the Swift Lab app's home window, or:
 
@@ -20,10 +20,10 @@ swiftlab show perf tabs-panel V1 --project shipyard
 
 ## The kit
 
-Every variant links `kit/` through a `Kit` symlink in its folder, so the extracted code exists once:
+Every variant links `kit/` through a `Kit` symlink in its folder, and one of `versions/` through a `Version` symlink, so the extracted code exists once:
 
 - `kit/Brand/`: the app's `Logo`, `Sailboat`, `LogoBadge` and `SailboatImage`, unchanged.
-- `kit/UI/`: the app's views from `Sources/ShipyardApp/UI/` (design tokens, components, row keys, hover help, both layouts), with three kinds of edits, each marked in the code:
+- `kit/UI/`: the app's views from `Sources/ShipyardApp/UI/` (design tokens, components, row keys, hover help), with three kinds of edits, each marked in the code:
   - `// lab probe`: a counter the perf meter reads (`Probe.hit`). It counts; it changes nothing the view does.
   - `// lab id`: a test identifier (`labID`), so `swiftlab interact` can click a tab.
   - `// lab: internal (private in the app), for the gallery`: a `private` view made internal, so a gallery variant can draw it alone.
@@ -31,8 +31,10 @@ Every variant links `kit/` through a `Kit` symlink in its folder, so the extract
 - `kit/App/LabPanel.swift`: the panel's frame (header, layout, footer) as `Panel.swift` draws it once ready, on a mock store whose actions change only the fixture model.
 - `kit/Perf/`: the probes, the main-thread meter, and the stress window (`PerfLab`).
 - `kit/Gallery/`: sample rows of every kind and state, and the specimen frames the galleries use.
+- `versions/before/`: the tabs and list layouts as they shipped at commit `54a4e4f`, before the performance fixes. Frozen: the perf session's `V1` to `V3` and `list-panel` `V1` link it, so the problems stay measurable.
+- `versions/after/`: the two layouts as the app has them now, with the same marked edits. The perf session's `V4` to `V6`, `list-panel` `V2` and every design session link it.
 
-The kit is a copy of the app at commit `54a4e4f` and does not follow the app: it keeps the tabs layout as it was before any performance fix, so the perf session shows the problem. To compare a fix, add it as a new perf variant with its own copy of the changed files, rather than editing the kit.
+The kit is a copy of the app, not a dependency: changing the app changes nothing here. When either layout changes in the app, copy it into `versions/after/` with the marked edits, so the design sessions show the app as it is. To compare another fix, add a folder under `versions/` and perf variants that link it, and keep `versions/before/` as it is.
 
 A variant's own file names must differ from the kit's (`Logo.swift` in a variant clashes with `kit/Brand/Logo.swift`).
 

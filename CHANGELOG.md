@@ -4,6 +4,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 ## Unreleased
 
+- **A fast tabs layout with many projects.** The All tab stays smooth however much it lists. A tab builds only the rows in view, so switching to All takes about a tenth of the time it did with 11 projects, and stays well under a second with ten times as many items. Moving the pointer over rows, and scrolling, no longer redraw the whole tab. An open panel with a running workflow run stops keeping the processor busy. In the list layout, moving the pointer over rows and scrolling no longer skip frames. Measured before and after in `swift-lab/perf/FINDINGS.md`.
 - **The graphite logo.** The app icon, the README's logo and the welcome and status views' badge are a white sailboat on Swift Lab's dark graphite tile with a double rim, in place of the cream sailboat on khaki green. Each sail folds like paper, its forward face grey, in the style of Swift Lab's and the skills repository's logos. The sailboat's shape, and the menu bar item, don't change.
 - **Set up shipyard command.** The settings menu's Set up shipyard CLI item is now Set up shipyard command. The view it opens doesn't change.
 - **Notifications show the installed icon.** `make install` registers the installed app with macOS afresh and forgets the build's copy, so notifications show the app's current icon instead of an older build's.

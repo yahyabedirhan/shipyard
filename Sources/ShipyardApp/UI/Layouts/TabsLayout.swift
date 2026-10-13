@@ -100,19 +100,20 @@ struct TabsLayout: View {
             MeasuredScrollView {
                 VStack(spacing: 0) {
                     RowListTop()
-                    ZStack(alignment: .top) {
-                        TabList(content: content, actions: actions, highlight: $highlight)
-                            .rowList(tab)
-                            .id(tab)
-                            .transition(.asymmetric(
-                                insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
-                                removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
-                            ))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
                     // Drawn here, not in each tab's list, so only the
                     // selected tab's row is lit while the lists slide.
-                    .rowHighlight(highlight, in: tab)
+                    HighlightLayer(highlight: $highlight, list: tab) {
+                        ZStack(alignment: .top) {
+                            TabList(content: content, actions: actions, highlight: $highlight)
+                                .rowList(tab)
+                                .id(tab)
+                                .transition(.asymmetric(
+                                    insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
+                                    removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
+                                ))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .top)
+                    }
                     RowListBottom()
                 }
                 .clipped()
@@ -317,7 +318,9 @@ private struct TabList: View {
     @Binding var highlight: RowHighlight
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // Lazy: a tab can list hundreds of rows, and only the ones in view
+        // are made, laid out and tracked, as in the list layout.
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
             ForEach(content.notes, id: \.self) { NoteRow(note: $0).clearsRowHighlight($highlight) }
             ForEach(Array(content.groups.enumerated()), id: \.element.id) { index, group in
