@@ -606,6 +606,21 @@ extension View {
     }
 }
 
+/// The row highlight behind `content`, in a view of its own: a hover moves
+/// the highlight on every row the pointer crosses, and only this layer and
+/// the rows read it. Read in a layout's body, each move would run that body
+/// again, with everything it builds (the tabs layout works out the tab's
+/// content, sorting every project's rows for All).
+struct HighlightLayer<Content: View>: View {
+    @Binding var highlight: RowHighlight
+    var list: AnyHashable? = nil
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content.rowHighlight(highlight, in: list)
+    }
+}
+
 /// The rows' highlight shape, rounded and inset; a project header's is its whole band, square.
 struct RowHighlightShape: View {
     var body: some View {

@@ -44,7 +44,7 @@
     },
     {
       "kind" : "app",
-      "lastLabel" : 1,
+      "lastLabel" : 2,
       "size" : {
         "height" : 790,
         "width" : 740
@@ -55,7 +55,12 @@
         {
           "keep" : false,
           "label" : "V1",
-          "title" : "List layout, heavy volume"
+          "title" : "Before, heavy volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V2",
+          "title" : "After, heavy volume"
         }
       ]
     }

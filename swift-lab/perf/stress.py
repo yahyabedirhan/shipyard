@@ -133,7 +133,7 @@ def run(variant):
 
 
 def main():
-    variants = sys.argv[1:] or ["tabs-panel/V1", "tabs-panel/V4", "tabs-panel/V2", "tabs-panel/V5", "tabs-panel/V3", "tabs-panel/V6", "list-panel/V1"]
+    variants = sys.argv[1:] or ["tabs-panel/V1", "tabs-panel/V4", "tabs-panel/V2", "tabs-panel/V5", "tabs-panel/V3", "tabs-panel/V6", "list-panel/V1", "list-panel/V2"]
     for variant in variants:
         print(f"\n{variant}")
         print(f"  {'phase':16} {'busy %':>7} {'worst stall ms':>15} {'late frames/s':>14} {'row bodies/s':>13}")
