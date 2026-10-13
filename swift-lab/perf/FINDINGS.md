@@ -6,14 +6,19 @@ The tabs layout slows down as the panel holds more projects and items, worst in 
 
 Measured on the maintainer's Mac with shipyard 0.6.0 in the tabs layout: 11 projects, the app's state knowing about 1,200 items. The main thread was sampled with `sample` (one stack every millisecond or so) while `shipyard panel` opened the panel and switched tabs.
 
-| State | Main thread busy |
+Every `shipyard panel` command takes app control's lease for a minute, and the lease banner it brings costs the panel a lot (cause 1). So the first table measures the panel while an agent drives it. The second measures a release build on the same configuration whose panel opened itself, as a click opens it, with no command and no lease.
+
+| Opened through `shipyard panel` (lease held) | Main thread busy |
 |---|---|
 | Panel closed | 0% |
 | Panel open on All, untouched | 80–97% |
 | Panel open on a project's tab, untouched | 87% |
-| Panel open on All, untouched, no workflow run running in any configured repository | 91% |
 
-- 30 tab switches through `shipyard panel tab` took 12.6 s: about 420 ms each, the command's round trip included.
+| Opened as a click opens it (no lease) | Main thread busy |
+|---|---|
+| Panel open on All, untouched, two runs | 0% and 1% |
+
+- 30 tab switches through `shipyard panel tab` took 12.6 s: about 420 ms each, the command's round trip and the lease banner included. The lab's 411 ms, with no lease, is the cleaner number.
 - With the panel open and untouched, the main thread re-renders the window on every display frame: `NSDisplayCycleFlush` → `NSHostingView.layout()` → `ViewGraphRootValueUpdater.render` → `ViewGraph.beginNextUpdate(at:)`, with no shipyard code on the stack. Instruments' Animation Hitches data agrees: 458 frame updates in 4 s (about one per display refresh), 36 of them hitches. No body runs, so SwiftUI is advancing something time-driven (an animation that doesn't settle, or a timeline) rather than reacting to new data.
 - While switching tabs, shipyard's own frames on the main thread were `TabsLayout.body`, `MenuModel.tabContent(for:)`, `Arrangement.groups` sorting, copies of `ItemRow`, and `RowBoundsKey.reduce`.
 
@@ -34,8 +39,8 @@ The lab's maintainer volume matches the real app: about 97% busy while idle, and
 
 ## Causes
 
-1. **Something keeps the open panel redrawing every frame, and its driver isn't identified yet.** The real app spends about 90% of the main thread on it while the panel is open and untouched, on All or on a project's tab, with no running workflow run listed. The lab doesn't reproduce it: these were each tried and ruled out (idle stays at 5–14%): hosting the panel in a self-sizing panel window as `MenuBarExtra` does, returning to All after another tab (the strip's animated `scrollTo`), and the pointer resting on a row. What the real panel has and the lab's doesn't: the `MenuBarExtra` window itself, the account's avatar, the rate-limit footer, the banners and their timelines, and the real data. The next step is a debug build recorded with Instruments' SwiftUI template, which names the view that updates; an attached release build records no SwiftUI events.
-2. **Running workflow runs re-render the whole list on every frame.** `StateSymbol` gives a running run's icon `.symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)` (`Sources/ShipyardApp/UI/Components.swift:176`). While any running run is in the tab, SwiftUI updates and lays out the hosting view every display frame, and the work grows with the view tree. In the lab, finishing every run takes idle use on All from 97% to about 10%. It is the same symptom as cause 1, and the lab's way to show it.
+1. **While an agent holds app control's lease, its banner keeps the panel redrawing.** Each `shipyard` control command takes the lease for a minute, and the panel shows its banner (`Panel.leaseBanner`): a `TimelineView` ticking every second and a countdown that animates on each tick. With it, the open panel stays 60–90% busy while untouched. Without it, the same panel idles at 0–1%. This was found in a diagnostic build on branch `diag/idle-redraw`, never merged: the panel's parts can be switched off one at a time, and only leaving out the banners stopped it. A screenshot never shows the banner, because captures leave the lease's banners out. It costs only while agents drive the app, but it slows their runs and inflated every real-app number above that was taken through `shipyard panel`. The lab has no app control, so it has no lease banner either.
+2. **Running workflow runs re-render the whole list on every frame.** `StateSymbol` gives a running run's icon `.symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)` (`Sources/ShipyardApp/UI/Components.swift:176`). While any running run is in the tab, SwiftUI updates and lays out the hosting view every display frame, and the work grows with the view tree. In the lab, finishing every run takes idle use on All from 97% to about 10%. It shows whenever a run is running, with no agent involved.
 3. **The tabs list is eager.** `TabsLayout.list` puts `TabList` in a plain `VStack` inside `MeasuredScrollView`, so every row of the tab is made, laid out and tracked at once, the hundreds below the fold included. The list layout uses a `LazyVStack` (`ListLayout.swift:34`) and stays fast at the same volume. The cost shows most when the tab changes: `.id(tab)` with the slide transition builds the incoming tab's rows from nothing, so switching to All costs 0.4 s at the maintainer's volume and 1.8 s at the heavy one.
 4. **The hover highlight lives at the top of the layout.** `TabsLayout` owns `@State highlight`, and every row's `itemRow`/`highlightable` binds to it. Each pointer enter or exit changes it, which evaluates `TabsLayout.body` again: it recomputes the tab's content and hands `TabList` a new binding, so every row's `ItemRow` body runs again, recomputing its hover card's text (`PanelText.rowCard`). The meter counts about 1,400 row bodies a second while the pointer moves over rows, and none while it rests.
 5. **The All tab is rebuilt from scratch on each body evaluation.** `MenuModel.tabContent(for: .all)` (`MenuTabs.swift:75`) flattens every project's rows, removes duplicates and runs `Arrangement.groups`, sorting copies of `MenuRow`, every time it's called. In a release build it takes 8.8 ms at ~420 rows, 30 ms at 1,600 and 71 ms at 3,600. `TabsLayout.body` calls it on every evaluation (cause 4 makes that every hover), as do ← and → (`switchTab`), `MenuModel.subsection` and `MenuModel.foldsToKeep`.
@@ -46,7 +51,7 @@ One more cost showed up only while measuring, and only affects agents. While an 
 ## Seeing it in the lab
 
 - `perf` › `tabs-panel` › `V1`: the panel at the maintainer's volume, the meter red while idle. Untick **Running workflow runs** and it turns green; hover or scroll the rows and it turns red again.
-- **Also host it in a menu-bar-style panel** opens a second copy of the panel in a self-sizing window, behind other windows, for experiments on cause 1.
+- **Also host it in a menu-bar-style panel** opens a second copy of the panel in a self-sizing window, behind other windows. Self-sizing was one of the idle-loop suspects; it ruled itself out.
 - **Switch tabs ×10** times the switches; **Reload** times a refresh that brings back the same rows.
 - `V2` and `V3` are the same panel at the heavy and extreme volumes; the volume menu switches any of them.
 - `list-panel` › `V1` is the list layout at the heavy volume: the same data, drawn lazily.
