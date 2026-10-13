@@ -62,11 +62,16 @@ A machine Herdr can't reach (`herdr machine status`) is reported with the rest a
 .handoff/<date>-<topic>.md     tracked   handoffs between sessions
 assets/images/<topic>/         tracked   images the project uses, such as the logo and the app icon's drafts
 assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from issues, pull requests and docs
+swift-lab/                     tracked   the Swift Lab project: the app's design and the tabs layout's stress window, on fixture data
 .scratch/                      ignored   notes, logs, temp files, raw captures and pull request description sources
 .claude/worktrees/             ignored   sub-agent worktrees
 ```
 
 `.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
+
+## Swift Lab
+
+`swift-lab/` is the `shipyard` project of Swift Lab (the **swift-lab** skill); `swift-lab/README.md` maps its sessions and its kit. The kit is a copy of the app's views and model at one commit, not a dependency: changing the app never changes it, and the `perf` session keeps the tabs layout as it was before any fix, so a fix is measured against it. Compare a fix by adding it as a new `perf` variant, and record what changed in `swift-lab/perf/FINDINGS.md`.
 
 ## Agent skills
 
