@@ -310,21 +310,6 @@ private struct TabPill: View {
 
 // MARK: - A tab's rows
 
-/// The row highlight behind `content`, in a view of its own: a hover moves
-/// the highlight on every row the pointer crosses, and only this layer and
-/// the rows read it. Read in `TabsLayout`'s body, each move would work out
-/// the tab's content again (the All tab sorts every project's rows) and
-/// hand the list a new value.
-private struct HighlightLayer<Content: View>: View {
-    @Binding var highlight: RowHighlight
-    let list: MenuTab
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        content.rowHighlight(highlight, in: list)
-    }
-}
-
 /// The tab's error rows, then its groups' rows, each under its subheader
 /// (by default a small kind header) or after a line.
 private struct TabList: View {

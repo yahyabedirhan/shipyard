@@ -31,25 +31,22 @@ struct ListLayout: View {
                     // The list's ends, outside the lazy stack, for ↑ and ↓ to
                     // wrap to: always laid out, unlike the far end's rows.
                     RowListTop()
-                    LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                        ForEach(model.sections) { section in
-                            Section {
-                                if !section.isCollapsed {
-                                    lines(section)
+                    HighlightLayer(highlight: $highlight) {
+                        LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                            ForEach(model.sections) { section in
+                                Section {
+                                    if !section.isCollapsed {
+                                        lines(section)
+                                    }
+                                } header: {
+                                    let place = MenuRowPlace.header(section.name)
+                                    HighlightedSectionHeader(section: section, place: place, highlight: $highlight, actions: actions)
+                                        .highlightable(place, $highlight, drawsOwnHighlight: true)
+                                        .id(place)
                                 }
-                            } header: {
-                                let place = MenuRowPlace.header(section.name)
-                                ListSectionHeader(
-                                    section: section,
-                                    isHighlighted: highlight.isHighlighted(place),
-                                    actions: actions
-                                )
-                                .highlightable(place, $highlight, drawsOwnHighlight: true)
-                                .id(place)
                             }
                         }
                     }
-                    .rowHighlight(highlight)
                     RowListBottom()
                 }
             }
@@ -194,6 +191,19 @@ struct ListLayout: View {
 }
 
 // MARK: - A project's header
+
+/// A project's header that reads whether it's highlighted in its own body,
+/// so a hover elsewhere in the list doesn't run the layout's body again.
+private struct HighlightedSectionHeader: View {
+    let section: MenuSection
+    let place: MenuRowPlace
+    @Binding var highlight: RowHighlight
+    let actions: LayoutActions
+
+    var body: some View {
+        ListSectionHeader(section: section, isHighlighted: highlight.isHighlighted(place), actions: actions)
+    }
+}
 
 /// The chevron and the project's title, then right beside the title the
 /// open-in-browser icon, shown on hover while the project has a
