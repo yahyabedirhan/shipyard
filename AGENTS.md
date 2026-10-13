@@ -71,7 +71,7 @@ swift-lab/                     tracked   the Swift Lab project: the app's design
 
 ## Swift Lab
 
-`swift-lab/` is the `shipyard` project of Swift Lab (the **swift-lab** skill); `swift-lab/README.md` maps its sessions and its kit. The kit is a copy of the app's views and model at one commit, not a dependency: changing the app never changes it, and the `perf` session keeps the tabs layout as it was before any fix, so a fix is measured against it. Compare a fix by adding it as a new `perf` variant, and record what changed in `swift-lab/perf/FINDINGS.md`.
+`swift-lab/` is the `shipyard` project of Swift Lab (the **swift-lab** skill); `swift-lab/README.md` maps its sessions and its kit. The kit is a copy of the app's views and model, not a dependency: changing the app never changes it. The tabs layout has two versions there: `versions/before/` stays as it was before the performance fix, so a change is measured against it, and `versions/after/` follows the app. Measure a performance change as new `perf` variants with `swift-lab/perf/stress.py`, and record the result in `swift-lab/perf/FINDINGS.md`.
 
 ## Agent skills
 

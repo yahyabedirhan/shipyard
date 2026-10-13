@@ -14,7 +14,8 @@ through `swiftlab interact`, under one held lease:
   reload           the same volume loaded again, as a refresh does
 
 Usage: swift-lab/perf/stress.py [component/variant ...]
-       (default: tabs-panel/V1 tabs-panel/V2 tabs-panel/V3 list-panel/V1)
+       (default: each before variant next to its after variant, then the list layout)
+Run it from the worktree whose sessions it should drive.
 """
 import glob
 import json
@@ -105,7 +106,7 @@ def run(variant):
         if component == "tabs-panel":
             interact("click", "switch-tabs")
             # Ten switches 450 ms apart, each as slow as the volume makes it.
-            for _ in range(60):
+            for _ in range(180):
                 time.sleep(1)
                 if any(e.get("scenario") == "switch-tabs" for e in entries(start, time.time())):
                     break
@@ -132,7 +133,7 @@ def run(variant):
 
 
 def main():
-    variants = sys.argv[1:] or ["tabs-panel/V1", "tabs-panel/V2", "tabs-panel/V3", "list-panel/V1"]
+    variants = sys.argv[1:] or ["tabs-panel/V1", "tabs-panel/V4", "tabs-panel/V2", "tabs-panel/V5", "tabs-panel/V3", "tabs-panel/V6", "list-panel/V1"]
     for variant in variants:
         print(f"\n{variant}")
         print(f"  {'phase':16} {'busy %':>7} {'worst stall ms':>15} {'late frames/s':>14} {'row bodies/s':>13}")
