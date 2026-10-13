@@ -29,6 +29,7 @@ APP_BUNDLE  := $(BUILD_DIR)/$(APP).app
 CONTENTS    := $(APP_BUNDLE)/Contents
 ZIP         := $(BUILD_DIR)/$(APP)-$(VERSION)-macos.zip
 INSTALL_DIR := /Applications
+LSREGISTER  := /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 ICON_FILE   := Packaging/Icon/AppIcon.icns
 ICONSET     := $(BUILD_DIR)/AppIcon.iconset
 # The variant make-icon.swift draws for the app: graphite (shipyard's logo),
@@ -151,6 +152,11 @@ install: bundle
 	done
 	rm -rf $(INSTALL_DIR)/$(APP).app
 	ditto $(APP_BUNDLE) $(INSTALL_DIR)/$(APP).app
+	@# Notifications draw the icon of the copy LaunchServices has for the
+	@# bundle ID, which can be this build's copy or an older one. So the
+	@# build's copy is forgotten and the installed one registered afresh.
+	@$(LSREGISTER) -u $(APP_BUNDLE) 2>/dev/null || true
+	@$(LSREGISTER) -f $(INSTALL_DIR)/$(APP).app
 	@echo "installed $(INSTALL_DIR)/$(APP).app"
 	open $(INSTALL_DIR)/$(APP).app
 
