@@ -8,8 +8,8 @@ import Testing
 /// The `shipyard` router as the Mac's build assembles it: every group its
 /// `main.swift` adds, run through `ShipyardCLI.run`. The contract it owns is
 /// the command table's: the help is made from it, `help --json` lists it,
-/// old names keep working with a warning, and a mistyped group gets the
-/// closest one. Each group's own behaviour is its own suite's.
+/// a form from before the noun-verb tree is refused, and a mistyped group
+/// gets the closest one. Each group's own behaviour is its own suite's.
 @Suite("The command table")
 struct CommandTableTests {
     let root = FileManager.default.temporaryDirectory
@@ -43,32 +43,20 @@ struct CommandTableTests {
         )
     }
 
-    @Test("an old form runs its new command, with a warning on standard error naming the new form", arguments: [
-        (["notify", "--help"], ["notice", "send", "--help"], CommandTable.renamed("notify", "notice send")),
-        (["notify", "withdraw", "--help"], ["notice", "withdraw", "--help"], CommandTable.renamed("notify withdraw", "notice withdraw")),
-        (["screenshot", "--help"], ["app", "capture", "--help"], CommandTable.renamed("screenshot", "app capture")),
-        (["control", "take", "--wait", "x"], ["lease", "take", "--wait", "x"], CommandTable.renamed("control", "lease")),
-        (["panel", "tab"], ["panel", "show-tab"], CommandTable.renamed("panel tab", "panel show-tab")),
-        (["panel", "view"], ["panel", "show-view"], CommandTable.renamed("panel view", "panel show-view")),
-        (["ping", "Ready", "--repo", "owner/shop", "--id", "ready"], ["ping", "send", "Ready", "--repo", "owner/shop", "--id", "ready"],
-         CommandTable.renamed("ping <title>", "ping send <title>")),
+    @Test("a form from before the noun-verb tree is refused in one line, exit 2, and runs nothing", arguments: [
+        (["ping", "Ready", "--repo", "owner/shop"],
+         "shipyard ping: unknown command `Ready`; send a ping with `shipyard ping send <title>`. Run `shipyard ping --help` for usage.\n"),
+        (["notify", "Done"], "shipyard: unknown command `notify`. Did you mean `shipyard notice`? Run `shipyard --help` for the commands.\n"),
+        (["screenshot", "x.png"], "shipyard: unknown command `screenshot`. Run `shipyard --help` for the commands.\n"),
+        (["control", "take"], "shipyard: unknown command `control`. Run `shipyard --help` for the commands.\n"),
+        (["panel", "tab", "shop"], "shipyard panel: unknown command `tab`. Run `shipyard panel --help` for usage.\n"),
+        (["panel", "view", "cli"], "shipyard panel: unknown command `view`. Run `shipyard panel --help` for usage.\n"),
     ])
-    func renamed(old: [String], new: [String], warning: String) {
+    func oldForm(arguments: [String], line: String) {
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let current = shipyard(new)
-        let renamed = shipyard(old)
-
-        #expect(renamed == CommandResult(output: current.output, error: warning + current.error, status: current.status))
-    }
-
-    @Test("every old name in the table names a command the table runs")
-    func renamesLand() {
-        let groups = Set(table.entries.map(\.name))
-        for rename in CommandTable.renames {
-            #expect(groups.contains(rename.new[0]), "\(rename.new) isn't a group")
-            #expect(!groups.contains(rename.old[0]) || rename.old.count > 1, "\(rename.old) hides a group")
-        }
+        #expect(shipyard(arguments) == CommandResult(error: line, status: 2))
+        #expect(store.all().isEmpty)
     }
 
     @Test("each group's help names every command the table lists for it, and help <group> prints the same")
@@ -86,14 +74,12 @@ struct CommandTableTests {
         }
     }
 
-    @Test("help --json lists every command of the table with its usage and summary, and every old name")
+    @Test("help --json lists every command of the table with its usage and summary")
     func helpJSON() throws {
         struct Listing: Decodable {
             struct Command: Decodable { var group: String; var usage: String; var summary: String }
-            struct Rename: Decodable { var old: String; var new: String }
             var version: String
             var commands: [Command]
-            var renamed: [Rename]
         }
 
         let result = shipyard("help", "--json")
@@ -107,7 +93,6 @@ struct CommandTableTests {
         }
         #expect(listing.commands.map(\.summary) == summaries)
         #expect(listing.commands.contains { $0.usage == "shipyard ping send <title> [options]" && $0.group == "ping" })
-        #expect(listing.renamed.count == CommandTable.renames.count + 1)
     }
 
     @Test("a mistyped group is one line naming the closest one, exit 2; one far from any just points at the help", arguments: [

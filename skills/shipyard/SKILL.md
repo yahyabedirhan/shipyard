@@ -538,7 +538,7 @@ shipyard ping withdraw <id>
 shipyard ping list [--json]
 ```
 
-Every command is `shipyard <group> <command>`, and `shipyard --help` lists them all. Older forms (`shipyard ping "<title>"` without `send`, `shipyard notify`, `shipyard screenshot`, `shipyard control`, `panel tab`, `panel view`) still run until shipyard 1.0, with a warning on standard error naming the new form; write the new ones.
+Every command is `shipyard <group> <command>`, and `shipyard --help` lists them all.
 
 | Flag | What it does |
 |---|---|

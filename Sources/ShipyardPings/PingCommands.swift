@@ -21,12 +21,7 @@ public enum PingCommands {
         ]
     }
 
-    /// The words after `ping` that name a command; anything else is the
-    /// old form of `send`, a title and its flags.
-    static let verbs: Set<String> = ["send", "withdraw", "list"]
-
-    /// `shipyard ping …`: its help, `send`, `withdraw`, `list`, or the old
-    /// form of `send`, which warns and sends.
+    /// `shipyard ping …`: its help, `send`, `withdraw` or `list`.
     private static func ping(
         _ arguments: [String],
         environment: CommandEnvironment,
@@ -47,9 +42,7 @@ public enum PingCommands {
         case "list": return PingCommand.list(rest, store: store, now: now)
         case "send": return PingCommand.run(rest, environment: environment, filing: filing, store: store, now: now)
         default:
-            var result = PingCommand.run(arguments, environment: environment, filing: filing, store: store, now: now)
-            result.error = CommandTable.renamed("ping <title>", "ping send <title>") + result.error
-            return result
+            return .usage("shipyard ping: unknown command `\(verb)`; send a ping with `shipyard ping send <title>`. Run `shipyard ping --help` for usage.")
         }
     }
 

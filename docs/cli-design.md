@@ -91,6 +91,8 @@ Nouns are the glossary's: ping, notice, app, panel, lease, notes, config. Every 
 
 ## Renames
 
+Each old form is replaced, with no alias: an old form is refused like any unknown command (exit 2, one line). The CLI, the skill and the callers move together in one release.
+
 | Before | After | Rule it broke |
 |---|---|---|
 | `shipyard ping "<title>"` | `shipyard ping send "<title>"` | the group was also its verb; a title could clash with a verb |
@@ -164,7 +166,7 @@ shipyard --version
 
 **Errors** are one line on standard error that names the command, says what is wrong and ends with the way out: `shipyard panel show-tab: missing <name>. Run 'shipyard panel --help' for usage.` A mistyped group names the closest one and never runs it: `shipyard: unknown command 'pnig'. Did you mean 'shipyard ping'? Run 'shipyard --help' for the commands.` A Mac-only group on another machine says `shipyard: 'shipyard app' runs on the Mac, where the app is`.
 
-**Old forms** print, on standard error before anything else, `shipyard: 'shipyard notify' is now 'shipyard notice send'; the old form stops working in shipyard 1.0`, and then run the new command. Standard output and the exit code are the new command's, so a script that reads them is unaffected.
+**Old forms** are unknown commands: `shipyard notify` names `shipyard notice` as the closest group, and `shipyard ping "<title>"` says `shipyard ping: unknown command '<title>'; send a ping with 'shipyard ping send <title>'.`
 
 ## Help
 
@@ -223,18 +225,18 @@ A build lists only the groups it links: on Linux the "Drive the app" section and
 
 **Group help** (`shipyard <group> --help`, `shipyard help <group>`, `shipyard <group>` alone on standard error): a summary line, a `Usage:` block with every command's full usage, examples, then each command's details and the group's exit codes. `ping` and `notice` hold every flag there, since `send` is where they're used.
 
-**Machine-readable listing** (`shipyard help --json`): `version`, `commands` (each `group`, `usage`, `summary`, `section`), `renamed` (each `old`, `new`) and `renamedUntil`. Agents read it to learn the build's commands without parsing text.
+**Machine-readable listing** (`shipyard help --json`): `version`, `commands` (each `group`, `usage`, `summary`, `section`). Agents read it to learn the build's commands without parsing text.
 
 ## Implementation
 
 ```text
 Sources/
 ├── ShipyardCommand/
-│   ├── CommandTable.swift          the table (Entry, Command, Section), macOnly, renames; ShipyardCLI: the top help,
-│   │                               help --json, help <group>, renames, the closest-name hint, and routing
+│   ├── CommandTable.swift          the table (Entry, Command, Section), macOnly; ShipyardCLI: the top help,
+│   │                               help --json, help <group>, the closest-name hint, and routing
 │   ├── CommandResult.swift         output, error, status 0 / 1 / 2
 │   └── ConfigurationCommands.swift config
-├── ShipyardPings/PingCommands.swift ping (send, withdraw, list, the old bare send) and herdr-event
+├── ShipyardPings/PingCommands.swift ping (send, withdraw, list) and herdr-event
 ├── ShipyardNotices/NotifyCommand.swift notice (send, withdraw)
 ├── ShipyardControl/ControlCommands.swift app (with capture), panel, lease, notes; their parsers in
 │                                   ControlCommand, PanelCommand, LeaseCommand, ScreenshotCommand
@@ -243,23 +245,21 @@ Sources/
 
 **The table.** `CommandTable.Entry` is one group: `name`, `section`, `commands` and `run`. `CommandTable.Command` is one command: its `usage` after the group's name, verb first, and its one-line `summary`. The top help and `help --json` are made from these, so a group a build doesn't link is never listed. Each group's detailed help (`usageText`) lives beside its parser, and a contract test checks it names every command in the table.
 
-**One path.** `shipyard notify "done" --from claude`:
+**One path.** `shipyard notice send "done" --from claude`:
 
 ```text
 main.swift                    builds the table: ping, notice, app, panel, lease, notes, config, herdr-event
-└── ShipyardCLI.run(["notify", "done", "--from", "claude"])
+└── ShipyardCLI.run(["notice", "send", "done", "--from", "claude"])
     ├── not --help, help or --version
-    ├── CommandTable.renames: ["notify"] → ["notice", "send"]; warning = renamed("notify", "notice send")
     ├── table.entry(named: "notice")
     └── NoticeCommands' run(["send", "done", "--from", "claude"])
         └── verb "send" → NotifyCommand.run(["done", "--from", "claude"])
             └── ControlNoticeRoute → the app → "shown", exit 0
-    error = warning + the command's own error
 ```
 
 **A refusal.** `shipyard app capture` with no file: `ShipyardCLI.run` finds `app`, its `run` sees `capture` and calls `ScreenshotCommand.parse([])`, which returns `.usage("shipyard app capture: missing <file.png>. Run 'shipyard app capture --help' for usage.")`, exit 2. Nothing is sent to the app.
 
-**Contract tests** (`CommandTableTests`): every old form runs its new command and prints the warning; every group's `--help` names each of its table commands; a mistyped group suggests the closest one in one line; `help --json` lists every command; `help <group>` is `<group> --help`. `SkillDocumentTests` checks that the skill teaches each command as it's built.
+**Contract tests** (`CommandTableTests`): every old form is refused in one line and runs nothing; every group's `--help` names each of its table commands; a mistyped group suggests the closest one in one line; `help --json` lists every command; `help <group>` is `<group> --help`. `SkillDocumentTests` checks that the skill teaches each command as it's built.
 
 ## Evolution
 
@@ -268,16 +268,15 @@ main.swift                    builds the table: ping, notice, app, panel, lease,
 | A new verb on a group, such as `ping get <id>` | the group's parser, one `Command` in its table entry, its `usageText`; the top help and `help --json` follow |
 | A new group, such as `notes list` growing into `note` | one `Entry` in its module and `main.swift`'s `add`; `macOnly` when it needs the app |
 | A new flag | the parser and the group's `usageText`; additive, no rename |
-| A rename | the parser, one `Rename` in `CommandTable.renames`, the skill and the docs |
-| Removing the old forms at 1.0 | delete `CommandTable.renames`, the bare-title branch in `PingCommands`, and their test rows |
+| A rename | the parser, the table's `Command`, the skill, the docs, and every caller in the same release |
 | A `--json` on `notes check` | the app's `notes.check` reply and the command: the reply is text today |
 
 **Rules for changing the contract**
 
 - Add before changing: a new command, flag or JSON field breaks no caller.
-- A rename keeps the old form as an alias, matched on whole words and listed in `CommandTable.renames`, with a warning naming the new form, until the release the table names (`renamesEnd`, now 1.0). A catch-all is allowed only where it already existed: `ping <title>`.
+- A rename is a breaking change: it ships with the skill, the herdr-shipyard plugin and every caller updated in the same release, and the changelog says so. No aliases are kept.
 - `ping list --json`'s shape is read by older Macs through Herdr: change it only by adding fields.
-- The skill, the herdr-shipyard plugin and the docs ship with the release that changes a command. The callers outside this repository that use the old forms (the session-status mod's `ping`, the workstation's `notification-method`) move to the new forms after the release that brings them, since an older `shipyard` on another machine doesn't know them.
+- The skill, the herdr-shipyard plugin and the docs ship with the release that changes a command. The callers outside this repository (the session-status mod's `ping`, the workstation's `notification-method`) move to the new forms in the same release, since the new `shipyard` refuses the old ones and an older one doesn't know the new ones.
 
 ## Review checklist
 
@@ -293,4 +292,4 @@ main.swift                    builds the table: ping, notice, app, panel, lease,
 | 8 | Nothing prompts or hangs | yes: no prompts; every wait bounded |
 | 9 | Every list in the help is made from the table | the top help and `help --json`; each group's detailed help is written beside its parser and tested against the table |
 | 10 | Every example tested; every command named in a doc exists | the skill's examples are parsed by `SkillDocumentTests` |
-| 11 | Every rename leaves an alias; breaking changes announced | yes: warned aliases until 1.0, in CHANGELOG.md |
+| 11 | Every rename leaves an alias; breaking changes announced | no aliases, by choice: the renames ship as one breaking release, announced in CHANGELOG.md |

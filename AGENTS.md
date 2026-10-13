@@ -95,7 +95,7 @@ When a ticket that changes what the maintainer sees or does is built, close it a
 
 `docs/low-level-design.md` is the agreed module design: requirements, modules and their state, the folder tree, the refresh pipeline and traced flows. Read it before adding or moving a module, and update it in the same change when the design moves.
 
-`docs/cli-design.md` is the `shipyard` command line's design: its groups, verbs, help, exit codes and the old names it still takes. A new command or flag follows it, and a rename goes through `CommandTable.renames`, never a silent change.
+`docs/cli-design.md` is the `shipyard` command line's design: its groups, verbs, help and exit codes. A new command or flag follows it.
 
 ## Testing
 

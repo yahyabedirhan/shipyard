@@ -95,39 +95,6 @@ public struct CommandTable: Sendable {
     /// on the Mac" for a command it lacks. `notice` isn't one: every build
     /// has a route for it.
     public static let macOnly: Set<String> = ["app", "panel", "lease", "notes"]
-
-    /// A command's old name, kept working after a rename: the old words
-    /// are replaced with the new ones, and a warning on standard error
-    /// names the new form.
-    public struct Rename: Equatable, Sendable {
-        public var old: [String]
-        public var new: [String]
-
-        public init(_ old: [String], _ new: [String]) {
-            self.old = old
-            self.new = new
-        }
-    }
-
-    /// Every old name, matched on whole words, the longest first. A ping
-    /// sent without `send` (`shipyard ping "<title>"`) is the ping group's
-    /// own to read, since a title isn't a word to match.
-    public static let renames: [Rename] = [
-        Rename(["notify", "withdraw"], ["notice", "withdraw"]),
-        Rename(["notify"], ["notice", "send"]),
-        Rename(["screenshot"], ["app", "capture"]),
-        Rename(["control"], ["lease"]),
-        Rename(["panel", "tab"], ["panel", "show-tab"]),
-        Rename(["panel", "view"], ["panel", "show-view"]),
-    ]
-
-    /// The release the old names stop working in.
-    public static let renamesEnd = "1.0"
-
-    /// The warning an old form prints on standard error, naming the new one.
-    public static func renamed(_ old: String, _ new: String) -> String {
-        "shipyard: `shipyard \(old)` is now `shipyard \(new)`; the old form stops working in shipyard \(renamesEnd)\n"
-    }
 }
 
 /// The `shipyard` command line (ADR 0004), bundled in `Shipyard.app` and
@@ -182,7 +149,7 @@ public enum ShipyardCLI {
     }
 
     /// What `shipyard help --json` prints for `table`: every command with
-    /// its usage and summary, and every old name with its new one.
+    /// its usage and summary.
     public static func json(_ table: CommandTable) -> String {
         struct Listing: Encodable {
             struct Command: Encodable {
@@ -191,14 +158,8 @@ public enum ShipyardCLI {
                 var summary: String
                 var section: String
             }
-            struct Rename: Encodable {
-                var old: String
-                var new: String
-            }
             var version: String
             var commands: [Command]
-            var renamed: [Rename]
-            var renamedUntil: String
         }
         let listing = Listing(
             version: ShipyardVersion.current,
@@ -208,11 +169,7 @@ public enum ShipyardCLI {
                         Listing.Command(group: entry.name, usage: "shipyard " + words(entry.name, $0.usage), summary: $0.summary, section: section.rawValue)
                     }
                 }
-            },
-            renamed: CommandTable.renames.map {
-                Listing.Rename(old: "shipyard " + $0.old.joined(separator: " "), new: "shipyard " + $0.new.joined(separator: " "))
-            } + [Listing.Rename(old: "shipyard ping <title>", new: "shipyard ping send <title>")],
-            renamedUntil: CommandTable.renamesEnd
+            }
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
@@ -221,9 +178,8 @@ public enum ShipyardCLI {
     }
 
     /// Runs `arguments` (without the program's name) at `now`: `--help`,
-    /// `help` and `--version` here, an old name rewritten to its new one
-    /// with a warning, anything else by the group of `table` it names
-    /// first, with the arguments after the name.
+    /// `help` and `--version` here, anything else by the group of `table`
+    /// it names first, with the arguments after the name.
     public static func run(
         _ arguments: [String],
         table: CommandTable,
@@ -243,22 +199,13 @@ public enum ShipyardCLI {
         default:
             break
         }
-        var arguments = arguments
-        var warning = ""
-        if let rename = CommandTable.renames.first(where: { arguments.starts(with: $0.old) }) {
-            arguments = rename.new + arguments.dropFirst(rename.old.count)
-            warning = CommandTable.renamed(rename.old.joined(separator: " "), rename.new.joined(separator: " "))
-        }
-        let group = arguments[0]
-        guard let entry = table.entry(named: group) else {
-            if CommandTable.macOnly.contains(group) {
-                return .usage("shipyard: `shipyard \(group)` runs on the Mac, where the app is")
+        guard let entry = table.entry(named: first) else {
+            if CommandTable.macOnly.contains(first) {
+                return .usage("shipyard: `shipyard \(first)` runs on the Mac, where the app is")
             }
-            return unknown(group, table: table)
+            return unknown(first, table: table)
         }
-        var result = entry.run(Array(arguments.dropFirst()), environment, now)
-        result.error = warning + result.error
-        return result
+        return entry.run(Array(arguments.dropFirst()), environment, now)
     }
 
     /// `shipyard help [<group> | --json]`.
