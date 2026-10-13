@@ -528,7 +528,7 @@ Ping when the user should act or would want to know now: a pull request is ready
 
 ### The command
 
-The app links its command at `~/.local/bin/shipyard` (onboarding, or **Set up shipyard CLI** in the panel's settings menu, the gear). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from **Set up shipyard CLI**, which also says what is in the way when the link can't be made. The app needn't be running: a ping sent meanwhile shows when it starts.
+The app links its command at `~/.local/bin/shipyard` (onboarding, or **Set up shipyard command** in the panel's settings menu, the gear). When `shipyard` isn't found, run `~/.local/bin/shipyard`; when that isn't there either, ask the user to link it from **Set up shipyard command**, which also says what is in the way when the link can't be made. The app needn't be running: a ping sent meanwhile shows when it starts.
 
 ```sh
 shipyard ping "<title>" [--body <text>] [--from <label>] [--id <id>]

@@ -107,7 +107,7 @@ extension PanelText {
         case .github: "Set up GitHub"
         case .notion: "Set up Notion"
         case .skill: "Set up /shipyard skill"
-        case .cli: "Set up shipyard CLI"
+        case .cli: "Set up shipyard command"
         }
     }
 
