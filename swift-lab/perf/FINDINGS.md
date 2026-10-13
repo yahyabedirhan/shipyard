@@ -13,7 +13,7 @@ At the maintainer's volume (11 projects, about 420 rows in All), in the lab, on 
 | Scrolling: worst stall | 232 ms | 6 ms |
 | Switching to All: average | 428 ms | 103 ms |
 
-At ten times the volume, a switch to All went from 9.9 s to 154 ms, and hovering from 3.3 s stalls to 9 ms. The fix is two small changes in `TabsLayout.swift`. The maintainer then used the installed build on their own projects, and found it fast.
+At ten times the volume, a switch to All went from 9.9 s to 154 ms, and hovering from 3.3 s stalls to 9 ms. The fix is two small changes in `TabsLayout.swift`. The maintainer then used the installed build on their own projects, and found it fast. That made a smaller problem in the list layout noticeable, and the same fix removed it (see [The list layout](#the-list-layout)).
 
 ## 1. Symptom
 
@@ -98,6 +98,24 @@ The lab builds variants in debug, so these switch times are slower than a releas
 
 On the maintainer's own configuration, in a release build that switched tabs itself, with no lease, the old layout took about 350 ms per switch to All. A clean run of the new one couldn't be taken while the maintainer used the Mac (see the wrong turns). Instead the maintainer installed the fixed build and used it on their projects, and found it fast.
 
+## The list layout
+
+The maintainer tried the fixed build and found the tabs layout smooth. The list layout then felt "like a game with its graphics turned down", though it had never been slow.
+
+- **Measurement.** The list layout builds its rows lazily already, so it was never slow at any volume. But at the heavy volume, hovering ran 400 to 460 row bodies a second, with stalls of 24 to 27 ms and 8 to 11 late frames a second. A 27 ms stall skips about three frames at 120 Hz. The eye reads that as a lower frame rate, next to a tabs layout that now skips none.
+- **Root cause.** Cause 3 again (reuse and invalidation). `ListLayout` read its highlight state in its own body: in each project header's `isHighlighted`, and in `.rowHighlight(highlight)`. Each row the pointer crossed ran the layout's body again, with every header and row in view.
+- **The fix.** `HighlightLayer` moved to `Components.swift`, and both layouts use it. The list layout also reads the highlight in a small view around each project header (`HighlightedSectionHeader`), so a hover redraws the highlight and the two headers it touches.
+- **Verification.** Two runs each, at the heavy volume (`list-panel` `V1` before, `V2` after):
+
+| List layout, heavy | Before | After |
+|---|---|---|
+| Hovering: late frames | 8 to 11 per second | 0 |
+| Hovering: worst stall | 24 to 27 ms | 11 to 14 ms |
+| Scrolling: late frames | 7 per second | 0 |
+| Row bodies run while hovering | 400 to 460 per second | 0 |
+
+The lesson: after a big fix, users notice smaller costs they used to accept. Measure late frames, not only the main thread's share. The list layout used less than 30% of the main thread, and still skipped frames.
+
 ## Wrong turns
 
 These cost time, and each one is now a rule in `/swift-performance`.
@@ -121,4 +139,4 @@ swiftlab show perf tabs-panel V4 --project shipyard   # after, the same data
 swift-lab/perf/stress.py                              # every phase, before and after, as a table
 ```
 
-`V1` to `V3` link `versions/before/TabsLayout.swift`, the layout as it shipped at `54a4e4f`. `V4` to `V6` link `versions/after/`, the layout as the app has it now. Untick **Running workflow runs** to remove the pulse, and use **Switch tabs ×10** and **Reload** in the meter. Every reading is also a JSON line in the runner's temporary folder, `shipyard-lab-perf.jsonl`.
+`V1` to `V3` and `list-panel` `V1` link `versions/before/`, the layouts as they shipped at `54a4e4f`. `V4` to `V6` and `list-panel` `V2` link `versions/after/`, the layouts as the app has them now. Untick **Running workflow runs** to remove the pulse, and use **Switch tabs ×10** and **Reload** in the meter. Every reading is also a JSON line in the runner's temporary folder, `shipyard-lab-perf.jsonl`.
