@@ -1,0 +1,51 @@
+{
+  "components" : [
+    {
+      "kind" : "app",
+      "lastLabel" : 3,
+      "size" : {
+        "height" : 790,
+        "width" : 740
+      },
+      "slug" : "tabs-panel",
+      "title" : "Tabs panel under load",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "Maintainer volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V2",
+          "title" : "Heavy volume"
+        },
+        {
+          "keep" : false,
+          "label" : "V3",
+          "title" : "Extreme volume"
+        }
+      ]
+    },
+    {
+      "kind" : "app",
+      "lastLabel" : 1,
+      "size" : {
+        "height" : 790,
+        "width" : 740
+      },
+      "slug" : "list-panel",
+      "title" : "List panel, same load",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "List layout, heavy volume"
+        }
+      ]
+    }
+  ],
+  "source" : "/Users/yahyabedirhanpak/.treehouse/shipyard-1e47e3/6/shipyard",
+  "title" : "Tabs performance",
+  "version" : 2
+}
