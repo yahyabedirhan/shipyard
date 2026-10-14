@@ -2,6 +2,13 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
+## 0.7.1 (2026-10-15)
+
+The skill install output shows each line once, and the code explains itself without narration comments. It gathers [#262](https://github.com/yahyabedirhan/shipyard/pull/262) and [#273](https://github.com/yahyabedirhan/shipyard/pull/273).
+
+- **One line per line in the skill install output.** The Shipyard Skill view and the onboarding skill card show what a terminal would: the last frame of each `npx` spinner line, not every frame side by side. A line that ends in a carriage return keeps its text, on macOS and Linux: [#250](https://github.com/yahyabedirhan/shipyard/issues/250) "Bug: Spinner frames pile up in the skill install output".
+- **Fewer comments, the same behaviour.** Comments that repeated the code are gone. What they covered now lives in the code: the configuration watch cancels its sources through a lock, `state.json` skips one entry a build can't read and keeps its neighbours, and `make-icon --help` prints its usage. Nothing you see changes.
+
 ## 0.7.0 (2026-10-13)
 
 The `shipyard` command is regrouped as `shipyard <group> <verb>`, with help made from one command table, and the old forms are gone. The tabs layout stays fast with many projects, and the logo is the folded sailboat on graphite. It gathers [#263](https://github.com/yahyabedirhan/shipyard/pull/263), [#266](https://github.com/yahyabedirhan/shipyard/pull/266), [#267](https://github.com/yahyabedirhan/shipyard/pull/267), [#268](https://github.com/yahyabedirhan/shipyard/pull/268), [#270](https://github.com/yahyabedirhan/shipyard/pull/270) and [#271](https://github.com/yahyabedirhan/shipyard/pull/271).
