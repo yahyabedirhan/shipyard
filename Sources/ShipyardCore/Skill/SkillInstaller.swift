@@ -56,8 +56,15 @@ public struct SkillInstaller: Sendable {
     }
 
     static func clean(_ output: String) -> String {
-        output
+        let withoutCursorControls = output
             .replacingOccurrences(of: "\u{1B}\\[[0-9;?]*[A-Za-z]", with: "", options: .regularExpression)
+        // Split on scalars, not characters: "\r\n" is one Character, which
+        // Linux's Foundation never splits on "\n".
+        let lastFrames = withoutCursorControls.unicodeScalars
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in line.split(separator: "\r").last.map { String(Substring($0)) } ?? "" }
+            .joined(separator: "\n")
+        return lastFrames
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
