@@ -730,12 +730,24 @@ func optionSheet(_ families: [[Minimal]], to url: URL) throws {
     try writePNG(rep, to: url)
 }
 
+let usage = """
+    usage: make-icon <out.iconset> [--variant \(Variant.allCases.map(\.rawValue).joined(separator: "|"))]
+           make-icon --sheet <out.png>
+           make-icon --exploration <dir>
+           make-icon --help
+
+    """
+
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write("\(message)\nusage: make-icon.swift <out.iconset> [--variant \(Variant.allCases.map(\.rawValue).joined(separator: "|"))] | --sheet <out.png>\n".data(using: .utf8)!)
+    FileHandle.standardError.write("\(message)\n\(usage)".data(using: .utf8)!)
     exit(64)
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
+if arguments == ["--help"] || arguments == ["-h"] {
+    print(usage, terminator: "")
+    exit(0)
+}
 var variant = Variant.graphite
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }
