@@ -1,20 +1,13 @@
 import Foundation
 @testable import ShipyardCore
 
-/// A REST answer to `GET /repos/{owner}/{repo}/actions/runs`, built in the
-/// test, for scenarios that change runs between refreshes (a run finishes,
-/// fails, is re-run). It has the shape of `Fixtures/rest-workflow-runs.json`,
-/// trimmed to the fields shipyard reads plus a few it doesn't.
 struct WorkflowRunsResponse {
-    /// One workflow run as GitHub would describe it.
     struct Run {
         var number: Int
         var name = "CI"
         var branch = "main"
         var event = "push"
-        /// `queued`, `in_progress`, `completed`…
         var status = "completed"
-        /// `success`, `failure`, `cancelled`…; `nil` while not completed.
         var conclusion: String? = "success"
         var createdAt = "2026-09-25T11:00:00Z"
         var updatedAt = "2026-09-25T11:10:00Z"
@@ -23,8 +16,6 @@ struct WorkflowRunsResponse {
 
         init(_ number: Int) { self.number = number }
 
-        /// A run's page: runs are ids, not numbers, on GitHub; the tests use
-        /// 9000 + the number.
         func url(in repository: String) -> URL {
             URL(string: "https://github.com/\(repository)/actions/runs/\(9000 + number)")!
         }
@@ -62,12 +53,10 @@ struct WorkflowRunsResponse {
         self.runs = runs
     }
 
-    /// The runs endpoint of `repository`, matching any query.
     static func url(_ repository: String) -> URL {
         GitHubClient.apiURL.appendingPathComponent("repos/\(repository)/actions/runs")
     }
 
-    /// The `200` answer, with REST's rate-limit headers and, when given, an `ETag`.
     func answer(etag: String? = nil, remaining: Int = 4900) -> StubHTTP.Answer {
         var headers = Harness.rateLimitHeaders(remaining: remaining, resource: "core")
         headers["ETag"] = etag
@@ -79,7 +68,6 @@ struct WorkflowRunsResponse {
         return answer
     }
 
-    /// GitHub's answer to a conditional request whose `ETag` still matches.
     static func notModified(etag: String, remaining: Int = 4900) -> StubHTTP.Answer {
         var headers = Harness.rateLimitHeaders(remaining: remaining, resource: "core")
         headers["ETag"] = etag

@@ -12,13 +12,9 @@ private let projects = """
 
     """
 
-/// `shipyard config check` as an agent runs it after an edit: the same
-/// verdict as the app's `config-status.json`, for `config.toml` and the
-/// command's own `cli.toml`, without the app running.
 @Suite("shipyard config check")
 @MainActor
 struct ConfigurationCheckTests {
-    /// `cli.toml` beside the harness's `config.toml`, as the Mac's build finds it.
     func writeCLISettings(_ harness: Harness, _ text: String) throws {
         try Data(text.utf8).write(to: CLISettingsFile.beside(config: harness.configURL).url)
     }

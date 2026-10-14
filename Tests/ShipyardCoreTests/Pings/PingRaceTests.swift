@@ -15,38 +15,27 @@ private let shop = """
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
-/// A ping store in a fresh temporary directory.
 private func temporaryStore() -> PingStore {
     PingStore(directory: FileManager.default.temporaryDirectory
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
 }
 
-/// A ping as the CLI first writes it.
 private func sent(_ id: String = "input", title: String = "Waiting for your input", instance: String = "first") -> Ping {
     Ping(id: id, title: title, projects: ["shop"], sent: Harness.now, action: .app("Claude"), instance: instance)
 }
 
-/// `ping` replaced as the CLI does with `--id`: new content and the same
-/// instance, unseen with no failure. Its sent time is kept, unlike the
-/// CLI's, so only what each race changes differs.
 private func replaced(_ ping: Ping, title: String) -> Ping {
     Ping(id: ping.id, title: title, projects: ping.projects, sent: ping.sent, instance: ping.instance)
 }
 
 @MainActor
 private extension Harness {
-    /// The ping rows of `shop`.
     var pingRows: [MenuRow] { section("shop")?.rows.filter { $0.kind == .ping } ?? [] }
 }
 
-/// The CLI and the app write the same ping store at once. The app reads a
-/// ping, then writes back what the user did to it (seen, a failure, its
-/// removal once its window has passed); a withdraw or a replace landing in
-/// between must win, never be undone.
 @Suite("Pings written by the CLI and the app at once")
 @MainActor
 struct PingRaceTests {
-    // MARK: The store
 
     @Test("marking seen a ping withdrawn and sent anew under its id leaves the new one unseen")
     func seenAfterSentAnew() throws {
@@ -97,24 +86,19 @@ struct PingRaceTests {
         seen.seen = Harness.now
         try store.save(seen)
 
-        // Replaced meanwhile: unseen again.
         try store.save(replaced(seen, title: "Still waiting"))
         #expect(try store.removeIfUnchanged(seen) == false)
         #expect(store.ping(id: "input")?.title == "Still waiting")
 
-        // Replaced and seen again, later: `seen` changed.
         var seenAgain = replaced(seen, title: "Waiting for your input")
         seenAgain.seen = Harness.now.addingTimeInterval(3600)
         try store.save(seenAgain)
         #expect(try store.removeIfUnchanged(seen) == false)
         #expect(store.ping(id: "input") != nil)
 
-        // As it was read: removed.
         #expect(try store.removeIfUnchanged(seenAgain))
         #expect(store.ping(id: "input") == nil)
     }
-
-    // MARK: A click whose action is still running
 
     @Test("a ping replaced while its action runs stays unseen, as the replacement")
     func replacedWhileRunning() async throws {
@@ -152,8 +136,6 @@ struct PingRaceTests {
             #expect(harness.pingRows.isEmpty)
         }
     }
-
-    // MARK: Signed out
 
     @Test("a ping sent while the app was closed notifies at start, signed out and without GitHub")
     func notifiesAtStartSignedOut() async throws {

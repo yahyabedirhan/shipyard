@@ -18,14 +18,10 @@ private let projects = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, none in the blog.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Started with `config`, GitHub answering one pull request, ntn
-    /// logged in and Notion answering as `NotionStub` records (then as
-    /// `workspace` changes them), then the notes timer's first read.
     static func withNotes(config: String = projects, query: [StubHTTP.Answer]? = nil, workspace: (StubHTTP) throws -> Void = { _ in }) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.ntn.set(.loggedIn)
@@ -39,9 +35,6 @@ private extension Harness {
         return harness
     }
 
-    /// Started with `config`, GitHub answering one pull request, ntn
-    /// logged in and Notion answering as `NotionStub` records, but Notion
-    /// not connected: as a user who never pressed Connect with ntn.
     static func notConnected(config: String = projects) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.ntn.set(.loggedIn)
@@ -50,38 +43,30 @@ private extension Harness {
         return harness
     }
 
-    /// GitHub answering one pull request, and Notion as `NotionStub` records.
     func answer() throws {
         stub.on(Harness.userURL, Harness.viewerAnswer)
         graphQL([onePullRequest])
         try stub.onNotion()
     }
 
-    /// Fires the notes timer, which must be armed, and waits for the read.
     func readNotes(sourceLocation: SourceLocation = #_sourceLocation) async {
         let fired = await notesTimer.fire()
         #expect(fired, "the notes timer wasn't armed", sourceLocation: sourceLocation)
     }
 
-    /// The note rows of `project`.
     func noteRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .note } ?? []
     }
 
-    /// The error rows about `project`'s notes, beside its repositories' own.
     func noteErrors(_ project: String) -> [String] {
         section(project)?.errors.map(\.message).filter { $0.hasPrefix("notes: ") } ?? []
     }
 
-    /// The notes banner, when the panel shows one.
     var notesBanner: PanelBanner? { shipyard.banners(at: clock.now).first { $0.kind == .notes } }
 
-    /// The queries sent for `shop`'s notes.
     var shopQueries: [URLRequest] { stub.requests("POST", NotionStub.shopQuery) }
 }
 
-/// The user's notes, read from Notion through the HTTP seam, in the menu:
-/// end to end across `NotionClient`, `NotesReader` and the orchestrator.
 @Suite("Notes in the menu")
 @MainActor
 struct NotesTests {
@@ -101,7 +86,6 @@ struct NotesTests {
         ])
         #expect(rows.map { PanelText.noteLabels($0) } == ["ideation", nil, "brainstorming, checkout"])
         #expect(harness.section("shop")?.groups.map(\.title) == ["Pull requests", "Notes"])
-        // `Shop` isn't `blog`, and isn't `shop` either: no database, no Notes group.
         #expect(harness.noteRows("blog").isEmpty)
         #expect(harness.noteErrors("blog").isEmpty)
     }
@@ -118,7 +102,6 @@ struct NotesTests {
         #expect(filter.contains { ($0["select"] as? [String: Any])?["is_empty"] as? Bool == true })
         #expect(filter.contains { ($0["select"] as? [String: Any])?["does_not_equal"] as? String == "Archived" })
         #expect((body["sorts"] as? [[String: String]]) == [["timestamp": "created_time", "direction": "descending"]])
-        // Only `shop` has a database: one query in all, and the entry page found by search.
         #expect(harness.shopQueries.count == 1)
         #expect(harness.stub.requests("POST", NotionStub.search).first?.bodyText.contains("Shipyard Notes") == true)
         #expect(harness.stub.unmatched.isEmpty)
@@ -199,10 +182,8 @@ struct NotesTests {
 
         await harness.shipyard.panelOpened()
         #expect(harness.shopQueries.count == 3)
-        // Found once: the entry page and the data source are remembered.
         #expect(harness.stub.requests("POST", NotionStub.search).count == 1)
         #expect(harness.stub.requests("GET", NotionStub.shop).count == 1)
-        // The untitled note wasn't edited since: its first line isn't read again.
         #expect(harness.stub.requests("GET", NotionStub.untitledBody).count == 1)
     }
 
@@ -311,8 +292,6 @@ struct NotesTests {
         #expect(harness.notesBanner == nil)
     }
 
-    // MARK: - Connecting Notion
-
     @Test("before Connect with ntn no ntn runs, at start, on opening the menu or on a configuration change: no notes, no banner, no new-note icons, no notes timer, and the notes check is refused")
     func notConnected() async throws {
         let harness = try await Harness.notConnected()
@@ -380,7 +359,6 @@ struct NotesTests {
         #expect(relaunched.ntn.runs == 0)
         #expect(relaunched.noteRows().isEmpty)
 
-        // Connected again with ntn logged out, the banner says to log in; Disconnect takes it away.
         relaunched.ntn.set(.loggedOut)
         await relaunched.shipyard.connectNotion()
         #expect(relaunched.notesBanner?.kind == .notes)

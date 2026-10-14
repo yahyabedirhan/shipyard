@@ -13,7 +13,6 @@ private let projects = """
 
     """
 
-/// `config-status.json` as an agent reads it: plain JSON, no Swift types.
 private struct Record {
     let json: [String: Any]
 
@@ -30,7 +29,6 @@ private struct Record {
     var warnings: [[String: Any]] { json["warnings"] as? [[String: Any]] ?? [] }
 }
 
-/// Sets the configuration file's modification time, as a save would.
 private func touch(_ harness: Harness, at modified: Date) throws {
     try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: harness.configURL.path)
 }
@@ -51,7 +49,6 @@ struct ConfigStatusTests {
         #expect(record.json["version"] as? Int == 1)
         #expect(record.accepted == true)
         #expect(record.checked == "2026-09-25T12:00:00Z")
-        // Whole seconds, as `date -u -r config.toml +%Y-%m-%dT%H:%M:%SZ` prints it.
         #expect(record.configModified as? String == "2026-09-25T11:59:58Z")
         #expect(record.config == harness.configURL.path)
         #expect(record.problems.isEmpty)
@@ -143,7 +140,6 @@ struct ConfigStatusTests {
         let harness = try Harness(stored: nil, config: nil)
         await harness.shipyard.start()
 
-        // Start creates a missing file, so delete it afterwards.
         try FileManager.default.removeItem(at: harness.configURL)
         await harness.shipyard.reloadConfiguration()
 

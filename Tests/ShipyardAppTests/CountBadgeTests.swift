@@ -2,8 +2,6 @@
 import SwiftUI
 import Testing
 
-/// A project's count badge is accented when folded and muted when unfolded:
-/// only its colour differs, so folding never moves or resizes it.
 @Suite("Count badge")
 @MainActor
 struct CountBadgeTests {

@@ -8,9 +8,6 @@ import Testing
 
 private typealias Listed = RepositoryListResponse.Repository
 
-/// Signed in with a stored token and, with `config`, that file; otherwise
-/// the header `start()` creates. GraphQL answers `fetches` in order, and a
-/// group lookup answers `groups`. Started: in `needsProjects`.
 @MainActor
 private func onboarding(
     config: String? = nil,
@@ -31,7 +28,6 @@ private func contents(_ harness: Harness) throws -> String {
     try String(contentsOf: harness.configURL, encoding: .utf8)
 }
 
-/// Whether `config-status.json` says the file was accepted.
 private func accepted(_ harness: Harness) throws -> Bool? {
     let data = try Data(contentsOf: harness.stateDirectory.appendingPathComponent("config-status.json"))
     let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -66,7 +62,6 @@ struct PresetOnboardingTests {
         #expect(harness.shipyard.configError == nil)
         #expect(harness.shipyard.configWarnings.isEmpty)
         #expect(try accepted(harness) == true)
-        // The file holds the preset now: onboarding won't offer another.
         #expect(harness.shipyard.presets.isEmpty)
     }
 

@@ -11,15 +11,12 @@ private let shop = """
 
     """
 
-/// `shop` with `[herdr] terminal` set to Ghostty.
 private let shopInGhostty = "[herdr]\nterminal = \"Ghostty\"\n\n" + shop
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Sends a ping to `shop` through the CLI with `flags`, from the Herdr
-    /// pane `pane`, and returns its id, then lets the app see the store change.
     @discardableResult
     func send(_ title: String, _ flags: String..., pane: String? = nil, variables: [String: String] = [:]) async throws -> String {
         let result = cli(["ping", "send", title, "--project", "shop"] + flags, herdrPane: pane, variables: variables)
@@ -28,25 +25,18 @@ private extension Harness {
         return result.pingID
     }
 
-    /// The ping row titled `title` in `shop`.
     func pingRow(_ title: String) throws -> MenuRow {
         try #require(section("shop")?.rows.first { $0.kind == .ping && $0.title == title })
     }
 
-    /// Clicks the ping row titled `title` and waits for its action.
     func click(_ title: String) async throws {
         await shipyard.open(try pingRow(title)).value
     }
 }
 
-/// `--herdr` through the CLI, and what clicking the ping then does: focus
-/// the Herdr tab or pane, then bring `[herdr] terminal` forward. End to end
-/// across the ping command, the store, `Shipyard`, `HerdrFocus` over a fake
-/// `herdr`, and the recording action port.
 @Suite("A ping's Herdr action")
 @MainActor
 struct HerdrActionTests {
-    // MARK: The command
 
     @Test("--herdr with no id takes the agent's own pane from HERDR_PANE_ID")
     func ownPane() async throws {
@@ -88,7 +78,6 @@ struct HerdrActionTests {
         #expect(!PingCommand.isHerdrID("w1:x2"))
         #expect(!PingCommand.isHerdrID("a b:t2"))
         #expect(!PingCommand.isHerdrID("--from"))
-        // A trailing newline isn't part of an id.
         #expect(!PingCommand.isHerdrID("w1:t2\n"))
         #expect(!PingCommand.isHerdrID("w1:t2\nw1:t3"))
     }
@@ -102,9 +91,6 @@ struct HerdrActionTests {
         #expect(harness.pingStore.all().isEmpty)
     }
 
-    // MARK: The terminal it was sent from
-
-    /// An environment and the terminal app `--herdr` records from it.
     struct Outer: Sendable, CustomTestStringConvertible {
         var variables: [String: String]
         var terminal: String?
@@ -146,8 +132,6 @@ struct HerdrActionTests {
         #expect(harness.pingStore.ping(id: app)?.terminal == nil)
         #expect(harness.pingStore.ping(id: none)?.terminal == nil)
     }
-
-    // MARK: Clicking
 
     @Test("clicking a tab's ping focuses the tab and marks it seen; without [herdr] terminal nothing else runs")
     func focusTab() async throws {
@@ -202,12 +186,9 @@ struct HerdrActionTests {
         #expect(harness.pingStore.ping(id: id)?.seen == harness.clock.now)
     }
 
-    // MARK: A named Herdr session
-
     @Test("a ping sent from a named Herdr session focuses its pane in that session, not the default one")
     func namedSession() async throws {
         let harness = try await Harness.started(config: shopInGhostty, graphQL: onePullRequest)
-        // Each session numbers its panes alike: the default one has a w1:p3 too.
         harness.herdr.open(tab: "w1:t1", panes: ["w1:p3"])
         harness.herdr.open(tab: "w1:t2", panes: ["w1:p3"], inSession: "work")
         let id = try await harness.send("Waiting", "--herdr", pane: "w1:p3", variables: ["HERDR_SESSION": "work"])
@@ -279,13 +260,9 @@ struct HerdrActionTests {
         #expect(harness.actions.ran == [.app("com.mitchellh.ghostty")])
     }
 
-    // MARK: A failed action
-
-    /// What's wrong on the Herdr side when a ping's action runs.
     enum Breakage: CaseIterable, Sendable {
         case paneGone, tabGone, notInstalled, notRunning
 
-        /// The ping's `--herdr` id.
         var target: String {
             switch self {
             case .paneGone: "w1:p9"
@@ -295,7 +272,6 @@ struct HerdrActionTests {
             }
         }
 
-        /// The reason the row shows, short enough for its meta column.
         var reason: String {
             switch self {
             case .paneGone: "Pane gone"
@@ -305,7 +281,6 @@ struct HerdrActionTests {
             }
         }
 
-        /// The reason the hover card shows, whole.
         var detail: String {
             switch self {
             case .paneGone: "Herdr pane w1:p9 is gone"
@@ -344,7 +319,6 @@ struct HerdrActionTests {
         #expect(harness.pingStore.ping(id: id)?.seen == nil)
         #expect(harness.actions.ran.isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 1)
-        // A pane that has closed since leaves its tab alone.
         #expect(harness.herdr.focused.isEmpty)
         if breakage == .paneGone { #expect(harness.herdr.runs == [["pane", "get", "w1:p9"]]) }
     }
@@ -363,8 +337,6 @@ struct HerdrActionTests {
         #expect(try harness.pingRow("Tab").needsAttention)
     }
 
-    // MARK: The row and the record
-
     @Test("a Herdr ping's row shows the terminal icon; its card says what it focuses")
     func row() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
@@ -374,8 +346,6 @@ struct HerdrActionTests {
         #expect(PanelText.stateLabel(row) == "ping, focuses a Herdr tab")
         #expect(PanelText.rowCard(row, now: harness.clock.now).lines == ["Focuses w1:p3 in Herdr"])
     }
-
-    // MARK: Finding herdr
 
     @Test("herdr is looked for where its installer and Homebrew put it, then on PATH")
     func locate() {

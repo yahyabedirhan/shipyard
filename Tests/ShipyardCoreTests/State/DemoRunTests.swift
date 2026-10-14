@@ -6,11 +6,6 @@ import ShipyardPings
 @testable import ShipyardCore
 import Testing
 
-/// A demo run end to end: `shipyard app open --demo <folder>` as the agent
-/// runs it, the app launched with the environment it passed (its files
-/// where `AppFiles` puts them, as `AppServices` builds them), and the
-/// user's own configuration, state and ping store beside it, which the run
-/// must leave as they were.
 @Suite("A demo run")
 @MainActor
 struct DemoRunTests {
@@ -40,7 +35,6 @@ struct DemoRunTests {
         let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("sy-\(UUID().uuidString.prefix(8))", isDirectory: true).standardizedFileURL
         defer { try? FileManager.default.removeItem(at: root) }
-        // The user's own folders: their config.toml and state.json, which the demo must leave byte for byte.
         let home = root.appendingPathComponent("home", isDirectory: true)
         let userConfig = home.appendingPathComponent(".config/shipyard/config.toml")
         let userSupport = home.appendingPathComponent("support", isDirectory: true)
@@ -50,21 +44,18 @@ struct DemoRunTests {
         let userState = Data(#"{"knownItems":{}}"#.utf8)
         try userConfigText.write(to: userConfig)
         try userState.write(to: userSupport.appendingPathComponent(AppStateStore.fileName))
-        // The demo folder, as an agent taking screenshots would use it.
         let demo = root.appendingPathComponent("demo", isDirectory: true)
         let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
         let demoConfig = demo.appendingPathComponent("shipyard/config.toml")
         try FileManager.default.createDirectory(at: demoConfig.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n".utf8).write(to: demoConfig)
 
-        // 1. The agent opens the demo; the user's app isn't running.
         let launcher = Launches()
         let app = Sockets(answering: ControlSocket.url(in: demoSupport), once: launcher)
         let opened = shipyard(["app", "open", "--demo", demo.path], support: userSupport, home: home, launcher: launcher, transport: app)
         try #require(opened.status == 0, "\(opened)")
         let environment = try #require(launcher.environments.current.only)
 
-        // 2. The app, launched with that environment, starts and is used.
         let harness = Harness(launchedWith: environment, home: home)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shipyard", [])])])
@@ -75,9 +66,7 @@ struct DemoRunTests {
         await harness.shipyard.reloadPings()
 
         #expect(harness.files == AppFiles(config: demoConfig, support: demoSupport, demo: demo))
-        // The login item is the user's app's: the demo's launch-at-login doesn't touch it.
         #expect(harness.loginItem.settings.isEmpty)
-        // Nor is the user's ntn asked: a demo never lists their notes.
         #expect(!harness.shipyard.readsNotes)
         #expect(harness.stub.notionRequests.isEmpty)
         #expect(harness.shipyard.configStore.lastValid.projects.map(\.slug) == ["shipyard"])
@@ -87,12 +76,10 @@ struct DemoRunTests {
             AppStateStore.fileName, "Pings", ConfigurationLocation.fileName, ConfigStatusStore.fileName, ResolvedRepositoriesStore.fileName,
         ].sorted())
         #expect(ConfigurationLocation.recorded(in: demoSupport) == demoConfig)
-        // The socket the command waited at is the one this app listens on, and later commands find it.
         #expect(app.asked.current.last == ControlSocket.url(in: harness.files.support))
-        try Data().write(to: ControlSocket.url(in: harness.files.support))   // the app's server listening
+        try Data().write(to: ControlSocket.url(in: harness.files.support))
         #expect(ControlSocket.locate(support: userSupport) == ControlSocket.url(in: demoSupport))
 
-        // 3. Meanwhile an agent's ping, from a shell without the variable, goes to the user's store, against their config.
         let userPings = PingStore(directory: PingStore.appDirectory(in: userSupport))
         var userTable = CommandTable()
         userTable.add(PingCommands.entries(
@@ -111,18 +98,14 @@ struct DemoRunTests {
         #expect(userPings.all().map(\.title) == ["Outside the demo"])
         #expect(harness.pingStore.all().map(\.title) == ["In the demo"])
 
-        // 4. Plain open brings the user's app back (nothing here plays it, so its wait runs out).
         _ = shipyard(["app", "open"], support: userSupport, home: home, launcher: launcher, transport: app)
 
-        // The user's config.toml and state.json are byte for byte as they were; their folder holds only their pings besides.
         #expect(try Data(contentsOf: userConfig) == userConfigText)
         #expect(try Data(contentsOf: userSupport.appendingPathComponent(AppStateStore.fileName)) == userState)
         let left = try FileManager.default.contentsOfDirectory(atPath: userSupport.path).sorted()
         #expect(left == [AppStateStore.fileName, "Pings"].sorted())
     }
 
-    /// `shipyard <arguments>` with the Mac's `app` command, the user's
-    /// support folder `support` and `HOME` at `home`.
     private func shipyard(_ arguments: [String], support: URL, home: URL, launcher: Launches, transport: Sockets) -> CommandResult {
         var table = CommandTable()
         table.add(ControlCommands.entries(support: support, launcher: launcher, transport: transport, pause: { _ in }))
@@ -135,7 +118,6 @@ struct DemoRunTests {
     }
 }
 
-/// A launcher that records each launch's environment.
 private final class Launches: AppLaunching {
     let environments = Locked<[[String: String]]>([])
 
@@ -144,8 +126,6 @@ private final class Launches: AppLaunching {
     }
 }
 
-/// The app's end of the sockets: nothing answers, except a demo app at
-/// `socket` once `launcher` launched one, until it's asked to quit.
 private final class Sockets: ControlTransport {
     let asked = Locked<[URL]>([])
     private let quit = Locked(false)
@@ -171,6 +151,5 @@ private final class Sockets: ControlTransport {
 }
 
 extension Array {
-    /// The one element, or nil when there are none or several.
     fileprivate var only: Element? { count == 1 ? first : nil }
 }

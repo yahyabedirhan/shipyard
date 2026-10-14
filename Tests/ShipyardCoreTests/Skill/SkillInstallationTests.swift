@@ -3,7 +3,6 @@ import ShipyardCommand
 import ShipyardCore
 import Testing
 
-/// A sleep that never ends until its task is cancelled: the timeout never fires.
 private let neverTimesOut: Sleep = { _ in
     while true { try await Task.sleep(for: .seconds(3600)) }
 }

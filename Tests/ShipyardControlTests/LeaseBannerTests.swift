@@ -2,8 +2,6 @@ import Foundation
 import ShipyardControl
 import Testing
 
-/// The banner's words while an agent holds the lease, the owner test: who,
-/// why, the step, the countdown, the queue and where, as the maintainer reads them.
 @Suite("The lease banner")
 struct LeaseBannerTests {
     @Test("the banner heads with the purpose or the agent, over its step and how many wait", arguments: [
@@ -53,7 +51,6 @@ struct LeaseBannerTests {
         }
 
         #expect(shown == ["1m 00s left", "59s left", "48s left", "1s left"])
-        // At its end the lease is free, and there's no banner to draw.
         #expect(lease.status(at: Date(timeIntervalSince1970: 60)) == nil)
     }
 }

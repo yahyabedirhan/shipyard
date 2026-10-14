@@ -94,8 +94,6 @@ struct SkillInstallerTests {
             let output = await ProcessShellRunner().run(ShellInvocation(executable: "/bin/sh", arguments: ["-c", "echo started"]))
             result.withValue { $0 = .some(output) }
         }
-        // Waits up to five seconds rather than awaiting the task, so a run
-        // that never ends fails this test instead of hanging the suite.
         let deadline = Date().addingTimeInterval(5)
         while result.current == nil, Date() < deadline {
             try await Task.sleep(for: .milliseconds(20))

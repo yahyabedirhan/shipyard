@@ -4,12 +4,6 @@ import ShipyardCommand
 import ShipyardNotices
 import Testing
 
-/// `shipyard notice send` as an agent runs it on a machine without the app,
-/// through `ShipyardCLI.run` with that build's table: `cli.toml`'s
-/// `[notices]` decides the route, and with `app-machine` set the notice goes
-/// to the Mac over the tailnet, one HTTP request answered with the app's
-/// verdict. A recording HTTP stands in for the network. Whether the app
-/// shows it is the app's to say (`TailnetNoticeTests`).
 @Suite("The notify command over the tailnet")
 struct TailnetNotifyCommandTests {
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
@@ -18,18 +12,15 @@ struct TailnetNotifyCommandTests {
         .appendingPathComponent("shipyard-notify-\(UUID().uuidString)", isDirectory: true)
     var settings: CLISettingsFile { CLISettingsFile(url: root.appendingPathComponent("cli.toml")) }
 
-    /// A working folder's `origin`.
     struct Git: GitRemoteLookup {
         func origin(in folder: URL) -> String? { "git@github.com:owner/shop.git" }
     }
 
-    /// Writes `cli.toml`.
     func write(_ text: String) throws {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data(text.utf8).write(to: settings.url)
     }
 
-    /// Runs `shipyard <arguments>` in the build without the app, over `http`.
     func shipyard(_ arguments: [String], http: RecordingHTTP, poll: RecordingRoute = RecordingRoute()) -> CommandResult {
         var table = CommandTable()
         table.add(NoticeCommands.entries(route: RemoteNoticeRoute(settings: settings, http: http, poll: poll)))
@@ -176,8 +167,6 @@ struct TailnetNotifyCommandTests {
     }
 }
 
-/// The poll route, standing in for the herdr-shipyard plugin: records each
-/// notice and queues it.
 final class RecordingRoute: NoticeRoute {
     let notices = Locked<[NoticeRequest]>([])
 
@@ -187,8 +176,6 @@ final class RecordingRoute: NoticeRoute {
     }
 }
 
-/// A `NoticeHTTP` standing in for the network: records each post and
-/// answers with the outcome it was given.
 final class RecordingHTTP: NoticeHTTP {
     typealias Outcome = NoticeHTTPOutcome
 

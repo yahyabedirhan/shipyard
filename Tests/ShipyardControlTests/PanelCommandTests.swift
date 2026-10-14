@@ -3,13 +3,8 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard panel …` as an agent runs it, through `ShipyardCLI.run` with
-/// the Mac's table and an in-memory app at the end of the socket: what each
-/// command sends, prints and exits with. Whether a project, kind or tab
-/// exists is the app's to say; its refusals come back as replies.
 @Suite("The panel command")
 struct PanelCommandTests {
-    /// Runs `shipyard <arguments>` in the Mac's build against `transport`.
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {
         shipyard(arguments, transport: transport)
     }

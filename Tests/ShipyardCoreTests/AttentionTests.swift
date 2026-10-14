@@ -15,7 +15,6 @@ private let shop = """
 
     """
 
-/// The projects `graphql-pull-requests.json` answers for.
 private let twoProjects = """
     [[projects]]
     slug = "e-commerce"
@@ -35,19 +34,16 @@ private func answer(_ pullRequests: PR...) -> StubHTTP.Answer {
 
 @MainActor
 private extension Harness {
-    /// The row for pull request `number` in `project`.
     func row(_ number: Int, in project: String = "shop") throws -> MenuRow {
         try #require(section(project)?.rows.first { $0.number == number })
     }
 
-    /// The attention count.
     var count: Int { shipyard.menu.attention.total }
 }
 
 @Suite("Attention through the refresh pipeline")
 @MainActor
 struct AttentionTests {
-    // MARK: - What counts
 
     @Test("a new pull request counts, and one arriving later counts too")
     func newPullRequestCounts() async throws {
@@ -82,7 +78,6 @@ struct AttentionTests {
         #expect(harness.count == 0)
         #expect(harness.section("shop")?.attentionCount == 0)
 
-        // Refreshing without a change keeps them seen; opening the panel marks nothing.
         await harness.refresh(answering: answer(PR(1), PR(2)))
         #expect(harness.count == 0)
     }
@@ -159,7 +154,6 @@ struct AttentionTests {
         #expect(try harness.row(3).attentionReasons == [])
         #expect(harness.count == 2)
 
-        // A click clears them until the item changes.
         harness.shipyard.markSeen(try harness.row(1))
         harness.shipyard.markSeen(try harness.row(2))
         #expect(harness.count == 0)
@@ -227,7 +221,6 @@ struct AttentionTests {
         #expect(harness.section("shop")?.rows.allSatisfy { !$0.needsAttention } == true)
         #expect(harness.count == 0)
 
-        // An unseen open one stops counting once it's merged.
         var open = PR(3)
         await harness.refresh(answering: answer(merged, closed, open))
         #expect(harness.count == 1)
@@ -263,12 +256,9 @@ struct AttentionTests {
         #expect(harness.count == 1)
     }
 
-    // MARK: - Mark all seen
-
     @Test("mark all seen, per project and for everything")
     func markAllSeen() async throws {
         let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
-        // e-commerce: open #14 (draft), #57, #12, #56, #55; job-search: #3. Closed #54 and #9 don't count.
         #expect(harness.section("e-commerce")?.attentionCount == 5)
         #expect(harness.section("job-search")?.attentionCount == 1)
         #expect(harness.count == 6)
@@ -307,8 +297,6 @@ struct AttentionTests {
         #expect(harness.section("job-search")?.attentionCount == 0)
     }
 
-    // MARK: - The menu bar
-
     @Test("the menu bar label follows [menu-bar] count, with per-kind counts")
     func menuBarLabel() async throws {
         let fixture = try Harness.fixture("graphql-pull-requests.json")
@@ -341,7 +329,6 @@ struct AttentionTests {
         #expect(harness.shipyard.phase == .needsProjects)
         #expect(harness.shipyard.menu.menuBarLabel.text == nil)
 
-        // A collapse recomputes attention; the count stays hidden.
         harness.shipyard.toggleCollapsed("job-search")
         #expect(harness.shipyard.menu.menuBarLabel.text == nil)
 
@@ -364,8 +351,6 @@ struct AttentionTests {
         #expect(harness.shipyard.menu.menuBarLabel.text == nil)
     }
 
-    // MARK: - App state
-
     @Test("collapsed projects and seen items survive a restart")
     func survivesRestart() async throws {
         let harness = try await Harness.started(config: twoProjects, graphQL: Harness.fixture("graphql-pull-requests.json"))
@@ -374,7 +359,6 @@ struct AttentionTests {
 
         #expect(harness.section("job-search")?.isCollapsed == true)
         #expect(harness.section("e-commerce")?.isCollapsed == false)
-        // Collapsing hides rows; they still count.
         #expect(harness.count == 1)
 
         let relaunched = harness.relaunched()

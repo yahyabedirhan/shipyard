@@ -4,9 +4,6 @@ import Foundation
 import SwiftUI
 import Testing
 
-/// The app icon, the menu bar item and the welcome screens' badge are one figure,
-/// `Sailboat.path`, and the icon and the badge are one logo, `Logo`: both drawn
-/// by the app and compiled into the icon script.
 @Suite("Sailboat")
 struct SailboatTests {
     private static let root = URL(fileURLWithPath: #filePath)
@@ -16,11 +13,9 @@ struct SailboatTests {
     func menuBarPath() {
         let side = SailboatImage.menuBarSide
         #expect(SailboatImage.menuBarPath() == Sailboat.path(in: CGRect(x: 0, y: 0, width: side, height: side)))
-        // Fitted: the figure's height fills the square and it's centred across.
         let box = SailboatImage.menuBarPath().boundingBoxOfPath
         #expect(abs(box.height - side) < 0.001)
         #expect(abs(box.midX - side / 2) < 0.001)
-        // The same shape as the icon's, only scaled.
         let icon = Sailboat.bounds
         #expect(abs(box.width / box.height - icon.width / icon.height) < 0.001)
     }
@@ -31,7 +26,6 @@ struct SailboatTests {
         #expect(image.isTemplate)
         #expect(image.size == NSSize(width: SailboatImage.menuBarSide, height: SailboatImage.menuBarSide))
 
-        // Rendered at 8 pixels to the point, the inked pixels span the path's bounds.
         let scale: CGFloat = 8
         let pixels = Int(SailboatImage.menuBarSide * scale)
         let rep = try #require(NSBitmapImageRep(
@@ -45,7 +39,6 @@ struct SailboatTests {
         var inked = CGRect.null
         for y in 0..<pixels {
             for x in 0..<pixels where rep.colorAt(x: x, y: y)!.alphaComponent > 0.5 {
-                // colorAt counts rows from the top; the path's y runs up.
                 inked = inked.union(CGRect(x: x, y: pixels - 1 - y, width: 1, height: 1))
             }
         }
@@ -84,11 +77,8 @@ struct SailboatTests {
         #expect(abs(shape.midY - (rect.height - path.midY)) < 0.001)
     }
 
-    /// The 1024-grid icon body, and a spot on it clear of the figure and the rim.
     private static let iconBody = CGRect(x: 100, y: 100, width: 824, height: 824)
     private static let backgroundSpot = CGPoint(x: 160, y: 300)
-    /// A spot inside the mainsail's lit face, and one inside its shaded face
-    /// (`Logo.folds`), on `Sailboat.path`'s own grid.
     private static let sailSpot = CGPoint(x: 640, y: 600)
     private static let foldSpot = CGPoint(x: 540, y: 600)
 
@@ -98,13 +88,11 @@ struct SailboatTests {
         #expect(Sailboat.path.contains(Self.sailSpot))
         #expect(!Logo.folds.contains(Self.sailSpot))
         #expect(Logo.folds.contains(Self.foldSpot))
-        // The committed icon, at 512 pixels (half the 1024 grid), y up.
         let icns = try #require(NSImage(contentsOf: Self.root.appendingPathComponent("Packaging/Icon/AppIcon.icns")))
         let icon = try #require(icns.representations.compactMap { $0 as? NSBitmapImageRep }.first { $0.pixelsWide == 512 })
         func iconColour(_ p: CGPoint) -> NSColor {
             icon.colorAt(x: Int(p.x / 2), y: 511 - Int(p.y / 2))!.usingColorSpace(.sRGB)!
         }
-        // The badge, rendered with its body as big as the icon's, y down.
         let side = Self.iconBody.width
         let renderer = ImageRenderer(content: LogoBadge(side: side))
         renderer.scale = 1
@@ -127,9 +115,6 @@ struct SailboatTests {
         #expect(Self.near(iconBody, badgeBody))
         #expect(Self.near(iconFigure, badgeFigure))
         #expect(Self.near(iconFold, badgeFold))
-        // And they are the logo's: a dark, neutral graphite body (no channel
-        // more than a few levels from the others, so no tint), a
-        // white figure, and a grey fold between them.
         #expect(badgeBody.greenComponent < 0.25)
         #expect(abs(badgeBody.greenComponent - badgeBody.redComponent) < 0.03 && abs(badgeBody.blueComponent - badgeBody.greenComponent) < 0.03)
         #expect(badgeFigure.redComponent > 0.95 && badgeFigure.greenComponent > 0.95 && badgeFigure.blueComponent > 0.95)

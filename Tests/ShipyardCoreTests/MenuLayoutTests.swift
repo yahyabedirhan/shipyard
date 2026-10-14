@@ -17,9 +17,6 @@ private func answer(_ numbers: Int...) -> StubHTTP.Answer {
     PullRequestsResponse("yahyabedirhan/shop", numbers.map { PullRequestsResponse.PullRequest($0) }).answer
 }
 
-// `[menu] layout` picks how the panel draws the menu model: the list
-// (the default) or the tabs. Like every setting it applies as soon as the
-// configuration changes.
 @MainActor
 @Suite("The menu layout")
 struct MenuLayoutTests {

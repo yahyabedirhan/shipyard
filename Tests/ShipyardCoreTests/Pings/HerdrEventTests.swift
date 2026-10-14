@@ -13,41 +13,27 @@ private let shop = """
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
-/// `HERDR_PLUGIN_EVENT_JSON` as Herdr 0.9.3 sets it for
-/// `pane.agent_status_changed`: the event envelope, its fields under `data`.
 private func statusChanged(_ status: String, pane: String = "w1:p3", agent: String? = "claude") -> String {
     let agentField = agent.map { #","agent":"\#($0)""# } ?? ""
     return #"{"event":"pane_agent_status_changed","data":{"type":"pane_agent_status_changed","pane_id":"\#(pane)","workspace_id":"w1","agent_status":"\#(status)"\#(agentField)}}"#
 }
 
-/// `HERDR_PLUGIN_EVENT_JSON` for `pane.closed`.
 private func paneClosed(_ pane: String = "w1:p3") -> String {
     #"{"event":"pane_closed","data":{"type":"pane_closed","pane_id":"\#(pane)","workspace_id":"w1"}}"#
 }
 
-/// `HERDR_PLUGIN_EVENT_JSON` for `tab.closed`, which names the tab, not its panes.
 private func tabClosed(_ tab: String = "w1:t2") -> String {
     #"{"event":"tab_closed","data":{"type":"tab_closed","tab_id":"\#(tab)","workspace_id":"w1"}}"#
 }
 
-/// `HERDR_PLUGIN_EVENT_JSON` for `workspace.closed`.
 private func workspaceClosed(_ workspace: String = "w1") -> String {
     #"{"event":"workspace_closed","data":{"type":"workspace_closed","workspace_id":"\#(workspace)"}}"#
 }
 
-/// The folder the blocked agent works in, in Herdr.
 private let agentFolder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
 
 @MainActor
 private extension Harness {
-    /// Runs `shipyard herdr-event` as the herdr-shipyard plugin's hook does:
-    /// with `HERDR_PLUGIN_EVENT` `event` and `HERDR_PLUGIN_EVENT_JSON` `json`
-    /// (each `nil`: not set), Herdr's own `herdr` the fake one, and
-    /// `agentFolder`'s `origin` `origin`, filing through `filing` (`nil`:
-    /// the Mac's), with the focused pane `focusedPane` (`HERDR_PANE_ID` in a
-    /// hook is the focused pane), in the named Herdr session `session`
-    /// (`HERDR_SESSION`, which a hook inherits from its server; `nil`: the
-    /// default session).
     @discardableResult
     func herdrEvent(
         _ event: String?,
@@ -76,22 +62,15 @@ private extension Harness {
         )
     }
 
-    /// `herdrEvent` for `pane.agent_status_changed` to `status`.
     @discardableResult
     func agent(_ status: String, pane: String = "w1:p3", agent: String? = "claude") -> CommandResult {
         herdrEvent("pane.agent_status_changed", statusChanged(status, pane: pane, agent: agent))
     }
 }
 
-/// `shipyard herdr-event`, run by the herdr-shipyard plugin's hooks: a
-/// blocked agent pings by itself, and the ping goes when the agent goes on
-/// or its pane closes. Through `ShipyardCLI.run` with recorded event JSON,
-/// a fake `herdr` answering `pane get` and `tab get`, and the app reading
-/// the store.
 @Suite("Herdr events")
 @MainActor
 struct HerdrEventTests {
-    // MARK: Blocked
 
     @Test("a blocked agent in a named Herdr session pings to be focused in that session")
     func blockedInNamedSession() throws {
@@ -199,9 +178,6 @@ struct HerdrEventTests {
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.projects == [])
         #expect(unconfigured.pingStore.ping(id: "herdr-w1-p3")?.repository == nil)
 
-        // A refusal would reach no one, so a ping only projects hiding pings
-        // would list is filed under them, hidden as they ask, and the hook
-        // still succeeds.
         let hidden = try Harness(config: shop + "pings = { show = false }\n")
         hidden.herdr.open(pane: "w1:p3", tab: "w1:t2", label: "checkout", folder: agentFolder)
         #expect(hidden.agent("blocked") == CommandResult(output: "herdr-w1-p3\n"))
@@ -246,8 +222,6 @@ struct HerdrEventTests {
         #expect(harness.pingStore.all().isEmpty)
     }
 
-    // MARK: Going on
-
     @Test("an agent that goes on withdraws its pane's ping, and its notification leaves", arguments: ["working", "idle", "done", "unknown"])
     func goingOnWithdraws(status: String) async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
@@ -283,7 +257,6 @@ struct HerdrEventTests {
         harness.agent("blocked")
         harness.agent("blocked", pane: "w1:p4")
         harness.agent("blocked", pane: "w1:p5")
-        // A ping an agent sent itself, focusing a pane in the tab: not herdr-event's to take back.
         try harness.pingStore.save(Ping(id: "mine", title: "Look at this", projects: ["shop"], sent: harness.clock.now, action: .herdr("w1:p3")))
         await harness.shipyard.reloadPings()
 
@@ -363,8 +336,6 @@ struct HerdrEventTests {
         #expect(harness.agent("working") == CommandResult(output: "herdr-w1-p3\n"))
         #expect(harness.pingStore.all().isEmpty)
     }
-
-    // MARK: Nothing to do, and errors
 
     @Test("another event or status needs nothing, and exits 0")
     func otherEvents() throws {

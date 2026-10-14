@@ -27,7 +27,6 @@ struct PanelTextTests {
         #expect(PanelText.attentionSummary(0) == nil)
         #expect(PanelText.attentionSummary(1) == "1 needs attention")
         #expect(PanelText.attentionSummary(10) == "10 need attention")
-        // A count badge says its number to VoiceOver in the same words.
         #expect(PanelText.attentionCount(1) == "1 needs attention")
         #expect(PanelText.attentionCount(7) == "7 need attention")
     }
@@ -71,7 +70,6 @@ struct PanelTextTests {
         #expect(PanelText.lastUpdated(now.addingTimeInterval(-5 * 60 - 10), now: now) == "Last updated 5 min ago")
         #expect(PanelText.lastUpdated(now.addingTimeInterval(-2 * 3600), now: now) == "Last updated 2 h ago")
         #expect(PanelText.lastUpdated(now.addingTimeInterval(-3 * 86_400), now: now) == "Last updated 3 d ago")
-        // A clock that went back doesn't say "in the future".
         #expect(PanelText.lastUpdated(now.addingTimeInterval(60), now: now) == "Last updated just now")
     }
 
@@ -134,8 +132,6 @@ struct PanelTextTests {
         #expect(PanelText.emptySection(MenuSection(name: "a", rows: [], errors: [error])) == nil)
     }
 
-    // MARK: - Rows
-
     private func row(
         repository: String = "yahyabedirhan/shipyard",
         number: Int = 21,
@@ -194,14 +190,12 @@ struct PanelTextTests {
             "Approved · Checks passed",
             "3 comments · 1 review · updated 5m ago",
         ])
-        // The app draws each fact with its icon, a line of them at a time.
         #expect(card.facts == [
             [.branches(head: "attention-dot", base: "main")],
             [.size(additions: 120, deletions: 43), .files(6)],
             [.review(.approved), .checks(.passed)],
             [.comments(3), .reviews(1), .updated("5m")],
         ])
-        // Beside its clock icon, the update reads as just the age.
         #expect(PanelText.updatedAge("5m") == "5m ago")
         #expect(PanelText.updatedAge("now") == "now")
         #expect(PanelText.fact(.updated("now")) == "updated now")
@@ -408,11 +402,8 @@ struct PanelTextTests {
         #expect(PanelText.state(state) == text)
     }
 
-    // MARK: - The rate limit
-
     private let london = TimeZone(identifier: "Europe/London")!
     private let british = Locale(identifier: "en_GB")
-    /// 12:42 UTC, 13:42 in London (summer time).
     private var reset: Date { now.addingTimeInterval(42 * 60) }
 
     @Test("the footer's rate-limit line: remaining / limit per API and when it resets")
@@ -440,8 +431,6 @@ struct PanelTextTests {
     func refreshDelay(delay: RefreshDelay?, text: String?) {
         #expect(PanelText.refreshDelay(delay, locale: british, timeZone: london) == text)
     }
-
-    // MARK: - The connect screen
 
     @Test("on first launch, or signed out with nothing signed in, a welcome, Sign in with GitHub leads and gh folds away", arguments: [
         Shipyard.SignedOutReason.noToken, .userSignedOut(.signedOut),
@@ -550,7 +539,6 @@ struct PanelTextTests {
         let code = try Regex("`[^`]*`")
         let gh = try Regex("\\bgh\\b")
         for text in words {
-            // Outside the code spans, no gh is left.
             #expect(text.replacing(code, with: "").firstMatch(of: gh) == nil, "bare gh in: \(text)")
         }
     }
@@ -570,8 +558,6 @@ struct PanelTextTests {
     func stillSignedOut(reason: Shipyard.SignedOutReason, text: String) {
         #expect(PanelText.stillSignedOut(reason) == text)
     }
-
-    // MARK: - Sign in with GitHub
 
     @Test("the code screen shows the code, says where it goes, how to copy it, and how to open GitHub")
     func deviceCodeScreen() {
@@ -605,8 +591,6 @@ struct PanelTextTests {
     func signInFailed(error: DeviceFlowError, text: String) {
         #expect(PanelText.signInFailed(error) == text)
     }
-
-    // MARK: - The agent skill
 
     private let skillCommand = "npx -y skills add yahyabedirhan/shipyard -g -y"
 
@@ -668,8 +652,6 @@ struct PanelTextTests {
         #expect(text.command == skillCommand)
         #expect(text.action == .tryAgain)
     }
-
-    // MARK: - The CLI link
 
     private let linkCommand = "mkdir -p ~/.local/bin && ln -sf /Applications/Shipyard.app/Contents/Helpers/shipyard ~/.local/bin/shipyard"
 
@@ -735,8 +717,6 @@ struct PanelTextTests {
         #expect(text.action == nil)
         #expect(text.tone == .warning)
     }
-
-    // MARK: - The project picker
 
     @Test("the preset step speaks to the user and names neither the app nor the configuration file in its description")
     func presetWords() {

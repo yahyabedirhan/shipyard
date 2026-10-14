@@ -11,38 +11,26 @@ private let shop = """
 
     """
 
-/// `shop` as a whole file, with its `version`.
 private let shopFile = "version = 1\n\n" + shop
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// The banners the panel shows at the clock's time, in order.
     var banners: [PanelBanner] { shipyard.banners(at: clock.now) }
 
-    /// The keys of the banners the panel shows now, in order, less the
-    /// notes banner: these harnesses keep no Notion token, so it always
-    /// asks to connect (`NotesTests` owns it).
     var bannerKeys: [String] { banners.map(\.id).filter { $0 != "notes" } }
 
-    /// The words of the banner `key` the panel shows now; `nil` while it's hidden.
     func bannerText(_ key: String) -> String? {
         banners.first { $0.id == key }?.text
     }
 
-    /// Refreshes now, with GitHub answering `answer`.
     func refreshNow(answering answer: StubHTTP.Answer) async {
         graphQL([answer])
         await shipyard.refresh()
     }
 }
 
-/// Dismissing a panel banner snoozes it for an hour: it stays hidden while
-/// its condition holds, shows again once the hour ends, and a condition
-/// that stops and starts again shows its banner at once. End to end through
-/// `Harness`, at the manual clock, reading what the panel shows
-/// (`Shipyard.banners(at:)`).
 @Suite("Banner snoozes")
 @MainActor
 struct BannerSnoozeTests {
@@ -52,20 +40,17 @@ struct BannerSnoozeTests {
         await harness.refreshNow(answering: .failure())
         #expect(harness.bannerKeys.contains("fetch"))
 
-        // The panel redraws on the dismissal itself, as it observes what it read.
         let redrawn = Locked(false)
         withObservationTracking { _ = harness.banners } onChange: { redrawn.withValue { $0 = true } }
         harness.shipyard.dismissBanner("fetch")
         #expect(redrawn.current)
         #expect(!harness.bannerKeys.contains("fetch"))
 
-        // Still failing at 59 minutes: still hidden.
         harness.clock.advance(by: 59 * 60)
         await harness.refreshNow(answering: .failure())
         #expect(!harness.bannerKeys.contains("fetch"))
         #expect(harness.shipyard.bannerSnoozeEnds == [Harness.now.addingTimeInterval(3600)])
 
-        // At 60 minutes it's back, with no refresh in between.
         harness.clock.advance(by: 60)
         #expect(harness.bannerKeys.contains("fetch"))
         #expect(harness.shipyard.bannerSnoozeEnds.isEmpty)
@@ -112,12 +97,10 @@ struct BannerSnoozeTests {
         harness.shipyard.dismissBanner("machine-netcup-vps")
         #expect(harness.bannerKeys == ["machine-hetzner-vps"])
 
-        // netcup's line now says something else; it's the same condition.
         harness.herdr.setReach(.disabled, on: "netcup-vps")
         await harness.poll()
         #expect(harness.bannerKeys == ["machine-hetzner-vps"])
 
-        // netcup answers, then goes down again: its line is back at once.
         harness.herdr.setReach(.up, on: "netcup-vps")
         await harness.poll()
         harness.herdr.setReach(.unreachable, on: "netcup-vps")
@@ -127,7 +110,6 @@ struct BannerSnoozeTests {
 
     @Test("a refresh delay whose words change stays hidden, since the snooze is the delay's, not its words'")
     func delayWordsChange() async throws {
-        // 900 of 5,000 left: backed off to every 10 minutes.
         let low = try Harness.fixture("graphql-pull-requests.json", remaining: 900)
         let harness = try await Harness.started(config: shopFile, graphQL: low)
         #expect(harness.shipyard.menu.refreshDelay == .backedOff(600, api: .graphql))
@@ -135,7 +117,6 @@ struct BannerSnoozeTests {
         harness.shipyard.dismissBanner("delay")
         #expect(harness.bannerText("delay") == nil)
 
-        // A 15-minute interval: still backed off, now every 15 minutes, other words, still the delay.
         try harness.writeConfig("version = 1\nrefresh-interval = \"15m\"\n\n" + shop)
         await harness.shipyard.reloadConfiguration()
         harness.clock.advance(by: 600)
@@ -174,10 +155,6 @@ struct BannerSnoozeTests {
         for key in harness.bannerKeys { harness.shipyard.dismissBanner(key) }
         #expect(harness.bannerKeys.isEmpty)
 
-        // Half an hour later the app quits and starts again over the same
-        // support folder. Until the first refresh, the first poll and the
-        // notifier's first word, none of the conditions is known: their
-        // snoozes must survive the sign-in and the menu changes before them.
         harness.clock.advance(by: 30 * 60)
         let relaunched = harness.relaunched()
         relaunched.herdr.addMachine("netcup-vps")
@@ -191,7 +168,6 @@ struct BannerSnoozeTests {
         let end = Harness.now.addingTimeInterval(3600)
         #expect(relaunched.shipyard.bannerSnoozeEnds == [end, end, end])
 
-        // At the hour's end all three are back, without a refresh.
         relaunched.clock.advance(by: 30 * 60)
         #expect(relaunched.bannerKeys == ["fetch", "machine-netcup-vps", "notifications"])
         await relaunched.refreshNow(answering: .failure())
@@ -223,7 +199,6 @@ struct BannerSnoozeTests {
         harness.shipyard.dismissBanner("config")
         #expect(!harness.bannerKeys.contains("config"))
 
-        // Read again at 59 minutes, still rejected: still hidden.
         harness.clock.advance(by: 59 * 60)
         await harness.shipyard.reloadConfiguration()
         #expect(!harness.bannerKeys.contains("config"))
@@ -240,20 +215,16 @@ struct BannerSnoozeTests {
         #expect(harness.bannerKeys == ["lease"])
         #expect(harness.bannerText("lease") == "Checking the header icons")
 
-        // Hidden while the same lease is renewed. The menu bar icon's dot is
-        // the app's, read from its lease indicator: no snooze reaches it.
         harness.shipyard.dismissBanner("lease")
         #expect(harness.bannerKeys.isEmpty)
         harness.clock.advance(by: 60)
         harness.shipyard.lease = PanelBanner.Lease(held: first)
         #expect(harness.bannerKeys.isEmpty)
 
-        // It ends; the same agent's next lease shows its banner at once.
         harness.shipyard.lease = PanelBanner.Lease()
         harness.shipyard.lease = PanelBanner.Lease(held: .init(term: "agent@120.0", headline: "Agent uses shipyard"))
         #expect(harness.bannerKeys == ["lease"])
 
-        // Handed straight to a waiting agent: its lease shows too.
         harness.shipyard.dismissBanner("lease")
         harness.shipyard.lease = PanelBanner.Lease(held: .init(term: "other@180.0", headline: "Codex uses shipyard"))
         #expect(harness.bannerKeys == ["lease"])
@@ -272,7 +243,6 @@ struct BannerSnoozeTests {
         harness.shipyard.dismissBanner("stopped-claude")
         #expect(harness.bannerKeys == ["lease", "stopped-codex"])
 
-        // Allowed back, then stopped again: its line is back at once.
         harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [codex])
         harness.shipyard.lease = PanelBanner.Lease(held: held, stopped: [claude, codex])
         #expect(harness.bannerKeys == ["lease", "stopped-claude", "stopped-codex"])
@@ -288,7 +258,6 @@ struct BannerSnoozeTests {
         harness.shipyard.dismissBanner("stopped-codex")
         #expect(harness.bannerKeys.isEmpty)
 
-        // The relaunch is handed the same lease; the bar didn't survive.
         harness.clock.advance(by: 60)
         let relaunched = harness.relaunched()
         relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)

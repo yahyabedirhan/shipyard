@@ -4,10 +4,6 @@ import ShipyardCommand
 import ShipyardConfig
 import Testing
 
-/// `cli.toml`, the `shipyard` command's own settings: where each build
-/// finds it, a missing file read as the defaults, and a file that doesn't
-/// read refused with exit 1 and what's wrong, as a command reading it hands
-/// the agent.
 @Suite("cli.toml, the command's own settings")
 struct CLISettingsTests {
     let root = FileManager.default.temporaryDirectory
@@ -23,12 +19,9 @@ struct CLISettingsTests {
         try data.write(to: file.url)
     }
 
-    /// What reading `file` hands a command: the settings, or its failure.
     func read() -> Result<CLISettings, CommandResult> {
         Result { () throws(CommandResult) in try file.read() }
     }
-
-    // MARK: - Where it is
 
     @Test("without the app it's in the XDG config folder, ~/.config without one, as config.toml would be")
     func withoutTheApp() {
@@ -48,8 +41,6 @@ struct CLISettingsTests {
         try ConfigurationLocation.record(URL(fileURLWithPath: "/Users/me/dotfiles/shipyard/config.toml"), in: support)
         #expect(mac().url.path == "/Users/me/dotfiles/shipyard/cli.toml")
     }
-
-    // MARK: - Reading it
 
     @Test("a missing file, an empty one and an empty [notices] are the defaults", arguments: [nil, "", "# nothing yet\n", "[notices]\n"])
     func defaults(text: String?) throws {
@@ -87,13 +78,10 @@ struct CLISettingsTests {
         #expect(failure.error.hasSuffix("; fix it, then try again\n"))
     }
 
-    // MARK: - [notices]
-
     @Test("[notices] names the app machine, and the scheme and port its notices go over, http and the listener's default port unless given", arguments: [
         ("[notices]\napp-machine = \"mac\"\n", NoticeSettings(appMachine: "mac", appScheme: .http, appPort: 47420)),
         ("[notices]\napp-machine = \" my-mac.tail1234.ts.net \"\napp-scheme = \"https\"\napp-port = 443\n",
          NoticeSettings(appMachine: "my-mac.tail1234.ts.net", appScheme: .https, appPort: 443)),
-        // Without a machine, scheme and port wait for one.
         ("[notices]\napp-port = 8080\n", NoticeSettings(appMachine: nil, appScheme: .http, appPort: 8080)),
     ])
     func notices(text: String, settings: NoticeSettings) throws {
@@ -112,7 +100,6 @@ struct CLISettingsTests {
         ("app-port = 0", "`notices.app-port` must be between 1 and 65535 (got 0)"),
         ("app-port = 70000", "`notices.app-port` must be between 1 and 65535 (got 70000)"),
         ("app-port = \"80\"", "`notices.app-port` must be a whole number"),
-        // config.toml's [notices] keys are the app's, never cli.toml's: no setting appears in both files.
         ("port = 443", "unknown setting `notices.port`; known: `app-machine`, `app-scheme`, `app-port`"),
     ])
     func badNotices(line: String, problem: String) throws {

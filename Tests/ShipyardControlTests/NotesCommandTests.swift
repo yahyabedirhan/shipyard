@@ -3,9 +3,6 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard notes check` as an agent runs it, through `ShipyardCLI.run`
-/// with the Mac's table and an in-memory app at the end of the socket: the
-/// app reads Notion through ntn and answers with the report.
 @Suite("The notes command")
 struct NotesCommandTests {
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {

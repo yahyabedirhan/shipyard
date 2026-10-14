@@ -12,8 +12,6 @@ private typealias Issue = PullRequestsResponse.Issue
 private let web = "yahyabedirhan/shop-web"
 private let api = "yahyabedirhan/shop-api"
 
-/// One project over two repositories, issues shown, arranged by `settings`
-/// (lines written into its block) under `[menu] layout`.
 private func config(_ settings: String = "", layout: MenuLayout = .list) -> String {
     """
     [menu]
@@ -39,9 +37,6 @@ private func pr(_ number: Int, title: String, created: String, updated: String, 
     return pr
 }
 
-/// Web: #1 (updated 11:00, created 08:00, "Zebra") and issue #5 ("A
-/// problem", updated yesterday). Api: #2 (updated 10:00, created 09:30, "apple", by
-/// octocat) and #3 (updated 2026-09-22, created 09:00, "Mango").
 private let answer = PullRequestsResponse.answer([
     PullRequestsResponse(web, [
         pr(1, title: "Zebra", created: "2026-09-25T08:00:00Z", updated: "2026-09-25T11:00:00Z"),
@@ -60,14 +55,11 @@ private let answer = PullRequestsResponse.answer([
 @MainActor
 private extension Harness {
     var shop: MenuSection? { section("shop") }
-    /// Each group's title and its rows' numbers.
     var arranged: [String: [Int]] {
         Dictionary(uniqueKeysWithValues: (shop?.groups ?? []).map { ($0.title, $0.rows.map(\.number)) })
     }
 }
 
-// `group-by`, `sort-by` and `subsections` arrange a project's listed items,
-// in the list and in a project's tab alike; the All tab keeps its own look.
 @MainActor
 @Suite("Arranging a project")
 struct MenuArrangementTests {
@@ -126,7 +118,6 @@ struct MenuArrangementTests {
 
         try harness.writeConfig(config("sort-by = \"title\"\ngroup-by = \"date\""))
         await harness.shipyard.reloadConfiguration()
-        // Sorting by title buckets by the last update.
         #expect(harness.arranged == ["Today": [2, 1], "Yesterday": [5], "This week": [3]])
     }
 
@@ -148,7 +139,6 @@ struct MenuArrangementTests {
 
         let project = harness.shipyard.menu.tabContent(for: .project("shop"))
         #expect(project.groups.map(\.title) == [api, web])
-        // By title across kinds: "A problem" (#5) before "Zebra" (#1).
         #expect(project.groups.map { $0.rows.map(\.number) } == [[2, 3], [5, 1]])
         #expect(project.groups.map(\.showsHeader) == [true, true])
 

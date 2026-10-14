@@ -2,9 +2,6 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-/// The GitHub view: the connection `Shipyard` reports while signed in (the
-/// view's account and source, the settings menu's mark), none while signed
-/// out (the view shows the onboarding content then), and the view's words.
 @Suite("The GitHub view")
 @MainActor
 struct GitHubViewTests {
@@ -66,8 +63,6 @@ struct GitHubViewTests {
 
         #expect(harness.shipyard.gitHubConnection == GitHubConnection(login: nil, source: .tokenStore))
     }
-
-    // MARK: - The words
 
     private let signOutSegment = PanelText.StatusPage.Alternative(
         line: "Sign out to stop listing your pull requests, issues and workflow runs.",

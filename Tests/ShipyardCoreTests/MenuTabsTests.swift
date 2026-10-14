@@ -35,7 +35,6 @@ struct MenuTabsTests {
     }
 
     private func section(_ name: String, _ rows: [MenuRow], showsRepository: Bool = false, isLoaded: Bool = true) -> MenuSection {
-        // Arranged as a project with the default settings is in the tabs layout.
         MenuSection(
             name: name,
             groups: Arrangement.groups(rows: rows, project: name, settings: ArrangementSettings(), layout: .tabs, now: now),
@@ -162,8 +161,6 @@ struct MenuTabsTests {
         #expect(PanelText.emptyTab(loading.tabContent(for: .all)) == "Not loaded yet")
         #expect(PanelText.emptyTab(model([section("shipyard", [])]).tabContent(for: .all)) == "Nothing open")
     }
-
-    // MARK: - Words
 
     @Test("a tab's title is All or its project's title")
     func titles() {

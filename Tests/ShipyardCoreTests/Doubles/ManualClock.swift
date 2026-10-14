@@ -1,7 +1,6 @@
 import Foundation
 import ShipyardCore
 
-/// A `WallClock` that stays where a test puts it.
 final class ManualClock: WallClock {
     private let time: Locked<Date>
 

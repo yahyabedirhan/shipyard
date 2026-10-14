@@ -4,7 +4,6 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-/// Decodes `text`, failing the test if it's rejected.
 func decoded(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) -> Configuration.Decoded? {
     do {
         return try Configuration.decode(text)
@@ -14,7 +13,6 @@ func decoded(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) 
     }
 }
 
-/// The problems a rejected file is rejected for; fails the test if it decodes.
 func rejection(_ text: String, sourceLocation: SourceLocation = #_sourceLocation) -> [ConfigurationIssue] {
     do throws(ConfigurationError) {
         _ = try Configuration.decode(text)
@@ -25,23 +23,16 @@ func rejection(_ text: String, sourceLocation: SourceLocation = #_sourceLocation
     }
 }
 
-/// A documentation snippet as part of a whole file: one that sets keys
-/// without `version` is read below the `version = 1` a file starts with,
-/// so a fragment such as one `[[projects]]` block reads without the
-/// missing-version warning.
 func asFile(_ snippet: String) -> String {
     snippet.components(separatedBy: "\n").contains { $0.hasPrefix("version = ") } ? snippet : "version = 1\n" + snippet
 }
 
-/// The repository root, for the design document and the schema.
 let repositoryRoot = URL(fileURLWithPath: #filePath)
-    .deletingLastPathComponent() // Config
-    .deletingLastPathComponent() // ShipyardCoreTests
-    .deletingLastPathComponent() // Tests
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
     .deletingLastPathComponent()
 
-/// The example `config.toml` in `docs/low-level-design.md`, read from the
-/// design itself so the two can't drift apart.
 func designExample() throws -> String {
     let design = try String(contentsOf: repositoryRoot.appendingPathComponent("docs/low-level-design.md"), encoding: .utf8)
     let start = try #require(design.range(of: "```toml\n#:schema"))
@@ -50,7 +41,6 @@ func designExample() throws -> String {
     return String(body[..<end.lowerBound]) + "\n"
 }
 
-/// Every key the configuration has, each set away from its default.
 let everyKey = """
     #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
     version = 1
@@ -173,7 +163,6 @@ struct ConfigurationDecodingTests {
         #expect(config.menu.headerCounts == [.pullRequest, .issue, .workflowRun, .ping, .note])
         #expect(config.rateLimit == .init(show: .always, maxSharePercent: 10))
         #expect(config.attention == .init(unseen: true, changed: true, reviewRequested: true, checksFailed: true))
-        // Every author, in every kind: an existing file lists what it did.
         #expect(config.defaults.pullRequests == .init(
             show: true, states: [.open, .merged, .closed], closedWindow: 7 * 86_400, drafts: true, authors: AuthorFilter(show: [], hide: []), reviewRequested: false
         ))
@@ -181,7 +170,6 @@ struct ConfigurationDecodingTests {
         #expect(config.defaults.workflowRuns == .init(
             show: false, states: [.inProgress, .failed, .succeeded], finishedWindow: 3 * 3600, branches: .defaultAndPullRequests, authors: AuthorFilter()
         ))
-        // Pings show in every project, and a seen one stays listed a day.
         #expect(config.defaults.pings == PingSettings(show: true, seenWindow: 86_400))
         #expect(config.herdr.terminal == nil)
         #expect(config.remote.machines == [])
@@ -416,7 +404,6 @@ struct ConfigurationValidationTests {
 
     @Test("header-counts lists the kinds with a header slot, each once, globally")
     func headerCounts() throws {
-        // Without the key, every kind.
         #expect(try #require(decoded("[menu]\nlayout = \"list\"\n")).configuration.menu.headerCounts
             == [.pullRequest, .issue, .workflowRun, .ping, .note])
         let subset = try #require(decoded("version = 1\n[menu]\nheader-counts = [\"pings\", \"issues\"]\n"))
@@ -426,10 +413,8 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 4, message: "unknown kind `pull-request` in `header-counts` (did you mean `pull-requests`?)")])
         #expect(rejection("[menu]\nheader-counts = [\"issues\", \"pings\", \"issues\"]\n")
             == [ConfigurationIssue(line: 2, message: "`issues` is listed twice in `header-counts`")])
-        // Across lines, the error is on the repeated copy's line.
         #expect(rejection("[menu]\nheader-counts = [\n  \"issues\",\n  \"pings\",\n  \"issues\",\n]\n")
             == [ConfigurationIssue(line: 5, message: "`issues` is listed twice in `header-counts`")])
-        // A project can't set it: it's ignored there, with a warning.
         let project = try #require(decoded("version = 1\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nheader-counts = [\"issues\"]\n"))
         #expect(project.configuration.menu.headerCounts == Configuration.Menu().headerCounts)
         #expect(project.warnings == [ConfigurationIssue(line: 5, message: "unknown setting `projects[0].header-counts` (ignored)")])
@@ -590,7 +575,6 @@ struct ConfigurationValidationTests {
             repositories = ["o/b"]
             """)
         #expect(issues == [ConfigurationIssue(line: 6, message: "project slug `a` is used twice (first on line 2)")])
-        // Two titles may be the same: only the slug is the project's ID.
         #expect(decoded("[[projects]]\nslug = \"a\"\ntitle = \"T\"\nrepositories = [\"o/a\"]\n[[projects]]\nslug = \"b\"\ntitle = \"T\"\nrepositories = [\"o/b\"]\n") != nil)
     }
 
@@ -630,7 +614,6 @@ struct ConfigurationValidationTests {
             #expect(rejection("[[projects]]\nname = \"a\"\n\(key)\nrepositories = [\"o/a\"]\n")
                 == [ConfigurationIssue(line: 2, message: "`name` is the old form of `slug` and `title`, which this project sets too; delete `name`")], "\(key)")
         }
-        // "Shop" and "shop" both make the slug `shop`: the second is the one rejected.
         #expect(rejection("[[projects]]\nslug = \"shop\"\nrepositories = [\"o/a\"]\n[[projects]]\nname = \"Shop\"\nrepositories = [\"o/b\"]\n")
             == [ConfigurationIssue(line: 5, message: "project slug `shop` is used twice (first on line 2)")])
     }
@@ -832,7 +815,6 @@ struct ConfigurationMergeTests {
         let settings = config.settings(for: config.projects[0])
         #expect(settings.slug == "overrides")
         #expect(settings.repositories == ["o/a", "o/b"])
-        // `authors` merges key by key too: the project's `hide`, the default `show`.
         #expect(settings.pullRequests == PullRequestSettings(
             show: true, closedWindow: 3 * 86_400, drafts: true, authors: AuthorFilter(show: [.others], hide: [.login("octocat")])
         ))

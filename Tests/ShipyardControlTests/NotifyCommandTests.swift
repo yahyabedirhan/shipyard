@@ -4,25 +4,16 @@ import ShipyardControl
 import ShipyardNotices
 import Testing
 
-/// `shipyard notice send` as an agent runs it on the Mac, through
-/// `ShipyardCLI.run` with the Mac's table, an in-memory app at the end of
-/// the socket and a recording launcher: the notice it sends, what it
-/// prints and how it exits. Whether the notice is shown is the app's to
-/// say (`NoticeTests`); its verdict comes back as the reply.
 @Suite("The notice command")
 struct NotifyCommandTests {
     static let support = URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true)
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
 
-    /// A working folder's `origin`, or none.
     struct Git: GitRemoteLookup {
         var origin: String?
         func origin(in folder: URL) -> String? { origin }
     }
 
-    /// Runs `shipyard <arguments>` in the Mac's build, in a checkout at
-    /// `folder` whose `origin` is `origin`, with the environment
-    /// `variables`, against `transport`.
     func shipyard(
         _ arguments: [String],
         origin: String? = "git@github.com:owner/shop.git",
@@ -35,7 +26,6 @@ struct NotifyCommandTests {
         table.add(NoticeCommands.entries(route: ControlNoticeRoute(
             support: Self.support, transport: transport, processes: FakeProcessTable.agent
         )))
-        // `app` is there too, as in the real table, so a launch would show.
         table.add(ControlCommands.entries(
             support: Self.support, launcher: launcher, transport: transport, processes: FakeProcessTable.agent, pause: { _ in }
         ))
@@ -75,7 +65,6 @@ struct NotifyCommandTests {
             #expect(result == CommandResult(output: "shown\n"))
             #expect(app.requests == [.notify(.show(notice))])
         } else {
-            // After --, a flag's word is the title, and the checkout files it.
             #expect(result.status == 1)
             #expect(app.requests.isEmpty)
         }

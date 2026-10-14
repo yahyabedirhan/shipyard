@@ -2,13 +2,9 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-/// The settings menu's items and marks, and the words of each status view,
-/// as `PanelText` gives them to the panel.
 @Suite("The settings menu and the status views")
 struct StatusViewTextTests {
     private let command = "mkdir -p ~/.local/bin && ln -sf /Applications/Shipyard.app/Contents/Helpers/shipyard ~/.local/bin/shipyard"
-
-    // MARK: - The settings menu
 
     @Test("the settings menu lists the configuration file, the four parts' Set up items, then Sign out once signed in")
     func settingsMenuOrder() {
@@ -45,8 +41,6 @@ struct StatusViewTextTests {
         #expect(notInstalled.filter(\.isChecked).isEmpty)
     }
 
-    // MARK: - Opening a view by name
-
     @Test("a view is named as the panel command takes it, in any case, and projects names none; another name is refused with the names")
     func viewNames() throws {
         #expect(SetupPart.allCases.map(\.commandName) == ["github", "notion", "skill", "cli"])
@@ -57,8 +51,6 @@ struct StatusViewTextTests {
             try SetupPart.named("gh")
         }
     }
-
-    // MARK: - The Shipyard CLI view
 
     @Test("linked, the CLI view shows the link's path and nothing to do")
     func cliLinked() {
@@ -110,8 +102,6 @@ struct StatusViewTextTests {
         #expect(page.detail == detail)
         #expect(page.primary == nil && page.commands.isEmpty && page.alternatives.isEmpty)
     }
-
-    // MARK: - The Shipyard Skill view
 
     private let skillCommand = "npx -y skills add yahyabedirhan/shipyard -g -y"
 

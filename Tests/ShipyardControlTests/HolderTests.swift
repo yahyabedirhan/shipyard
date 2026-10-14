@@ -3,14 +3,8 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// The holder every app control request carries, as the `shipyard` command
-/// works it out on each call: through `ShipyardCLI.run` with the Mac's
-/// table, an in-memory app and a fake process table, what each command
-/// sends as its `holder`.
 @Suite("The holder")
 struct HolderTests {
-    /// Runs `shipyard <arguments>` in `/work/shop` with `variables`, in the
-    /// process tree `processes`, and returns the holders the app was sent.
     func holders(
         _ arguments: [String],
         variables: [String: String] = [:],

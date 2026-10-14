@@ -5,12 +5,10 @@ import Testing
 
 @Suite("Arrangement")
 struct ArrangementTests {
-    /// Friday 2026-09-25 12:00 UTC.
     private let now = Date(timeIntervalSince1970: 1_790_337_600)
     private let hour: TimeInterval = 3600
     private let day: TimeInterval = 86_400
 
-    /// Weeks start on Monday, in UTC, so the buckets don't depend on the machine.
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "UTC")!
@@ -68,8 +66,6 @@ struct ArrangementTests {
         groups.map { $0.rows.map(\.number) }
     }
 
-    // MARK: - The default: today's grouping
-
     @Test("by default: pull requests, pings, issues, runs; open by last update, then closed by when they closed")
     func defaultIsToday() {
         let items = [
@@ -96,8 +92,6 @@ struct ArrangementTests {
             #expect(arrange([], groupBy: groupBy).isEmpty)
         }
     }
-
-    // MARK: - Grouping
 
     @Test("by repository: A to Z, ignoring case")
     func byRepository() {
@@ -130,8 +124,6 @@ struct ArrangementTests {
 
     @Test("by date: Today, Yesterday, This week, This month, Older, newest first")
     func byDate() {
-        // Friday the 25th at noon: yesterday is Thursday, the week began
-        // Monday the 21st, the month on the 1st.
         let items = [
             item(1, updated: 40 * day),
             item(2, updated: 11 * hour),
@@ -176,8 +168,6 @@ struct ArrangementTests {
         #expect(numbers(groups) == [[3, 1, 2]])
     }
 
-    // MARK: - Sorting
-
     @Test("sort-by created: newest created first, open before closed")
     func sortByCreated() {
         let items = [
@@ -208,8 +198,6 @@ struct ArrangementTests {
         #expect(numbers(arrange(items)) == [[3, 1, 2]])
     }
 
-    // MARK: - Subheaders or dividers
-
     @Test("a group counts its rows that need attention")
     func attentionCount() {
         let rows = [MenuRow(item(1), needsAttention: true), MenuRow(item(2)), MenuRow(item(3, .issue), needsAttention: true)]
@@ -219,9 +207,6 @@ struct ArrangementTests {
         #expect(groups.map(\.attentionCount) == [1, 1])
     }
 
-    // MARK: - Show more
-
-    /// Seven open pull requests, #1 the newest, and two issues.
     private var sevenAndTwo: [Item] {
         (1...7).map { item($0, updated: Double($0) * hour) } + [item(8, .issue), item(9, .issue)]
     }
@@ -276,8 +261,6 @@ struct ArrangementTests {
             }
         }
     }
-
-    // MARK: - Words
 
     @Test("a subheader shows a kind or a date in capitals, a repository or a login as written")
     func headerWords() {

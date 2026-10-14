@@ -8,13 +8,8 @@ import ShipyardCore
 import ShipyardNotices
 import Testing
 
-/// The app's listener for notices from other machines, on a real socket:
-/// bound to 127.0.0.1 alone, it hands each `POST /notify` on with its
-/// `Tailscale-User-Login` and answers with the verdict, posted as
-/// `tailscale serve` passes a request on, with the login it adds.
 @Suite("The notice listener")
 struct NoticeListenerTests {
-    /// What the listener handed on.
     final class Handed: @unchecked Sendable {
         private let lock = NSLock()
         private var value: [(NoticeRequest, String?)] = []
@@ -22,7 +17,6 @@ struct NoticeListenerTests {
         func add(_ request: NoticeRequest, _ login: String?) { lock.withLock { value.append((request, login)) } }
     }
 
-    /// A listener on a free port answering `verdict`, recording into `handed`.
     func listener(_ handed: Handed, verdict: NoticeVerdict = .shown) throws -> NoticeListener {
         try NoticeListener.start(port: 0) { request, login in
             handed.add(request, login)
@@ -30,12 +24,10 @@ struct NoticeListenerTests {
         }
     }
 
-    /// Sends `request` to 127.0.0.1:`port` as raw bytes and reads the whole answer.
     func exchange(_ request: String, port: Int) async throws -> String {
         try await exchange(Data(request.utf8), port: port)
     }
 
-    /// Sends `request`'s bytes to 127.0.0.1:`port` and reads the whole answer.
     func exchange(_ request: Data, port: Int) async throws -> String {
         // Off the cooperative pool: a blocking read there could starve the
         // listener's own tasks, which answer on it.
@@ -44,8 +36,6 @@ struct NoticeListenerTests {
         }
     }
 
-    /// `body`, which blocks (the command's route waits on a semaphore), run
-    /// on a thread of its own rather than the cooperative pool.
     static func offPool<T: Sendable>(_ body: @escaping @Sendable () -> T) async -> T {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async { continuation.resume(returning: body()) }
@@ -66,7 +56,6 @@ struct NoticeListenerTests {
         return String(decoding: answer, as: UTF8.self)
     }
 
-    /// A connection to 127.0.0.1:`port`, its reads giving up after 5 seconds.
     static func connected(port: Int) throws -> Int32 {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         var address = sockaddr_in()
@@ -88,7 +77,6 @@ struct NoticeListenerTests {
 
     struct ConnectFailed: Error {}
 
-    /// A `POST /notify` carrying `body`, with `login` as `tailscale serve` adds it.
     static func post(_ body: Data, login: String? = "me@example.com") -> Data {
         let loginLine = login.map { "\(TailnetWire.loginHeader): \($0)\r\n" } ?? ""
         let head = "POST /notify HTTP/1.1\r\nHost: my-mac:47420\r\n\(loginLine)"
@@ -96,7 +84,6 @@ struct NoticeListenerTests {
         return Data(head.utf8) + body
     }
 
-    /// `request`'s JSON, as the command sends it.
     static func json(_ request: NoticeRequest) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
@@ -130,7 +117,6 @@ struct NoticeListenerTests {
         #expect(handed.all.map(\.0) == [.show(notice)])
         #expect(handed.all.map(\.1) == ["me@example.com"])
 
-        // The command sends no login: only tailscale serve adds one. The route waits on a semaphore, so it runs off the cooperative pool.
         let direct = await Self.offPool { route.deliver(.show(notice), environment: CommandEnvironment(workingDirectory: URL(fileURLWithPath: "/"), variables: [:])) }
 
         #expect(direct == .refused(NoticeRules.noLogin))
@@ -163,10 +149,8 @@ struct NoticeListenerTests {
         ("POST /notify HTTP/1.1\r\nHost: m\r\nTailscale-User-Login: me@x\r\nContent-Length: 8\r\n\r\nnot json", "400", "the request didn't read as a notice's JSON, so nothing was done"),
         ("POST /notify HTTP/1.1\r\nHost: m\r\nTailscale-User-Login: me@x\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n", "411", "send the notice with a Content-Length"),
         ("POST /notify HTTP/1.1\r\nHost: m\r\nTailscale-User-Login: me@x\r\nContent-Length: 8388609\r\n\r\n", "413", "a notice is at most 8 MB"),
-        // Without a login, or with an empty one, it's refused on its head alone: the body it promises is never waited for.
         ("POST /notify HTTP/1.1\r\nHost: m\r\nContent-Length: 4096\r\n\r\n", "403", NoticeRules.noLogin),
         ("POST /notify HTTP/1.1\r\nHost: m\r\nTailscale-User-Login: \r\nContent-Length: 4096\r\n\r\n", "403", NoticeRules.noLogin),
-        // Nothing passes for the login tailscale serve sets: a second one, or a name with space in it.
         ("POST /notify HTTP/1.1\r\nTailscale-User-Login: a@x\r\nTailscale-User-Login: b@x\r\nContent-Length: 16\r\n\r\n{\"title\":\"Done\"}",
          "400", "the request doesn't read as HTTP"),
         ("POST /notify HTTP/1.1\r\nTailscale-User-Login : a@x\r\nContent-Length: 16\r\n\r\n{\"title\":\"Done\"}",
@@ -189,7 +173,6 @@ struct NoticeListenerTests {
         let handed = Handed()
         let listener = try listener(handed)
         defer { listener.close() }
-        // Connections that send nothing hold their place until they close.
         let held = try (0..<NoticeListener.mostConnections).map { _ in try Self.connected(port: listener.port) }
 
         let raw = try await exchange(Self.post(try Self.json(.show(Notice(title: "One too many")))), port: listener.port)
@@ -209,7 +192,6 @@ struct NoticeListenerTests {
         #expect(handed.all.map(\.0) == [.show(Notice(title: "Room again"))])
     }
 
-    /// This Mac's IPv4 addresses other than loopback.
     static func otherIPv4Addresses() -> [String] {
         var first: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&first) == 0 else { return [] }
@@ -228,7 +210,6 @@ struct NoticeListenerTests {
         return found
     }
 
-    /// Whether a TCP connection to `host`:`port` is accepted.
     static func connects(to host: String, port: Int) -> Bool {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         defer { close(descriptor) }

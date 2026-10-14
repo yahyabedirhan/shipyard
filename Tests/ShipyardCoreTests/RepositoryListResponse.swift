@@ -1,11 +1,7 @@
 import Foundation
 @testable import ShipyardCore
 
-/// GraphQL answers to the repository resolver's lookups, built in the test:
-/// a repository group's (`viewer.repositories`) or an owner's
-/// (`repositoryOwner(login).repositories`), one page each.
 struct RepositoryListResponse {
-    /// One repository as the listing describes it.
     struct Repository {
         var slug: String
         var isArchived = false
@@ -18,13 +14,9 @@ struct RepositoryListResponse {
         }
     }
 
-    /// The body marker of a group's lookup, for `StubHTTP.on(_:_:body:answers:)`.
     static let groupQuery = "ShipyardGroupRepositories"
-    /// The body marker of an owner's lookup.
     static let ownerQuery = "ShipyardOwnerRepositories"
 
-    /// One page of `repositories`; `next` is the cursor of the page after,
-    /// when there is one.
     static func page(_ repositories: [Repository], next: String? = nil, owner: Bool = false) -> StubHTTP.Answer {
         let connection: [String: Any] = [
             "pageInfo": ["hasNextPage": next != nil, "endCursor": next.map { $0 as Any } ?? NSNull()],
@@ -41,7 +33,6 @@ struct RepositoryListResponse {
         return answer(["\(owner ? "repositoryOwner" : "viewer")": ["repositories": connection]])
     }
 
-    /// The answer for an owner GitHub doesn't know, or hides from the token.
     static var missingOwner: StubHTTP.Answer { answer(["repositoryOwner": NSNull()]) }
 
     private static func answer(_ data: [String: Any]) -> StubHTTP.Answer {

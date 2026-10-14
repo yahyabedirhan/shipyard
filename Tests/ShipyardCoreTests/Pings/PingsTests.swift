@@ -19,12 +19,10 @@ private let shop = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, none in the blog.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Sends a ping through the CLI and returns its id.
     @discardableResult
     func ping(_ title: String, project: String = "shop") throws -> String {
         let result = cli("ping", "send", title, "--project", project)
@@ -32,19 +30,15 @@ private extension Harness {
         return result.pingID
     }
 
-    /// The ping rows of `project`.
     func pingRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
 
-    /// The group titles of `project`, in order.
     func groupTitles(_ project: String = "shop") -> [String] {
         section(project)?.groups.map(\.title) ?? []
     }
 }
 
-/// A ping sent with the CLI, through the shared store, to the menu: end to
-/// end across the ping command and the `Shipyard` orchestrator.
 @Suite("Pings in the menu")
 @MainActor
 struct PingsTests {
@@ -83,8 +77,6 @@ struct PingsTests {
     func sentWhileRunning() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
         let requests = harness.graphQLRequests.count
-        // Starting made the store's directory, so even before the first
-        // ping the watch is on it alone, not on the support folder.
         #expect(harness.pingStore.watchedDirectory.standardizedFileURL == harness.pingStore.directory.standardizedFileURL)
         #expect(try FileManager.default.contentsOfDirectory(atPath: harness.pingStore.directory.path).isEmpty)
 
@@ -93,8 +85,6 @@ struct PingsTests {
 
         #expect(harness.pingRows().map(\.title) == ["Waiting for your input"])
         #expect(harness.graphQLRequests.count == requests)
-        // From then on the watch is on the pings alone: the ping's file is
-        // in the watched directory, and saving app state writes elsewhere.
         let watched = harness.pingStore.watchedDirectory
         #expect(watched.standardizedFileURL == harness.pingStore.directory.standardizedFileURL)
         let entries = { try FileManager.default.contentsOfDirectory(atPath: watched.path).sorted() }

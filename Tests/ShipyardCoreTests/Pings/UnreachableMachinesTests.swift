@@ -11,29 +11,23 @@ private let shop = """
 
     """
 
-/// `shop`, and two remote machines.
 private let twoMachines = "[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"]\n\n" + shop
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// A harness signed in with `config`, whose Herdr has saved
-    /// `hetzner-vps` and `netcup-vps` listing `hetzner` and `netcup`,
-    /// started and polled once.
     static func polled(_ config: String = twoMachines, hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup, polled: true)
         return harness
     }
 
-    /// The panel's quiet lines about machines, as it shows them.
     var machineLines: [String] {
         shipyard.menu.machineNotices.map(PanelText.machineNotice)
     }
 }
 
-/// Waits, a moment at a time, until `condition` holds; false after about two seconds.
 @MainActor
 private func eventually(_ condition: () -> Bool) async -> Bool {
     for _ in 0..<1000 {
@@ -43,10 +37,6 @@ private func eventually(_ condition: () -> Bool) async -> Bool {
     return condition()
 }
 
-/// Machines that don't answer: one down, unknown to Herdr, disabled, too
-/// slow or too far apart in version keeps its last pings, and the panel
-/// says why in one quiet line until its next good poll. End to end through
-/// `Harness`, over a fake `herdr` with two saved machines.
 @Suite("Machines that don't answer")
 @MainActor
 struct UnreachableMachinesTests {
@@ -70,7 +60,6 @@ struct UnreachableMachinesTests {
         #expect(harness.titles("hetzner-vps") == ["Tests are red"])
         #expect(harness.machineLines == ["netcup-vps is disabled in Herdr. Its last pings stay listed."])
         #expect(harness.machineTimer.armed == Shipyard.machinePollInterval)
-        // A GitHub refresh keeps the line.
         await harness.timer.fire()
         #expect(harness.machineLines == ["netcup-vps is disabled in Herdr. Its last pings stay listed."])
 
@@ -132,7 +121,6 @@ struct UnreachableMachinesTests {
         harness.herdr.setPings([remotePing("a2", "Fixed")], on: "hetzner-vps")
         let polling = Task { await harness.poll() }
 
-        // hetzner lists while netcup still hangs, and GitHub refreshes meanwhile.
         #expect(await eventually { harness.titles("hetzner-vps") == ["Fixed"] })
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
         let requests = harness.graphQLRequests.count
@@ -159,14 +147,10 @@ struct UnreachableMachinesTests {
         #expect(harness.titles("hetzner-vps") == ["Fixed"])
         #expect(harness.titles("netcup-vps") == ["Merge it?"])
         #expect(harness.graphQLRequests.count > requests)
-        // The machine timer comes back a full interval after.
         #expect(harness.machineTimer.armed == Shipyard.machinePollInterval)
     }
 }
 
-/// The lines Herdr prints when it refuses a machine before asking it
-/// (`cli/target.rs`, `resolve_machine`, at Herdr commit 65e35a3), beyond
-/// the unknown and disabled labels the scenarios above cover.
 @Suite("Herdr's machine refusals")
 struct HerdrRefusalTests {
     @Test("an ambiguous label is read; another machine's refusal, or a failed connection, isn't")

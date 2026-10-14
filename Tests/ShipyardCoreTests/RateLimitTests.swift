@@ -5,7 +5,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// The projects `graphql-pull-requests.json` answers for.
 private let projects = """
     [[projects]]
     slug = "e-commerce"
@@ -17,7 +16,6 @@ private let projects = """
 
     """
 
-/// `graphql-pull-requests.json` (which costs 3 points) with `remaining` left.
 private func pullRequests(remaining: Int = 4990, reset: Date = Harness.rateLimitReset) throws -> StubHTTP.Answer {
     try Harness.fixture("graphql-pull-requests.json", remaining: remaining, reset: reset)
 }
@@ -38,14 +36,12 @@ struct RateLimitTests {
         )
         let shipyard = harness.shipyard
 
-        // Plenty left: the configured interval, and the footer shows GraphQL's limit.
         #expect(harness.timer.armed == 120)
         #expect(shipyard.menu.refreshDelay == .configured(120))
         #expect(shipyard.menu.rateIndicator?.apis == [
             RateUsage(api: .graphql, remaining: 4990, limit: 5000, resetAt: Harness.rateLimitReset, level: .normal),
         ])
 
-        // 900 of 5,000 is 18%: every 10 minutes, amber.
         harness.clock.advance(by: 120)
         await harness.timer.fire()
         #expect(harness.timer.armed == 600)
@@ -53,19 +49,16 @@ struct RateLimitTests {
         #expect(shipyard.menu.rateIndicator?.level == .low)
         #expect(shipyard.menu.canRefreshNow)
 
-        // Exhausted (a 200 with RATE_LIMITED): paused until 12:42, red, rows kept.
         harness.clock.advance(by: 600)
         let rows = shipyard.menu.sections
         await harness.timer.fire()
         let pausedFor = Harness.rateLimitReset.timeIntervalSince(harness.clock.now)
         #expect(shipyard.fetchError == .rateLimited(resetAt: Harness.rateLimitReset, api: .graphql))
         #expect(shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
-        // The timer still comes back every interval, to list again (windows pass).
         #expect(pausedFor > 120)
         #expect(harness.timer.armed == 120)
         #expect(shipyard.menu.rateIndicator?.level == .exhausted)
         #expect(shipyard.menu.rateIndicator?.apis.first?.remaining == 0)
-        // The pause banner says why; the fetch error's banner doesn't repeat it.
         #expect(shipyard.menu.bannerFetchError == nil)
         #expect(shipyard.menu.sections == rows)
         #expect(shipyard.menu.lastUpdated == Harness.now.addingTimeInterval(120))
@@ -73,14 +66,11 @@ struct RateLimitTests {
         #expect(!shipyard.canRefreshNow)
         #expect(harness.graphQLRequests.count == 3)
 
-        // ⌘R, opening the panel, waking: nothing is sent while paused.
         await shipyard.refresh()
         await shipyard.refresh()
         #expect(harness.graphQLRequests.count == 3)
         #expect(harness.timer.armed == 120)
 
-        // A timer that fires before the reset sends nothing and comes back
-        // after the interval, or at the reset when that's sooner.
         harness.clock.advance(by: 1000)
         await harness.timer.fire()
         #expect(harness.graphQLRequests.count == 3)
@@ -91,7 +81,6 @@ struct RateLimitTests {
         #expect(harness.graphQLRequests.count == 3)
         #expect(harness.timer.armed == 60)
 
-        // At the reset time: refreshes resume at the configured interval.
         harness.clock.set(Harness.rateLimitReset)
         await harness.timer.fire()
         #expect(harness.graphQLRequests.count == 4)
@@ -140,7 +129,6 @@ struct RateLimitTests {
 
     @Test("a refresh costing more than the share stretches the interval, and the model says why")
     func stretched() async throws {
-        // 3 points a refresh at 1% of 5,000 an hour: one every 216 s.
         let harness = try await Harness.started(
             config: "[rate-limit]\nmax-share-percent = 1\n\n" + projects,
             graphQL: pullRequests()
@@ -158,14 +146,12 @@ struct RateLimitTests {
         #expect(shipyard.menu.refreshDelay == .configured(120))
         #expect(shipyard.menu.rateIndicator != nil)
 
-        // Seen while the refresh the edit starts is still waiting on GitHub.
         let during = Locked<(RefreshDelay?, RateIndicator?)?>(nil)
         harness.stub.onSend { request in
             guard request.url == GitHubClient.graphQLURL else { return }
             let menu = await shipyard.menu
             during.withValue { $0 = (menu.refreshDelay, menu.rateIndicator) }
         }
-        // 3 points a refresh at 1% of 5,000 an hour: one every 216 s.
         try harness.writeConfig("[rate-limit]\nmax-share-percent = 1\nshow = \"never\"\n\n" + projects)
         await shipyard.reloadConfiguration()
 

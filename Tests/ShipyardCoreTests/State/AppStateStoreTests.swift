@@ -101,8 +101,6 @@ struct AppStateStoreTests {
         let directory = temporaryDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = AppStateStore(directory: directory)
-        // As a later version might write it: known and notified in shapes this
-        // build can't read (dropped, not fatal), and a field nobody knows yet.
         let later = """
             {
               "version": 1,
@@ -125,7 +123,6 @@ struct AppStateStoreTests {
         #expect(store.state.collapsed == ["shop"])
         #expect(store.state.attention.seen.isEmpty)
 
-        // A known item from before `present` was kept still loads.
         let older = """
             {
               "version": 1,
@@ -137,7 +134,6 @@ struct AppStateStoreTests {
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.known.items["https://github.com/o/r/pull/1"]?.present == .distantPast)
 
-        // A ping-number section this build can't read drops alone; the others keep their numbers.
         let numbers = """
             {
               "version": 1,
@@ -256,7 +252,6 @@ struct AppStateStoreTests {
         #expect(try Data(contentsOf: aside) == Data(newer.utf8))
         #expect(store.state == AppState())
 
-        // The current version, or none, still loads.
         try Data(#"{"version": \#(AppState.currentVersion), "collapsed": ["shop"]}"#.utf8).write(to: store.url)
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.collapsed == ["shop"])

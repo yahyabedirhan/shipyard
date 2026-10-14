@@ -2,8 +2,6 @@ import Foundation
 import ShipyardCore
 import Testing
 
-/// The real file system, except that making a link fails as a folder
-/// without write permission would.
 private struct NoPermission: LinkFileSystem {
     struct Denied: LocalizedError {
         var errorDescription: String? { "You don't have permission to save the file “shipyard” in the folder “bin”" }
@@ -16,7 +14,6 @@ private struct NoPermission: LinkFileSystem {
     func createSymbolicLink(at url: URL, to destination: URL) throws { throw Denied() }
 }
 
-/// A file system with nothing in it, for the words alone.
 private struct Empty: LinkFileSystem {
     func fileExists(at url: URL) -> Bool { false }
     func entry(at url: URL) -> LinkEntry { .none }
@@ -24,7 +21,6 @@ private struct Empty: LinkFileSystem {
     func createSymbolicLink(at url: URL, to destination: URL) throws {}
 }
 
-/// A home folder and an app bundle with its CLI, in a fresh temporary folder.
 private struct Sandbox {
     let root: URL
     let home: URL
@@ -73,7 +69,6 @@ struct CLILinkTests {
         let sandbox = try Sandbox()
         defer { sandbox.remove() }
         try sandbox.makeBin()
-        // A relative link to the same file counts too.
         let relative = "../../../Applications/Shipyard.app/Contents/Helpers/shipyard"
         try FileManager.default.createSymbolicLink(atPath: sandbox.link.path, withDestinationPath: relative)
 

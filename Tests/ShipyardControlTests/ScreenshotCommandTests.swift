@@ -3,10 +3,6 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard app capture …` as an agent runs it, through `ShipyardCLI.run`
-/// with the Mac's table and an in-memory app at the end of the socket: the
-/// request it sends (its path made absolute against the working folder),
-/// what it prints and how it exits.
 @Suite("The app capture command")
 struct ScreenshotCommandTests {
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {

@@ -5,7 +5,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// What `ntn api` was asked, and answers with.
 private final class FakeNtn: Sendable {
     private let calls = Locked<[(executable: String, arguments: [String])]>([])
     private let answer: NtnCLI.Output?
@@ -31,9 +30,6 @@ private func output(_ status: Int32, out: String = "", err: String = "") -> NtnC
     NtnCLI.Output(status: status, standardOutput: Data(out.utf8), standardError: err)
 }
 
-/// The notes read Notion through `ntn api`, Notion's CLI, as the HTTP
-/// transport `NotionClient` sends through: each request becomes one run,
-/// and the run's exit code and error line become the status Notion gave.
 @Suite("ntn as the notes' transport")
 struct NtnCLITests {
     @Test("a request runs ntn api with its path, query, method, version and JSON body")
@@ -57,16 +53,13 @@ struct NtnCLITests {
     @Test(
         "ntn's exit and error line come back as Notion's status",
         arguments: [
-            // Logged out, no workspace, or a token Notion stopped taking: exit 4.
             (output(4, err: "error: No workspace selected.\n  hint: Run `ntn login` first"), NotionError.unauthorized),
             (output(4, err: "error: Public API request failed: API token is invalid."), NotionError.unauthorized),
-            // An API error: exit 5, with the status and Notion's code in the line.
             (
                 output(5, err: "error: Public API request failed (404 Not Found object_not_found): Could not find page with ID: x."),
                 NotionError.http(404, code: "object_not_found", message: "Could not find page with ID: x.")
             ),
             (output(5, err: "error: Public API request failed (429 Too Many Requests rate_limited): slow down"), NotionError.rateLimited(retryAfter: nil)),
-            // Anything else is the run's own failure, in its first line.
             (output(1, err: "error: connection refused\nmore"), NotionError.network("ntn: error: connection refused")),
         ]
     )

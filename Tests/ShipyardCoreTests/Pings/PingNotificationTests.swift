@@ -20,12 +20,10 @@ private let shop = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, none in the blog.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Sends a ping through the CLI and returns its id.
     @discardableResult
     func ping(_ title: String, project: String = "shop") throws -> String {
         let result = cli("ping", "send", title, "--project", project)
@@ -33,15 +31,11 @@ private extension Harness {
         return result.pingID
     }
 
-    /// The ping rows of `project`.
     func pingRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
 }
 
-/// A new ping posts a notification through the notification rules, as the
-/// event `ping.sent`: end to end from the CLI or the store to what the
-/// recording notifier was asked to post.
 @Suite("A ping's notification")
 @MainActor
 struct PingNotificationTests {
@@ -101,7 +95,6 @@ struct PingNotificationTests {
         await harness.shipyard.reloadPings()
         #expect(harness.pingNotifications.map(\.title) == ["shop · Waiting for your input", "blog · Another one"])
 
-        // The same id with new content (a replace) posts no second banner.
         var replaced = try #require(harness.pingStore.ping(id: id))
         replaced.title = "Still waiting, 10 min"
         try harness.pingStore.save(replaced)
@@ -149,7 +142,6 @@ struct PingNotificationTests {
         await harness.shipyard.reloadPings()
 
         #expect(harness.pingNotifications.map(\.title) == ["blog · Heard"])
-        // Not notified isn't the same as seen: the silent one still needs attention.
         #expect(harness.pingRows().first?.needsAttention == true)
     }
 
@@ -172,8 +164,6 @@ struct PingNotificationTests {
     @Test("a ping the project doesn't list isn't notified")
     func hiddenNotNotified() async throws {
         let harness = try await Harness.started(config: "[defaults.pings]\nshow = false\n" + shop, graphQL: onePullRequest)
-        // The CLI refuses a ping no project shows, so this one was filed
-        // before the project hid pings.
         try harness.pingStore.save(Ping(id: "k7qm2x", title: "Hidden", projects: ["shop"], sent: harness.clock.now))
 
         await harness.shipyard.reloadPings()

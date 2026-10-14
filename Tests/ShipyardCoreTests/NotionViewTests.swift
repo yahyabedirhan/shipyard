@@ -16,8 +16,6 @@ private let emptySearch = StubHTTP.Answer.json(#"{"object":"list","results":[],"
 
 @MainActor
 private extension Harness {
-    /// Started with ntn as `ntn` and Notion answering as `NotionStub`
-    /// records, Notion not connected, then the Notion view's check.
     static func notionChecked(_ ntn: FakeNtnRoute.State, workspace: (StubHTTP) -> Void = { _ in }) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(ntn)
@@ -31,12 +29,9 @@ private extension Harness {
     }
 }
 
-/// The Notion view: where ntn stands, found through the route the notes
-/// are read through, and the view's words for each status.
 @Suite("The Notion view")
 @MainActor
 struct NotionViewTests {
-    // MARK: - The check
 
     @Test("the check finds ntn missing, logged out, or logged in to its workspace by name, with or without a Shipyard Notes page", arguments: [
         (FakeNtnRoute.State.missing, false, NotionStatus.ntnMissing),
@@ -91,8 +86,6 @@ struct NotionViewTests {
         _ = await harness.notesTimer.fire()
         #expect(!harness.shipyard.notionIsSetUp)
     }
-
-    // MARK: - The words
 
     @Test("no ntn: the install command and ntn login, each in a box, and Check again")
     func ntnMissingPage() {

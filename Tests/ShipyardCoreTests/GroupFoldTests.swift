@@ -12,9 +12,6 @@ private typealias Issue = PullRequestsResponse.Issue
 private let web = "yahyabedirhan/shop-web"
 private let api = "yahyabedirhan/shop-api"
 
-/// One project, "shop", over two repositories with issues shown, arranged
-/// by `settings` under `[menu] layout`; `more` adds lines after it (another
-/// project).
 private func config(_ settings: String = "subsections = true", layout: MenuLayout = .list, more: String = "") -> String {
     """
     [menu]
@@ -32,7 +29,6 @@ private func config(_ settings: String = "subsections = true", layout: MenuLayou
     """
 }
 
-/// Web: PRs #1 and #2, issue #5; api: PR #3.
 private let answer = PullRequestsResponse.answer([
     PullRequestsResponse(web, [PR(1), PR(2)], issues: [Issue(5)]),
     PullRequestsResponse(api, [PR(3)], issues: []),
@@ -49,7 +45,6 @@ private extension Harness {
         shop?.groups.first { $0.id == id }
     }
 
-    /// `collapsedGroups` as `state.json` has it.
     var savedFolds: [[String: String]]? {
         guard let data = try? Data(contentsOf: stateURL),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
@@ -57,9 +52,6 @@ private extension Harness {
     }
 }
 
-// A subsection (a group under a subheader) folds and unfolds like a
-// project: the fold is app state, survives a relaunch, and is pruned with
-// its group or its project. A group drawn after a divider doesn't fold.
 @MainActor
 @Suite("Folding a subsection")
 struct GroupFoldTests {
@@ -77,10 +69,8 @@ struct GroupFoldTests {
         #expect(folded.rows == before.rows)
         #expect(folded.attentionCount == before.attentionCount)
         #expect(harness.group(issues)?.isFolded == false)
-        // Its rows still count, in the project and in the menu bar.
         #expect(harness.shop?.attentionCount == 4)
         #expect(harness.shipyard.menu.menuBarLabel == .total(4))
-        // No refresh: only the app state changed.
         #expect(harness.graphQLRequests.count == 1)
 
         harness.shipyard.toggleGroup(pullRequests)
@@ -149,7 +139,6 @@ struct GroupFoldTests {
         harness.shipyard.toggleGroup(issues)
         harness.shipyard.toggleGroup(pullRequests)
 
-        // The issue was closed: its group is gone, and so is its fold.
         harness.graphQL([PullRequestsResponse.answer([
             PullRequestsResponse(web, [PR(1), PR(2)], issues: []),
             PullRequestsResponse(api, [PR(3)], issues: []),
@@ -213,7 +202,6 @@ struct GroupFoldTests {
         #expect(harness.shipyard.menu.fetchError != nil)
         #expect(harness.shipyard.appStateStore.state.collapsedGroups == [issues])
 
-        // Web, which has the issue, can't be fetched: the group may come back.
         harness.graphQL([PullRequestsResponse.answer([
             PullRequestsResponse(web, [], missing: true),
             PullRequestsResponse(api, [PR(3)], issues: []),
@@ -236,7 +224,6 @@ struct GroupFoldTests {
         #expect(all.rowPlaces.last == .groupHeader(allIssues, in: nil))
         #expect(harness.shipyard.menu.tabContent(for: .project("shop")).groups.map(\.isFolded) == [false, false])
 
-        // Kept after a refresh while the All tab lists issues.
         harness.graphQL([answer])
         await harness.timer.fire()
         #expect(harness.shipyard.appStateStore.state.collapsedGroups == [allIssues])

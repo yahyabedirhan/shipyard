@@ -15,7 +15,6 @@ private let shop = """
 
     """
 
-/// Two projects over the same repository: everything, and only what waits on the user.
 private let shopAndQueue = """
     [[projects]]
     slug = "shop"
@@ -49,7 +48,6 @@ private func shopAnswer(
 
 @MainActor
 private extension Harness {
-    /// The numbers of the rows `project` lists, in ascending order.
     func numbers(in project: String) -> [Int] {
         (section(project)?.rows.map(\.number) ?? []).sorted()
     }
@@ -58,7 +56,6 @@ private extension Harness {
 @Suite("Review requests come from one search, teams included")
 @MainActor
 struct ReviewRequestTests {
-    // MARK: - Teams count like the user
 
     @Test("a pull request asking for a review from the user's team needs attention, like a direct request")
     func teamRequestNeedsAttention() async throws {
@@ -89,8 +86,6 @@ struct ReviewRequestTests {
         #expect(harness.notifier.posted.map(\.title) == ["shop · Review requested on PR #1"])
     }
 
-    // MARK: - review-requested = true
-
     @Test("review-requested = true lists only the project's pull requests waiting on the user")
     func reviewRequestedListsOnlyWaiting() async throws {
         var team = pr(1)
@@ -103,7 +98,6 @@ struct ReviewRequestTests {
         merged.state = "MERGED"
         merged.closedAt = "2026-09-25T11:00:00Z"
         merged.reviewRequests = ["yabepa"]
-        // Waiting on the user, but in a repository neither project watches.
         var elsewhere = pr(5)
         elsewhere.reviewRequests = ["yabepa"]
         let search: PullRequestsResponse.ReviewSearch = .pullRequests([
@@ -116,7 +110,6 @@ struct ReviewRequestTests {
         )
 
         #expect(harness.numbers(in: "shop") == [1, 2, 3, 4, 7])
-        // Issues aren't pull requests: the setting leaves them as they are.
         #expect(harness.numbers(in: "queue") == [1, 2, 7])
     }
 
@@ -153,8 +146,6 @@ struct ReviewRequestTests {
         #expect(harness.numbers(in: "shop") == [2])
     }
 
-    // MARK: - The query
-
     @Test("the search goes out once, in the first batch, and pull requests aren't asked for their review requests")
     func searchInFirstBatch() async throws {
         let repositories = (0..<7).map { String(format: "yahyabedirhan/repo-%02d", $0) }
@@ -178,7 +169,6 @@ struct ReviewRequestTests {
         #expect(bodies[0].contains("first: 100"))
         #expect(!bodies[1].contains("search("))
         #expect(bodies.allSatisfy { !$0.contains("reviewRequests") })
-        // The search's cost is part of the first batch's, which the budget records.
         #expect(harness.shipyard.budget.costs[.graphql] == [5])
     }
 
@@ -190,8 +180,6 @@ struct ReviewRequestTests {
         #expect(harness.numbers(in: "shop") == [1])
         #expect(harness.graphQLRequests.allSatisfy { !$0.bodyText.contains("search(") })
     }
-
-    // MARK: - A failed search
 
     @Test("a failed search shows an error row in review-requested projects and leaves the rest as it was")
     func failedSearch() async throws {
@@ -207,7 +195,6 @@ struct ReviewRequestTests {
         #expect(harness.section("shop")?.errors.isEmpty == true)
         let errors = try #require(harness.section("queue")?.errors)
         #expect(errors.map(\.message) == ["review requests: Something went wrong while executing your query."])
-        // The last requests found are kept, so the queue still lists them.
         #expect(harness.numbers(in: "queue") == [2])
     }
 

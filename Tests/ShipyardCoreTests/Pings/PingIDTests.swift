@@ -20,13 +20,10 @@ private let shopAndBlog = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, none in the blog.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Runs `shipyard ping send` with `arguments`, requires it to work, lets the
-    /// app see the store change, and returns the id it printed.
     @discardableResult
     func send(_ arguments: String...) async throws -> String {
         let result = cli(["ping", "send"] + arguments)
@@ -35,34 +32,25 @@ private extension Harness {
         return result.pingID
     }
 
-    /// Runs `shipyard ping withdraw id`, requires it to work, and lets the
-    /// app see the store change.
     func withdraw(_ id: String) async throws {
         let result = cli("ping", "withdraw", id)
         try #require(result == CommandResult(output: id + "\n"), "\(result.error)")
         await shipyard.reloadPings()
     }
 
-    /// The ping rows in `project`.
     func pingRows(_ project: String = "shop") -> [MenuRow] {
         section(project)?.rows.filter { $0.kind == .ping } ?? []
     }
 
-    /// Refreshes with GitHub answering `onePullRequest` again.
     func refreshAgain() async {
         graphQL([onePullRequest])
         await shipyard.refresh()
     }
 }
 
-/// Ids are global: one names one ping wherever it's filed. Sending an id
-/// again replaces that ping without a second notification; withdrawing it
-/// removes the ping and its notification. End to end from the CLI through
-/// the store to the menu and the recording notifier.
 @Suite("A ping's id")
 @MainActor
 struct PingIDTests {
-    // MARK: --id
 
     @Test("--id names the ping, and the id is printed")
     func namedID() async throws {
@@ -77,7 +65,6 @@ struct PingIDTests {
 
     @Test("an id that isn't 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, is a usage error", arguments: [
         "Checkout", "-x", "_x", "a b", "a/b", "../x", "a.b", "é", "", String(repeating: "a", count: 65),
-        // A newline isn't part of an id, trailing or not.
         "build-42\n", "a\nb",
     ])
     func badID(id: String) throws {
@@ -108,8 +95,6 @@ struct PingIDTests {
         #expect(PingCommand.isID(id))
         #expect(harness.pingStore.ping(id: id)?.title == "Ready")
     }
-
-    // MARK: Replacing
 
     @Test("sending an id again replaces content, action and filing, starts its age again, and needs attention again")
     func replace() async throws {
@@ -160,8 +145,6 @@ struct PingIDTests {
         #expect(relaunched.pingNotifications.isEmpty)
         #expect(relaunched.notifier.removed.isEmpty)
     }
-
-    // MARK: Withdrawing
 
     @Test("withdraw removes the ping from the menu, the store and Notification Center, and prints its id")
     func withdraw() async throws {
@@ -275,8 +258,6 @@ struct PingIDTests {
         #expect(relaunched.pingNotifications.map(\.title) == ["shop · Waiting again"])
     }
 
-    // MARK: Dismissing and leaving
-
     @Test("dismissing a ping removes its banner, and its id sent again notifies again")
     func dismissRemovesBanner() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
@@ -306,8 +287,6 @@ struct PingIDTests {
         #expect(harness.notifier.removed == [banner.id])
     }
 
-    // MARK: --
-
     @Test("after --, everything is the title: withdraw, list, or a word starting with --")
     func endOfOptions() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
@@ -320,7 +299,6 @@ struct PingIDTests {
         #expect(harness.pingStore.ping(id: "word")?.title == "withdraw")
         #expect(harness.pingStore.ping(id: "listing")?.title == "list")
         #expect(harness.pingStore.ping(id: "flag")?.title == "--help")
-        // Only the first -- ends the flags; a second is the title.
         #expect(harness.pingStore.ping(id: "dashes")?.title == "--")
     }
 

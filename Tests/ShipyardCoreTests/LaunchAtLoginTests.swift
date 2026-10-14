@@ -2,8 +2,6 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-// `launch-at-login` registers shipyard as a login item (the default) or
-// removes it, when shipyard starts and whenever the configuration changes.
 @MainActor
 @Suite("Launch at login")
 struct LaunchAtLoginTests {
@@ -40,7 +38,6 @@ struct LaunchAtLoginTests {
 
     @Test("a file that's broken at launch leaves the login item alone, rather than applying the default")
     func brokenAtLaunch() async throws {
-        // Written as false before it broke: registering (the default) would undo that.
         let harness = try Harness(config: "version = 1\nlaunch-at-login = false\nrefresh-interval-seconds = \"oops\"\n")
         await harness.shipyard.start()
         #expect(harness.shipyard.configError != nil)

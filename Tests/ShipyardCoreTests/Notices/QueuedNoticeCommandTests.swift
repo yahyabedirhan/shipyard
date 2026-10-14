@@ -3,25 +3,14 @@ import ShipyardCommand
 import ShipyardNotices
 import Testing
 
-/// `shipyard notice send` on a machine that leaves its notices with the
-/// herdr-shipyard plugin for the Mac's poll (`PluginNoticeRoute`), through
-/// `ShipyardCLI.run`: a home folder with the plugin linked at
-/// `~/.local/bin/shipyard` as its install does, and a stand-in for the
-/// plugin's `scripts/notices.sh` that records what it's handed and exits
-/// as the real one does. Whether the Mac shows a queued notice is the
-/// Mac's to say (`RemoteNoticeTests`).
 @Suite("The notify command on the poll route")
 struct QueuedNoticeCommandTests {
     static let sent = Date(timeIntervalSince1970: 1_790_966_400)
 
-    /// A home folder with the plugin at `plugin/`, linked unless `linked`
-    /// is false, its `scripts/notices.sh` running `script` unless it's `nil`.
     struct Home {
         let root: URL
         var plugin: URL { root.appendingPathComponent("plugins/herdr-shipyard", isDirectory: true) }
-        /// What the script was run with, one argument per line.
         var arguments: String? { try? String(contentsOf: root.appendingPathComponent("arguments"), encoding: .utf8) }
-        /// What the script read on standard input.
         var input: Data? { try? Data(contentsOf: root.appendingPathComponent("input")) }
 
         init(script: String? = Home.storing, linkTo target: String? = nil, linked: Bool = true) throws {
@@ -45,13 +34,11 @@ struct QueuedNoticeCommandTests {
             }
         }
 
-        /// Stores the notice: records its arguments and input, exits 0.
         static let storing = """
             printf '%s\\n' "$@" > "$RECORD/arguments"
             cat > "$RECORD/input"
             """
 
-        /// Refuses a notice too large for a listing, in the plugin's words.
         static let tooLarge = """
             cat > /dev/null
             echo "herdr-shipyard: the notice is 50000 bytes, more than a listing can carry (49108 bytes)" >&2
@@ -61,7 +48,6 @@ struct QueuedNoticeCommandTests {
         func remove() { try? FileManager.default.removeItem(at: root) }
     }
 
-    /// Runs `shipyard <arguments>` with the poll route over `home`.
     func shipyard(_ arguments: [String], home: Home) -> CommandResult {
         var table = CommandTable()
         table.add(NoticeCommands.entries(route: PluginNoticeRoute(home: home.root, now: { Self.sent })))
@@ -93,8 +79,6 @@ struct QueuedNoticeCommandTests {
         #expect(arguments.count == 2)
         #expect(arguments.first == "add")
         let stored = try #require(home.input)
-        // The notice's own JSON as is, under the id it's stored by and when
-        // it was sent; compact, one line, `sent` in ISO 8601: what the Mac reads back.
         #expect(!arguments[1].isEmpty)
         #expect(String(decoding: stored, as: UTF8.self) == #"{"id":"\#(arguments[1])","notice":{"body":"12 of 40 passed","from":"claude","repository":"owner/shop","title":"Tests running"},"sent":"2026-10-02T18:40:00Z"}"#)
     }
@@ -186,7 +170,6 @@ struct QueuedNoticeCommandTests {
 }
 
 private extension JSONDecoder {
-    /// Reads `sent` as the plugin stores it, ISO 8601.
     static var iso8601: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

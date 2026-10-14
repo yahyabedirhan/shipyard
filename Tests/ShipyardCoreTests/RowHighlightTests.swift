@@ -33,8 +33,6 @@ struct RowHighlightTests {
         MenuRowPlace(section: section, row: row.id)
     }
 
-    // MARK: - The pointer
-
     @Test("the row the pointer enters is highlighted")
     func enter() {
         let a = place("shipyard", row(.pullRequest, 1))
@@ -108,8 +106,6 @@ struct RowHighlightTests {
         #expect(!highlight.isHighlighted(inShipyard))
     }
 
-    // MARK: - The rows changing under it
-
     @Test("a highlighted row that's no longer listed (collapsed, filtered out, another tab) loses the highlight")
     func rowGone() {
         let a = place("shipyard", row(.pullRequest, 1))
@@ -133,8 +129,6 @@ struct RowHighlightTests {
 
         #expect(highlight.place == a)
     }
-
-    // MARK: - The rows a highlight can rest on
 
     @Test("the list layout's rows run top to bottom: each project's header, then its rows while it's expanded; errors and placeholders aren't rows")
     func listPlaces() {
@@ -187,8 +181,6 @@ struct RowHighlightTests {
             .groupHeader(.allTab(.kind(.workflowRun)), in: nil), place(nil, run),
         ])
     }
-
-    // MARK: - ↑ and ↓
 
     private var threeRows: [MenuRowPlace] {
         [place("shipyard", row(.pullRequest, 1)), place("shipyard", row(.issue, 2)), place("mirror", row(.pullRequest, 1))]
@@ -310,8 +302,6 @@ struct RowHighlightTests {
         #expect(highlight.place == nil)
     }
 
-    // MARK: - ← and → in the list layout
-
     private struct Fold {
         let pull: MenuRow
         let issue: MenuRow
@@ -410,8 +400,6 @@ struct RowHighlightTests {
         #expect(gone.place == .header("gone"))
     }
 
-    // MARK: - Subsections
-
     private struct Subsections {
         let pulls: RowGroup
         let issues: RowGroup
@@ -420,8 +408,6 @@ struct RowHighlightTests {
         let menu: MenuModel
     }
 
-    /// "shipyard" under two subheaders, pull requests open and issues
-    /// folded, then "plain", whose groups are drawn after a divider.
     private var subsections: Subsections {
         let pull = row(.pullRequest, 1)
         let issue = row(.issue, 2)
@@ -475,7 +461,6 @@ struct RowHighlightTests {
         #expect(folded.moveLeft(in: s.menu) == nil)
         #expect(folded.place == .header("shipyard"))
 
-        // Without a subheader, an item goes straight to its project's header.
         var plain = RowHighlight(place: place("plain", row(.pullRequest, 3)))
         #expect(plain.moveLeft(in: s.menu) == nil)
         #expect(plain.place == .header("plain"))
@@ -530,8 +515,6 @@ struct RowHighlightTests {
         #expect(content.row(at: .groupHeader(s.pulls.id, in: nil)) == nil)
     }
 
-    // MARK: - ← and → in the tabs layout
-
     @Test("← and → switch to the previous or next tab, wrapping at the ends")
     func tabSwitch() {
         let menu = MenuModel(sections: [MenuSection(name: "shipyard", rows: []), MenuSection(name: "mirror", rows: [])])
@@ -541,12 +524,9 @@ struct RowHighlightTests {
         #expect(menu.tab(beside: .project("mirror"), by: 1) == .all)
         #expect(menu.tab(beside: .all, by: -1) == .project("mirror"))
         #expect(menu.tab(beside: .project("shipyard"), by: -1) == .all)
-        // A tab whose project was removed counts as All.
         #expect(menu.tab(beside: .project("gone"), by: 1) == .project("shipyard"))
         #expect(MenuModel().tab(beside: .all, by: 1) == .all)
     }
-
-    // MARK: - The pointer and the keys share one highlight
 
     @Test("rows scrolling under a resting pointer don't take the highlight from the keys")
     func scrollUnderRestingPointer() {
@@ -555,7 +535,6 @@ struct RowHighlightTests {
         highlight.pointerEntered(places[0])
         highlight.moveDown(in: places)
 
-        // The list scrolls to the highlighted row, moving rows and headers under the pointer.
         highlight.pointerExited(places[0])
         highlight.pointerEntered(places[2])
         highlight.pointerLeftRows()
@@ -575,7 +554,6 @@ struct RowHighlightTests {
         highlight.pointerMoved()
 
         #expect(highlight.place == places[2])
-        // It follows the pointer again.
         highlight.pointerEntered(places[0])
         #expect(highlight.place == places[0])
     }
@@ -617,8 +595,6 @@ struct RowHighlightTests {
 
         #expect(highlight.place == nil)
     }
-
-    // MARK: - What Return acts on
 
     @Test("Return's target: an item under its expanded project or a project's header in the list; a row among the tab's groups in a tab")
     func targetAtPlace() {

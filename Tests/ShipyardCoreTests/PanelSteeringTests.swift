@@ -9,8 +9,6 @@ private typealias Issue = PullRequestsResponse.Issue
 private let web = "yahyabedirhan/shop-web"
 private let blogRepo = "yahyabedirhan/blog"
 
-/// Two projects, "shop" (pull requests capped at 5, issues shown) and
-/// "blog" grouped by `blogGroupBy`, under `layout`.
 private func config(layout: MenuLayout = .tabs, blogGroupBy: String = "kind") -> String {
     """
     [menu]
@@ -31,7 +29,6 @@ private func config(layout: MenuLayout = .tabs, blogGroupBy: String = "kind") ->
     """
 }
 
-/// Seven pull requests and an issue in shop, one pull request in blog.
 private let answer = PullRequestsResponse.answer([
     PullRequestsResponse(web, (1...7).map { number in
         var pr = PR(number)
@@ -43,9 +40,6 @@ private let answer = PullRequestsResponse.answer([
 
 private let shopPullRequests = GroupID(project: "shop", key: .kind(.pullRequest))
 
-// `shipyard panel fold`, `unfold` and `show-more` reach the orchestrator's
-// own operations by name, and `tab` finds its tab in the menu; whatever
-// they name that isn't there is refused with what is.
 @MainActor
 @Suite("Steering the panel by name")
 struct PanelSteeringTests {
@@ -88,7 +82,6 @@ struct PanelSteeringTests {
 
         #expect(harness.shipyard.menu.group(shopPullRequests)?.rows.count == 7)
         #expect(harness.shipyard.menu.kindGroupsShowingAll.map { "\($0.project) \($0.kind.commandName)" } == ["shop pull-requests"])
-        // A group under its cap stays as it is.
         try harness.shipyard.showMore("shop", kind: "issues")
         #expect(harness.shipyard.expandedGroups == [shopPullRequests])
 

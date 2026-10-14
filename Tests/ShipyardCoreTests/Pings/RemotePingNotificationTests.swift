@@ -3,7 +3,6 @@ import Foundation
 @testable import ShipyardPings
 import Testing
 
-/// `shop`, which watches `yahyabedirhan/shop`, and two remote machines.
 private let twoMachines = """
     [remote]
     machines = ["hetzner-vps", "netcup-vps"]
@@ -14,7 +13,6 @@ private let twoMachines = """
 
     """
 
-/// As `twoMachines`, but `shop`'s own rules don't select `ping.sent`.
 private let quietShop = """
     [remote]
     machines = ["hetzner-vps", "netcup-vps"]
@@ -30,8 +28,6 @@ private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullReq
 
 @MainActor
 private extension Harness {
-    /// A harness signed in with `config`, whose Herdr has saved
-    /// `hetzner-vps` and `netcup-vps` listing `hetzner` and `netcup`, started.
     static func notifying(_ config: String = twoMachines, hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup)
@@ -39,15 +35,10 @@ private extension Harness {
     }
 }
 
-/// The notification id a remote ping's `ping.sent` posts under.
 private func notificationID(_ machine: String, _ id: String, instance: String) -> String {
     "ping.sent \(Ping.url(machine: machine, id: id).absoluteString) \(instance)"
 }
 
-/// A remote ping notifies under the same `ping.sent` rule as a local one,
-/// once per sending, and its notification leaves when the ping leaves its
-/// machine: end to end from two fake machines' `list` answers to what the
-/// recording notifier was asked to post and remove.
 @Suite("A remote ping's notification")
 @MainActor
 struct RemotePingNotificationTests {
@@ -113,9 +104,7 @@ struct RemotePingNotificationTests {
     @Test(
         "a remote ping its machine's section lists until a group resolves, then a project files, notifies once in all",
         arguments: [
-            // The machine's section passes it over: the project's rules get their chance.
             (defaults: "notifications = []", expected: ["mine · Tests are red"]),
-            // The machine's section notified it: the project doesn't again.
             (defaults: "notifications = [{ event = \"ping.sent\" }]", expected: ["netcup-vps · Tests are red"]),
         ]
     )
@@ -133,7 +122,6 @@ struct RemotePingNotificationTests {
             notifications = [{ event = "ping.sent" }]
 
             """)
-        // The group brings in nothing at first, then `yahyabedirhan/shop`.
         harness.stub.on(
             "POST",
             GitHubClient.graphQLURL,
@@ -149,7 +137,6 @@ struct RemotePingNotificationTests {
         #expect(harness.section("mine")?.rows.filter { $0.kind == .ping }.map(\.title) == ["Tests are red"])
         #expect(harness.section("netcup-vps") == nil)
 
-        // Neither another refresh nor another poll notifies it again.
         harness.clock.advance(by: 120)
         await harness.shipyard.refreshNow()
         await harness.poll()
@@ -183,7 +170,6 @@ struct RemotePingNotificationTests {
         #expect(harness.pingNotifications.count == 1)
         #expect(harness.notifier.removed.isEmpty)
 
-        // A list that stops early, before q1.
         let newer = (0..<PingList.maxPings).map { remotePing("n\($0)", "Newer \($0)", minutes: Double($0) / 1000) }
         harness.herdr.setPings(newer + [remotePing("q1", "Deploy?")], on: "netcup-vps")
         await harness.poll()
@@ -201,16 +187,13 @@ struct RemotePingNotificationTests {
         await first.poll()
         #expect(first.pingNotifications.count == 1)
 
-        // Quit; meanwhile netcup's agent sends another.
         let next = first.relaunched()
         await next.startWithMachines(graphQL: onePullRequest, netcup: [remotePing("q2", "Merge it?", minutes: 1), remotePing("q1", "Deploy?")])
-        // Before the first poll answers, nothing leaves Notification Center.
         #expect(next.notifier.removed.isEmpty)
         await next.poll()
         #expect(next.pingNotifications.map(\.title) == ["netcup-vps · Merge it?"])
         #expect(next.notifier.removed.isEmpty)
 
-        // Quit; meanwhile both are withdrawn.
         let last = next.relaunched()
         await last.startWithMachines(graphQL: onePullRequest)
         await last.poll()
@@ -224,12 +207,10 @@ struct RemotePingNotificationTests {
     func machineRemoved() async throws {
         let harness = try await Harness.notifying(hetzner: [remotePing("a1", "Tests are red")], netcup: [remotePing("q1", "Deploy?")])
         await harness.poll()
-        // Its projects go too, so no refresh runs after.
         try harness.writeConfig("[remote]\nmachines = [\"netcup-vps\"]\n")
         await harness.shipyard.reloadConfiguration()
         #expect(harness.notifier.removed == [notificationID("hetzner-vps", "a1", instance: "i-a1")])
 
-        // Quit; meanwhile netcup is taken out too.
         try harness.writeConfig("")
         let next = harness.relaunched()
         await next.startWithMachines(graphQL: onePullRequest, netcup: [remotePing("q1", "Deploy?")])

@@ -3,14 +3,8 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard lease take [--wait <seconds>] [--for <purpose>] [--key <k>] | release [--key <k>]`
-/// as an agent runs it, through `ShipyardCLI.run` with the Mac's table and
-/// an in-memory app at the end of the socket: what each command sends,
-/// with which timeout, prints and exits with. The lease's rules are the
-/// app's, in `ControlLeaseTests`; its holder's key in `HolderTests`.
 @Suite("The lease command")
 struct LeaseCommandTests {
-    /// Runs `shipyard <arguments>` in the Mac's build against `transport`.
     func shipyard(_ arguments: String..., transport: FakeTransport) -> CommandResult {
         shipyard(arguments, transport: transport)
     }

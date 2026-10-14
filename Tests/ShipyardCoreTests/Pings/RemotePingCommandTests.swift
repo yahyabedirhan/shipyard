@@ -5,27 +5,17 @@ import ShipyardConfig
 @testable import ShipyardPings
 import Testing
 
-/// `shipyard` on a machine without the app, as an agent there runs it
-/// through `ShipyardCLI.run` with the `Unfiled` filing its build picks:
-/// pings saved as given for the Mac to file, the Herdr pane they came
-/// from, a day's life, and `ping list --json`. The same commands with the
-/// Mac's filing (`ProjectFiling`) keep 0.0.5's behaviour.
 @Suite("The ping command on a machine without the app")
 struct RemotePingCommandTests {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("shipyard-remote-\(UUID().uuidString)", isDirectory: true)
-    /// The store as read at `now`, the time the commands run at by default.
     var store: PingStore { PingStore(directory: root.appendingPathComponent("pings", isDirectory: true), now: { Self.now }) }
     var configURL: URL { root.appendingPathComponent("config.toml") }
-    /// The Mac's filing, against `configURL`.
     var macFiling: ProjectFiling { ProjectFiling(configURL: configURL, repositories: ResolvedRepositoriesStore(directory: root)) }
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
     static let now = Date(timeIntervalSince1970: 1_790_000_000)
     static let day: TimeInterval = 24 * 60 * 60
 
-    /// Runs `shipyard <arguments>` at `now` in the build whose filing is
-    /// `filing` (a machine without the app's, by default), in a working
-    /// folder whose `origin` is `origin`, in Herdr pane `herdrPane`.
     @discardableResult
     func shipyard(
         _ arguments: String...,
@@ -46,14 +36,11 @@ struct RemotePingCommandTests {
         )
     }
 
-    /// The one stored ping.
     func stored() throws -> Ping {
         let all = store.all()
         try #require(all.count == 1, "\(all)")
         return all[0]
     }
-
-    // MARK: - Where pings live
 
     @Test("without the app pings live in the XDG data directory, ~/.local/share without it; on the Mac beside the app's state")
     func storeLocation() {
@@ -73,8 +60,6 @@ struct RemotePingCommandTests {
         let files = try FileManager.default.contentsOfDirectory(atPath: store.directory.path).sorted()
         #expect(files == ["first.json", "second.json"])
     }
-
-    // MARK: - Saved as given
 
     @Test("without a configuration, a ping keeps its working folder's repository, prints its id and expires a day later")
     func savedByOrigin() throws {
@@ -132,8 +117,6 @@ struct RemotePingCommandTests {
         #expect(store.ping(id: "two")?.repository == "yahyabedirhan/shop")
     }
 
-    // MARK: - The Herdr pane
-
     @Test("sent from a Herdr pane without an action, clicking it focuses that pane")
     func herdrPaneWithoutTheFlag() throws {
         #expect(shipyard("ping", "send", "Which cache?", herdrPane: "w1:p3").status == 0)
@@ -152,8 +135,6 @@ struct RemotePingCommandTests {
         #expect(try stored().action == nil)
     }
 
-    // MARK: - Replace
-
     @Test("sending an id again replaces it: its age and its day start again, and its instance stays")
     func replace() throws {
         shipyard("ping", "send", "Building", "--id", "build")
@@ -167,12 +148,9 @@ struct RemotePingCommandTests {
         #expect(replaced.sent == later)
         #expect(replaced.instance == first.instance)
         #expect(replaced.expires == later.addingTimeInterval(Self.day))
-        // The list the Mac reads carries the replace's time, so its row is aged from it.
         let list = try PingList.decode(shipyard("ping", "list", "--json", at: later).output)
         #expect(list.pings.map(\.sent) == [later])
     }
-
-    // MARK: - A day's life
 
     @Test("a ping is listed until a day after its sending, then it's gone from the store")
     func expiry() throws {
@@ -215,8 +193,6 @@ struct RemotePingCommandTests {
         let list = PingCommand.list(["--json"], store: store, now: Self.now)
         #expect(try PingList.decode(list.output).pings.isEmpty)
     }
-
-    // MARK: - ping list --json
 
     @Test("list --json prints the contract on one line, newest first, with every field a ping is sent with and no expiry")
     func listContract() throws {
@@ -268,8 +244,6 @@ struct RemotePingCommandTests {
         #expect(shipyard("ping", "list", "--yaml").status == CommandResult.usageStatus)
         #expect(shipyard("ping", "list", "--json", "extra").status == CommandResult.usageStatus)
     }
-
-    // MARK: - The Mac's filing stays as it was
 
     @Test("with the Mac's filing a ping is filed against the configuration and never expires")
     func macFiles() throws {

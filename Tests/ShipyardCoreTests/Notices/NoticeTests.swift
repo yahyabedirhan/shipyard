@@ -11,24 +11,17 @@ private let shop = """
 
     """
 
-/// `[[defaults.notifications]]` blocks for `events`.
 private func rules(_ events: [String]) -> String {
     events.map { "[[defaults.notifications]]\nevent = \"\($0)\"\n\n" }.joined()
 }
 
-/// A project watching `yahyabedirhan/shop` with its own notification list, `list`.
 private func project(_ name: String, notifying list: String? = nil) -> String {
     "[[projects]]\nslug = \"\(name)\"\nrepositories = [\"yahyabedirhan/shop\"]\n" + (list.map { "notifications = \($0)\n" } ?? "") + "\n"
 }
 
-/// An agent's notice handed to the app as the control socket hands it
-/// (`Shipyard.show(_:)`): whether the rules show it, under which project,
-/// what's posted, and that nothing else changes. Prior art:
-/// `PingNotificationTests`, `NotificationTests`.
 @Suite("An agent's notice")
 @MainActor
 struct NoticeTests {
-    /// A signed-out app with `config`, started: notices need no GitHub.
     func app(_ config: String, resolved: [String: [String]] = [:]) async throws -> Harness {
         let harness = try Harness(config: config)
         if !resolved.isEmpty { try harness.repositoriesStore.record(resolved) }
@@ -51,22 +44,17 @@ struct NoticeTests {
         #expect(posted.event == .agentNotice)
         #expect(posted.title == "shop · Tests running")
         #expect(posted.body == "12 of 40 passed\nfrom claude")
-        // Never kept, counted or listed.
         #expect(harness.shipyard.menu == menu)
         #expect(harness.pingStore.all().isEmpty)
     }
 
     @Test("agent.notice is on by default and follows the rules: a project whose list leaves it out refuses the notice and posts nothing", arguments: [
-        // The built-in defaults hold it.
         (shop, nil),
-        // A written default list replaces them.
         (rules(["pr.opened", "ping.sent"]) + shop, "notices are off for project `shop`"),
         (rules(["agent.notice"]) + shop, nil),
-        // A project's own list replaces the defaults, either way.
         (project("shop", notifying: #"[{ event = "pr.opened" }]"#), "notices are off for project `shop`"),
         (project("shop", notifying: "[]"), "notices are off for project `shop`"),
         (rules(["pr.opened"]) + project("shop", notifying: #"[{ event = "agent.notice" }]"#), nil),
-        // A notice has no author, so a rule with authors never selects it.
         (project("shop", notifying: #"[{ event = "agent.notice", authors = ["me"] }]"#), "notices are off for project `shop`"),
     ] as [(String, String?)])
     func followsRules(config: String, refusal: String?) async throws {

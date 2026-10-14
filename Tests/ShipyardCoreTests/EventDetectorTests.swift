@@ -72,7 +72,6 @@ private func snapshot(_ items: [String: [Item]], errors: [ItemSource: Repository
     Snapshot(fetchedAt: fetchedAt, items: items, errors: errors)
 }
 
-/// What's known after one refresh listing `items` in "shop".
 private func known(_ items: Item..., projects: [ProjectSettings] = [settings()]) -> KnownItems {
     KnownItems().updated(with: snapshot(["shop": items]), projects: projects)
 }
@@ -131,15 +130,12 @@ struct EventDetectorTests {
         #expect(issueEvents([issue(1, state: .closed)], [issue(1)]) == [])
         #expect(issueEvents([issue(1)], [issue(1), issue(2, state: .closed)]) == [])
 
-        // Issues and pull requests are separate sources: issues just shown are
-        // a first sight, even in a project whose pull requests are known.
         let before = KnownItems().updated(with: snapshot(["shop": [pr(1)]]), projects: [settings()])
         #expect(!before.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
         #expect(EventDetector.events(known: before, snapshot: snapshot(["shop": [pr(1), issue(1)]]), projects: withIssues).isEmpty)
         let shown = before.updated(with: snapshot(["shop": [pr(1), issue(1)]]), projects: withIssues)
         #expect(shown.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
 
-        // Hiding them forgets the source again.
         let hidden = shown.updated(with: snapshot(["shop": [pr(1)]]), projects: [settings()])
         #expect(!hidden.knows(ItemSource(repository: "o/r", kind: .issue), in: "shop"))
 
@@ -162,16 +158,13 @@ struct EventDetectorTests {
 
     @Test("nothing is an event the first time a project's source is fetched")
     func firstSightIsSilent() {
-        // The first refresh ever.
         #expect(events(KnownItems(), pr(1)) == [])
 
-        // A project just added: the other project's items are known, not its own.
         let two = [settings(), settings("blog", repositories: ["o/blog"])]
         let before = known(pr(1), projects: [settings()])
         let next = snapshot(["shop": [pr(1), pr(2)], "blog": [pr(7, repository: "o/blog")]])
         #expect(EventDetector.events(known: before, snapshot: next, projects: two).map(\.item.number) == [2])
 
-        // A repository just added to a project.
         let wider = [settings(repositories: ["o/r", "o/new"])]
         let added = snapshot(["shop": [pr(1), pr(5, repository: "o/new")]])
         #expect(EventDetector.events(known: before, snapshot: added, projects: wider).isEmpty)
@@ -209,7 +202,6 @@ struct EventDetectorTests {
         let back = snapshot(["shop": [pr(1), pr(2, repository: "o/gone"), pr(3, repository: "o/gone")]])
         #expect(EventDetector.events(known: failed, snapshot: back, projects: project).map(\.item.number) == [3])
 
-        // A repository that failed on its first refresh isn't known yet.
         let never = KnownItems().updated(with: snapshot(["shop": [pr(1)]], errors: gone), projects: project)
         #expect(!never.knows(ItemSource(repository: "o/gone", kind: .pullRequest), in: "shop"))
     }
@@ -217,13 +209,11 @@ struct EventDetectorTests {
     @Test("an item that leaves the list and comes back isn't new: it's compared with its last version")
     func leavesAndReturns() {
         let before = known(pr(1), pr(2))
-        // #2 drops out of the most recent 50 for a while.
         let gone = before.updated(with: snapshot(["shop": [pr(1)]], at: now + 600), projects: [settings()])
         #expect(gone.items[pr(2).id]?.state == .open)
         let later = snapshot(["shop": [pr(1), pr(2), pr(3)]], at: now + 1_200)
         #expect(EventDetector.events(known: gone, snapshot: later, projects: [settings()]).map(\.item.number) == [3])
 
-        // Merged while it was out of the list: it's merged when it's back.
         let merged = snapshot(["shop": [pr(1), pr(2, state: .merged)]], at: now + 1_200)
         #expect(EventDetector.events(known: gone, snapshot: merged, projects: [settings()]).map(\.kind) == [.prMerged])
     }
@@ -236,7 +226,6 @@ struct EventDetectorTests {
         #expect(month.items[pr(2).id] != nil)
         let past = month.updated(with: snapshot(["shop": [pr(1)]], at: now + 31 * day), projects: [settings()])
         #expect(past.items[pr(2).id] == nil)
-        // #1 was listed all along, so it stays.
         #expect(past.items[pr(1).id] != nil)
     }
 
@@ -261,7 +250,6 @@ struct EventDetectorTests {
         )
         let runs = ItemSource(repository: "o/r", kind: .workflowRun)
         let forbidden = [runs: RepositoryError(repository: "o/r", kind: .forbidden, message: "workflow runs: HTTP 403")]
-        // A project just added, whose runs are forbidden on its first refresh.
         let first = KnownItems().updated(with: snapshot(["blog": [pr(1)]], errors: forbidden), projects: [withRuns])
         #expect(first.knows(ItemSource(repository: "o/r", kind: .pullRequest), in: "blog"))
         #expect(!first.knows(runs, in: "blog"))
@@ -319,7 +307,6 @@ struct NotificationRulesTests {
         #expect(rule.covers(pr(author: "renovate[bot]"), viewer: "yabepa"))
         #expect(!rule.covers(pr(author: "someone"), viewer: "yabepa"))
         #expect(NotificationRule(event: .prOpened).covers(pr(author: "someone"), viewer: nil))
-        // `me` is the viewer, even where the item didn't say so.
         let mine = settings(rules: [NotificationRule(event: .prOpened, authors: [.me])])
         #expect(NotificationRules.shouldNotify(event(author: "yabepa"), settings: mine, viewer: "yabepa"))
     }

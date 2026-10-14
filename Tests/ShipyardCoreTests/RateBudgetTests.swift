@@ -10,19 +10,16 @@ private let now = Harness.now
 private let reset = now.addingTimeInterval(2520)
 private let past = now.addingTimeInterval(-60)
 
-/// A GraphQL limit of 5,000 with `remaining` left, costing `cost` this refresh.
 private func graphql(_ remaining: Int = 4990, cost: Int? = 7, resetAt: Date = reset) -> RateLimits {
     RateLimits(graphql: RateLimit(limit: 5000, remaining: remaining, resetAt: resetAt, cost: cost))
 }
 
-/// A GraphQL limit with plenty left and a REST limit of 5,000 with `remaining` left.
 private func withREST(_ remaining: Int = 4990, cost: Int? = 10, resetAt: Date = reset) -> RateLimits {
     var limits = graphql()
     limits.rest = RateLimit(limit: 5000, remaining: remaining, resetAt: resetAt, cost: cost)
     return limits
 }
 
-/// One row of the budget table: what was recorded, what's asked, what comes back.
 struct BudgetCase: Sendable, CustomTestStringConvertible {
     var name: String
     var records: [RateLimits] = []
@@ -181,14 +178,11 @@ struct RateBudgetTests {
         #expect(RefreshDelay.paused(until: past, reason: .secondaryLimit).seconds(from: now) == 0)
     }
 
-    // MARK: - Indicator
-
     struct IndicatorCase: Sendable, CustomTestStringConvertible {
         var name: String
         var records: [RateLimits] = []
         var errors: [GitHubError] = []
         var show: RateLimitDisplay = .always
-        /// Remaining per API and the overall level; `nil` for no indicator.
         var expected: ([RateAPI: Int], RateLevel)?
 
         var testDescription: String { name }
@@ -261,9 +255,6 @@ struct RateBudgetTests {
     }
 }
 
-// MARK: - Recognising a limit in a response
-
-/// One response and the error `GitHubClient.send` reads from it.
 struct ResponseCase: Sendable, CustomTestStringConvertible {
     var name: String
     var url: URL = GitHubClient.apiURL.appendingPathComponent("repos/yahyabedirhan/job-search/actions/runs")

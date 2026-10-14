@@ -6,8 +6,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// The projects `graphql-pull-requests.json` answers for: repo0 and repo1
-/// are e-commerce's, repo2 is job-search's.
 private let projects = """
     version = 1
 
@@ -21,8 +19,6 @@ private let projects = """
 
     """
 
-/// The projects `graphql-missing-repository.json` answers for: repo0 is
-/// job-search, repo1 doesn't exist.
 private let withMissingRepository = """
     [[projects]]
     slug = "job-search"
@@ -38,7 +34,6 @@ private func pullRequests() throws -> StubHTTP.Answer {
     try Harness.fixture("graphql-pull-requests.json")
 }
 
-/// What `/graphql` was sent.
 private struct GraphQLBody: Decodable {
     var query: String
     var variables: [String: String]
@@ -47,7 +42,6 @@ private struct GraphQLBody: Decodable {
 @Suite("Pull requests through the refresh pipeline")
 @MainActor
 struct RefreshTests {
-    // MARK: - The menu model
 
     @Test("one section per project in configuration order, each with all its repositories' pull requests")
     func sectionsPerProject() async throws {
@@ -56,8 +50,6 @@ struct RefreshTests {
         let menu = harness.shipyard.menu
         #expect(harness.shipyard.phase == .ready)
         #expect(menu.sections.map(\.name) == ["e-commerce", "job-search"])
-        // Open by last update, newest first; then closed by close time, newest
-        // first. #8 closed 15 days ago, outside the 7-day window.
         #expect(menu.sections[0].rows.map(\.number) == [14, 57, 12, 56, 55, 54, 9])
         #expect(menu.sections[1].rows.map(\.number) == [3])
         #expect(menu.sections.allSatisfy { $0.errors.isEmpty })
@@ -87,7 +79,6 @@ struct RefreshTests {
         #expect(fix.kind == .pullRequest)
         #expect(fix.since == date("2026-09-24T08:00:00Z"))
         #expect(fix.age(at: Harness.now) == 28 * 3600)
-        // What only the hover card shows.
         #expect(fix.item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
         #expect(fix.item.details == ItemDetails(
             headBranch: "fix-totals",
@@ -107,9 +98,7 @@ struct RefreshTests {
         #expect(rows.mapValues(\.checks) == [
             14: .pending, 57: .failed, 12: .passed, 56: ChecksState.none, 55: .passed, 54: nil, 9: nil, 3: .failed,
         ])
-        // A closed row's age counts from when it closed.
         #expect(rows[9]?.since == date("2026-09-23T15:00:00Z"))
-        // GraphQL names a Bot without `[bot]`; a deleted account is `ghost`.
         #expect(rows[55]?.author == "dependabot[bot]")
         #expect(rows[55]?.authorKind == .bot)
         #expect(rows[54]?.author == "ghost")
@@ -123,7 +112,6 @@ struct RefreshTests {
             graphQL: pullRequests()
         )
 
-        // #54 closed 18 hours ago; #9 two days ago.
         #expect(harness.section("e-commerce")?.rows.map(\.number) == [14, 57, 12, 56, 55, 54])
     }
 
@@ -155,8 +143,6 @@ struct RefreshTests {
         #expect(harness.section("e-commerce")?.rows.map(\.number) == [57, 12, 56, 54, 9])
     }
 
-    // MARK: - The request
-
     @Test("one GraphQL request covers every repository, and the rate-limit headers are read")
     func oneRequest() async throws {
         let harness = try await Harness.started(config: projects, graphQL: pullRequests())
@@ -178,7 +164,6 @@ struct RefreshTests {
         #expect(body.query.contains("pullRequests(states: [CLOSED, MERGED], first: 20"))
         #expect(body.query.contains("rateLimit { limit remaining used resetAt cost }"))
 
-        // The headers (remaining 4990) win over the body (4993); the cost comes from the body.
         #expect(harness.shipyard.snapshot?.rateLimits.graphql == RateLimit(
             limit: 5000, remaining: 4990, used: 10, resetAt: Harness.rateLimitReset, cost: 3
         ))
@@ -196,8 +181,6 @@ struct RefreshTests {
         #expect(harness.section("job-search")?.rows.map(\.number) == [3])
         #expect(harness.section("archive")?.rows.map(\.number) == [3])
     }
-
-    // MARK: - Failures
 
     @Test("a missing repository becomes an error row in its project while the rest load")
     func missingRepository() async throws {
@@ -318,8 +301,6 @@ struct RefreshTests {
         #expect(harness.shipyard.menu == .empty)
     }
 
-    // MARK: - When refreshes run
-
     @Test("after each refresh the timer is armed with the configured interval, and firing it refreshes")
     func timer() async throws {
         let harness = try await Harness.started(
@@ -357,7 +338,6 @@ struct RefreshTests {
             }
             guard count == 1 else { return }
             #expect(await shipyard.isRefreshing)
-            // Both return at once: the running refresh takes them up.
             await shipyard.refresh()
             await shipyard.refresh()
             #expect(inFlight.current == 1)
@@ -392,8 +372,6 @@ struct RefreshTests {
         #expect(harness.graphQLRequests.count == 3)
         #expect(harness.section("e-commerce")?.rows.map(\.number) == [14, 57, 12, 56, 54, 9])
     }
-
-    // MARK: - Lifecycle
 
     @Test("no projects reaches needsProjects and fetches nothing; adding some reaches ready and refreshes")
     func lifecycle() async throws {
@@ -507,8 +485,6 @@ struct RefreshTests {
         #expect(harness.shipyard.configError != nil)
         #expect(harness.shipyard.phase == .needsProjects)
     }
-
-    // MARK: - Opening an item
 
     @Test("opening a row opens its URL through the action port")
     func openRow() async throws {

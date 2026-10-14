@@ -21,9 +21,6 @@ private typealias PR = PullRequestsResponse.PullRequest
 
 @MainActor
 private extension Harness {
-    /// Started with `config`, ntn logged in, Notion answering a read
-    /// as `NotionStub` records and the icon's schema reads and creates,
-    /// after the notes' first read.
     static func withNewNote(config: String = projects) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.ntn.set(.loggedIn)
@@ -37,17 +34,14 @@ private extension Harness {
         return harness
     }
 
-    /// The error rows about starting a note in `project`.
     func newNoteErrors(_ project: String) -> [String] {
         section(project)?.errors.map(\.message).filter { $0.hasPrefix("new note: ") } ?? []
     }
 
-    /// The databases the icon created, and the pages.
     var createdDatabases: [URLRequest] { stub.requests("POST", NotionStub.databases) }
     var createdPages: [URLRequest] { stub.requests("POST", NotionStub.pages) }
 }
 
-/// A request's JSON body.
 private func json(_ request: URLRequest?) throws -> NSDictionary {
     try #require(try JSONSerialization.jsonObject(with: request?.httpBody ?? Data()) as? NSDictionary)
 }
@@ -56,17 +50,12 @@ private func json(_ text: String) throws -> NSDictionary {
     try #require(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? NSDictionary)
 }
 
-/// The new-note icon on a project's header: a database when the project
-/// has none, then an empty page, opened in Notion; end to end across
-/// `NotionClient`, `NotesReader` and the orchestrator, over recorded
-/// Notion answers.
 @Suite("The new-note icon")
 @MainActor
 struct NewNoteTests {
     @Test("a project without a database: the icon creates it under the Projects page with the fixed core and a free prefix, then an empty page in it, opens the page, and the menu lists it")
     func databaseThenPage() async throws {
         let harness = try await Harness.withNewNote()
-        // Once the database is made, the Projects page lists `blog`, and its query the new page.
         let children = try StubHTTP.Answer.fixture("notion-projects-children.json")
         var withBlog = children
         withBlog.body = Data(String(decoding: children.body, as: UTF8.self)
@@ -117,14 +106,12 @@ struct NewNoteTests {
         await harness.shipyard.startNote(in: "shop")
 
         #expect(harness.createdDatabases.isEmpty)
-        // No database is made, so no prefix is looked for.
         #expect(harness.stub.requests("GET", NotionStub.shopSchema).isEmpty)
         #expect(try json(harness.createdPages.first) == json("""
             {"parent": {"type": "data_source_id", "data_source_id": "\(NotionStub.shopDataSource)"},
              "properties": {"Status": {"select": {"name": "Open"}}}}
             """))
         #expect(harness.actions.opened == [NotionStub.createdPage])
-        // The notes are read again, so the new one lists.
         #expect(harness.stub.requests("POST", NotionStub.shopQuery).count == queries + 1)
     }
 
@@ -229,7 +216,6 @@ struct NewNoteTests {
     func noEntryPage() async throws {
         let harness = try await Harness.withNewNote()
         harness.stub.on("POST", NotionStub.search, .json(#"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#))
-        // The entry page and Projects page found by the first read are gone.
         harness.stub.on(NotionStub.projectsChildren, .json(#"{"object":"error","status":404,"code":"object_not_found","message":"Could not find block."}"#, status: 404))
         harness.stub.on(NotionStub.entryChildren, .json(#"{"object":"error","status":404,"code":"object_not_found","message":"Could not find block."}"#, status: 404))
 
@@ -250,7 +236,6 @@ struct NewNoteTests {
         #expect(harness.section("shop")?.newNote == .ready)
         #expect(harness.section("blog")?.newNote == nil)
 
-        // ntn logged out, or gone: no icon, until the next read finds it back.
         harness.ntn.set(.loggedOut)
         _ = await harness.notesTimer.fire()
         #expect(harness.section("shop")?.newNote == nil)

@@ -1,6 +1,5 @@
 import ShipyardCore
 
-/// A `TokenStore` held in memory, standing in for the Keychain.
 final class InMemoryTokenStore: TokenStore {
     private let stored: Locked<String?>
 

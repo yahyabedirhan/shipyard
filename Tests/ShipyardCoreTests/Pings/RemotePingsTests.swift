@@ -10,7 +10,6 @@ private let shop = """
 
     """
 
-/// `shop`, and two remote machines.
 private let twoMachines = "[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"]\n\n" + shop
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
@@ -19,8 +18,6 @@ private let plugin = ["--plugin", "yahyabedirhan.herdr-shipyard"]
 
 @MainActor
 private extension Harness {
-    /// A harness signed in with `config`, whose Herdr has saved
-    /// `hetzner-vps` and `netcup-vps` listing `hetzner` and `netcup`, started.
     static func withMachines(_ config: String = twoMachines, hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup)
@@ -28,15 +25,9 @@ private extension Harness {
     }
 }
 
-/// The remote machines in `[remote] machines`: their pings asked for
-/// through `herdr --machine`, on a timer of their own, and listed in the
-/// menu. End to end across the configuration, `Shipyard`,
-/// `RemotePingReader` over a fake `herdr` with two saved machines, and the
-/// menu model.
 @Suite("Remote pings")
 @MainActor
 struct RemotePingsTests {
-    // MARK: Asking a machine
 
     @Test("each machine is asked through Herdr: the plugin's list action, then its log record among the newest few; then its notices")
     func asksThroughHerdr() async throws {
@@ -44,15 +35,12 @@ struct RemotePingsTests {
         await harness.poll()
         let invoke: [String] = ["plugin", "action", "invoke", "list"] + plugin
         let logList: [String] = ["plugin", "log", "list"] + plugin + ["--limit", "10"]
-        // The notices waiting on it, after its pings are listed (`RemoteNoticeTests`): none here.
         let notices: [String] = ["plugin", "action", "invoke", "notices"] + plugin
         for label in ["hetzner-vps", "netcup-vps"] {
             #expect(harness.herdr.runs(on: label) == [invoke, logList, notices, logList])
         }
-        // Nothing but `--machine` runs: no ssh, no shell.
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
 
-        // Past the limit, older records go unlisted; the one just started is still found.
         for _ in 0..<RemotePingReader.logLimit { await harness.poll() }
         harness.herdr.setPings([remotePing("q2", "Merge it?")], on: "netcup-vps")
         await harness.poll()
@@ -68,13 +56,10 @@ struct RemotePingsTests {
         harness.herdr.addMachine("netcup-vps", pings: [remotePing("q1", "Deploy?")], runningFor: 2)
         await harness.shipyard.start()
         await harness.poll()
-        // Up to the notices, which are asked for once the pings are in.
         let pingRuns = harness.herdr.runs(on: "netcup-vps").prefix { !$0.starts(with: ["plugin", "action", "invoke", "notices"]) }
         #expect(pingRuns.filter { $0.starts(with: ["plugin", "log", "list"]) }.count == 3)
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
     }
-
-    // MARK: The menu
 
     @Test("each machine's pings list under a section named after it, after the projects, needing attention")
     func machineSections() async throws {
@@ -82,7 +67,6 @@ struct RemotePingsTests {
             hetzner: [remotePing("a1", "Tests are red", sender: "codex")],
             netcup: [remotePing("q1", "Deploy?", minutes: 1, sender: "claude"), remotePing("q2", "Merge it?", minutes: 9)]
         )
-        // Before the first poll, only the projects.
         #expect(harness.shipyard.menu.sections.map(\.name) == ["shop"])
         #expect(harness.machineTimer.armed == 0)
         await harness.poll()
@@ -103,7 +87,6 @@ struct RemotePingsTests {
         await harness.poll()
         let rows = try #require(harness.section("netcup-vps")?.rows)
         #expect(rows.map(\.machine) == ["netcup-vps", "netcup-vps"])
-        // Numbered on the Mac, the older first.
         #expect(rows.map { PanelText.rowDetail($0, showingRepository: false) } == ["#2 · netcup-vps · claude", "#1 · netcup-vps"])
         #expect(rows.map(PanelText.pingMeta) == ["netcup-vps · claude", "netcup-vps"])
     }
@@ -120,8 +103,6 @@ struct RemotePingsTests {
         #expect(harness.titles("hetzner-vps") == ["From hetzner"])
         #expect(harness.titles("netcup-vps") == ["From netcup"])
     }
-
-    // MARK: Polling
 
     @Test("machines are polled every 30 seconds on their own timer, with no GitHub request")
     func ownTimer() async throws {
@@ -226,8 +207,6 @@ struct RemotePingsTests {
         #expect(harness.machineTimer.armed == nil)
     }
 
-    // MARK: Not the ping store's
-
     @Test("clicking, marking or dismissing a remote ping never touches a local ping with its id")
     func leavesLocalPings() async throws {
         let harness = try await Harness.withMachines(netcup: [remotePing("q1", "Remote")])
@@ -250,7 +229,6 @@ struct RemotePingsTests {
     }
 }
 
-/// `RemotePingReader` on its own: what it makes of Herdr's answers.
 @Suite("Remote ping reader")
 struct RemotePingReaderTests {
     @Test("a machine that doesn't answer in time fails, and its herdr is stopped")

@@ -16,7 +16,6 @@ private func pr(_ number: Int, author: String = "octocat") -> PR {
     return pullRequest
 }
 
-/// A project of pull requests waiting on the user's review anywhere.
 private let reviews = """
     [[projects]]
     slug = "reviews"
@@ -26,8 +25,6 @@ private let reviews = """
 
     """
 
-/// The answer when the projects watch no repository: the viewer, the limit
-/// and the review search's `found`, each in its repository.
 private func searchAnswer(
     _ found: [(repository: String, pullRequest: PR)],
     total: Int? = nil,
@@ -38,7 +35,6 @@ private func searchAnswer(
 
 @MainActor
 private extension Harness {
-    /// The rows `project` lists, as `owner/name#number`, in ascending order.
     func listed(in project: String) -> [String] {
         (section(project)?.rows.map { "\($0.repository)#\($0.number)" } ?? []).sorted()
     }
@@ -56,13 +52,11 @@ struct AnywhereTests {
 
         let section = try #require(harness.section("reviews"))
         #expect(harness.listed(in: "reviews") == ["another/place#9", "someone/else#5"])
-        // Rows come from many repositories, so each names its own.
         #expect(section.showsRepository)
         #expect(section.errors.isEmpty)
         #expect(section.notes.isEmpty)
         #expect(section.attentionCount == 2)
         #expect(harness.shipyard.menu.attention.total == 2)
-        // It resolves to no repositories: one request, carrying the search.
         let body = try #require(harness.graphQLRequests.last?.httpBody).utf8
         #expect(body.contains("review-requested:@me"))
         #expect(!body.contains("repo0"))
@@ -71,7 +65,6 @@ struct AnywhereTests {
     @Test("a pull request the search newly finds notifies, as new and as a review request")
     func newRequestsNotify() async throws {
         let harness = try await Harness.started(config: reviews, graphQL: searchAnswer([("someone/else", pr(5))]))
-        // The first refresh is a first sight: nothing notifies.
         #expect(harness.notifier.posted.isEmpty)
 
         await harness.refresh(answering: searchAnswer([("someone/else", pr(5)), ("another/place", pr(9))]))

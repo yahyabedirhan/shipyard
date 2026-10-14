@@ -2,10 +2,6 @@ import Foundation
 @testable import ShipyardCore
 import Testing
 
-// `docs/configuration.md` tells maintainers how configuration works in the
-// code and what to touch when a setting is added or changed. These tests
-// keep its checklist naming every place a setting lives.
-
 private func document() throws -> String {
     try String(contentsOf: repositoryRoot.appendingPathComponent("docs/configuration.md"), encoding: .utf8)
 }
@@ -18,15 +14,15 @@ struct ConfigurationDocumentTests {
         let start = try #require(text.range(of: "## Adding or changing a setting")).upperBound
         let steps = String(text[start...])
         for place in [
-            "ConfigurationReader.swift", // the reader
-            "Configuration.swift", // the model and its defaults
-            "schema/config.schema.json", // the schema
-            "Configuration.header", // the new-file header
-            "skills/shipyard/SKILL.md", // the skill
-            "README.md", // the README
-            "ConfigurationTests", // the configuration seam
-            "Harness", // the orchestrator seam
-            "docs/low-level-design.md", // the design doc
+            "ConfigurationReader.swift",
+            "Configuration.swift",
+            "schema/config.schema.json",
+            "Configuration.header",
+            "skills/shipyard/SKILL.md",
+            "README.md",
+            "ConfigurationTests",
+            "Harness",
+            "docs/low-level-design.md",
         ] {
             #expect(steps.contains("`\(place)`"), "the checklist doesn't name `\(place)`")
         }

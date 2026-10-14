@@ -8,16 +8,12 @@ import Testing
 private let userURL = Harness.userURL
 private let avatarURL = URL(string: "https://avatars.githubusercontent.com/u/42?v=4")!
 private let newAvatarURL = URL(string: "https://avatars.githubusercontent.com/u/42?v=5")!
-/// A few bytes standing in for a PNG: the cache stores what it's given.
 private let avatarBytes = Data([0x89, 0x50, 0x4E, 0x47, 1, 2, 3])
 private let newAvatarBytes = Data([0x89, 0x50, 0x4E, 0x47, 4, 5, 6])
 
-/// The header's account: who shipyard is signed in as, its profile
-/// and its avatar.
 @Suite("The connected account")
 @MainActor
 struct AccountTests {
-    // MARK: - The viewer
 
     @Test("signing in keeps the account's name, avatar and profile from GET /user")
     func viewerFields() async throws {
@@ -47,8 +43,6 @@ struct AccountTests {
         #expect(viewer.profileURL == URL(string: "https://github.com/yabepa")!)
     }
 
-    // MARK: - Opening the profile
-
     @Test("the header's account opens the profile on GitHub")
     func openProfile() async throws {
         let harness = try Harness(stored: "gho_stored")
@@ -71,8 +65,6 @@ struct AccountTests {
         #expect(harness.shipyard.viewer == nil)
         #expect(harness.actions.opened.isEmpty)
     }
-
-    // MARK: - The avatar
 
     @Test("the avatar is downloaded once, without the token, at the header's size")
     func avatarDownloadedOnce() async throws {

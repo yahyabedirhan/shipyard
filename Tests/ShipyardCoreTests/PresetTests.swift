@@ -7,7 +7,6 @@ import Testing
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// An open pull request by `author`, waiting on the viewer's review.
 private func waiting(_ number: Int, author: String = "octocat") -> PR {
     var pullRequest = PR(number)
     pullRequest.author = author
