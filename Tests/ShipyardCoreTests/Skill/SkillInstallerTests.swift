@@ -36,9 +36,9 @@ struct SkillInstallerTests {
 
     @Test("keeps only the last frame when terminal output redraws a line")
     func redrawOutput() async {
-        let output = "Cloning…◐\r\u{1B}[2K\u{1B}[1GCloning repository…◓\rCloning repository…◑\n"
+        let output = "Cloning…◐\r\u{1B}[2K\u{1B}[1GCloning repository…◓\rCloning repository…◑\r\n✓ Installed 1 skill: shipyard\r\n"
         let result = await SkillInstaller(environment: ["SHELL": "/bin/zsh"], runner: FakeShell(ShellOutput(status: 0, output: output))).install()
-        #expect(result == .installed(output: "Cloning repository…◑"))
+        #expect(result == .installed(output: "Cloning repository…◑\n✓ Installed 1 skill: shipyard"))
     }
 
     @Test("a failing command reports what it printed")

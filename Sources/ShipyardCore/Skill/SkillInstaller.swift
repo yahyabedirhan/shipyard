@@ -60,13 +60,15 @@ public struct SkillInstaller: Sendable {
     }
 
     /// The output without terminal colour codes and surrounding blank space,
-    /// so the panel can show it as plain text.
+    /// with each redrawn line reduced to its last frame, so the panel can show
+    /// it as plain text. A trailing carriage return, as in a CRLF line ending,
+    /// keeps the text before it, as a terminal would.
     static func clean(_ output: String) -> String {
         let withoutCursorControls = output
             .replacingOccurrences(of: "\u{1B}\\[[0-9;?]*[A-Za-z]", with: "", options: .regularExpression)
         let lastFrames = withoutCursorControls
             .components(separatedBy: "\n")
-            .map { $0.components(separatedBy: "\r").last ?? "" }
+            .map { $0.components(separatedBy: "\r").last { !$0.isEmpty } ?? "" }
             .joined(separator: "\n")
         return lastFrames
             .trimmingCharacters(in: .whitespacesAndNewlines)
