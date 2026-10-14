@@ -92,21 +92,21 @@ extension AppState: Codable {
         let seen = try container.decodeIfPresent([String: Attention.SeenRecord].self, forKey: .seen) ?? [:]
         attention = Attention(seen: seen)
         collapsed = try container.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
-        let folds = (try? container.decodeIfPresent([Lossy<GroupID>].self, forKey: .collapsedGroups)) ?? []
+        let folds = (try? container.decodeIfPresent([SkippedWhenUnreadable<GroupID>].self, forKey: .collapsedGroups)) ?? []
         collapsedGroups = Set(folds.compactMap(\.value))
-        let items = (try? container.decodeIfPresent([String: Lossy<KnownItem>].self, forKey: .known)) ?? [:]
-        let sources = (try? container.decodeIfPresent([String: [Lossy<ItemSource>]].self, forKey: .knownProjects)) ?? [:]
+        let items = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<KnownItem>].self, forKey: .known)) ?? [:]
+        let sources = (try? container.decodeIfPresent([String: [SkippedWhenUnreadable<ItemSource>]].self, forKey: .knownProjects)) ?? [:]
         known = KnownItems(
             items: items.compactMapValues(\.value),
             sources: sources.mapValues { Set($0.compactMap(\.value)) }
         )
-        let records = (try? container.decodeIfPresent([String: Lossy<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
+        let records = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
         notified = NotifiedEvents(records: records.compactMapValues(\.value))
-        let marks = (try? container.decodeIfPresent([String: Lossy<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
+        let marks = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
         remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
-        let sequences = try? container.decodeIfPresent([String: Lossy<PingNumbers.Sequence>].self, forKey: .pingNumbers)
+        let sequences = try? container.decodeIfPresent([String: SkippedWhenUnreadable<PingNumbers.Sequence>].self, forKey: .pingNumbers)
         pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
-        let snoozes = (try? container.decodeIfPresent([String: Lossy<Date>].self, forKey: .bannerSnoozes)) ?? [:]
+        let snoozes = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<Date>].self, forKey: .bannerSnoozes)) ?? [:]
         bannerSnoozes = BannerSnoozes(ends: snoozes.compactMapValues(\.value))
         notionConnected = (try? container.decodeIfPresent(Bool.self, forKey: .notionConnected)) == true
     }
@@ -127,7 +127,7 @@ extension AppState: Codable {
     }
 }
 
-private struct Lossy<Value: Decodable>: Decodable {
+private struct SkippedWhenUnreadable<Value: Decodable>: Decodable {
     var value: Value?
 
     init(from decoder: any Decoder) throws {
