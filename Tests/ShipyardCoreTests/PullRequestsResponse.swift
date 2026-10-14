@@ -1,15 +1,9 @@
 import Foundation
 
-/// A GraphQL answer for one repository, built in the test, for scenarios
-/// that change a pull request or an issue between refreshes (a push, a
-/// review request, failed checks, a merge, a comment). It has the recorded
-/// fixtures' shape.
 struct PullRequestsResponse {
-    /// One pull request as GitHub would describe it.
     struct PullRequest {
         var number: Int
         var title = "A change"
-        /// `OPEN`, `MERGED` or `CLOSED`.
         var state = "OPEN"
         var isDraft = false
         var author = "yabepa"
@@ -19,15 +13,9 @@ struct PullRequestsResponse {
         var closedAt: String?
         var comments = 0
         var reviews = 0
-        /// Logins whose review is requested. The review search finds the
-        /// pull request when the viewer's is.
         var reviewRequests: [String] = []
-        /// Teams whose review is requested, each one the viewer is in: the
-        /// review search finds the pull request for them too.
         var teamReviewRequests: [String] = []
-        /// `statusCheckRollup.state`: `SUCCESS`, `FAILURE`, `PENDING`…; `nil` for none.
         var checks: String? = "PENDING"
-        /// The branch it would merge; `change-<number>` unless set.
         var headRefName: String?
 
         init(_ number: Int) { self.number = number }
@@ -36,8 +24,6 @@ struct PullRequestsResponse {
             URL(string: "https://github.com/\(repository)/pull/\(number)")!
         }
 
-        /// Whether `review-requested:@me` finds it for `viewer`: open, and
-        /// asking for the viewer's review or one of their teams'.
         func waitsOn(_ viewer: String) -> Bool {
             state == "OPEN" && (reviewRequests.contains { $0.lowercased() == viewer.lowercased() } || !teamReviewRequests.isEmpty)
         }
@@ -62,11 +48,9 @@ struct PullRequestsResponse {
         }
     }
 
-    /// One issue as GitHub would describe it.
     struct Issue {
         var number: Int
         var title = "A problem"
-        /// `OPEN` or `CLOSED`.
         var state = "OPEN"
         var author = "octocat"
         var authorType = "User"
@@ -98,17 +82,10 @@ struct PullRequestsResponse {
 
     var repository: String
     var pullRequests: [PullRequest]
-    /// The repository's issues; `nil` answers as GitHub does when the query
-    /// didn't ask for them (no `openIssues`/`closedIssues` keys).
     var issues: [Issue]?
     var viewer = "yabepa"
-    /// The repository's default branch, answered as `defaultBranchRef`.
     var defaultBranch = "main"
-    /// Answer as GitHub does when the query asked only for open pull
-    /// requests' heads (runs shown, pull requests not): `openPullRequestHeads`.
     var headsOnly = false
-    /// Answer as GitHub does for a repository that's gone or out of reach:
-    /// a `null` alias and a `NOT_FOUND` error.
     var missing = false
 
     init(_ repository: String, _ pullRequests: [PullRequest], issues: [Issue]? = nil, missing: Bool = false) {
@@ -118,28 +95,14 @@ struct PullRequestsResponse {
         self.missing = missing
     }
 
-    /// The answer, with GitHub's rate-limit headers.
     var answer: StubHTTP.Answer { Self.answer([self]) }
 
-    /// What the review search (`reviewSearch`) answers.
     enum ReviewSearch {
-        /// The open pull requests of the answer's repositories waiting on
-        /// the viewer, directly or through a team.
         case waiting
-        /// These pull requests, each in its repository; `total` is how many
-        /// matched in all (`issueCount`), when more than these.
         case pullRequests([(repository: String, pullRequest: PullRequest)], total: Int? = nil)
-        /// A `null` search with an error on its path; the rest of the answer as usual.
         case failed(String)
     }
 
-    /// One answer for several repositories, as `repo0`, `repo1`… in the
-    /// order the query asks for them: the configuration's, each repository
-    /// once. A request carries one batch of repositories, so a refresh with
-    /// more than a batch needs one answer per batch. The body reports `cost`,
-    /// and the body and headers `remaining`.
-    /// It answers the review search (`reviewSearch`) too, which only the
-    /// first batch asks for; later batches' copies go unread.
     static func answer(
         _ responses: [PullRequestsResponse],
         cost: Int = 1,

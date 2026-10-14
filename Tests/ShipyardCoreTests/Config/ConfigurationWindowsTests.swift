@@ -125,7 +125,6 @@ struct ConfigurationWindowsTests {
         #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigurationIssue(
             line: 4, message: "`finished-window-hours` is the old form of `finished-window`, which this table sets too; delete `finished-window-hours`"
         )])
-        // In different tables, the project's new key overrides the defaults' old one.
         let result = decoded("[defaults.pull-requests]\nclosed-window-days = 1\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { closed-window = \"30m\" }\n")
         let config = result?.configuration
         #expect(config.map { $0.settings(for: $0.projects[0]).pullRequests.closedWindow } == 1800)

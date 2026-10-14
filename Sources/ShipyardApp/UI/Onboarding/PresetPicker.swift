@@ -2,13 +2,6 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-/// Onboarding's first step, shown while `phase` is `needsProjects` and the
-/// file holds nothing but `version` (`shipyard.presets` isn't empty): choose
-/// a preset. `my-agents` goes on to the `ProjectPicker`;
-/// `incoming-contributions` watches all the account's repositories (`owned`)
-/// by default, or goes on to the picker; `review-queue` needs nothing. The
-/// preset is written by `choosePreset(_:projects:)`, and the menu follows
-/// the reload without a restart. The rules live in `PresetChoice`.
 struct PresetPicker: View {
     let shipyard: Shipyard
 
@@ -31,8 +24,6 @@ struct PresetPicker: View {
             }
         }
     }
-
-    // MARK: - Choosing
 
     private var presets: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -61,7 +52,6 @@ struct PresetPicker: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// A preset's title, and under it what it lists.
     private func label(_ preset: Preset) -> some View {
         (Text(preset.title).font(TypeScale.bodyEmphasis)
             + Text("\n" + preset.summary).font(TypeScale.meta).foregroundColor(.secondary))
@@ -69,7 +59,6 @@ struct PresetPicker: View {
             .padding(.vertical, 2)
     }
 
-    /// `incoming-contributions`: every repository the account owns, or picked ones.
     private var repositoriesChoice: some View {
         VStack(alignment: .leading, spacing: 4) {
             Picker(PanelText.watchOwned, selection: $choice.watchesOwned) {
@@ -109,7 +98,6 @@ struct PresetPicker: View {
         }
     }
 
-    /// On to the picker, or writes the preset now when it needs no repositories.
     private func proceed() {
         guard !isWriting, let preset = choice.preset else { return }
         writeError = nil
@@ -118,9 +106,6 @@ struct PresetPicker: View {
         Task {
             defer { isWriting = false }
             do {
-                // The phase moves to `ready` and the panel swaps this view
-                // for the list; a refusal empties `presets`, and the panel
-                // shows the plain picker.
                 try await shipyard.choosePreset(preset, projects: choice.projects(from: []))
             } catch let error as ConfigurationError {
                 writeError = error.description

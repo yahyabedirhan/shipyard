@@ -90,8 +90,6 @@ public struct RemotePingReader: Sendable {
         }
     }
 
-    /// `body`'s result, or a failure saying `label` didn't answer in time
-    /// once `timeout` has passed, whichever comes first.
     func timed<Value: Sendable>(
         _ label: String,
         _ body: @escaping @Sendable () async -> Result<Value, Failure>
@@ -112,22 +110,14 @@ public struct RemotePingReader: Sendable {
         }
     }
 
-    /// Why a plugin action's output couldn't be had.
     enum ActionFailure: Error {
-        /// Herdr couldn't be run, refused, or didn't answer in time.
         case herdr(Failure)
-        /// Herdr started the action but didn't say which log record holds it.
         case noLog
-        /// Its log record wasn't among the newest.
         case lost
-        /// The action ended without succeeding.
         case failed
-        /// It was still running after `waitAttempts` asks.
         case stillRunning
     }
 
-    /// What the plugin's action `action` printed on the machine `label`:
-    /// invoked, then its log record asked for until it's no longer running.
     func output(of action: String, on label: String) async -> Result<String, ActionFailure> {
         let invoked: [String: Any]
         switch await run(["plugin", "action", "invoke", action, "--plugin", Self.pluginID], on: label) {
@@ -162,7 +152,6 @@ public struct RemotePingReader: Sendable {
         return .failure(.stillRunning)
     }
 
-    /// The list `stdout` holds, its pings marked with `label`.
     private func decode(_ stdout: String, machine label: String) -> Result<PingList, Failure> {
         do {
             var list = try PingList.decode(stdout)
@@ -177,8 +166,6 @@ public struct RemotePingReader: Sendable {
         }
     }
 
-    /// Runs `herdr --machine <label>` with `arguments`: its `result`, or
-    /// why not. Every reason names the machine, as the panel shows it alone.
     private func run(_ arguments: [String], on label: String) async -> Result<[String: Any], Failure> {
         switch await herdr.run(arguments, on: label) {
         case .notFound: return .failure(Failure("Couldn't find herdr to reach \(label)"))

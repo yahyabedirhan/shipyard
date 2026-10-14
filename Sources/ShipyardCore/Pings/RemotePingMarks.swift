@@ -42,8 +42,6 @@ public struct RemotePingMarks: Equatable, Sendable {
         self.marks = marks
     }
 
-    /// The mark for `ping`'s instance, if any: a mark made for another
-    /// instance under its URL isn't this ping's.
     private func mark(for ping: Ping) -> Mark? {
         guard let mark = marks[ping.item.id], mark.instance == ping.instance else { return nil }
         return mark
@@ -97,8 +95,6 @@ public struct RemotePingMarks: Equatable, Sendable {
         }
     }
 
-    /// Whether two listings of a remote ping are the same sending, whatever
-    /// the machine's label (not kept in the stored copy).
     private static func isSameSending(_ first: Ping, _ second: Ping) -> Bool {
         var first = first, second = second
         first.machine = nil

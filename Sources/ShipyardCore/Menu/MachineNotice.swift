@@ -6,10 +6,7 @@ import Foundation
 /// has none, so its next good poll clears the line by itself.
 public struct MachineNotice: Equatable, Sendable, Identifiable {
     public enum Kind: Equatable, Sendable {
-        /// Its latest poll failed, for this reason (`RemoteMachines.Machine.failure`);
-        /// `answered` when one before it succeeded, so its last pings stay listed.
         case unreachable(String, answered: Bool)
-        /// Its list stopped early, after this many pings: it holds more.
         case truncated(listed: Int)
     }
 

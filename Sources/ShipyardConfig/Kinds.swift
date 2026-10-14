@@ -5,11 +5,7 @@ public enum ItemKind: String, Codable, Equatable, Hashable, Sendable {
     case pullRequest
     case issue
     case workflowRun
-    /// A ping an agent sent through the `shipyard` CLI: kept by shipyard,
-    /// not fetched from GitHub.
     case ping
-    /// One of the user's own notes, kept in Notion: read from the
-    /// project's notes database, not fetched from GitHub.
     case note
 }
 
@@ -56,9 +52,7 @@ public enum StateGroup: String, CaseIterable, Hashable, Sendable {
         case .pullRequest: [.open, .merged, .closed]
         case .issue: [.open, .closed]
         case .workflowRun: [.inProgress, .failed, .succeeded]
-        // A ping is always open; pings take no `states`.
         case .ping: [.open]
-        // The menu lists open notes only; notes take no `states`.
         case .note: [.open]
         }
     }

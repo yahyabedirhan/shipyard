@@ -3,9 +3,6 @@ import Foundation
 /// Reads a folder's git `origin` remote. The seam between a command and
 /// spawning `git`, so tests use a fake working folder.
 public protocol GitRemoteLookup: Sendable {
-    /// The URL of `origin` for the repository `folder` is in, as git prints
-    /// it; `nil` when `folder` isn't in a git repository, has no `origin`,
-    /// or git can't be run.
     func origin(in folder: URL) -> String?
 }
 
@@ -39,13 +36,11 @@ public enum GitRemote {
         let text = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var path: Substring
         if let scheme = text.range(of: "://") {
-            // `scheme://[user@]host[:port]/path`: drop up to the host's end.
             guard text[..<scheme.lowerBound].lowercased() != "file" else { return nil }
             let rest = text[scheme.upperBound...]
             guard let slash = rest.firstIndex(of: "/") else { return nil }
             path = rest[rest.index(after: slash)...]
         } else if let colon = text.firstIndex(of: ":"), colon != text.startIndex, !text[..<colon].contains("/") {
-            // scp-like `[user@]host:path`.
             path = text[text.index(after: colon)...]
         } else {
             return nil

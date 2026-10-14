@@ -63,22 +63,6 @@ public struct ConfigurationCheck: Equatable, Sendable {
     }
 }
 
-// `config-status.json`, and each file's entry in `config check --json`:
-//
-//     {
-//       "version": 1,
-//       "checked": "2026-09-25T12:05:01Z",
-//       "config": "/Users/me/.config/shipyard/config.toml",
-//       "configModified": "2026-09-25T12:05:00Z",
-//       "accepted": false,
-//       "problems": [{ "line": 1, "message": "…", "banner": "config.toml line 1: …" }],
-//       "warnings": []
-//     }
-//
-// Times are UTC in whole seconds, so an agent can compare `configModified`
-// with `date -u -r <file> +%Y-%m-%dT%H:%M:%SZ` after its save. `configModified`
-// is null when there was no file, a problem's `line` null when it can't be
-// placed. `banner` is the problem's line in the panel's banner, word for word.
 extension ConfigurationCheck: Encodable {
     private enum CodingKeys: String, CodingKey {
         case version, checked, config, configModified, accepted, problems, warnings
@@ -92,7 +76,6 @@ extension ConfigurationCheck: Encodable {
 
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            // Explicit null rather than a missing key: easier to read for an agent.
             try container.encode(issue.line, forKey: .line)
             try container.encode(issue.message, forKey: .message)
             try container.encode(ConfigurationCheck.banner(issue, in: name), forKey: .banner)
@@ -110,7 +93,6 @@ extension ConfigurationCheck: Encodable {
         try container.encode(warnings.map { Entry(issue: $0, name: name) }, forKey: .warnings)
     }
 
-    /// `date` in UTC, truncated to the second as `date -r` prints a file's time.
     private static func wholeSeconds(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = TimeZone(identifier: "UTC")

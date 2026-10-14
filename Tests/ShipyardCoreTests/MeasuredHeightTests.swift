@@ -1,10 +1,6 @@
 @testable import ShipyardCore
 import Testing
 
-/// A measured scroll view takes a new height only when its content's height,
-/// capped at the scroll view's maximum, really changed: otherwise a lazy
-/// stack re-estimating its height under each new viewport resizes the panel
-/// forever.
 @Suite("Measured height")
 struct MeasuredHeightTests {
     @Test("content shorter than the cap sets the height to its own")

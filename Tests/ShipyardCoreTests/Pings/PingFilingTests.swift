@@ -8,9 +8,6 @@ import Testing
 
 private typealias Listed = RepositoryListResponse.Repository
 
-/// A ping filed by the agent's repository, end to end: the CLI in a fake
-/// working folder, the repositories the app resolved, the ping store and
-/// the menu.
 @Suite("A ping filed by its repository")
 @MainActor
 struct PingFilingTests {
@@ -102,7 +99,6 @@ struct PingFilingTests {
     }
 }
 
-/// The repositories the app last resolved, as the CLI reads them.
 @Suite("The resolved repositories file")
 struct ResolvedRepositoriesStoreTests {
     let store = ResolvedRepositoriesStore(directory: FileManager.default.temporaryDirectory

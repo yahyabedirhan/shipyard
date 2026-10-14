@@ -18,7 +18,6 @@ import ShipyardCommand
 /// lands there.
 public struct HerdrFocus: Sendable {
     private let herdr: HerdrCommand
-    /// `herdr` for a run on a saved machine, timed by `machineTimeout`.
     private let remote: HerdrCommand
 
     /// How long one `herdr` run may take before it's stopped and the
@@ -55,7 +54,6 @@ public struct HerdrFocus: Sendable {
         )
     }
 
-    /// Whether `id` is a tab's id (`w1:t2`); any other is taken for a pane's.
     static func isTab(_ id: String) -> Bool {
         id.range(of: ":t[0-9]+$", options: .regularExpression) != nil
     }
@@ -71,7 +69,6 @@ public struct HerdrFocus: Sendable {
     /// tab only when Herdr finds no agent there; it fails too when the
     /// machine can't be reached or doesn't answer within `machineTimeout`.
     public func focus(_ id: String, on machine: String? = nil, inSession session: String? = nil) async -> ActionOutcome {
-        // A saved machine is reached in the session it names.
         let session = machine == nil ? session : nil
         var tab = id
         if !Self.isTab(id) {
@@ -97,8 +94,6 @@ public struct HerdrFocus: Sendable {
         }
     }
 
-    /// Why a `herdr` command failed: in a few words for the ping's row,
-    /// whole for its hover card, with Herdr's error code when it gave one.
     struct Failure: Error {
         var reason: String
         var detail: String
@@ -107,10 +102,6 @@ public struct HerdrFocus: Sendable {
         var outcome: ActionOutcome { .failed(reason, detail: detail) }
     }
 
-    /// Runs `herdr` with `arguments`, on the saved machine `machine` when
-    /// it's given, else in the named local session `session`, and reads
-    /// its answer, one JSON object: its `result` when it worked, else why
-    /// not, for the tab or pane `id`.
     private func run(_ arguments: [String], about id: String, on machine: String?, inSession session: String? = nil) async -> Result<[String: Any], Failure> {
         switch await (machine == nil ? herdr : remote).run(arguments, on: machine, inSession: session) {
         case .notFound: return .failure(Failure(reason: "No herdr", detail: "Couldn't find herdr"))
@@ -127,24 +118,17 @@ public struct HerdrFocus: Sendable {
         }
     }
 
-    /// What a failed run's row says in a few words, to fit its narrow
-    /// column, from Herdr's error `code`, run on `machine` (if any); the
-    /// hover card has the whole of it (`reason`).
     private static func shortReason(_ code: String?, on machine: String?, output: String) -> String {
         switch code {
         case "pane_not_found", "agent_not_found": "Pane gone"
         case "tab_not_found": "Tab gone"
         case "server_not_running": "Herdr off"
         case nil where machine != nil:
-            // Herdr refused the label, or the machine never answered.
             HerdrCommand.refusal(output, machine: machine!) == nil ? "Offline" : "No machine"
         default: "No focus"
         }
     }
 
-    /// What a failed run's hover card says, from Herdr's error `code` for the tab
-    /// or pane `id`, run on `machine` or in the named session `session` (if
-    /// either) with `output`.
     private static func reason(_ code: String?, about id: String, on machine: String?, inSession session: String?, output: String) -> String {
         let on = machine.map { " on \($0)" } ?? ""
         switch code {
@@ -152,8 +136,6 @@ public struct HerdrFocus: Sendable {
         case "tab_not_found": return "Herdr tab \(id) is gone\(on)"
         case "server_not_running": return session.map { "Herdr session \($0) isn't running" } ?? "Herdr isn't running\(on)"
         default:
-            // Without Herdr's JSON error the machine never answered: Herdr
-            // refused its label (`HerdrCommand.refusal`), or the connection failed.
             if let machine, code == nil {
                 return HerdrCommand.refusal(output, machine: machine) ?? "Couldn't reach \(machine) through Herdr"
             }

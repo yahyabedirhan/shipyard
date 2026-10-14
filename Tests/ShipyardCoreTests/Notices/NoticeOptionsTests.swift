@@ -11,14 +11,9 @@ private let shop = """
 
     """
 
-/// A notice's options handed to the app as the control socket hands them
-/// (`Shipyard.receive(_:)`): each reaches the posted notification, an id
-/// replaces and withdraws, and a click or a button runs its action as a
-/// ping's click does. Prior art: `NoticeTests`, `HerdrActionTests`.
 @Suite("A notice's options")
 @MainActor
 struct NoticeOptionsTests {
-    /// A signed-out app with `config`, started: notices need no GitHub.
     func app(_ config: String = shop) async throws -> Harness {
         let harness = try Harness(config: config)
         await harness.shipyard.start()
@@ -160,6 +155,5 @@ struct NoticeOptionsTests {
 }
 
 private extension Array {
-    /// The one element, or `nil` when there are none or several.
     var only: Element? { count == 1 ? first : nil }
 }

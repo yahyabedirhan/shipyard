@@ -13,7 +13,6 @@ import Observation
 @MainActor
 @Observable
 public final class SkillDetector {
-    /// The repository the skill installs from, as the lock file names it.
     nonisolated public static let source = "yahyabedirhan/shipyard"
 
     /// Whether the skill was installed when last looked; `check()` looks again.
@@ -32,7 +31,6 @@ public final class SkillDetector {
         isInstalled = Self.isInstalled(home: home)
     }
 
-    /// Whether the skill is installed under `home`.
     nonisolated public static func isInstalled(home: URL) -> Bool {
         let agents = home.appendingPathComponent(".agents", isDirectory: true)
         if let entry = lockEntry(in: agents.appendingPathComponent(".skill-lock.json", isDirectory: false)) {
@@ -42,7 +40,6 @@ public final class SkillDetector {
         return FileManager.default.fileExists(atPath: skill.path)
     }
 
-    /// The lock file's shape, as far as the detector reads it.
     private struct Lock: Decodable {
         struct Entry: Decodable {
             var source: String?
@@ -51,8 +48,6 @@ public final class SkillDetector {
         var skills: [String: Entry]?
     }
 
-    /// The lock file's `shipyard` entry; nil when there's no lock file, it
-    /// isn't one, or it has no such entry.
     nonisolated private static func lockEntry(in file: URL) -> Lock.Entry? {
         guard let data = try? Data(contentsOf: file),
               let lock = try? JSONDecoder().decode(Lock.self, from: data)

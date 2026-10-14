@@ -18,7 +18,6 @@ private let withProjects = """
 @Suite("Signing in")
 @MainActor
 struct SignInTests {
-    // MARK: - Finding a token
 
     @Test("a token in the token store signs in without asking gh")
     func storedToken() async throws {
@@ -81,8 +80,6 @@ struct SignInTests {
         #expect(harness.shipyard.viewer == nil)
     }
 
-    // MARK: - A 401 from any request
-
     @Test("a 401 from a later request signs out and drops the stored token")
     func unauthorizedLater() async throws {
         let harness = try Harness(stored: "gho_stored", config: withProjects)
@@ -112,8 +109,6 @@ struct SignInTests {
         #expect(harness.shipyard.phase == .ready)
         #expect(try harness.store.token() == "gho_stored")
     }
-
-    // MARK: - Device flow
 
     @Test("the device flow shows the code while polling, then saves the token and signs in")
     func deviceFlowSignsIn() async throws {
@@ -303,8 +298,6 @@ struct SignInTests {
         #expect(try harness.store.token() == nil)
     }
 
-    // MARK: - Signing out
-
     @Test("signing out clears the token store")
     func signOut() async throws {
         let harness = try Harness(stored: "gho_stored", config: withProjects)
@@ -329,8 +322,6 @@ struct SignInTests {
         #expect(harness.shipyard.signOut() == .ghStillSignedIn)
         #expect(harness.shipyard.phase == .signedOut)
     }
-
-    // MARK: - Why shipyard is signed out (the connect screen)
 
     @Test("before the first look for a token there's no reason yet")
     func noReasonBeforeStart() throws {

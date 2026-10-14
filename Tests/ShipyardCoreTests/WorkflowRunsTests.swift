@@ -8,9 +8,6 @@ import Testing
 private let shopRepository = "yahyabedirhan/shop"
 private let blogRepository = "yahyabedirhan/blog"
 
-/// Runs on for the shop project, with the default window and branches.
-/// `rest-workflow-runs.json` answers for it; pull request #1's head is
-/// `change-1` (see `PullRequestsResponse`), the default branch `main`.
 private func runsConfig(_ runs: String = "workflow-runs = { show = true }", extra: String = "") -> String {
     """
     \(extra)
@@ -45,7 +42,6 @@ private func run(
     return run
 }
 
-/// `Fixtures/rest-workflow-runs.json`, with REST's rate-limit headers.
 private func runsFixture() throws -> StubHTTP.Answer {
     try .fixture("rest-workflow-runs.json", headers: Harness.rateLimitHeaders(remaining: 4900, resource: "core"))
 }
@@ -58,15 +54,12 @@ private func shopRuns(_ runs: [Run], etag: String? = nil) -> StubHTTP.Answer {
     WorkflowRunsResponse(shopRepository, runs).answer(etag: etag)
 }
 
-/// What `/graphql` was sent.
 private struct QueryBody: Decodable {
     var query: String
 }
 
 @MainActor
 private extension Harness {
-    /// Signed in with `config`, GraphQL answering `graphQL` and each
-    /// repository's runs endpoint its answers, after `start()`.
     static func started(config: String, graphQL: StubHTTP.Answer, runs: [String: [StubHTTP.Answer]]) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.stub.on(userURL, viewerAnswer)
@@ -78,8 +71,6 @@ private extension Harness {
         return harness
     }
 
-    /// Refreshes `after` seconds later, with the runs endpoint of `repository`
-    /// answering `runs` (and GraphQL as before, or `graphQL`).
     func refresh(runs: StubHTTP.Answer, of repository: String = shopRepository, graphQL: StubHTTP.Answer? = nil, after: TimeInterval = 120) async {
         stub.on("GET", WorkflowRunsResponse.url(repository), runs)
         if let graphQL { self.graphQL([graphQL]) }
@@ -87,7 +78,6 @@ private extension Harness {
         await shipyard.refresh()
     }
 
-    /// Every runs request sent, in order, to any repository.
     var runsRequests: [URLRequest] {
         stub.requests.filter { $0.url?.path.hasSuffix("/actions/runs") ?? false }
     }
@@ -104,7 +94,6 @@ private extension Harness {
 @Suite("Workflow runs through the refresh pipeline")
 @MainActor
 struct WorkflowRunsTests {
-    // MARK: - Showing
 
     @Test("runs follow issues: running first, then finished within 3 hours, on the default branch and open pull requests' heads")
     func showing() async throws {
@@ -115,8 +104,6 @@ struct WorkflowRunsTests {
         )
 
         let rows = try #require(harness.section("shop")?.rows)
-        // #39 ran on `experiment` (no pull request), #38 finished 3.5 hours
-        // ago, #37 was cancelled.
         #expect(rows.map(\.kind) == [.pullRequest, .workflowRun, .workflowRun, .workflowRun, .workflowRun])
         let runs = harness.runRows
         #expect(runs.map(\.number) == [43, 42, 41, 40])
@@ -128,19 +115,15 @@ struct WorkflowRunsTests {
         #expect(runs[1].authorKind == .bot)
         #expect(runs[2].authorKind == .me)
         #expect(runs[2].url == URL(string: "https://github.com/yahyabedirhan/shop/actions/runs/9041"))
-        // What only the hover card shows: the run's title, what started it and who.
         #expect(runs[0].item.details.runTitle == "Add order export")
         #expect(runs[0].item.details.runEvent == "pull_request")
         #expect(runs[0].item.details.runAttempt == 1)
         #expect(runs[0].item.avatarURL == URL(string: "https://avatars.githubusercontent.com/u/42?v=4"))
-        // Age: a running run's from when it started, a finished one's from when it finished.
         #expect(runs[1].since == date("2026-09-25T11:55:10Z"))
         #expect(runs[1].age(at: Harness.now) == 290)
         #expect(runs[2].since == date("2026-09-25T11:50:00Z"))
         #expect(rows.first?.branch == nil)
 
-        // One request for the repository's recent runs, with its default
-        // branch and pull request heads asked for in the GraphQL request.
         let request = try #require(harness.runsRequests.first)
         #expect(harness.runsRequests.count == 1)
         let url = try #require(request.url?.absoluteString)
@@ -152,7 +135,6 @@ struct WorkflowRunsTests {
         let query = try harness.lastQuery()
         #expect(query.contains("defaultBranchRef { name }"))
         #expect(query.contains("headRefName"))
-        // The hover card's fields are plain fields, so they cost nothing more.
         #expect(query.contains("baseRefName additions deletions changedFiles reviewDecision"))
         #expect(query.contains("author { login __typename avatarUrl }"))
     }
@@ -205,11 +187,9 @@ struct WorkflowRunsTests {
             graphQL: shopGraphQL(),
             runs: [shopRepository: [runsFixture()]]
         )
-        // #38 finished at 08:30, inside 4 hours; the request reaches back to 07:00.
         #expect(harness.runRows.map(\.number) == [43, 42, 41, 40, 38])
         #expect(harness.runsRequests.last?.url?.absoluteString.contains("created=%3E%3D2026-09-25T07:00:00Z") == true)
 
-        // At 15:40 #41 (finished 11:50) is still inside the window, #40 (11:30) isn't.
         await harness.refresh(
             runs: shopRuns([run(42, "running", updatedAt: "2026-09-25T11:58:00Z"), run(41, "failure", updatedAt: "2026-09-25T11:50:00Z"), run(40, updatedAt: "2026-09-25T11:30:00Z")]),
             after: 3 * 3600 + 40 * 60
@@ -217,7 +197,6 @@ struct WorkflowRunsTests {
         #expect(harness.runRows.map(\.number) == [42, 41])
         #expect(harness.runsRequests.last?.url?.absoluteString.contains("created=%3E%3D2026-09-25T10:00:00Z") == true)
 
-        // A window of 0 lists only running runs.
         try harness.writeConfig(runsConfig("workflow-runs = { show = true, finished-window = \"0\" }"))
         harness.stub.on("GET", WorkflowRunsResponse.url(shopRepository), shopRuns([run(42, "running"), run(41, "failure")]))
         await harness.shipyard.reloadConfiguration()
@@ -270,7 +249,6 @@ struct WorkflowRunsTests {
         let query = try harness.lastQuery()
         #expect(!query.contains("defaultBranchRef"))
         #expect(!query.contains("openPullRequestHeads"))
-        // No REST limit is reported while runs are off.
         #expect(harness.shipyard.menu.rateIndicator?.apis.map(\.api) == [.graphql])
     }
 
@@ -289,8 +267,6 @@ struct WorkflowRunsTests {
         #expect(harness.runRows.isEmpty)
         #expect(harness.shipyard.menu.rateIndicator?.apis.map(\.api) == [.graphql])
     }
-
-    // MARK: - Conditional requests and the rate limit
 
     @Test("each refresh asks once per repository, one after another, with If-None-Match; a 304 reuses the runs and costs nothing")
     func notModified() async throws {
@@ -322,15 +298,12 @@ struct WorkflowRunsTests {
             "/repos/yahyabedirhan/shop/actions/runs",
             "/repos/yahyabedirhan/blog/actions/runs",
         ])
-        // REST's headers reach the budget and the footer, with the two
-        // requests that counted.
         #expect(harness.shipyard.budget.costs[.rest] == [2])
         let rest = try #require(harness.shipyard.menu.rateIndicator?.apis.first { $0.api == .rest })
         #expect(rest.remaining == 4899)
         #expect(rest.limit == 5000)
         #expect(rest.resetAt == Harness.rateLimitReset)
 
-        // Nothing changed: both answer 304, and the runs are listed as before.
         harness.stub.on("GET", WorkflowRunsResponse.url(blogRepository), WorkflowRunsResponse.notModified(etag: #"W/"blog-1""#, remaining: 4899))
         await harness.refresh(runs: WorkflowRunsResponse.notModified(etag: #"W/"shop-1""#, remaining: 4899))
         let second = Array(harness.runsRequests.suffix(2))
@@ -340,7 +313,6 @@ struct WorkflowRunsTests {
         #expect(harness.shipyard.budget.costs[.rest] == [2, 0])
         #expect(harness.runsRequests.count == 4)
 
-        // A new answer replaces them.
         await harness.refresh(runs: shopRuns([run(42, "running"), run(41, "failure"), run(40)], etag: #"W/"shop-2""#))
         #expect(harness.runRows.map(\.number) == [42, 41, 40, 7])
         #expect(harness.shipyard.budget.costs[.rest] == [2, 0, 1])
@@ -409,8 +381,6 @@ struct WorkflowRunsTests {
         #expect(harness.shipyard.menu.rateIndicator?.apis.first { $0.api == .rest }?.level == .exhausted)
     }
 
-    // MARK: - Attention
-
     @Test("a failed run needs attention until seen, and again when a re-run fails; running and succeeded runs never do")
     func attention() async throws {
         let harness = try await Harness.started(
@@ -427,19 +397,15 @@ struct WorkflowRunsTests {
         #expect(harness.actions.opened == [failed.url])
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 1))
 
-        // Re-run: running (no attention), then failed again (attention again).
         await harness.refresh(runs: shopRuns([run(41, "running", branch: "change-1", updatedAt: "2026-09-25T12:01:00Z")]))
         #expect(harness.runRows.map(\.state) == [.running])
         #expect(harness.shipyard.menu.attention.workflowRuns == 0)
         await harness.refresh(runs: shopRuns([run(41, "failure", branch: "change-1", updatedAt: "2026-09-25T12:03:00Z")]))
         #expect(harness.shipyard.menu.attention.workflowRuns == 1)
 
-        // Mark all seen covers failed runs.
         harness.shipyard.markAllSeen(project: "shop")
         #expect(harness.shipyard.menu.attention.total == 0)
     }
-
-    // MARK: - Notifications
 
     @Test("run.failed and run.succeeded are notified by rule, after a silent first sight, once each")
     func notifications() async throws {
@@ -452,10 +418,8 @@ struct WorkflowRunsTests {
             graphQL: shopGraphQL(),
             runs: [shopRepository: [shopRuns([run(40), run(39, "failure")])]]
         )
-        // The first sight of the runs (a success and a failure) is silent.
         #expect(harness.notifier.posted.isEmpty)
 
-        // A new run failed between two refreshes; another is running.
         await harness.refresh(runs: shopRuns([
             run(42, "running"),
             run(41, "failure", branch: "change-1", updatedAt: "2026-09-25T12:01:00Z"),
@@ -467,7 +431,6 @@ struct WorkflowRunsTests {
         #expect(posted.body == "CI · change-1")
         #expect(posted.itemURL == URL(string: "https://github.com/yahyabedirhan/shop/actions/runs/9041"))
 
-        // The running one succeeds.
         await harness.refresh(runs: shopRuns([
             run(42, updatedAt: "2026-09-25T12:03:00Z"),
             run(41, "failure", branch: "change-1", updatedAt: "2026-09-25T12:01:00Z"),
@@ -475,7 +438,6 @@ struct WorkflowRunsTests {
         ]))
         #expect(harness.titles.last == "shop · Run #42 succeeded")
 
-        // Nothing new: nothing posted again. A bot's success doesn't match `me`.
         var deploy = run(43, updatedAt: "2026-09-25T12:06:00Z")
         deploy.actor = "github-actions[bot]"
         deploy.actorType = "Bot"

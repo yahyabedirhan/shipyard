@@ -8,14 +8,9 @@ import Foundation
 public struct MenuRowPlace: Hashable, Sendable {
     /// What a place holds. A new stop for the keys is one more case.
     public enum Kind: Hashable, Sendable {
-        /// An item: its `MenuRow.id`.
         case item(String)
-        /// The list layout's header of the project in `section`.
         case projectHeader
-        /// A subsection's subheader.
         case groupHeader(GroupID)
-        /// A capped group's Show more row, which reads Show less while the
-        /// group is expanded.
         case showMore(GroupID)
     }
 
@@ -91,7 +86,6 @@ public enum MenuFold: Equatable, Sendable {
 public struct RowHighlight: Equatable, Sendable {
     /// The highlighted row; `nil` when none is.
     public private(set) var place: MenuRowPlace?
-    /// The row under the pointer, from its enter and exit events.
     private var underPointer: MenuRowPlace?
     /// Whether the pointer drives the highlight; `false` after a key,
     /// until the pointer moves.
@@ -104,8 +98,6 @@ public struct RowHighlight: Equatable, Sendable {
     public func isHighlighted(_ place: MenuRowPlace) -> Bool {
         self.place == place
     }
-
-    // MARK: - The pointer
 
     /// The pointer entered a row (or a project's header): it's the
     /// highlighted one now (unless the keys hold the highlight and the row
@@ -136,8 +128,6 @@ public struct RowHighlight: Equatable, Sendable {
         followsPointer = true
         place = underPointer
     }
-
-    // MARK: - ↑ and ↓
 
     /// ↓: the row after the highlighted one in `places` (the layout's rows,
     /// top to bottom), or the first when none is highlighted or the
@@ -170,8 +160,6 @@ public struct RowHighlight: Equatable, Sendable {
         let count = places.count
         self.place = places[((index + step) % count + count) % count]
     }
-
-    // MARK: - ← and → in the list layout
 
     /// ←, as in an outline: from an item to its subsection's subheader, or
     /// to its project's header when its group has none; on an open
@@ -231,8 +219,6 @@ public struct RowHighlight: Equatable, Sendable {
         }
     }
 
-    // MARK: - ← and → on a tab's subheader
-
     /// ← on a tab's subheader: folds it if it's open. Returns the group
     /// to fold, if any; anywhere else in the tab, nothing happens (← there
     /// switches tabs).
@@ -249,17 +235,12 @@ public struct RowHighlight: Equatable, Sendable {
         return foldRight(group, in: nil)
     }
 
-    // MARK: - Folding a subsection
-
-    /// ← on `group`'s subheader: folds it unless it's folded already.
     private mutating func foldLeft(_ group: RowGroup) -> MenuFold? {
         guard !group.isFolded else { return nil }
         followsPointer = false
         return .fold(group.id)
     }
 
-    /// → on `group`'s subheader, listed under `section`: unfolds it, or goes
-    /// to its first item.
     private mutating func foldRight(_ group: RowGroup, in section: String?) -> MenuFold? {
         if group.isFolded {
             followsPointer = false
@@ -269,13 +250,10 @@ public struct RowHighlight: Equatable, Sendable {
         return nil
     }
 
-    /// The keys move the highlight to `place`.
     private mutating func moveTo(_ place: MenuRowPlace) {
         followsPointer = false
         self.place = place
     }
-
-    // MARK: - The rows
 
     /// The rows changed (a refresh, a collapse, another tab): a highlighted
     /// row that's no longer among `places` loses the highlight.
@@ -308,7 +286,6 @@ extension RowGroup {
             + (hasShowMore ? [.showMore(id, in: section)] : [])
     }
 
-    /// Its row with the id `id`, unless it's folded away.
     func visibleRow(_ id: String) -> MenuRow? {
         isFolded ? nil : rows.first { $0.id == id }
     }

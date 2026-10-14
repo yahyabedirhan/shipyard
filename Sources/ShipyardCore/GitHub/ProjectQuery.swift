@@ -1,40 +1,22 @@
 import Foundation
 import ShipyardConfig
 
-/// One repository a refresh asks GitHub about, and what it asks for.
 struct RepositoryRequest: Equatable, Sendable {
-    /// `owner/name`, as the configuration spells it.
     var slug: String
-    /// Whether any project with this repository shows pull requests.
     var pullRequests: Bool
-    /// Whether any project with this repository shows issues. Only then does
-    /// the query ask for its issues, so repositories without them cost nothing more.
     var issues: Bool = false
-    /// The widest `finished-window` of the projects with this
-    /// repository that show workflow runs; `nil` when none does. Runs come
-    /// from REST, not this query.
     var runsWindow: TimeInterval? = nil
-    /// Whether a project keeps this repository's runs only on the default
-    /// branch and open pull requests' heads: then the query asks for both.
     var runBranches: Bool = false
 
     var owner: String { String(slug.split(separator: "/", maxSplits: 1)[0]) }
     var name: String { String(slug.split(separator: "/", maxSplits: 1)[1]) }
 }
 
-/// What the review search found: one page of pull requests, and how many
-/// matched in all (more than the page holds when there were more than
-/// `ProjectQuery.reviewSearchFirst`).
 struct ReviewSearchResult: Equatable, Sendable {
     var pullRequests: [Item] = []
     var total = 0
 }
 
-/// The GraphQL request a refresh makes for one batch of repositories: each
-/// repository as an alias (its pull requests and, where shown, its issues),
-/// plus the viewer and the rate limit, and in the first batch the review
-/// search. Builds the query and parses the answer into items, so the query
-/// text and its parser have one owner.
 enum ProjectQuery {
     /// Repositories asked about per request. A refresh with more sends
     /// several requests, one after another, so one query stays inside
@@ -49,24 +31,13 @@ enum ProjectQuery {
     /// way because it used too many resources, answering what it had so far.
     static let resourceLimitsExceeded = "RESOURCE_LIMITS_EXCEEDED"
 
-    /// Open pull requests (and open issues) fetched per repository.
     static let openFirst = 50
-    /// Closed or merged pull requests (and closed issues) fetched per
-    /// repository, most recently updated first; the menu keeps those inside
-    /// the closed window.
     static let closedFirst = 20
 
-    /// The open pull requests waiting on the viewer's review, anywhere on
-    /// GitHub. `review-requested:@me` counts requests to the viewer's teams
-    /// too (`user-review-requested:@me` wouldn't).
     static let reviewSearchQuery = "is:pr is:open archived:false review-requested:@me"
-    /// Pull requests the review search returns: one page, GitHub's largest.
     static let reviewSearchFirst = 100
-    /// The review search's alias in the query and the answer.
     static let reviewSearchAlias = "reviewSearch"
 
-    /// The repositories to ask about, each once, in the order the projects
-    /// first name them.
     static func plan(_ projects: [ProjectSettings]) -> [RepositoryRequest] {
         var requests: [RepositoryRequest] = []
         var index: [String: Int] = [:]
@@ -90,20 +61,13 @@ enum ProjectQuery {
         return requests
     }
 
-    /// The alias of the repository at `index`, e.g. `repo0`.
     static func alias(_ index: Int) -> String { "repo\(index)" }
 
-    /// One request's share of a batch: its repositories, and whether it
-    /// carries the review search.
     struct Part: Equatable, Sendable {
         var repositories: [RepositoryRequest]
         var reviewSearch: Bool
     }
 
-    /// The smaller requests to ask about `repositories` (and the review
-    /// search) in, after GitHub cut their query short: two halves, the
-    /// search with the first; or one repository and the search apart; or
-    /// `nil` when the request is already as small as it gets.
     static func split(_ repositories: [RepositoryRequest], reviewSearch: Bool) -> [Part]? {
         if repositories.count > 1 {
             let middle = repositories.count / 2
@@ -118,10 +82,6 @@ enum ProjectQuery {
         return nil
     }
 
-    // MARK: - Building
-
-    /// The query text for `repositories`, with `$owner<i>`/`$name<i>`
-    /// variables, and with `reviewSearch` the review search.
     static func document(_ repositories: [RepositoryRequest], reviewSearch: Bool = false) -> String {
         let parameters = repositories.indices
             .map { "$owner\($0): String!, $name\($0): String!" }
@@ -177,7 +137,6 @@ enum ProjectQuery {
         }
         text += fields
         text += "  rateLimit { limit remaining used resetAt cost }\n}\n"
-        // GraphQL rejects a fragment no field uses.
         if reviewSearch || repositories.contains(where: \.pullRequests) {
             text += """
 
@@ -206,7 +165,6 @@ enum ProjectQuery {
         return text
     }
 
-    /// The JSON body to POST to `/graphql`.
     static func body(_ repositories: [RepositoryRequest], reviewSearch: Bool = false) -> Data {
         var variables: [String: String] = [:]
         for (index, repository) in repositories.enumerated() {
@@ -216,7 +174,6 @@ enum ProjectQuery {
         let request = Request(query: document(repositories, reviewSearch: reviewSearch), variables: variables)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        // Encoding strings and a string dictionary can't fail.
         return (try? encoder.encode(request)) ?? Data()
     }
 
@@ -225,32 +182,16 @@ enum ProjectQuery {
         var variables: [String: String]
     }
 
-    // MARK: - Parsing
-
-    /// What the answer held.
     struct Parsed: Equatable, Sendable {
         var viewerLogin: String?
-        /// Items per repository slug (as requested).
         var items: [String: [Item]] = [:]
         var errors: [String: RepositoryError] = [:]
-        /// The body's `rateLimit`, for its `cost`.
         var rateLimit: RateLimit?
-        /// GitHub said the GraphQL limit ran out (status 200, `RATE_LIMITED`).
         var rateLimited = false
-        /// GitHub stopped the query part way (`RESOURCE_LIMITS_EXCEEDED`),
-        /// so none of its repositories, nor its review search, came back
-        /// whole: each is an `.incomplete` error, and the client asks again
-        /// in smaller requests. `add` doesn't carry it over.
         var resourceLimited = false
-        /// Per repository slug that asked (`runBranches`): its default branch
-        /// and open pull requests' heads, for the runs' branch filter.
         var branches: [String: RunBranches] = [:]
-        /// What the review search found, when this answer's query asked for it.
         var reviewSearch: ReviewSearchAnswer?
 
-        /// Adds the answer to the next batch: its repositories' items,
-        /// errors and branches. The rate limit is the later one's, costing
-        /// the sum of both.
         mutating func add(_ next: Parsed) {
             viewerLogin = viewerLogin ?? next.viewerLogin
             reviewSearch = reviewSearch ?? next.reviewSearch
@@ -265,25 +206,11 @@ enum ProjectQuery {
         }
     }
 
-    /// The review search's answer: the pull requests it found (their
-    /// `reviewRequestedFromViewer` set) and how many matched in all, which is
-    /// more than it returned when there were more than one page; or GitHub's
-    /// message when it came back `null` with an error.
     enum ReviewSearchAnswer: Equatable, Sendable {
         case found(ReviewSearchResult)
         case failed(String)
     }
 
-    /// Reads GitHub's answer. A body that isn't GraphQL's shape throws
-    /// `.malformed`; errors with no data throw `.graphQL`. A repository whose
-    /// alias came back `null` becomes a `RepositoryError`, and the rest still
-    /// parse; so does a review search that came back `null`.
-    ///
-    /// A partial answer is never read as the truth: when GitHub cut the
-    /// query short (`resourceLimited`), every repository in it and the
-    /// review search fail as `.incomplete`; so does any repository, or the
-    /// search, whose list came back with `null` entries, since dropping
-    /// them would read as items gone.
     static func parse(_ data: Data, repositories: [RepositoryRequest], reviewSearch: Bool = false) throws -> Parsed {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -305,8 +232,6 @@ enum ProjectQuery {
         }
         let limited = errors.filter { $0.type == resourceLimitsExceeded }
         parsed.resourceLimited = !limited.isEmpty
-        // Why `alias` isn't whole: GitHub's error on its path, else the
-        // query's first resource-limits error, else that a list had gaps.
         func incompleteMessage(_ alias: String) -> String {
             let onPath = limited.first { $0.path?.first == .key(alias) }
             return (onPath ?? limited.first)?.message ?? "GitHub left entries out of its answer."
@@ -356,8 +281,6 @@ enum ProjectQuery {
         return parsed
     }
 
-    // MARK: - Response shape
-
     private struct Response: Decodable {
         var data: Payload?
         var errors: [GraphQLError]?
@@ -386,9 +309,7 @@ enum ProjectQuery {
     private struct Payload: Decodable {
         var viewer: ViewerNode?
         var rateLimit: RateLimitNode?
-        /// The review search; `nil` when it came back `null` (or wasn't asked).
         var reviewSearch: SearchAnswer?
-        /// `repo<i>` aliases; `nil` where GitHub answered `null`.
         var repositories: [String: RepositoryNode?] = [:]
 
         private struct Key: CodingKey {
@@ -425,12 +346,9 @@ enum ProjectQuery {
         /// GitHub may answer `null` for a node it couldn't resolve.
         var nodes: [Node?]?
         var present: [Node] { (nodes ?? []).compactMap { $0 } }
-        /// Whether GitHub left an entry out (`null`), as it does for the
-        /// entries it hadn't reached when it cut a query short.
         var hasGaps: Bool { (nodes ?? []).contains { $0 == nil } }
     }
 
-    /// The review search: one page of results, and how many matched in all.
     private struct SearchAnswer: Decodable {
         var nodes: Nodes<SearchNode>
         var issueCount: Int?
@@ -458,7 +376,6 @@ enum ProjectQuery {
         struct BranchNode: Decodable { var name: String }
         struct HeadNode: Decodable { var headRefName: String? }
 
-        /// Whether any of its lists has an entry GitHub left out.
         var hasGaps: Bool {
             [openPullRequests?.hasGaps, closedPullRequests?.hasGaps, openIssues?.hasGaps,
              closedIssues?.hasGaps, openPullRequestHeads?.hasGaps].contains(true)
@@ -484,9 +401,6 @@ enum ProjectQuery {
         var avatarUrl: URL?
     }
 
-    /// One result of the review search: a pull request and its repository.
-    /// A result that isn't a pull request (the query asks only for them)
-    /// decodes with neither and is skipped.
     private struct SearchNode: Decodable {
         struct Repository: Decodable { var nameWithOwner: String }
         var repository: Repository?
@@ -536,7 +450,6 @@ enum ProjectQuery {
             case "CLOSED": .closed
             default: isDraft ? .draft : .open
             }
-            // Whether it waits on the viewer comes from the review search.
             return Item(
                 kind: .pullRequest,
                 repository: repository,
@@ -565,9 +478,6 @@ enum ProjectQuery {
             )
         }
 
-        /// A deleted account is GitHub's `ghost`. GraphQL names a Bot
-        /// `dependabot`, where REST and the web say `dependabot[bot]`; the
-        /// `[bot]` spelling is kept so an `@login` author selector matches either way.
         static func author(_ node: AuthorNode?, viewer: String?) -> (String, AuthorKind) {
             guard let node else { return ("ghost", .other) }
             if node.__typename == "Bot" || node.login.hasSuffix("[bot]") {
@@ -577,7 +487,6 @@ enum ProjectQuery {
             return (node.login, .other)
         }
 
-        /// `StatusCheckRollup.state`: SUCCESS, FAILURE, ERROR, PENDING, EXPECTED.
         static func checks(_ state: String?) -> ChecksState {
             switch state {
             case nil: .none
@@ -588,9 +497,6 @@ enum ProjectQuery {
         }
     }
 
-    /// An issue: open or closed (GitHub's `stateReason`, completed or not
-    /// planned, isn't read). No checks and no review requests; its activity
-    /// is its comments.
     private struct IssueNode: Decodable {
         var number: Int
         var title: String
@@ -626,7 +532,6 @@ enum ProjectQuery {
 }
 
 extension RepositoryError.Kind {
-    /// From a GraphQL error's `type`.
     init(graphQLType type: String?) {
         switch type {
         case nil, "NOT_FOUND": self = .notFound

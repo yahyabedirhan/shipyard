@@ -2,11 +2,6 @@ import AppKit
 import ShipyardCore
 import SwiftUI
 
-/// A part's badge at the top of its status view (`StatusView`): shipyard's
-/// logo (`LogoBadge`) for the skill and the CLI, and the maker's mark for
-/// GitHub and Notion, on a tile of the badge's own squircle in the maker's
-/// colours. Every badge is `side` square with the same corners, and keeps
-/// its colours in light and dark mode, as `LogoBadge` does.
 struct SetupBadge: View {
     let part: SetupPart
     var side: CGFloat = 32
@@ -48,9 +43,6 @@ struct SetupBadge: View {
         .frame(width: side * tile.markShare, height: side * tile.markShare)
     }
 
-    /// GitHub's or Notion's mark as a template image, for the tile to draw
-    /// in its mark colour; nil for the skill and the CLI, which show the
-    /// sailboat, or when the bundle lacks the file.
     @MainActor
     static func mark(for part: SetupPart) -> NSImage? {
         guard let name = Tile(part)?.resource else { return nil }
@@ -65,8 +57,6 @@ struct SetupBadge: View {
 
     @MainActor private static var cache: [String: NSImage] = [:]
 
-    /// A maker's tile: its colours and how much of the side the mark's own
-    /// 24-unit box takes, tuned so each mark looks the size of the sailboat.
     private struct Tile {
         let resource: String
         let fill: Color
@@ -81,7 +71,6 @@ struct SetupBadge: View {
                 // colours GitHub's logo terms allow.
                 self.init(resource: "github", fill: LogoBadge.color(0x24292F), mark: .white, hairline: .white.opacity(0.10), markShare: 0.66)
             case .notion:
-                // White with Notion's black cube, as Notion's own app icon.
                 self.init(resource: "notion", fill: .white, mark: .black, hairline: .black.opacity(0.12), markShare: 0.64)
             case .skill, .cli:
                 return nil

@@ -5,7 +5,6 @@ import Testing
 
 @Suite("Author selectors")
 struct AuthorSelectorTests {
-    /// The parsed selector, or the message it's rejected with.
     private func parse(_ text: String) -> Result<AuthorSelector, AuthorSelector.Rejection> {
         Result { () throws(AuthorSelector.Rejection) in try AuthorSelector(parsing: text) }
     }
@@ -18,7 +17,6 @@ struct AuthorSelectorTests {
         #expect(try AuthorSelector(parsing: "@octocat") == .login("octocat"))
         #expect(try AuthorSelector(parsing: "@dependabot[bot]") == .login("dependabot[bot]"))
         #expect(try AuthorSelector(parsing: "@some-login-2") == .login("some-login-2"))
-        // Each is written back the way it was read.
         for text in ["me", "others", "bots", "@octocat", "@dependabot[bot]"] {
             #expect(try AuthorSelector(parsing: text).description == text)
         }
@@ -29,7 +27,6 @@ struct AuthorSelectorTests {
         #expect(parse("bots2") == .failure(.init("unknown author `bots2` (did you mean `bots` or `@bots2`?)")))
         #expect(parse("bot") == .failure(.init("unknown author `bot` (did you mean `bots` or `@bot`?)")))
         #expect(parse("alice") == .failure(.init("unknown author `alice` (did you mean `@alice`?)")))
-        // The old notification spelling for everyone.
         #expect(parse("any") == .failure(.init("unknown author `any` (an empty list means everyone)")))
         #expect(parse("two words") == .failure(.init("unknown author `two words` (expected `me`, `others`, `bots` or an `@login`)")))
     }
@@ -60,11 +57,9 @@ struct AuthorSelectorTests {
 
     @Test("the groups cover every author once, and a login matches ignoring case", arguments: [
         AuthorCase(author: "yabepa", kind: .me, matches: [.me, .login("yabepa")]),
-        // The viewer's login, where the item didn't say it's theirs.
         AuthorCase(author: "YaBePa", kind: .other, matches: [.me, .login("yabepa")]),
         AuthorCase(author: "octocat", kind: .other, matches: [.others]),
         AuthorCase(author: "dependabot[bot]", kind: .bot, matches: [.bots, .login("Dependabot[bot]")]),
-        // A `[bot]` login counts as a bot even where the account type didn't say.
         AuthorCase(author: "renovate[bot]", kind: .other, matches: [.bots]),
     ])
     func matching(_ author: AuthorCase) {

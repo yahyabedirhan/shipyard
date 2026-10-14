@@ -14,12 +14,8 @@ import ShipyardCommand
 public final class ConfigurationStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
-        /// The file is valid and either differs from the last valid
-        /// configuration or fixes the previous error.
         case changed(Configuration)
-        /// The file is valid and means the same as before.
         case unchanged
-        /// The file was rejected; the last valid configuration stays.
         case invalid(ConfigurationError)
     }
 
@@ -79,8 +75,6 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// `error` and clears `warnings`; a valid one clears the error.
     @discardableResult
     public func reload() -> ReloadResult {
-        // Taken before the bytes: a save in between gets a later time and
-        // another reload, so the time never claims a newer file than was read.
         let modified = ConfigurationCheck.modificationDate(of: url)
         let outcome: Result<Configuration.Decoded, ConfigurationError>
         var acceptsPreset = false
@@ -98,7 +92,6 @@ public final class ConfigurationStore: @unchecked Sendable {
             switch outcome {
             case .failure(let error):
                 _error = error
-                // Warnings from an older read carry stale line numbers.
                 _warnings = []
                 return .invalid(error)
             case .success(let decoded):
@@ -143,7 +136,6 @@ public final class ConfigurationStore: @unchecked Sendable {
         let fileManager = FileManager.default
         guard !fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // `withoutOverwriting`: a file an editor wrote meanwhile wins.
         try Data(Configuration.header.utf8).write(to: url, options: .withoutOverwriting)
     }
 
@@ -182,8 +174,6 @@ public final class ConfigurationStore: @unchecked Sendable {
             throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
         let edited = try Configuration.settingLayout(layout, in: text)
-        // In place, not by renaming a new file over it: a symlinked file
-        // (dotfiles) stays a symlink and keeps its permissions.
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.truncate(atOffset: 0)
@@ -191,10 +181,6 @@ public final class ConfigurationStore: @unchecked Sendable {
         return reload()
     }
 
-    /// Checks the picker's projects before a write: names not empty, each
-    /// making a slug that isn't among `existing` (slugs) or each other's,
-    /// at least one `owner/name` each, none twice. Package-wide for the
-    /// core's preset writer.
     package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigurationError) {
         var issues: [ConfigurationIssue] = []
         var slugs = Set(existing)
@@ -227,8 +213,6 @@ public final class ConfigurationStore: @unchecked Sendable {
         return try body()
     }
 
-    /// The file's bytes; a missing file reads as empty. Package-wide for
-    /// the core's preset writer.
     package func read() throws(ConfigurationError) -> Data {
         guard FileManager.default.fileExists(atPath: url.path) else { return Data() }
         do {
@@ -240,11 +224,6 @@ public final class ConfigurationStore: @unchecked Sendable {
 }
 
 extension Configuration {
-    /// Whether a preset may replace `text`: it reads, and its only live key
-    /// is `version`, as in the commented header the app creates. Comments
-    /// and blank lines don't count; any table, even an empty one, does.
-    /// `ConfigurationStore.reload()` records it, and the core's preset writer
-    /// checks it again before writing.
     package static func acceptsPreset(_ text: String) -> Bool {
         guard (try? decode(text)) != nil else { return false }
         return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && $0.path == [.key("version")] }

@@ -1,16 +1,12 @@
 @testable import ShipyardCore
 import Testing
 
-/// How the list scrolls to keep the row the keys highlighted in view:
-/// not at all while it's visible, just enough to show it otherwise, and
-/// clear of the pinned project header.
 @Suite("Row scroll")
 struct RowScrollTests {
     private let item = MenuRowPlace(section: "shipyard", row: "https://github.com/yahyabedirhan/shipyard/pull/2")
     private let next = MenuRowPlace(section: "shipyard", row: "https://github.com/yahyabedirhan/shipyard/pull/3")
     private var places: [MenuRowPlace] { [.header("shipyard"), item, next] }
 
-    /// A 560 pt list, 26 pt headers, 24 pt rows.
     private func reveal(_ target: MenuRowPlace, from previous: MenuRowPlace?, top: Double?, pinnedHeader: Double = 26) -> RowScroll {
         RowScroll.reveal(
             target,
@@ -57,9 +53,7 @@ struct RowScrollTests {
 
     @Test("a row the list hasn't laid out yet is scrolled to by the way the highlight moved: up to the top, down to the bottom")
     func notLaidOut() {
-        // An item above: below the pinned header, near enough without its height.
         #expect(reveal(item, from: next, top: nil) == .alignTop(anchor: 26.0 / 560))
-        // An item below.
         #expect(reveal(next, from: item, top: nil) == .alignBottom)
     }
 
@@ -86,10 +80,7 @@ struct RowScrollTests {
 
     @Test("from a pinned header to its first item not laid out: just below the header, not to the bottom")
     func fromPinnedHeaderToFirstItem() {
-        // Scrolled into the middle of the project, its first item is above
-        // the visible area, under the header pinned at the top.
         #expect(reveal(item, from: .header("shipyard"), top: nil) == .alignTop(anchor: 26.0 / 560))
-        // A row further down still goes the way the highlight moved.
         #expect(RowScroll.reveal(
             next, from: .header("shipyard"), in: places + [.header("other")], frame: nil, visibleHeight: 560, pinnedHeader: 26
         ) == .alignBottom)
@@ -117,10 +108,7 @@ struct RowScrollTests {
     @Test("a wrap to the bottom keeps scrolling to the end until its row lands in full view")
     func wrapLandsAtBottom() {
         var landing = RowWrapLanding(.wrapToBottom, to: next)
-        // The lazy stack guessed the rows above too short: once they're
-        // laid out, the last row is still below the list's bottom edge.
         #expect(landing?.check(frame: RowSpan(top: 580, bottom: 604), visibleHeight: 560) == .scrollAgain)
-        // Not laid out at all yet: short of the end too.
         #expect(landing?.check(frame: nil, visibleHeight: 560) == .scrollAgain)
         #expect(landing?.check(frame: RowSpan(top: 533, bottom: 557), visibleHeight: 560) == .landed)
     }

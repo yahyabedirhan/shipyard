@@ -71,7 +71,6 @@ public enum PanelCommand {
         return .success(request(rest))
     }
 
-    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
         .usage(line + ". Run `shipyard panel --help` for usage.")
     }

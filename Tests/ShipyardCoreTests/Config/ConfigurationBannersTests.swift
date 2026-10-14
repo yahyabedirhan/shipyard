@@ -3,8 +3,6 @@ import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
-/// `config.toml`'s `[banners]`: how long a dismissed panel banner stays
-/// hidden.
 @Suite("Configuration: banners")
 struct ConfigurationBannersTests {
     @Test("an hour by default; snooze-duration is read as a duration")

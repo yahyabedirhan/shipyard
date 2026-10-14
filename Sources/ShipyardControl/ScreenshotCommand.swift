@@ -77,7 +77,6 @@ public enum ScreenshotCommand {
         return .success(.screenshot(path: absolute, appearance: appearance, menuBarIcon: menuBarIcon, withIndicator: withIndicator))
     }
 
-    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
         .usage(line + ". Run `shipyard app capture --help` for usage.")
     }

@@ -1,15 +1,5 @@
 import Foundation
 
-/// A strict reading of a skill's YAML frontmatter: the lines between the
-/// opening and closing `---`, each `key: value` with a scalar value.
-///
-/// `npx skills add` parses the frontmatter as YAML and skips a skill whose
-/// frontmatter isn't valid, so this reader refuses what YAML refuses rather
-/// than splitting at the first colon. A plain (unquoted) value can't contain
-/// `: ` or ` #`, can't end with `:`, and can't start with an indicator; a
-/// quoted value must close its quotes. Anything richer than one-line scalars
-/// (block scalars, lists, nested maps) is refused too: the skill doesn't
-/// need it, and refusing keeps the reader small and exact.
 struct SkillFrontmatter: Equatable {
     struct Invalid: Error, Equatable, CustomStringConvertible {
         let line: Int

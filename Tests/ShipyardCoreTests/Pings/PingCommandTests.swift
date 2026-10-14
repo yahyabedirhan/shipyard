@@ -16,20 +16,13 @@ private let twoProjects = """
 
     """
 
-/// `shipyard ping` as an agent runs it: arguments, environment,
-/// configuration and the ping store in, the text it prints and its exit
-/// status out. What the app then shows is in `PingsTests`.
 @Suite("The ping command")
 struct PingCommandTests {
     let store = PingStore(directory: FileManager.default.temporaryDirectory
         .appendingPathComponent("shipyard-pings-\(UUID().uuidString)", isDirectory: true))
-    /// The agent's working folder, a fake one: `origin` says its remote.
     static let folder = URL(fileURLWithPath: "/work/shop", isDirectory: true)
     let environment = CommandEnvironment(workingDirectory: Self.folder, variables: [:], git: FakeGitRemote())
 
-    /// The Mac's filing, as `main.swift` builds it, over a `config.toml`
-    /// holding `text` and the resolved lists `resolved`, in a fresh
-    /// temporary folder.
     private func filing(_ text: String = twoProjects, resolved: [String: [String]] = [:]) throws -> ProjectFiling {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-filing-\(UUID().uuidString)", isDirectory: true)
@@ -62,8 +55,6 @@ struct PingCommandTests {
         )
     }
 
-    /// The stored pings, each without its `instance` (made up at random,
-    /// tested end to end in `PingIDTests`).
     private var storedWithoutInstance: [Ping] {
         store.all().map { ping in
             var ping = ping
@@ -107,9 +98,7 @@ struct PingCommandTests {
             repositories = ["yahyabedirhan/blog"]
 
             """
-        // A title, as an older shipyard sends a project's old name.
         #expect(try ping("Published", "--project", "My blog", config: config).status == 0)
-        // A slug wins over another project's title.
         #expect(try ping("Ready", "--project", "shop", config: config, id: "a2b3c4").status == 0)
         #expect(try ping("Ready", "--project", "Shop", config: config, id: "d5e6f7").status == 0)
         #expect(store.all().map(\.projects).sorted { $0[0] < $1[0] } == [["blog"], ["shop"], ["storefront"]])
@@ -317,8 +306,6 @@ struct PingCommandTests {
     }
 }
 
-/// The `shipyard` command line: its subcommands, its help, and reading the
-/// configuration before a ping.
 @Suite("The shipyard CLI")
 @MainActor
 struct ShipyardCLITests {
@@ -375,12 +362,6 @@ struct ShipyardCLITests {
         #expect(result.error == "shipyard ping send: no project is named `shop`; config.toml has no projects yet\n")
     }
 
-    // MARK: - Which config.toml
-
-    /// `shipyard <arguments>` as the Mac's `main.swift` assembles it, in an
-    /// agent's shell whose environment is `shell` and whose home is
-    /// `home`: the configuration file is the one `ConfigurationLocation` finds
-    /// beside `harness`'s app state, the folder the app writes for the CLI.
     private func shipyard(_ arguments: String..., in harness: Harness, shell: [String: String], home: URL) -> CommandResult {
         let filing = ProjectFiling(
             configURL: ConfigurationLocation.current(environment: shell, home: home, support: harness.stateDirectory),
@@ -394,8 +375,6 @@ struct ShipyardCLITests {
         )
     }
 
-    /// A folder for an agent's own `XDG_CONFIG_HOME`, holding a
-    /// `shipyard/config.toml` with only the project `elsewhere`.
     private func shellConfigHome() throws -> URL {
         let folder = FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-shell-\(UUID().uuidString)", isDirectory: true)

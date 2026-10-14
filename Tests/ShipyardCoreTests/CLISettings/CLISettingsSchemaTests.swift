@@ -3,17 +3,11 @@ import ShipyardCLISettings
 import ShipyardCommand
 import Testing
 
-// The published `cli.toml` schema (`schema/cli.schema.json`) is the contract
-// agents validate a machine's file against with `taplo check`, as
-// `config.schema.json` is for `config.toml`.
-
 private func loadCLISchema() throws -> [String: Any] {
     let data = try Data(contentsOf: repositoryRoot.appendingPathComponent("schema/cli.schema.json"))
     return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
 
-/// The example `cli.toml` in a document: its ```toml block that names the
-/// app machine.
 private func cliExample(in path: String) throws -> String {
     let text = try String(contentsOf: repositoryRoot.appendingPathComponent(path), encoding: .utf8)
     return try #require(tomlBlocks(in: text).first { $0.contains("app-machine = ") }, "\(path) has no cli.toml example")
@@ -21,7 +15,6 @@ private func cliExample(in path: String) throws -> String {
 
 private let documents = ["skills/shipyard/references/notices.md", "docs/configuration.md"]
 
-/// Every key `cli.toml` has, each set away from its default.
 private let everyCLIKey = """
     #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/cli.schema.json
     version = 1

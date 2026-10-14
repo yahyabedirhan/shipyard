@@ -2,27 +2,17 @@ import AppKit
 import ShipyardCore
 import SwiftUI
 
-// The small pieces the frame and the layouts share, drawn from the tokens
-// in `Design.swift`.
-
 private struct PanelNowKey: EnvironmentKey {
     static var defaultValue: Date { .now }
 }
 
 extension EnvironmentValues {
-    /// The time the panel draws ages against, ticking every 30 s.
     var panelNow: Date {
         get { self[PanelNowKey.self] }
         set { self[PanelNowKey.self] = newValue }
     }
 }
 
-/// A scroll view as tall as its content, up to `maxHeight`. The
-/// `MenuBarExtra` window sizes the panel from a zero-height proposal, which a
-/// plain scroll view (or `ViewThatFits`) takes as 0; so the content is
-/// measured and the height fixed from it, capped, and changed only when the
-/// capped value really moves (`MeasuredHeight`), so a lazy stack's estimates
-/// under each new viewport don't resize the panel forever.
 struct MeasuredScrollView<Content: View>: View {
     var maxHeight: CGFloat = Grid.maxListHeight
     @ViewBuilder var content: Content
@@ -41,20 +31,12 @@ struct MeasuredScrollView<Content: View>: View {
     }
 }
 
-/// A one-point line between the panel's parts.
 struct Hairline: View {
     var body: some View {
         Rectangle().fill(Palette.separator).frame(height: 1)
     }
 }
 
-/// A count in a capsule that rolls to its new number: the accent colour
-/// when it asks to be seen, muted when the rows it counts are in view.
-///
-/// Both colourings are drawn, one over the other, and muting fades between
-/// them. Restyling the number instead would change the text itself, and
-/// its numeric content transition would roll the digits on a colour change
-/// alone; this way only a new count rolls them.
 struct CountBadge: View {
     let count: Int
     var muted = false
@@ -64,8 +46,6 @@ struct CountBadge: View {
             number.foregroundStyle(.secondary).opacity(muted ? 1 : 0)
             number.foregroundStyle(Color.white).opacity(muted ? 0 : 1)
         }
-        // Fixed, so a tab's label style changing around the badge doesn't
-        // restyle the muted number either.
         .foregroundStyle(Color.primary)
         .padding(.horizontal, 5)
         .frame(minWidth: 17, minHeight: 15)
@@ -88,8 +68,6 @@ struct CountBadge: View {
     }
 }
 
-/// A banner's ✕ at its trailing edge, which hides it for an hour
-/// (`Shipyard.dismissBanner`): small and quiet, its words from `PanelText`.
 struct BannerDismissButton: View {
     let dismiss: () -> Void
 
@@ -101,24 +79,17 @@ struct BannerDismissButton: View {
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.dismissBanner)
         .accessibilityLabel(PanelText.dismissBanner)
-        // Centred on the first line, its hover fill reaching into the
-        // banner's padding, so the banner keeps its height.
         .padding(.vertical, -2)
         .padding(.trailing, -4)
     }
 }
 
-/// A note above the content: what's wrong or slowed down, tinted by how
-/// much it matters, with an optional link-style action under the words, or
-/// at the right edge, as the lease banner's Stop is, when `trailing`.
 struct Banner: View {
     let symbol: String
     let text: String
     let tint: Color
     var action: (title: String, run: () -> Void)?
     var trailing = false
-    /// The ✕ at the trailing edge, which hides the banner for an hour
-    /// (`Shipyard.dismissBanner`); `nil` leaves it out.
     var dismiss: (() -> Void)?
 
     var body: some View {
@@ -161,10 +132,6 @@ struct Banner: View {
     }
 }
 
-// MARK: - A row's pieces
-
-/// A row's state icon: its symbol in its state's colour, a running run
-/// pulsing; a ping's says what clicking it does.
 struct StateSymbol: View {
     let row: MenuRow
 
@@ -178,10 +145,6 @@ struct StateSymbol: View {
     }
 }
 
-/// A known agent's mark: its logo, fitted to a square with the corners an
-/// app icon has; a one-colour glyph is tinted like text, and a logo with a
-/// dark-mode file switches to it. Decoration: the sender's name beside it,
-/// or the card's words, say who sent the ping.
 struct AgentMarkView: View {
     let agent: KnownAgent
     let size: CGFloat
@@ -205,8 +168,6 @@ struct AgentMarkView: View {
     }
 }
 
-/// A pull request's check dot, cut out of what it sits on like a status
-/// badge; nothing when there are no checks.
 struct CheckDot: View {
     let checks: ChecksState?
 
@@ -216,14 +177,11 @@ struct CheckDot: View {
                 Circle().fill(Palette.panel).frame(width: 8, height: 8)
                 Circle().fill(color).frame(width: 5.5, height: 5.5)
             }
-            // Its words are in the row's hover card (`PanelText.rowCard`).
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
     }
 }
 
-/// The attention dot: shown while the row needs attention, shrinking away
-/// once it's seen.
 struct AttentionDot: View {
     let isOn: Bool
 
@@ -239,11 +197,6 @@ struct AttentionDot: View {
 }
 
 extension View {
-    /// An item's row at `place`, in either layout: clicking opens it and
-    /// marks it seen, ⌥-click (or the VoiceOver action) only marks it seen;
-    /// its hover card holds what the row doesn't show (`PanelText.rowCard`); the attention
-    /// dot and weight animate as it's seen; and it's `highlightable`. The
-    /// layout still puts `.id(place)` on the lazy list's own child.
     func itemRow(
         _ row: MenuRow,
         at place: MenuRowPlace,
@@ -255,7 +208,6 @@ extension View {
     }
 }
 
-/// `itemRow(_:at:highlight:showsRepository:actions:)`.
 private struct ItemRow: ViewModifier {
     let row: MenuRow
     let place: MenuRowPlace
@@ -267,21 +219,18 @@ private struct ItemRow: ViewModifier {
     func body(content: Content) -> some View {
         Button(action: click) { content }
             .buttonStyle(RowButtonStyle())
-            // A ping's ✕, over its age while the row is highlighted.
             .overlay(alignment: .trailing) {
                 if row.item.ping != nil, highlight.isHighlighted(place) {
                     DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
                         .padding(.trailing, Grid.inset)
                 }
             }
-            // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
             .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
             .animation(Motion.seen, value: row.needsAttention)
             .highlightable(place, $highlight)
     }
 
-    /// ⌥ held: mark seen without opening; otherwise open (which marks seen).
     private func click() {
         let flags = NSApp.currentEvent?.modifierFlags ?? NSEvent.modifierFlags
         withAnimation(Motion.seen) {
@@ -290,8 +239,6 @@ private struct ItemRow: ViewModifier {
     }
 }
 
-/// A ping row's ✕: removes the ping now. It sits over the row's age on
-/// the row's own highlight, so its background is that highlight on the panel.
 private struct DismissButton: View {
     let action: () -> Void
 
@@ -311,9 +258,6 @@ private struct DismissButton: View {
     }
 }
 
-/// A note about a project's list, in a row's place, such as the review
-/// search's limit: information, not a failure. It wraps rather than
-/// truncating, so it needs no hover help.
 struct NoteRow: View {
     let note: String
 
@@ -336,9 +280,6 @@ struct NoteRow: View {
     }
 }
 
-/// A repository of a project that couldn't be fetched, in a row's place.
-/// Its message wraps, up to `maxLines`, rather than truncating, so it needs
-/// no hover help; VoiceOver reads it whole.
 struct ErrorRow: View {
     let error: MenuErrorRow
     private static let maxLines = 3
@@ -365,10 +306,8 @@ struct ErrorRow: View {
     }
 }
 
-/// A command to run in a terminal, in a box with a Copy button.
 struct CommandBox: View {
     let command: String
-    /// Whether it starts with a `$` prompt (a single-line shell command).
     var prompt = true
     var font = TypeScale.code
     @State private var copiedAt: Date?
@@ -396,30 +335,16 @@ struct CommandBox: View {
     }
 }
 
-/// The copy icon beside text to copy (a `CommandBox`'s command, the
-/// sign-in code): puts `text` on the clipboard and turns into a checkmark.
-/// No hover help: the checkmark says it was copied. With a `title` it has a
-/// short word beside the icon ("Copy"), which rolls to `copiedTitle`
-/// ("Copied") with the counts' text transition. Ten seconds after the last
-/// copy it turns back, with the same animations; another copy before then
-/// starts the ten seconds again. `copiedAt` (when it was last copied; `nil`
-/// shows the copy icon) is the caller's, so another way of copying the same
-/// text can show it too, through `CopyButton.copied(_:)`, and new text can
-/// reset it at once.
 struct CopyButton: View {
-    /// How long the checkmark stays after a copy.
     static let resetDelay: Duration = .seconds(10)
 
-    /// Marks `copiedAt` as copied now, with the icon's animation.
     static func copied(_ copiedAt: Binding<Date?>) {
         withAnimation(.spring(duration: 0.3)) { copiedAt.wrappedValue = Date() }
     }
 
     let text: String
-    /// VoiceOver's label before and after copying.
     var label = PanelText.copy
     var copiedLabel = PanelText.copied
-    /// The word beside the icon before and after copying; none without it.
     var title: String? = nil
     var copiedTitle: String? = nil
     @Binding var copiedAt: Date?
@@ -436,7 +361,6 @@ struct CopyButton: View {
                     .contentTransition(.symbolEffect(.replace))
                 if let title {
                     let after = copiedTitle ?? title
-                    // Sized for the longer word, so the icon doesn't shift as it rolls.
                     ZStack(alignment: .leading) {
                         Text(title.count > after.count ? title : after).hidden()
                         Text(copied ? after : title)
@@ -449,7 +373,6 @@ struct CopyButton: View {
         }
         .buttonStyle(IconButtonStyle(labeled: title != nil))
         .accessibilityLabel(copied ? copiedLabel : label)
-        // Restarts with each copy and is cancelled when the button goes away.
         .task(id: copiedAt) {
             guard copiedAt != nil else { return }
             do { try await Task.sleep(for: Self.resetDelay) } catch { return }
@@ -458,16 +381,13 @@ struct CopyButton: View {
     }
 }
 
-/// The general pasteboard, for text.
 enum Clipboard {
-    /// Puts exactly `text` on the clipboard, in place of what was there.
     static func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
     }
 }
 
-/// A card: a softly filled, bordered box (the skill install card).
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -480,13 +400,8 @@ extension View {
     func card() -> some View { modifier(CardBackground()) }
 }
 
-// MARK: - Buttons
-
-/// A borderless icon button with hover and pressed states.
 struct IconButtonStyle: ButtonStyle {
-    /// An icon with a word beside it: as wide as both, rather than square.
     var labeled = false
-    /// A small icon in a row of chips: a tight square, not the toolbar's 24×22.
     var compact = false
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
@@ -518,11 +433,8 @@ private struct IconButtonBody: View {
     }
 }
 
-/// A rounded button: prominent (the accent, for the screen's main action)
-/// or quiet.
 struct PillButtonStyle: ButtonStyle {
     var prominent = false
-    /// 24 in a row of buttons; taller for a screen's stacked, full-width actions.
     var height: CGFloat = 24
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
@@ -561,14 +473,11 @@ private struct PillButtonBody: View {
     }
 }
 
-/// A row: darker while pressed. Its hover highlight isn't drawn here but
-/// once per layout, behind the rows (`rowHighlight(_:)`), so it can glide.
 struct RowButtonStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
             .background {
                 if configuration.isPressed {
-                    // Over the hover highlight, the two add up to `Palette.pressed`.
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(Palette.hover)
                         .padding(.horizontal, Grid.inset)
@@ -577,17 +486,7 @@ struct RowButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - The row highlight
-
 extension View {
-    /// Draws `highlight` behind the rows in this view: one shape, at the
-    /// highlighted row's bounds, gliding from row to row. It's one view
-    /// moving rather than a shape matched between rows, so rows that a lazy
-    /// stack creates and drops can't make it jump, and a row scrolled out of
-    /// the stack takes the highlight with it. With tabs, `list` is the
-    /// selected tab: only its rows are lit, not the outgoing tab's while
-    /// the list slides, and the shape fades in on a new tab rather than
-    /// gliding from the old one.
     func rowHighlight(_ highlight: RowHighlight, in list: AnyHashable? = nil) -> some View {
         backgroundPreferenceValue(RowBoundsKey.self) { bounds in
             GeometryReader { proxy in
@@ -605,11 +504,6 @@ extension View {
     }
 }
 
-/// The row highlight behind `content`, in a view of its own: a hover moves
-/// the highlight on every row the pointer crosses, and only this layer and
-/// the rows read it. Read in a layout's body, each move would run that body
-/// again, with everything it builds (the tabs layout works out the tab's
-/// content, sorting every project's rows for All).
 struct HighlightLayer<Content: View>: View {
     @Binding var highlight: RowHighlight
     var list: AnyHashable? = nil
@@ -620,14 +514,12 @@ struct HighlightLayer<Content: View>: View {
     }
 }
 
-/// The rows' highlight shape, rounded and inset; a project header's is its whole band, square.
 struct RowHighlightShape: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover)
     }
 }
 
-/// A plain button that dims and shrinks a hair while pressed (a tab).
 struct PressButtonStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
@@ -637,11 +529,6 @@ struct PressButtonStyle: ButtonStyle {
     }
 }
 
-/// A project's new-note icon (its header in the list, its tab's summary in
-/// the tabs): a square and pencil that starts a note in the project's
-/// Notion database and opens it. While the note is being started, the
-/// native mini spinner stands in for it, at the same size, and a click
-/// does nothing.
 struct NewNoteIcon: View {
     let project: String
     let state: NewNoteButton
@@ -651,16 +538,12 @@ struct NewNoteIcon: View {
         Button(action: action) {
             Image(systemName: "square.and.pencil")
                 .font(.system(size: 9, weight: .semibold))
-                // The symbol draws its ink about half a point low and right
-                // of its box (measured at this size); moved back, it sits
-                // centred in its square, as the open-repository icon does.
                 .offset(x: -0.5, y: -0.5)
                 .opacity(state == .starting ? 0 : 1)
                 .overlay {
                     if state == .starting { ProgressView().controlSize(.mini).scaleEffect(0.8) }
                 }
         }
-        // The compact square of the header's other icons (Mark all seen, open repository).
         .buttonStyle(IconButtonStyle(compact: true))
         .disabled(state == .starting)
         .hoverHelp(PanelText.newNoteHelp(project))
@@ -668,8 +551,6 @@ struct NewNoteIcon: View {
     }
 }
 
-/// The tabs layout's Mark all seen (or Mark seen) for a tab: a
-/// checkmark and `title` as a text button. `action` brings its own animation.
 struct MarkSeenButton: View {
     let title: String
     let action: () -> Void
@@ -685,8 +566,6 @@ struct MarkSeenButton: View {
     }
 }
 
-/// A small text button ("Mark all seen", "Quit"): quiet until hovered,
-/// then tinted.
 struct TextButtonStyle: ButtonStyle {
     var tint: Color = Palette.accent
     var font: Font = TypeScale.captionEmphasis
@@ -720,15 +599,8 @@ private struct TextButtonBody: View {
     }
 }
 
-/// Inline Markdown from `PanelText` (a command in backticks, a link) as
-/// the panel draws it: `size` points, with each code span monospaced on a
-/// faint chip. The chip is what makes it read as code: SF Mono's "g" and "h"
-/// are drawn almost like SF Pro's, so a short command such as `gh` in the
-/// monospaced font alone looks like the words around it.
 enum CodeText {
-    /// The chip behind a code span.
     static let chip = Color.primary.opacity(0.09)
-    /// The chip's padding at each end: a thin space, so it doesn't hug the letters.
     static let padding = "\u{2009}"
 
     static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular) -> AttributedString {
@@ -754,17 +626,11 @@ enum CodeText {
 }
 
 extension Text {
-    /// `CodeText.attributed(markdown, size:weight:)`: the font is in the
-    /// runs, so a `.font(_:)` on the view doesn't change it.
     init(markdown: String, size: CGFloat, weight: Font.Weight = .regular) {
         self.init(CodeText.attributed(markdown, size: size, weight: weight))
     }
 }
 
-/// A tone's icon (`PanelText.SkillInstall.Tone`), as the onboarding cards'
-/// headings and a status view's status line show it: a green check for
-/// success, an amber triangle for a problem, and `neutral` in
-/// `neutralTint` for neither.
 struct ToneIcon: View {
     let tone: PanelText.SkillInstall.Tone
     let neutral: String

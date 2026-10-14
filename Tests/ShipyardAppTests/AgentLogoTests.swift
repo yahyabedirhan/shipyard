@@ -3,9 +3,6 @@ import ShipyardCore
 @testable import ShipyardApp
 import Testing
 
-/// Every known agent's logo is a file the app bundles: an agent added to
-/// `KnownAgent`, or a logo renamed, without its PDF in `AgentLogos` would
-/// show an empty mark.
 @Suite("Agent logos")
 @MainActor
 struct AgentLogoTests {

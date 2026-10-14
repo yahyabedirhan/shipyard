@@ -3,19 +3,11 @@ import ShipyardConfig
 import ShipyardNotices
 import ShipyardPings
 
-// What the app plugs into the core. Each port wraps an Apple-only service
-// (Keychain, notifications, the system clock, NSWorkspace) behind a small
-// protocol, so every rule in ShipyardCore builds and tests on Linux. The app
-// target supplies the real adapters; tests use in-memory doubles.
-
 /// Keeps the one GitHub token shipyard signed in with. The app stores it in
 /// the login Keychain.
 public protocol TokenStore: Sendable {
-    /// The stored token, or `nil` when there is none.
     func token() throws -> String?
-    /// Stores `token`, replacing any earlier one.
     func save(_ token: String) throws
-    /// Removes the stored token. Deleting when there is none is not an error.
     func delete() throws
 }
 
@@ -107,14 +99,7 @@ public struct PostedNotification: Equatable, Hashable, Sendable {
 /// `Shipyard.openNotification(_:)` with the notification's `itemURL`.
 public protocol Notifying: Sendable {
     func post(_ notification: PostedNotification) async
-    /// Takes the notification `id` (`PostedNotification.id`) out of
-    /// Notification Center, as when its ping is withdrawn or dismissed. One
-    /// that was never posted, or is gone already, is no error.
     func removeDelivered(id: String) async
-    /// Whether a notification posted now could show: false when the user
-    /// turned shipyard's notifications off. Never asked yet counts as
-    /// could, since the first post asks. An agent's notice asks it first,
-    /// so its verdict is never `shown` for a notice macOS would drop.
     func canShow() async -> Bool
 }
 
@@ -122,7 +107,6 @@ public protocol Notifying: Sendable {
 /// app takes from the tailnet (ADR 0010). The seam between the core and
 /// asking Tailscale, so tests use a fake; the app's is `TailscaleCLI`.
 public protocol TailnetIdentity: Sendable {
-    /// The login, such as `me@example.com`, or why it can't be learned now.
     func ownLogin() async -> Result<String, TailnetLoginUnknown>
 }
 
@@ -148,9 +132,6 @@ public struct SystemClock: WallClock {
 /// What running a ping's action came to.
 public enum ActionOutcome: Equatable, Sendable {
     case done
-    /// It didn't work: a reason short enough for the ping's row, such as
-    /// "No app", and the whole of it for its hover card, such as "No app
-    /// named Claude" (`nil` when the short one says it all).
     case failed(String, detail: String? = nil)
 }
 
@@ -161,9 +142,7 @@ public enum ActionOutcome: Equatable, Sendable {
 /// focuses Herdr through `HerdrFocus`, then sends `[herdr] terminal` as an
 /// `.app` action.
 public protocol ActionRunning: Sendable {
-    /// Opens `url` (a GitHub page), without waiting to see whether it opened.
     func open(_ url: URL)
-    /// Runs a ping's action and reports how it went.
     func run(_ action: PingAction) async -> ActionOutcome
 }
 
@@ -171,7 +150,5 @@ public protocol ActionRunning: Sendable {
 /// app as a login item (`SMAppService.mainApp`); `Shipyard` tells it which,
 /// following `launch-at-login`.
 public protocol LoginItem: Sendable {
-    /// Registers shipyard as a login item when `enabled`, removes it
-    /// otherwise. Telling it what it already is changes nothing.
     func setEnabled(_ enabled: Bool)
 }

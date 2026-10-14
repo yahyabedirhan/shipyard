@@ -39,8 +39,6 @@ public struct RemoteNoticeRoute: NoticeRoute {
         return TailnetNoticeRoute(appMachine: machine, scheme: notices.appScheme, port: notices.appPort, http: http).unfit(notice)
     }
 
-    /// A failed read's line, without the `shipyard: ` it starts with, for
-    /// `notify` to put its own in front.
     private static func reason(_ failure: CommandResult) -> String {
         var line = failure.error.trimmingCharacters(in: .newlines)
         if line.hasPrefix("shipyard: ") { line.removeFirst("shipyard: ".count) }
@@ -67,7 +65,6 @@ public struct TailnetNoticeRoute: NoticeRoute {
         self.http = http
     }
 
-    /// Where the app machine is, without the path: `http://my-mac:47420`.
     var origin: String { "\(scheme.rawValue)://\(appMachine):\(port)" }
 
     /// A notice whose click or a button focuses Herdr: the request names

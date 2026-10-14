@@ -38,8 +38,6 @@ public struct TailscaleCLI: TailnetIdentity {
     public func ownLogin() async -> Result<String, TailnetLoginUnknown> {
         guard let executable = locate() else { return .failure(TailnetLoginUnknown("the tailscale command wasn't found")) }
         let run = run
-        // Off the main actor, and never waited on past the timeout: a
-        // Tailscale that hangs refuses the notice rather than holding it.
         let output = await Self.firstOf(
             { run(executable, ["status", "--json"]) },
             orAfter: Self.timeout
@@ -53,7 +51,6 @@ public struct TailscaleCLI: TailnetIdentity {
         return Self.login(fromStatus: Data(output.standardOutput.utf8))
     }
 
-    /// The first `tailscale` found: the known paths, then each `PATH` directory.
     func locate() -> String? {
         if let known = Self.knownPaths.first(where: isExecutable) { return known }
         for directory in (pathEnvironment ?? "").split(separator: ":") {
@@ -63,8 +60,6 @@ public struct TailscaleCLI: TailnetIdentity {
         return nil
     }
 
-    /// The login in `tailscale status --json`'s output: `User[Self.UserID].LoginName`,
-    /// when `BackendState` is `Running`.
     static func login(fromStatus data: Data) -> Result<String, TailnetLoginUnknown> {
         guard let status = try? JSONDecoder().decode(Status.self, from: data) else {
             return .failure(TailnetLoginUnknown("`tailscale status --json` printed something it couldn't read"))
@@ -82,7 +77,6 @@ public struct TailscaleCLI: TailnetIdentity {
         return .success(login)
     }
 
-    /// The part of `tailscale status --json` the login is in.
     private struct Status: Decodable {
         var backendState: String?
         var selfNode: Node?
@@ -105,8 +99,6 @@ public struct TailscaleCLI: TailnetIdentity {
         }
     }
 
-    /// `body`'s result, run off the caller's actor, or `nil` once `limit`
-    /// passes first; `body` is then left to finish on its own.
     private static func firstOf(
         _ body: @escaping @Sendable () -> CommandOutput?,
         orAfter limit: Duration
@@ -122,7 +114,6 @@ public struct TailscaleCLI: TailnetIdentity {
         }
     }
 
-    /// A continuation resumed by whichever comes first, once.
     private final class Once: @unchecked Sendable {
         private let lock = NSLock()
         private var continuation: CheckedContinuation<CommandOutput?, Never>?

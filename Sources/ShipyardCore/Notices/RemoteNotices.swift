@@ -1,15 +1,6 @@
 import Foundation
 import ShipyardNotices
 
-/// Collecting the notices another machine's agents left with its
-/// herdr-shipyard plugin (`PluginNoticeRoute`), on the same poll and
-/// through the same Herdr connection as its pings (ADR 0005).
-///
-/// Two of the plugin's actions, each read from its command log as the ping
-/// list is: `notices` lists what waits, oldest first, as
-/// `{"version":1,"truncated":<bool>,"notices":[…]}` (within 48 KiB; the
-/// rest wait for the next poll), and `notices-read` removes what that
-/// listing handed out.
 extension RemotePingReader {
     /// The plugin's action that lists the notices waiting on the machine.
     public static let noticesActionID = "notices"
@@ -37,15 +28,12 @@ extension RemotePingReader {
     }
 }
 
-/// The plugin's `notices` listing.
 struct NoticeListing: Decodable {
-    /// The listing's contract version this build reads.
     static let currentVersion = 1
 
     var version: Int
     var notices: [Entry]
 
-    /// One stored notice, `nil` when it doesn't read as a `QueuedNotice`.
     struct Entry: Decodable {
         var queued: QueuedNotice?
 
@@ -54,7 +42,6 @@ struct NoticeListing: Decodable {
         }
     }
 
-    /// The listing `stdout` holds, or `nil` when it isn't one this build reads.
     static func decode(_ stdout: String) -> NoticeListing? {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

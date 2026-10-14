@@ -6,17 +6,11 @@ import ShipyardCore
 import ShipyardNotices
 import Testing
 
-/// App control's server: how it answers each request (with a fake panel),
-/// and the real socket, from the `shipyard` command's client to the server
-/// and back, in a temporary folder.
 @Suite("The control server")
 @MainActor
 struct ControlServerTests {
     static let status = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: ["shop"])
 
-    /// Records each call it's asked to make, and refuses all of them with
-    /// `refusal` when it's set. Its status says the panel is open unless
-    /// `isOpen` is false.
     final class FakePanel: PanelControlling {
         var calls: [String] = []
         var refusal: PanelRefusal?
@@ -48,7 +42,6 @@ struct ControlServerTests {
         }
     }
 
-    /// Records each screenshot it's asked for, and answers with `outcome`.
     final class FakeScreenshotter: Screenshotting {
         var calls: [String] = []
         var outcome = ScreenshotOutcome.captured
@@ -64,30 +57,23 @@ struct ControlServerTests {
         }
     }
 
-    /// Whether the server asked the app to quit.
     final class QuitRecorder {
         var quits = 0
     }
 
-    /// The lease's notices, as the app makes them from the transitions the
-    /// server tells: what it would hand the notifier, in order.
     final class NoticeRecorder {
         var notices: [ControlNotice] = []
     }
 
-    /// The time the server decides the lease at, moved by the test.
     final class Clock {
         var now = Date(timeIntervalSince1970: 0)
     }
 
-    /// The agent the tests' requests come from, and another one.
     nonisolated static let agent = Holder(key: "CLAUDE_CODE_SESSION_ID=agent", name: "Claude Code", place: "/work")
     nonisolated static let other = Holder(key: "process:300@800250000", name: "codex", place: "Herdr pane w1-2")
-    /// A lease `holder` took at `taken` seconds, held to its cap, as a `take` grants it.
     nonisolated static func term(_ holder: Holder, taken: TimeInterval) -> ControlLease.Term {
         ControlLease.Term(holder: holder, taken: Date(timeIntervalSince1970: taken), ends: Date(timeIntervalSince1970: taken + ControlLease.cap))
     }
-    /// `agent` as it reads in a request on the wire.
     nonisolated static let agentWire = #""holder":{"key":"CLAUDE_CODE_SESSION_ID=agent","name":"Claude Code","place":"\/work"}"#
 
     let panel = FakePanel()
@@ -95,7 +81,6 @@ struct ControlServerTests {
     let quitter = QuitRecorder()
     let clock = Clock()
     let indicator = LeaseIndicator()
-    /// A folder of its own for each test, short enough for a socket's path.
     let folder = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         .appendingPathComponent("shipyard-\(UUID().uuidString.prefix(8))", isDirectory: true)
     var socket: URL { ControlSocket.url(in: folder) }
@@ -116,8 +101,6 @@ struct ControlServerTests {
 
     let recorder = NoticeRecorder()
 
-    /// The lease's banners as the indicator last handed them to the core
-    /// (`Shipyard.lease`).
     final class BannersRecorder {
         var last = PanelBanner.Lease()
     }
@@ -147,8 +130,6 @@ struct ControlServerTests {
             quit: { quitter.quits += 1 }
         )
     }
-
-    // MARK: - Dispatch
 
     @Test("status answers with the panel's status, as lines or as JSON")
     func status() async {
@@ -310,7 +291,6 @@ struct ControlServerTests {
         #expect(server.lease.current(at: clock.now)?.holder == Self.agent)
     }
 
-    /// The notice requests the server handed the app, in order.
     final class NoticeLog {
         var requests: [NoticeRequest] = []
     }
@@ -341,11 +321,8 @@ struct ControlServerTests {
 
         #expect(answer == .init(reply: .refused(why)))
         #expect(panel.calls.isEmpty)
-        // Nothing that didn't read takes the lease.
         #expect(server.lease.current(at: clock.now) == nil)
     }
-
-    // MARK: - The lease
 
     @Test("a leased request from another holder is refused, naming the holder, with nothing done", arguments: [
         ControlRequest.appQuit, .appOpen, .panelOpen, .panelClose, .panelFold(project: "shop"), .panelUnfold(project: "shop"),
@@ -355,7 +332,6 @@ struct ControlServerTests {
     ])
     func refusedToAnother(request: ControlRequest) async {
         let server = server()
-        // The agent's first leased request takes the lease, for a minute.
         _ = await server.reply(to: ControlRequest.panelOpen.sent())
         clock.now = Date(timeIntervalSince1970: 12)
 
@@ -394,19 +370,16 @@ struct ControlServerTests {
 
         _ = await server.reply(to: ControlRequest.panelOpen.sent())
         clock.now = Date(timeIntervalSince1970: 12)
-        // Another agent's refused request changes nothing shown, its step included.
         _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
 
         #expect(indicator.shown(at: clock.now) == AppStatus.Lease(
             holder: "Claude Code", place: "/work", secondsLeft: 48, waiting: 0, step: "Opened the panel · 12s ago"
         ))
         #expect(indicator.shownEnd(at: clock.now) == Date(timeIntervalSince1970: 60))
-        // Its end comes with no request: the server's timer settles it.
         clock.now = Date(timeIntervalSince1970: 60)
         server.settleLease()
         #expect(indicator.lease == ControlLease())
         #expect(indicator.shown(at: clock.now) == nil)
-        // A capture without the indicator hides a lease that's held.
         _ = await server.reply(to: ControlRequest.panelOpen.sent(by: Self.other))
         indicator.hideForCapture()
         #expect(indicator.shown(at: clock.now) == nil)
@@ -422,12 +395,10 @@ struct ControlServerTests {
         clock.now = Date(timeIntervalSince1970: 40)
         _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
         _ = await server.reply(to: ControlRequest.appStatus(json: false).sent(by: Self.other))
-        // The renewal at 30 moved its end to 90, where the timer settles it.
         clock.now = Date(timeIntervalSince1970: 90)
         server.settleLease()
         clock.now = Date(timeIntervalSince1970: 100)
         _ = await server.reply(to: ControlRequest.panelClose.sent(by: Self.other))
-        // Ended with no timer: the next request settles it before it takes the lease.
         clock.now = Date(timeIntervalSince1970: 170)
         _ = await server.reply(to: ControlRequest.panelOpen.sent())
 
@@ -473,7 +444,6 @@ struct ControlServerTests {
         clock.now = Date(timeIntervalSince1970: 1010)
         _ = await server.reply(to: ControlRequest.panelOpen.sent())
         #expect(recorder.notices.isEmpty)
-        // Renewed to 1070, but capped at 750 + 5 minutes.
         clock.now = Date(timeIntervalSince1970: 1050)
         server.settleLease()
 
@@ -543,7 +513,6 @@ struct ControlServerTests {
         }
         let line = indicator.shown(at: clock.now)
 
-        // Its end comes with no request: the server's timer settles it.
         clock.now = Date(timeIntervalSince1970: 60)
         server.settleLease()
         let granted = await waiting.value
@@ -552,8 +521,6 @@ struct ControlServerTests {
         #expect(granted == .init(reply: .done("you hold shipyard until 00:06:00\n"), granted: Self.term(Self.other, taken: 60)))
         #expect(indicator.shown(at: clock.now) == AppStatus.Lease(holder: "codex", place: "Herdr pane w1-2", secondsLeft: 300, waiting: 0))
     }
-
-    // MARK: - Stop and Allow
 
     @Test("after Stop, the stopped agent's leased requests and take are refused with the stop's words and nothing done, until allowed back")
     func stopped() async {
@@ -604,7 +571,6 @@ struct ControlServerTests {
 
         #expect(granted == .init(reply: .done("you hold shipyard until 00:05:10\n"), granted: Self.term(Self.other, taken: 10)))
         #expect(indicator.shown(at: clock.now)?.holder == "codex")
-        // The core gets the next lease, a new one, under the stopped agent's quiet line.
         #expect(banners.last == PanelBanner.Lease(
             held: .init(term: "\(Self.other.key)@10.0", headline: "Codex uses shipyard"),
             stopped: [.init(key: Self.agent.key, text: "You took shipyard back from Claude Code")]
@@ -614,14 +580,11 @@ struct ControlServerTests {
             .ended(agent: "Claude Code", reason: .stopped),
             .started(agent: "codex", place: "Herdr pane w1-2"),
         ])
-        // The bar and the waiter's cap end together, with no request: the timer settles both.
         clock.now = Date(timeIntervalSince1970: 310)
         server.settleLease()
         #expect(indicator.lease == ControlLease())
         #expect(banners.last == PanelBanner.Lease())
     }
-
-    // MARK: - The socket
 
     @Test("over the socket, a take waiting in line keeps its connection while others are answered, and gets the lease on release")
     func waitingTake() async throws {
@@ -634,7 +597,6 @@ struct ControlServerTests {
 
         let taken = await Self.sending { holder.send(.controlTake(waitSeconds: nil)) }
         #expect(taken == .success(.done("you hold shipyard until 00:05:00\n")))
-        // The waiting client blocks its own thread (`sending`) until the lease is handed over.
         let waiting = Task { await Self.sending { waiter.send(.controlTake(waitSeconds: 30)) } }
         for _ in 0..<200 where server.lease.status(at: clock.now)?.waiting != 1 {
             try await Task.sleep(nanoseconds: 10_000_000)
@@ -662,8 +624,6 @@ struct ControlServerTests {
         let next = ControlClient(socket: socket, holder: third, transport: UnixSocketTransport())
         _ = await Self.sending { holder.send(.controlTake(waitSeconds: nil)) }
 
-        // A take that waits in line, sent as the `shipyard` command sends it,
-        // whose client then goes (stopped, or its harness's timeout) before the lease is free.
         let gone = UnixSocket.make()
         try #require(UnixSocket.connectSocket(gone, to: try #require(UnixSocket.address(socket.path))) == 0)
         _ = UnixSocket.writeAll(gone, ControlRequest.controlTake(waitSeconds: 30).sent(by: Self.other))
@@ -672,7 +632,6 @@ struct ControlServerTests {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         close(gone)
-        // Another take waits behind it, its client still there.
         let waiting = Task { await Self.sending { next.send(.controlTake(waitSeconds: 30)) } }
         for _ in 0..<200 where server.lease.waiting(at: clock.now) != 2 {
             try await Task.sleep(nanoseconds: 10_000_000)
@@ -696,7 +655,6 @@ struct ControlServerTests {
     func socket() async throws {
         defer { try? FileManager.default.removeItem(at: folder) }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        // Left by an app that crashed.
         try Data().write(to: socket)
         let server = server(socket: socket)
         let client = ControlClient(socket: socket, holder: Self.agent, transport: UnixSocketTransport())
@@ -708,12 +666,10 @@ struct ControlServerTests {
         #expect(info.st_mode & S_IFMT == S_IFSOCK)
         #expect(info.st_mode & 0o777 == 0o600)
 
-        // The client blocks while it waits, so it runs on a thread of its own (`sending`).
         let status = await Self.sending { client.send(.appStatus(json: true)) }
         #expect(status == .success(.done(Self.status.json)))
         let opened = await Self.sending { client.send(.panelOpen) }
         #expect(opened == .success(.done("panel open\n")))
-        // Another agent's quit is refused over the socket, and the app stays.
         let refused = await Self.sending { another.send(.appQuit) }
         #expect(refused == .success(.refused(
             "shipyard is in use by Claude Code in /work until 00:01:00 (60s left); `shipyard lease take --wait <seconds>` to queue"
@@ -739,7 +695,6 @@ struct ControlServerTests {
         try server.start()
         defer { server.stop() }
 
-        // Sends a request and closes at once: the reply is written to a closed peer.
         let impatient = UnixSocket.make()
         try #require(UnixSocket.connectSocket(impatient, to: try #require(UnixSocket.address(socket.path))) == 0)
         _ = UnixSocket.writeAll(impatient, ControlRequest.appStatus(json: false).sent())
@@ -764,7 +719,6 @@ struct ControlServerTests {
 }
 
 extension ControlRequest {
-    /// The request as `holder`'s `shipyard` command sends it.
     fileprivate func sent(by holder: Holder = ControlServerTests.agent) -> Data {
         ControlMessage(self, holder: holder).encoded()
     }

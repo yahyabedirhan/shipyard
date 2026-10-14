@@ -4,16 +4,11 @@ import ShipyardConfig
 import Testing
 import TOMLDecoder
 
-// The published schema (`schema/config.schema.json`) is the contract agents
-// validate against with `taplo check`. These tests check it with a small
-// validator that covers the JSON Schema keywords the file uses.
-
 func loadSchema() throws -> [String: Any] {
     let data = try Data(contentsOf: repositoryRoot.appendingPathComponent("schema/config.schema.json"))
     return try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
 
-/// A TOML value in the shape JSON Schema sees it.
 private indirect enum Value {
     case object([String: Value])
     case array([Value])
@@ -48,7 +43,6 @@ private func value(of array: TOMLArray) -> Value {
     })
 }
 
-/// The schema violations in `text`, as "path: problem".
 func violations(_ text: String, schema: [String: Any]) throws -> [String] {
     var found: [String] = []
     check(value(of: try TOMLTable(source: text)), against: schema, root: schema, at: "", into: &found)
@@ -72,13 +66,11 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
             return inBranch.isEmpty
         }
         if !passes { found.append("\(path): matches none of anyOf") }
-        // A project's `anyOf` only adds a requirement to its other keywords.
         guard schema["type"] != nil else { return }
     }
     let type = schema["type"] as? String
     switch value {
     case .object(let object):
-        // No `type` (an `anyOf` branch of requirements alone) takes any table.
         guard type == nil || type == "object" else { return found.append("\(path): expected \(type ?? "?"), got a table") }
         let properties = schema["properties"] as? [String: Any] ?? [:]
         for key in schema["required"] as? [String] ?? [] where object[key] == nil {
@@ -97,7 +89,6 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
             found.append("\(path): fewer than \(minItems) items")
         }
         if schema["uniqueItems"] as? Bool == true {
-            // Strings are all the file's unique lists hold; compared exactly, as JSON Schema does.
             let strings = elements.compactMap { element -> String? in
                 guard case .string(let string) = element else { return nil }
                 return string
@@ -133,8 +124,6 @@ private func check(_ value: Value, against raw: [String: Any], root: [String: An
     }
 }
 
-/// Every property path the schema declares, e.g. `defaults.pull-requests.show`
-/// and `projects[].notifications[].event`.
 func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
     let schema = resolve(raw, root: root)
     var paths: Set<String> = []
@@ -151,8 +140,6 @@ func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = 
     return paths
 }
 
-/// The property paths the schema marks `deprecated`: old keys shipyard
-/// still reads, with a warning, which a file without warnings doesn't set.
 func deprecatedPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
     let schema = resolve(raw, root: root)
     var paths: Set<String> = []
@@ -170,7 +157,6 @@ func deprecatedPaths(_ raw: [String: Any], root: [String: Any], at path: String 
     return paths
 }
 
-/// Every key path set in a TOML value, in the same notation.
 private func setPaths(_ value: Value, at path: String = "") -> Set<String> {
     switch value {
     case .object(let object):
@@ -206,9 +192,6 @@ struct ConfigSchemaTests {
     func describesEveryKey() throws {
         let schema = try loadSchema()
         let everyKeyValue = value(of: try TOMLTable(source: everyKey))
-        // `everyKey` decodes without warnings (see the decoding tests), so its
-        // keys are the ones shipyard reads, besides the deprecated ones it
-        // still reads with a warning.
         let deprecated = deprecatedPaths(schema, root: schema)
         #expect(deprecated == [
             "hide-authors", "refresh-interval-seconds", "banners.snooze", "projects[].name",
@@ -319,8 +302,6 @@ struct ConfigSchemaTests {
         let properties = try #require(schema["properties"] as? [String: Any])
         #expect(enumValues(["menu-bar", "properties", "count"], in: properties) == MenuBarCount.allCases.map(\.rawValue))
         #expect(enumValues(["menu", "properties", "layout"], in: properties) == MenuLayout.allCases.map(\.rawValue))
-        // The header's slot order, the `header-counts` default and the
-        // schema's list name the kinds in one order.
         let headerCountNames = MenuModel.headerCountOrder.map(\.commandName)
         #expect(enumValues(["menu", "properties", "header-counts", "items"], in: properties) == headerCountNames)
         let headerCounts = ((properties["menu"] as? [String: Any])?["properties"] as? [String: Any])?["header-counts"] as? [String: Any]
@@ -379,9 +360,6 @@ struct ConfigSchemaTests {
         #expect(header?.warnings == [])
         #expect(header?.configuration == Configuration())
         #expect(try violations(Configuration.header, schema: schema) == [])
-        // The header shows settings as commented-out TOML (`# [menu]`,
-        // `# layout = "list"`), each at its default; uncommenting any one
-        // example, or all of them, must still read cleanly and mean the same.
         let examples = headerExamples()
         #expect(examples.count >= 7)
         for example in examples + [Set(examples.joined())] {
@@ -422,8 +400,6 @@ struct ConfigSchemaTests {
     }
 }
 
-/// The header's commented-out examples: each a run of consecutive setting
-/// lines (`# [table]`, `# key = value`), as line indices.
 private func headerExamples() -> [Set<Int>] {
     var examples: [Set<Int>] = []
     var current: Set<Int> = []
@@ -440,7 +416,6 @@ private func headerExamples() -> [Set<Int>] {
     return examples
 }
 
-/// The header with the lines at `indices` uncommented.
 private func uncommenting(_ indices: Set<Int>) -> String {
     Configuration.header.components(separatedBy: "\n").enumerated().map { index, line in
         indices.contains(index) ? String(line.dropFirst(2)) : line

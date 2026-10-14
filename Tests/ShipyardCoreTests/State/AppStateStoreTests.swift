@@ -101,8 +101,6 @@ struct AppStateStoreTests {
         let directory = temporaryDirectory()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let store = AppStateStore(directory: directory)
-        // As a later version might write it: known and notified in shapes this
-        // build can't read (dropped, not fatal), and a field nobody knows yet.
         let later = """
             {
               "version": 1,
@@ -125,7 +123,6 @@ struct AppStateStoreTests {
         #expect(store.state.collapsed == ["shop"])
         #expect(store.state.attention.seen.isEmpty)
 
-        // A known item from before `present` was kept still loads.
         let older = """
             {
               "version": 1,
@@ -137,7 +134,6 @@ struct AppStateStoreTests {
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.known.items["https://github.com/o/r/pull/1"]?.present == .distantPast)
 
-        // A ping-number section this build can't read drops alone; the others keep their numbers.
         let numbers = """
             {
               "version": 1,
@@ -256,10 +252,72 @@ struct AppStateStoreTests {
         #expect(try Data(contentsOf: aside) == Data(newer.utf8))
         #expect(store.state == AppState())
 
-        // The current version, or none, still loads.
         try Data(#"{"version": \#(AppState.currentVersion), "collapsed": ["shop"]}"#.utf8).write(to: store.url)
         #expect(store.load(at: now) == .loaded)
         #expect(store.state.collapsed == ["shop"])
+    }
+
+    @Test("an entry this build can't read is skipped, and the entries beside it stay")
+    func skipsUnreadableEntries() throws {
+        let directory = temporaryDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let store = AppStateStore(directory: directory)
+        let later = """
+            {
+              "version": 1,
+              "collapsed": ["shop"],
+              "known": {
+                "https://github.com/o/r/pull/1": { "repository": "o/r", "state": "open", "checks": "none",
+                  "reviewRequested": false, "activity": 0, "fingerprint": "f", "present": "2026-09-25T12:00:00Z" },
+                "https://github.com/o/r/pull/2": { "state": "folded" }
+              },
+              "knownProjects": {
+                "shop": [{ "repository": "o/r", "kind": "pullRequest" }, { "kind": "folded" }]
+              },
+              "notified": {
+                "https://github.com/o/r/pull/1": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" },
+                "https://github.com/o/r/pull/2": { "events": "pr.opened" }
+              },
+              "remotePings": {
+                "shipyard://ping/netcup-vps/q1": { "instance": "abc", "dismissed": false },
+                "shipyard://ping/netcup-vps/q2": { "dismissed": "yes" }
+              },
+              "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1 } }, "blog": { "last": "many" } },
+              "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "delay": "soon" }
+            }
+            """
+        try Data(later.utf8).write(to: store.url)
+
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsed == ["shop"])
+        #expect(Array(store.state.known.items.keys) == ["https://github.com/o/r/pull/1"])
+        #expect(store.state.known.sources == ["shop": Set([ItemSource(repository: "o/r", kind: .pullRequest)])])
+        #expect(store.state.notified.records["https://github.com/o/r/pull/1"]?.events == Set(["pr.opened"]))
+        #expect(store.state.notified.records["https://github.com/o/r/pull/2"] == nil)
+        #expect(store.state.remotePings.marks == ["shipyard://ping/netcup-vps/q1": .init(instance: "abc")])
+        #expect(store.state.pingNumbers == PingNumbers(sections: ["shop": .init(last: 3, pings: ["shipyard://ping/k7qm2x": 1])]))
+        #expect(store.state.bannerSnoozes == BannerSnoozes(ends: ["fetch": now.addingTimeInterval(3600)]))
+
+        let unreadableSections = """
+            {
+              "version": 1,
+              "collapsed": ["shop"],
+              "known": ["not-a-map"],
+              "knownProjects": "shop",
+              "notified": [],
+              "remotePings": [],
+              "pingNumbers": [],
+              "bannerSnoozes": []
+            }
+            """
+        try Data(unreadableSections.utf8).write(to: store.url)
+        #expect(store.load(at: now) == .loaded)
+        #expect(store.state.collapsed == ["shop"])
+        #expect(store.state.known == KnownItems())
+        #expect(store.state.notified == NotifiedEvents())
+        #expect(store.state.remotePings == RemotePingMarks())
+        #expect(store.state.pingNumbers == nil)
+        #expect(store.state.bannerSnoozes == BannerSnoozes())
     }
 
     @Test("the file carries its version")

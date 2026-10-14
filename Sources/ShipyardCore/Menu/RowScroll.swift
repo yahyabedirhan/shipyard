@@ -20,20 +20,10 @@ public struct RowSpan: Equatable, Sendable {
 /// the pinned project header. No animation: holding a key repeats at the
 /// system's rate and the list keeps up.
 public enum RowScroll: Equatable, Sendable {
-    /// The row is in view.
     case stay
-    /// Scroll to the row with this unit anchor (`UnitPoint`'s y): the row's
-    /// point at `anchor` of its height meets the list's point at `anchor`
-    /// of its height, which puts the row's top just below the pinned header.
     case alignTop(anchor: Double)
-    /// Scroll so the row's bottom meets the list's bottom.
     case alignBottom
-    /// ↓ wrapped from the last row to the first: scroll straight to the
-    /// list's very top, in the same key press. The first row may not be
-    /// laid out, so the list goes to its own top edge, not to the row.
     case wrapToTop
-    /// ↑ wrapped from the first row to the last: scroll straight to the
-    /// list's very bottom, whether the last row is laid out or not.
     case wrapToBottom
 
     /// How to reveal `target`, highlighted after `previous`, among `places`
@@ -61,11 +51,8 @@ public enum RowScroll: Equatable, Sendable {
         guard let frame else {
             let index = places.firstIndex(of: target) ?? 0
             let from = previous.flatMap { places.firstIndex(of: $0) }
-            // A header's first item sits just under it; with the header
-            // pinned at the top, that item is scrolled away above.
             let underHeader = previous?.isHeader == true && previous?.section == target.section && from == index - 1
             let upward = underHeader || from.map { index < $0 } ?? (index == 0)
-            // Without the row's height, near enough: off by the row's share of the header.
             return upward ? .alignTop(anchor: anchor(clear, visibleHeight, rowHeight: 0)) : .alignBottom
         }
         if frame.top < clear { return .alignTop(anchor: anchor(clear, visibleHeight, rowHeight: frame.height)) }
@@ -73,8 +60,6 @@ public enum RowScroll: Equatable, Sendable {
         return .stay
     }
 
-    /// The unit anchor whose point on the row and on the list are `clear`
-    /// apart: y × (visible − row) = clear.
     private static func anchor(_ clear: Double, _ visibleHeight: Double, rowHeight: Double) -> Double {
         let room = visibleHeight - rowHeight
         guard room > 0 else { return 0 }
@@ -93,11 +78,8 @@ public enum RowScroll: Equatable, Sendable {
 public struct RowWrapLanding: Equatable, Sendable {
     /// What a check says to do next.
     public enum Step: Equatable, Sendable {
-        /// The row is in full view: done.
         case landed
-        /// Short of it: scroll to the list's end again.
         case scrollAgain
-        /// Scrolled again as often as it may: stop following the wrap.
         case giveUp
     }
 

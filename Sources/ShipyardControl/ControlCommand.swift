@@ -9,14 +9,8 @@ import ShipyardCommand
 public enum ControlCommand {
     /// What a command line asks for.
     public enum Invocation: Equatable, Sendable {
-        /// `app open`: launch the app unless it runs, then wait until it
-        /// answers. With a demo, the running app is quit first and the
-        /// demo's launched; without one, a demo that runs is quit and the
-        /// normal app launched.
         case open(demo: Demo?)
-        /// `app quit`: ask the app to quit, then wait until it's gone.
         case quit
-        /// Any other request, answered by the app.
         case send(ControlRequest)
     }
 
@@ -49,10 +43,6 @@ public enum ControlCommand {
             ]
         }
 
-        /// The GitHub CLI's folder as `gh` finds it with `variables`:
-        /// `GH_CONFIG_DIR`, else `$XDG_CONFIG_HOME/gh`, else
-        /// `~/.config/gh`, `~` from `HOME`, else the user's home. A relative
-        /// one is taken against `workingDirectory`, as `gh` would.
         static func ghFolder(variables: [String: String], workingDirectory: URL) -> URL {
             if let dir = variables["GH_CONFIG_DIR"], !dir.isEmpty {
                 return absolute(dir, in: workingDirectory)
@@ -85,7 +75,6 @@ public enum ControlCommand {
             self.pause = pause
         }
 
-        /// The same client, asking at `socket`.
         func client(at socket: URL) -> ControlClient {
             var client = client
             client.socket = socket
@@ -93,13 +82,8 @@ public enum ControlCommand {
         }
     }
 
-    /// How long `open` waits for a launched app to answer, and `quit` for
-    /// the app to go, in looks a quarter second apart.
     static let wait: TimeInterval = 10
     static let interval: TimeInterval = 0.25
-    /// How long one look at a starting or quitting app waits for an
-    /// answer: such an app may accept a connection before (or after) it
-    /// can answer, and the looks must fit in `wait`.
     static let lookTimeout: TimeInterval = 1
 
     public static let usageText = """
@@ -158,7 +142,6 @@ public enum ControlCommand {
         case ("status", ["--json"]):
             return .success(.send(.appStatus(json: true)))
         case ("open", _), ("quit", _), ("status", _):
-            // The first word past the option this subcommand takes, if it led.
             let option = switch (subcommand, rest.first) {
             case ("status", "--json"): 1
             case ("open", "--demo"): 2
@@ -171,9 +154,6 @@ public enum ControlCommand {
         }
     }
 
-    /// The demo folder `path` names, made absolute against the working
-    /// folder: it must be a folder, and its socket's path short enough for
-    /// a socket's address.
     private static func demo(_ path: String, environment: CommandEnvironment) -> Result<Demo, CommandResult> {
         let folder = absolute(path, in: environment.workingDirectory).standardizedFileURL
         var isFolder: ObjCBool = false
@@ -191,14 +171,12 @@ public enum ControlCommand {
         return .success(demo)
     }
 
-    /// `path` as a folder, taken against `directory` when it's relative.
     private static func absolute(_ path: String, in directory: URL) -> URL {
         path.hasPrefix("/")
             ? URL(fileURLWithPath: path, isDirectory: true)
             : directory.appendingPathComponent(path, isDirectory: true)
     }
 
-    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
         .usage(line + ". Run `shipyard app --help` for usage.")
     }
@@ -220,11 +198,6 @@ public enum ControlCommand {
         }
     }
 
-    /// The normal app's status when it runs, renewing the lease (`app.open`
-    /// is leased). Otherwise it's launched, then asked for its status every
-    /// quarter second until it answers, or exit 1 after about 10 seconds. A
-    /// demo left running is quit first, its pointer removed, and its lease
-    /// handed over to the app launched.
     private static func open(_ context: Context) -> CommandResult {
         let normal = context.client(at: ControlSocket.url(in: context.support))
         var handover: ControlLease.Term?
@@ -243,17 +216,11 @@ public enum ControlCommand {
         case .failure(.notRunning):
             break
         case let answer:
-            // It runs (or is there but failing): no second launch.
             return result(of: answer)
         }
         return launch(environment: [:], handing: handover, answeringAt: normal, context)
     }
 
-    /// Points the command at the demo's support folder, quits whatever app
-    /// answers (the normal one, or a demo the pointer named), launches the
-    /// app on the demo with the quit app's lease handed over, and waits for
-    /// it as `open` does. The pointer is written first, so nothing is quit
-    /// when it can't be, and removed again when no demo comes to run.
     private static func openDemo(_ demo: Demo, _ context: Context) -> CommandResult {
         let normal = ControlSocket.url(in: context.support)
         do {
@@ -276,56 +243,49 @@ public enum ControlCommand {
             context
         )
         if outcome.status != 0 {
-            // No demo runs: later commands look for the normal app again.
             try? DemoPointer.remove(in: context.support)
         }
         return outcome
     }
 
-    /// Quits the app answering `client`, waiting until it's gone: the lease
-    /// its quit handed back (nil when it never ran), else what to exit
-    /// with.
     private static func quitIfRunning(_ client: ControlClient, _ context: Context) -> Result<ControlLease.Term?, CommandResult> {
         if case .failure(.notRunning) = client.send(.appStatus(json: false)) { return .success(nil) }
         return quit(client, context).map(\.lease)
     }
 
-    /// Launches the app with `environment`, and `handover` handed over in
-    /// it when there's one, then asks `client` for its status every quarter
-    /// second until it answers, or exit 1 after about 10 seconds.
     private static func launch(
         environment: [String: String],
         handing handover: ControlLease.Term?,
         answeringAt client: ControlClient,
         _ context: Context
     ) -> CommandResult {
-        let status = ControlRequest.appStatus(json: false)
         let environment = handover.map { environment.merging(ControlLease.handover($0)) { _, lease in lease } } ?? environment
         do throws(AppLaunchFailure) {
             try context.launcher.launch(bundleID: ShipyardBundle.identifier, environment: environment)
         } catch {
             return .failed("shipyard app open: \(error.reason)")
         }
-        // A starting app may accept a connection before it can answer, so
-        // each look waits briefly and a slow one is looked at again.
+        guard let answer = statusOfStartingApp(client, context) else {
+            return .failed("shipyard didn't answer within \(Int(wait)) seconds of launching")
+        }
+        return result(of: answer)
+    }
+
+    private static func statusOfStartingApp(_ client: ControlClient, _ context: Context) -> Result<ControlReply, ControlClient.Failure>? {
         var look = client
         look.timeout = lookTimeout
         for _ in 0..<looks {
             context.pause(interval)
-            switch look.send(status) {
+            switch look.send(.appStatus(json: false)) {
             case .failure(.notRunning), .failure(.timedOut):
                 continue
             case let answer:
-                return result(of: answer)
+                return answer
             }
         }
-        return .failed("shipyard didn't answer within \(Int(wait)) seconds of launching")
+        return nil
     }
 
-    /// Asks the app to quit; once it said it will, waits until nothing
-    /// answers on the socket, so a following `app open` launches a new app
-    /// instead of finding the old one. The quit's reply, with the lease it
-    /// renewed, else what to exit with.
     private static func quit(_ client: ControlClient, _ context: Context) -> Result<ControlReply, CommandResult> {
         let answer = client.send(.appQuit)
         guard case .success(let reply) = answer, reply.ok else { return .failure(result(of: answer)) }
@@ -342,7 +302,6 @@ public enum ControlCommand {
 
     private static var looks: Int { Int(wait / interval) }
 
-    /// What a reply, or the failure to get one, prints and how it exits.
     static func result(of answer: Result<ControlReply, ControlClient.Failure>) -> CommandResult {
         switch answer {
         case .success(let reply) where reply.ok:

@@ -29,19 +29,12 @@ public final class RepositoryResolver {
     /// How long a looked-up list is used before it's looked up again.
     public static let interval: TimeInterval = 3600
 
-    /// One lookup's latest result.
     private struct Entry {
-        /// The last list GitHub gave; `nil` before one arrived, or when the
-        /// owner can't be seen.
         var repositories: [RepoSummary]?
-        /// When that answer arrived; `nil` before any did.
         var answeredAt: Date?
-        /// Why the latest lookup failed, or that the owner can't be seen.
         var error: RepositoryError.Kind?
         var message = ""
 
-        /// Whether a failed lookup is tried again at the next refresh rather
-        /// than an hour later: an owner that can't be seen was an answer.
         var retries: Bool { error != nil && error != .notFound }
     }
 
@@ -105,7 +98,6 @@ public final class RepositoryResolver {
         return resolved
     }
 
-    /// The project's selectors with the lists at hand.
     private func resolution(of project: ProjectSettings) -> ResolvedRepositories {
         var result = ResolvedRepositories()
         var seen = Set<String>()
@@ -114,7 +106,6 @@ public final class RepositoryResolver {
         }
         for selector in project.repositories {
             guard let wanted = selector.lookup else {
-                // Named on its own: always listed, archived or a fork.
                 selector.slug.map(add)
                 continue
             }
@@ -137,7 +128,6 @@ public final class RepositoryResolver {
         return result
     }
 
-    /// A lookup's failure in a few words, for its error row.
     private static func reason(_ error: any Error) -> String {
         switch error as? GitHubError {
         case .rateLimited: "the rate limit ran out"

@@ -2,8 +2,6 @@ import Foundation
 import ShipyardCore
 import Testing
 
-/// A home folder in a fresh temporary folder, where a test writes the
-/// skills CLI's lock file and the installed skill's folder.
 private struct Home {
     let url: URL
 
@@ -13,15 +11,12 @@ private struct Home {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     }
 
-    /// `~/.agents/.skill-lock.json` with a `shipyard` entry from `source`,
-    /// beside another skill, as the skills CLI writes it.
     func writeLock(shipyardSource source: String?) throws {
         let shipyard = source.map { #", "shipyard": {"source": "\#($0)", "sourceType": "github", "skillPath": "skills/shipyard/SKILL.md"}"# } ?? ""
         let text = #"{"version": 3, "skills": {"handoff": {"source": "someone/skills", "sourceType": "github"}\#(shipyard)}, "dismissed": {}}"#
         try write(text, to: ".agents/.skill-lock.json")
     }
 
-    /// `~/.agents/skills/shipyard/SKILL.md`.
     func writeSkill() throws {
         try write("---\nname: shipyard\n---\n", to: ".agents/skills/shipyard/SKILL.md")
     }

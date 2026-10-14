@@ -64,47 +64,6 @@ public struct AppState: Equatable, Sendable {
     }
 }
 
-// `state.json`:
-//
-//     {
-//       "version": 1,
-//       "seen": { "<item url>": { "fingerprint": "…", "present": "2026-09-25T12:00:00Z" } },
-//       "collapsed": ["job-search"],
-//       "collapsedGroups": [{ "project": "shop", "group": "kind:issue" }],
-//       "known": { "<item url>": { "repository": "o/r", "state": "open", "checks": "pending",
-//                                  "reviewRequested": false, "activity": 0, "fingerprint": "…",
-//                                  "present": "2026-09-25T12:00:00Z" } },
-//       "knownProjects": { "job-search": [{ "repository": "o/r", "kind": "pullRequest" }] },
-//       "notified": { "<item url>": { "events": ["pr.opened"], "present": "2026-09-25T12:00:00Z" } },
-//       "remotePings": { "shipyard://ping/netcup-vps/q1": { "instance": "…", "seen": "2026-09-25T12:00:00Z",
-//                                                         "seenSending": { …the ping… }, "dismissed": false } },
-//       "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1, "shipyard://ping/netcup-vps/q1": 3 } } },
-//       "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "machine-netcup-vps": "2026-09-25T12:40:00Z" },
-//       "notionConnected": true
-//     }
-//
-// `known`, `knownProjects` and `notified` came with notification rules.
-// Each is optional, and one that can't be read is dropped rather than making
-// the whole file unreadable: without them the next refresh is silent (no
-// project is known), which is the safe way to fail. Inside them, an entry a
-// newer build wrote that this one can't read (a new state, say) is skipped.
-// A known item's `present` came later: one without it is kept while it's
-// listed and dropped the first time it isn't. `collapsedGroups` came with
-// subsections; like those, it's optional, dropped when it can't be read, and
-// a fold a newer build wrote (a group key this one doesn't know) is
-// skipped. `remotePings` came with remote pings: optional too, and a mark
-// that can't be read is skipped (that ping needs attention again).
-// `pingNumbers` came with the Mac numbering pings: optional, and missing
-// until it first numbers them. It's written as its sections, by name; a
-// section that can't be read is dropped, and the pings it lists then are
-// numbered again from 1 there, and a `pingNumbers` that can't be read at
-// all is dropped as a whole. `bannerSnoozes` came with dismissable
-// banners: each banner key with when its snooze ends. It's optional, and a
-// snooze that can't be read is skipped (its banner shows).
-// `notionConnected` came with the Notion opt-in (ADR 0013): optional, and
-// missing or unreadable means not connected, so a user who never pressed
-// Connect with ntn runs no `ntn`. A `version` above `currentVersion` fails
-// the decode, so the store sets the file aside.
 extension AppState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version
@@ -122,8 +81,6 @@ extension AppState: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        // A file a newer build wrote in a format this one would misread
-        // isn't read at all: the store sets it aside, as a first run.
         let version = try container.decodeIfPresent(Int.self, forKey: .version) ?? Self.currentVersion
         guard version <= Self.currentVersion else {
             throw DecodingError.dataCorruptedError(
@@ -135,21 +92,21 @@ extension AppState: Codable {
         let seen = try container.decodeIfPresent([String: Attention.SeenRecord].self, forKey: .seen) ?? [:]
         attention = Attention(seen: seen)
         collapsed = try container.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
-        let folds = (try? container.decodeIfPresent([Lossy<GroupID>].self, forKey: .collapsedGroups)) ?? []
+        let folds = (try? container.decodeIfPresent([SkippedWhenUnreadable<GroupID>].self, forKey: .collapsedGroups)) ?? []
         collapsedGroups = Set(folds.compactMap(\.value))
-        let items = (try? container.decodeIfPresent([String: Lossy<KnownItem>].self, forKey: .known)) ?? [:]
-        let sources = (try? container.decodeIfPresent([String: [Lossy<ItemSource>]].self, forKey: .knownProjects)) ?? [:]
+        let items = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<KnownItem>].self, forKey: .known)) ?? [:]
+        let sources = (try? container.decodeIfPresent([String: [SkippedWhenUnreadable<ItemSource>]].self, forKey: .knownProjects)) ?? [:]
         known = KnownItems(
             items: items.compactMapValues(\.value),
             sources: sources.mapValues { Set($0.compactMap(\.value)) }
         )
-        let records = (try? container.decodeIfPresent([String: Lossy<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
+        let records = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<NotifiedEvents.Record>].self, forKey: .notified)) ?? [:]
         notified = NotifiedEvents(records: records.compactMapValues(\.value))
-        let marks = (try? container.decodeIfPresent([String: Lossy<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
+        let marks = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<RemotePingMarks.Mark>].self, forKey: .remotePings)) ?? [:]
         remotePings = RemotePingMarks(marks: marks.compactMapValues(\.value))
-        let sequences = try? container.decodeIfPresent([String: Lossy<PingNumbers.Sequence>].self, forKey: .pingNumbers)
+        let sequences = try? container.decodeIfPresent([String: SkippedWhenUnreadable<PingNumbers.Sequence>].self, forKey: .pingNumbers)
         pingNumbers = sequences.map { PingNumbers(sections: $0.compactMapValues(\.value)) }
-        let snoozes = (try? container.decodeIfPresent([String: Lossy<Date>].self, forKey: .bannerSnoozes)) ?? [:]
+        let snoozes = (try? container.decodeIfPresent([String: SkippedWhenUnreadable<Date>].self, forKey: .bannerSnoozes)) ?? [:]
         bannerSnoozes = BannerSnoozes(ends: snoozes.compactMapValues(\.value))
         notionConnected = (try? container.decodeIfPresent(Bool.self, forKey: .notionConnected)) == true
     }
@@ -170,9 +127,7 @@ extension AppState: Codable {
     }
 }
 
-/// Decodes a value, or `nil` when it can't, so one unreadable entry doesn't
-/// fail the collection around it.
-private struct Lossy<Value: Decodable>: Decodable {
+private struct SkippedWhenUnreadable<Value: Decodable>: Decodable {
     var value: Value?
 
     init(from decoder: any Decoder) throws {
@@ -192,11 +147,8 @@ private struct Lossy<Value: Decodable>: Decodable {
 public final class AppStateStore {
     /// What `load` found.
     public enum LoadResult: Equatable, Sendable {
-        /// No file yet: a first run.
         case missing
         case loaded
-        /// The file was unreadable; it was moved to this URL and the state
-        /// starts empty.
         case setAside(URL)
     }
 
@@ -253,7 +205,6 @@ public final class AppStateStore {
         }
     }
 
-    /// Moves the unreadable file out of the way, keeping it for a look later.
     private func setAside(at now: Date) -> URL {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -262,7 +213,6 @@ public final class AppStateStore {
         let target = directory.appendingPathComponent("state-corrupt-\(formatter.string(from: now)).json", isDirectory: false)
         try? FileManager.default.removeItem(at: target)
         if (try? FileManager.default.moveItem(at: url, to: target)) == nil {
-            // Can't move it: drop it, so the next save isn't blocked by it.
             try? FileManager.default.removeItem(at: url)
         }
         return target

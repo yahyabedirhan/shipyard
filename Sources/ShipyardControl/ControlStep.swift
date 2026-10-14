@@ -43,7 +43,6 @@ extension ControlRequest {
         }
     }
 
-    /// A kind as the command names it, in words: `pull-requests` is "pull requests".
     private static func words(_ kind: String) -> String {
         kind.replacingOccurrences(of: "-", with: " ")
     }

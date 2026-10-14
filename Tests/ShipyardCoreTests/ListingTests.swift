@@ -23,13 +23,10 @@ private func shopAnswer(_ pullRequests: PR...) -> StubHTTP.Answer {
     PullRequestsResponse(shopRepository, pullRequests).answer
 }
 
-/// One answer for shop (repo0) and blog (repo1).
 private func bothAnswer(shop: [PR], blog: [PR]) -> StubHTTP.Answer {
     PullRequestsResponse.answer([PullRequestsResponse(shopRepository, shop), PullRequestsResponse(blogRepository, blog)])
 }
 
-/// A pull request each from the viewer (yabepa), someone else, a Bot
-/// account and a `[bot]` login.
 private let everyAuthor = [
     pr(1, author: "yabepa"),
     pr(2, author: "octocat"),
@@ -37,7 +34,6 @@ private let everyAuthor = [
     pr(4, author: "renovate[bot]"),
 ]
 
-/// A shop project whose pull requests take `authors`.
 private func shop(authors: String? = nil) -> String {
     """
     [[projects]]
@@ -50,7 +46,6 @@ private func shop(authors: String? = nil) -> String {
 
 @MainActor
 private extension Harness {
-    /// Replaces the configuration and follows it, GitHub answering `answer`.
     func reconfigure(_ config: String, answering answer: StubHTTP.Answer) async throws {
         try writeConfig(config)
         graphQL([answer])
@@ -65,7 +60,6 @@ private extension Harness {
 @Suite("Listing: what a project has")
 @MainActor
 struct ListingTests {
-    // MARK: - Whose items
 
     @Test("by default a project lists everyone's items, as before authors existed")
     func everyoneByDefault() async throws {
@@ -117,7 +111,6 @@ struct ListingTests {
 
             """ + shop(authors: #"{ show = ["others", "bots"] }"#)
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3]))
-        // The project's show, the defaults' hide.
         #expect(harness.numbers("shop") == [2])
     }
 
@@ -131,23 +124,18 @@ struct ListingTests {
         #expect(menu.attentionCount(for: .all) == 1)
     }
 
-    // MARK: - Notifications read the listing
-
     @Test("an item hidden by a filter, then shown by a filter change, doesn't notify")
     func looseningDoesNotNotify() async throws {
         let harness = try await Harness.started(config: shop(authors: #"{ hide = ["bots"] }"#), graphQL: shopAnswer(pr(1)))
 
-        // Opened while hidden: known, not listed, not notified.
         await harness.refresh(answering: shopAnswer(pr(1), pr(2, author: "dependabot", type: "Bot")))
         #expect(harness.numbers("shop") == [1])
         #expect(harness.headlines.isEmpty)
 
-        // Shown now: listed, and still not notified as new.
         try await harness.reconfigure(shop(), answering: shopAnswer(pr(1), pr(2, author: "dependabot", type: "Bot")))
         #expect(harness.numbers("shop")?.sorted() == [1, 2])
         #expect(harness.headlines.isEmpty)
 
-        // A pull request opened after the change notifies as usual.
         await harness.refresh(answering: shopAnswer(pr(1), pr(2, author: "dependabot", type: "Bot"), pr(3, author: "dependabot", type: "Bot")))
         #expect(harness.headlines == ["shop · New PR #3"])
     }
@@ -225,8 +213,6 @@ struct ListingTests {
         #expect(harness.headlines == ["with history · Merged PR #1"])
     }
 
-    // MARK: - How long
-
     @Test("closed-window = \"30m\" lists and notifies a merged pull request for 30 minutes, then drops it at the next timer refresh")
     func thirtyMinuteWindow() async throws {
         let config = """
@@ -247,8 +233,6 @@ struct ListingTests {
         #expect(harness.numbers("shop") == [1])
         #expect(harness.headlines == ["shop · Merged PR #1"])
 
-        // Each timer refresh lists again from its own time: at 12:30 the
-        // merge (12:01) is inside the window, at 12:32 it isn't.
         #expect(harness.timer.armed == 120)
         harness.clock.set(date("2026-09-25T12:30:00Z"))
         await harness.timer.fire()
@@ -271,7 +255,6 @@ struct ListingTests {
         var merged = pr(1)
         merged.state = "MERGED"
         merged.closedAt = "2026-09-25T11:59:00Z"
-        // The first refresh spends the last point: paused until 12:42.
         let harness = try await Harness.started(
             config: config,
             graphQL: PullRequestsResponse.answer([PullRequestsResponse(shopRepository, [merged])], remaining: 0)
@@ -279,7 +262,6 @@ struct ListingTests {
         #expect(harness.numbers("shop") == [1])
         #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
 
-        // The timer comes back every interval to list again, sending nothing.
         #expect(harness.timer.armed == 120)
         harness.clock.set(date("2026-09-25T12:28:00Z"))
         await harness.timer.fire()
@@ -291,13 +273,10 @@ struct ListingTests {
         #expect(harness.shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
         #expect(harness.timer.armed == 120)
 
-        // The last stretch waits only for the pause's end.
         harness.clock.set(date("2026-09-25T12:41:00Z"))
         await harness.timer.fire()
         #expect(harness.timer.armed == 60)
     }
-
-    // MARK: - Which states
 
     @Test("states = [\"open\"] lists no merged or closed pull requests, and doesn't notify pr.merged there; the default lists all three")
     func onlyOpenPullRequests() async throws {
@@ -330,7 +309,6 @@ struct ListingTests {
         #expect(harness.numbers("everything")?.sorted() == [1, 2, 3, 4, 5])
         #expect(harness.section("open-only")?.attentionCount == 3)
 
-        // #4 is merged and #5 closed: notified only where merged and closed pull requests are listed.
         var mergedNow = pr(4)
         mergedNow.state = "MERGED"
         mergedNow.closedAt = "2026-09-25T12:01:00Z"
@@ -341,8 +319,6 @@ struct ListingTests {
         #expect(harness.headlines.sorted() == ["everything · Closed PR #5", "everything · Merged PR #4"])
         #expect(harness.numbers("open-only") == [1])
     }
-
-    // MARK: - Old files
 
     @Test("an old hide-authors still hides, with a warning in the banner and the status record")
     func oldHideAuthors() async throws {
@@ -386,7 +362,6 @@ struct ListingTests {
         #expect(harness.numbers("shop")?.sorted() == [1, 2])
     }
 
-    /// The warnings' messages in `config-status.json`, as an agent reads them.
     private func recordedWarnings(_ harness: Harness) throws -> [String] {
         let data = try Data(contentsOf: harness.stateDirectory.appendingPathComponent(ConfigStatusStore.fileName))
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])

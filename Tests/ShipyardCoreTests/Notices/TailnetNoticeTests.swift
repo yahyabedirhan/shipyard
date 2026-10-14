@@ -5,11 +5,6 @@ import ShipyardConfig
 import ShipyardNotices
 import Testing
 
-/// A notice from another machine, handed to the app as its tailnet
-/// listener hands it (`Shipyard.receive(_:from:)`), with the login `tailscale
-/// serve` put on the request: shown only for the Mac's own Tailscale login,
-/// and then by the same rules as a notice from the Mac. Prior art:
-/// `NoticeTests`.
 @Suite("A notice over the tailnet")
 @MainActor
 struct TailnetNoticeTests {
@@ -20,8 +15,6 @@ struct TailnetNoticeTests {
 
         """
 
-    /// A signed-out app with `config`, started, on a Mac whose own
-    /// Tailscale login is `own`.
     func app(_ config: String = shop, own: Result<String, TailnetLoginUnknown> = .success("me@example.com")) async throws -> Harness {
         let harness = try Harness(config: config)
         harness.tailnet.set(own)
@@ -125,7 +118,6 @@ struct TailnetNoticeTests {
         harness.graphQL([try Harness.fixture("graphql-pull-requests.json")])
         let shipyard = harness.shipyard
         let seen = Locked<[Int?]>([])
-        // What the app watches: the port, through observation, while a GitHub request is in flight.
         harness.stub.onSend { _ in
             let port = await MainActor.run { shipyard.noticeListenerPort }
             seen.withValue { $0.append(port) }

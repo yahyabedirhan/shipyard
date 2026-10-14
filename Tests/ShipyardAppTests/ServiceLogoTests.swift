@@ -3,9 +3,6 @@ import ShipyardCore
 @testable import ShipyardApp
 import Testing
 
-/// GitHub's and Notion's marks are files the app bundles: a renamed SVG, or
-/// `ServiceLogos` dropped from the app's resources, would leave their status
-/// views an empty tile. The skill and the CLI show the sailboat, no file.
 @Suite("Service logos")
 @MainActor
 struct ServiceLogoTests {

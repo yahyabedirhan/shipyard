@@ -4,7 +4,6 @@ import Foundation
 @testable import ShipyardPings
 import Testing
 
-/// `shop`, two remote machines, and `[herdr] terminal` set to Ghostty.
 private let config = """
     [herdr]
     terminal = "Ghostty"
@@ -22,41 +21,28 @@ private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullReq
 
 @MainActor
 private extension Harness {
-    /// A harness signed in with `config`, whose Herdr has saved
-    /// `hetzner-vps` and `netcup-vps` listing `hetzner` and `netcup`,
-    /// started and polled once.
     static func polled(hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup, polled: true)
         return harness
     }
 
-    /// The row titled `title` in the section of the machine `machine`.
     func remoteRow(_ title: String, on machine: String = "netcup-vps") throws -> MenuRow {
         try #require(section(machine)?.rows.first { $0.title == title })
     }
 
-    /// Clicks the row titled `title` on `machine` and waits for its action.
     func clickRemote(_ title: String, on machine: String = "netcup-vps") async throws {
         await shipyard.open(try remoteRow(title, on: machine)).value
     }
 
-    /// The runs on `machine` past its polls' plugin runs.
     func focusRuns(on machine: String) -> [[String]] {
         herdr.runs(on: machine).filter { $0.first != "plugin" }
     }
 }
 
-/// Clicking a remote ping: a pane or tab is focused on its machine through
-/// `herdr --machine`, then `[herdr] terminal` comes forward; a link or an
-/// app opens on the Mac. One that works marks the ping seen on the Mac;
-/// one that fails says why on its row. End to end across `Shipyard`,
-/// `HerdrFocus` and `RemotePingReader` over a fake `herdr` with two saved
-/// machines, the recording action port, and the menu model.
 @Suite("Clicking a remote ping")
 @MainActor
 struct RemoteClickTests {
-    // MARK: A Herdr action
 
     @Test("a pane's agent is focused on its machine, then the terminal comes forward, and the ping is seen")
     func focusesAgent() async throws {
@@ -68,7 +54,6 @@ struct RemoteClickTests {
 
         #expect(harness.focusRuns(on: "netcup-vps") == [["agent", "focus", "w1:p3"]])
         #expect(harness.focusRuns(on: "hetzner-vps").isEmpty)
-        // Nothing focuses on the Mac's own Herdr.
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
         #expect(harness.actions.ran == [.app("Ghostty")])
         #expect(try !harness.remoteRow("Deploy?").needsAttention)
@@ -124,8 +109,6 @@ struct RemoteClickTests {
         #expect(try !harness.remoteRow("Deploy?").needsAttention)
     }
 
-    // MARK: On the Mac
-
     @Test("a link or an app opens on the Mac, as a local ping's does, nothing runs on the machine, and each is seen; so is one without an action")
     func onTheMac() async throws {
         let link = URL(string: "https://github.com/yahyabedirhan/shop/pull/1")!
@@ -143,8 +126,6 @@ struct RemoteClickTests {
         #expect(harness.focusRuns(on: "netcup-vps").isEmpty)
         #expect(harness.section("netcup-vps")?.rows.allSatisfy { !$0.needsAttention } == true)
     }
-
-    // MARK: Failing
 
     @Test("a pane that's gone says so on the row and stays unseen, across polls; a later click that works clears it")
     func paneGone() async throws {
@@ -188,7 +169,6 @@ struct RemoteClickTests {
         try await harness.clickRemote("Deploy?")
         #expect(try harness.remoteRow("Deploy?").actionError != nil)
 
-        // The same id and instance, a new title: `shipyard ping --id` again.
         harness.herdr.setPings([remotePing("q1", "Deploy now?", action: .herdr("w1:p3"))], on: "netcup-vps")
         _ = await harness.machineTimer.fire()
 
@@ -196,7 +176,6 @@ struct RemoteClickTests {
     }
 }
 
-/// `HerdrFocus` on a saved machine, on its own: what it makes of Herdr's answers.
 @Suite("Focusing on a machine")
 struct HerdrMachineFocusTests {
     @Test("a machine that doesn't answer in time fails the focus, and its herdr is stopped")

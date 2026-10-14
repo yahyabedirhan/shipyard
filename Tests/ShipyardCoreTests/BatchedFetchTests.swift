@@ -6,8 +6,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// Twelve repositories, `yahyabedirhan/repo-00` to `repo-11`, each with one open
-/// pull request; `repo-06` (the second batch's second) is gone.
 private let repositories = (0..<12).map { String(format: "yahyabedirhan/repo-%02d", $0) }
 private let missing = "yahyabedirhan/repo-06"
 
@@ -18,7 +16,6 @@ private let config = """
 
     """
 
-/// The GraphQL answers for `slice` of the repositories, as one request.
 private func answer(_ slice: ArraySlice<String>, cost: Int = 1, remaining: Int = 4990) -> StubHTTP.Answer {
     PullRequestsResponse.answer(
         slice.enumerated().map { offset, repository in
@@ -31,7 +28,6 @@ private func answer(_ slice: ArraySlice<String>, cost: Int = 1, remaining: Int =
     )
 }
 
-/// One answer per batch of five: the batches a refresh of the twelve sends.
 private func batches(costs: [Int] = [1, 1, 1], remaining: [Int] = [4990, 4990, 4990]) -> [StubHTTP.Answer] {
     [
         answer(repositories[0..<5], cost: costs[0], remaining: remaining[0]),
@@ -40,7 +36,6 @@ private func batches(costs: [Int] = [1, 1, 1], remaining: [Int] = [4990, 4990, 4
     ]
 }
 
-/// How many repositories a GraphQL request asked about.
 private func aliases(in request: URLRequest) -> Int {
     request.bodyText.components(separatedBy: ": repository(owner: ").count - 1
 }
@@ -61,7 +56,6 @@ struct BatchedFetchTests {
         #expect(requests[1].bodyText.contains(#""name0":"repo-05""#))
         #expect(requests[2].bodyText.contains(#""name1":"repo-11""#))
 
-        // The same projects, asked in a single request: the snapshot is the same.
         let stub = StubHTTP()
         stub.on("POST", GitHubClient.graphQLURL, answer(repositories[...], cost: 3))
         let client = GitHubClient(token: "gho_test", transport: stub, repositoriesPerRequest: 12)
@@ -74,8 +68,6 @@ struct BatchedFetchTests {
         let snapshot = try #require(harness.shipyard.snapshot)
         #expect(snapshot == oneRequest)
 
-        // Every repository's pull request is listed, and the one that's gone
-        // (in the second batch) is that repository's error only.
         let items = try #require(snapshot.items["everything"])
         #expect(items.count == 11)
         #expect(Set(items.map(\.repository)) == Set(repositories).subtracting([missing]))
@@ -132,7 +124,6 @@ struct BatchedFetchTests {
         #expect(shipyard.menu.sections == before.sections)
         #expect(shipyard.menu.refreshDelay == .paused(until: Harness.rateLimitReset, reason: .exhausted(.graphql)))
         #expect(shipyard.menu.rateIndicator?.level == .exhausted)
-        // Only the successful refresh's cost is on record.
         #expect(shipyard.budget.costs[.graphql] == [3])
     }
 
@@ -160,8 +151,6 @@ struct BatchedFetchTests {
         #expect(shipyard.budget.costs[.graphql] == [3])
     }
 
-    // MARK: - Answers cut short
-
     @Test("a batch GitHub cuts short (resource limits exceeded) is asked again in halves, and every item is listed")
     func cutShortBatchIsSplit() async throws {
         let harness = try await Harness.started(
@@ -173,14 +162,12 @@ struct BatchedFetchTests {
 
         let requests = harness.graphQLRequests
         #expect(requests.map(aliases(in:)) == [2, 1, 1])
-        // The review search goes with the first half.
         #expect(requests.map { $0.bodyText.contains("reviewSearch: search(") } == [true, true, false])
         #expect(requests[2].bodyText.contains(#""name0":"e-commerce-backend""#))
         let section = try #require(harness.section("e-commerce"))
         #expect(Set(section.rows.map(\.url)) == shopItems)
         #expect(section.errors.isEmpty)
         #expect(harness.shipyard.menu.fetchError == nil)
-        // The cut-short answer cost points too.
         #expect(harness.shipyard.budget.costs[.graphql] == [11])
     }
 
@@ -196,9 +183,6 @@ struct BatchedFetchTests {
 
         await harness.refresh(answering: try answer.answer())
 
-        // Resource limits: both halves, then the first half's repository
-        // and the review search apart, each cut short again. Entries left
-        // out without an error aren't asked again.
         #expect(harness.graphQLRequests.count - requestsBefore == answer.requests)
         let after = try #require(harness.section("e-commerce"))
         #expect(after.rows == before.rows)
@@ -207,19 +191,14 @@ struct BatchedFetchTests {
         #expect(after.errors.first?.message == "\(frontendRepository): couldn't be read whole (\(answer.message))")
         #expect(harness.shipyard.menu.fetchError == nil)
         #expect(harness.shipyard.menu.lastUpdated == Harness.now.addingTimeInterval(120))
-        // Nothing is recorded as gone, so nothing is announced.
         #expect(Set(shopItems.map(\.absoluteString)).isSubset(of: harness.shipyard.appStateStore.state.known.items.keys))
         #expect(harness.notifier.posted.isEmpty)
     }
 }
 
-// MARK: - Answers cut short
-
 private let frontendRepository = "yahyabedirhan/e-commerce-frontend"
 private let backendRepository = "yahyabedirhan/e-commerce-backend"
 
-/// The project `graphql-resource-limits.json` answers for: repo0 is the
-/// frontend, repo1 the backend, pull requests and issues shown.
 private let shop = """
     [defaults.issues]
     show = true
@@ -233,7 +212,6 @@ private let shop = """
 private let frontend = PullRequestsResponse(frontendRepository, [PullRequestsResponse.PullRequest(14)], issues: [PullRequestsResponse.Issue(3)])
 private let backend = PullRequestsResponse(backendRepository, [PullRequestsResponse.PullRequest(57)], issues: [PullRequestsResponse.Issue(8)])
 
-/// The URLs of the shop's pull requests and issues, whole.
 private let shopItems: Set<URL> = [
     URL(string: "https://github.com/\(frontendRepository)/pull/14")!,
     URL(string: "https://github.com/\(frontendRepository)/issues/3")!,
@@ -241,12 +219,8 @@ private let shopItems: Set<URL> = [
     URL(string: "https://github.com/\(backendRepository)/issues/8")!,
 ]
 
-/// How GitHub answers a query it couldn't finish, for every request.
 enum CutShort: CaseIterable, Sendable {
-    /// `graphql-resource-limits.json`: lists of `null` entries and a
-    /// `RESOURCE_LIMITS_EXCEEDED` error for each.
     case resourceLimits
-    /// The same lists of `null` entries, without any error.
     case entriesLeftOut
 
     func answer() throws -> StubHTTP.Answer {
@@ -259,10 +233,8 @@ enum CutShort: CaseIterable, Sendable {
         return answer
     }
 
-    /// The GraphQL requests a refresh of the shop sends.
     var requests: Int { self == .resourceLimits ? 5 : 1 }
 
-    /// Why each repository isn't whole, as its error says.
     var message: String {
         self == .resourceLimits ? "Resource limits for this query exceeded." : "GitHub left entries out of its answer."
     }

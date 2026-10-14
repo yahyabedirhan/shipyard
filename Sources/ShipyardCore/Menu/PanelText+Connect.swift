@@ -1,6 +1,5 @@
 import Foundation
 
-// The connect screen's words (`ConnectView`).
 extension PanelText {
     /// What the connect screen says, and which way in leads: a title, one
     /// line on what happened, then Sign in with GitHub and the `gh` way in
@@ -9,15 +8,8 @@ extension PanelText {
     public struct Connect: Equatable, Sendable {
         /// Which way in the screen puts first.
         public enum Lead: Equatable, Sendable {
-            /// Sign in with GitHub, prominent; under it the `gh` way,
-            /// folded in a disclosure.
             case signIn
-            /// The `gh auth login` box with Connect with gh beside it,
-            /// prominent; Sign in with GitHub under it.
             case ghCommand
-            /// Connect with gh, prominent, under the message (`gh` is
-            /// signed in already); then, after a divider, `alternative` and
-            /// Sign in with GitHub.
             case connectWithGh
         }
 
@@ -133,7 +125,6 @@ extension PanelText {
                 lead: .connectWithGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: false,
-                // Without a client ID there's no second way to offer.
                 alternative: canSignIn ? "Alternatively, sign in with GitHub, if you'd rather:" : nil
             )
         case .rejected(.tokenStore):
@@ -142,7 +133,6 @@ extension PanelText {
                 message: "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.",
                 lead: signInOrGh,
                 signInUnavailable: unavailable,
-                // The `gh` way folds into the same disclosure as on first launch.
                 showsInstallHint: canSignIn
             )
         case .rejected(.gh):

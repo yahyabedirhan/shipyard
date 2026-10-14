@@ -8,15 +8,12 @@ import Testing
 
 private typealias Listed = RepositoryListResponse.Repository
 
-/// A GraphQL answer giving each of `repositories`, in order, one open pull
-/// request numbered from `first`.
 private func pullRequests(_ repositories: [String], first: Int = 1) -> StubHTTP.Answer {
     PullRequestsResponse.answer(repositories.enumerated().map { offset, repository in
         PullRequestsResponse(repository, [PullRequestsResponse.PullRequest(first + offset)])
     })
 }
 
-/// The repositories a fetch request asked about, in alias order.
 private func fetched(_ request: URLRequest) -> [String] {
     guard let body = try? JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any],
           let variables = body["variables"] as? [String: Any]
@@ -27,7 +24,6 @@ private func fetched(_ request: URLRequest) -> [String] {
     }
 }
 
-/// The variables a lookup request sent.
 private func variables(_ request: URLRequest) -> [String: String] {
     let body = try? JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
     return body?["variables"] as? [String: String] ?? [:]
@@ -35,8 +31,6 @@ private func variables(_ request: URLRequest) -> [String: String] {
 
 @MainActor
 private extension Harness {
-    /// A signed-in harness over `config`, with the group and owner lookups
-    /// and the fetches answering in order, not started yet.
     static func withLookups(
         _ config: String,
         groups: [StubHTTP.Answer] = [],
@@ -63,7 +57,6 @@ private extension Harness {
         stub.requests("POST", GitHubClient.graphQLURL, body: RepositoryListResponse.ownerQuery)
     }
 
-    /// Every GraphQL request that fetched items (not a lookup).
     var fetches: [URLRequest] {
         graphQLRequests.filter { !$0.bodyText.contains("ShipyardGroupRepositories") && !$0.bodyText.contains("ShipyardOwnerRepositories") }
     }
@@ -97,14 +90,12 @@ struct RepositoryGroupsTests {
         #expect(lookups[0].bodyText.contains("isArchived isFork"))
         #expect(variables(lookups[0]) == [:])
         #expect(variables(lookups[1]) == ["after": "cursor-1"])
-        // Forks are kept by default; archived repositories are left out.
         #expect(harness.fetches.map(fetched) == [["o/a", "o/fork"]])
         let section = try #require(harness.section("mine"))
         #expect(section.rows.map(\.repository) == ["o/a", "o/fork"])
         #expect(section.repositories == ["o/a", "o/fork"])
         #expect(section.showsRepository)
         #expect(section.errors.isEmpty)
-        // A project's first sight is quiet, whatever brought its repositories in.
         #expect(harness.notifier.posted.isEmpty)
     }
 
@@ -156,13 +147,11 @@ struct RepositoryGroupsTests {
         )
         await harness.shipyard.start()
 
-        // `owned` is looked up once for both projects.
         #expect(harness.groupLookups.count == 1)
         #expect(harness.ownerLookups.count == 1)
         #expect(harness.fetches.map(fetched) == [["yahyabedirhan/a", "yahyabedirhan/b", "yahyabedirhan/retired"]])
         #expect(harness.section("everything")?.rows.map(\.repository) == ["yahyabedirhan/a", "yahyabedirhan/b", "yahyabedirhan/retired"])
         #expect(harness.section("also-mine")?.rows.map(\.repository) == ["yahyabedirhan/a", "yahyabedirhan/b"])
-        // A pull request in two projects counts once.
         #expect(harness.shipyard.menu.attention.total == 3)
     }
 
@@ -193,8 +182,6 @@ struct RepositoryGroupsTests {
         #expect(PanelText.emptySection(helping) == "Nothing open")
         #expect(harness.shipyard.fetchError == nil)
 
-        // An owner that can't be seen is an answer: it's asked again within
-        // the hour only when forced.
         harness.clock.advance(by: 120)
         await harness.timer.fire()
         #expect(harness.ownerLookups.count == 1)
@@ -215,14 +202,12 @@ struct RepositoryGroupsTests {
         await harness.shipyard.start()
         #expect(harness.section("mine")?.rows.map(\.repository) == ["o/a"])
 
-        // ⌘R looks it up again, which fails: the last list is fetched.
         await harness.shipyard.refreshNow()
         #expect(harness.groupLookups.count == 2)
         #expect(harness.fetches.map(fetched) == [["o/a"], ["o/a"]])
         #expect(harness.section("mine")?.rows.map(\.repository) == ["o/a"])
         #expect(harness.section("mine")?.errors.isEmpty == true)
 
-        // A failed lookup is tried again at the next refresh, not an hour later.
         harness.clock.advance(by: 120)
         await harness.timer.fire()
         #expect(harness.groupLookups.count == 3)
@@ -266,21 +251,17 @@ struct RepositoryGroupsTests {
         )
         await harness.shipyard.start()
 
-        // Two minutes on: the list is fresh, so nothing is looked up.
         harness.clock.advance(by: 120)
         await harness.timer.fire()
         #expect(harness.groupLookups.count == 1)
         #expect(harness.section("mine")?.rows.map(\.repository) == ["o/a"])
 
-        // An hour on: looked up again, and the new repository's open pull
-        // request is listed without a notification.
         harness.clock.advance(by: RepositoryResolver.interval)
         await harness.timer.fire()
         #expect(harness.groupLookups.count == 2)
         #expect(harness.section("mine")?.rows.map(\.repository).sorted() == ["o/a", "o/new"])
         #expect(harness.notifier.posted.isEmpty)
 
-        // What happens there afterwards notifies as anywhere else.
         harness.clock.advance(by: 120)
         await harness.timer.fire()
         #expect(harness.notifier.posted.map(\.headline) == ["New PR #8"])
@@ -307,7 +288,6 @@ struct RepositoryGroupsTests {
         #expect(harness.section("mine")?.rows.map(\.repository) == ["o/a", "o/new"])
         #expect(harness.notifier.posted.isEmpty)
 
-        // `forks = false` changes what the group brings in: looked up again at once.
         try harness.writeConfig("""
             [[projects]]
             slug = "mine"

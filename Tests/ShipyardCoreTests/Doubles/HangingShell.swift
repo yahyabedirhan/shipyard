@@ -1,9 +1,6 @@
 import ShipyardCommand
 import ShipyardCore
 
-/// A `ShellRunning` whose command never finishes on its own, like an `npx`
-/// stuck on the network: it waits until its task is cancelled, and records
-/// that it was.
 final class HangingShell: ShellRunning {
     private let log = Locked<(started: Int, cancelled: Int)>((0, 0))
 

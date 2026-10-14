@@ -32,7 +32,6 @@ public struct LeaseBanner: Equatable, Sendable {
     public init(_ lease: AppStatus.Lease) {
         agent = lease.holder
         place = lease.place.hasPrefix("/") ? URL(fileURLWithPath: lease.place).lastPathComponent : lease.place
-        // A process's name may start lowercase ("codex", "an unknown agent"); each line starts a sentence.
         headline = lease.purpose.map(Self.capitalized) ?? Self.capitalized(lease.holder) + " uses shipyard"
         let minutes = lease.secondsLeft / 60, seconds = lease.secondsLeft % 60
         timeLeft = (minutes == 0 ? "\(seconds)s" : "\(minutes)m " + (seconds < 10 ? "0" : "") + "\(seconds)s") + " left"

@@ -9,27 +9,18 @@
 ///     └─────────────────────────────────────────────────────────────────────────────┘
 /// ```
 public enum Phase: Equatable, Sendable {
-    /// No usable token: onboarding's connect step.
     case signedOut
-    /// The device flow is running; the user is entering this code on github.com.
     case connecting(DeviceCode)
-    /// Signed in, but the configuration has no projects: the project picker.
     case needsProjects
-    /// Signed in with at least one project: refreshes run.
     case ready
 }
 
 /// What moves shipyard from one phase to another.
 public enum LifecycleEvent: Equatable, Sendable {
-    /// The device flow gave a code to show.
     case deviceFlowStarted(DeviceCode)
-    /// The user cancelled the device flow, or its code expired.
     case deviceFlowCancelled
-    /// A token was found (token store or `gh`) or the device flow finished.
     case signedIn(hasProjects: Bool)
-    /// The configuration was loaded or changed.
     case configurationChanged(hasProjects: Bool)
-    /// GitHub rejected the token (401), or the user signed out.
     case signedOut
 }
 

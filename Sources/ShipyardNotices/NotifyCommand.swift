@@ -114,19 +114,14 @@ public enum NotifyCommand {
 
         """
 
-    /// The usage line errors point at.
     static let usageLine = "shipyard notice send <title> [options] (shipyard notice --help lists them)"
 
-    /// How a run's errors start.
     static let prefix = "shipyard notice send: "
 
-    /// The flags that give a notice its click; it takes one at most.
     static let actionFlags = ["--open", "--app", "--herdr"]
 
-    /// The flags that take a value of text: an empty one is none.
     static let textFlags = ["--subtitle", "--body", "--from"]
 
-    /// Every flag that takes a value (`--herdr` takes one only when it's an id).
     static let valueFlags = textFlags + ["--project", "--repo", "--image", "--sound", "--thread", "--level", "--id", "--open", "--app", "--button"]
 
     /// Runs `shipyard notice send` with `arguments` (those after `send`) in
@@ -162,9 +157,6 @@ public enum NotifyCommand {
         }
     }
 
-    /// `shipyard notice withdraw <id>`, with `arguments` those after
-    /// `withdraw`: asks the app over `route` to take the notice shown under
-    /// the id away, and prints `withdrawn`.
     static func withdraw(_ arguments: [String], environment: CommandEnvironment, route: any NoticeRoute) -> CommandResult {
         let prefix = "shipyard notice withdraw: "
         guard arguments.count == 1, let id = arguments.first else {
@@ -178,25 +170,16 @@ public enum NotifyCommand {
         }
     }
 
-    /// A notice's arguments, read: the notice, and the image file
-    /// `--image` names, which `run` reads.
     struct Request: Equatable {
         var notice: Notice
         var imagePath: String?
     }
 
-    /// Why the arguments don't read, as the error line says it.
     struct ParseError: Error, Equatable {
         var message: String
         init(_ message: String) { self.message = message }
     }
 
-    /// Reads `arguments`: one title and the flags `usageText` lists, in any
-    /// order. Everything after `--` is the title. An empty `--subtitle`,
-    /// `--body` or `--from` is none. `--herdr`, and a button's `herdr`
-    /// action, without an id take `herdrPane` (the agent's own pane, from
-    /// `HERDR_PANE_ID`). The notice's repository is left for `run` to find
-    /// when neither `--repo` nor `--project` names where it goes.
     static func parse(_ arguments: [String], herdrPane: String? = nil) -> Result<Request, ParseError> {
         var titles: [String] = []
         var notice = Notice(title: "")
@@ -292,8 +275,6 @@ public enum NotifyCommand {
         return .success(Request(notice: notice, imagePath: imagePath))
     }
 
-    /// A button's value, `<label>=<action>`: split at the first `=`, so
-    /// the action's URL may hold more.
     static func button(_ value: String, herdrPane: String?) -> Result<NoticeButton, ParseError> {
         let shape = "`--button` takes \"<label>=<action>\", its action open:<url>, app:<bundle id or name> or herdr[:<tab or pane id>]"
         guard let equals = value.firstIndex(of: "=") else { return .failure(ParseError("\(shape), not `\(value)`")) }
@@ -306,9 +287,6 @@ public enum NotifyCommand {
         return action(text, herdrPane: herdrPane, for: "`--button` `\(label)`").map { NoticeButton(label: label, action: $0) }
     }
 
-    /// An action written `open:<url>`, `app:<bundle id or name>`, `herdr`
-    /// or `herdr:<tab or pane id>`, as a button's is and as `--open` and
-    /// `--app` read; `flag` names it in an error.
     static func action(_ text: String, herdrPane: String?, for flag: String) -> Result<PingAction, ParseError> {
         if text.hasPrefix("open:") {
             let value = String(text.dropFirst("open:".count)).trimmingCharacters(in: .whitespaces)
@@ -330,8 +308,6 @@ public enum NotifyCommand {
         return .success(.herdr(id))
     }
 
-    /// The agent's own Herdr pane, which a Herdr action without an id
-    /// focuses, or why there's none.
     static func ownPane(_ herdrPane: String?, for flag: String) -> Result<String, ParseError> {
         let pane = herdrPane?.trimmingCharacters(in: .whitespaces) ?? ""
         guard !pane.isEmpty else {
@@ -342,8 +318,6 @@ public enum NotifyCommand {
         return .success(pane)
     }
 
-    /// The image at `path` (relative to `folder` unless absolute), read
-    /// for `--image`: a PNG, JPEG or GIF of `Notice.largestImage` at most.
     static func readImage(_ path: String, in folder: URL) -> Result<NoticeImage, ParseError> {
         let file = path.hasPrefix("/") ? URL(fileURLWithPath: path) : folder.appendingPathComponent(path)
         guard NoticeImage.extensions.contains(file.pathExtension.lowercased()) else {

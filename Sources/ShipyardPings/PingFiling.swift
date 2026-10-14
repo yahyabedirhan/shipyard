@@ -7,32 +7,21 @@ import ShipyardCommand
 /// code asks the platform. On a machine without the app it's `Unfiled`; on
 /// the Mac it files against `config.toml`.
 public protocol PingFiling: Sendable {
-    /// The projects a ping for `target` goes under and the repository it
-    /// keeps, or the refusal the command returns (exit 1). `whenNoProject`
-    /// says what a ping no project takes comes to.
     func file(_ target: FilingTarget, whenNoProject: NoProject) -> Result<Filing, CommandResult>
-    /// When a ping sent or replaced at `sent` stops being live; `nil`: never.
     func expiry(sentAt sent: Date) -> Date?
-    /// The action a ping gets when the agent gives none; `nil`: none.
     func defaultAction(_ environment: CommandEnvironment) -> PingAction?
 }
 
 /// What a ping names to be filed by.
 public enum FilingTarget: Equatable, Sendable {
-    /// `--project <name>`.
     case project(String)
-    /// `--repo <owner/name>`, else the working folder's `origin`.
     case repository(String)
-    /// Neither: why there's no repository, as the refusal says it.
     case none(why: String)
 }
 
 /// What a ping no project takes comes to.
 public enum NoProject: Equatable, Sendable {
-    /// It's refused, saying why: `shipyard ping`, whose agent waits for the answer.
     case refuse
-    /// It's saved under no project, with the repository it named:
-    /// `shipyard herdr-event`, whose refusal would reach no one.
     case keepUnfiled
 }
 

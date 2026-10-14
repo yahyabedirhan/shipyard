@@ -3,10 +3,6 @@ import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
-// Each preset is a whole configuration file onboarding writes and the skill
-// shows. These check its text at the configuration seam: it reads with no
-// warnings, passes the schema, and configures what the preset says.
-
 private let picked = [
     NewProject(title: "hello-world", repositories: ["octocat/hello-world"]),
     NewProject(title: "spoon-knife", repositories: ["octocat/Spoon-Knife", "octocat/linguist"]),
@@ -39,13 +35,11 @@ struct PresetTextTests {
         do throws(ConfigurationError) {
             let result = try Configuration.decode(text)
             #expect(result.warnings.isEmpty, "warnings in:\n\(text)")
-            // my-agents is only written once repositories are picked.
             #expect(result.configuration.hasProjects || (preset.asks == .repositories && projects.isEmpty))
         } catch {
             Issue.record("rejected: \(error)\nin:\n\(text)")
         }
         #expect(try violations(text, schema: loadSchema()) == [], "schema violations in:\n\(text)")
-        // Its only live key outside tables is version, above every table.
         let firstTable = try #require(text.range(of: "\n["))
         let topLevel = text[..<firstTable.lowerBound].split(separator: "\n").filter { !$0.hasPrefix("#") && !$0.isEmpty }
         #expect(topLevel == ["version = \(Configuration.supportedVersion)"])
@@ -92,14 +86,12 @@ struct PresetTextTests {
         #expect(reviews.arrangement.groupBy == .repository)
         #expect(reviews.notifications == [.prReviewRequested, .pingSent, .agentNotice].map { NotificationRule(event: $0) })
 
-        // Picked repositories take owned's place.
         let chosen = try decoded(.incomingContributions, [NewProject(title: "Incoming", repositories: ["octocat/hello-world"])])
         #expect(chosen.projects.map(\.repositories) == [[.repository("octocat/hello-world")], [.anywhere]])
     }
 
     @Test("review-queue is one anywhere project of review requests, by repository, notifying each request")
     func reviewQueue() throws {
-        // It asks for no repositories, and ignores any it's given.
         #expect(Preset.reviewQueue.text(projects: picked) == Preset.reviewQueue.text())
         let config = try decoded(.reviewQueue)
         #expect(config.projects.map(\.title) == ["Review queue"])

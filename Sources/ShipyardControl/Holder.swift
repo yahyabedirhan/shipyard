@@ -30,14 +30,8 @@ public struct Holder: Codable, Hashable, Sendable {
         ("CLAUDE_CODE_SESSION_ID", "Claude Code"),
     ]
 
-    /// The shells a command runs through, which never identify an agent:
-    /// the holder is the nearest ancestor that isn't one.
     static let shells: Set<String> = ["sh", "bash", "zsh", "fish", "dash", "ksh", "mksh", "tcsh", "csh", "nu"]
 
-    /// The variable that names the holder's key for every control command
-    /// run with it, for a setup where neither the agent's session nor its
-    /// process stays the same across its commands. A command's `--key`
-    /// still wins; a value that's empty or blank counts as unset.
     static let keyVariable = "SHIPYARD_CONTROL_KEY"
 
     /// The holder of a command run with `variables` in `workingDirectory`:
@@ -54,7 +48,6 @@ public struct Holder: Codable, Hashable, Sendable {
         return holder
     }
 
-    /// The holder its session, else its process, makes it.
     private static func automatic(variables: [String: String], place: String, processes: any ProcessTable) -> Holder {
         for (variable, agent) in sessionVariables {
             if let session = variables[variable], !session.isEmpty {
@@ -68,12 +61,9 @@ public struct Holder: Codable, Hashable, Sendable {
         return Holder(key: "process:\(agent.pid)@\(started)", name: agent.name, place: place)
     }
 
-    /// The nearest ancestor of `processes.currentPID` that isn't a shell;
-    /// the farthest shell when every readable ancestor up to launchd is one.
     private static func ancestor(_ processes: any ProcessTable) -> ProcessRecord? {
         guard var pid = processes.process(processes.currentPID)?.parent else { return nil }
         var farthest: ProcessRecord?
-        // A process table is a tree, but never trust it not to loop.
         for _ in 0..<64 where pid > 1 {
             guard let process = processes.process(pid) else { break }
             let name = process.name.hasPrefix("-") ? String(process.name.dropFirst()) : process.name
@@ -106,9 +96,7 @@ public struct ProcessRecord: Equatable, Sendable {
 /// The processes `Holder.find` walks up through: macOS's process table in
 /// production, a fake in tests.
 public protocol ProcessTable: Sendable {
-    /// This process: the `shipyard` command.
     var currentPID: Int32 { get }
-    /// The process `pid`, or nil when there's none (or it can't be read).
     func process(_ pid: Int32) -> ProcessRecord?
 }
 
@@ -124,7 +112,6 @@ public struct SystemProcessTable: ProcessTable {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
-        // A pid nobody has is no error: the answer is just empty.
         guard sysctl(&name, u_int(name.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
         let start = info.kp_proc.p_un.__p_starttime
         let command = withUnsafeBytes(of: info.kp_proc.p_comm) { bytes in

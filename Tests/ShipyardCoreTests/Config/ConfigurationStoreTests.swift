@@ -3,7 +3,6 @@ import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
-/// A fresh configuration directory under the system's temporary directory.
 private func temporaryConfigURL() -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("shipyard-tests-\(UUID().uuidString)", isDirectory: true)
@@ -80,7 +79,6 @@ struct ConfigurationStoreTests {
         #expect(store.reload() == .unchanged)
 
         try write(valid + "refresh-interval = \"5m\"\n", to: url)
-        // A top-level key after a table belongs to that table: an unknown key, so still unchanged.
         #expect(store.reload() == .unchanged)
         #expect(store.warnings.map(\.message) == ["unknown setting `projects[0].refresh-interval` (ignored)"])
 
@@ -149,7 +147,7 @@ struct ConfigurationStoreAppendTests {
             [[projects]]
             slug = "a"   # the first one
             repositories = ["o/a"]
-            """ // no trailing newline
+            """
         try write(existing, to: url)
         let store = ConfigurationStore(url: url)
         store.reload()
@@ -197,7 +195,6 @@ struct ConfigurationStoreAppendTests {
 
 @Suite("Configuration store: setting the layout")
 struct ConfigurationStoreLayoutTests {
-    /// Writes `text`, reloads, sets the layout and returns the file after.
     private func setLayout(_ layout: MenuLayout, in text: String) throws -> (text: String, store: ConfigurationStore) {
         let url = temporaryConfigURL()
         try write(text, to: url)
@@ -249,7 +246,6 @@ struct ConfigurationStoreLayoutTests {
         #expect(store.lastValid.projects.map(\.slug) == ["a"])
         #expect(store.warnings.isEmpty)
 
-        // Back to list: the now-live key is replaced, nothing else moves.
         try store.setLayout(.list)
         #expect(try contents(of: store.url) == expected.replacingOccurrences(of: "layout = \"tabs\"", with: "layout = \"list\""))
         #expect(store.lastValid.menu.layout == .list)
@@ -300,7 +296,7 @@ struct ConfigurationStoreLayoutTests {
             [[projects]]
             slug = "a"
             repositories = ["o/a"]
-            """ // no trailing newline
+            """
         let (after, store) = try setLayout(.tabs, in: before)
         #expect(after == """
             #:schema \(Configuration.schemaURL)

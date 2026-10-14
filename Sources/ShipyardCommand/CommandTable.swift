@@ -9,16 +9,11 @@ import Foundation
 public struct CommandTable: Sendable {
     /// Where a group is listed in the top help: one heading per job.
     public enum Section: String, CaseIterable, Sendable {
-        /// Telling the user something: pings and notices, on every machine.
         case messages
-        /// Driving the Mac's app: app control and the lease.
         case app
-        /// Checking the settings files and the notes workspace.
         case checks
-        /// What other programs run, never an agent or a person.
         case plumbing
 
-        /// Its heading in the top help.
         var heading: String {
             switch self {
             case .messages: "Tell the user (any machine):"
@@ -137,12 +132,10 @@ public enum ShipyardCLI {
         return lines.joined(separator: "\n")
     }
 
-    /// The group and the command's usage, as one line.
     private static func words(_ group: String, _ usage: String) -> String {
         usage.isEmpty ? group : group + " " + usage
     }
 
-    /// Two columns, the left one as wide as its longest entry.
     private static func columns(_ rows: [(left: String, right: String)]) -> [String] {
         let width = rows.map(\.left.count).max() ?? 0
         return rows.map { "  " + $0.left.padding(toLength: width, withPad: " ", startingAt: 0) + "   " + $0.right }
@@ -208,7 +201,6 @@ public enum ShipyardCLI {
         return entry.run(Array(arguments.dropFirst()), environment, now)
     }
 
-    /// `shipyard help [<group> | --json]`.
     private static func help(_ arguments: [String], table: CommandTable, environment: CommandEnvironment, now: Date) -> CommandResult {
         switch arguments {
         case []: CommandResult(output: usage(table))
@@ -220,8 +212,6 @@ public enum ShipyardCLI {
         }
     }
 
-    /// A group this build doesn't have: one line, with the closest name
-    /// when one is near, and where the list is. It never runs the match.
     private static func unknown(_ group: String, table: CommandTable) -> CommandResult {
         let near = (table.entries.map(\.name) + ["help"])
             .map { (name: $0, distance: distance($0, group)) }
@@ -231,7 +221,6 @@ public enum ShipyardCLI {
         return .usage("shipyard: unknown command `\(group)`.\(hint) Run `shipyard --help` for the commands.")
     }
 
-    /// The edit distance between `a` and `b`, for the closest name.
     static func distance(_ a: String, _ b: String) -> Int {
         let a = Array(a), b = Array(b)
         guard !a.isEmpty else { return b.count }

@@ -4,11 +4,7 @@ import ShipyardConfig
 import FoundationNetworking
 #endif
 
-/// The branches a repository's runs are kept on under `branches =
-/// "default-and-pull-requests"`: its default branch and the head branches of
-/// its open pull requests, from the GraphQL request.
 struct RunBranches: Equatable, Sendable {
-    /// `nil` for a repository without one (empty).
     var defaultBranch: String?
     var pullRequestHeads: Set<String>
 
@@ -28,12 +24,8 @@ struct RunBranches: Equatable, Sendable {
 /// repository per refresh. Builds the request and parses the answer into
 /// items; the branch filter and the cache the `304` path reads live here too.
 enum WorkflowRuns {
-    /// Runs asked for per repository (GitHub's maximum page).
     static let perPage = 100
 
-    /// The request for `slug`'s runs created since `since`.
-    /// `exclude_pull_requests` keeps the answer small; the branch filter uses
-    /// the GraphQL request's pull request heads instead.
     static func url(for slug: String, since: Date) -> URL {
         var components = URLComponents(
             url: GitHubClient.apiURL.appendingPathComponent("repos/\(slug)/actions/runs"),
@@ -50,19 +42,11 @@ enum WorkflowRuns {
         return components.url!
     }
 
-    /// The oldest creation time a refresh at `now` asks for, to show runs
-    /// finished within `window` seconds: an hour before the window starts (so
-    /// a run of up to an hour that finished inside it is still in the answer),
-    /// rounded down to the hour, so the URL, and with it the `ETag`, stays
-    /// the same for an hour and unchanged runs come back `304`.
     static func since(window: TimeInterval, at now: Date) -> Date {
         let start = now.timeIntervalSince1970 - max(0, window) - 3600
         return Date(timeIntervalSince1970: (start / 3600).rounded(.down) * 3600)
     }
 
-    /// The runs in GitHub's answer for `repository`. Cancelled, skipped and
-    /// stale runs aren't listed (they neither ran nor failed). A body that
-    /// isn't the endpoint's shape throws `.malformed`.
     static func parse(_ data: Data, repository: String, viewer: String?) throws -> [Item] {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -70,15 +54,12 @@ enum WorkflowRuns {
         return response.workflow_runs.compactMap { $0.item(in: repository, viewer: viewer) }
     }
 
-    /// The runs a project keeps under `branches`.
     static func filter(_ runs: [Item], branches: WorkflowRunBranches, known: RunBranches?) -> [Item] {
         switch branches {
         case .all: runs
         case .defaultAndPullRequests: runs.filter { (known ?? RunBranches()).keeps($0.branch) }
         }
     }
-
-    // MARK: - Response shape
 
     private struct Response: Decodable {
         var workflow_runs: [Run]
@@ -128,21 +109,16 @@ enum WorkflowRuns {
             )
         }
 
-        /// GitHub's `status` and `conclusion` as a semantic state: anything
-        /// not `completed` is running (queued, waiting, in progress…);
-        /// `action_required` waits on someone, so it's running too. `nil` for
-        /// a run that isn't listed.
         static func state(status: String?, conclusion: String?) -> (ItemState, ChecksState)? {
             guard status == "completed" else { return (.running, .pending) }
             switch conclusion {
             case "success", "neutral": return (.succeeded, .passed)
             case "failure", "timed_out", "startup_failure": return (.failed, .failed)
             case "action_required": return (.running, .pending)
-            default: return nil  // cancelled, skipped, stale
+            default: return nil
             }
         }
 
-        /// REST spells a Bot's login with `[bot]` already.
         static func author(_ actor: Actor?, viewer: String?) -> (String, AuthorKind) {
             guard let actor else { return ("ghost", .other) }
             if actor.type == "Bot" || actor.login.hasSuffix("[bot]") {
@@ -154,10 +130,6 @@ enum WorkflowRuns {
     }
 }
 
-/// The last answer for each repository's runs: the URL asked, its `ETag`
-/// and the runs it listed, so the next request can be conditional and a
-/// `304` reuses them. Kept in memory by the `GitHubClient` of one sign-in
-/// (a relaunch asks afresh, once).
 final class WorkflowRunCache: @unchecked Sendable {
     struct Entry: Equatable {
         var url: URL
@@ -168,7 +140,6 @@ final class WorkflowRunCache: @unchecked Sendable {
     private let lock = NSLock()
     private var entries: [String: Entry] = [:]
 
-    /// The entry for `slug`, if its last request was `url`.
     func entry(_ slug: String, url: URL) -> Entry? {
         lock.lock()
         defer { lock.unlock() }

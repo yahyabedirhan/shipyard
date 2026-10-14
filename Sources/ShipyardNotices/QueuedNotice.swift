@@ -25,7 +25,6 @@ public struct QueuedNotice: Codable, Equatable, Sendable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .iso8601
-        // Every field is a string or a date: encoding can't fail.
         return (try? encoder.encode(self)) ?? Data()
     }
 }

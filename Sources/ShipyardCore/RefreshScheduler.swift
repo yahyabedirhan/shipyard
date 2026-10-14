@@ -1,18 +1,9 @@
 import Foundation
 
-/// One refresh at a time, without losing a request that arrives meanwhile.
-///
-/// A refresh in flight started with the configuration of its time; a request
-/// dropped while it runs (a configuration change, ⌘R) would wait for the
-/// next timer tick. So a request that can't start is queued, and the running
-/// refresh runs once more when it finishes. Several requests meanwhile still
-/// make only one more run. (ghbar's `RefreshGate`.)
 struct RefreshGate: Equatable, Sendable {
-    /// Whether a refresh is running; the panel shows "Refreshing…" from it.
     private(set) var isRunning = false
     private var queued = false
 
-    /// True when a refresh may start now; otherwise the request is queued.
     mutating func begin() -> Bool {
         guard !isRunning else {
             queued = true
@@ -22,8 +13,6 @@ struct RefreshGate: Equatable, Sendable {
         return true
     }
 
-    /// The running refresh finished. True when a request arrived meanwhile:
-    /// the caller then begins again.
     mutating func finish() -> Bool {
         isRunning = false
         guard queued else { return false }
@@ -36,9 +25,7 @@ struct RefreshGate: Equatable, Sendable {
 /// to the next one, and disarms it when refreshes stop (signed out, no
 /// projects). Tests fire it by hand.
 public protocol RefreshTimer: Sendable {
-    /// Calls `fire` once after `seconds`, replacing any earlier arming.
     func arm(after seconds: TimeInterval, _ fire: @escaping @Sendable () async -> Void)
-    /// Cancels the armed call, if any.
     func disarm()
 }
 

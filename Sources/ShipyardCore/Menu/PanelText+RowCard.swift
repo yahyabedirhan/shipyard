@@ -44,31 +44,20 @@ public struct RowCard: Hashable, Sendable {
     /// One thing the card says, which the app draws with its icon and
     /// colour and VoiceOver reads in words (`PanelText.fact`).
     public enum Fact: Hashable, Sendable {
-        /// A pull request's head branch and the branch it merges into.
         case branches(head: String, base: String)
-        /// A pull request's lines added and removed.
         case size(additions: Int, deletions: Int)
         case files(Int)
         case review(ReviewDecision)
         case checks(ChecksState)
-        /// Comments; zero says "No comments".
         case comments(Int)
         case reviews(Int)
-        /// When it last changed, as an age: "5m", "now".
         case updated(String)
-        /// What started a run (GitHub's event name) and who.
         case trigger(event: String?, by: String)
-        /// A run's attempt, past the first.
         case attempt(Int)
-        /// How long a run ran, or has been running: "3m 12s".
         case duration(String, running: Bool)
-        /// A ping's body, whole.
         case body(String)
-        /// What clicking a ping does.
         case action(PingAction)
-        /// A ping with no action: clicking it only marks it seen.
         case noAction
-        /// Why a ping's action failed at its last click.
         case failure(String)
     }
 }
@@ -97,8 +86,6 @@ extension PanelText {
             if !review.isEmpty { facts.append(review) }
             facts.append(activity(row, now: now))
         case .issue:
-            // An issue's card is its title and its tags; a
-            // lone "No comments" under them would be noise.
             let activity = activity(row, now: now).filter { $0 != .comments(0) }
             if !activity.isEmpty { facts.append(activity) }
         case .workflowRun:
@@ -106,14 +93,11 @@ extension PanelText {
             facts.append([.trigger(event: details.runEvent, by: row.author)] + attempt)
             facts.append([runTime(row, now: now)])
         case .ping:
-            // Its whole body (the row may cut it off), where clicking it
-            // takes you, and why that last failed.
             let ping = row.item.ping
             if let body = ping?.body { facts.append([.body(body)]) }
             if let ping { facts.append([ping.action.map { .action($0) } ?? .noAction]) }
             if let failure = ping?.failureDetail ?? ping?.failure { facts.append([.failure(failure)]) }
         case .note:
-            // Where clicking it takes you, and when it last changed.
             facts.append([.action(.url(row.url))])
             if let note = row.item.note, note.edited.timeIntervalSince(note.created) >= 60 {
                 facts.append([.updated(age(max(0, now.timeIntervalSince(note.edited))))])
@@ -174,9 +158,6 @@ extension PanelText {
         }
     }
 
-    /// "3 comments · 1 review · updated 5m ago": the counts that aren't
-    /// zero ("No comments" when none are), and when it last changed, if
-    /// that's later than the age the row shows.
     static func activity(_ row: MenuRow, now: Date) -> [RowCard.Fact] {
         let details = row.item.details
         var facts: [RowCard.Fact] = []
@@ -188,7 +169,6 @@ extension PanelText {
         return facts
     }
 
-    /// What started a run, as GitHub's web names its events.
     static func eventWord(_ event: String) -> String {
         switch event {
         case "push": "Push"
@@ -201,14 +181,12 @@ extension PanelText {
         }
     }
 
-    /// How long a run has been running, or ran once it finished.
     static func runTime(_ row: MenuRow, now: Date) -> RowCard.Fact {
         let start = row.item.createdAt
         guard let end = row.item.closedAt else { return .duration(duration(now.timeIntervalSince(start)), running: true) }
         return .duration(duration(end.timeIntervalSince(start)), running: false)
     }
 
-    /// "42s", "3m 12s", "1h 5m".
     static func duration(_ seconds: TimeInterval) -> String {
         let total = max(0, Int(seconds.rounded()))
         switch total {

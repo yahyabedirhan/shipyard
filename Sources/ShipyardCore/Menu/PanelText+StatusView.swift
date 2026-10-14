@@ -1,19 +1,13 @@
 import Foundation
 
-// The settings menu's words, and each status view's (`StatusView`): one
-// page shape for every part, in the signed-out onboarding view's style.
 extension PanelText {
-    // MARK: - The settings menu
 
     /// One item of the header's settings menu: its words, what a click
     /// does, and whether it shows the set-up mark on its right.
     public struct SettingsItem: Equatable, Sendable {
         public enum Action: Equatable, Sendable {
-            /// Opens `config.toml`.
             case openConfiguration
-            /// Opens the part's status view.
             case open(SetupPart)
-            /// Signs out of GitHub.
             case signOut
         }
 
@@ -38,8 +32,6 @@ extension PanelText {
         return items
     }
 
-    // MARK: - A status view
-
     /// What a status view shows, top to bottom, under its ‹ Back row: the
     /// logo badge and `title`, the `lead` line, the `status` line, a
     /// `detail` line on what to do, a command's `output`, `commands` each in
@@ -55,19 +47,12 @@ extension PanelText {
 
         /// What a button does; the view runs it.
         public enum Action: Equatable, Sendable {
-            /// Links the CLI (`CLILink.makeLink`), or looks again at what's in the way.
             case linkCLI
-            /// Installs or updates the agent skill (`SkillInstallation.start`).
             case installSkill
-            /// Stops the running skill install (`SkillInstallation.cancel`).
             case cancelSkillInstall
-            /// Looks at ntn again (`Shipyard.checkNotion()`): Check again.
             case checkNotion
-            /// Connects Notion, reads the notes and shows the projects (`Shipyard.connectNotion()`).
             case connectNotion
-            /// Disconnects Notion (`Shipyard.disconnectNotion()`).
             case disconnectNotion
-            /// Signs out of GitHub (`Shipyard.signOut()`), as the settings menu's Sign out does.
             case signOut
         }
 
@@ -130,8 +115,6 @@ extension PanelText {
         case .cli: "Your agents run the `shipyard` command to ping you, post notices and drive the app."
         }
     }
-
-    // MARK: - The Shipyard CLI view
 
     /// The Shipyard CLI view for `state`: the link's path once linked; the
     /// Link button and `command` to run by hand while unlinked; what's in

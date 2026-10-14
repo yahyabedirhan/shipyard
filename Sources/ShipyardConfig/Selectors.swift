@@ -1,10 +1,6 @@
 import Foundation
 import ShipyardCommand
 
-// Selectors name authors and repositories in the configuration (ADR 0002):
-// a bare word is a group, `@` marks a login and `/` a repository. The key a
-// selector sits under says which set it's from, so a group needs no symbol.
-
 /// One entry of an author filter: an author group or a single login.
 ///
 /// `me` is the signed-in account, so agents working as the user count as
@@ -15,14 +11,11 @@ public enum AuthorSelector: Hashable, Sendable, CustomStringConvertible {
     case me
     case others
     case bots
-    /// A login, written `@login` in the file and kept here without the `@`.
     case login(String)
 
     /// The author groups, in the order the file's documentation lists them.
     public static let groups: [AuthorSelector] = [.me, .others, .bots]
 
-    /// The repository groups: bare words that belong under `repositories`,
-    /// named here so an author filter can say where they go.
     static var repositoryGroups: [String] { RepositorySelector.groupNames }
 
     /// Why a string isn't an author selector, in the words the banner shows.
@@ -67,8 +60,6 @@ public enum AuthorSelector: Hashable, Sendable, CustomStringConvertible {
         }
     }
 
-    /// A GitHub login: letters, digits and hyphens, starting with a letter
-    /// or digit; a bot's keeps GitHub's `[bot]` suffix.
     static func isLogin(_ text: String) -> Bool {
         let name = text.hasSuffix("[bot]") ? String(text.dropLast("[bot]".count)) : text
         guard let first = name.unicodeScalars.first, first != "-" else { return false }
@@ -109,20 +100,14 @@ public struct AuthorFilterOverrides: Equatable, Sendable {
     }
 }
 
-// MARK: - Repositories
-
 /// A repository group that's looked up: every repository the signed-in
 /// account reaches one way, named after GitHub's own affiliations. The three
 /// don't overlap, and together they are every repository the account can
 /// reach. (`anywhere`, the fourth group, isn't looked up: see
 /// `RepositorySelector.anywhere`.)
 public enum RepositoryGroup: String, CaseIterable, Hashable, Sendable {
-    /// Repositories the account itself owns.
     case owned
-    /// Repositories the account reaches through membership of an
-    /// organization, directly or through one of its teams.
     case organizations
-    /// Someone else's repositories that added the account as a collaborator.
     case collaborator
 }
 
@@ -131,16 +116,9 @@ public enum RepositoryGroup: String, CaseIterable, Hashable, Sendable {
 /// group (a bare word). The key it sits under says it's a repository, so a
 /// group needs no symbol of its own; a `/` marks a repository.
 public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
-    /// `owner/name`, as the file spells it. Always listed, archived or not.
     case repository(String)
-    /// `owner/*`: every repository the user or organization `owner` owns.
     case owner(String)
-    /// `owned`, `organizations` or `collaborator`.
     case group(RepositoryGroup)
-    /// `anywhere`: the open pull requests waiting on the user's review in
-    /// any repository, which the review search finds. It resolves to no
-    /// repositories, and is valid only in a project listing pull requests
-    /// with `review-requested = true` and no issues or runs.
     case anywhere
 
     /// The bare words `repositories` takes, in the documentation's order.
@@ -205,13 +183,11 @@ public enum RepositorySelector: Hashable, Sendable, CustomStringConvertible {
         throw RepositorySelectorRejection("repository `\(text)` isn't \(accepted)")
     }
 
-    /// What `repositories` takes, for the messages.
     static var accepted: String {
         let groups = groupNames.map { "`\($0)`" }
         return "`owner/name`, `owner/*`, " + groups.dropLast().joined(separator: ", ") + " or " + groups.last!
     }
 
-    /// An owner's login: a person's or an organization's, never a bot's.
     static func isLogin(_ text: String) -> Bool {
         AuthorSelector.isLogin(text) && !text.hasSuffix("[bot]")
     }

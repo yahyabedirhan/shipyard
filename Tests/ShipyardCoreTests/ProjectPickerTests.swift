@@ -6,8 +6,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// What the picker writes for the projects `graphql-pull-requests.json`
-/// answers for (repo0 and repo1 are e-commerce's, repo2 is job-search's).
 private let chosen = [
     NewProject(title: "e-commerce", repositories: ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]),
     NewProject(title: "job-search", repositories: ["yahyabedirhan/job-search"]),
@@ -33,18 +31,14 @@ private func pullRequests() throws -> StubHTTP.Answer {
     try Harness.fixture("graphql-pull-requests.json")
 }
 
-/// `GET /repos/{slug}`.
 private func repositoryURL(_ slug: String) -> URL {
     GitHubClient.apiURL.appendingPathComponent("repos/\(slug)")
 }
 
-/// A REST answer from `Fixtures/` with the `core` rate-limit headers.
 private func rest(_ name: String, status: Int = 200) throws -> StubHTTP.Answer {
     try .fixture(name, status: status, headers: Harness.rateLimitHeaders(remaining: 4999, resource: "core"))
 }
 
-/// Signed in with a stored token and, with `config`, that file; otherwise
-/// no configuration file at all. Started: in `needsProjects` without projects.
 @MainActor
 private func signedIn(config: String? = nil, graphQL answers: [StubHTTP.Answer] = []) async throws -> Harness {
     let harness = try Harness(stored: "gho_stored", config: config)
@@ -57,7 +51,6 @@ private func signedIn(config: String? = nil, graphQL answers: [StubHTTP.Answer] 
 @Suite("Project picker")
 @MainActor
 struct ProjectPickerTests {
-    // MARK: - Suggestions
 
     @Test("suggestions are the viewer's and contributed repositories, by latest push, once each, without archived ones")
     func suggestions() async throws {
@@ -120,8 +113,6 @@ struct ProjectPickerTests {
         #expect(!harness.shipyard.canRefreshNow)
         #expect(harness.shipyard.phase == .needsProjects)
     }
-
-    // MARK: - Checking a typed repository
 
     @Test("a typed repository GitHub has is accepted with GitHub's spelling")
     func checkAccepted() async throws {
@@ -217,16 +208,12 @@ struct ProjectPickerTests {
         #expect(harness.shipyard.phase == .signedOut)
     }
 
-    // MARK: - Confirming
-
     @Test("confirming writes one block per project and moves to ready without a restart; emptying goes back to the picker")
     func confirmAndEmpty() async throws {
-        // The third refresh asks for job-search alone, which this fixture's repo0 is.
         let harness = try await signedIn(graphQL: [
             recentRepositories(), pullRequests(), Harness.fixture("graphql-missing-repository.json"),
         ])
         #expect(harness.shipyard.phase == .needsProjects)
-        // Starting without a file created it with the header alone.
         #expect(try String(contentsOf: harness.configURL, encoding: .utf8) == Configuration.header)
         _ = try await harness.shipyard.suggestedRepositories()
 
@@ -245,10 +232,8 @@ struct ProjectPickerTests {
         #expect(harness.shipyard.menu.sections.map(\.name) == ["e-commerce", "job-search"])
         #expect(harness.section("job-search")?.rows.map(\.number) == [3])
         #expect(harness.timer.armed == 120)
-        // First sight of the new projects: nothing announces itself.
         #expect(harness.notifier.posted.isEmpty)
 
-        // The user (or an agent) takes every project out again.
         try harness.writeConfig(Configuration.header)
         await harness.shipyard.reloadConfiguration()
 
@@ -256,7 +241,6 @@ struct ProjectPickerTests {
         #expect(harness.timer.armed == nil)
         #expect(harness.graphQLRequests.count == 2)
 
-        // The picker is back, and picking again reaches ready again.
         try await harness.shipyard.addProjects([chosen[1]])
 
         #expect(harness.shipyard.phase == .ready)

@@ -1,10 +1,6 @@
 import ShipyardCore
 import SwiftUI
 
-/// The agent skill install: the offer, the running install with Cancel, and
-/// how it ended (installed, the failure's output, or the command to copy when
-/// `npx` isn't found), in `PanelText.skillInstall`'s words. Onboarding shows
-/// it under the picker.
 struct SkillInstallCard: View {
     let installation: SkillInstallation
 

@@ -7,10 +7,6 @@ import Foundation
 @testable import ShipyardPings
 import Testing
 
-// The shipyard agent skill (`skills/shipyard/SKILL.md`) teaches agents the
-// configuration file. These tests read it from the source tree, so it can't
-// drift from what the code reads and validates.
-
 private let skillURL = repositoryRoot.appendingPathComponent("skills/shipyard/SKILL.md")
 private let presetsURL = repositoryRoot.appendingPathComponent("skills/shipyard/presets.md")
 private let noticesURL = repositoryRoot.appendingPathComponent("skills/shipyard/references/notices.md")
@@ -19,7 +15,6 @@ private func skill() throws -> String {
     try String(contentsOf: skillURL, encoding: .utf8)
 }
 
-/// The body of every ```toml fence in `text`, in order.
 func tomlBlocks(in text: String) -> [String] {
     var blocks: [String] = []
     var current: [String]?
@@ -39,13 +34,10 @@ func tomlBlocks(in text: String) -> [String] {
     return blocks
 }
 
-/// The key-like words in a code span: `[menu-bar] count` has `menu-bar` and `count`.
 private func words(_ span: String) -> Set<String> {
     Set(span.split { !($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }.map(String.init))
 }
 
-/// `prose` split at blank lines into paragraphs, list runs and tables; a
-/// table stays with the paragraph that introduces it.
 private func proseBlocks(_ prose: String) -> [String] {
     var blocks: [[String]] = []
     var current: [String] = []
@@ -72,8 +64,6 @@ struct SkillDocumentTests {
         #expect(skillURL.deletingLastPathComponent().lastPathComponent == "shipyard")
         let description = try #require(frontmatter["description"])
         #expect(description.count > 20)
-        // "Change my shipyard" means its configuration. The skill is for any
-        // shipyard user: shipyard's own repository and code are AGENTS.md's.
         #expect(description.contains("my shipyard"))
         #expect(description.contains("the shipyard app"))
         let described = words(description.lowercased())
@@ -124,31 +114,21 @@ struct SkillDocumentTests {
     @Test("the worked requests configure what they say")
     func workedRequests() throws {
         let blocks = tomlBlocks(in: try skill()).map { try? Configuration.decode($0).configuration }
-        // "notify me when others open PRs here"
         let others = blocks.compactMap { $0?.projects.first?.notifications }
         #expect(others.contains([NotificationRule(event: .prOpened, authors: [.others])]))
-        // "show issues for this project": issues on, the window left at its default
         let issues = try #require(blocks.compactMap { $0?.projects.first }.first { $0.issues == IssueOverrides(show: true) })
         let config = Configuration()
         #expect(config.settings(for: issues).issues == IssueSettings(show: true, closedWindow: config.defaults.issues.closedWindow))
-        // "group these repos"
         #expect(blocks.contains { ($0?.projects.first?.repositories.count ?? 0) > 1 })
-        // "hide dependabot": its pull requests, in every project
         #expect(blocks.contains { $0?.defaults.pullRequests.authors == AuthorFilter(hide: [.login("dependabot[bot]")]) })
-        // "only show what other people open in this project": me and bots hidden, per kind
         let incoming = blocks.compactMap { $0?.projects.first }.first { $0.pullRequests.authors.hide == [.me, .bots] }
         #expect(incoming?.issues.authors.hide == [.me, .bots])
-        // "only show open PRs and issues here"
         let states = blocks.compactMap { $0?.projects.first }.first { $0.pullRequests.states == [.open] }
         #expect(states?.issues == IssueOverrides(show: true, states: [.open]))
-        // "switch the menu to tabs"
         #expect(blocks.contains { $0?.menu.layout == .tabs })
-        // "show CI runs for this project and tell me when they fail": runs on for that
-        // project alone, with the default project rules kept beside run.failed
         let runs = try #require(blocks.compactMap { $0?.projects.first }.first { $0.workflowRuns.show == true })
         #expect(config.settings(for: runs).workflowRuns.finishedWindow == config.defaults.workflowRuns.finishedWindow)
         #expect(runs.notifications == [.prOpened, .pingSent, .agentNotice, .runFailed].map { NotificationRule(event: $0) })
-        // "shipyard doesn't notify me about pings": a file with its own rules adds `ping.sent`
         #expect(blocks.contains { config in
             let rules = config?.defaults.notifications ?? []
             return rules.contains(NotificationRule(event: .pingSent)) && rules.count > 1
@@ -159,7 +139,6 @@ struct SkillDocumentTests {
     func pingCommand() throws {
         let text = try skill()
         #expect(!text.contains("there is no CLI"))
-        // Every flag the command's own help lists is named in a code span.
         let flags = Set(PingCommand.usageText.matches(of: /--[a-z]+/).map { String($0.output) })
         #expect(flags.isSuperset(of: ["--body", "--from", "--id", "--open", "--app", "--herdr", "--repo", "--project"]))
         for flag in flags.sorted() where flag != "--help" {
@@ -173,7 +152,6 @@ struct SkillDocumentTests {
         #expect(text.contains("exit 1") && text.contains("exit 2") && text.contains("exits 0"))
         #expect(CommandResult.failedStatus == 1 && CommandResult.usageStatus == 2)
 
-        // Every example command reads as the command reads it.
         let examples = shellExamples(in: text, command: "ping")
         #expect(examples.count >= 4)
         var withdrawn = 0
@@ -204,19 +182,16 @@ struct SkillDocumentTests {
     func appControl() throws {
         let text = try skill()
         let flowing = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        // The synopsis is the commands' own, word for word.
         for usage in [ControlCommand.usageText, PanelCommand.usageText, ScreenshotCommand.usageText, LeaseCommand.usageText] {
             let wanted = synopsis(of: usage)
             #expect(flowing.contains(wanted), "`\(wanted)` isn't taught")
         }
-        // The refusals and the fallback's note, in the command's words.
         for line in [
             ControlCommand.notRunning, "captured by rendering: <why>", "runs on the Mac, where the app is",
             "use a folder with a shorter path", "the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`",
         ] {
             #expect(text.contains(line), "`\(line)` isn't quoted")
         }
-        // The lease's refusals, in the lease's own words, its times and counts as placeholders.
         let now = Date(timeIntervalSince1970: 0)
         let term = ControlLease.Term(
             holder: Holder(key: "k", name: "<name>", place: "<place>"), taken: now, ends: now.addingTimeInterval(48)
@@ -231,7 +206,6 @@ struct SkillDocumentTests {
         #expect(text.contains("<folder>/shipyard/config.toml"))
         #expect(text.contains("**0**") && text.contains("**1**") && text.contains("**2**"))
 
-        // Every example reads as its command reads it, and each subcommand and option has one.
         let demo = FileManager.default.temporaryDirectory.appendingPathComponent("skill-demo-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: demo, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: demo) }
@@ -240,7 +214,6 @@ struct SkillDocumentTests {
         for command in ["app", "panel", "lease"] {
             for words in shellExamples(in: text, command: command) {
                 var arguments = Array(words.dropFirst(2))
-                // A demo folder must exist to read; the example's own is made by its block.
                 if let flag = arguments.firstIndex(of: "--demo"), flag + 1 < arguments.count { arguments[flag + 1] = demo.path }
                 let verb = arguments.first ?? ""
                 let reads = switch (command, verb) {
@@ -273,8 +246,6 @@ struct SkillDocumentTests {
         let leaves = Set(declaredPaths(schema, root: schema).map { path in
             String(path.split(separator: ".").last!).replacingOccurrences(of: "[]", with: "")
         })
-        // The words inside `code spans`: `[menu-bar] count` names `menu-bar` and `count`.
-        // Fenced examples don't count: a key has to be named in the prose.
         var inFence = false
         let prose = text.components(separatedBy: "\n").filter { line in
             if line.trimmingCharacters(in: .whitespaces).hasPrefix("```") { inFence.toggle(); return false }
@@ -287,8 +258,6 @@ struct SkillDocumentTests {
         for key in leaves.sorted() {
             #expect(named.contains(key), "`\(key)` isn't named")
         }
-        // A nested key is named beside its table, as `[menu-bar] count` or
-        // `pull-requests.show`, so `show` in one table doesn't cover another's.
         let spanWords = spans.map(words)
         for path in declaredPaths(schema, root: schema).sorted() {
             let segments = path.split(separator: ".").map(String.init)
@@ -296,10 +265,6 @@ struct SkillDocumentTests {
             let (table, key) = (segments[segments.count - 2], segments[segments.count - 1])
             #expect(spanWords.contains { $0.contains(table) && $0.contains(key) }, "`\(path)` isn't named beside `\(table)`")
         }
-        // A key of an array's elements (a project's `name`, a rule's `event`)
-        // is named in a code span in the same paragraph or table as a span
-        // naming its array (`[[projects]]`, `notifications`), so a bare
-        // mention elsewhere doesn't count.
         let blockWords = proseBlocks(prose).map { block in
             block.components(separatedBy: "`").enumerated().filter { $0.offset % 2 == 1 }.map { words($0.element) }
         }
@@ -321,7 +286,6 @@ struct SkillDocumentTests {
         let c = Configuration()
         func literal<T: RawRepresentable>(_ choice: T) -> String where T.RawValue == String { "\"\(choice.rawValue)\"" }
         func window(_ seconds: TimeInterval) -> String { "\"\(ConfigurationDuration.text(seconds))\"" }
-        // A kind's states, in the order the file writes them, when the default is all of them.
         func states(_ kind: ItemKind, _ value: Set<StateGroup>) -> String {
             value == Set(StateGroup.all(for: kind)) ? "[" + StateGroup.all(for: kind).map(literal).joined(separator: ", ") + "]" : "?"
         }
@@ -357,7 +321,6 @@ struct SkillDocumentTests {
             ("[defaults] archived", "\(c.defaults.archived)"),
             ("[defaults] forks", "\(c.defaults.forks)"),
             ("pings.show", "\(c.defaults.pings.show)"),
-            // Written in hours, as the configuration header writes it, rather than "1d".
             ("pings.seen-window", c.defaults.pings.seenWindow == 24 * 3600 ? "\"24h\"" : "?"),
         ]
         for (key, value) in rows {
@@ -391,14 +354,12 @@ struct SkillDocumentTests {
     @Test("its presets page shows the app's presets, file for file, and the skill says when to start from one")
     func presets() throws {
         let page = try String(contentsOf: presetsURL, encoding: .utf8)
-        // The examples the page puts where onboarding's picks go.
         let examples: [String: [NewProject]] = [
             Preset.myAgents.name: [
                 NewProject(title: "hello-world", repositories: ["octocat/hello-world"]),
                 NewProject(title: "Spoon-Knife", repositories: ["octocat/Spoon-Knife"]),
             ],
         ]
-        // One `## `name`` section per preset, in the app's order, each with its file.
         let sections = page.components(separatedBy: "\n## ").dropFirst()
         let named = sections.filter { $0.hasPrefix("`") }
         #expect(named.map { String($0.prefix { $0 != "\n" }) } == Preset.all.map { "`\($0.name)`" })
@@ -449,12 +410,9 @@ struct SkillDocumentTests {
         #expect(text.contains("~/.config/shipyard/config.toml"))
         #expect(text.contains("#:schema \(Configuration.schemaURL)"))
         #expect(text.contains("taplo check"))
-        // The command's check, in the edit steps, so an agent runs it after each edit.
         let editSteps = try #require(text.components(separatedBy: "## Editing it").dropFirst().first?.components(separatedBy: "\n## ").first)
         #expect(editSteps.contains("`shipyard config check`"))
-        // The app's own check: its error banner, in the words the panel shows.
         #expect(text.contains("Using the last valid configuration."))
-        // The app's verdict, where an agent reads it, with the fields it names.
         #expect(text.contains("~/Library/Application Support/Shipyard/\(ConfigStatusStore.fileName)"))
         for field in ["accepted", "configModified", "problems", "line", "banner", "warnings"] {
             #expect(text.contains("`\(field)`") || text.contains("\"\(field)\""), "`\(field)` isn't named")
@@ -464,15 +422,11 @@ struct SkillDocumentTests {
     }
 }
 
-/// A command's synopsis, its help's `Usage:` block, as one line of words.
 private func synopsis(of usage: String) -> String {
     let block = usage.components(separatedBy: "\n\n").first { $0.hasPrefix("Usage: ") } ?? ""
     return block.replacingOccurrences(of: "Usage: ", with: "").split(whereSeparator: \.isWhitespace).joined(separator: " ")
 }
 
-/// The `shipyard <command>` lines of the ```sh fences in `text`, each split
-/// into words: a line ending in `\` continues on the next, `||` and `&&`
-/// separate commands, and a synopsis (with `<placeholders>`) is skipped.
 private func shellExamples(in text: String, command: String) -> [[String]] {
     var examples: [[String]] = []
     var inShell = false
@@ -487,7 +441,6 @@ private func shellExamples(in text: String, command: String) -> [[String]] {
         pending = ""
         for part in joined.components(separatedBy: "||").flatMap({ $0.components(separatedBy: "&&") }) {
             let words = shellWords(part.trimmingCharacters(in: .whitespaces))
-            // A synopsis line, with `<placeholders>` or `[options]`, isn't an example.
             guard words.count > 1, words[0] == "shipyard", words[1] == command, !part.contains("<"), !part.contains(" [") else { continue }
             examples.append(words)
         }
@@ -495,7 +448,6 @@ private func shellExamples(in text: String, command: String) -> [[String]] {
     return examples
 }
 
-/// `command` split into words as a shell splits it, for double-quoted words and plain ones.
 private func shellWords(_ command: String) -> [String] {
     var words: [String] = []
     var current = ""

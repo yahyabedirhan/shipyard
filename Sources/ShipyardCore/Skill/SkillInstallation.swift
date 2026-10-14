@@ -12,13 +12,9 @@ import ShipyardCommand
 public final class SkillInstallation {
     /// Where an install is.
     public enum State: Equatable, Sendable {
-        /// Not started, or cancelled: the offer to install.
         case idle
-        /// The command is running.
         case running
-        /// The command ended: installed, failed, or no `npx`.
         case finished(SkillInstallResult)
-        /// Stopped after running `seconds`.
         case timedOut(seconds: TimeInterval)
     }
 
@@ -33,8 +29,6 @@ public final class SkillInstallation {
     private let timeout: TimeInterval
     private let sleep: Sleep
     private var task: Task<Void, Never>?
-    /// Counts installs, so one that was cancelled (and still winds down)
-    /// never writes over the state of a later one.
     private var generation = 0
 
     public init(
@@ -79,15 +73,12 @@ public final class SkillInstallation {
         let outcome = await withTaskGroup(of: Outcome?.self) { group in
             group.addTask { .finished(await installer.install()) }
             group.addTask {
-                // `nil` when the sleep is cancelled: the install finished first.
                 guard (try? await sleep(timeout)) != nil else { return nil }
                 return .timedOut
             }
             var first: Outcome?
             for await outcome in group where first == nil {
                 first = outcome
-                // The other one stops: the timer, or the shell (whose runner
-                // returns at once when cancelled).
                 if outcome != nil { group.cancelAll() }
             }
             return first

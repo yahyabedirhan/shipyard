@@ -6,9 +6,6 @@ import AppKit
 /// Starts the app, which `shipyard app open` can't ask through the socket
 /// since the app isn't running yet. Tests record the launch.
 public protocol AppLaunching: Sendable {
-    /// Launches the app `bundleID` in the background, with `environment`
-    /// (empty for a normal launch) set for it. Throws a line saying why it
-    /// couldn't.
     func launch(bundleID: String, environment: [String: String]) throws(AppLaunchFailure)
 }
 
@@ -31,12 +28,7 @@ public enum ShipyardBundle {
 /// app forward: the menu bar app has no window to show, and the agent's
 /// terminal keeps the focus.
 public struct WorkspaceLauncher: AppLaunching {
-    /// How long to wait for Launch Services to say the app started.
     var timeout: TimeInterval = 10
-    /// How long to wait for a quitting copy of the app to end before
-    /// launching. `app open` only launches once nothing answers on the
-    /// socket, so a copy still there is quitting, or runs without app
-    /// control (then it's brought back as it is, after this wait).
     var quitGrace: TimeInterval = 5
 
     public init() {}
@@ -71,7 +63,6 @@ public struct WorkspaceLauncher: AppLaunching {
         }
     }
 
-    /// The completion handler's answer, read after the semaphore.
     private final class LaunchOutcome: @unchecked Sendable {
         var error: String?
     }

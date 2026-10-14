@@ -70,18 +70,14 @@ public enum PingCommand {
 
         """
 
-    /// The usage line errors point at.
     static let usageLine = "shipyard ping send <title> [options] (shipyard ping --help lists them)"
 
-    /// The flags that give a ping its action; it takes one at most.
     static let actionFlags = ["--open", "--app", "--herdr"]
 
     /// The environment variable Herdr sets in each of its panes to that
     /// pane's id, which `--herdr` without an id takes.
     public static let herdrPaneVariable = "HERDR_PANE_ID"
 
-    /// The environment variable Herdr sets in the panes of a named session
-    /// (`herdr --session <name>`) to its name, inherited from its server.
     static let herdrSessionVariable = "HERDR_SESSION"
 
     /// The named Herdr session the CLI runs in, which a `--herdr` ping is
@@ -147,7 +143,6 @@ public enum PingCommand {
         case .failure(let error): return .usage("shipyard ping send: \(error.message)")
         }
         var sending = request
-        // An action the agent gives wins over the filing's.
         if sending.action == nil { sending.action = filing.defaultAction(environment) }
         var terminal: String?, session: String?
         if case .herdr = sending.action {
@@ -167,17 +162,6 @@ public enum PingCommand {
         )
     }
 
-    /// Files `request` through `filing` and saves it, with the terminal and
-    /// the named Herdr session a `--herdr` ping was sent from
-    /// (`outerTerminal`, `herdrSession`), as `run` does once
-    /// its arguments read, then prints its id. It's filed by the one
-    /// project `--project` names, else by its repository (`--repo`, else
-    /// the `origin` of `folder`; none when `folder` is `nil`). A refusal is
-    /// returned with nothing written. An id already stored is replaced.
-    /// `whenNoProject` says what a ping no project takes comes to:
-    /// Herdr's ping for a blocked agent (`HerdrEvent`) is kept unfiled,
-    /// since a refusal would reach no one. It expires when `filing` says,
-    /// from `now`, so a replace starts its day again.
     static func send(
         _ request: Request,
         terminal: String? = nil,
@@ -205,9 +189,6 @@ public enum PingCommand {
         }
         let replaced = store.ping(id: id)
         do {
-            // A replace is what the agent says now, so its age starts again;
-            // it keeps its instance, so it isn't notified again; seen and
-            // failure start over, so it needs attention again.
             try store.save(Ping(
                 id: id,
                 title: request.title,
@@ -228,8 +209,6 @@ public enum PingCommand {
         return CommandResult(output: "\(id)\n")
     }
 
-    /// What `request` is filed by: `--project`, else `--repo`, else the
-    /// `origin` of `folder`, else nothing, with why.
     private static func target(of request: Request, folder: URL?, git: any GitRemoteLookup) -> FilingTarget {
         if let project = request.project { return .project(project) }
         if let repository = request.repository { return .repository(repository) }
@@ -260,7 +239,6 @@ public enum PingCommand {
         }
     }
 
-    /// How long ago `date` was at `now`, shortest first: `40s`, `12m`, `3h`, `2d`.
     static func age(of date: Date, at now: Date) -> String {
         let seconds = max(0, Int(now.timeIntervalSince(date)))
         switch seconds {
@@ -297,8 +275,6 @@ public enum PingCommand {
     /// ids too. One rule for every id keeps it a safe file name and a URL
     /// path, the same on case-insensitive disks.
     public static func isID(_ id: String) -> Bool {
-        // `\A` and `\z`, not `^` and `$`, which also match before a
-        // trailing newline: "build-42\n" isn't an id.
         id.range(of: #"\A[a-z0-9][a-z0-9_-]{0,63}\z"#, options: .regularExpression) != nil
     }
 
@@ -307,26 +283,15 @@ public enum PingCommand {
         "an id is 1 to 64 lowercase letters, digits, - and _, starting with a letter or digit, not `\(id)`"
     }
 
-    /// A ping's arguments, read.
     struct Request: Equatable {
         var title: String
         var project: String?
-        /// `--repo`'s `owner/name`.
         var repository: String?
         var body: String?
-        /// `--from`'s label.
         var sender: String?
         var action: PingAction?
-        /// `--id`'s id; `nil` to make one up.
         var id: String?
 
-        /// Reads `arguments`: one title; `--body` and `--from`; one action
-        /// flag at most (`--open`, `--app`, `--herdr`); `--repo <owner/name>`
-        /// or `--project <name>`; `--id <id>`; in any order. Everything after
-        /// `--` is the title, flags or not. An empty `--body` or `--from`
-        /// is none. `--herdr` takes the next argument as its id when it's
-        /// shaped like a Herdr id (`isHerdrID`), and `herdrPane` (the
-        /// agent's own pane, from `HERDR_PANE_ID`) otherwise.
         static func parse(_ arguments: [String], herdrPane: String? = nil) -> Result<Request, ParseError> {
             var titles: [String] = []
             var project: String?
@@ -432,7 +397,6 @@ public enum PingCommand {
         argument.range(of: #"\A[^\s:]+:[tp][0-9]+\z"#, options: .regularExpression) != nil
     }
 
-    /// Why the arguments don't read, as the error line says it.
     struct ParseError: Error, Equatable {
         var message: String
         init(_ message: String) { self.message = message }

@@ -1,17 +1,6 @@
-/// The prefix a new notes database's `No.` gets, as the shipyard skill's
-/// notes reference says to pick one: two to five uppercase letters from
-/// the project's title (`shipyard` → `SHIP`), not already another
-/// database's.
 enum NotePrefix {
-    /// The lengths tried, in order: four reads best, then shorter, longer,
-    /// and the shortest.
     private static let lengths = [4, 3, 5, 2]
 
-    /// The first free prefix for project `name`, given the `taken` ones
-    /// (any case): the name's first letters (A to Z only) at each length;
-    /// then its first letter followed by later letters of the name, in
-    /// order; then its first letter and any letter; then any two letters.
-    /// `nil` only when every two-letter prefix is taken too.
     static func choose(for name: String, taken: Set<String>) -> String? {
         let taken = Set(taken.map { $0.uppercased() })
         let letters = Array(name.uppercased().filter { $0.isASCII && $0.isLetter })
@@ -37,8 +26,6 @@ enum NotePrefix {
         return nil
     }
 
-    /// The first of `letters`' subsequences of `count` letters, in order,
-    /// that `accept` takes.
     private static func firstSubsequence(
         of letters: [Character],
         count: Int,

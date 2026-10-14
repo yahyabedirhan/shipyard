@@ -31,7 +31,6 @@ public struct Viewer: Equatable, Sendable, Decodable {
             login: container.decode(String.self, forKey: .login),
             id: container.decode(Int.self, forKey: .id),
             name: try? container.decodeIfPresent(String.self, forKey: .name),
-            // An odd link is left out rather than failing the sign-in.
             avatarURL: try? container.decodeIfPresent(URL.self, forKey: .avatarURL),
             profileURL: try? container.decodeIfPresent(URL.self, forKey: .profileURL)
         )
@@ -50,20 +49,12 @@ public struct Viewer: Equatable, Sendable, Decodable {
 
 /// Why a request to GitHub's API failed.
 public enum GitHubError: Error, Equatable, Sendable {
-    /// 401: the token is missing, revoked or expired. Shipyard signs out.
     case unauthorized
-    /// Any other unexpected HTTP status.
     case http(Int)
-    /// The request didn't reach GitHub.
     case network(String)
-    /// GitHub's answer couldn't be read.
     case malformed
-    /// GraphQL answered with errors and no data.
     case graphQL(String)
-    /// `api`'s hourly limit ran out; requests work again at `resetAt`, from
-    /// the response. GraphQL says so with a 200, REST with a 403 or 429.
     case rateLimited(resetAt: Date, api: RateAPI = .graphql)
-    /// A secondary limit (too many requests too fast); wait `retryAfter` seconds.
     case secondaryLimit(retryAfter: TimeInterval)
 }
 
@@ -75,18 +66,10 @@ public struct GitHubClient: Sendable {
 
     private let token: String
     private let transport: any HTTPTransport
-    /// Each repository's last runs answer and its `ETag`, for as long as
-    /// this client (one sign-in) lives.
     private let runCache = WorkflowRunCache()
-    /// The pull requests the last review search that answered found, for
-    /// as long as this client (one sign-in) lives.
     private let reviewSearchCache = ReviewSearchCache()
-    /// Each repository's pull requests and issues as last read whole, for
-    /// as long as this client (one sign-in) lives.
     private let repositoryCache = RepositoryCache()
 
-    /// Repositories per GraphQL request; tests change it to compare batches
-    /// with a single request.
     private let repositoriesPerRequest: Int
 
     public init(token: String, transport: any HTTPTransport) {
@@ -146,11 +129,9 @@ public struct GitHubClient: Sendable {
     ) async throws -> Snapshot {
         let projects = configured.map { $0.resolved(by: resolved[$0.slug]) }
         let repositories = ProjectQuery.plan(projects)
-        // The review search is only worth its cost where pull requests show.
         let searchesReviews = projects.contains { $0.pullRequests.show }
         var parsed = ProjectQuery.Parsed()
         var headers: RateLimit?
-        // With no repositories, one request still asks for the viewer and the limit.
         let starts = repositories.isEmpty ? [0] : Array(stride(from: 0, to: repositories.count, by: repositoriesPerRequest))
         for start in starts {
             let batch = Array(repositories[start..<min(start + repositoriesPerRequest, repositories.count)])
@@ -158,8 +139,6 @@ public struct GitHubClient: Sendable {
             parsed.add(answer.parsed)
             headers = answer.headers ?? headers
         }
-        // A repository read whole is remembered; one that couldn't be keeps
-        // what was last read whole, so its items don't seem gone.
         for repository in repositories {
             if parsed.errors[repository.slug]?.kind == .incomplete {
                 guard let kept = repositoryCache.last(repository.slug) else { continue }
@@ -172,8 +151,6 @@ public struct GitHubClient: Sendable {
         var graphql = headers ?? parsed.rateLimit
         graphql?.cost = parsed.rateLimit?.cost
 
-        // A failed search keeps the last pull requests it found, so a request
-        // doesn't seem withdrawn (and then new) over one failure.
         var search = ReviewSearchResult()
         var reviewSearchError: RepositoryError?
         switch parsed.reviewSearch {
@@ -190,8 +167,6 @@ public struct GitHubClient: Sendable {
         let reviewRequested = Set(searchPullRequests.map(\.id))
 
         let runs = try await workflowRuns(
-            // Runs come from REST, so a repository GraphQL answered only in
-            // part still has them.
             of: repositories.filter { $0.runsWindow != nil && (parsed.errors[$0.slug].map { $0.kind == .incomplete } ?? true) },
             viewer: parsed.viewerLogin,
             at: fetchedAt
@@ -205,10 +180,6 @@ public struct GitHubClient: Sendable {
             for repository in project.repositorySlugs {
                 guard let slug = slugs[repository.lowercased()] else { continue }
                 if let error = parsed.errors[slug] {
-                    // Nothing of the repository could be fetched: every kind
-                    // the project shows from it failed. Answered only in
-                    // part, its runs (from REST) didn't, and it lists the
-                    // pull requests and issues it kept.
                     let incomplete = error.kind == .incomplete
                     for kind in project.fetchedKinds where !(incomplete && kind == .workflowRun) {
                         errors[ItemSource(repository: repository, kind: kind)] =
@@ -217,8 +188,6 @@ public struct GitHubClient: Sendable {
                     if !incomplete { continue }
                 }
                 var found = (parsed.items[slug] ?? []).filter { project.shows($0.kind) }
-                // Runs that couldn't be read leave the pull requests and
-                // issues listed, with an error for the runs source only.
                 if project.workflowRuns.show, let error = runs.errors[slug] {
                     errors[ItemSource(repository: repository, kind: .workflowRun)] =
                         RepositoryError(repository: repository, kind: error.kind, message: error.message)
@@ -237,8 +206,6 @@ public struct GitHubClient: Sendable {
                 }
             }
             if project.usesAnywhere {
-                // `anywhere`: the search's pull requests, from any repository,
-                // after the project's own repositories' (each item once).
                 let listed = Set(projectItems.map(\.id))
                 projectItems += searchPullRequests.filter { !listed.contains($0.id) }
             }
@@ -259,11 +226,6 @@ public struct GitHubClient: Sendable {
         )
     }
 
-    /// Asks about one batch as `query` does; when GitHub cuts the query
-    /// short (resource limits exceeded), asks again in the smaller requests
-    /// `ProjectQuery.split` gives, each the same way, so only a request as
-    /// small as it gets can come back `.incomplete`. The cut-short answers'
-    /// cost counts too.
     private func queryWhole(
         _ batch: [RepositoryRequest],
         reviewSearch: Bool,
@@ -284,9 +246,6 @@ public struct GitHubClient: Sendable {
         return (parsed, headers)
     }
 
-    /// Asks GraphQL about one batch of repositories, and with `reviewSearch`
-    /// for the review search. Throws `.rateLimited` when the limit ran out,
-    /// which GraphQL says with a 200.
     private func query(
         _ batch: [RepositoryRequest],
         reviewSearch: Bool,
@@ -299,8 +258,6 @@ public struct GitHubClient: Sendable {
         let (data, response) = try await send(request)
 
         let headers = RateLimit(headers: response)
-        // GraphQL's exhausted limit is a 200: an error typed RATE_LIMITED,
-        // or at least `x-ratelimit-remaining: 0` with no data.
         let resetAt = headers?.resetAt ?? fetchedAt.addingTimeInterval(60)
         let parsed: ProjectQuery.Parsed
         do {
@@ -313,17 +270,12 @@ public struct GitHubClient: Sendable {
         return (parsed, headers)
     }
 
-    /// What the runs requests of one refresh found.
     private struct RunsFetch {
-        /// Per repository slug, before any project's branch filter.
         var items: [String: [Item]] = [:]
         var errors: [String: RepositoryError] = [:]
-        /// The latest REST limit reported, with the requests that counted as its cost.
         var rateLimit: RateLimit?
     }
 
-    /// Asks for each repository's runs in turn, conditionally: a `304`
-    /// reuses the runs of the last answer to the same URL.
     private func workflowRuns(of repositories: [RepositoryRequest], viewer: String?, at now: Date) async throws -> RunsFetch {
         var fetch = RunsFetch()
         var counted = 0
@@ -372,12 +324,6 @@ public struct GitHubClient: Sendable {
         return fetch
     }
 
-    /// Sends `request` with the token and GitHub's headers. A 401 throws
-    /// `.unauthorized`; other non-2xx statuses throw `.http`, or `.rateLimited` /
-    /// `.secondaryLimit` for a 403 or 429 that says a limit was hit; transport
-    /// failures throw `.network`; cancellation throws `CancellationError`.
-    /// With `acceptingNotModified`, a `304` (the answer to `If-None-Match`)
-    /// returns like a success.
     func send(_ request: URLRequest, acceptingNotModified: Bool = false) async throws -> (Data, HTTPURLResponse) {
         var request = request
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -419,8 +365,6 @@ public struct GitHubClient: Sendable {
         }
     }
 
-    /// Which limit a response counts against: its `x-ratelimit-resource`
-    /// (`graphql`, or `core` and the other REST resources), else the URL.
     static func api(of response: HTTPURLResponse, for request: URLRequest) -> RateAPI {
         if let resource = response.value(forHTTPHeaderField: "x-ratelimit-resource")?.lowercased() {
             return resource == "graphql" ? .graphql : .rest
@@ -430,8 +374,6 @@ public struct GitHubClient: Sendable {
 }
 
 extension RateLimit {
-    /// From the `x-ratelimit-*` headers every GitHub API response carries;
-    /// `nil` when they're missing.
     init?(headers response: HTTPURLResponse) {
         func header(_ name: String) -> Int? {
             response.value(forHTTPHeaderField: name).flatMap { Int($0.trimmingCharacters(in: .whitespaces)) }
@@ -449,9 +391,6 @@ extension RateLimit {
     }
 }
 
-/// Each repository's pull requests and issues (and its branches, where
-/// asked) as last read whole, by slug in any case, kept so a repository
-/// GitHub answers only in part lists what it had rather than nothing.
 final class RepositoryCache: @unchecked Sendable {
     struct Entry {
         var items: [Item]
@@ -474,8 +413,6 @@ final class RepositoryCache: @unchecked Sendable {
     }
 }
 
-/// What the last review search found, kept so a failed search leaves the
-/// requests as they were.
 final class ReviewSearchCache: @unchecked Sendable {
     private let lock = NSLock()
     private var result = ReviewSearchResult()

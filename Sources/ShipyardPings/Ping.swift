@@ -137,8 +137,6 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
         return now < seen.addingTimeInterval(seenWindow)
     }
 
-    /// The letters a generated id is made of: lowercase letters and digits
-    /// without the ones easy to misread (`0`, `o`, `1`, `l`, `i`).
     static let idAlphabet = Array("abcdefghjkmnpqrstuvwxyz23456789")
 
     /// A new short id: six letters from `idAlphabet`, such as `k7qm2x`.
@@ -151,14 +149,8 @@ public struct Ping: Codable, Equatable, Hashable, Sendable, Identifiable {
 /// What clicking a ping does: one action at most, given by the flag the
 /// agent passed. Stored as `{"url": "…"}`, `{"app": "…"}` or `{"herdr": "…"}`.
 public enum PingAction: Codable, Equatable, Hashable, Sendable {
-    /// Opens a URL (`--open`): a web page, an artifact, an app's deep link.
     case url(URL)
-    /// Brings an app forward (`--app`), named by its bundle id
-    /// (`com.anthropic.claudefordesktop`) or its name (`Claude`).
     case app(String)
-    /// Focuses a Herdr tab or pane (`--herdr`), by the id Herdr gives it:
-    /// a tab's (`w1:t2`) or a pane's (`w1:p3`). Then `[herdr] terminal`, when
-    /// set, is brought forward (`HerdrFocus`).
     case herdr(String)
 
     private enum CodingKeys: String, CodingKey {

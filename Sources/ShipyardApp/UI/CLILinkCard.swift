@@ -1,12 +1,6 @@
 import ShipyardCore
 import SwiftUI
 
-/// The offer to link the bundled `shipyard` CLI into `~/.local/bin`, and how
-/// it went (linked, or the command to copy when something is in the way or
-/// the link can't be made), in `PanelText.cliLink`'s words. It looks again
-/// each time it appears, since the user may have linked it by hand. Shaped
-/// like `SkillInstallCard`: onboarding shows it under the skill card. Once
-/// onboarding is done, the Shipyard CLI view (`StatusView`) shows the link.
 struct CLILinkCard: View {
     let link: CLILink
 

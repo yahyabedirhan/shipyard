@@ -1,28 +1,14 @@
 import ShipyardCore
 import SwiftUI
 
-/// The tabs layout (`[menu] layout = "tabs"`): the menu's ready state from
-/// below the header to above the footer. A pill strip with All and one tab
-/// per project, each with its attention count; under it what the tab needs
-/// and Mark all seen (or Mark seen); then the tab's rows grouped by kind.
-///
-/// More projects than fit: the strip scrolls sideways, and choosing a tab
-/// scrolls it into view, with the cut-off edges faded. The selected tab is
-/// `PanelState`'s, which `shipyard panel show-tab` sets too; it's kept while the
-/// menu closes and opens, and goes back to All when its project is removed
-/// from the configuration.
 struct TabsLayout: View {
     let model: MenuModel
     let panel: PanelState
     let actions: LayoutActions
 
-    /// The row under the pointer, in the selected tab; one highlight glides
-    /// between rows.
     @State private var highlight = RowHighlight()
 
-    /// The selected tab, or All while its project isn't there.
     private var tab: MenuTab { model.resolved(panel.selectedTab) }
-    /// Whether the latest tab change moved right, so the list slides that way.
     private var forward: Bool { panel.movedForward }
 
     var body: some View {
@@ -36,7 +22,6 @@ struct TabsLayout: View {
             list(content)
         }
         .frame(maxWidth: .infinity)
-        // A row gone from the tab (refreshed away, or another tab chosen) loses the highlight.
         .onChange(of: content.rowPlaces) { _, places in highlight.keep(in: places) }
         .onChange(of: model.tabs) {
             if model.resolved(panel.selectedTab) != panel.selectedTab {
@@ -49,10 +34,6 @@ struct TabsLayout: View {
         withAnimation(Motion.tab) { panel.select(next, from: tab, in: model.tabs) }
     }
 
-    // MARK: - Under the strip
-
-    /// What the tab needs, and Mark all seen (or Mark seen) for it; on a
-    /// project's tab, its new-note icon too.
     private func summary(_ content: MenuTabContent) -> some View {
         HStack(spacing: 4) {
             if content.attentionCount == 0 {
@@ -72,7 +53,6 @@ struct TabsLayout: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .trailing)))
             }
-            // A project's tab stands for its header: its new-note icon is here.
             if let section = section(for: tab), let newNote = section.newNote {
                 NewNoteIcon(project: section.title, state: newNote) { actions.startNote(section) }
             }
@@ -91,17 +71,11 @@ struct TabsLayout: View {
         }
     }
 
-    // MARK: - The list
-
-    /// As tall as the rows, scrolling past the maximum. The rows
-    /// slide in from the direction of travel when the tab changes.
     private func list(_ content: MenuTabContent) -> some View {
         ScrollViewReader { proxy in
             MeasuredScrollView {
                 VStack(spacing: 0) {
                     RowListTop()
-                    // Drawn here, not in each tab's list, so only the
-                    // selected tab's row is lit while the lists slide.
                     HighlightLayer(highlight: $highlight, list: tab) {
                         ZStack(alignment: .top) {
                             TabList(content: content, actions: actions, highlight: $highlight)
@@ -121,7 +95,6 @@ struct TabsLayout: View {
             .onHover { inside in
                 if !inside { highlight.pointerLeftRows() }
             }
-            // ↑ and ↓ within the selected tab; ← and → switch tabs.
             .rowKeys(
                 $highlight,
                 places: content.rowPlaces,
@@ -130,7 +103,6 @@ struct TabsLayout: View {
                 left: { side(&$0, content, by: -1) },
                 right: { side(&$0, content, by: 1) },
                 dismiss: { place in
-                    // ⌫: removes the highlighted row when it's a ping's.
                     guard let row = content.row(at: place), row.item.ping != nil else { return false }
                     withAnimation(Motion.seen) { actions.dismiss(row) }
                     return true
@@ -155,8 +127,6 @@ struct TabsLayout: View {
         }
     }
 
-    /// ← (`step` -1) or →: on a subheader, folds or unfolds it (→ on an
-    /// open one goes to its first row); anywhere else, switches tabs.
     private func side(_ highlight: inout RowHighlight, _ content: MenuTabContent, by step: Int) -> RowKeyMove {
         guard highlight.place?.group != nil else { return switchTab(&highlight, by: step) }
         let change = step < 0 ? highlight.moveLeft(in: content) : highlight.moveRight(in: content)
@@ -169,8 +139,6 @@ struct TabsLayout: View {
         return .moved
     }
 
-    /// ← and → (provisional) off a subheader: the previous or next tab,
-    /// wrapping, with `highlight` on its first row.
     private func switchTab(_ highlight: inout RowHighlight, by step: Int) -> RowKeyMove {
         let next = model.tab(beside: tab, by: step)
         guard next != tab else { return .ignored }
@@ -180,26 +148,17 @@ struct TabsLayout: View {
     }
 }
 
-// MARK: - The tab strip
-
-/// All and one pill per project on a track. The selected pill slides
-/// between tabs; with more tabs than fit, the track scrolls sideways.
 private struct TabStrip: View {
     let model: MenuModel
     let selection: MenuTab
     let select: (MenuTab) -> Void
 
     @Namespace private var pill
-    /// The pills' height, measured: a scroll view in the menu window has
-    /// no height of its own.
     @State private var height: CGFloat = 0
-    /// The pills' frame in the strip: its width and how far it's scrolled.
     @State private var content: CGRect = .zero
     @State private var visibleWidth: CGFloat = 0
 
-    /// Tabs hidden past the leading edge.
     private var hidesLeading: Bool { content.minX < -0.5 }
-    /// Tabs hidden past the trailing edge.
     private var hidesTrailing: Bool { content.maxX > visibleWidth + 0.5 }
 
     var body: some View {
@@ -234,7 +193,6 @@ private struct TabStrip: View {
         }
     }
 
-    /// Fades an end past which tabs are hidden.
     private var edgeFade: some View {
         HStack(spacing: 0) {
             LinearGradient(colors: [.black.opacity(hidesLeading ? 0 : 1), .black], startPoint: .leading, endPoint: .trailing)
@@ -248,7 +206,6 @@ private struct TabStrip: View {
     }
 }
 
-/// One tab: its title and attention badge, riding the shared pill.
 private struct TabPill: View {
     let title: String
     let count: Int
@@ -256,8 +213,6 @@ private struct TabPill: View {
     let namespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
-    /// Whether the title is cut off at `Grid.maxTabTitleWidth`: only then
-    /// does hovering show it whole.
     @State private var isTruncated = false
 
     var body: some View {
@@ -269,7 +224,6 @@ private struct TabPill: View {
                     .truncationMode(.tail)
                     .frame(maxWidth: Grid.maxTabTitleWidth)
                     .background {
-                        // The title at its full width, measured, never drawn.
                         Text(title)
                             .font(TypeScale.button)
                             .fixedSize()
@@ -277,7 +231,6 @@ private struct TabPill: View {
                             .onGeometryChange(for: Bool.self) { $0.size.width > Grid.maxTabTitleWidth } action: { isTruncated = $0 }
                     }
                 if count > 0 {
-                    // The accent on the selected tab; muted on the others.
                     CountBadge(count: count, muted: !isOn)
                         .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }
@@ -308,18 +261,12 @@ private struct TabPill: View {
     }
 }
 
-// MARK: - A tab's rows
-
-/// The tab's error rows, then its groups' rows, each under its subheader
-/// (by default a small kind header) or after a line.
 private struct TabList: View {
     let content: MenuTabContent
     let actions: LayoutActions
     @Binding var highlight: RowHighlight
 
     var body: some View {
-        // Lazy: a tab can list hundreds of rows, and only the ones in view
-        // are made, laid out and tracked, as in the list layout.
         LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(content.errors) { ErrorRow(error: $0).clearsRowHighlight($highlight) }
             ForEach(content.notes, id: \.self) { NoteRow(note: $0).clearsRowHighlight($highlight) }
@@ -331,7 +278,6 @@ private struct TabList: View {
                 } else if index > 0 {
                     GroupDivider().padding(.vertical, 2)
                 }
-                // A folded subsection shows its subheader alone.
                 ForEach(group.isFolded ? [] : group.rows) { row in
                     let place = MenuRowPlace(section: nil, row: row.id)
                     TabRow(row: row, showsRepository: content.showsRepository)
@@ -353,10 +299,6 @@ private struct TabList: View {
     }
 }
 
-/// One item: the attention dot, its state icon in a tinted square (with a
-/// pull request's check dot on it), its title (bold while it needs
-/// attention) over the second line, and its age on the right. What a
-/// click does, its hover help and its highlight come from `itemRow(…)`.
 private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool
@@ -381,17 +323,13 @@ private struct TabRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 HStack(spacing: 5) {
-                    // A known agent's logo leads a ping's line, which names
-                    // it, unless the line says why it failed.
                     if row.actionError == nil, let agent = row.agent {
                         AgentMarkView(agent: agent, size: Grid.agentMark)
                     }
                     Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                         .font(TypeScale.meta)
-                        // A ping's failed action reads in red until it's cleared.
                         .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
                         .lineLimit(1)
-                        // A long branch or author gives way in the middle.
                         .truncationMode(.middle)
                 }
             }
@@ -408,7 +346,6 @@ private struct TabRow: View {
     }
 }
 
-/// A tab with nothing to list: nothing open, or not loaded yet.
 private struct EmptyTab: View {
     let text: String
     let isLoaded: Bool

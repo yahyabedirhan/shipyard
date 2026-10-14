@@ -15,15 +15,12 @@ private let shop = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, by `yabepa`.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 private let artifact = URL(string: "https://claude.ai/artifact/42")!
 
 @MainActor
 private extension Harness {
-    /// Sends a ping to `shop` through the CLI with `flags` and returns its id,
-    /// then lets the app see the store change.
     @discardableResult
     func send(_ title: String, _ flags: String...) async throws -> String {
         let result = cli(["ping", "send", title, "--project", "shop"] + flags)
@@ -32,19 +29,14 @@ private extension Harness {
         return result.pingID
     }
 
-    /// The ping row titled `title` in `shop`.
     func pingRow(_ title: String) throws -> MenuRow {
         try #require(section("shop")?.rows.first { $0.kind == .ping && $0.title == title })
     }
 }
 
-/// `--open`, `--app`, `--body` and `--from` through the CLI, and what
-/// clicking the ping (its row or its notification) then does: end to end
-/// across the ping command, the store, `Shipyard` and the action port.
 @Suite("A ping's action")
 @MainActor
 struct PingActionTests {
-    // MARK: The command
 
     @Test("--open, --app, --body and --from are stored with the ping")
     func flagsAreStored() async throws {
@@ -99,8 +91,6 @@ struct PingActionTests {
         #expect(harness.pingStore.all().isEmpty)
     }
 
-    // MARK: Clicking
-
     @Test("clicking a ping's row runs its action and marks it seen; nothing opens on GitHub")
     func rowClickRunsAction() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
@@ -142,8 +132,6 @@ struct PingActionTests {
         #expect(harness.actions.ran.isEmpty)
         #expect(try harness.pingRow("Published").needsAttention == false)
     }
-
-    // MARK: A failed action
 
     @Test("a failed action keeps the ping unseen and shows its reason on the row, until a click that works")
     func failureShowsUntilNextClick() async throws {
@@ -219,8 +207,6 @@ struct PingActionTests {
         #expect(try harness.pingRow("Published").needsAttention == false)
     }
 
-    // MARK: The row
-
     @Test("a ping's row shows an icon for its action, its sender and its body; its card the body whole and where it goes")
     func row() async throws {
         let harness = try await Harness.started(config: shop, graphQL: onePullRequest)
@@ -294,8 +280,6 @@ struct PingActionTests {
         #expect(PanelText.rowCard(row, now: harness.clock.now).agent == nil)
         #expect(PanelText.rowDetail(row, showingRepository: false) == "#1 · \(sender.replacingOccurrences(of: " ", with: "-"))")
     }
-
-    // MARK: Grouping
 
     @Test("group-by = \"author\" groups pings by sender, after the authors; pings without one sit in a Pings group, last")
     func groupedBySender() async throws {

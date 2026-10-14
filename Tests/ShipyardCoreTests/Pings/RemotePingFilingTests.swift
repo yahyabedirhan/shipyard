@@ -30,25 +30,17 @@ private let bothRepositories = PullRequestsResponse.answer([
 
 @MainActor
 private extension Harness {
-    /// A harness signed in with `config`, whose Herdr has saved
-    /// `netcup-vps` (the one machine `config` names) listing `pings`,
-    /// started and polled once.
     static func polled(_ config: String = shopAndBlog, graphQL: StubHTTP.Answer = bothRepositories, pings: [Ping]) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: graphQL, netcup: pings, polled: true)
         return harness
     }
 
-    /// The titles of the ping rows in the section `name`.
     func pingTitles(_ name: String) -> [String] {
         section(name)?.rows.filter { $0.kind == .ping }.map(\.title) ?? []
     }
 }
 
-/// A remote ping filed on the Mac, as a local ping is when it's sent:
-/// under the projects that watch its repository, else the project its
-/// `--project` names, else its machine's section. End to end across a
-/// fake `herdr`, `Shipyard`, the resolved repositories and the menu.
 @Suite("Remote pings filed under projects")
 @MainActor
 struct RemotePingFilingTests {
@@ -58,7 +50,6 @@ struct RemotePingFilingTests {
 
         for project in ["shop", "everything"] {
             #expect(harness.pingTitles(project) == ["Deploy?"], "\(project)")
-            // The open pull request, and the ping.
             #expect(harness.section(project)?.attentionCount == 2, "\(project)")
         }
         #expect(harness.pingTitles("blog").isEmpty)

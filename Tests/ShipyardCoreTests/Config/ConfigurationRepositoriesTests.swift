@@ -32,7 +32,6 @@ struct ConfigurationRepositoriesTests {
         let plain = config.settings(for: config.projects[1])
         #expect(!plain.archived)
         #expect(plain.forks)
-        // As written in the file.
         #expect(config.projects[0].repositories.map(\.description) == ["owned", "organizations", "collaborator", "Some-Org/*", "o/r"])
     }
 
@@ -105,10 +104,8 @@ struct ConfigurationRepositoriesTests {
         let reviews = config.settings(for: config.projects[0])
         #expect(reviews.usesAnywhere)
         #expect(reviews.repositorySlugs.isEmpty)
-        // Nothing to look up: the review search answers it.
         #expect(RepositorySelector.anywhere.lookup == nil)
         #expect(reviews.resolved(by: ResolvedRepositories()).repositories == [.anywhere])
-        // `review-requested` can come from the defaults.
         let queue = config.settings(for: config.projects[1])
         #expect(queue.usesAnywhere)
         #expect(queue.resolved(by: nil).repositories == [.repository("o/r"), .anywhere])
@@ -145,7 +142,6 @@ struct ConfigurationRepositoriesTests {
             repositories = ["anywhere"]
             pull-requests = { show = false, review-requested = true }
             """) == [ConfigurationIssue(line: 3, message: message)])
-        // Issues the defaults show count too; the project can turn them off.
         let defaults = "[defaults.issues]\nshow = true\n\n"
         #expect(rejection(defaults + """
             [[projects]]

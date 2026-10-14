@@ -6,8 +6,6 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
-/// A ping sent `minutesAgo` minutes before a fixed moment, in whole seconds
-/// (the list's dates carry no fractions).
 private func ping(_ id: String, minutesAgo: Int, title: String = "a question", body: String? = nil) -> Ping {
     Ping(
         id: id,
@@ -40,7 +38,6 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         var seen = ping("seen-one", minutesAgo: 1)
         seen.seen = Date(timeIntervalSince1970: 1_790_000_000)
         seen.failure = "no such app"
-        // `herdr --machine` reaches the session its saved machine names.
         seen.herdrSession = "work"
 
         let text = PingList.encode([seen])
@@ -77,7 +74,7 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
     }
 
     @Test func longPingsStopAtTheByteBudgetAsAWholeDocument() throws {
-        let body = String(repeating: "é", count: 2_000)  // 4 000 bytes each
+        let body = String(repeating: "é", count: 2_000)
         let pings = (0..<40).map { ping("p\($0)", minutesAgo: $0, body: body) }
 
         let text = PingList.encode(pings)
@@ -88,7 +85,6 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         #expect(list.truncated)
         #expect(list.pings.count < 40)
         #expect(list.pings.map(\.id) == (0..<list.pings.count).map { "p\($0)" })
-        // The next ping would not have fit.
         let one = PingList.encode(Array(pings.prefix(list.pings.count + 1)))
         #expect(try PingList.decode(one).pings.count == list.pings.count)
     }

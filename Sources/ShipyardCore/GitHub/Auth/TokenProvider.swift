@@ -3,10 +3,7 @@ import ShipyardCommand
 
 /// Where the token shipyard signed in with came from.
 public enum TokenSource: Equatable, Sendable {
-    /// The token store (the Keychain in the app): the user signed in with the
-    /// device flow.
     case tokenStore
-    /// `gh auth token`: the user is signed in to the GitHub CLI.
     case gh
 }
 
@@ -48,7 +45,6 @@ public struct TokenProvider: Sendable {
 /// Asks the GitHub CLI for its token. The seam between the core and spawning
 /// `gh`, so tests use a fake lookup.
 public protocol GhTokenLookup: Sendable {
-    /// `gh`'s token, or `nil` when `gh` isn't installed or isn't signed in.
     func token() -> String?
 }
 

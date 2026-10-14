@@ -28,7 +28,6 @@ public struct ShellOutput: Equatable, Sendable {
 /// callers (the skill installer, `HerdrCommand`) and spawning a process,
 /// so tests use a fake shell.
 public protocol ShellRunning: Sendable {
-    /// What the run printed and its status; `nil` when it couldn't be started.
     func run(_ invocation: ShellInvocation) async -> ShellOutput?
 }
 
@@ -56,20 +55,14 @@ public struct ProcessShellRunner: ShellRunning {
     }
 }
 
-/// One shell run that another thread can stop. It ends once, with whichever
-/// comes first: the process's output, or `nil` for a cancel (before or after
-/// the launch).
 private final class ProcessControl: @unchecked Sendable {
-    /// How long the group has after SIGTERM before SIGKILL.
     private static let killDelay: TimeInterval = 1
 
     private let lock = NSLock()
     private let process = Process()
     private let pipe = Pipe()
     private var cancelled = false
-    /// The run's result, once it has ended.
     private var ended: ShellOutput?? = nil
-    /// Called once, with the run's output or `nil`.
     private var onEnd: ((ShellOutput?) -> Void)?
 
     init(_ invocation: ShellInvocation) {
@@ -80,9 +73,6 @@ private final class ProcessControl: @unchecked Sendable {
         process.standardInput = FileHandle.nullDevice
     }
 
-    /// Sets what the run calls when it ends. When it has already ended (a
-    /// cancel before the start), calls `body` at once and returns false: there
-    /// is nothing left to run.
     func whenEnded(_ body: @escaping (ShellOutput?) -> Void) -> Bool {
         let result: ShellOutput?? = locked {
             if ended == nil { onEnd = body }
@@ -93,7 +83,6 @@ private final class ProcessControl: @unchecked Sendable {
         return false
     }
 
-    /// Runs the process and waits for it; ends with `nil` when it couldn't start.
     func runToEnd() {
         guard launch() else { return end(nil) }
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
@@ -101,8 +90,6 @@ private final class ProcessControl: @unchecked Sendable {
         end(ShellOutput(status: process.terminationStatus, output: String(decoding: data, as: UTF8.self)))
     }
 
-    /// Stops the run: ends it with `nil` now, and signals the shell and its
-    /// descendants.
     func terminate() {
         let shell: pid_t? = locked {
             cancelled = true
@@ -119,7 +106,6 @@ private final class ProcessControl: @unchecked Sendable {
         }
     }
 
-    /// Every process under `root`, from `ps` (macOS and Linux alike).
     private static func descendants(of root: pid_t) -> [pid_t] {
         let ps = Process()
         ps.executableURL = URL(fileURLWithPath: "/bin/ps")

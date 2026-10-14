@@ -3,28 +3,19 @@ import ShipyardCommand
 import ShipyardControl
 import Testing
 
-/// `shipyard app open [--demo <folder>] | quit | status` as an agent runs it, through
-/// `ShipyardCLI.run` with the Mac's table, an in-memory app at the end of
-/// the socket and a recording launcher: what each command sends, prints and
-/// exits with.
 @Suite("The app command")
 struct AppCommandTests {
     static let support = URL(fileURLWithPath: "/Users/agent/Library/Application Support/Shipyard", isDirectory: true)
     static let status = AppStatus(version: "0.2.0", panelOpen: false, layout: "tabs", projects: ["shop", "blog"])
-    /// The lease an app hands back when it quits: held by the tests' agent
-    /// (`FakeProcessTable.agent` in `/work`), taken at 1000, ending at 1060.
     static let held = ControlLease.Term(
         holder: Holder(key: "process:300@800250000", name: "claude", place: "/work"),
         taken: Date(timeIntervalSince1970: 1000),
         ends: Date(timeIntervalSince1970: 1060)
     )
-    /// `held` as a relaunch hands it over in the launched app's environment.
     static let handover = #"{"ends":1060,"holder":{"key":"process:300@800250000","name":"claude","place":"/work"},"taken":1000}"#
 
-    /// Waits recorded, never slept.
     let pauses = Locked<[TimeInterval]>([])
 
-    /// Runs `shipyard <arguments>` in the Mac's build against `transport`.
     func shipyard(_ arguments: String..., transport: FakeTransport, launcher: RecordingLauncher = RecordingLauncher()) -> CommandResult {
         shipyard(arguments, transport: transport, launcher: launcher)
     }
@@ -52,8 +43,6 @@ struct AppCommandTests {
             now: Date(timeIntervalSince1970: 0)
         )
     }
-
-    // MARK: - Status
 
     @Test("status sends one versioned request to control.sock in the support folder and prints the app's reply")
     func status() throws {
@@ -102,7 +91,6 @@ struct AppCommandTests {
             + #""lease":{"holder":"Claude Code","place":"Herdr pane w1-2","secondsLeft":48,"waiting":1},"#
             + #""panelOpen":false,"projects":["shop","blog"],"#
             + #""running":true,"showingAll":[{"kind":"pull-requests","project":"shop"}],"tab":"shop","version":"0.2.0","view":"cli"}"# + "\n")
-        // The list layout has no tab: no line, and null in the JSON. A free lease is `free`, and null.
         let list = AppStatus(version: "0.2.0", panelOpen: true, layout: "list", projects: [])
         #expect(list.text == """
             shipyard 0.2.0 is running
@@ -142,8 +130,6 @@ struct AppCommandTests {
             + #""running":true,"showingAll":[],"tab":null,"version":"0.2.0","view":"projects"}"# + "\n")
     }
 
-    // MARK: - Not running, refusals and failures
-
     @Test("when the app isn't running, every command but open exits 1 saying how to open it", arguments: [
         ["app", "status"], ["app", "status", "--json"], ["app", "quit"],
     ])
@@ -175,8 +161,6 @@ struct AppCommandTests {
         #expect(result == CommandResult(output: "done\n", error: "a note\n"))
     }
 
-    // MARK: - Open
-
     @Test("open when the app runs launches nothing, and prints its status through the leased app.open, which renews the lease")
     func openWhenRunning() {
         let launcher = RecordingLauncher()
@@ -193,7 +177,6 @@ struct AppCommandTests {
     @Test("open launches the app by bundle id, then looks every quarter second, briefly each time, until it answers")
     func openLaunches() {
         let launcher = RecordingLauncher()
-        // Not running when asked first or at the first look; then listening but too busy to answer once.
         let app = FakeTransport { _, index in
             switch index {
             case 0, 1: .failure(.notRunning)
@@ -232,10 +215,6 @@ struct AppCommandTests {
         #expect(pauses.current.isEmpty)
     }
 
-    // MARK: - Demo
-
-    /// A support folder and a demo folder of their own, short enough for a
-    /// socket's path, removed when `body` returns.
     func inFolders(_ body: (_ support: URL, _ demo: URL) throws -> Void) throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("sy-\(UUID().uuidString.prefix(8))", isDirectory: true)
@@ -247,12 +226,6 @@ struct AppCommandTests {
         try body(support.standardizedFileURL, demo.standardizedFileURL)
     }
 
-    /// The user's app at `support`'s socket, running until it's asked to
-    /// quit (or from the start when `normalRuns` is false, never), and the
-    /// demo's at `demo`'s, running once `launcher` launched it with an
-    /// environment, and until it's asked to quit. Each quit hands back the
-    /// agent's lease: `held` from the user's app, and from the demo's
-    /// `held` renewed to 1120.
     func apps(support: URL, demo: URL, launcher: RecordingLauncher) -> FakeTransport {
         let normal = ControlSocket.url(in: support)
         let demoSocket = ControlSocket.url(in: demo.appendingPathComponent("support", isDirectory: true))
@@ -303,11 +276,9 @@ struct AppCommandTests {
                 "GH_CONFIG_DIR": "/Users/agent/.config/gh",
                 "SHIPYARD_CONTROL_LEASE": Self.handover,
             ])])
-            // The user's app was asked to quit before the launch, and the launched one asked at the demo's socket.
             #expect(app.requests.contains(.appQuit))
             #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: demoSupport))
             #expect(DemoPointer.recorded(in: support) == demoSupport)
-            // The pointer is the only file in the user's support folder.
             let files = try FileManager.default.contentsOfDirectory(atPath: support.path)
             #expect(files == [DemoPointer.fileName])
         }
@@ -325,7 +296,6 @@ struct AppCommandTests {
             _ = shipyard(["app", "status"], transport: app, support: support)
             #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: demoSupport))
 
-            // The demo quit from its own menu: its socket is gone, the pointer left behind.
             try FileManager.default.removeItem(at: ControlSocket.url(in: demoSupport))
             _ = shipyard(["app", "status"], transport: app, support: support)
             #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: support))
@@ -340,22 +310,18 @@ struct AppCommandTests {
             let opened = shipyard(["app", "open", "--demo", demo.path], transport: app, launcher: launcher, support: support)
             try #require(opened.status == 0, "\(opened)")
             let demoSupport = demo.appendingPathComponent("support", isDirectory: true)
-            // The demo app listens.
             try FileManager.default.createDirectory(at: demoSupport, withIntermediateDirectories: true)
             try Data().write(to: ControlSocket.url(in: demoSupport))
 
             let result = shipyard(["app", "open"], transport: app, launcher: launcher, support: support)
 
-            // No demo variables; the lease as the demo's quit renewed it.
             #expect(launcher.launches.current.map(\.environment).last == [
                 "SHIPYARD_CONTROL_LEASE": Self.handover.replacingOccurrences(of: #""ends":1060"#, with: #""ends":1120"#),
             ])
             #expect(DemoPointer.recorded(in: support) == nil)
             let files = try FileManager.default.contentsOfDirectory(atPath: support.path)
             #expect(files.isEmpty)
-            // The user's app quit for the demo, then the demo for the user's app.
             #expect(app.requests.filter { $0 == .appQuit }.count == 2)
-            // The fake's user app stays quit, so the wait at the user's socket runs out.
             #expect(result == CommandResult(error: "shipyard didn't answer within 10 seconds of launching\n", status: 1))
             #expect(app.exchanges.current.last?.socket == ControlSocket.url(in: support))
         }
@@ -367,7 +333,6 @@ struct AppCommandTests {
         try inFolders { support, demo in
             let launcher = RecordingLauncher()
             let inUse = "shipyard is in use by codex in Herdr pane w1-2 until 12:01:00 (48s left); `shipyard control take --wait <seconds>` to queue"
-            // The app answers its free status, and refuses every leased request.
             let app = FakeTransport { request, _ in
                 request.isLeased
                     ? .success(ControlReply.refused(inUse).encoded())
@@ -432,11 +397,8 @@ struct AppCommandTests {
         }
     }
 
-    // MARK: - Quit
-
     @Test("quit asks the app to quit, then returns once nothing answers, looking with a short timeout")
     func quit() {
-        // The quit is answered; the app still answers one look, then it's gone.
         let app = FakeTransport { request, index in
             switch (request, index) {
             case (.appQuit, _): .success(ControlReply.done("shipyard quit\n").encoded())
@@ -458,8 +420,6 @@ struct AppCommandTests {
 
         #expect(result == CommandResult(error: "shipyard said it would quit, but it still answers after 10 seconds\n", status: 1))
     }
-
-    // MARK: - Arguments
 
     @Test("arguments that don't read exit 2 with one line pointing at the app help, and send nothing; none prints the usage", arguments: [
         (["app"], ""),
@@ -491,8 +451,6 @@ struct AppCommandTests {
         #expect(app.exchanges.current.isEmpty)
     }
 
-    // MARK: - A build without app control
-
     @Test("a build without app control refuses app with a pointer to the Mac, exit 2, and doesn't list it")
     func withoutControl() {
         let table = CommandTable()
@@ -506,6 +464,5 @@ struct AppCommandTests {
 }
 
 extension Array {
-    /// The one element, or nil when there are none or several.
     var only: Element? { count == 1 ? first : nil }
 }

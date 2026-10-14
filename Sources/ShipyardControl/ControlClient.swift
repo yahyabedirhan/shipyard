@@ -17,11 +17,8 @@ public protocol ControlTransport: Sendable {
 
 /// Why an exchange over the socket didn't come back with a reply.
 public enum ControlTransportFailure: Error, Equatable, Sendable {
-    /// Nothing listens: no socket file, or a connection refused.
     case notRunning
-    /// Connected, but the app wrote no reply in time.
     case timedOut
-    /// Any other failure, in words.
     case failed(String)
 }
 
@@ -38,7 +35,6 @@ public struct UnixSocketTransport: ControlTransport {
         UnixSocket.configure(descriptor, timeout: timeout)
         guard UnixSocket.connectSocket(descriptor, to: address) == 0 else {
             let code = errno
-            // No file, or a file nobody listens on (left by an app that crashed).
             if code == ENOENT || code == ECONNREFUSED { throw .notRunning }
             throw .failed("couldn't reach \(socket.path): \(UnixSocket.reason(code))")
         }
@@ -75,11 +71,8 @@ public struct ControlClient: Sendable {
     }
 
     public enum Failure: Error, Equatable, Sendable {
-        /// The app isn't running.
         case notRunning
-        /// The app didn't answer within the timeout.
         case timedOut(TimeInterval)
-        /// The exchange failed, or the reply didn't read: why.
         case failed(String)
     }
 

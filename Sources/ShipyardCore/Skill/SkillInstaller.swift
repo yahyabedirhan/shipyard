@@ -4,12 +4,8 @@ import ShipyardCommand
 /// How installing the shipyard agent skill ended, for onboarding's card and
 /// the Shipyard Skill view.
 public enum SkillInstallResult: Equatable, Sendable {
-    /// The command succeeded; its output, for a details line.
     case installed(output: String)
-    /// The command ran and failed, or the shell couldn't be started; what it
-    /// printed (or why it didn't run), to show the user.
     case failed(output: String)
-    /// The login shell has no `npx`: show `command` with a Copy button.
     case npxNotFound(command: String)
 }
 
@@ -59,10 +55,6 @@ public struct SkillInstaller: Sendable {
         }
     }
 
-    /// The output without terminal colour codes and surrounding blank space,
-    /// with each redrawn line reduced to its last frame, so the panel can show
-    /// it as plain text. A trailing carriage return, as in a CRLF line ending,
-    /// keeps the text before it, as a terminal would.
     static func clean(_ output: String) -> String {
         let withoutCursorControls = output
             .replacingOccurrences(of: "\u{1B}\\[[0-9;?]*[A-Za-z]", with: "", options: .regularExpression)

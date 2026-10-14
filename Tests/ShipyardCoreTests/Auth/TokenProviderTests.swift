@@ -3,7 +3,6 @@ import ShipyardCommand
 import ShipyardCore
 import Testing
 
-/// A token store that can't be read, like a locked Keychain.
 private struct UnreadableTokenStore: TokenStore {
     struct Unreadable: Error {}
     func token() throws -> String? { throw Unreadable() }

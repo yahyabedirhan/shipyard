@@ -29,7 +29,6 @@ private func shopAnswer(_ pullRequests: PR...) -> StubHTTP.Answer {
     PullRequestsResponse(shopRepository, pullRequests).answer
 }
 
-/// One answer for shop (repo0) and blog (repo1).
 private func bothAnswer(shop: [PR], blog: [PR], blogMissing: Bool = false) -> StubHTTP.Answer {
     PullRequestsResponse.answer([
         PullRequestsResponse(shopRepository, shop),
@@ -45,26 +44,22 @@ private func pr(_ number: Int, author: String = "yabepa", type: String = "User",
     return pullRequest
 }
 
-/// `[[defaults.notifications]]` blocks for `events`, each with `authors` when given.
 private func rules(_ events: [String], authors: String? = nil) -> String {
     events.map { "[[defaults.notifications]]\nevent = \"\($0)\"\n" + (authors.map { "authors = \($0)\n" } ?? "") + "\n" }.joined()
 }
 
-/// shop with its own notification list, naming `events`.
 private func shopNotifying(_ events: [String]) -> String {
     shop + "notifications = [" + events.map { "{ event = \"\($0)\" }" }.joined(separator: ", ") + "]\n"
 }
 
 @MainActor
 private extension Harness {
-    /// What was posted: "project · headline" per notification.
     var titles: [String] { notifier.posted.map(\.title) }
 }
 
 @Suite("Notifications through the refresh pipeline")
 @MainActor
 struct NotificationTests {
-    // MARK: - The default rule
 
     @Test("the first refresh is silent; a pull request opened after it is notified, by default from anyone")
     func defaultRule() async throws {
@@ -84,7 +79,6 @@ struct NotificationTests {
         #expect(posted.title == "shop · New PR #57")
         #expect(posted.body == "Add order export")
 
-        // Anyone: another author's pull request is notified too.
         await harness.refresh(answering: shopAnswer(pr(1), pr(2, author: "octocat"), pr(57), pr(58, author: "octocat")))
         #expect(harness.titles == ["shop · New PR #57", "shop · New PR #58"])
     }
@@ -102,7 +96,6 @@ struct NotificationTests {
         await relaunched.shipyard.start()
         #expect(relaunched.notifier.posted.isEmpty)
 
-        // Notified is apart from seen: marking it seen doesn't make it new again.
         let row = try #require(relaunched.section("shop")?.rows.first { $0.number == 2 })
         relaunched.shipyard.markSeen(row)
         await relaunched.refresh(answering: shopAnswer(pr(1), pr(2)))
@@ -134,8 +127,6 @@ struct NotificationTests {
         #expect(harness.titles == ["shop · New PR #2"])
     }
 
-    // MARK: - Project overrides
-
     @Test("a project's own rules replace the defaults for it")
     func projectOverride() async throws {
         let config = shop + """
@@ -152,7 +143,6 @@ struct NotificationTests {
         post.closedAt = "2026-09-25T11:50:00Z"
         await harness.refresh(answering: bothAnswer(shop: [pr(1), pr(2)], blog: [post, pr(11)]))
 
-        // shop keeps the default (pr.opened); blog only hears about merges.
         #expect(harness.titles == ["shop · New PR #2", "blog · Merged PR #10"])
     }
 
@@ -170,8 +160,6 @@ struct NotificationTests {
         #expect(harness.titles == ["shop · New PR #2"])
     }
 
-    // MARK: - Author filters
-
     struct AuthorCase: Sendable, CustomTestStringConvertible {
         var authors: String
         var expected: [Int]
@@ -184,7 +172,6 @@ struct NotificationTests {
         AuthorCase(authors: #"["others"]"#, expected: [3]),
         AuthorCase(authors: #"["bots"]"#, expected: [4, 5]),
         AuthorCase(authors: #"["@octocat", "@renovate[bot]"]"#, expected: [3, 5]),
-        // The old spellings still read (with a warning).
         AuthorCase(authors: #""any""#, expected: [2, 3, 4, 5]),
         AuthorCase(authors: #""others""#, expected: [3]),
     ])
@@ -215,8 +202,6 @@ struct NotificationTests {
         await harness.refresh(answering: shopAnswer(pr(1), pr(2, author: "dependabot", type: "Bot"), pr(3)))
         #expect(harness.titles == ["shop · New PR #3"])
     }
-
-    // MARK: - First sight
 
     @Test("adding a project is silent for its existing pull requests, not for new ones")
     func addingAProject() async throws {
@@ -257,8 +242,6 @@ struct NotificationTests {
         #expect(relaunched.titles == ["shop · New PR #3"])
     }
 
-    // MARK: - Every pull request event
-
     @Test("every pull request event is found and notified when a rule selects it")
     func everyEvent() async throws {
         let rules = EventKind.allCases.filter { $0.rawValue.hasPrefix("pr.") }
@@ -286,8 +269,6 @@ struct NotificationTests {
         }
         #expect(harness.notifier.posted.map(\.headline) == steps.map(\.0))
     }
-
-    // MARK: - Clicking a notification
 
     @Test("clicking a notification opens the item and marks it seen")
     func click() async throws {
@@ -318,18 +299,12 @@ struct NotificationTests {
         #expect(relaunched.shipyard.appStateStore.state.attention.seen[posted.itemURL.absoluteString] != nil)
     }
 
-    // MARK: - App control's lease
-
     @Test("a lease's start and end notify under the top-level rules only: the built-in list, or a written one that names them", arguments: [
-        // The built-in list holds both, whatever a project lists for itself.
         (shop, ["Claude Code is using shipyard", "Claude Code is done with shipyard"]),
         (shopNotifying(["pr.merged"]), ["Claude Code is using shipyard", "Claude Code is done with shipyard"]),
-        // A written list replaces it: what it leaves out is silent.
         (rules(["pr.opened", "ping.sent"]) + shop, []),
         (rules(["control.started"]) + shop, ["Claude Code is using shipyard"]),
-        // A rule's authors don't apply to a lease.
         (rules(["control.ended"], authors: #"["bots"]"#) + shop, ["Claude Code is done with shipyard"]),
-        // A project's own list doesn't count, even when it names them.
         (rules(["pr.opened"]) + shopNotifying(["control.started", "control.ended"]), []),
     ])
     func leaseNotifications(config: String, titles: [String]) async throws {
@@ -362,7 +337,6 @@ struct NotificationTests {
         #expect(Set(posted.map(\.id)).count == 4)
         #expect(posted.allSatisfy { $0.itemURL == ControlNotice.panelURL && $0.project.isEmpty })
 
-        // The app opens the panel for it; the core opens and marks nothing.
         await harness.shipyard.openNotification(ControlNotice.panelURL).value
         #expect(harness.actions.opened.isEmpty)
         #expect(harness.actions.ran.isEmpty)

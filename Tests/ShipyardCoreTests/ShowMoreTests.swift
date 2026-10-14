@@ -11,8 +11,6 @@ private typealias Issue = PullRequestsResponse.Issue
 
 private let web = "yahyabedirhan/shop-web"
 
-/// One project, "shop", with issues shown, arranged by `settings` under
-/// `[menu] layout` and any other `[menu]` lines in `menu`.
 private func config(_ settings: String = "show-first = 5", layout: MenuLayout = .list, menu: String = "") -> String {
     """
     [menu]
@@ -29,7 +27,6 @@ private func config(_ settings: String = "show-first = 5", layout: MenuLayout = 
     """
 }
 
-/// Seven open pull requests, #1 the newest, and one issue.
 private let answer = PullRequestsResponse.answer([
     PullRequestsResponse(web, (1...7).map { number in
         var pr = PR(number)
@@ -54,9 +51,6 @@ private extension Harness {
     }
 }
 
-// `show-first` caps each group at its first rows, with a Show more row that
-// shows the rest and then reads Show less. The expansion lives in memory
-// only, and the menu closing caps every group again.
 @MainActor
 @Suite("Show more")
 struct ShowMoreTests {
@@ -80,7 +74,6 @@ struct ShowMoreTests {
 
         #expect(harness.group(pullRequests) == capped)
         #expect(harness.shipyard.expandedGroups.isEmpty)
-        // No refresh: only the menu model changed, and nothing was saved.
         #expect(harness.graphQLRequests.count == 1)
         #expect(!((try? String(contentsOf: harness.stateURL, encoding: .utf8)) ?? "").contains("expanded"))
     }
@@ -118,7 +111,6 @@ struct ShowMoreTests {
         #expect(group.allRows.count == 7)
         #expect(harness.shop?.attentionCount == 8)
         #expect(harness.shipyard.menu.menuBarLabel == .total(8))
-        // The All tab isn't capped, and lists the hidden rows too.
         #expect(harness.shipyard.menu.tabContent(for: .all).groups.first?.rows.count == 7)
 
         harness.shipyard.markAllSeen(project: "shop")
@@ -132,7 +124,6 @@ struct ShowMoreTests {
         let harness = try Harness(stored: "gho_stored", config: config)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([answer])
-        // A failed run needs attention until seen; a succeeded one never does.
         var failed = WorkflowRunsResponse.Run(9)
         failed.conclusion = "failure"
         harness.stub.on("GET", WorkflowRunsResponse.url(web), WorkflowRunsResponse(web, [failed, WorkflowRunsResponse.Run(10)]).answer())
@@ -145,8 +136,6 @@ struct ShowMoreTests {
         #expect(harness.group(pullRequests)?.hiddenCount == 2)
 
         let chips = { (harness.shop?.headerCounts ?? []).map { "\($0.kind) \($0.count)\($0.needsAttention ? "!" : "")" } }
-        // Every kind with rows has a chip, in the header's order; notes,
-        // with no rows, get none.
         #expect(chips() == ["pullRequest 7!", "issue 1!", "workflowRun 2!", "ping 1!"])
 
         harness.shipyard.markAllSeen(project: "shop")
@@ -170,9 +159,6 @@ struct ShowMoreTests {
         await harness.shipyard.reloadPings()
 
         let chips = { (name: String) in (harness.section(name)?.headerCounts ?? []).map { "\($0.kind) \($0.count)" } }
-        // The issue has a row but isn't listed, so no chip; notes have no
-        // rows, so no chip; shop's pull requests give docs no chip; the
-        // chips keep the header's order rather than the file's.
         #expect(chips("shop") == ["pullRequest 7", "ping 1"])
         #expect(chips("docs") == ["ping 1"])
     }
@@ -210,8 +196,6 @@ struct ShowMoreTests {
         #expect(harness.group(issues)?.hasShowMore == false)
     }
 
-    // MARK: - The keys
-
     @Test("↑ and ↓ reach the Show more row after a group's rows, and Return's target is its group")
     func keysReachShowMore() async throws {
         let harness = try await Harness.started(config: config("show-first = 5\nsubsections = true"), graphQL: answer)
@@ -231,7 +215,6 @@ struct ShowMoreTests {
         #expect(highlight.place == showMore)
         #expect(menu.listTarget(at: showMore) == .showMore(try #require(harness.group(pullRequests))))
 
-        // Return toggles it; the highlight stays on the row, now Show less.
         harness.shipyard.showMore(pullRequests)
         let expanded = harness.shipyard.menu
         highlight.keep(in: expanded.listRowPlaces)
@@ -239,7 +222,6 @@ struct ShowMoreTests {
         #expect(expanded.listRowPlaces.firstIndex(of: showMore) == 9)
         #expect(expanded.listTarget(at: showMore) == .showMore(try #require(harness.group(pullRequests))))
 
-        // ← goes to the group's subheader; → does nothing.
         #expect(highlight.moveRight(in: expanded) == nil)
         #expect(highlight.place == showMore)
         #expect(highlight.moveLeft(in: expanded) == nil)

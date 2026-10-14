@@ -24,7 +24,6 @@ public struct BannerSnoozes: Codable, Equatable, Sendable {
         ends[key] = now.addingTimeInterval(length)
     }
 
-    /// Whether the banner `key` is hidden at `now`.
     private func isSnoozed(_ key: String, at now: Date) -> Bool {
         ends[key].map { now < $0 } ?? false
     }

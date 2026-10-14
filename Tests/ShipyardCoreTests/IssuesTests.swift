@@ -8,8 +8,6 @@ import Testing
 private let shopRepository = "yahyabedirhan/shop"
 private let blogRepository = "yahyabedirhan/blog"
 
-/// Issues on for every project, closed ones kept 3 days (pull requests keep
-/// the default 7). `graphql-issues.json` answers for it.
 private let issuesEverywhere = """
     [defaults.issues]
     show = true
@@ -24,8 +22,6 @@ private let issuesEverywhere = """
 private typealias PR = PullRequestsResponse.PullRequest
 private typealias Issue = PullRequestsResponse.Issue
 
-/// An open issue, by default updated at 10:<number>, so a higher number
-/// is listed first.
 private func issue(_ number: Int, author: String = "octocat", comments: Int = 0, updatedAt: String? = nil) -> Issue {
     var issue = Issue(number)
     issue.author = author
@@ -46,7 +42,6 @@ private func shopAnswer(_ pullRequests: [PR] = [PR(1)], issues: [Issue]?) -> Stu
     PullRequestsResponse(shopRepository, pullRequests, issues: issues).answer
 }
 
-/// What `/graphql` was sent.
 private struct QueryBody: Decodable {
     var query: String
     var variables: [String: String]
@@ -54,7 +49,6 @@ private struct QueryBody: Decodable {
 
 @MainActor
 private extension Harness {
-    /// The query text of the latest GraphQL request.
     func lastQuery() throws -> String {
         let body = try #require(graphQLRequests.last?.httpBody)
         return try JSONDecoder().decode(QueryBody.self, from: body).query
@@ -63,7 +57,6 @@ private extension Harness {
     var titles: [String] { notifier.posted.map(\.title) }
 }
 
-/// The part of `query` that asks about the repository aliased `repo<index>`.
 private func selection(of index: Int, in query: String) -> String {
     let start = query.range(of: "repo\(index): repository(")!.lowerBound
     let rest = query[start...]
@@ -74,15 +67,12 @@ private func selection(of index: Int, in query: String) -> String {
 @Suite("Issues through the refresh pipeline")
 @MainActor
 struct IssuesTests {
-    // MARK: - Showing
 
     @Test("issues follow the pull requests: open first, then closed within their own window; open or closed")
     func showing() async throws {
         let harness = try await Harness.started(config: issuesEverywhere, graphQL: Harness.fixture("graphql-issues.json"))
 
         let rows = try #require(harness.section("shop")?.rows)
-        // PR #18 merged 5 days ago is inside the pull requests' 7 days; issue
-        // #24 closed 4 days ago is outside the issues' 3.
         #expect(rows.map(\.number) == [20, 18, 31, 30, 29, 25])
         #expect(rows.map(\.kind) == [.pullRequest, .pullRequest, .issue, .issue, .issue, .issue])
         #expect(rows.suffix(4).map(\.state) == [.open, .open, .open, .closed])
@@ -134,8 +124,6 @@ struct IssuesTests {
         #expect(!query.contains("IssueFields"))
         #expect(harness.section("shop")?.rows.map(\.kind) == [.pullRequest])
     }
-
-    // MARK: - Per project
 
     @Test("issues are asked for only in the repositories of projects that show them")
     func onlyWhereShown() async throws {
@@ -200,11 +188,8 @@ struct IssuesTests {
         #expect(harness.section("shop")?.rows.map(\.number) == [1, 7])
         #expect(harness.section("shop-code")?.rows.map(\.number) == [1])
         #expect(harness.section("blog")?.rows.map(\.number) == [2])
-        // The issue counts once, in the one project that lists it.
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 2, issues: 1))
     }
-
-    // MARK: - Attention
 
     @Test("open issues need attention when unseen or changed, closed never; they count per kind")
     func attention() async throws {
@@ -230,15 +215,12 @@ struct IssuesTests {
         let rows = try #require(harness.section("shop")?.rows)
         #expect(rows.filter(\.needsAttention).map(\.number) == [1, 8, 7])
 
-        // Clicking an issue opens it and marks it seen.
         let seven = try #require(rows.first { $0.number == 7 })
         harness.shipyard.open(seven)
         #expect(harness.actions.opened == [seven.url])
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 1, issues: 1))
         #expect(harness.shipyard.menu.menuBarLabel.text == "1 PR · 1 issue")
 
-        // A comment changes it: it needs attention again. Issue #8 closing
-        // takes it out of the count.
         await harness.refresh(answering: shopAnswer(issues: [
             issue(7, comments: 1, updatedAt: "2026-09-25T11:30:00Z"),
             closed(issue(8)),
@@ -247,13 +229,10 @@ struct IssuesTests {
         #expect(harness.shipyard.menu.attention == AttentionCounts(pullRequests: 1, issues: 1))
         #expect(harness.section("shop")?.rows.filter(\.needsAttention).map(\.number) == [1, 7])
 
-        // Mark all seen covers issues too.
         harness.shipyard.markAllSeen()
         #expect(harness.shipyard.menu.attention.total == 0)
         #expect(harness.shipyard.menu.menuBarLabel.text == nil)
     }
-
-    // MARK: - Notifications
 
     @Test("issue.opened, issue.closed and issue.commented are notified by rule, after a silent first sight")
     func notifications() async throws {
@@ -272,8 +251,6 @@ struct IssuesTests {
         let harness = try await Harness.started(config: config, graphQL: shopAnswer(issues: [issue(7)]))
         #expect(harness.notifier.posted.isEmpty)
 
-        // A new issue is notified; a new pull request isn't (the project's
-        // rules replace the default `pr.opened`).
         var crash = issue(9, comments: 0)
         crash.title = "Checkout crashes on Safari"
         await harness.refresh(answering: shopAnswer([PR(1), PR(2)], issues: [crash, issue(7)]))
@@ -283,14 +260,11 @@ struct IssuesTests {
         #expect(posted.body == "Checkout crashes on Safari")
         #expect(posted.itemURL == URL(string: "https://github.com/yahyabedirhan/shop/issues/9"))
 
-        // Someone comments on #9 and #7 is closed.
         crash.comments = 1
         crash.updatedAt = "2026-09-25T11:00:00Z"
         await harness.refresh(answering: shopAnswer([PR(1), PR(2)], issues: [crash, closed(issue(7))]))
         #expect(Set(harness.titles.dropFirst()) == ["shop · New comment on issue #9", "shop · Closed issue #7"])
 
-        // Nothing new: nothing posted again. A comment on an issue of mine
-        // doesn't match `others`.
         let count = harness.notifier.posted.count
         await harness.refresh(answering: shopAnswer([PR(1), PR(2)], issues: [crash, closed(issue(7))]))
         await harness.refresh(answering: shopAnswer([PR(1), PR(2)], issues: [crash, closed(issue(7)), issue(10, author: "yabepa")]))

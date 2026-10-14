@@ -77,9 +77,6 @@ public struct NtnCLI: HTTPTransport {
         return Self.response(to: url, output)
     }
 
-    /// `ntn api`'s arguments for `request`: its path under the API host
-    /// (`v1/search`), each query item as `name==value`, the method, the
-    /// `Notion-Version` and the JSON body as `-d`.
     static func arguments(for request: URLRequest) -> [String] {
         let components = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }
         let path = String((components?.path ?? "").drop { $0 == "/" })
@@ -93,11 +90,6 @@ public struct NtnCLI: HTTPTransport {
         return arguments
     }
 
-    /// The HTTP answer a run stands for: exit 0 is a 200 with what ntn
-    /// printed; exit 4 a 401; exit 5 the status and code in ntn's error
-    /// line, with its message as Notion's error body. Any other exit, or no
-    /// error line with a status, is a 599 `NotionClient` reads as the run's
-    /// own failure, with ntn's error line.
     static func response(to url: URL, _ output: Output) -> (Data, HTTPURLResponse) {
         let lines = output.standardError
             .split(whereSeparator: \.isNewline)
@@ -116,7 +108,6 @@ public struct NtnCLI: HTTPTransport {
                 status = failure.status
                 body = (try? JSONSerialization.data(withJSONObject: ["code": failure.code, "message": failure.message])) ?? Data()
             } else {
-                // A warning can come first: the error line is the one that says so.
                 let error = lines.first { $0.hasPrefix("error:") } ?? lines.first ?? "exit \(output.status)"
                 status = runFailed
                 body = (try? JSONSerialization.data(withJSONObject: ["message": "ntn: \(error)"])) ?? Data()
@@ -126,13 +117,8 @@ public struct NtnCLI: HTTPTransport {
         return (body, response)
     }
 
-    /// The status `response` gives a run that failed before Notion
-    /// answered (offline, ntn's own error, a run that timed out):
-    /// `NotionClient` reads it as `NotionError.network`.
     static let runFailed = 599
 
-    /// ntn's line for an API error: "error: Public API request failed
-    /// (404 Not Found object_not_found): Could not find page …".
     private struct APIFailure {
         var status: Int
         var code: String
@@ -155,7 +141,6 @@ public struct NtnCLI: HTTPTransport {
     /// network), and the notes read moves on rather than waiting for good.
     public static let timeout: TimeInterval = 30
 
-    /// The exit status `processRunner` gives a run it stopped at its timeout.
     static let timedOut: Int32 = 124
 
     /// Runs `ntn` with Foundation's `Process` (`processRunner`), stopped
@@ -188,23 +173,19 @@ public struct NtnCLI: HTTPTransport {
     }
 }
 
-/// One `ntn` run that another thread can stop, before or after its launch.
 private final class NtnRun: @unchecked Sendable {
     enum Stop {
         case cancelled
         case timedOut(after: TimeInterval)
     }
 
-    /// How long the run has after SIGTERM before SIGKILL.
     private static let killDelay: TimeInterval = 1
 
     private let lock = NSLock()
     private let process = Process()
     private let output = Pipe()
     private let error = Pipe()
-    /// Why the run was stopped, once it was; read and set under `lock`.
     private var stopped: Stop?
-    /// What ntn printed on standard error, read on a thread of its own.
     private var errorData = Data()
 
     init(executable: String, arguments: [String]) {
@@ -215,10 +196,8 @@ private final class NtnRun: @unchecked Sendable {
         process.standardError = error
     }
 
-    /// Runs ntn and waits for it; `nil` when it couldn't start or was cancelled.
     func toEnd() -> NtnCLI.Output? {
         guard launch() else { return nil }
-        // Standard error is read on its own thread, so neither pipe can fill while the other is read.
         let errorRead = DispatchGroup()
         errorRead.enter()
         DispatchQueue.global(qos: .userInitiated).async {
@@ -238,9 +217,6 @@ private final class NtnRun: @unchecked Sendable {
         }
     }
 
-    /// Stops the run for `reason`: one not launched yet never launches,
-    /// one running gets SIGTERM, then SIGKILL. A run already stopped, or
-    /// ended, is left alone.
     func stop(_ reason: Stop) {
         let pid: pid_t? = locked {
             guard stopped == nil else { return nil }
@@ -254,7 +230,6 @@ private final class NtnRun: @unchecked Sendable {
         }
     }
 
-    /// Launches ntn unless the run was stopped first; false when it wasn't launched.
     private func launch() -> Bool {
         locked {
             guard stopped == nil else { return false }

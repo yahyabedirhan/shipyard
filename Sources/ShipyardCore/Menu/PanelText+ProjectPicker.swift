@@ -1,7 +1,6 @@
 import Foundation
 import ShipyardConfig
 
-// The project picker's words (`ProjectPicker`).
 extension PanelText {
     public static let pickerTitle = "Pick your projects"
     public static let pickerIntro = "Each repository you choose is a project, one section in the list. Give several the same project name to group them into one."

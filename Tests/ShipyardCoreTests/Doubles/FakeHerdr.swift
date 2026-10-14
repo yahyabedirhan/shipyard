@@ -4,34 +4,6 @@ import ShipyardCore
 import ShipyardNotices
 import ShipyardPings
 
-/// A `ShellRunning` standing in for the `herdr` command: a Herdr session
-/// with the tabs and panes it was given, answering `herdr pane get <id>`,
-/// `herdr pane list`, `herdr tab get <id>` and `herdr tab focus <id>` with
-/// Herdr's JSON, and
-/// recording every run. It's installed at `FakeHerdr.path` (one of
-/// the paths `HerdrCommand.locate` looks in first) until `installed` is false; `running` false
-/// answers as Herdr does with no server. `command` answers the same way for
-/// the `shipyard` command, which runs programs synchronously.
-///
-/// It runs named local sessions too (`open(tab:panes:inSession:)`):
-/// `herdr --session <name> pane get <id>` and `… tab focus <id>` answer
-/// from that session's server, a session not opened as Herdr does when
-/// its server isn't running, and `--session default` as plain `herdr`.
-///
-/// It knows saved machines too (`addMachine`): `herdr --machine <label>
-/// plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` starts
-/// a command log record of the machine's pings as `shipyard ping list
-/// --json` prints them, and `… plugin log list --plugin … --limit <n>`
-/// lists the machine's newest `n` records, oldest first, as Herdr 0.9.3 does. A record can stay `running` for
-/// a number of log lists first. The plugin holds notices too (`queue`), as
-/// its `notices.sh` does: the `notices` action lists them, and
-/// `notices-read` removes what that listing handed out; a plugin from
-/// before notices (`withoutNotices`) has neither action. A label it doesn't know, and a machine
-/// disabled, are refused with the line Herdr prints (`cli/target.rs` at
-/// commit 65e35a3). A machine's panes and agents (`open(pane:tab:agent:on:)`)
-/// answer `agent focus`, `pane get` and `tab focus` through `--machine`,
-/// and a machine can be out of reach, or hang until its read times out
-/// (`setReach`, `timeOutReads`).
 final class FakeHerdr: ShellRunning {
     static let path = "/usr/local/bin/herdr"
 
@@ -40,59 +12,36 @@ final class FakeHerdr: ShellRunning {
     private struct State {
         var installed = true
         var running = true
-        /// Each tab's label (empty for none).
         var tabs: [String: String] = [:]
-        /// Each pane's tab.
         var panes: [String: String] = [:]
-        /// Each pane's working folder, when it has one.
         var folders: [String: String] = [:]
-        /// Each pane's agent status, when it has one.
         var statuses: [String: String] = [:]
         var runs: [[String]] = []
         var focused: [String] = []
-        /// Each named session's tabs and panes, each to its tab (a tab to itself).
         var sessions: [String: [String: String]] = [:]
-        /// The tabs focused in each named session, in order.
         var focusedInSessions: [String: [String]] = [:]
         var machines: [String: Machine] = [:]
         var nextLog = 1
-        /// Set by `timeOutReads`: every wait for an answer ends at once.
         var timingOut = false
     }
 
-    /// How a saved machine answers.
     enum Reach {
-        /// As asked.
         case up
-        /// Saved but disabled in Herdr.
         case disabled
-        /// Herdr can't connect to it.
         case unreachable
-        /// Never answers, until its run is stopped.
         case hanging
     }
 
-    /// A saved machine with the herdr-shipyard plugin installed.
     private struct Machine {
-        /// What its `list` action prints.
         var output: String
-        /// How many log lists a new record stays `running` for.
         var runningFor = 0
-        /// Its command log records, oldest first.
         var logs: [Log] = []
-        /// Each pane's tab, on the machine.
         var panes: [String: String] = [:]
-        /// The tabs open on the machine.
         var tabs: Set<String> = []
-        /// The panes an agent occupies.
         var agents: Set<String> = []
-        /// How Herdr reaches it.
         var reach = Reach.up
-        /// The notices its plugin holds, oldest first, as stored.
         var notices: [String] = []
-        /// What the last `notices` listing handed out, for `notices-read`.
         var handed: [String] = []
-        /// Whether its plugin has the `notices` and `notices-read` actions.
         var holdsNotices = true
     }
 
@@ -114,12 +63,9 @@ final class FakeHerdr: ShellRunning {
         set { state.withValue { $0.running = newValue } }
     }
 
-    /// Every `herdr` run's arguments, in order.
     var runs: [[String]] { state.current.runs }
-    /// The tabs focused, in order.
     var focused: [String] { state.current.focused }
 
-    /// Opens the tab `tab`, unlabelled, with the panes `panes` in it.
     func open(tab: String, panes: [String] = []) {
         state.withValue { state in
             state.tabs[tab] = ""
@@ -127,8 +73,6 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Opens the tab `tab`, with the panes `panes` in it, in the named
-    /// session `session`, starting its server when it's the first.
     func open(tab: String, panes: [String] = [], inSession session: String) {
         state.withValue { state in
             state.sessions[session, default: [:]][tab] = tab
@@ -136,13 +80,10 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// The tabs focused in the named session `session`, in order.
     func focused(inSession session: String) -> [String] {
         state.current.focusedInSessions[session] ?? []
     }
 
-    /// Opens the pane `pane` in tab `tab` (labelled `label`), working in
-    /// `folder`, its agent's status `status`.
     func open(pane: String, tab: String, label: String = "", folder: URL? = nil, status: String? = nil) {
         state.withValue { state in
             state.tabs[tab] = label
@@ -152,7 +93,6 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Closes the tab `tab` and the panes in it, as `herdr tab close` does.
     func close(tab: String) {
         state.withValue { state in
             state.tabs[tab] = nil
@@ -160,8 +100,6 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Closes the workspace `workspace` (`w1`): every tab and pane whose id
-    /// starts `w1:`, as `herdr workspace close` does.
     func close(workspace: String) {
         state.withValue { state in
             state.tabs = state.tabs.filter { !$0.key.hasPrefix(workspace + ":") }
@@ -169,12 +107,10 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Whether `path` is this `herdr`, while it's installed.
     var isExecutable: @Sendable (String) -> Bool {
         { [self] path in path == FakeHerdr.path && installed }
     }
 
-    /// `HerdrFocus` over this Herdr, with no `PATH` to search.
     var focus: HerdrFocus {
         HerdrFocus(
             home: URL(fileURLWithPath: "/nonexistent-home"),
@@ -184,27 +120,18 @@ final class FakeHerdr: ShellRunning {
         )
     }
 
-    /// Saves the machine `label`, with the plugin's `list` action listing
-    /// `pings` (as the machine's `shipyard` encodes them), each new record
-    /// staying `running` for `runningFor` log lists.
     func addMachine(_ label: String, pings: [Ping] = [], runningFor: Int = 0) {
         state.withValue { $0.machines[label] = Machine(output: PingList.encode(pings), runningFor: runningFor) }
     }
 
-    /// What the machine `label`'s `list` action lists from now on.
     func setPings(_ pings: [Ping], on label: String) {
         setListOutput(PingList.encode(pings), on: label)
     }
 
-    /// What the machine `label`'s `list` action prints from now on, as is.
     func setListOutput(_ output: String, on label: String) {
         state.withValue { $0.machines[label]?.output = output }
     }
 
-    /// Opens the pane `pane` in the tab `tab` on the machine `label`, with
-    /// an agent in it unless `agent` is false. `herdr --machine <label>
-    /// agent focus <pane>` focuses an agent's pane; `pane get` and `tab
-    /// focus` answer as on this computer.
     func open(pane: String, tab: String, agent: Bool = true, on label: String) {
         state.withValue { state in
             state.machines[label]?.panes[pane] = tab
@@ -213,48 +140,34 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Leaves `notice` with the plugin on the machine `label`, as
-    /// `notices.sh add` stores it, after the ones already there.
     func queue(_ notice: QueuedNotice, on label: String) {
         queue(String(decoding: notice.encoded(), as: UTF8.self), on: label)
     }
 
-    /// Leaves `json` with the plugin on the machine `label`, as is.
     func queue(_ json: String, on label: String) {
         state.withValue { $0.machines[label]?.notices.append(json) }
     }
 
-    /// The notices the plugin on the machine `label` still holds.
     func queued(on label: String) -> [String] {
         state.current.machines[label]?.notices ?? []
     }
 
-    /// Makes the plugin on the machine `label` one from before notices:
-    /// Herdr knows no `notices` or `notices-read` action there.
     func withoutNotices(on label: String) {
         state.withValue { $0.machines[label]?.holdsNotices = false }
     }
 
-    /// How Herdr reaches the machine `label` from now on.
     func setReach(_ reach: Reach, on label: String) {
         state.withValue { $0.machines[label]?.reach = reach }
     }
 
-    /// From now on, every wait for an answer ends at once, as if its time
-    /// passed: a machine left hanging times out. One that answers may
-    /// time out too, so afterwards poll only while the others hang.
     func timeOutReads() {
         state.withValue { $0.timingOut = true }
     }
 
-    /// The runs made on the machine `label` (`--machine <label>` and what followed).
     func runs(on label: String) -> [[String]] {
         runs.filter { $0.starts(with: ["--machine", label]) }.map { Array($0.dropFirst(2)) }
     }
 
-    /// `RemotePingReader` over this Herdr, with no `PATH` to search, asking
-    /// again at once while a record is running, and timing out only when
-    /// `timeOutReads` says so.
     var remote: RemotePingReader {
         RemotePingReader(
             home: URL(fileURLWithPath: "/nonexistent-home"),
@@ -270,7 +183,6 @@ final class FakeHerdr: ShellRunning {
         )
     }
 
-    /// Runs this `herdr` as the `shipyard` command runs a program: at once.
     var command: GhCLI.Run {
         { [self] executable, arguments in
             guard executable == FakeHerdr.path, installed else { return nil }
@@ -328,7 +240,6 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// Answers `arguments` run with `--session <session>`, a named session.
     private static func answer(_ arguments: [String], inSession session: String, in state: inout State) -> ShellOutput {
         // Herdr's words when no server listens on the session's socket (`cli/server_not_running.rs`).
         guard let known = state.sessions[session] else {
@@ -352,7 +263,6 @@ final class FakeHerdr: ShellRunning {
         id.range(of: ":t[0-9]+$", options: .regularExpression) != nil
     }
 
-    /// Answers `arguments` run with `--machine <label>`.
     private static func answer(_ arguments: [String], on label: String, in state: inout State) -> ShellOutput {
         guard var machine = state.machines[label] else {
             return ShellOutput(status: 2, output: "error: unknown machine '\(label)'; use `herdr machine list`\n")
@@ -389,11 +299,9 @@ final class FakeHerdr: ShellRunning {
             case RemotePingReader.actionID:
                 stdout = machine.output
             case RemotePingReader.noticesActionID where machine.holdsNotices:
-                // As `notices.sh list` prints them, remembering what it handed out.
                 machine.handed = machine.notices
                 stdout = #"{"version":1,"truncated":false,"notices":["# + machine.notices.joined(separator: ",") + "]}\n"
             case RemotePingReader.noticesReadActionID where machine.holdsNotices:
-                // As `notices.sh read` removes them.
                 let removed = machine.notices.filter { machine.handed.contains($0) }.count
                 machine.notices.removeAll { machine.handed.contains($0) }
                 machine.handed = []
@@ -424,7 +332,6 @@ final class FakeHerdr: ShellRunning {
         }
     }
 
-    /// A command log record as Herdr lists it: no output while it's running.
     private static func record(_ log: Log) -> [String: Any] {
         var record: [String: Any] = [
             "log_id": log.id,

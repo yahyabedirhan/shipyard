@@ -18,17 +18,14 @@ private let projects = """
 
 private let empty = #"{"object":"list","results":[],"has_more":false,"next_cursor":null}"#
 
-/// A list answer of `blocks`, each a JSON object.
 private func list(_ blocks: [String]) -> StubHTTP.Answer {
     .json(#"{"object":"list","results":[\#(blocks.joined(separator: ","))],"has_more":false,"next_cursor":null}"#)
 }
 
-/// A child block of `type` titled `title`.
 private func child(_ type: String, _ id: String, _ title: String) -> String {
     #"{"object":"block","id":"\#(id)","type":"\#(type)","in_trash":false,"\#(type)":{"title":"\#(title)"}}"#
 }
 
-/// A table row of plain-text cells.
 private func row(_ cells: [String]) -> String {
     let cells = cells.map { #"[{"type":"text","plain_text":"\#($0)"}]"# }.joined(separator: ",")
     return #"{"object":"block","id":"r","type":"table_row","table_row":{"cells":[\#(cells)]}}"#
@@ -38,8 +35,6 @@ private let tableID = "27a0c3e1-8f4b-80aa-b009-0000000000a1"
 
 @MainActor
 private extension Harness {
-    /// Started with ntn logged in and Notion answering as
-    /// `NotionStub` records, both databases' schemas included.
     static func withWorkspace() async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: projects)
         harness.ntn.set(.loggedIn)
@@ -52,7 +47,6 @@ private extension Harness {
         return harness
     }
 
-    /// The home page lists `rows` (project, prefix) in its Projects index.
     func index(_ rows: [[String]]) {
         stub.on(NotionStub.entryChildren, list([
             child("child_page", NotionStub.projectsPage, "Projects"),
@@ -67,10 +61,6 @@ private extension Harness {
     }
 }
 
-/// `shipyard notes check` as the app answers it (`Shipyard.checkNotes`):
-/// the notes workspace read through ntn, the way the menu reads
-/// it, and checked against the layout the app expects; over recorded
-/// Notion answers.
 @Suite("The notes check")
 @MainActor
 struct NotesCheckTests {
@@ -96,7 +86,6 @@ struct NotesCheckTests {
     @Test("what hides notes from the app is an error: a database outside Projects, one missing a property; what agents keep tidy is a warning")
     func problems() async throws {
         let harness = try await Harness.withWorkspace()
-        // `Shop` (SHO, no Labels or Status) matches no project; the index lacks both.
         harness.index([["blog", "BLOG", ""]])
         harness.stub.on(NotionStub.entryChildren, list([
             child("child_page", NotionStub.projectsPage, "Projects"),

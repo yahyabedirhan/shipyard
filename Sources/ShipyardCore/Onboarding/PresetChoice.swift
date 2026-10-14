@@ -13,9 +13,7 @@ import ShipyardConfig
 public struct PresetChoice: Equatable, Sendable {
     /// Where onboarding is.
     public enum Step: Equatable, Sendable {
-        /// Choosing a preset.
         case preset
-        /// Picking the repositories for the chosen preset.
         case repositories
     }
 

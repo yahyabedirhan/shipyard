@@ -4,8 +4,6 @@ import ShipyardNotices
 @testable import ShipyardPings
 import Testing
 
-/// `shop`, which watches `yahyabedirhan/shop`, `quiet`, whose own rules
-/// leave `agent.notice` out, and two remote machines.
 private let twoMachines = """
     [remote]
     machines = ["hetzner-vps", "netcup-vps"]
@@ -25,8 +23,6 @@ private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullReq
 
 private let plugin = ["--plugin", "yahyabedirhan.herdr-shipyard"]
 
-/// A notice an agent on another machine queued `minutes` before the
-/// harness's now, filed under `project`.
 private func queued(_ title: String, minutes: Double = 1, project: String = "shop", id: String? = nil) -> QueuedNotice {
     QueuedNotice(
         id: id ?? "n-\(title)",
@@ -37,23 +33,15 @@ private func queued(_ title: String, minutes: Double = 1, project: String = "sho
 
 @MainActor
 private extension Harness {
-    /// A harness signed in, whose Herdr has saved `hetzner-vps` and
-    /// `netcup-vps` with `netcup` pings, started and not yet polled.
     static func withMachines(netcup: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: twoMachines)
         await harness.startWithMachines(graphQL: onePullRequest, netcup: netcup)
         return harness
     }
 
-    /// The titles of the notices posted, in order.
     var noticeTitles: [String] { notifier.posted.filter { $0.event == .agentNotice }.map(\.title) }
 }
 
-/// Notices agents on another machine left with its herdr-shipyard plugin
-/// (the poll route): collected on the remote-ping poll through `FakeHerdr`,
-/// shown by the same rules as any notice unless they waited more than ten
-/// minutes, and removed from the machine once read. Prior art:
-/// `RemotePingNotificationTests`, `NoticeTests`.
 @Suite("A notice on the poll route")
 @MainActor
 struct RemoteNoticeTests {
@@ -74,7 +62,6 @@ struct RemoteNoticeTests {
             ["plugin", "action", "invoke", "notices"] + plugin,
             ["plugin", "action", "invoke", "notices-read"] + plugin,
         ])
-        // Never listed or counted.
         #expect(harness.titles("netcup-vps").isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 0)
 
@@ -134,7 +121,6 @@ struct RemoteNoticeTests {
         #expect(harness.titles("netcup-vps") == ["Deploy?"])
         #expect(harness.pingNotifications.map(\.title) == ["netcup-vps · Deploy?"])
         #expect(harness.noticeTitles == ["shop · Done"])
-        // No machine line: a plugin without notices isn't a failure.
         #expect(harness.shipyard.menu.machineNotices.isEmpty)
         #expect(harness.machineTimer.armed == 30)
     }

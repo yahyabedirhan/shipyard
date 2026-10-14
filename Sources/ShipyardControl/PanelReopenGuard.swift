@@ -10,7 +10,6 @@ public struct PanelReopenGuard: Equatable, Sendable {
     /// How long after the user's close app control waits to open the panel.
     public static let cooldown: TimeInterval = 30
 
-    /// When the user last closed the panel; nil once app control closed it.
     private var userClosed: Date?
 
     public init() {}

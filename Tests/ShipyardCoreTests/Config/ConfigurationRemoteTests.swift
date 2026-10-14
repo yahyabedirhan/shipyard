@@ -3,8 +3,6 @@ import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
-/// `[remote] machines`: the other machines whose pings the menu lists, by
-/// their Herdr labels.
 @Suite("Configuration: remote machines")
 struct ConfigurationRemoteTests {
     @Test("no machines in an empty file; labels are read in order, trimmed")

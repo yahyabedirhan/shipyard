@@ -18,13 +18,10 @@ private let shopAndBlog = """
 
 private typealias PR = PullRequestsResponse.PullRequest
 
-/// One open pull request in `yahyabedirhan/shop`, none in the blog.
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PR(1)]).answer
 
 @MainActor
 private extension Harness {
-    /// Sends a ping through the CLI with `flags`, lets the app see the
-    /// store change, and returns its id.
     @discardableResult
     func send(_ title: String, _ flags: String...) async throws -> String {
         let result = cli(["ping", "send", title] + (flags.contains("--project") || flags.contains("--repo") ? [] : ["--project", "shop"]) + flags)
@@ -33,30 +30,23 @@ private extension Harness {
         return result.pingID
     }
 
-    /// The ping rows' titles in `project`.
     func pingTitles(_ project: String = "shop") -> [String] {
         section(project)?.rows.filter { $0.kind == .ping }.map(\.title) ?? []
     }
 
-    /// The ping row titled `title` in `project`.
     func pingRow(_ title: String, in project: String = "shop") throws -> MenuRow {
         try #require(section(project)?.rows.first { $0.kind == .ping && $0.title == title })
     }
 
-    /// Refreshes with GitHub answering `onePullRequest` again.
     func refreshAgain() async {
         graphQL([onePullRequest])
         await shipyard.refresh()
     }
 }
 
-/// How pings leave: a seen one after its `seen-window`, any one when it's
-/// dismissed; an unseen one never on its own. End to end from the CLI
-/// through the store to the menu, with the clock double.
 @Suite("Pings leaving")
 @MainActor
 struct PingExpiryTests {
-    // MARK: seen-window
 
     @Test("a seen ping stays listed for 24 hours by default, then leaves on the next refresh and is removed from the store")
     func seenWindowDefault() async throws {
@@ -208,8 +198,6 @@ struct PingExpiryTests {
         #expect(harness.pingStore.all().isEmpty)
     }
 
-    // MARK: Mark all seen
-
     @Test("Mark all seen for one project marks only its pings seen")
     func markAllSeenInProject() async throws {
         let harness = try await Harness.started(config: shopAndBlog, graphQL: onePullRequest)
@@ -223,8 +211,6 @@ struct PingExpiryTests {
         #expect(try harness.pingRow("In the shop").needsAttention)
         #expect(try harness.pingRow("In the blog", in: "blog").needsAttention == false)
     }
-
-    // MARK: Dismiss
 
     @Test("dismissing a ping removes it now, seen or not, and it no longer counts")
     func dismiss() async throws {

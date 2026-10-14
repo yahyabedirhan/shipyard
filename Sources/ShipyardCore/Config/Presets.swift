@@ -8,16 +8,11 @@ import ShipyardConfig
 public struct Preset: Hashable, Sendable, Identifiable {
     /// What onboarding asks for before the preset is written.
     public enum Asks: Hashable, Sendable {
-        /// Repositories to watch, one project each.
         case repositories
-        /// Every repository the account owns (`owned`), or picked ones.
         case ownedOrRepositories
-        /// Nothing: the preset watches no repositories of its own.
         case nothing
     }
 
-    /// Which file the preset writes; `text(projects:)` switches on it, so
-    /// every preset has its own file and none falls back to another's.
     enum Kind: Hashable, Sendable {
         case myAgents
         case incomingContributions
@@ -96,8 +91,6 @@ public struct Preset: Hashable, Sendable, Identifiable {
             return Preset.reviewQueueText
         }
     }
-
-    // MARK: - The files
 
     private static func myAgentsText(_ projects: [NewProject]) -> String {
         """
@@ -216,13 +209,11 @@ public struct Preset: Hashable, Sendable, Identifiable {
 
         """
 
-    /// What every preset's opening comment says after its summary.
     private static let editedBy = """
         # You and your agents edit this file; shipyard applies changes live.
         # Every key is optional; keys, defaults and events are in the schema above.
         """
 
-    /// `projects` as plain `[[projects]]` blocks, a blank line between each.
     private static func blocks(_ projects: [NewProject]) -> String {
         projects.map(Configuration.projectBlock).joined(separator: "\n")
     }

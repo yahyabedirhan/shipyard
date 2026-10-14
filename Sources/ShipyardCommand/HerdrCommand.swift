@@ -12,7 +12,6 @@ import Foundation
 /// so `herdr` is looked for where its installer and Homebrew put it first,
 /// then on `PATH`, as `gh` is. Each run races `timeout`.
 public struct HerdrCommand: Sendable {
-    /// Where `herdr` is looked for before `PATH`, under the home folder `home`.
     private static func knownPaths(home: URL) -> [String] {
         [
             home.appendingPathComponent(".local/bin/herdr").path,
@@ -44,7 +43,6 @@ public struct HerdrCommand: Sendable {
         self.sleep = sleep
     }
 
-    /// The first `herdr` found: the known paths, then each `PATH` directory.
     package func locate() -> String? {
         Self.locate(home: home, pathEnvironment: pathEnvironment, isExecutable: isExecutable)
     }
@@ -60,33 +58,21 @@ public struct HerdrCommand: Sendable {
         return nil
     }
 
-    /// How a run went.
     package enum Outcome: Sendable {
-        /// No `herdr` was found.
         case notFound
-        /// `herdr` was found but wouldn't start.
         case couldNotRun
-        /// It didn't finish within `timeout`, and was stopped.
         case timedOut
-        /// It finished, with this status and output.
         case finished(ShellOutput)
     }
 
-    /// Runs `herdr` with `arguments`, on the saved machine `machine` when
-    /// it's given (`--machine <label>` first), else against the named local
-    /// session `session` when it's given (`--session <name>` first). Herdr
-    /// refuses the two together: a saved machine names its own session.
     package func run(_ arguments: [String], on machine: String? = nil, inSession session: String? = nil) async -> Outcome {
         guard let herdr = locate() else { return .notFound }
         let prefix = machine.map { ["--machine", $0] } ?? session.map { ["--session", $0] } ?? []
         let invocation = ShellInvocation(executable: herdr, arguments: prefix + arguments)
         let runner = runner, timeout = timeout, sleep = sleep
-        // Whichever ends first stops the other (the runner returns at once
-        // when cancelled, and `ProcessShellRunner` stops the process).
         return await withTaskGroup(of: Outcome?.self) { group in
             group.addTask { await runner.run(invocation).map(Outcome.finished) ?? .couldNotRun }
             group.addTask {
-                // `nil` when the sleep is cancelled: herdr answered first.
                 guard (try? await sleep(timeout)) != nil else { return nil }
                 return .timedOut
             }
@@ -99,8 +85,6 @@ public struct HerdrCommand: Sendable {
         }
     }
 
-    /// `output` read as Herdr's one JSON object: its `result` when the run
-    /// worked; else its error's `code` and `message`, when it says.
     package static func answer(_ output: ShellOutput) -> Result<[String: Any], HerdrError> {
         let answer = (try? JSONSerialization.jsonObject(with: Data(output.output.utf8))) as? [String: Any]
         if output.status == 0 {
@@ -110,11 +94,6 @@ public struct HerdrCommand: Sendable {
         return .failure(HerdrError(code: error?["code"] as? String, message: error?["message"] as? String))
     }
 
-    /// Why Herdr refused the saved machine `label` before asking it, from
-    /// the plain line (not JSON) it prints then, when it's one of these; the
-    /// poll and a click both say it. As Herdr's `cli/target.rs`
-    /// (`resolve_machine`, at commit 65e35a3) words them, after `error: `,
-    /// with exit status 2.
     package static func refusal(_ output: String, machine label: String) -> String? {
         let line = output.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
         switch line {
@@ -129,7 +108,6 @@ public struct HerdrCommand: Sendable {
         }
     }
 
-    /// The error Herdr answered with; both `nil` when it didn't say.
     package struct HerdrError: Error {
         package var code: String?
         package var message: String?

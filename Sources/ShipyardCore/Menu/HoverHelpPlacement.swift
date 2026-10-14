@@ -71,7 +71,6 @@ public enum HoverHelpPlacement {
         return Rect(x: x, y: y, width: width, height: height)
     }
 
-    /// `value` inside `lower...upper`; `lower` when the range is empty.
     private static func clamp(_ value: Double, lower: Double, upper: Double) -> Double {
         max(lower, min(value, upper))
     }

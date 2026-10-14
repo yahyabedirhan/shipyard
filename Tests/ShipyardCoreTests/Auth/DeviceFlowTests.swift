@@ -5,7 +5,6 @@ import FoundationNetworking
 import ShipyardCore
 import Testing
 
-/// GitHub's answers, as recorded from the device flow endpoints.
 enum DeviceFlowAnswers {
     static func code(interval: Int = 5, expiresIn: Int = 900, userCode: String = "WDJB-MJHT") -> StubHTTP.Answer {
         .json("""
@@ -85,7 +84,6 @@ struct DeviceFlowTests {
             _ = try await device.waitForToken(authorization)
         }
         #expect(sleeper.clock.now.timeIntervalSince(start) == 900)
-        // Polled every 5 s before the 900 s mark, never after it.
         #expect(stub.requests("POST", DeviceFlow.tokenURL).count == 179)
     }
 

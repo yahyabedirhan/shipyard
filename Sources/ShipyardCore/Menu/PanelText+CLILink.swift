@@ -1,6 +1,5 @@
 import Foundation
 
-// The CLI link card's words (`CLILinkCard`), which onboarding shows.
 extension PanelText {
     /// What the CLI link card says: a title, what happened or what to do,
     /// the command to copy, and its button.

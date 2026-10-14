@@ -5,7 +5,6 @@ import Testing
 struct HoverHelpPlacementTests {
     private typealias Rect = HoverHelpPlacement.Rect
 
-    /// The panel: 400 points wide, as `Grid.panelWidth`.
     private let panel = Rect(x: 0, y: 0, width: 400, height: 300)
 
     private func row(at y: Double) -> Rect {

@@ -5,11 +5,6 @@ import ShipyardNotices
 @testable import ShipyardPings
 import Testing
 
-/// The `shipyard` router as the Mac's build assembles it: every group its
-/// `main.swift` adds, run through `ShipyardCLI.run`. The contract it owns is
-/// the command table's: the help is made from it, `help --json` lists it,
-/// a form from before the noun-verb tree is refused, and a mistyped group
-/// gets the closest one. Each group's own behaviour is its own suite's.
 @Suite("The command table")
 struct CommandTableTests {
     let root = FileManager.default.temporaryDirectory
@@ -18,8 +13,6 @@ struct CommandTableTests {
 
     var store: PingStore { PingStore(directory: root.appendingPathComponent("pings", isDirectory: true), now: { Self.now }) }
 
-    /// The Mac's table, with pings kept as sent and the app nowhere to be
-    /// reached: no command here needs it to answer.
     var table: CommandTable {
         let support = root.appendingPathComponent("support", isDirectory: true)
         var table = CommandTable()
@@ -117,7 +110,6 @@ struct CommandTableTests {
     }
 }
 
-/// A launcher no test here reaches.
 private struct NoLauncher: AppLaunching {
     func launch(bundleID: String, environment: [String: String]) throws(AppLaunchFailure) {}
 }

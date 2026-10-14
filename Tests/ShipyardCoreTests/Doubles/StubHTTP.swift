@@ -4,33 +4,19 @@ import FoundationNetworking
 #endif
 import ShipyardCore
 
-/// An `HTTPTransport` that answers from recorded responses instead of the
-/// network, and records every request it was sent.
-///
-/// Register answers per method and URL with `on`. A URL without a query
-/// matches any query on the same path; one with a query matches only that
-/// query. A route registered with a body marker matches only requests whose
-/// body contains it (GraphQL requests share one URL), and is tried before
-/// the others. Answers are given in order and the last one repeats. A request
-/// nothing matches fails with `URLError(.unsupportedURL)` and is listed in
-/// `unmatched`. A hook set with `onSend` runs while a request is in flight,
-/// for example to trigger something mid-refresh.
 final class StubHTTP: HTTPTransport {
-    /// One recorded answer: a response, or a transport failure.
     struct Answer: Sendable {
         var status: Int = 200
         var headers: [String: String] = [:]
         var body = Data()
         var failure: URLError?
 
-        /// A JSON body.
         static func json(_ body: String, status: Int = 200, headers: [String: String] = [:]) -> Answer {
             var headers = headers
             headers["Content-Type"] = headers["Content-Type"] ?? "application/json; charset=utf-8"
             return Answer(status: status, headers: headers, body: Data(body.utf8))
         }
 
-        /// A JSON body read from `Tests/ShipyardCoreTests/Fixtures/<name>`.
         static func fixture(_ name: String, status: Int = 200, headers: [String: String] = [:]) throws -> Answer {
             let url = URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent()
@@ -42,12 +28,10 @@ final class StubHTTP: HTTPTransport {
             return answer
         }
 
-        /// A bare status, for example a 401 or a 500.
         static func status(_ status: Int, headers: [String: String] = [:]) -> Answer {
             Answer(status: status, headers: headers)
         }
 
-        /// The request never reaches the server.
         static func failure(_ code: URLError.Code = .notConnectedToInternet) -> Answer {
             Answer(failure: URLError(code))
         }
@@ -56,7 +40,6 @@ final class StubHTTP: HTTPTransport {
     private struct Route {
         var method: String
         var url: URL
-        /// Text the request's body must contain; `nil` for any body.
         var body: String?
         var answers: [Answer]
 
@@ -72,46 +55,33 @@ final class StubHTTP: HTTPTransport {
     private let missed = Locked<[URLRequest]>([])
     private let hook = Locked<(@Sendable (URLRequest) async -> Void)?>(nil)
 
-    /// Every request sent, in order.
     var requests: [URLRequest] { log.current }
-    /// Requests no route matched.
     var unmatched: [URLRequest] { missed.current }
 
-    /// Requests sent to `url` (any query) with `method`.
     func requests(_ method: String, _ url: URL) -> [URLRequest] {
         requests.filter { $0.httpMethod ?? "GET" == method && Self.matches(route: url, request: $0.url) }
     }
 
-    /// Answers `GET url` with `answers` in order, the last repeating.
     func on(_ url: URL, _ answers: Answer...) {
         register("GET", url, answers)
     }
 
-    /// Answers `method url` with `answers` in order, the last repeating.
-    /// Replaces an earlier registration for the same method and URL.
     func on(_ method: String, _ url: URL, _ answers: Answer...) {
         register(method, url, answers)
     }
 
-    /// Answers `method url` with `answers` in order, the last repeating.
     func on(_ method: String, _ url: URL, answers: [Answer]) {
         register(method, url, answers)
     }
 
-    /// Answers `method url` requests whose body contains `marker` with
-    /// `answers` in order, the last repeating, before any route without a
-    /// marker. Replaces an earlier registration for the same marker.
     func on(_ method: String, _ url: URL, body marker: String, answers: [Answer]) {
         register(method, url, answers, body: marker)
     }
 
-    /// Requests sent to `url` with `method` whose body contains `marker`.
     func requests(_ method: String, _ url: URL, body marker: String) -> [URLRequest] {
         requests(method, url).filter { $0.bodyText.contains(marker) }
     }
 
-    /// Runs `body` for every request, after it's recorded and before it's
-    /// answered.
     func onSend(_ body: @escaping @Sendable (URLRequest) async -> Void) {
         hook.withValue { $0 = body }
     }
@@ -129,7 +99,6 @@ final class StubHTTP: HTTPTransport {
         log.withValue { $0.append(request) }
         if let body = hook.current { await body(request) }
         let answer: Answer? = routes.withValue { routes in
-            // A route with a body marker or a query is more specific, so it's tried first.
             func specificity(_ route: Route) -> Int { (route.body != nil ? 2 : 0) + (route.url.query != nil ? 1 : 0) }
             let order = routes.indices.sorted { specificity(routes[$0]) > specificity(routes[$1]) }
             guard let index = order.first(where: { routes[$0].matches(request) }) else { return nil }
@@ -157,10 +126,8 @@ final class StubHTTP: HTTPTransport {
 }
 
 extension URLRequest {
-    /// The body as text, for asserting on what was sent.
     var bodyText: String { httpBody.map { String(decoding: $0, as: UTF8.self) } ?? "" }
 
-    /// The form fields of an `application/x-www-form-urlencoded` body.
     var formFields: [String: String] {
         var fields: [String: String] = [:]
         for pair in bodyText.split(separator: "&") {

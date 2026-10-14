@@ -1,36 +1,4 @@
-// Draws Shipyard's app icon in one of eight variants (see README.md here):
-//
-//   graphite        shipyard's logo: the folded white sailboat on graphite (the app's icon)
-//   green-graphite  the same on graphite with a trace of green
-//   khaki-green  the sailboat in cream on khaki green, the logo until 0.6.0
-//   olive-khaki  the sailboat in cream on olive khaki
-//   origami      the menu bar's sailboat folded from paper, on amber
-//   sailboat     the menu bar's sailboat on a sea-blue squircle
-//   night        the sailboat under a crescent moon and stars
-//   sunset       the sailboat in silhouette against a low sun
-//
-//   make-icon <out.iconset> [--variant <name>]   every size an .iconset needs (graphite by default)
-//   make-icon --sheet <out.png>                  a contact sheet of every variant, for review
-//   make-icon --exploration <dir>                the minimal sailboat options, one PNG each and a comparison sheet
-//
-// It's compiled together with the app's Sources/ShipyardApp/Brand/Sailboat.swift
-// (the sailboat) and Brand/Logo.swift (the logo's squircle, colours and figure
-// size), which the menu bar item and the welcome screens' badge draw too, into
-// build/make-icon/make-icon (the Makefile's icon targets do it), so the icon
-// and the app can't drift apart.
-//
-// Command Line Tools only (AppKit and CoreGraphics). `make icon` runs it and
-// packs the iconset with `iconutil -c icns` into Packaging/Icon/AppIcon.icns;
-// `make icon-alternates` packs the others into Packaging/Icon/alternates/.
-//
-// Everything is drawn on the 1024-point macOS 11+ icon grid (an 824-point body
-// with a drop shadow) and rendered at each pixel size as vectors. Below 64
-// pixels each variant simplifies (a bigger subject, less fine detail), so it
-// still reads at 16.
-
 import AppKit
-
-// MARK: - Colour and gradients
 
 let sRGB = CGColorSpace(name: CGColorSpace.sRGB)!
 
@@ -42,13 +10,10 @@ func rgb(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
         alpha: alpha)
 }
 
-/// A gradient through `colors`, evenly spaced unless `locations` are given.
 func grad(_ colors: [CGColor], _ locations: [CGFloat]? = nil) -> CGGradient {
     let l = locations ?? colors.indices.map { CGFloat($0) / CGFloat(max(colors.count - 1, 1)) }
     return CGGradient(colorsSpace: sRGB, colors: colors as CFArray, locations: l)!
 }
-
-// MARK: - Shapes (1024 grid, y up)
 
 typealias P = (CGFloat, CGFloat)
 
@@ -63,7 +28,6 @@ func disc(_ c: P, _ r: CGFloat) -> CGPath {
     CGPath(ellipseIn: CGRect(x: c.0 - r, y: c.1 - r, width: r * 2, height: r * 2), transform: nil)
 }
 
-/// The sea: a swell across the body, filled down past its bottom edge.
 func wave(_ body: CGRect, level: CGFloat, amplitude: CGFloat, waves: CGFloat, phase: CGFloat = 0.6) -> CGPath {
     let path = CGMutablePath()
     path.move(to: CGPoint(x: body.minX - 10, y: body.minY - 10))
@@ -84,8 +48,6 @@ struct Boat {
     var hull: CGPath
 }
 
-/// The sailboat SF Symbol's shape: a straight-edged jib ahead of the mast, a
-/// taller mainsail with a curved leech behind it, and a hull.
 func boat() -> Boat {
     let mastX: CGFloat = 520
     let boomY: CGFloat = 392
@@ -121,25 +83,20 @@ func boat() -> Boat {
     return Boat(jib: jib, main: main, mast: mast, hull: hull)
 }
 
-// MARK: - Drawing helpers
-
 func fillSolid(_ ctx: CGContext, _ path: CGPath, _ color: CGColor) {
     ctx.addPath(path); ctx.setFillColor(color); ctx.fillPath()
 }
 
-/// Fills `path` with a gradient running from p0 to p1, extended past both ends.
 func fillAlong(_ ctx: CGContext, _ path: CGPath, _ g: CGGradient, _ p0: CGPoint, _ p1: CGPoint) {
     ctx.saveGState(); ctx.addPath(path); ctx.clip()
     ctx.drawLinearGradient(g, start: p0, end: p1, options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
     ctx.restoreGState()
 }
 
-/// Fills `path` with a vertical gradient from `top` at y0 to `bottom` at y1.
 func fill(_ ctx: CGContext, _ path: CGPath, _ top: CGColor, _ bottom: CGColor, from y0: CGFloat, to y1: CGFloat) {
     fillAlong(ctx, path, grad([top, bottom]), CGPoint(x: 0, y: y0), CGPoint(x: 0, y: y1))
 }
 
-/// A radial gradient about `c`, clipped to `path` when one is given.
 func fillRadial(_ ctx: CGContext, _ path: CGPath?, _ g: CGGradient, _ c: CGPoint, _ r: CGFloat) {
     ctx.saveGState()
     if let path { ctx.addPath(path); ctx.clip() }
@@ -155,7 +112,6 @@ func line(_ ctx: CGContext, _ pts: [P], _ color: CGColor, _ width: CGFloat) {
     ctx.restoreGState()
 }
 
-/// A line along the sea's top edge, the same swell `wave` fills.
 func crestLine(_ ctx: CGContext, _ body: CGRect, level: CGFloat, amplitude: CGFloat, waves: CGFloat,
                phase: CGFloat = 0.6, color: CGColor, width: CGFloat) {
     let crest = CGMutablePath()
@@ -171,7 +127,6 @@ func crestLine(_ ctx: CGContext, _ body: CGRect, level: CGFloat, amplitude: CGFl
     ctx.restoreGState()
 }
 
-/// Draws `body` scaled by `s` about `c`.
 func scaled(_ ctx: CGContext, _ s: CGFloat, about c: CGPoint, _ body: () -> Void) {
     ctx.saveGState()
     ctx.translateBy(x: c.x, y: c.y); ctx.scaleBy(x: s, y: s); ctx.translateBy(x: -c.x, y: -c.y)
@@ -185,11 +140,6 @@ func shadow(_ ctx: CGContext, dy: CGFloat, blur: CGFloat, color: CGColor) {
     ctx.setShadow(offset: CGSize(width: 0, height: dy * scale), blur: blur * scale, color: color)
 }
 
-/// The shared macOS 11+ frame: a drop shadow cast by the body filled with
-/// `base` (it shows at the body's edge), the squircle body with its background
-/// gradient (top of the body down to `backgroundEnd`), the content,
-/// a sheen from above and, above 32 pixels, a thin bright rim. The content gets
-/// whether it's drawing small (below 64 pixels) and the body's rectangle.
 func frame(_ ctx: CGContext, pixels: Int, base: CGColor = rgb(0x203050), background: CGGradient, backgroundEnd: CGFloat? = nil,
            sheen: CGFloat = 0.16, rim: CGFloat = 0.22, _ content: (CGContext, Bool, CGRect) -> Void) {
     let small = pixels < 64
@@ -224,8 +174,6 @@ func frame(_ ctx: CGContext, pixels: Int, base: CGColor = rgb(0x203050), backgro
     }
 }
 
-// MARK: - Sailboat: the menu bar's sailboat on a sea-blue squircle
-
 func drawSailboat(_ ctx: CGContext, pixels: Int) {
     let skyTop = rgb(0x4DB5F5), skyBottom = rgb(0x1466D2)
     let seaTop = rgb(0x0E4FA8), seaBottom = rgb(0x082C6B)
@@ -235,9 +183,7 @@ func drawSailboat(_ ctx: CGContext, pixels: Int) {
 
     frame(ctx, pixels: pixels, base: skyBottom, background: grad([skyTop, skyBottom]), backgroundEnd: 340, sheen: 0.18, rim: 0.25) { ctx, small, body in
         let b = boat()
-        // Small sizes: a bigger boat on the same background.
         scaled(ctx, small ? 1.22 : 1, about: CGPoint(x: 512, y: 560)) {
-            // Sails and mast, with a soft shadow for depth.
             ctx.saveGState()
             shadow(ctx, dy: -8, blur: 18, color: rgb(0x06285C, 0.35))
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
@@ -248,7 +194,6 @@ func drawSailboat(_ ctx: CGContext, pixels: Int) {
             ctx.restoreGState()
 
             if !small {
-                // A shaded strip along the main's mast edge: the cloth's curve.
                 ctx.saveGState()
                 ctx.addPath(b.main); ctx.clip()
                 ctx.drawLinearGradient(grad([rgb(0x9DB8DA, 0.45), rgb(0x9DB8DA, 0)]),
@@ -261,7 +206,6 @@ func drawSailboat(_ ctx: CGContext, pixels: Int) {
             fill(ctx, b.hull, hullTop, hullBottom, from: 358, to: 250)
             ctx.restoreGState()
             if !small {
-                // A light rail along the deck.
                 ctx.saveGState()
                 ctx.addPath(b.hull); ctx.clip()
                 ctx.setFillColor(rgb(0xFFFFFF, 0.28))
@@ -270,41 +214,32 @@ func drawSailboat(_ ctx: CGContext, pixels: Int) {
             }
         }
 
-        // Sea, in front of the hull's keel.
         let level: CGFloat = small ? 222 : 282
         fill(ctx, wave(body, level: level, amplitude: small ? 10 : 14, waves: 2.5), seaTop, seaBottom, from: level + 14, to: body.minY)
         if !small {
-            // A darker second swell, and a crest line on the first.
             fillSolid(ctx, wave(body, level: 206, amplitude: 12, waves: 3.5), rgb(0x000000, 0.14))
             crestLine(ctx, body, level: level, amplitude: 14, waves: 2.5, color: rgb(0xFFFFFF, 0.35), width: 6)
         }
     }
 }
 
-// MARK: - Origami: the sailboat folded from paper, on amber
-
 func drawOrigami(_ ctx: CGContext, pixels: Int) {
     let bg = grad([rgb(0xFFDB78), rgb(0xF5A03C)])
     frame(ctx, pixels: pixels, background: bg) { ctx, small, body in
         if small {
-            // A deeper amber, so the paper stands off it.
             ctx.drawLinearGradient(grad([rgb(0xFFC650), rgb(0xEE8A24)]), start: CGPoint(x: 0, y: body.maxY), end: CGPoint(x: 0, y: body.minY), options: [])
         }
         let light = rgb(0xFFFEFA), mid = rgb(0xEEE7DA), shade = rgb(0xD3C7B2), deep = rgb(0xB9AB93)
         let crease = rgb(0xB3A690, 0.9)
 
         scaled(ctx, small ? 1.2 : 1, about: CGPoint(x: 512, y: 560)) {
-            // Jib: two facets either side of a fold from the head.
             let jHead: P = (492, 752), jTack: P = (492, 392), jClew: P = (296, 392), jFold: P = (410, 392)
-            // Main: a big facet from head to clew, the leech folded under.
             let mHead: P = (546, 818), mTack: P = (546, 392), mClew: P = (752, 392)
             let l1: P = (672, 650), l2: P = (740, 510)
-            // Hull: a deck strip folded over, the side face and the two end flaps.
             let dL: P = (236, 384), dR: P = (812, 384), sL: P = (282, 340), sR: P = (766, 340)
             let kL: P = (360, 214), kR: P = (680, 214)
             let mFold: P = (676, 392)
 
-            // One shadow under the whole boat.
             let whole = CGMutablePath()
             whole.addPath(poly([jHead, jTack, jClew]))
             whole.addPath(poly([mHead, mTack, mClew, l2, l1]))
@@ -315,7 +250,6 @@ func drawOrigami(_ ctx: CGContext, pixels: Int) {
             fillSolid(ctx, whole, light)
             ctx.restoreGState()
 
-            // Mast: a narrow folded strip.
             fillSolid(ctx, poly([(510, 372), (522, 372), (522, 836), (510, 828)]), mid)
             fillSolid(ctx, poly([(522, 372), (536, 372), (536, 828), (522, 836)]), deep)
 
@@ -333,12 +267,10 @@ func drawOrigami(_ ctx: CGContext, pixels: Int) {
                 for seg in [[jHead, jFold], [mHead, mFold], [sL, sR], [sL, kL], [sR, kR]] {
                     line(ctx, seg, crease, 3)
                 }
-                // A centre crease down the hull's side.
                 line(ctx, [(520, 340), (520, 214)], rgb(0xB3A690, 0.6), 3)
             }
         }
 
-        // The sea, folded too: a row of faceted peaks (fewer when small).
         let level: CGFloat = small ? 214 : 236
         let peaks = small ? 4 : 7
         let step = (body.width + 40) / CGFloat(peaks)
@@ -352,7 +284,6 @@ func drawOrigami(_ ctx: CGContext, pixels: Int) {
         let sea = poly(pts)
         fillAlong(ctx, sea, grad([rgb(0x2F8FE3), rgb(0x0E4FA8)]), CGPoint(x: 0, y: level + 18), CGPoint(x: 0, y: body.minY))
         if !small {
-            // Each peak lit on one face and shaded on the other.
             ctx.saveGState()
             ctx.addPath(sea); ctx.clip()
             for i in 0..<peaks {
@@ -361,7 +292,6 @@ func drawOrigami(_ ctx: CGContext, pixels: Int) {
                 fillSolid(ctx, poly([(x + step / 2, level + 18), (x + step, level - 16), (x + step, body.minY - 20), (x + step / 2, body.minY - 20)]), rgb(0x001A4A, 0.08))
             }
             ctx.restoreGState()
-            // A second, deeper fold.
             var pts2: [P] = [(body.minX - 20, body.minY - 20)]
             for i in 0...peaks {
                 let x = body.minX - 20 + CGFloat(i) * step + step / 2
@@ -373,15 +303,11 @@ func drawOrigami(_ ctx: CGContext, pixels: Int) {
     }
 }
 
-// MARK: - Night: the sailboat under a crescent moon and stars
-
 func drawNight(_ ctx: CGContext, pixels: Int) {
     let bg = grad([rgb(0x0A1236), rgb(0x1B2C6B), rgb(0x3A4F96)], [0, 0.6, 1])
     frame(ctx, pixels: pixels, background: bg, rim: 0.18) { ctx, small, body in
-        // Small: a bigger moon, one star and no moon path.
         let moon = small ? CGPoint(x: 760, y: 770) : CGPoint(x: 730, y: 740)
         fillRadial(ctx, nil, grad([rgb(0xFFF1C8, 0.35), rgb(0xFFF1C8, 0)]), moon, 260)
-        // Crescent: the moon's disc with an offset disc bitten out.
         let mr: CGFloat = small ? 96 : 70
         ctx.saveGState()
         let bite = CGMutablePath()
@@ -391,7 +317,6 @@ func drawNight(_ ctx: CGContext, pixels: Int) {
         fillSolid(ctx, disc((moon.x, moon.y), mr), rgb(0xFFF3CF))
         ctx.restoreGState()
 
-        // Stars: four-point sparkles.
         func star(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat, _ a: CGFloat) {
             let p = CGMutablePath()
             p.move(to: CGPoint(x: x, y: y + r))
@@ -414,7 +339,6 @@ func drawNight(_ ctx: CGContext, pixels: Int) {
             }
         }
 
-        // Boat, moonlit.
         let b = boat()
         scaled(ctx, small ? 1.0 : 0.86, about: CGPoint(x: small ? 490 : 440, y: small ? 300 : 330)) {
             ctx.translateBy(x: -60, y: 0)
@@ -427,7 +351,6 @@ func drawNight(_ ctx: CGContext, pixels: Int) {
             ctx.endTransparencyLayer()
             ctx.restoreGState()
             if !small {
-                // Moonlight catches the main's leech; the luff sits in shade.
                 ctx.saveGState()
                 ctx.addPath(b.main); ctx.clip()
                 ctx.drawLinearGradient(grad([rgb(0x7A88BE, 0.45), rgb(0x7A88BE, 0)]), start: CGPoint(x: 542, y: 0), end: CGPoint(x: 660, y: 0), options: [])
@@ -444,7 +367,6 @@ func drawNight(_ ctx: CGContext, pixels: Int) {
                   CGPoint(x: 0, y: level + 12), CGPoint(x: 0, y: body.minY))
         if !small {
             crestLine(ctx, body, level: level, amplitude: 12, waves: 2.5, color: rgb(0xBFD0FF, 0.35), width: 5)
-            // Moon path on the water.
             for (i, w) in ([120, 90, 150, 70, 110] as [CGFloat]).enumerated() {
                 let y = level - 34 - CGFloat(i) * 30
                 let x = moon.x + (i % 2 == 0 ? -10 : 14)
@@ -455,12 +377,9 @@ func drawNight(_ ctx: CGContext, pixels: Int) {
     }
 }
 
-// MARK: - Sunset: the sailboat in silhouette against a low sun
-
 func drawSunset(_ ctx: CGContext, pixels: Int) {
     let bg = grad([rgb(0x4B2F7F), rgb(0xD9607E), rgb(0xFFB35C)], [0, 0.55, 1])
     frame(ctx, pixels: pixels, background: bg) { ctx, small, body in
-        // Small: a bigger sun and boat, and one bar of light on the water.
         let level: CGFloat = small ? 250 : 290
         let sun: P = (512, level + 150)
         fillRadial(ctx, nil, grad([rgb(0xFFE3A3, 0.6), rgb(0xFFB35C, 0)]), CGPoint(x: sun.0, y: sun.1), 420)
@@ -474,7 +393,6 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
             ctx.beginTransparencyLayer(auxiliaryInfo: nil)
             for path in [b.jib, b.main, b.mast, b.hull] { fillSolid(ctx, path, silhouette) }
             if !small {
-                // A faint warm rim where the sun catches the sails' edges.
                 ctx.setBlendMode(.sourceAtop)
                 ctx.drawLinearGradient(grad([rgb(0x5A2E52, 0.9), rgb(0x2B1638, 0)]), start: CGPoint(x: 0, y: 820), end: CGPoint(x: 0, y: 600), options: [])
             }
@@ -484,7 +402,6 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
 
         fillAlong(ctx, wave(body, level: level, amplitude: 10, waves: 2.5), grad([rgb(0xA0507A), rgb(0x3A1C4E), rgb(0x1E1034)], [0, 0.35, 1]),
                   CGPoint(x: 0, y: level + 10), CGPoint(x: 0, y: body.minY))
-        // The sun's path on the water.
         let bars: [P] = small ? [(300, 28)] : [(340, 14), (240, 12), (300, 11), (170, 10), (220, 9)]
         for (i, (w, h)) in bars.enumerated() {
             let y = level - (small ? 60 : 36) - CGFloat(i) * 32
@@ -494,15 +411,8 @@ func drawSunset(_ ctx: CGContext, pixels: Int) {
     }
 }
 
-// MARK: - Graphite: shipyard's logo
-
-/// green-graphite's body: graphite with a trace of green.
 let greenGraphiteHue: (top: UInt32, bottom: UInt32) = (0x252A1E, 0x13160F)
 
-/// The folded white sailboat on a body of `hue` (the logo's graphite unless
-/// given), the rest all from `Logo`: the figure with its sails' shaded faces,
-/// and the double rim, the outer one alone below 64 pixels. No sheen: the rims
-/// catch the light instead.
 func drawFolded(_ ctx: CGContext, pixels: Int, hue: (top: UInt32, bottom: UInt32) = (Logo.top, Logo.bottom)) {
     let small = pixels < 64
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
@@ -531,25 +441,14 @@ func drawFolded(_ ctx: CGContext, pixels: Int, hue: (top: UInt32, bottom: UInt32
     }
 }
 
-// MARK: - Minimal: shipyard's sailboat, flat, on colour or on white
-
-/// The khaki variants' cream figure and white sheen, and khaki-green's body:
-/// the logo until 0.6.0, its gradient either side of 0x72873A.
 let khakiCream: UInt32 = 0xFBF6EA
 let khakiSheen: CGFloat = 0.14
 let khakiGreenHue: (top: UInt32, bottom: UInt32) = (0x809741, 0x637532)
 
-/// The exploration's two families, drawn from `Sailboat.path` (the figure the
-/// app's menu bar item and badge draw, in Sources/ShipyardApp/Brand/Sailboat.swift):
-/// a coloured body with a white figure, and a white body with the figure in
-/// colour. Navy, the favourite, comes first and has a lighter and a deeper shade.
 enum Minimal: String, CaseIterable {
     case solidNavy = "solid-navy", solidNavyLight = "solid-navy-light", solidNavyDeep = "solid-navy-deep"
     case solidBlue = "solid-blue", solidTeal = "solid-teal", solidCoral = "solid-coral"
     case whiteNavy = "white-navy", whiteBlue = "white-blue", whiteTeal = "white-teal", whiteCoral = "white-coral"
-    // The khaki range, muted and desaturated, from classic khaki to a deep brown
-    // khaki. Sand and a light khaki were tried and left out: under 3:1 against
-    // the figure, they lost it at 32 pixels.
     case solidKhaki = "solid-khaki", solidOliveKhaki = "solid-olive-khaki", solidDeepKhaki = "solid-deep-khaki"
     case whiteKhaki = "white-khaki", whiteOliveKhaki = "white-olive-khaki", whiteDeepKhaki = "white-deep-khaki"
 
@@ -557,13 +456,12 @@ enum Minimal: String, CaseIterable {
 
     var onWhite: Bool { rawValue.hasPrefix("white-") }
 
-    /// The hue as a top-to-bottom pair: the body's gradient, or the figure's on white.
     var hue: (top: UInt32, bottom: UInt32) {
         switch self {
         case .solidNavyLight: return (0x5476C4, 0x2C4A94)
         case .solidNavy, .whiteNavy: return (0x30498C, 0x152049)
         case .solidNavyDeep: return (0x1E2B55, 0x080E26)
-        case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)   // the connect screen's accent, 0x006BED
+        case .solidBlue, .whiteBlue: return (0x2E8BFF, 0x0058D6)
         case .solidTeal, .whiteTeal: return (0x22B8B0, 0x0A827E)
         case .solidCoral, .whiteCoral: return (0xFF8C6E, 0xEA5645)
         case .solidKhaki, .whiteKhaki: return (0xAE9B6C, 0x8E7B4E)
@@ -573,19 +471,15 @@ enum Minimal: String, CaseIterable {
     }
 
     func draw(_ ctx: CGContext, pixels: Int) {
-        // White on the first colours; cream, warmer, on khaki.
         Self.draw(ctx, pixels: pixels, hue: hue, figure: isKhaki ? khakiCream : 0xFFFFFF, onWhite: onWhite)
     }
 
-    /// Draws the figure in `figure` on a body of `hue`, or in `hue` on white:
-    /// the options above, and the logo, which isn't one of them.
     static func draw(_ ctx: CGContext, pixels: Int, hue: (top: UInt32, bottom: UInt32), figure: UInt32, onWhite: Bool) {
         let (top, bottom) = hue
         let background = onWhite ? grad([rgb(0xFFFFFF), rgb(0xECEFF3)]) : grad([rgb(top), rgb(bottom)])
         let base = onWhite ? rgb(0xC9CFD8) : rgb(bottom)
         frame(ctx, pixels: pixels, base: base, background: background,
               sheen: onWhite ? 0 : khakiSheen, rim: onWhite ? 0.6 : 0.2) { ctx, small, _ in
-            // The same path at every size; small sizes only draw it bigger.
             let b = Sailboat.bounds
             scaled(ctx, small ? Logo.smallFigureScale : Logo.figureScale, about: CGPoint(x: 512, y: 512)) {
                 ctx.translateBy(x: 512 - b.midX, y: 512 - b.midY)
@@ -594,7 +488,6 @@ enum Minimal: String, CaseIterable {
                 ctx.beginTransparencyLayer(auxiliaryInfo: nil)
                 fillSolid(ctx, Sailboat.path, rgb(figure))
                 if onWhite {
-                    // Colour the figure with the hue's gradient.
                     ctx.setBlendMode(.sourceIn)
                     ctx.drawLinearGradient(grad([rgb(top), rgb(bottom)]), start: CGPoint(x: 0, y: b.maxY), end: CGPoint(x: 0, y: b.minY),
                                            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
@@ -605,8 +498,6 @@ enum Minimal: String, CaseIterable {
         }
     }
 }
-
-// MARK: - Variants
 
 enum Variant: String, CaseIterable {
     case graphite, greenGraphite = "green-graphite", khakiGreen = "khaki-green", oliveKhaki = "olive-khaki", origami, sailboat, night, sunset
@@ -624,8 +515,6 @@ enum Variant: String, CaseIterable {
         }
     }
 }
-
-// MARK: - Rendering
 
 func render(_ variant: Variant, pixels: Int) -> NSBitmapImageRep {
     render(pixels: pixels) { variant.draw($0, pixels: pixels) }
@@ -650,10 +539,6 @@ func writePNG(_ rep: NSBitmapImageRep, to url: URL) throws {
     try rep.representation(using: .png, properties: [:])!.write(to: url)
 }
 
-// MARK: - Contact sheet
-
-/// One row per variant (the app's first), each at 16, 32, 128 and 512 pixels on
-/// a light panel and on a dark panel.
 func sheet(to url: URL) throws {
     let sizes = [16, 32, 128, 512]
     let gap = 28
@@ -693,14 +578,6 @@ func sheet(to url: URL) throws {
     try writePNG(rep, to: url)
 }
 
-// MARK: - Exploration
-
-/// Writes a 512-pixel PNG of each minimal variant into `dir`, and
-/// `comparison.png`, top to bottom: the maintainer's reference shots (when
-/// `dir` has them); the figure as the menu bar's template image at 16, 18 and
-/// 22 points on a light and a dark menu bar, with the connect screen's badge;
-/// then every variant at 512 and 32, a row per family, on a light panel and
-/// then on a dark one.
 func exploration(to dir: URL) throws {
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     for m in Minimal.allCases {
@@ -718,7 +595,6 @@ func exploration(to dir: URL) throws {
         NSImage(contentsOf: dir.appendingPathComponent("\(name).png")).map { (name, $0) }
     }
     let refH = references.isEmpty ? 0 : gap + 400 + 12 + label + gap
-    // The menu bar and badge row, drawn 4 pixels to the point so it reads on the sheet.
     let zoom: CGFloat = 4
     let appH = gap + 256 + 12 + label + gap
     let height = refH + appH + panelH * 2
@@ -751,8 +627,6 @@ func exploration(to dir: URL) throws {
         }
     }
 
-    // The menu bar item: the template image the app draws (`Sailboat.path` fitted
-    // to a square of the menu bar's size), black on a light bar, white on a dark one.
     let appTop = CGFloat(height - refH)
     var x = CGFloat(gap)
     for (bar, ink, name) in [(rgb(0xE8E8EA), rgb(0x000000, 0.85), "light"), (rgb(0x1E1E20), rgb(0xFFFFFF), "dark")] {
@@ -775,7 +649,6 @@ func exploration(to dir: URL) throws {
         x += barW + CGFloat(gap)
     }
 
-    // The connect screen's badge: the accent's rounded square, the figure at 18 points in white.
     for badgeZoom: CGFloat in [4, 8] {
         let side = 32 * badgeZoom
         let rect = CGRect(x: x, y: appTop - CGFloat(gap) - 128 - side / 2, width: side, height: side)
@@ -815,14 +688,11 @@ func exploration(to dir: URL) throws {
     NSGraphicsContext.restoreGraphicsState()
     try writePNG(rep, to: dir.appendingPathComponent("comparison.png"))
 
-    // The khaki range, with solid-navy (the favourite) first for comparison.
     let khaki = Minimal.allCases.filter(\.isKhaki)
     try optionSheet([[.solidNavy] + khaki.filter { !$0.onWhite }, khaki.filter(\.onWhite)],
                     to: dir.appendingPathComponent("comparison-khaki.png"))
 }
 
-/// A sheet of `families`, a row each, every option at 512 and 32 on a light
-/// panel and then on a dark one.
 func optionSheet(_ families: [[Minimal]], to url: URL) throws {
     let gap = 40, small = 32, label = 44
     let cellW = 512, rowH = gap + 512 + 20 + small + 12 + label
@@ -860,14 +730,24 @@ func optionSheet(_ families: [[Minimal]], to url: URL) throws {
     try writePNG(rep, to: url)
 }
 
-// MARK: - Main
+let usage = """
+    usage: make-icon <out.iconset> [--variant \(Variant.allCases.map(\.rawValue).joined(separator: "|"))]
+           make-icon --sheet <out.png>
+           make-icon --exploration <dir>
+           make-icon --help
+
+    """
 
 func fail(_ message: String) -> Never {
-    FileHandle.standardError.write("\(message)\nusage: make-icon.swift <out.iconset> [--variant \(Variant.allCases.map(\.rawValue).joined(separator: "|"))] | --sheet <out.png>\n".data(using: .utf8)!)
+    FileHandle.standardError.write("\(message)\n\(usage)".data(using: .utf8)!)
     exit(64)
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
+if arguments == ["--help"] || arguments == ["-h"] {
+    print(usage, terminator: "")
+    exit(0)
+}
 var variant = Variant.graphite
 if let flag = arguments.firstIndex(of: "--variant") {
     guard flag + 1 < arguments.count else { fail("--variant needs a name") }

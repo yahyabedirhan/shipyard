@@ -34,24 +34,16 @@ public struct NotesMenuState: Equatable, Sendable {
 
 /// A project header's new-note icon.
 public enum NewNoteButton: Equatable, Sendable {
-    /// A click starts a note (`Shipyard.startNote(in:)`).
     case ready
-    /// A note is being started; a click does nothing.
     case starting
 }
 
 /// Why notes can't be listed at all, for the panel's notes banner.
 public enum NotesNotice: Equatable, Sendable {
-    /// No `ntn` where the app looks for it.
     case ntnMissing
-    /// ntn isn't logged in, has no workspace, or Notion stopped taking
-    /// its login.
     case ntnLoggedOut
-    /// ntn's default workspace has no page titled "Shipyard Notes".
     case noEntryPage
 
-    /// Why `reading` could list nothing at all; `nil` when it read, or
-    /// failed in a way each project's error row says.
     init?(_ reading: NotesReading) {
         switch reading {
         case .noEntryPage: self = .noEntryPage
@@ -61,7 +53,5 @@ public enum NotesNotice: Equatable, Sendable {
         }
     }
 
-    /// Whether it's about ntn itself (missing, logged out), which also
-    /// hides the new-note icons; a workspace without Shipyard Notes isn't.
     var isNtn: Bool { self != .noEntryPage }
 }

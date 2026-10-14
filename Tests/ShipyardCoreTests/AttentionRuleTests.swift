@@ -34,8 +34,6 @@ typealias Toggles = Configuration.AttentionToggles
 
 @Suite("Needs-attention rule")
 struct AttentionRuleTests {
-    /// One case of the rule: whether the item was seen before its latest
-    /// change, its standing reasons, the toggles, and the answer.
     struct Case: Sendable, CustomTestStringConvertible {
         var name: String
         var changedSinceSeen = false
@@ -88,11 +86,9 @@ struct AttentionRuleTests {
         attention.markSeen(kept, at: now)
         attention.markSeen(gone, at: now)
 
-        // Within a day nothing is rewritten.
         let rewrote = attention.prune(present: [kept], at: now + 3_600)
         #expect(!rewrote)
 
-        // Every day the present one is bumped; the gone one ages out after 30 days.
         var day = now
         for _ in 1...30 {
             day += 86_400

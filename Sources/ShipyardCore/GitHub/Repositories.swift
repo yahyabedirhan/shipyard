@@ -38,23 +38,17 @@ public struct RepoSummary: Equatable, Sendable, Identifiable {
 
 /// What checking a repository the user typed in the picker found.
 public enum RepositoryCheck: Equatable, Sendable {
-    /// GitHub has it and the token can see it; add this (GitHub's spelling).
     case accepted(RepoSummary)
-    /// It can't be added, and why.
     case rejected(RepositoryRejection)
 }
 
 /// Why the picker can't add a typed repository. `message` is what it shows.
 public enum RepositoryRejection: Equatable, Sendable {
-    /// The text isn't `owner/name` (or a github.com link to one).
     case notASlug(String)
     /// GitHub answered 404: no such repository, or the token can't see it
     /// (GitHub answers the same for both).
     case notFound(String)
-    /// GitHub refused access (403), for example an organisation that
-    /// requires SSO for this token.
     case forbidden(String)
-    /// GitHub couldn't be asked (network, rate limit, sign-in); try again.
     case couldNotCheck(String, GitHubError)
 
     public var message: String {
@@ -79,12 +73,7 @@ public enum RepositoryRejection: Equatable, Sendable {
     }
 }
 
-/// The picker's two questions to GitHub: which repositories to suggest
-/// (GraphQL, one request) and whether a typed one exists (REST, one request).
-/// The query text and its parser live here, so they have one owner.
 enum RepositoriesQuery {
-    /// Repositories fetched from each list: the viewer's own (by push), and
-    /// those they contributed to (by push).
     static let first = 25
 
     static let document = """
@@ -107,23 +96,17 @@ enum RepositoriesQuery {
 
         """
 
-    /// The JSON body to POST to `/graphql`.
     static var body: Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return (try? encoder.encode(["query": document])) ?? Data()
     }
 
-    /// What the answer held: the suggestions, or GitHub saying the limit ran out.
     struct Parsed: Equatable, Sendable {
         var repositories: [RepoSummary] = []
         var rateLimited = false
     }
 
-    /// Reads the answer: both lists merged, each repository once, archived
-    /// ones left out, most recently pushed first (never pushed last; ties
-    /// keep GitHub's order, own repositories first). Errors with no data
-    /// throw `.graphQL`; a body that isn't GraphQL's shape throws `.malformed`.
     static func parse(_ data: Data) throws -> Parsed {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -193,11 +176,6 @@ enum RepositoriesQuery {
         }
     }
 
-    // MARK: - Checking one
-
-    /// `text` as `owner/name`: trimmed, and taken out of a github.com link
-    /// (`https://github.com/owner/name`, with or without `.git` or a
-    /// trailing slash). `nil` when it isn't a repository slug.
     static func slug(from text: String) -> String? {
         var slug = text.trimmingCharacters(in: .whitespacesAndNewlines)
         for prefix in ["https://github.com/", "http://github.com/", "github.com/"]
@@ -210,7 +188,6 @@ enum RepositoriesQuery {
         return GitRemote.isRepositorySlug(slug) ? slug : nil
     }
 
-    /// REST's `GET /repos/{owner}/{repo}` answer, the fields the picker reads.
     struct RESTRepository: Decodable {
         var full_name: String
         var description: String?
@@ -262,19 +239,8 @@ extension GitHubClient {
     }
 }
 
-// MARK: - Listing a group's or an owner's repositories
-
-/// The repository resolver's question to GitHub: every repository of a
-/// repository group, or of one owner, a page of 100 at a time. The query
-/// text and its parser live here, so they have one owner. Archived
-/// repositories and forks come back marked, and the resolver leaves them out
-/// per project, so one lookup serves projects that differ on `archived` or
-/// `forks`.
 enum RepositoryListQuery {
-    /// Repositories per page: GitHub's largest `first` on a connection.
     static let pageSize = 100
-    /// Pages read at most for one lookup (10,000 repositories), so an answer
-    /// that never stops paging can't hold a refresh forever.
     static let maxPages = 100
 
     static func document(_ lookup: RepositoryLookup) -> String {
@@ -284,9 +250,6 @@ enum RepositoryListQuery {
         }
         switch lookup {
         case .group(let group):
-            // `affiliations` is the viewer's relation, `ownerAffiliations` the
-            // owner's; for the viewer's own list both name the same account,
-            // and the second defaults to [OWNER, COLLABORATOR], so both are set.
             let affiliation = switch group {
             case .owned: "OWNER"
             case .organizations: "ORGANIZATION_MEMBER"
@@ -300,8 +263,6 @@ enum RepositoryListQuery {
 
                 """
         case .owner:
-            // Only what the owner owns: the default also lists repositories
-            // the owner collaborates on elsewhere.
             return """
                 query ShipyardOwnerRepositories($login: String!, $after: String) {
                   repositoryOwner(login: $login) { \(connection("ownerAffiliations: [OWNER], ")) }
@@ -312,7 +273,6 @@ enum RepositoryListQuery {
         }
     }
 
-    /// The JSON body to POST to `/graphql` for the page after `cursor`.
     static func body(_ lookup: RepositoryLookup, after cursor: String?) -> Data {
         struct Request: Encodable {
             var query: String
@@ -326,18 +286,12 @@ enum RepositoryListQuery {
         return (try? encoder.encode(Request(query: document(lookup), variables: variables))) ?? Data()
     }
 
-    /// One page of the answer.
     struct Page: Equatable, Sendable {
-        /// `nil` when the owner doesn't exist or the token can't see it.
         var repositories: [RepoSummary]?
-        /// The cursor of the next page; `nil` on the last.
         var nextCursor: String?
         var rateLimited = false
     }
 
-    /// Reads one page. An owner GitHub doesn't know (or hides) comes back
-    /// `null` with no error; errors with no data throw `.graphQL`; a body
-    /// that isn't GraphQL's shape throws `.malformed`.
     static func parse(_ data: Data) throws -> Page {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

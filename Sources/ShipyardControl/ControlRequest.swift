@@ -6,60 +6,20 @@ import ShipyardNotices
 /// holder. A new request is a case here, its `command` name and its fields
 /// in `ControlMessage.Wire`.
 public enum ControlRequest: Equatable, Sendable {
-    /// `shipyard app status [--json]`: the status as lines, or as one JSON
-    /// object (`AppStatus`).
     case appStatus(json: Bool)
-    /// `shipyard app open` while the app runs: its status as lines, and,
-    /// unlike `app.status`, leased, so the opener's lease is renewed.
     case appOpen
-    /// `shipyard app quit`: the app replies with the lease the quit
-    /// renewed, then quits.
     case appQuit
-    /// `shipyard panel open`: the menu bar icon's panel on screen.
     case panelOpen
-    /// `shipyard panel close`.
     case panelClose
-    /// `shipyard panel fold <project>`: the project's section collapsed.
     case panelFold(project: String)
-    /// `shipyard panel unfold <project>`.
     case panelUnfold(project: String)
-    /// `shipyard panel show-more <project> <kind>`: every row of the
-    /// project's group of that kind, past its `show-first` cap. The kind is
-    /// as the command names it (`pull-requests`); the app checks it.
     case panelShowMore(project: String, kind: String)
-    /// `shipyard panel show-tab <name>`: the tabs layout's selected tab, a
-    /// project's slug, or else its title, or `All`.
     case panelTab(name: String)
-    /// `shipyard panel show-view <name>`: a status view in place of the
-    /// projects (`github`, `notion`, `skill`, `cli`), or the projects again
-    /// (`projects`). The app checks the name.
     case panelView(name: String)
-    /// `shipyard app capture <file.png> [--appearance light|dark]
-    /// [--menu-bar-icon] [--with-indicator]`: the panel (or the menu bar
-    /// icon alone) written as a PNG at `path`, absolute since the app runs
-    /// in another folder; in `appearance` when it's set, as the Mac shows
-    /// it otherwise. The lease's dot and banner are left out of it unless
-    /// `withIndicator` keeps them.
     case screenshot(path: String, appearance: Appearance?, menuBarIcon: Bool, withIndicator: Bool)
-    /// `shipyard lease take [--wait <seconds>] [--for <purpose>]`: the
-    /// lease held until its cap. While another agent holds it, refused at
-    /// once, or with `waitSeconds` (0 to `longestWait`), answered once it's
-    /// this agent's or the wait runs out. `purpose` says why, for the
-    /// lease banner.
     case controlTake(waitSeconds: Int?, purpose: String? = nil)
-    /// `shipyard lease release`: the lease given up, when this agent
-    /// holds it.
     case controlRelease
-    /// `shipyard notice send "<title>" …`: an agent's notice, shown when the
-    /// user's rules select it for its project, answered with the app's
-    /// verdict; or `shipyard notice withdraw <id>`, the notice shown under
-    /// that id taken away. Not leased: any agent may post one while
-    /// another drives the app.
     case notify(NoticeRequest)
-    /// `shipyard notes check`: the notes workspace read the way the app
-    /// reads it, through ntn, and checked against the
-    /// layout the app expects; answered with the report, refused when it
-    /// found an error. Not leased: it reads and changes nothing.
     case notesCheck
 
     /// The appearance `screenshot` draws in.
@@ -159,7 +119,6 @@ public struct ControlMessage: Equatable, Sendable {
         wire.holder = holder
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        // Encoding a struct of strings, numbers and booleans can't fail.
         return try! encoder.encode(wire)
     }
 
@@ -180,7 +139,6 @@ public struct ControlMessage: Equatable, Sendable {
         return ControlMessage(try request(wire), holder: holder)
     }
 
-    /// The request `wire` names, with the fields its command needs.
     private static func request(_ wire: Wire) throws(ControlProtocolError) -> ControlRequest {
         switch wire.command {
         case "app.status": return .appStatus(json: wire.json ?? false)
@@ -229,9 +187,6 @@ public struct ControlMessage: Equatable, Sendable {
         }
     }
 
-    /// Every request's fields, each optional but `version` and `command`.
-    /// `holder` is optional here only so a request without one is refused
-    /// in words.
     struct Wire: Codable {
         var version = ControlRequest.version
         var command: String
@@ -246,12 +201,8 @@ public struct ControlMessage: Equatable, Sendable {
         var withIndicator: Bool?
         var waitSeconds: Int?
         var purpose: String?
-        /// `notify`'s request, as one object in its own shape
-        /// (`NoticeRequest`): the notice's, or `{"withdraw":"<id>"}`.
         var notice: NoticeRequest?
 
-        /// The field at `path`, which `command` needs: refused when the
-        /// request leaves it out.
         func field(_ path: KeyPath<Wire, String?>, _ key: String) throws(ControlProtocolError) -> String {
             guard let value = self[keyPath: path] else {
                 throw .unreadable("the control command `\(command)` needs its `\(key)`")
@@ -263,12 +214,8 @@ public struct ControlMessage: Equatable, Sendable {
 
 /// Why a control request or reply doesn't read.
 public enum ControlProtocolError: Error, Equatable, Sendable {
-    /// It isn't the JSON object it should be.
     case unreadable(String)
-    /// It speaks another version of the protocol: the `shipyard` command
-    /// and the app come from different builds.
     case otherVersion(Int)
-    /// Its version matches but its command doesn't exist.
     case unknownCommand(String)
 
     /// One line for the reply's `error`, from the app's side.

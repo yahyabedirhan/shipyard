@@ -11,7 +11,7 @@ struct CodeTextTests {
         let text = CodeText.attributed("Connect with `gh`", size: 12, weight: .medium)
         #expect(String(text.characters) == "Connect with \u{2009}gh\u{2009}")
         let runs = text.runs.map { (String(text[$0.range].characters), $0.font, $0.backgroundColor) }
-        #expect(runs.count == 4) // the words, the chip's padding, gh, the padding
+        #expect(runs.count == 4)
         #expect(runs.first { $0.0 == "gh" }?.1 == .system(size: 12, weight: .medium, design: .monospaced))
         #expect(runs.first { $0.0 == "gh" }?.2 == CodeText.chip)
         #expect(runs.first { $0.0 == "Connect with " }?.1 == .system(size: 12, weight: .medium))

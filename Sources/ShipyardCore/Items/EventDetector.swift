@@ -34,8 +34,6 @@ public struct Event: Equatable, Hashable, Sendable {
     /// title for `ping.sent`.
     public var headline: String { kind == .pingSent ? item.title : kind.headline(number: item.number) }
 
-    /// Whether the event is a remote ping's, listed in its machine's own
-    /// section (filed under no project), which bears the machine's label.
     var isInMachineSection: Bool {
         item.ping?.machine.map { $0 == project } ?? false
     }
@@ -45,26 +43,16 @@ public struct Event: Equatable, Hashable, Sendable {
 /// detector finds changes; `EventKind.of(_:for:)` names them per kind, so a
 /// new kind of item only adds names (and, for its own states, changes).
 public enum ItemChange: Equatable, Hashable, Sendable {
-    /// First listed, open (drafts included).
     case opened
-    /// Open before, merged now.
     case merged
-    /// Open before, closed (without merging) now.
     case closed
-    /// Closed before, open again.
     case reopened
-    /// Now asks for the viewer's review, and didn't before.
     case reviewRequested
-    /// Checks failed now, and hadn't before.
     case checksFailed
-    /// More comments and reviews than before.
     case commented
-    /// A workflow run failed: found failed, or failed after it wasn't (a re-run).
     case failed
-    /// A workflow run succeeded: found succeeded, or succeeded after it wasn't.
     case succeeded
 
-    /// Whether it can happen only once in an item's life.
     var happensOnce: Bool { self == .opened || self == .merged }
 }
 
@@ -85,8 +73,6 @@ extension EventKind {
         case (.issue, .commented): .issueCommented
         case (.workflowRun, .failed): .runFailed
         case (.workflowRun, .succeeded): .runSucceeded
-        // An issue reopened is no event (the spec lists none); its next
-        // close is `issue.closed` again, as a new occurrence.
         default: nil
         }
     }
@@ -107,11 +93,8 @@ extension EventKind {
         case .issueCommented: "New comment on issue #\(number)"
         case .runFailed: "Run #\(number) failed"
         case .runSucceeded: "Run #\(number) succeeded"
-        // A ping's headline is its title (`Event.headline`), not its number.
         case .pingSent: "New ping"
-        // No item has one: a notice's title is its own (`Notice.title`).
         case .agentNotice: "New notice"
-        // No item has one: a control event's title names its agent (`ControlNotice`).
         case .controlStarted: "An agent is using shipyard"
         case .controlEnded: "An agent is done with shipyard"
         }
@@ -178,8 +161,6 @@ public struct KnownItem: Codable, Equatable, Sendable {
         reviewRequested = try container.decode(Bool.self, forKey: .reviewRequested)
         activity = try container.decode(Int.self, forKey: .activity)
         fingerprint = try container.decode(String.self, forKey: .fingerprint)
-        // A file from before `present` was kept: the item is kept while
-        // it's listed, and dropped the first time it isn't, as it was then.
         present = try container.decodeIfPresent(Date.self, forKey: .present) ?? .distantPast
     }
 }
@@ -214,11 +195,7 @@ public struct KnownItems: Equatable, Sendable {
     public func updated(with snapshot: Snapshot, projects: [ProjectSettings]) -> KnownItems {
         var next = KnownItems()
         var failed = Set(snapshot.errors.keys)
-        // A failed search answered with the last one's pull requests (none
-        // after a launch): its first answer is still a first sight.
         if snapshot.reviewSearchError != nil { failed.insert(.anywhere) }
-        // The search's pull requests can be in any repository, so while a
-        // project uses it, items of repositories no project watches are kept too.
         let keepsAnyRepository = projects.contains(where: \.usesAnywhere)
         var fetched = Set<String>()
         for project in projects {
@@ -245,8 +222,6 @@ public struct KnownItems: Equatable, Sendable {
             let before = items[item.id]?.present
             let present = before.map { now.timeIntervalSince($0) < Attention.presenceResolution ? $0 : now } ?? now
             var known = KnownItem(item, present: present)
-            // The review search sees only open pull requests: a closed one
-            // keeps the request it had, so reopening it isn't a new request.
             if item.kind == .pullRequest, !item.state.isOpen, let earlier = items[item.id] {
                 known.reviewRequested = earlier.reviewRequested
             }
@@ -257,23 +232,17 @@ public struct KnownItems: Equatable, Sendable {
 }
 
 extension ProjectSettings {
-    /// The sources a refresh fetches for this project: each repository, for
-    /// each kind the project shows.
     var fetchedSources: [ItemSource] {
         repositorySlugs.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
             + (usesAnywhere ? [.anywhere] : [])
     }
 
-    /// Where the project's `item` came from: its repository, or the review
-    /// search for a pull request `anywhere` found in a repository the
-    /// project doesn't watch.
     func source(of item: Item) -> ItemSource {
         let watched = !usesAnywhere || item.kind != .pullRequest
             || repositorySlugs.contains { $0.caseInsensitiveCompare(item.repository) == .orderedSame }
         return watched ? ItemSource(repository: item.repository, kind: item.kind) : .anywhere
     }
 
-    /// The kinds this project shows, in the menu's order.
     var fetchedKinds: [ItemKind] {
         [ItemKind.pullRequest, .issue, .workflowRun].filter { shows($0) }
     }
@@ -295,8 +264,6 @@ public enum EventDetector {
                 guard known.knows(source, in: project.slug) else { return [] }
                 let before = known.items[item.id]
                 var found = changes(from: before, to: item)
-                // A pull request the search finds for the first time is a
-                // review request that just arrived, as well as a new item.
                 if source == .anywhere, before == nil, item.state.isOpen, item.reviewRequestedFromViewer {
                     found.append(.reviewRequested)
                 }
@@ -326,11 +293,6 @@ public enum EventDetector {
         }
     }
 
-    /// What changed from `before` (`nil` when the item wasn't known) to `item`.
-    /// An item first found already closed makes nothing: it may be an old
-    /// one coming back into the closed list. A workflow run is different: one
-    /// first found finished ran between two refreshes (the runs asked for are
-    /// only recent ones), so it failed or succeeded now.
     static func changes(from before: KnownItem?, to item: Item) -> [ItemChange] {
         if item.kind == .workflowRun {
             if item.state == .failed, before?.state != .failed { return [.failed] }

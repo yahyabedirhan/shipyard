@@ -7,19 +7,13 @@ import ShipyardConfig
 /// handover) and hands it to `Shipyard.notify(_:)`. Core doesn't link app
 /// control, so it's told only the agent's name, its place and why it ended.
 public enum ControlNotice: Equatable, Sendable {
-    /// `agent` (`Claude Code`) in `place` (a folder, or `Herdr pane <id>`)
-    /// took the lease.
     case started(agent: String, place: String)
-    /// `agent`'s lease ended, for `reason`.
     case ended(agent: String, reason: Reason)
 
     /// Why a lease ended, as the user reads it.
     public enum Reason: Equatable, Sendable {
-        /// The agent released it.
         case released
-        /// It ran out: no command for a while, or its longest term reached.
         case ranOut
-        /// The user stopped it from the panel's banner.
         case stopped
 
         /// The notification's body: "released", "its lease ran out", "you stopped it".

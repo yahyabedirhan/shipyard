@@ -27,7 +27,6 @@ public enum ControlCommands {
         }
         return [
             CommandTable.Entry(name: "app", section: .app, commands: appCommands) { arguments, environment, _ in
-                // `capture` reads its own options, a path among them.
                 if arguments.first == "capture" {
                     switch ScreenshotCommand.parse(Array(arguments.dropFirst()), workingDirectory: environment.workingDirectory) {
                     case .success(let request): return ControlCommand.run(.send(request), context: context(environment))
@@ -49,8 +48,6 @@ public enum ControlCommands {
                 switch LeaseCommand.parse(arguments) {
                 case .success(let invocation):
                     var context = context(environment)
-                    // `--key` names the holder for this command only, over
-                    // `SHIPYARD_CONTROL_KEY`.
                     if let key = invocation.key { context.client.holder.key = key }
                     return ControlCommand.run(.send(invocation.request), context: context)
                 case .failure(let result):

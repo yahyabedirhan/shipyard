@@ -3,8 +3,6 @@ import ShipyardConfig
 @testable import ShipyardCore
 import Testing
 
-/// `config.toml`'s `[notices]`: whether the app listens for notices from
-/// the user's other machines, and on which port of 127.0.0.1.
 @Suite("Configuration: notices from other machines")
 struct ConfigurationNoticesTests {
     @Test("off by default, on the default port; listen and port are read")

@@ -5,12 +5,7 @@ import ShipyardNotices
 import ShipyardPings
 import Testing
 
-/// A notice's options through `shipyard notice send` on the Mac: every flag
-/// lands in the one JSON shape every route carries, `withdraw` goes over
-/// the same route, and misuse exits 2. What the app makes of each option
-/// is `NoticeOptionsTests`'.
 extension NotifyCommandTests {
-    /// A folder of its own holding a PNG of `size` bytes named `chart.png`.
     static func folderWithImage(size: Int = 4) throws -> URL {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("notify-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -135,8 +130,6 @@ extension NotifyCommandTests {
         #expect(result == CommandResult(error: "shipyard notice send: \(line)\n", status: 2))
         #expect(app.requests.isEmpty)
     }
-
-    // MARK: Withdraw
 
     @Test("withdraw <id> asks the app over the same route to take the notice away, and prints `withdrawn`")
     func withdraw() throws {

@@ -5,14 +5,9 @@ import ShipyardCore
 import SwiftUI
 import Testing
 
-/// The screenshot's fallback, drawn in this process in an invisible
-/// window off screen: a view rendered in the appearance asked for, the menu bar
-/// icon as the menu bar tints it, and the PNG written where asked.
 @Suite("Screenshot rendering")
 @MainActor
 struct ScreenshotImageTests {
-    /// The mean brightness (0 to 1) of the image's opaque pixels, and how
-    /// many there are.
     func opaque(_ image: CGImage) throws -> (brightness: Double, count: Int) {
         let width = image.width, height = image.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -31,7 +26,6 @@ struct ScreenshotImageTests {
 
     @Test("a panel renders in the appearance asked for, on an opaque window background: never light text on transparency")
     func appearance() async throws {
-        // A text-coloured swatch on nothing, as the panel's rows sit on the window's material.
         let swatch = AnyView(Color(nsColor: .textColor).frame(width: 20, height: 20).padding(10))
 
         let light = try #require(await ScreenshotImage.render(swatch, appearance: ScreenshotImage.appearance(.light), opaque: true))
@@ -47,7 +41,6 @@ struct ScreenshotImageTests {
         #expect(try brightness(dark, atX: 1) < 0.3)
     }
 
-    /// The brightness (0 to 1) of the pixel at `x` on the image's middle row.
     func brightness(_ image: CGImage, atX x: Int) throws -> Double {
         var pixel = [UInt8](repeating: 0, count: 4)
         let context = try #require(CGContext(
@@ -70,12 +63,10 @@ struct ScreenshotImageTests {
         #expect(try opaque(dark).brightness > 0.7)
     }
 
-    /// Whether the lease's indicator was hidden each time a fresh panel was drawn.
     final class DrawnPanels {
         var hidden: [Bool] = []
     }
 
-    /// How many of the image's pixels are the lease dot's yellow.
     func yellow(_ image: CGImage) throws -> Int {
         let width = image.width, height = image.height
         var pixels = [UInt8](repeating: 0, count: width * height * 4)
@@ -108,7 +99,6 @@ struct ScreenshotImageTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         // The screenshotter sets the app's appearance, so the app object has to exist.
         _ = NSApplication.shared
-        // The panel is closed, so the screenshot renders a fresh one rather than opening it.
         let panel = ControlServerTests.FakePanel()
         panel.isOpen = false
         let indicator = LeaseIndicator()
@@ -146,7 +136,6 @@ struct ScreenshotImageTests {
             return AnyView(Color.gray.frame(width: 20, height: 20))
         }
 
-        // Both are under way at once: each waits while its fallback settles.
         async let first = screenshotter.capturePanel(to: folder.appendingPathComponent("first.png"), appearance: .light, withIndicator: false)
         async let second = screenshotter.capturePanel(to: folder.appendingPathComponent("second.png"), appearance: .light, withIndicator: false)
         let outcomes = await [first, second]

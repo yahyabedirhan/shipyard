@@ -50,11 +50,7 @@ public struct PingList: Equatable, Sendable {
 
     /// Why a list doesn't read.
     public enum DecodeError: Error, Equatable, Sendable {
-        /// The list is another contract version, from the shipyard version
-        /// named (when it says): shipyard on that machine (or on the Mac, for
-        /// a newer one) needs updating.
         case unsupportedVersion(Int, shipyardVersion: String?)
-        /// Not a ping list: not JSON, or a field missing or of the wrong type.
         case unreadable(String)
 
         /// What to tell the user about `machine` (its Herdr label).
@@ -85,9 +81,6 @@ public struct PingList: Equatable, Sendable {
                 ping.herdrSession = nil
                 return ping
             }
-        // What the envelope costs with no pings (`false`, the longer of the
-        // two), plus each ping and a comma: the document's size or a byte
-        // over it, since the encoding is compact.
         let envelope = document(PingList(shipyardVersion: shipyardVersion, pings: [], truncated: false)).utf8.count
         var size = envelope
         var count = 0
@@ -99,8 +92,6 @@ public struct PingList: Equatable, Sendable {
         }
         var list = PingList(shipyardVersion: shipyardVersion, pings: Array(sorted.prefix(count)), truncated: count < sorted.count)
         var text = document(list)
-        // A safeguard: the size above is never short, but the document must never
-        // exceed the budget, whatever the encoder does.
         while text.utf8.count > byteBudget, !list.pings.isEmpty {
             list.pings.removeLast()
             list.truncated = true
@@ -120,7 +111,6 @@ public struct PingList: Equatable, Sendable {
     public static func decode(_ data: Data) throws(DecodeError) -> PingList {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        // The version first: another version's shape may not read at all.
         let header: Header
         do {
             header = try decoder.decode(Header.self, from: data)
@@ -143,8 +133,6 @@ public struct PingList: Equatable, Sendable {
         }
     }
 
-    // MARK: - Encoding
-
     private enum CodingKeys: String, CodingKey {
         case version, shipyardVersion, pings, truncated
     }
@@ -160,8 +148,6 @@ public struct PingList: Equatable, Sendable {
         var truncated: Bool
     }
 
-    /// A listed ping, read with only the fields it's sent with, and an
-    /// action of an unknown kind read as none.
     private struct ListedPing: Decodable {
         var ping: Ping
 
@@ -204,7 +190,6 @@ public struct PingList: Equatable, Sendable {
         }
     }
 
-    /// Strings, dates and URLs always encode, so neither of these fails.
     private static func document(_ list: PingList) -> String {
         String(decoding: try! encoder.encode(Envelope(list: list)), as: UTF8.self)
     }
