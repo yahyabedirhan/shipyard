@@ -259,25 +259,31 @@ public enum ControlCommand {
         answeringAt client: ControlClient,
         _ context: Context
     ) -> CommandResult {
-        let status = ControlRequest.appStatus(json: false)
         let environment = handover.map { environment.merging(ControlLease.handover($0)) { _, lease in lease } } ?? environment
         do throws(AppLaunchFailure) {
             try context.launcher.launch(bundleID: ShipyardBundle.identifier, environment: environment)
         } catch {
             return .failed("shipyard app open: \(error.reason)")
         }
+        guard let answer = statusOfStartingApp(client, context) else {
+            return .failed("shipyard didn't answer within \(Int(wait)) seconds of launching")
+        }
+        return result(of: answer)
+    }
+
+    private static func statusOfStartingApp(_ client: ControlClient, _ context: Context) -> Result<ControlReply, ControlClient.Failure>? {
         var look = client
         look.timeout = lookTimeout
         for _ in 0..<looks {
             context.pause(interval)
-            switch look.send(status) {
+            switch look.send(.appStatus(json: false)) {
             case .failure(.notRunning), .failure(.timedOut):
                 continue
             case let answer:
-                return result(of: answer)
+                return answer
             }
         }
-        return .failed("shipyard didn't answer within \(Int(wait)) seconds of launching")
+        return nil
     }
 
     private static func quit(_ client: ControlClient, _ context: Context) -> Result<ControlReply, CommandResult> {
