@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Watches the configuration file's directory and calls `onChange` (on the
 /// main actor) once changes have settled for 200 ms. The ping store is
@@ -20,11 +21,22 @@ final class ConfigurationWatcher {
         case folder(@MainActor () -> URL)
     }
 
+    private struct Handles: @unchecked Sendable {
+        var directory: (any DispatchSourceFileSystemObject)?
+        var file: (any DispatchSourceFileSystemObject)?
+
+        mutating func cancel() {
+            directory?.cancel()
+            file?.cancel()
+            directory = nil
+            file = nil
+        }
+    }
+
     private let target: Target
     private let debounce: TimeInterval
     private let onChange: @MainActor () -> Void
-    nonisolated(unsafe) private var directorySource: (any DispatchSourceFileSystemObject)?
-    nonisolated(unsafe) private var fileSource: (any DispatchSourceFileSystemObject)?
+    nonisolated private let handles = OSAllocatedUnfairLock(initialState: Handles())
     private var pending: DispatchWorkItem?
 
     init(file: URL, debounce: TimeInterval = 0.2, onChange: @escaping @MainActor () -> Void) {
@@ -40,8 +52,7 @@ final class ConfigurationWatcher {
     }
 
     deinit {
-        directorySource?.cancel()
-        fileSource?.cancel()
+        handles.withLock { $0.cancel() }
     }
 
     func start() {
@@ -49,15 +60,20 @@ final class ConfigurationWatcher {
     }
 
     private func watch() {
-        directorySource?.cancel()
-        fileSource?.cancel()
+        let directory: (any DispatchSourceFileSystemObject)?
+        let file: (any DispatchSourceFileSystemObject)?
         switch target {
-        case .file(let file):
-            directorySource = source(at: Self.nearestExisting(file.deletingLastPathComponent()), events: [.write, .delete, .rename])
-            fileSource = source(at: file, events: [.write, .extend, .delete, .rename, .attrib])
+        case .file(let fileURL):
+            directory = source(at: Self.nearestExisting(fileURL.deletingLastPathComponent()), events: [.write, .delete, .rename])
+            file = source(at: fileURL, events: [.write, .extend, .delete, .rename, .attrib])
         case .folder(let folder):
-            directorySource = source(at: folder(), events: [.write, .delete, .rename])
-            fileSource = nil
+            directory = source(at: folder(), events: [.write, .delete, .rename])
+            file = nil
+        }
+        handles.withLock { state in
+            state.cancel()
+            state.directory = directory
+            state.file = file
         }
     }
 
