@@ -16,9 +16,6 @@ public struct ProjectFiling: PingFiling {
     private let configuration: @Sendable () -> Result<Configuration, CommandResult>
     private let resolved: @Sendable () -> [String: [String]]
 
-    /// Files against `configuration` and `resolved` (each project's
-    /// repositories as the app last resolved them, by name), each read when
-    /// a ping is filed.
     private init(
         configuration: @escaping @Sendable () -> Result<Configuration, CommandResult>,
         resolved: @escaping @Sendable () -> [String: [String]]
@@ -65,12 +62,6 @@ public struct ProjectFiling: PingFiling {
         return .success(Filing(projects: [], repository: slug))
     }
 
-    /// `filing`, unless every project it's under hides pings
-    /// (`pings.show = false`) and a ping no project takes is refused: the
-    /// agent would believe a ping the user never sees reached them, so it's
-    /// refused, naming those projects and the ones that show pings. A ping
-    /// that's kept unfiled instead (`herdr-event`'s) is filed as it is,
-    /// hidden as the configuration asks, since a refusal would reach no one.
     private func shown(_ filing: Filing, configuration: Configuration, whenNoProject: NoProject) -> Result<Filing, CommandResult> {
         guard whenNoProject == .refuse else { return .success(filing) }
         let showing = configuration.projects.filter { configuration.settings(for: $0).pings.show }.map(\.slug)
@@ -140,9 +131,6 @@ public struct ProjectFiling: PingFiling {
             : "the projects are " + names.map { "`\($0)`" }.joined(separator: ", ")
     }
 
-    /// The configuration file as the app reads it, or why it can't be used:
-    /// the app falls back on the last file that read, but the CLI has none,
-    /// so it says what to fix. A missing file is no projects.
     static func readConfiguration(at url: URL) -> Result<Configuration, CommandResult> {
         guard let data = try? Data(contentsOf: url) else { return .success(Configuration()) }
         do {

@@ -8,15 +8,8 @@ extension PanelText {
     public struct Connect: Equatable, Sendable {
         /// Which way in the screen puts first.
         public enum Lead: Equatable, Sendable {
-            /// Sign in with GitHub, prominent; under it the `gh` way,
-            /// folded in a disclosure.
             case signIn
-            /// The `gh auth login` box with Connect with gh beside it,
-            /// prominent; Sign in with GitHub under it.
             case ghCommand
-            /// Connect with gh, prominent, under the message (`gh` is
-            /// signed in already); then, after a divider, `alternative` and
-            /// Sign in with GitHub.
             case connectWithGh
         }
 

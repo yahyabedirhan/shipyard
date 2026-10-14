@@ -3,25 +3,9 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-/// `[menu] layout = "list"`: every project in one scrolling list, one line
-/// per item in columns (number, title, author or repository, age), under
-/// project headers that stay pinned while their rows scroll by. A header
-/// collapses its project, shows a count chip per kind and, on hover, Mark
-/// all seen.
-///
-/// The keys: ↑ and ↓ step through headers, subheaders and items, wrapping
-/// at the ends; ← goes from an item to its subheader (or header) and folds
-/// an open subheader or collapses an expanded header; → expands or unfolds
-/// and goes from an open one to what's first under it; Return opens the
-/// highlighted item (⌥Return marks it seen) or the header's repository, and
-/// folds or unfolds a subheader. Every row is a direct child of the
-/// lazy stack, with its place as its id, so the keys can scroll to a row
-/// that isn't laid out yet.
 struct ListLayout: View {
     let model: MenuModel
     let actions: LayoutActions
-    /// The row or header under the pointer or chosen with the keys; one
-    /// highlight glides between rows, and a header draws its own.
     @State private var highlight = RowHighlight()
 
     var body: some View {
@@ -65,8 +49,6 @@ struct ListLayout: View {
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
     }
 
-    /// After ← or →: collapses or expands the project, or folds or unfolds
-    /// the subsection, it asks for, not animated (see `lineTransition`).
     private func fold(_ change: MenuFold?) -> RowKeyMove {
         switch change {
         case nil:
@@ -83,9 +65,6 @@ struct ListLayout: View {
         return .moved
     }
 
-    /// Return: opens the item (⌥Return: marks it seen) or the header's
-    /// repository, folds or unfolds a subsection, or toggles Show more.
-    /// ⌥Return on a header, a subheader or a Show more row does nothing.
     private func activate(_ place: MenuRowPlace, markSeenOnly: Bool) -> Bool {
         switch model.listTarget(at: place) {
         case .group(let group):
@@ -110,17 +89,12 @@ struct ListLayout: View {
         }
     }
 
-    /// ⌫: removes the highlighted row when it's a ping's.
     private func dismiss(_ place: MenuRowPlace) -> Bool {
         guard case .item(let row) = model.listTarget(at: place), row.item.ping != nil else { return false }
         withAnimation(Motion.seen) { actions.dismiss(row) }
         return true
     }
 
-    /// An expanded project's lines, each its own child of the lazy stack:
-    /// placeholders while it loads, its error rows, then its groups' rows,
-    /// each group under its subheader or after a line, and a capped group's
-    /// Show more row after its rows.
     @ViewBuilder
     private func lines(_ section: MenuSection) -> some View {
         let hasContent = !section.isLoaded || !section.rows.isEmpty || !section.errors.isEmpty
@@ -169,21 +143,12 @@ struct ListLayout: View {
         }
     }
 
-    /// A project's lines coming in as it expands and going as it collapses,
-    /// and any line a refresh adds or drops. A fold isn't animated, so the
-    /// lazy stack puts the headers and rows below straight in their new
-    /// places, even past the window, where an animated one holds a header
-    /// over the new rows until its spring ends. The lines carry their own
-    /// animation instead: they fade in where they land, and go at once,
-    /// since the headers below have already moved up over them.
     private static let lineTransition = AnyTransition.asymmetric(
         insertion: .opacity.combined(with: .offset(y: -6)).animation(Motion.collapse),
         removal: .identity
     )
 }
 
-/// A project's header that reads whether it's highlighted in its own body,
-/// so a hover elsewhere in the list doesn't run the layout's body again.
 private struct HighlightedSectionHeader: View {
     let section: MenuSection
     let place: MenuRowPlace
@@ -195,17 +160,6 @@ private struct HighlightedSectionHeader: View {
     }
 }
 
-/// The chevron and the project's title, then right beside the title the
-/// open-in-browser icon, shown on hover while the project has a
-/// repository; then, right-aligned, Mark all seen's check, shown on hover
-/// while anything needs attention; then a count chip per kind the project
-/// has rows of (`MenuSection.headerCounts`), each as wide as its content
-/// and, for a kind with a page on GitHub, a button that opens it (in a
-/// project of several repositories, a menu of each one's page and count),
-/// or what the project says in their place ("Nothing open"); and last the new-note icon, when the project has
-/// one. Nothing keeps a fixed slot. Highlighted by the pointer or the
-/// keys, it draws the highlight over its own background, since it pins
-/// above the rows: a square band the header's full width.
 private struct ListSectionHeader: View {
     let section: MenuSection
     let isHighlighted: Bool
@@ -313,10 +267,6 @@ private struct ListSectionHeader: View {
     }
 }
 
-/// A project header's Mark all seen: a checkmark alone at the chips' icon
-/// size and weight, secondary gray from `IconButtonStyle` (primary on
-/// hover), its name in the hover help and for VoiceOver, in the style's
-/// button frame. `action` brings its own animation.
 private struct MarkAllSeenIcon: View {
     let action: () -> Void
 
@@ -331,10 +281,6 @@ private struct MarkAllSeenIcon: View {
     }
 }
 
-/// A project header's open-in-browser icon: opens the project's first
-/// repository on GitHub, as Return on the header does, in the compact
-/// button the check and a ping row's ✕ use. Its hover help and VoiceOver
-/// label name the repository.
 private struct OpenRepositoryIcon: View {
     let repository: String
     let action: () -> Void
@@ -350,11 +296,6 @@ private struct OpenRepositoryIcon: View {
     }
 }
 
-/// One kind's count in a project's header: its icon and number, in the
-/// accent while any of its rows needs attention (expanded or collapsed
-/// alike), else secondary gray, with no background in either state, so the
-/// color alone marks it. As wide as its content: the model gives no chip
-/// at 0.
 private struct HeaderCountChip: View {
     let chip: HeaderCount
 
@@ -377,11 +318,6 @@ private struct HeaderCountChip: View {
     }
 }
 
-/// A count chip's menu in a project of several repositories: under a
-/// heading naming the page ("Open pull requests on GitHub"), one item per
-/// repository, named without its owner, with its count as the item's
-/// badge (none at 0). Native, at the pointer, so it reads like any menu;
-/// choosing an item opens that repository's page.
 @MainActor
 private enum PageLinkMenu {
     static func show(_ links: [PageLink], kind: ItemKind, open: @escaping (PageLink) -> Void) {
@@ -398,7 +334,6 @@ private enum PageLinkMenu {
     }
 }
 
-/// A menu item that runs a closure when chosen.
 private final class ActionMenuItem: NSMenuItem {
     private let run: () -> Void
 
@@ -414,8 +349,6 @@ private final class ActionMenuItem: NSMenuItem {
     @objc private func choose() { run() }
 }
 
-/// A count chip that opens its kind's page: the chip on a faint capsule
-/// while hovered, darker while pressed.
 private struct ChipButtonStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         ChipButtonBody(configuration: configuration)
@@ -437,17 +370,9 @@ private struct ChipButtonBody: View {
     }
 }
 
-/// One item on one line: the attention dot, the state icon (with a pull
-/// request's check dot on it), the number, the title (bold when it needs
-/// attention; a run's is its workflow's name, followed by its branch as a
-/// chip), the author or, in a multi-repository project, the repository,
-/// and the age. What a click does, its hover help and its highlight come
-/// from `itemRow(…)`.
 private struct ListRow: View {
     let row: MenuRow
     let showsRepository: Bool
-    /// The longest number in the row's group, which the number column
-    /// keeps room for.
     let widestNumber: String
     @Environment(\.panelNow) private var now
 
@@ -516,12 +441,6 @@ private struct ListRow: View {
             .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
     }
 
-    /// The author, or in a project of several repositories, the repository
-    /// (without its owner); a run names no author. A ping names its sender,
-    /// or why its action failed, while it has (the hover card has it whole);
-    /// one filed with `--project` has no repository, so it names its
-    /// sender there too. A remote ping names its machine first, wherever
-    /// it's listed. A note names its labels.
     private var meta: String? {
         if let error = row.actionError { return error }
         if row.machine != nil { return PanelText.pingMeta(row) }
@@ -539,21 +458,16 @@ private struct ListRow: View {
         return row.authorKind == .bot ? "cpu" : nil
     }
 
-    /// A known agent's logo before its name, when the column names the
-    /// sender.
     private var metaAgent: KnownAgent? {
         guard row.actionError == nil, !showsRowRepository else { return nil }
         return row.agent
     }
 
-    /// Whether the meta column names this row's repository: in a project of
-    /// several, when the row has one (a ping may not).
     private var showsRowRepository: Bool {
         showsRepository && !row.repository.isEmpty
     }
 }
 
-/// A run's branch, after its workflow's name.
 private struct BranchChip: View {
     let branch: String
 
@@ -572,7 +486,6 @@ private struct BranchChip: View {
     }
 }
 
-/// A placeholder row, pulsing, while a project isn't loaded yet.
 private struct SkeletonRow: View {
     let width: CGFloat
     @State private var pulse = false

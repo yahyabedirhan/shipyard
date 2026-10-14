@@ -1,23 +1,11 @@
 import ShipyardCore
 import SwiftUI
 
-/// A part's status view (`SetupPart`), in place of the panel's content
-/// while `PanelState.openView` names it: the ‹ Back row, then the page
-/// `PanelText` gives for the part, in the signed-out onboarding view's
-/// shape (`ConnectView`): the part's badge (`SetupBadge`) and the title, the lead line, the
-/// status line with its tone's icon, what to do, what a command printed,
-/// each command in a box with a copy button, the full-width button, and
-/// each alternative under its own divider. One view draws every part; each part's
-/// page and the actions its buttons run are picked here. The GitHub view,
-/// signed out, shows the signed-out onboarding view (`ConnectView`) under
-/// ‹ Back instead.
 struct StatusView: View {
     let part: SetupPart
     let actions: AppServices
-    /// ‹ Back: the projects again.
     let back: () -> Void
 
-    /// The height of the page's full-width buttons, as onboarding's.
     private static let actionHeight: CGFloat = 28
 
     var body: some View {
@@ -39,8 +27,6 @@ struct StatusView: View {
         .onChange(of: part, initial: true) { lookAgain() }
     }
 
-    /// The part's words, as its state is now; nil for GitHub while signed
-    /// out, which shows `ConnectView` instead.
     private var page: PanelText.StatusPage? {
         switch part {
         case .cli:
@@ -142,7 +128,6 @@ struct StatusView: View {
         }
     }
 
-    /// A full-width button; Cancel has the running install's spinner beside it.
     private func button(_ button: PanelText.StatusPage.Button, prominent: Bool) -> some View {
         HStack(spacing: 8) {
             if button.action == .cancelSkillInstall {
@@ -155,7 +140,6 @@ struct StatusView: View {
         }
     }
 
-    /// A line of the page's words, which may hold code spans.
     private func line(_ text: String) -> some View {
         Text(markdown: text, size: 12)
             .foregroundStyle(.secondary)

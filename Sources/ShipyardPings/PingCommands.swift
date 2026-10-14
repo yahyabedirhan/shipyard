@@ -21,7 +21,6 @@ public enum PingCommands {
         ]
     }
 
-    /// `shipyard ping …`: its help, `send`, `withdraw` or `list`.
     private static func ping(
         _ arguments: [String],
         environment: CommandEnvironment,

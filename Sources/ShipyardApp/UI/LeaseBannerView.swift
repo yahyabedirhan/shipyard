@@ -2,18 +2,9 @@ import ShipyardControl
 import ShipyardCore
 import SwiftUI
 
-/// The banner topping the panel while an agent holds the lease, in two
-/// lines: the agent's logo, the headline (why it took shipyard, or
-/// "Claude Code uses shipyard") over a smaller line with its step and how
-/// many wait, then the time left and Stop, centred, in
-/// `LeaseBanner`'s words. Where it runs is the tooltip. Stop takes shipyard
-/// back, and is the banner's only way into the lease.
 struct LeaseBannerView: View {
     let lease: AppStatus.Lease
-    /// Takes shipyard back from the holder (`ControlServer.stopLease`).
     let stop: () -> Void
-    /// The ✕ after Stop, which hides the banner for an hour
-    /// (`Shipyard.dismissBanner`); the menu bar icon's dot stays.
     var dismiss: (() -> Void)?
 
     var body: some View {
@@ -63,8 +54,6 @@ struct LeaseBannerView: View {
     }
 }
 
-/// The holder's mark in the banner: a known agent's logo, as a ping's row
-/// shows it, or a generic terminal for an agent shipyard doesn't know.
 private struct LeaseAgentMark: View {
     let agent: KnownAgent?
 

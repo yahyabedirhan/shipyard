@@ -1,15 +1,6 @@
 import Foundation
 
-/// Setting `[menu] layout` in the text of `config.toml` for the header's
-/// layout button: one line changes (or a `[menu]` table is added), and
-/// every other line and comment stays as it was.
 extension Configuration {
-    /// `text` with `[menu] layout` set to `layout`.
-    ///
-    /// Throws the file's own `ConfigurationError` when `text` doesn't read, and a
-    /// `ConfigurationError` saying so when the edit wouldn't read back as the same
-    /// configuration with only the layout changed (a `[menu]` written in a
-    /// form this doesn't edit, such as an inline table).
     static func settingLayout(_ layout: MenuLayout, in text: String) throws(ConfigurationError) -> String {
         let current = try decode(text).configuration
         let map = TOMLSourceMap(text)
@@ -41,12 +32,6 @@ extension Configuration {
         return edited
     }
 
-    /// `lines` with a commented-out `# [menu]` (the new-file header's
-    /// example) uncommented and its `# layout = …` line, when the comment
-    /// block under it has one, uncommented with `value`; otherwise `layout`
-    /// goes under the header. `nil` when there's no such comment, or when
-    /// live settings follow it before the next table, which uncommenting
-    /// would move into `[menu]`.
     private static func uncommentingMenuExample(in lines: [String], map: TOMLSourceMap, value: String) -> [String]? {
         let starts = lines.indices.filter { lines[$0].wholeMatch(of: /[ \t]*#[ \t]*\[[ \t]*menu[ \t]*\][ \t]*(#.*)?\r?/) != nil }
         for start in starts {
@@ -69,9 +54,6 @@ extension Configuration {
         return nil
     }
 
-    /// `lines` with a `[menu]` table added before the first table (above the
-    /// comments right over it), or at the end when there's no table: top-
-    /// level keys stay above every table, so none moves into `[menu]`.
     private static func addingMenuTable(to lines: [String], map: TOMLSourceMap, value: String) -> [String] {
         let table = ["[menu]", "layout = \(value)"]
         var out = lines
@@ -97,13 +79,10 @@ extension Configuration {
         line.firstMatch(of: /^[ \t]*#[ \t]*\[/) != nil
     }
 
-    /// `line` without its leading `#` and the space after it.
     private static func uncommented(_ line: String) -> String {
         line.replacing(/^([ \t]*)#[ \t]?/, with: { $0.output.1 })
     }
 
-    /// `line` (`key = "value"  # comment`) with its string value replaced;
-    /// `nil` when the value isn't a one-line string.
     private static func replacingValue(of line: String, with value: String) -> String? {
         guard let match = line.firstMatch(of: /^([^=]*=[ \t]*)("(?:[^"\\]|\\.)*"|'[^']*')(.*)$/) else { return nil }
         return match.output.1 + value + match.output.3

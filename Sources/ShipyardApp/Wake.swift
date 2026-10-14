@@ -1,7 +1,5 @@
 import AppKit
 
-/// Calls `onWake` a few seconds after the Mac wakes from sleep, once the
-/// network has had a moment to come back.
 @MainActor
 final class WakeObserver {
     nonisolated(unsafe) private var observer: (any NSObjectProtocol)?

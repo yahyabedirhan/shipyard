@@ -19,9 +19,7 @@ public actor AvatarCache {
 
     private let directory: URL
     private let transport: any HTTPTransport
-    /// What was last read or downloaded, so the panel opening again reads nothing.
     private var memory: (url: URL, data: Data)?
-    /// The download under way, so asks made meanwhile share it.
     private var loading: (url: URL, task: Task<Data?, Never>)?
 
     public init(directory: URL, transport: any HTTPTransport) {
@@ -70,8 +68,6 @@ public actor AvatarCache {
         return data
     }
 
-    /// Writes the image, then the URL it came from, so a crash between the
-    /// two leaves a URL that doesn't match and the next ask downloads again.
     private func store(_ data: Data, for url: URL) {
         let manager = FileManager.default
         try? manager.removeItem(at: urlFile)

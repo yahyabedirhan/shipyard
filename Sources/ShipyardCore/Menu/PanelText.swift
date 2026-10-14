@@ -85,10 +85,6 @@ public enum PanelText {
         return (row.number > 0 ? ["#\(row.number)"] : []) + repository + subject
     }
 
-    /// A ping's second line after its number: why its action failed,
-    /// while it has; otherwise the machine a remote ping came from, its
-    /// sender and its body on one line, each when given, or "ping" when
-    /// none is: "#3 · netcup-vps · claude-code · Waiting for your input".
     private static func pingDetail(_ row: MenuRow) -> [String] {
         if let failure = row.actionError { return [failure] }
         let body = row.item.ping?.body.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
@@ -189,8 +185,6 @@ public enum PanelText {
         return "\(state(row.state)) \(kindNoun(row.kind))"
     }
 
-    /// A kind as a noun for VoiceOver: "pull request", or "pull requests"
-    /// when `plural`.
     static func kindNoun(_ kind: ItemKind, plural: Bool = false) -> String {
         let noun = switch kind {
         case .pullRequest: "pull request"
@@ -274,8 +268,6 @@ public enum PanelText {
         return "Last updated \(count) \(unit) ago"
     }
 
-    /// `seconds` in whole minutes, hours or days (the largest that fits);
-    /// `nil` under a minute, or when it's negative (a clock that went back).
     private static func span(_ seconds: TimeInterval) -> (count: Int, unit: String)? {
         switch seconds {
         case ..<60: nil
@@ -377,7 +369,6 @@ public enum PanelText {
         }
     }
 
-    /// An interval in whole minutes, rounded up: "4 min", "1 h", "1 h 30 min".
     static func interval(_ seconds: TimeInterval) -> String {
         let minutes = max(1, Int((seconds / 60).rounded(.up)))
         let (hours, rest) = minutes.quotientAndRemainder(dividingBy: 60)
@@ -388,7 +379,6 @@ public enum PanelText {
         }
     }
 
-    /// A time of day the way the user's clock shows it, e.g. "16:42".
     static func clockTime(_ date: Date, locale: Locale, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale

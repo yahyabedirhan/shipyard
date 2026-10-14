@@ -6,11 +6,8 @@ extension PanelText {
     /// does, and whether it shows the set-up mark on its right.
     public struct SettingsItem: Equatable, Sendable {
         public enum Action: Equatable, Sendable {
-            /// Opens `config.toml`.
             case openConfiguration
-            /// Opens the part's status view.
             case open(SetupPart)
-            /// Signs out of GitHub.
             case signOut
         }
 
@@ -50,19 +47,12 @@ extension PanelText {
 
         /// What a button does; the view runs it.
         public enum Action: Equatable, Sendable {
-            /// Links the CLI (`CLILink.makeLink`), or looks again at what's in the way.
             case linkCLI
-            /// Installs or updates the agent skill (`SkillInstallation.start`).
             case installSkill
-            /// Stops the running skill install (`SkillInstallation.cancel`).
             case cancelSkillInstall
-            /// Looks at ntn again (`Shipyard.checkNotion()`): Check again.
             case checkNotion
-            /// Connects Notion, reads the notes and shows the projects (`Shipyard.connectNotion()`).
             case connectNotion
-            /// Disconnects Notion (`Shipyard.disconnectNotion()`).
             case disconnectNotion
-            /// Signs out of GitHub (`Shipyard.signOut()`), as the settings menu's Sign out does.
             case signOut
         }
 

@@ -1,14 +1,8 @@
 import ShipyardCore
 import SwiftUI
 
-/// A subsection's subheader: a chevron, the group's title in small capitals
-/// (a repository or a login as written) and how many rows it holds, folded
-/// or not. A click folds or unfolds it, as ← and → do when the keys
-/// highlight it; it's a place the highlight rests on, like a row. Shared by
-/// both layouts; in a tab it's the kind header the tabs always had.
 struct GroupHeader: View {
     let group: RowGroup
-    /// Where it sits, for the highlight and the keys.
     let place: MenuRowPlace
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
@@ -50,14 +44,8 @@ struct GroupHeader: View {
     }
 }
 
-/// A capped group's last row: "Show 2 more", which shows the rest of the
-/// group, then "Show less", which caps it again. A click toggles it, as
-/// Return does when the keys highlight it; it's a place the highlight
-/// rests on, like a row. Shared by both layouts, under subheaders or
-/// dividers alike.
 struct ShowMoreRow: View {
     let group: RowGroup
-    /// Where it sits, for the highlight and the keys.
     let place: MenuRowPlace
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
@@ -83,8 +71,6 @@ struct ShowMoreRow: View {
     }
 }
 
-/// The line between two groups drawn without subheaders, indented to the
-/// rows' titles.
 struct GroupDivider: View {
     var body: some View {
         Hairline()

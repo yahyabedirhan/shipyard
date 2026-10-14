@@ -59,7 +59,6 @@ public struct AppFiles: Equatable, Sendable {
         demo == nil ? transport : nil
     }
 
-    /// A login item a demo run leaves as the user set it.
     private struct LeftAlone: LoginItem {
         func setEnabled(_ enabled: Bool) {}
     }

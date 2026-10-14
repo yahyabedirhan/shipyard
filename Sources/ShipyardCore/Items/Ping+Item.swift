@@ -50,14 +50,12 @@ extension Ping {
         return (path[0], path[1])
     }
 
-    /// A ping URL's path, decoded: `[id]` or `[machine, id]`.
     private static func segments(of url: URL) -> [String]? {
         guard url.scheme == "shipyard", url.host == "ping" else { return nil }
         let path = url.pathComponents.filter { $0 != "/" }
         return path.isEmpty || path.contains(where: \.isEmpty) ? nil : path
     }
 
-    /// `text` as one path segment: everything but unreserved characters percent-encoded.
     private static func pathSegment(_ text: String) -> String {
         text.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? text
     }
@@ -76,12 +74,8 @@ extension PingAction {
 
 /// The icon a ping's row shows: what clicking it does.
 public enum PingIcon: Equatable, Sendable {
-    /// Opens a link.
     case link
-    /// Brings an app forward.
     case app
-    /// Focuses a Herdr tab or pane, then the terminal.
     case terminal
-    /// Only marks it seen.
     case noAction
 }

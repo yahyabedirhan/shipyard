@@ -6,13 +6,8 @@ import FoundationNetworking
 
 /// What came of posting a notice to the app machine.
 public enum NoticeHTTPOutcome: Equatable, Sendable {
-    /// Something answered, with this status and body: the app's verdict,
-    /// or a proxy's page when the app isn't behind it.
     case answered(status: Int, body: Data)
-    /// Nothing answered within the timeout.
     case timedOut
-    /// The request couldn't be made: the name didn't resolve, nothing
-    /// listens, the network is down. Why, in the system's words.
     case unreachable(String)
 }
 
@@ -56,7 +51,6 @@ public struct URLSessionNoticeHTTP: NoticeHTTP {
         return outcome
     }
 
-    /// The request's outcome, handed from URLSession's queue to the waiting caller.
     private final class Answer: @unchecked Sendable {
         let done = DispatchSemaphore(value: 0)
         private let lock = NSLock()

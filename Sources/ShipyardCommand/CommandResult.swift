@@ -31,5 +31,4 @@ public struct CommandResult: Equatable, Sendable {
     }
 }
 
-/// So a step that can't go on can hand back the result to print.
 extension CommandResult: Error {}

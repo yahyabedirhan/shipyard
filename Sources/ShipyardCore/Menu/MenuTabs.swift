@@ -30,8 +30,6 @@ public struct MenuTabContent: Equatable, Sendable {
 }
 
 extension MenuModel {
-    /// The All tab's fixed arrangement, whatever the projects set: by kind,
-    /// newest first, with the tabs' kind subheaders.
     static let allTabArrangement = ArrangementSettings(groupBy: .kind, subsections: true, sortBy: .updated)
 
     /// All, then one tab per project in configuration order.

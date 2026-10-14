@@ -12,13 +12,9 @@ import ShipyardCommand
 public final class SkillInstallation {
     /// Where an install is.
     public enum State: Equatable, Sendable {
-        /// Not started, or cancelled: the offer to install.
         case idle
-        /// The command is running.
         case running
-        /// The command ended: installed, failed, or no `npx`.
         case finished(SkillInstallResult)
-        /// Stopped after running `seconds`.
         case timedOut(seconds: TimeInterval)
     }
 
@@ -33,8 +29,6 @@ public final class SkillInstallation {
     private let timeout: TimeInterval
     private let sleep: Sleep
     private var task: Task<Void, Never>?
-    /// Counts installs, so one that was cancelled (and still winds down)
-    /// never writes over the state of a later one.
     private var generation = 0
 
     public init(

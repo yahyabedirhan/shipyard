@@ -8,9 +8,6 @@ import ShipyardNotices
 import ShipyardPings
 import SwiftUI
 
-/// The menu bar app: an icon with no Dock icon (`LSUIElement` in the
-/// bundle's Info.plist) that opens the panel. The type isn't named
-/// `ShipyardApp`, which is this module's name.
 @main
 struct ShipyardMenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -25,11 +22,6 @@ struct ShipyardMenuBarApp: App {
     }
 }
 
-/// The menu bar icon, shipyard's sailboat (the app icon's figure), and the
-/// attention count next to it (the model's label: none at 0, or when
-/// `[menu-bar] count = "none"`). While the rate budget pauses refreshing, the
-/// icon is a pause glyph. While an agent holds the lease, the icon carries
-/// a yellow dot (`LeaseDot`), next to the count.
 struct MenuBarLabelView: View {
     let shipyard: Shipyard
     let lease: LeaseIndicator
@@ -53,12 +45,9 @@ struct MenuBarLabelView: View {
 }
 
 extension Bundle {
-    /// Whether this is a `.app` bundle: false for `make run`, which runs the
-    /// bare executable, where notifications and login items don't exist.
     var isAppBundle: Bool { bundleURL.pathExtension == "app" }
 }
 
-/// Builds the core once the app has launched and starts it.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let services = AppServices()
@@ -72,26 +61,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// The core with the app's adapters plugged in, and the triggers that make
-/// it refresh: the configuration watcher and waking from sleep. The panel's
-/// footer actions live here too, and app control's server, which the
-/// `shipyard` command asks through `control.sock`.
 @MainActor
 final class AppServices {
     let shipyard: Shipyard
-    /// The agent skill install, kept for the app's run so an install goes
-    /// on, and its result stays, while the panel is closed.
     let skillInstallation = SkillInstallation()
-    /// Whether the agent skill is installed: the Shipyard Skill view and
-    /// the settings menu's mark show it.
     let skillDetector = SkillDetector(home: FileManager.default.homeDirectoryForCurrentUser)
-    /// The link of the bundled CLI into `~/.local/bin`: the Shipyard CLI
-    /// view and onboarding's card show it.
     let cliLink = CLILink(
         cli: CLILink.bundledCLI(in: Bundle.main.bundleURL),
         home: FileManager.default.homeDirectoryForCurrentUser
     )
-    /// The account's avatar for the header, kept on disk.
     let avatars = AvatarCache(
         directory: AppServices.files.avatars,
         transport: URLSessionTransport()
@@ -101,17 +79,10 @@ final class AppServices {
     private var configWatcher: ConfigurationWatcher?
     private var pingWatcher: ConfigurationWatcher?
     private var wake: WakeObserver?
-    /// Whether the panel is open, the status view and the tab it shows,
-    /// which its views and app control both read and set.
     let panelState = PanelState()
-    /// The panel as app control sees it.
     private let panelControl: PanelControl
-    /// The lease as the menu bar icon's dot and the panel's banner show it,
-    /// written by the control server.
     let leaseIndicator = LeaseIndicator()
     private var controlServer: ControlServer?
-    /// The listener for notices from other machines, while `[notices]
-    /// listen = true`; `nil` otherwise, so nothing listens unasked.
     private var noticeListener: NoticeListener?
     private static let log = Logger(subsystem: Bundle.main.bundleIdentifier ?? "shipyard", category: "control")
 
@@ -143,10 +114,6 @@ final class AppServices {
         }
     }
 
-    /// Where the app reads and writes: `config.toml` and the support folder
-    /// (`SupportFolder`'s one definition, which the CLI reads
-    /// `repositories.json` from, so the two can't disagree), both moved
-    /// into a demo's folder in a demo run.
     static let files = AppFiles(environment: ProcessInfo.processInfo.environment)
 
     func start() {
@@ -170,11 +137,6 @@ final class AppServices {
         startControl()
     }
 
-    /// Listens for notices from other machines when, and on the port, the
-    /// configuration says (`Shipyard.noticeListenerPort`), and stops when it
-    /// no longer does (ADR 0010), watching the port for its next change.
-    /// When the port can't be listened on, the app runs on without it and
-    /// says why in the log.
     private func followNoticeListening() {
         withObservationTracking {
             applyNoticeListening()
@@ -199,8 +161,6 @@ final class AppServices {
         }
     }
 
-    /// Listens on `control.sock` for the `shipyard` command. When it can't,
-    /// the app runs on without app control and says why in the log.
     private func startControl() {
         let shipyard = shipyard
         let screenshotter = Screenshotter(panel: panelControl, indicator: leaseIndicator) { [unowned self] in
@@ -233,7 +193,6 @@ final class AppServices {
         }
     }
 
-    /// Before the app quits: stops app control and removes its socket.
     func stop() {
         controlServer?.stop()
         controlServer = nil
@@ -241,9 +200,6 @@ final class AppServices {
         noticeListener = nil
     }
 
-    /// What the menu's layout can do: open or mark seen a row, mark a
-    /// project (or every project) seen, collapse a project, open a
-    /// project's repository, start a note in a project.
     var layoutActions: LayoutActions {
         let shipyard = shipyard
         return LayoutActions(
@@ -275,29 +231,19 @@ final class AppServices {
         )
     }
 
-    /// The header's avatar or handle: opens the account's profile on
-    /// GitHub, then closes the menu, as opening a row does.
     func openProfile() {
         shipyard.openProfile()
         closeMenu()
     }
 
-    /// The header's Refresh button (⌘R): also creates the configuration
-    /// file when it's missing.
     func refresh() {
         Task { await shipyard.refreshNow() }
     }
 
-    /// The header's layout button: writes the next layout to the
-    /// configuration file; the menu switches with the reload.
     func switchToNextLayout() {
         Task { await shipyard.switchToNextLayout() }
     }
 
-    /// Opening the panel rereads the notification permission (the user may
-    /// have changed it in System Settings), the CLI link, the skill and the
-    /// notes, so one just written shows. It doesn't refresh GitHub: looking
-    /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
         cliLink.check()
@@ -307,10 +253,6 @@ final class AppServices {
         Task { await shipyard.panelOpened() }
     }
 
-    /// Closing the panel caps every group Show more revealed and closes the
-    /// status view, so the menu opens on the projects with every cap back,
-    /// and, unless app control closed it, keeps app control from opening it
-    /// again for a while (`PanelReopenGuard`).
     func panelClosed() {
         panelState.isOpen = false
         panelState.reopenGuard.panelClosed(byControl: panelState.closingByControl, at: Date())
@@ -323,18 +265,14 @@ final class AppServices {
         notifier.openSettings()
     }
 
-    /// The lease banner's Stop: takes shipyard back from the agent holding it.
     func stopLease() {
         controlServer?.stopLease()
     }
 
-    /// A quiet line's Allow: lets the agent with holder `key` back before its bar ends.
     func allowLeaseHolder(_ key: String) {
         controlServer?.allow(key)
     }
 
-    /// Opens `config.toml` in the user's editor, creating it with its
-    /// commented header first when it's missing.
     func openConfigurationFile() {
         let url = shipyard.configStore.url
         do {
@@ -347,13 +285,6 @@ final class AppServices {
         closeMenu()
     }
 
-    /// Closes the menu's window after an action that opened something in
-    /// another app (an item, a notification's item, the account's profile,
-    /// the configuration file), as a menu bar menu does; otherwise it stays on screen
-    /// without being the key window, and keys go to the other app.
-    /// Actions that only change the menu (⌥-click, collapse, Mark all
-    /// seen) don't call it. It closes it as a click on the icon does
-    /// (`MenuBarWindow`).
     func closeMenu() {
         MenuBarWindow.close()
     }

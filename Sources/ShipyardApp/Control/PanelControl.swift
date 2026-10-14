@@ -5,45 +5,23 @@ import ShipyardControl
 import ShipyardCore
 import SwiftUI
 
-/// What the control server asks of the panel and the menu behind it. Each
-/// operation that names a project, kind or tab refuses with the ones that
-/// exist (`PanelRefusal`).
 @MainActor
 protocol PanelControlling: AnyObject {
-    /// The app's status: its version, whether the panel is open, the view
-    /// it shows, the menu's layout and selected tab, the projects, which
-    /// are folded and which groups show every row.
     func status() -> AppStatus
-    /// Opens the panel, once it's on screen; refused when it didn't open.
     func open() async throws(PanelRefusal)
-    /// Closes the panel, once it's gone; refused when it didn't close.
     func close() async throws(PanelRefusal)
-    /// Collapses the project's section.
     func fold(_ project: String) throws(PanelRefusal)
-    /// Expands the project's section.
     func unfold(_ project: String) throws(PanelRefusal)
-    /// Shows every row of the project's group of `kind`
-    /// (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`).
     func showMore(_ project: String, kind: String) throws(PanelRefusal)
-    /// Selects the tab `name` names in the tabs layout, and returns its
-    /// title (`All`, or the project's title).
     func selectTab(_ name: String) throws(PanelRefusal) -> String
-    /// Shows the status view `name` names (`github`, `notion`, `skill`,
-    /// `cli`) in place of the projects, or the projects again
-    /// (`projects`), and returns what it shows: the view's title, or
-    /// `projects`.
     func showView(_ name: String) throws(PanelRefusal) -> String
 }
 
-/// The panel as app control sees it: `PanelState`, the menu bar window
-/// behind it, and the orchestrator's operations a click would run.
 @MainActor
 final class PanelControl: PanelControlling {
     private let shipyard: Shipyard
     private let state: PanelState
-    /// The folder a demo run reads (`AppFiles.demo`), nil for the user's own app.
     private let demo: URL?
-    /// How long `open` and `close` wait for the panel to appear or go.
     private static let wait = Duration.seconds(2)
 
     init(shipyard: Shipyard, state: PanelState, demo: URL?) {
@@ -68,8 +46,6 @@ final class PanelControl: PanelControlling {
         )
     }
 
-    /// Refused while the user's close keeps app control out
-    /// (`PanelReopenGuard`), with nothing done.
     func open() async throws(PanelRefusal) {
         if !state.isOpen, let refusal = state.reopenGuard.refusal(at: Date(), timeZone: .current) {
             throw PanelRefusal(refusal)
@@ -85,8 +61,6 @@ final class PanelControl: PanelControlling {
         }
     }
 
-    /// Asks the menu bar window to be open (or closed) unless it already
-    /// is, and waits until the panel's appearing (or disappearing) says so.
     private func present(_ open: Bool) async -> Bool {
         guard state.isOpen != open else { return true }
         if open {

@@ -98,7 +98,6 @@ extension CLISettings {
         return settings
     }
 
-    /// Walks the parsed file table by table, collecting every issue.
     final class Reader {
         private(set) var issues: [CLISettingsIssue] = []
 
@@ -159,9 +158,6 @@ extension CLISettings {
             return settings
         }
 
-        /// A name a URL can hold as its host, nothing more: letters,
-        /// digits, `-` and `.` (a MagicDNS name, short or full, or an IPv4
-        /// address).
         static func isHostName(_ text: String) -> Bool {
             let allowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-.")
             return !text.hasPrefix("-") && !text.hasPrefix(".") && text.unicodeScalars.allSatisfy(allowed.contains)
@@ -202,8 +198,6 @@ extension CLISettings {
 }
 
 extension CLISettingsIssue {
-    /// TOMLDecoder's parse errors carry the line only in their description,
-    /// as "(Line 3) Syntax error: …".
     init(invalidTOML error: any Error) {
         let (line, detail) = Self.splitLine(from: String(describing: error))
         self.init(line: line, message: "invalid TOML: \(detail)")

@@ -163,10 +163,6 @@ public struct MenuModel: Equatable, Sendable {
         return model
     }
 
-    /// A section per remote machine whose listing has rows (its pings
-    /// filed under no project), after the projects, in the order of
-    /// `[remote] machines`. It's named after the machine's label, and
-    /// arranged with the defaults.
     private static func machineSections(
         _ listings: [String: [Item]],
         configuration: Configuration,
@@ -220,8 +216,6 @@ public struct MenuModel: Equatable, Sendable {
         menuBarLabel = MenuBarLabel(attention, style: configuration.menuBar.count)
     }
 
-    /// Sets each of `rows`' attention flag from `attention`, shown rows and
-    /// the rows behind a Show more alike.
     private static func flagAttention(_ rows: inout [MenuRow], attention: Attention, toggles: Configuration.AttentionToggles) {
         for row in rows.indices {
             rows[row].attentionReasons = attention.reasons(rows[row].item, toggles: toggles)
@@ -278,25 +272,17 @@ public struct MenuModel: Equatable, Sendable {
         }
     }
 
-    /// The review search's error row, in a project that needed the search:
-    /// one listing only pull requests waiting on the user.
     private static func reviewSearchErrors(_ snapshot: Snapshot, settings: ProjectSettings) -> [MenuErrorRow] {
         guard let error = snapshot.reviewSearchError, settings.pullRequests.show, settings.pullRequests.reviewRequested else { return [] }
         return [MenuErrorRow(error)]
     }
 
-    /// The rows saying why `project`'s notes couldn't be read ("notes:
-    /// can't reach Notion (…)") and why a note couldn't be started there
-    /// ("new note: …"), while it shows notes.
     private static func noteErrorRows(_ notes: NotesMenuState, project: String, configuration: Configuration) -> [MenuErrorRow] {
         guard showsNotes(project, configuration: configuration) else { return [] }
         return (notes.readErrors[project].map { [MenuErrorRow(.notes($0))] } ?? [])
             + (notes.startErrors[project].map { [MenuErrorRow(.newNote($0))] } ?? [])
     }
 
-    /// `sections` with the new-note icon on each project that shows notes,
-    /// while ntn can start one: starting while a note is being started
-    /// there; and each one's notes database, for its notes count.
     private static func newNoteIcons(_ sections: [MenuSection], _ notes: NotesMenuState, configuration: Configuration) -> [MenuSection] {
         guard notes.canStartNotes else { return sections }
         return sections.map { section in
@@ -308,33 +294,20 @@ public struct MenuModel: Equatable, Sendable {
         }
     }
 
-    /// Whether the project named `project` lists notes.
     private static func showsNotes(_ project: String, configuration: Configuration) -> Bool {
         configuration.projects.first { $0.slug == project }.map { configuration.settings(for: $0).notes.show } ?? false
     }
 
-    /// The note in a project using `anywhere` when the review search
-    /// matched more pull requests than its one page holds.
     private static func reviewSearchNotes(_ snapshot: Snapshot, settings: ProjectSettings) -> [String] {
         let shown = snapshot.searchPullRequests.count
         guard settings.usesAnywhere, snapshot.reviewSearchTotal > shown else { return [] }
         return [PanelText.reviewSearchLimit(shown: shown, total: snapshot.reviewSearchTotal)]
     }
 
-    /// The order kinds appear in within a section.
     static let kindOrder: [ItemKind] = [.pullRequest, .ping, .issue, .workflowRun, .note]
 
-    /// The order of the chips in a list section's header. It is the same
-    /// list as `ItemKind.commandOrder` on purpose, kept apart so the chips'
-    /// order stays fixed whatever that list becomes. The `[menu]
-    /// header-counts` default (`Configuration.Menu`) and the schema list
-    /// the same order; `ConfigSchemaTests` checks the three agree.
     static let headerCountOrder: [ItemKind] = [.pullRequest, .issue, .workflowRun, .ping, .note]
 
-    /// The kinds a list section's header may count: those `[menu]
-    /// header-counts` lists, always in `headerCountOrder`, whatever order
-    /// the file lists them in. A section shows a chip only for the ones it
-    /// has rows of (`HeaderCount.counts`).
     static func headerCountKinds(_ menu: Configuration.Menu) -> [ItemKind] {
         headerCountOrder.filter { menu.headerCounts.contains($0) }
     }
@@ -522,7 +495,6 @@ public struct HeaderCount: Equatable, Sendable, Identifiable {
         self.needsAttention = needsAttention
     }
 
-    /// One chip per kind of `kinds` that `rows` has, in that order.
     static func counts(_ rows: [MenuRow], kinds: [ItemKind]) -> [HeaderCount] {
         kinds.compactMap { kind in
             let ofKind = rows.filter { $0.kind == kind }
@@ -614,11 +586,8 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
 
 /// What the menu bar shows next to the icon.
 public enum MenuBarLabel: Equatable, Sendable {
-    /// `count = "total"`: the attention count.
     case total(Int)
-    /// `count = "per-kind"`: the attention count split by kind.
     case perKind(AttentionCounts)
-    /// `count = "none"`, or before anything was fetched: the icon alone.
     case hidden
 
     public init(_ counts: AttentionCounts, style: MenuBarCount) {

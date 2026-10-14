@@ -82,11 +82,6 @@ public enum Listing {
         return listings
     }
 
-    /// The sections `pings` are filed in, by project slug or machine label, before any filter: each
-    /// project in `projects` its pings name, and each machine in `machines`
-    /// its remote pings filed under none of `projects`. A section with no
-    /// ping is left out. Where `listings` lists them, and what the Mac
-    /// numbers them in (`PingNumbers`).
     static func sections(of pings: [Ping], projects: [String], machines: [String]) -> [String: [Ping]] {
         var sections: [String: [Ping]] = [:]
         let names = Set(projects)
@@ -101,8 +96,6 @@ public enum Listing {
         return sections
     }
 
-    /// Whether `project` lists `item`. `reviewRequested` holds the open pull
-    /// requests waiting on the viewer's review (the review search's).
     static func lists(_ item: Item, project: ProjectSettings, viewer: String?, reviewRequested: Set<String>, now: Date) -> Bool {
         project.shows(item.kind)
             && project.states(of: item.kind).contains(item.state.group)
@@ -112,10 +105,6 @@ public enum Listing {
             && (item.kind != .pullRequest || !project.pullRequests.reviewRequested || reviewRequested.contains(item.id))
     }
 
-    /// Open and running items always are; closed ones for their kind's
-    /// `closed-window`, finished runs for their `finished-window`,
-    /// counted back from `now`. A window of 0 leaves them all out. A ping
-    /// is while it's unseen, and for its `seen-window` once it's seen.
     private static func inWindow(_ item: Item, project: ProjectSettings, now: Date) -> Bool {
         if let ping = item.ping { return ping.isListed(seenWindow: project.pings.seenWindow, at: now) }
         guard !item.state.isActive else { return true }

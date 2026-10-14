@@ -100,28 +100,17 @@ public struct ControlLease: Equatable, Sendable {
 
     /// Why a lease ended.
     public enum Ending: Equatable, Sendable {
-        /// Its holder sent nothing for `renewal`.
         case expired
-        /// It reached `cap`.
         case capped
-        /// Its holder gave it up (`lease release`).
         case released
-        /// The maintainer took shipyard back (the banner's Stop).
         case stopped
     }
 
     /// Why a request isn't granted.
     public enum Refusal: Error, Equatable, Sendable {
-        /// Another holder has the lease.
         case inUse(Term)
-        /// Another holder has the lease, and the `take` waits in line behind
-        /// it: no answer yet, until it gets the lease or its wait runs out.
         case queued(Term)
-        /// The `take` waited its `seconds` in line, and another holder still
-        /// has the lease.
         case waitedOut(seconds: Int, Term)
-        /// The maintainer stopped this holder, and its bar hasn't ended or
-        /// been lifted.
         case stopped
 
         /// The refusal as the agent reads it, its times in `timeZone`.
@@ -139,7 +128,6 @@ public struct ControlLease: Equatable, Sendable {
         }
     }
 
-    /// `date` as the agent reads it in `timeZone`: `12:05:00`.
     static func clock(_ date: Date, _ timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -148,7 +136,6 @@ public struct ControlLease: Equatable, Sendable {
         return formatter.string(from: date)
     }
 
-    /// A `take` waiting in line: who, and until when it waits.
     struct Waiter: Equatable, Sendable {
         var holder: Holder
         var until: Date
@@ -163,13 +150,8 @@ public struct ControlLease: Equatable, Sendable {
         public var transitions: [Transition]
     }
 
-    /// The lease as of the last call; it may have ended since, so it's
-    /// read through `current(at:)`.
     private var term: Term?
-    /// The `take`s waiting for the lease, first come first: one place per
-    /// holder key.
     private var queue: [Waiter] = []
-    /// The holders the maintainer stopped, the latest first: one per holder key.
     private var bars: [Bar] = []
 
     /// A holder the maintainer stopped, refused until `until`.
@@ -358,7 +340,6 @@ public struct ControlLease: Equatable, Sendable {
         ([current(at: now)?.ends].compactMap { $0 } + stopped(at: now).map(\.until)).min()
     }
 
-    /// Whether `holder` is barred: settled first, so a bar listed is in force.
     private func isBarred(_ holder: Holder) -> Bool {
         bars.contains { $0.holder.key == holder.key }
     }
@@ -392,10 +373,7 @@ public struct ControlLease: Equatable, Sendable {
     }
 }
 
-/// A term as it goes in the quit's reply and the relaunch's environment:
-/// its times as seconds since 1970, whatever the coder's date strategy.
 extension ControlLease.Term: Codable {
-    /// The purpose is handed over; the step isn't (the relaunch ended it).
     private enum CodingKeys: String, CodingKey {
         case holder, taken, ends, purpose
     }

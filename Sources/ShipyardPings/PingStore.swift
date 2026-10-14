@@ -22,7 +22,6 @@ public struct PingStore: Sendable {
     /// The directory the pings live in.
     public var directory: URL { records.directory }
     private let records: RecordStore<Ping>
-    /// The time a read checks expiry against.
     private let now: @Sendable () -> Date
 
     public init(directory: URL, now: @escaping @Sendable () -> Date = { Date() }) {
@@ -133,9 +132,6 @@ public struct PingStore: Sendable {
         try records.remove(id: id)
     }
 
-    /// Whether `ping` is still live now (`Ping.isLive(at:)`); when it isn't,
-    /// its file is removed as it was read. A file that can't be removed
-    /// stays, and every read leaves it out by its expiry.
     private func isLive(_ ping: Ping) -> Bool {
         guard !ping.isLive(at: now()) else { return true }
         _ = try? records.removeIfUnchanged(ping, id: ping.id)

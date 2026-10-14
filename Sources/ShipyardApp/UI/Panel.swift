@@ -3,16 +3,9 @@ import ShipyardControl
 import ShipyardCore
 import SwiftUI
 
-/// The panel the menu bar icon opens: the frame every layout shares (the
-/// header, the banners and the footer) around what fits the lifecycle
-/// phase, once ready the layout `[menu] layout` picks, or around the status
-/// view the settings menu opened (`PanelState.openView`). It draws the core's
-/// `Shipyard` directly (it's observable) and redraws the ages every 30 s.
 struct Panel: View {
     let shipyard: Shipyard
     let actions: AppServices
-    /// A panel drawn only for a screenshot's fallback, never on screen: its
-    /// appearing and disappearing aren't the panel opening and closing.
     var isSnapshot = false
 
     var body: some View {
@@ -93,9 +86,6 @@ struct Panel: View {
         .animation(Motion.count, value: attention)
     }
 
-    /// The settings menu's items (`PanelText.settingsMenu`): the
-    /// configuration file, each part opening its status view, with the set-up
-    /// mark on its right (a menu item's badge), and Sign out under a divider.
     @ViewBuilder
     private var settingsItems: some View {
         let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
@@ -119,13 +109,6 @@ struct Panel: View {
         }
     }
 
-    /// The core's banners (`Shipyard.banners(at:)`), each with its ✕: the
-    /// lease's banner first, in every phase and layout, then a quiet line
-    /// for each agent the maintainer stopped, then the others. A stopped
-    /// agent's line stays under the next holder's banner, so Allow is there
-    /// for the whole bar. A capture without the indicator leaves the
-    /// lease's banners out. Redrawn when a snooze ends, so a banner whose
-    /// hour is up slides back in without a refresh.
     private var banners: some View {
         TimelineView(.explicit(shipyard.bannerSnoozeEnds)) { context in
             bannerStack(shipyard.banners(at: Self.bannerDate(context.date, now: Date())))
@@ -162,8 +145,6 @@ struct Panel: View {
         .animation(Motion.banner, value: items.map(\.id))
     }
 
-    /// One banner: the lease's with its countdown and Stop, a stopped
-    /// agent's quiet line with Allow, or one of the others.
     @ViewBuilder
     private func bannerView(_ item: PanelBanner, leaseEnds: Date?) -> some View {
         let dismiss = dismiss(of: item)
@@ -190,8 +171,6 @@ struct Panel: View {
         }
     }
 
-    /// A banner's button: notifications off opens System Settings; the
-    /// notes banner opens its status view.
     private func action(of banner: PanelBanner) -> (title: String, run: () -> Void)? {
         if let part = banner.opens {
             let panelState = actions.panelState
@@ -201,15 +180,11 @@ struct Panel: View {
         return (PanelText.openNotificationSettings, actions.openNotificationSettings)
     }
 
-    /// A banner's ✕, which hides it for an hour.
     private func dismiss(of banner: PanelBanner) -> () -> Void {
         let shipyard = shipyard
         return { shipyard.dismissBanner(banner.id) }
     }
 
-    /// While an agent holds the lease: its banner, the countdown ticking
-    /// each second, on the second the time left changes. The control
-    /// server ends the lease when it runs out, which takes the banner away.
     private func leaseBanner(ends: Date, dismiss: @escaping () -> Void) -> some View {
         TimelineView(.periodic(from: ends.addingTimeInterval(-ControlLease.cap), by: 1)) { context in
             if let lease = actions.leaseIndicator.shown(at: context.date) {
@@ -218,8 +193,6 @@ struct Panel: View {
         }
     }
 
-    /// The status view the settings menu or app control opened, in place
-    /// of what fits the phase; else that.
     @ViewBuilder
     private var content: some View {
         if let part = actions.panelState.openView {
@@ -251,8 +224,6 @@ struct Panel: View {
         }
     }
 
-    /// The configured layout, drawing the menu model. Each layout measures
-    /// its own scrolling area.
     @ViewBuilder
     private var layout: some View {
         switch shipyard.menu.layout {
@@ -311,12 +282,6 @@ struct Panel: View {
     }
 }
 
-/// The header's account: the round avatar and `@handle`, as one
-/// button that opens the profile on GitHub (the caller closes the menu).
-/// The avatar comes from the `AvatarCache`, so opening the panel downloads
-/// nothing once it's stored; until it's there, or when it can't be had, a
-/// plain circle stands in, never a broken image. The full name is in the
-/// hover text.
 private struct AccountButton: View {
     let viewer: Viewer
     let avatars: AvatarCache
@@ -396,11 +361,6 @@ private struct AccountButton: View {
 }
 
 extension PanelBanner {
-    /// The banner's icon: a stopped agent's quiet line, configuration
-    /// error, warnings, refresh delay, pause, fetch error (the rows are
-    /// kept; the footer says how old they are), a remote machine's quiet
-    /// line, notifications off. The lease's banner draws the agent's logo
-    /// instead (`LeaseBannerView`).
     fileprivate var symbol: String {
         switch kind {
         case .lease: "terminal.fill"
@@ -416,9 +376,6 @@ extension PanelBanner {
         }
     }
 
-    /// Red for the configuration error and a pause, amber for a slower
-    /// refresh and a failed one, the lease's yellow for its banner, gray
-    /// for the quiet ones.
     fileprivate var tint: Color {
         switch kind {
         case .configError, .paused: Palette.red
@@ -430,7 +387,6 @@ extension PanelBanner {
 }
 
 extension MenuLayout {
-    /// The layout button's icon while this layout is shown.
     fileprivate var symbol: String {
         switch self {
         case .list: "list.bullet"
@@ -439,8 +395,6 @@ extension MenuLayout {
     }
 }
 
-/// One API's rate limit: a bar of what's left, remaining / limit and the
-/// reset time; amber when low, red when exhausted.
 private struct RateLine: View {
     let usage: RateUsage
 

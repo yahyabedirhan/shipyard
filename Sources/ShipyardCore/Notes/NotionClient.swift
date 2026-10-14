@@ -5,22 +5,11 @@ import FoundationNetworking
 
 /// Why a request to Notion failed.
 public enum NotionError: Error, Equatable, Sendable {
-    /// No `ntn` to read Notion with: it isn't installed where the app
-    /// looks (`NtnCLI.locate`), or it couldn't be started.
     case ntnMissing
-    /// 401: ntn isn't logged in, has no workspace, or Notion stopped
-    /// taking its token.
     case unauthorized
-    /// 429 (or 529, Notion overloaded): too many requests; `Retry-After`
-    /// seconds, when Notion said.
     case rateLimited(retryAfter: TimeInterval?)
-    /// Any other status, with Notion's error `code` and `message` when it
-    /// gave them: a 404 is a page or database not shared with the
-    /// connection, or gone.
     case http(Int, code: String?, message: String?)
-    /// The request never reached Notion (offline, timeout, ntn's own failure).
     case network(String)
-    /// A 200 whose body isn't what the API documents.
     case unreadable(String)
 }
 
@@ -53,9 +42,7 @@ public struct NotionClient: Sendable {
     public static let projectsIcon = "📂"
     public static let databaseIcon = "🗂️"
 
-    /// The most a list asks for at once: the API's own maximum.
     static let pageSize = 100
-    /// How many pages of a list it follows before stopping.
     static let maxPages = 10
 
     private let transport: any HTTPTransport
@@ -100,8 +87,6 @@ public struct NotionClient: Sendable {
         try await children(of: pageID, type: "child_page")
     }
 
-    /// Page `pageID`'s child blocks of `type` (`child_database` or
-    /// `child_page`) that aren't in the trash, with their titles.
     private func children(of pageID: String, type: String) async throws -> [(id: String, title: String)] {
         var found: [(id: String, title: String)] = []
         var cursor: String?
@@ -243,9 +228,6 @@ public struct NotionClient: Sendable {
         return url
     }
 
-    /// Sends one request to `path` under the API (`users/me`), with
-    /// `query` and a JSON `body`, and decodes the answer as `T`. Every
-    /// status but 200 throws its `NotionError`.
     func send<T: Decodable>(
         _ method: String,
         _ path: String,
@@ -307,8 +289,6 @@ public struct NotionClient: Sendable {
         return decoder
     }()
 
-    /// A Notion timestamp, "2026-09-25T11:42:00.000Z", with or without
-    /// its fraction of a second.
     static func date(_ text: String) -> Date? {
         let fractional = ISO8601DateFormatter()
         fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -341,7 +321,6 @@ enum NoteProperty {
     static let status = "Status"
 }
 
-/// `GET /v1/users/me` as ntn's bot user answers it: `{"type":"bot","bot":{"workspace_name":"Notes",…}}`.
 private struct BotUser: Decodable {
     struct Bot: Decodable {
         var workspace_name: String?
@@ -350,26 +329,21 @@ private struct BotUser: Decodable {
     var bot: Bot?
 }
 
-/// Notion's error body: `{"object":"error","status":404,"code":"object_not_found","message":"…"}`.
 private struct ErrorBody: Decodable {
     var code: String?
     var message: String?
 }
 
-/// A paginated list: `results`, `has_more` and `next_cursor`.
 private struct List<Element: Decodable>: Decodable {
     var results: [Element]
     var has_more: Bool
     var next_cursor: String?
 }
 
-/// A piece of rich text; only its plain text is read.
 private struct RichText: Decodable {
     var plain_text: String
 }
 
-/// A block: a `child_database` or `child_page` with its title, or a
-/// block with text.
 private struct Block: Decodable {
     struct Child: Decodable { var title: String }
     struct Text: Decodable { var rich_text: [RichText]? }
@@ -383,14 +357,10 @@ private struct Block: Decodable {
     var text: Text?
     var table_row: TableRow?
 
-    /// A table row's cells, each its plain text; `nil` for another block.
     var cells: [String]? { table_row?.cells.map { $0.map(\.plain_text).joined() } }
 
-    /// A child database's or child page's title.
     var childTitle: String? { (child_database ?? child_page)?.title }
 
-    /// The block's text, whatever its type (a paragraph, a heading, a
-    /// list item…): the plain text of its type's `rich_text`.
     var plainText: String {
         (text?.rich_text ?? []).map(\.plain_text).joined()
     }
@@ -410,14 +380,12 @@ private struct Block: Decodable {
     }
 }
 
-/// `GET /v1/databases/{id}`: its data sources.
 private struct Database: Decodable {
     struct Source: Decodable { var id: String }
     var id: String?
     var data_sources: [Source]
 }
 
-/// `GET /v1/data_sources/{id}`: its schema; only a unique ID's prefix is read.
 private struct DataSource: Decodable {
     struct Property: Decodable {
         struct UniqueID: Decodable { var prefix: String? }
@@ -433,9 +401,7 @@ private struct DataSource: Decodable {
     var properties: [String: Property]
 }
 
-/// A page, from search, a data-source query or a create.
 private struct PageObject: Decodable {
-    /// One property value; only the types notes use are read.
     struct Property: Decodable {
         struct Option: Decodable { var name: String }
         struct UniqueID: Decodable {
@@ -457,14 +423,11 @@ private struct PageObject: Decodable {
     var last_edited_time: Date?
     var properties: [String: Property]?
 
-    /// The page's title, whatever its title property is called.
     var plainTitle: String {
         let title = properties?.values.first { $0.type == "title" }
         return (title?.title ?? []).map(\.plain_text).joined()
     }
 
-    /// The page as a note; `nil` when it's in the trash or lacks what
-    /// every page has (a URL, its times).
     var note: Note? {
         guard in_trash != true, let url = url.flatMap(URL.init(string:)), let created = created_time else { return nil }
         let number = properties?[NoteProperty.number]?.unique_id
@@ -482,7 +445,6 @@ private struct PageObject: Decodable {
     }
 }
 
-/// A coding key named at run time, for the block's type-named member.
 private struct AnyKey: CodingKey {
     var stringValue: String
     var intValue: Int? { nil }

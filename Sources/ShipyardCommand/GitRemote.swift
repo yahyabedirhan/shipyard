@@ -3,9 +3,6 @@ import Foundation
 /// Reads a folder's git `origin` remote. The seam between a command and
 /// spawning `git`, so tests use a fake working folder.
 public protocol GitRemoteLookup: Sendable {
-    /// The URL of `origin` for the repository `folder` is in, as git prints
-    /// it; `nil` when `folder` isn't in a git repository, has no `origin`,
-    /// or git can't be run.
     func origin(in folder: URL) -> String?
 }
 

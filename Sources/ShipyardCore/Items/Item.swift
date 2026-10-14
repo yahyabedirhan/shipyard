@@ -10,11 +10,8 @@ public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     case draft
     case merged
     case closed
-    /// A workflow run queued, waiting or in progress.
     case running
-    /// A workflow run that finished well (GitHub's `success` or `neutral`).
     case succeeded
-    /// A workflow run that finished badly (`failure`, `timed_out` or `startup_failure`).
     case failed
 
     /// Open and draft items are still open on GitHub; merged and closed ones
@@ -42,7 +39,6 @@ public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
 
 /// The head commit's combined check status on a pull request.
 public enum ChecksState: String, Codable, Equatable, Hashable, Sendable {
-    /// No checks ran, or none reported yet.
     case none
     case pending
     case passed
@@ -51,11 +47,8 @@ public enum ChecksState: String, Codable, Equatable, Hashable, Sendable {
 
 /// Who wrote an item, as the notification rules' author filter sees it.
 public enum AuthorKind: String, Equatable, Hashable, Sendable {
-    /// The signed-in account (and so the user's agents, which act as them).
     case me
-    /// A Bot account or a `[bot]` login.
     case bot
-    /// Anyone else.
     case other
 }
 
@@ -223,13 +216,7 @@ public struct RepositoryError: Equatable, Sendable {
         /// The repository doesn't exist, or the token can't see it (GitHub
         /// answers the same for both).
         case notFound
-        /// The token may not read it, for example an organisation enforcing SAML.
         case forbidden
-        /// GitHub answered only part of it, even asked about on its own
-        /// (its query exceeded GitHub's resource limits, or its lists came
-        /// back with entries left out). Its pull requests and issues are
-        /// the last ones read whole, where there are any; its runs, from
-        /// REST, still load.
         case incomplete
         case other
     }

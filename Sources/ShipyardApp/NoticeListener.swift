@@ -5,47 +5,22 @@ import ShipyardControl
 import ShipyardCore
 import ShipyardNotices
 
-/// The app's listener for notices from the user's other machines (ADR
-/// 0010): an HTTP server on 127.0.0.1 only, at the port `config.toml`'s
-/// `[notices]` names, which `tailscale serve` exposes to the tailnet. It's
-/// started only with `[notices] listen = true`.
-///
-/// Each connection is one request, `POST /notify` with a notice request's
-/// JSON (`TailnetWire`: a notice to show, or a withdrawal), answered with the verdict `respond` gives for it and
-/// its `Tailscale-User-Login`, then closed. It checks only what HTTP
-/// needs, and that a login is there at all: a request without one, or with
-/// an empty or doubled one, is refused on its head, before its body is read.
-/// Whether the login may post is `Shipyard.receive(_:from:)`'s to say. At
-/// most `mostConnections` are served at once; one more is answered 503.
-/// A request a web page could send (one with `Origin` or `Sec-Fetch-Site`)
-/// is refused, so a site the user visits can't reach it through the
-/// browser, even by pointing its own name at 127.0.0.1.
 final class NoticeListener: @unchecked Sendable {
     typealias Respond = @Sendable (_ request: NoticeRequest, _ login: String?) async -> NoticeVerdict
 
-    /// Why the listener couldn't start.
     struct Failure: Error, CustomStringConvertible {
         var description: String
     }
 
-    /// The port it's bound to: the one asked for, or the system's pick for 0.
     let port: Int
 
     private let source: DispatchSourceRead
     private let respond: Respond
-    /// The connections being served now, at most `mostConnections`.
     private let serving = OSAllocatedUnfairLock(initialState: 0)
-    /// The most connections served at once, so a flood of them can't hold
-    /// every thread; a request past them is refused with 503 at once.
     static let mostConnections = 8
     private static let queue = DispatchQueue(label: "shipyard.notices", attributes: .concurrent)
-    /// How long a connection may wait for each read or write, and how long
-    /// it may take to send its whole request, so one that stalls or trickles
-    /// never holds a thread.
     private static let connectionTimeout: TimeInterval = 5
     static let requestDeadline: TimeInterval = 30
-    /// The most a request's head and its body may hold: the body, a notice
-    /// with the largest image (`TailnetWire.largestBody`).
     static let headLimit = 16 * 1024
     static let bodyLimit = TailnetWire.largestBody
 
@@ -58,7 +33,6 @@ final class NoticeListener: @unchecked Sendable {
         source.resume()
     }
 
-    /// Listens on 127.0.0.1 at `port` (0: any free port, for tests).
     static func start(port: Int, respond: @escaping Respond) throws(Failure) -> NoticeListener {
         let descriptor = socket(AF_INET, SOCK_STREAM, 0)
         guard descriptor >= 0 else { throw Failure(description: "couldn't open a socket: \(UnixSocket.reason())") }
@@ -84,7 +58,6 @@ final class NoticeListener: @unchecked Sendable {
         return NoticeListener(port: actual, descriptor: descriptor, respond: respond)
     }
 
-    /// The port `descriptor` is bound to, as the system says.
     private static func boundPort(_ descriptor: Int32) -> Int? {
         var address = sockaddr_in()
         var length = socklen_t(MemoryLayout<sockaddr_in>.size)
@@ -94,12 +67,10 @@ final class NoticeListener: @unchecked Sendable {
         return read == 0 ? Int(UInt16(bigEndian: address.sin_port)) : nil
     }
 
-    /// Stops listening. A request being answered still gets its answer.
     func close() {
         source.cancel()
     }
 
-    /// Accepts every waiting connection; the listening socket doesn't block.
     private func acceptAll(_ descriptor: Int32) {
         while true {
             let connection = accept(descriptor, nil, nil)
@@ -119,7 +90,6 @@ final class NoticeListener: @unchecked Sendable {
         }
     }
 
-    /// Answers one connection: reads its request, answers, closes.
     private func serve(_ connection: Int32) {
         let request = Self.read(connection)
         let respond = respond
@@ -132,29 +102,23 @@ final class NoticeListener: @unchecked Sendable {
         }
     }
 
-    /// Answers a connection past `mostConnections` with 503, unread, and closes it.
     private static func turnAway(_ connection: Int32) {
         let busy = NoticeVerdict.refused("shipyard is answering \(mostConnections) other requests; try again in a moment")
         _ = UnixSocket.writeAll(connection, response(status: 503, verdict: busy))
         Darwin.close(connection)
     }
 
-    /// A request as far as it was read: its head and body, or the status
-    /// and reason it was refused with before it was read through.
     enum Request {
         case read(Head, body: Data)
         case refused(Int, String)
     }
 
-    /// A request's line and headers.
     struct Head {
         var method: String
         var target: String
-        /// Header names lowercased; a repeated header keeps its first value.
         var headers: [String: String]
     }
 
-    /// The verdict for `request`, and the HTTP status it's sent with.
     static func answer(_ request: Request, respond: Respond) async -> (Int, NoticeVerdict) {
         switch request {
         case .refused(let status, let why):
@@ -177,7 +141,6 @@ final class NoticeListener: @unchecked Sendable {
         }
     }
 
-    /// The bytes of an answer: `status` and the verdict as JSON.
     static func response(status: Int, verdict: NoticeVerdict) -> Data {
         let body = verdict.encoded()
         let reason = reasons[status] ?? "Error"
@@ -186,18 +149,12 @@ final class NoticeListener: @unchecked Sendable {
         return Data(head.utf8) + body
     }
 
-    /// The reason phrases of the statuses it answers with, in ASCII
-    /// whatever the Mac's language.
     static let reasons = [
         200: "OK", 400: "Bad Request", 403: "Forbidden", 404: "Not Found", 405: "Method Not Allowed",
         408: "Request Timeout", 411: "Length Required", 413: "Content Too Large", 431: "Request Header Fields Too Large",
         503: "Service Unavailable",
     ]
 
-    /// Reads one request off `connection`: the head up to its blank line,
-    /// then the body `Content-Length` says, after a `100 Continue` when the
-    /// client waits for one. A head without a login (`parseHead` refuses a
-    /// doubled one) is refused before the body is read.
     static func read(_ connection: Int32) -> Request {
         let deadline = Date().addingTimeInterval(requestDeadline)
         let late = Request.refused(408, "the request took longer than \(Int(requestDeadline)) seconds to arrive")
@@ -234,7 +191,6 @@ final class NoticeListener: @unchecked Sendable {
         return .read(head, body: body.prefix(length))
     }
 
-    /// The next bytes the peer sent; `nil` when it closed, failed or timed out.
     private static func receive(_ connection: Int32) -> Data? {
         var buffer = [UInt8](repeating: 0, count: 4096)
         while true {
@@ -245,9 +201,6 @@ final class NoticeListener: @unchecked Sendable {
         }
     }
 
-    /// The request line and headers in `data`, read strictly: a header name
-    /// with space in it, a folded line, or the login header twice doesn't
-    /// read, so nothing can pass for the login `tailscale serve` set.
     static func parseHead(_ data: Data) -> Head? {
         guard let text = String(data: data, encoding: .utf8) else { return nil }
         var lines = text.components(separatedBy: "\r\n")

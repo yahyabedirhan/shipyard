@@ -38,8 +38,6 @@ public enum Arrangement {
         )
     }
 
-    /// `groups(_:…)` over rows that already carry their attention flags,
-    /// each group counting its rows that need attention.
     static func groups(
         rows: [MenuRow],
         project: String,
@@ -67,7 +65,6 @@ public enum Arrangement {
         }
     }
 
-    /// The group `item` falls into.
     static func key(for item: Item, settings: ArrangementSettings, now: Date, calendar: Calendar) -> GroupKey {
         switch settings.groupBy {
         case .kind: .kind(item.kind)
@@ -79,8 +76,6 @@ public enum Arrangement {
         }
     }
 
-    /// The date an item sorts and buckets by: when it was created, or when
-    /// it last changed (for a closed or finished one, when it closed).
     static func sortDate(_ item: Item, _ sortBy: SortBy) -> Date {
         switch sortBy {
         case .created: item.createdAt
@@ -88,8 +83,6 @@ public enum Arrangement {
         }
     }
 
-    /// Open (or running) first; then newest first, or A to Z by title
-    /// (newest first between equal titles); then in the order given.
     private static func comesFirst(
         _ a: (offset: Int, row: MenuRow),
         _ b: (offset: Int, row: MenuRow),
@@ -106,8 +99,6 @@ public enum Arrangement {
         return a.offset < b.offset
     }
 
-    /// Kinds in the menu's kind order, dates newest first, repositories,
-    /// authors and senders A to Z ignoring case; senders after authors.
     private static func groupOrder(_ a: GroupKey, _ b: GroupKey) -> Bool {
         switch (a, b) {
         case (.kind(let left), .kind(let right)):
@@ -133,14 +124,10 @@ public enum Arrangement {
 /// The key a group is known by: what its items share.
 public enum GroupKey: Hashable, Sendable {
     case kind(ItemKind)
-    /// `owner/name`
     case repository(String)
     case date(DateBucket)
-    /// The author's login, without `@`.
     case author(String)
-    /// Who sent a ping (`--from`), under `group-by = "author"`.
     case sender(String)
-    /// The one group of `group-by = "none"`.
     case ungrouped
 }
 

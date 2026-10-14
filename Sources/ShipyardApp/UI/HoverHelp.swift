@@ -2,31 +2,15 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-/// How the hover help looks and when it shows.
 enum HoverHelp {
-    /// Where the help is, which decides its timing.
     enum Context {
-        /// The header's buttons, the account and the tabs: small targets
-        /// people move between on purpose, so help comes quickly and
-        /// glides from one to the next, as native tooltips do.
         case toolbar
-        /// The item rows: the pointer crosses them on its way elsewhere,
-        /// so help waits longer, closes as the pointer leaves, and each row
-        /// waits again rather than the card following the pointer down.
         case row
     }
 
-    /// When help shows and hides.
     struct Timing {
-        /// How long the pointer rests on a view before its help shows.
         let delay: Duration
-        /// How long after help hides that the next in the same context
-        /// shows without `delay`; zero makes every view wait `delay`, and
-        /// the card never glides from one to the next.
         let warmth: TimeInterval
-        /// How long help waits after the pointer leaves a view before
-        /// hiding, so moving to the next glides the card rather than
-        /// blinking it.
         let grace: Duration
     }
 
@@ -36,28 +20,15 @@ enum HoverHelp {
         case .row: Timing(delay: .milliseconds(1000), warmth: 0, grace: .zero)
         }
     }
-    /// A row card's avatar.
     static let avatarSize: CGFloat = 20
-    /// The space between a row card's avatar and its title.
     static let avatarGap: CGFloat = 8
-    /// The widest the card gets; longer lines wrap.
     static let maxWidth: CGFloat = 320
-    /// How far the card stays in from the panel's edges.
     static let margin: CGFloat = 6
-    /// The card's padding, so a row's help can line its text up with the
-    /// row's title.
     static let horizontalPadding: CGFloat = 8
-    /// How far in from a row's leading edge its help starts: the card's
-    /// text under the row's title.
     static let rowInset = Grid.gutter + Grid.dotColumn + Grid.iconColumn - horizontalPadding
 }
 
 extension View {
-    /// Shows `text` when the pointer rests on this view, and gives it to
-    /// VoiceOver as the view's hint (as `.help` did); `nil` shows nothing.
-    /// `context` sets its timing. A view wider than the help (a row) lines
-    /// the help up `leadingInset` in from its leading edge; a narrower one
-    /// centres it.
     func hoverHelp(
         _ text: String?,
         context: HoverHelp.Context = .toolbar,
@@ -66,20 +37,14 @@ extension View {
         modifier(HoverHelpSource(content: text.map(HoverHelpContent.text), context: context, leadingInset: leadingInset))
     }
 
-    /// `hoverHelp(_:context:leadingInset:)` for a line of Markdown, so a
-    /// command in backticks reads in code font; VoiceOver hears it without them.
     func hoverHelp(markdown text: String, context: HoverHelp.Context = .toolbar) -> some View {
         modifier(HoverHelpSource(content: .markdown(text), context: context, leadingInset: Grid.gutter))
     }
 
-    /// Shows a row's card when the pointer rests on it, lined up
-    /// `leadingInset` in from the row's leading edge, with the row's timing.
     func hoverHelp(_ card: RowCard, leadingInset: CGFloat) -> some View {
         modifier(HoverHelpSource(content: .row(card), context: .row, leadingInset: leadingInset))
     }
 
-    /// Draws the hover help of the views inside it: once, on the panel, so
-    /// the card can reach past a scroll view's clip and stays inside the panel.
     func hoverHelpHost() -> some View {
         overlayPreferenceValue(HoverHelpKey.self) { source in
             GeometryReader { proxy in
@@ -97,14 +62,11 @@ extension View {
     }
 }
 
-/// What a hover card shows: a line or two of help, or a row's card.
 enum HoverHelpContent: Hashable {
     case text(String)
-    /// One line of Markdown (inline code, links).
     case markdown(String)
     case row(RowCard)
 
-    /// What VoiceOver reads as the view's hint.
     var spoken: String {
         switch self {
         case .text(let text): text
@@ -114,7 +76,6 @@ enum HoverHelpContent: Hashable {
     }
 }
 
-/// The hovered view's help, handed up to `hoverHelpHost()`.
 private struct HoverHelpAnchor {
     let id: UUID
     let content: HoverHelpContent
@@ -131,7 +92,6 @@ private struct HoverHelpKey: PreferenceKey {
     }
 }
 
-/// `hoverHelp(_:context:leadingInset:)`.
 private struct HoverHelpSource: ViewModifier {
     let content: HoverHelpContent?
     let context: HoverHelp.Context
@@ -154,7 +114,6 @@ private struct HoverHelpSource: ViewModifier {
     }
 }
 
-/// The hovered view's help, placed in the host's space.
 private struct HoverHelpRequest: Equatable {
     let id: UUID
     let content: HoverHelpContent
@@ -162,7 +121,6 @@ private struct HoverHelpRequest: Equatable {
     let target: CGRect
     let leadingInset: CGFloat
 
-    /// What changes the help: a new view, or new words on the same one.
     struct Key: Hashable {
         let id: UUID
         let content: HoverHelpContent
@@ -171,10 +129,6 @@ private struct HoverHelpRequest: Equatable {
     var key: Key { Key(id: id, content: content) }
 }
 
-/// The card, shown its context's delay after the pointer rests on a view
-/// with help (at once while it's warm), gliding to the next view where the
-/// context allows it, fading out when the pointer leaves. It never takes
-/// the pointer from the rows under it.
 private struct HoverHelpOverlay: View {
     let request: HoverHelpRequest?
     @State private var shown: HoverHelpRequest?
@@ -225,8 +179,6 @@ private struct HoverHelpOverlay: View {
     }
 }
 
-/// Places the card by `HoverHelpPlacement`: under or over `target`, inside
-/// the host, as wide as its text up to `HoverHelp.maxWidth`.
 private struct HoverHelpLayout: Layout {
     let target: CGRect
     let leadingInset: CGFloat
@@ -261,8 +213,6 @@ extension HoverHelpPlacement.Rect {
     }
 }
 
-/// The card: the help on the system's popover material, with the panel's
-/// hairline and a soft shadow.
 private struct HoverHelpCard: View {
     let content: HoverHelpContent
 
@@ -282,7 +232,6 @@ extension HoverHelpContent {
     }
 }
 
-/// What the card shows: the help's words, or a row's card.
 private struct HoverHelpBody: View {
     let content: HoverHelpContent
 
@@ -297,9 +246,6 @@ private struct HoverHelpBody: View {
     }
 }
 
-/// A row's card: the author's avatar (a known agent's mark, for a ping it
-/// sent) centred beside the full title, then,
-/// under the title, its tags and facts.
 private struct RowCardView: View {
     let card: RowCard
 
@@ -339,8 +285,6 @@ private struct RowCardView: View {
     }
 }
 
-/// A reason the row needs attention, as a tinted tag: a review request
-/// amber, failed checks red.
 private struct AttentionTag: View {
     let reason: Attention.Reason
     let kind: ItemKind
@@ -376,8 +320,6 @@ private struct AttentionTag: View {
     }
 }
 
-/// One fact: its icon, tinted where it says how things stand (review,
-/// checks, a run's time), and its words, short where the icon says the rest.
 private struct FactView: View {
     let fact: RowCard.Fact
 
@@ -464,7 +406,6 @@ private struct FactView: View {
         }
     }
 
-    /// What started a run, as an icon.
     private static func symbol(event: String?) -> String {
         switch event {
         case "push": "arrow.up.circle"
@@ -478,8 +419,6 @@ private struct FactView: View {
     }
 }
 
-/// The author's avatar, a circle; a person glyph while it loads or when
-/// GitHub gave none.
 private struct AuthorAvatar: View {
     let url: URL?
 
@@ -497,8 +436,6 @@ private struct AuthorAvatar: View {
     }
 }
 
-/// The help's words: its first line in the primary colour, the lines under
-/// it quieter.
 private struct HoverHelpText: View {
     let text: String
 

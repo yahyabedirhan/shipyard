@@ -8,14 +8,9 @@ import Foundation
 public struct MenuRowPlace: Hashable, Sendable {
     /// What a place holds. A new stop for the keys is one more case.
     public enum Kind: Hashable, Sendable {
-        /// An item: its `MenuRow.id`.
         case item(String)
-        /// The list layout's header of the project in `section`.
         case projectHeader
-        /// A subsection's subheader.
         case groupHeader(GroupID)
-        /// A capped group's Show more row, which reads Show less while the
-        /// group is expanded.
         case showMore(GroupID)
     }
 
@@ -91,7 +86,6 @@ public enum MenuFold: Equatable, Sendable {
 public struct RowHighlight: Equatable, Sendable {
     /// The highlighted row; `nil` when none is.
     public private(set) var place: MenuRowPlace?
-    /// The row under the pointer, from its enter and exit events.
     private var underPointer: MenuRowPlace?
     /// Whether the pointer drives the highlight; `false` after a key,
     /// until the pointer moves.
@@ -241,15 +235,12 @@ public struct RowHighlight: Equatable, Sendable {
         return foldRight(group, in: nil)
     }
 
-    /// ← on `group`'s subheader: folds it unless it's folded already.
     private mutating func foldLeft(_ group: RowGroup) -> MenuFold? {
         guard !group.isFolded else { return nil }
         followsPointer = false
         return .fold(group.id)
     }
 
-    /// → on `group`'s subheader, listed under `section`: unfolds it, or goes
-    /// to its first item.
     private mutating func foldRight(_ group: RowGroup, in section: String?) -> MenuFold? {
         if group.isFolded {
             followsPointer = false
@@ -259,7 +250,6 @@ public struct RowHighlight: Equatable, Sendable {
         return nil
     }
 
-    /// The keys move the highlight to `place`.
     private mutating func moveTo(_ place: MenuRowPlace) {
         followsPointer = false
         self.place = place
@@ -296,7 +286,6 @@ extension RowGroup {
             + (hasShowMore ? [.showMore(id, in: section)] : [])
     }
 
-    /// Its row with the id `id`, unless it's folded away.
     func visibleRow(_ id: String) -> MenuRow? {
         isFolded ? nil : rows.first { $0.id == id }
     }

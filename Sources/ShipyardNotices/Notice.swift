@@ -139,9 +139,7 @@ public struct NoticeImage: Codable, Equatable, Hashable, Sendable {
 /// sound macOS knows by name. In JSON, one string: `default`, `none` or the name.
 public enum NoticeSound: Codable, Equatable, Hashable, Sendable {
     case `default`
-    /// No sound: `none` on the command line and in JSON.
     case silent
-    /// A sound by its name, without its extension (`Glass`).
     case named(String)
 
     public init(_ text: String) {
@@ -173,9 +171,7 @@ public enum NoticeSound: Codable, Equatable, Hashable, Sendable {
 /// How much a notice interrupts (`--level`). Critical and time-sensitive
 /// need entitlements shipyard doesn't have, so they aren't offered.
 public enum NoticeLevel: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
-    /// Shown in Notification Center without a banner or a sound lighting the screen.
     case passive
-    /// A banner, as any notification: the default.
     case active
 }
 
@@ -196,10 +192,7 @@ public struct NoticeButton: Codable, Equatable, Hashable, Sendable {
 /// notice to show is the notice's own JSON, unchanged; a withdrawal is
 /// `{"withdraw":"<id>"}`.
 public enum NoticeRequest: Codable, Equatable, Sendable {
-    /// `shipyard notice send "<title>" …`.
     case show(Notice)
-    /// `shipyard notice withdraw <id>`: the notice shown under `id` leaves
-    /// Notification Center. One that's gone already, or never was, is no error.
     case withdraw(id: String)
 
     private enum CodingKeys: String, CodingKey {
@@ -228,15 +221,8 @@ public enum NoticeRequest: Codable, Equatable, Sendable {
 
 /// What came of a notice request, as the agent that sent it learns it.
 public enum NoticeVerdict: Equatable, Sendable {
-    /// The app did it: posted the notice, or withdrew it.
     case shown
-    /// It waits on this machine for the Mac's next poll of it, which
-    /// shows it by the same rules, or drops it when it's waited too long;
-    /// for a withdrawal, the waiting notice was taken away. Only a route
-    /// that can't reach the app at once says this.
     case queued
-    /// It wasn't done: why, in one line, such as "notices are off for
-    /// project `shop`" or "shipyard isn't running, so this notice wasn't shown".
     case refused(String)
 }
 
@@ -246,15 +232,8 @@ public enum NoticeVerdict: Equatable, Sendable {
 /// way, the herdr-shipyard plugin, which holds it for the Mac's poll
 /// (`PluginNoticeRoute`).
 public protocol NoticeRoute: Sendable {
-    /// Hands `request` to the app, sent by the command run in
-    /// `environment`, and waits for its verdict. A route that can't reach
-    /// the app refuses, saying so; it never starts the app.
     func deliver(_ request: NoticeRequest, environment: CommandEnvironment) -> NoticeVerdict
 
-    /// Why this route can't carry `notice` at all, read from the notice
-    /// alone, before anything is sent: the command exits 2 with it, as for
-    /// arguments that don't read. `nil` when it can (every route but the
-    /// tailnet's, which can't carry a Herdr action).
     func unfit(_ notice: Notice) -> String?
 }
 

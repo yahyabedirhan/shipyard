@@ -82,7 +82,6 @@ extension PanelText {
             : "this run doesn't read notes"
     }
 
-    /// A workspace's name in curly quotes: “Notes”.
     private static func quoted(_ name: String) -> String {
         "\u{201C}\(name)\u{201D}"
     }

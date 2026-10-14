@@ -114,8 +114,6 @@ public struct NotifiedEvents: Equatable, Sendable {
         records[event.item.id, default: Record(events: [], present: now)].events.insert(Self.unfiledKey(event))
     }
 
-    /// Whether `recorded`, one of an item's recorded events, is `event`'s:
-    /// handled, or passed over while unfiled.
     static func records(_ recorded: String, as event: Event) -> Bool {
         recorded == key(event) || recorded == unfiledKey(event)
     }
@@ -155,14 +153,12 @@ public struct NotifiedEvents: Equatable, Sendable {
         return changed || records.count != before
     }
 
-    /// How `event` is recorded in its item's record: its kind, then its occurrence.
     static func key(_ event: Event) -> String {
         event.occurrence.isEmpty ? event.kind.rawValue : "\(event.kind.rawValue) \(event.occurrence)"
     }
 
     private static let unfiledPrefix = "unfiled "
 
-    /// How `event` is recorded while passed over unfiled: `unfiled `, then its key.
     private static func unfiledKey(_ event: Event) -> String {
         unfiledPrefix + key(event)
     }

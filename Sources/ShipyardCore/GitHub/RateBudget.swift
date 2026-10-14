@@ -3,9 +3,7 @@ import ShipyardConfig
 
 /// One of GitHub's two hourly limits shipyard spends.
 public enum RateAPI: String, CaseIterable, Equatable, Hashable, Sendable {
-    /// GraphQL points: pull requests and issues.
     case graphql
-    /// REST requests (the `core` resource): workflow runs.
     case rest
 
     /// For the footer: "GraphQL", "REST".
@@ -20,9 +18,7 @@ public enum RateAPI: String, CaseIterable, Equatable, Hashable, Sendable {
 /// How full one limit is, for the indicator's colour.
 public enum RateLevel: Int, Comparable, Equatable, Sendable {
     case normal
-    /// Under 25% remaining (amber).
     case low
-    /// Nothing remaining until the reset time (red).
     case exhausted
 
     public static func < (lhs: RateLevel, rhs: RateLevel) -> Bool { lhs.rawValue < rhs.rawValue }
@@ -30,9 +26,7 @@ public enum RateLevel: Int, Comparable, Equatable, Sendable {
 
 /// Why refreshing is paused.
 public enum PauseReason: Equatable, Sendable {
-    /// An hourly limit ran out; it comes back at the reset time.
     case exhausted(RateAPI)
-    /// GitHub's secondary limit (too much too fast) asked shipyard to wait.
     case secondaryLimit
 }
 
@@ -50,16 +44,9 @@ public struct RatePause: Equatable, Sendable {
 /// When the next refresh runs, and why then. The panel says it when it
 /// isn't simply the configured interval.
 public enum RefreshDelay: Equatable, Sendable {
-    /// The configured interval fits the budget.
     case configured(TimeInterval)
-    /// The configured interval would spend more than the share of `api`'s
-    /// hourly limit at the measured cost (average points or requests per
-    /// refresh), so it's stretched to `seconds`.
     case stretched(TimeInterval, api: RateAPI, cost: Double)
-    /// `api` has under 20% left (other tools are using it): every 10 minutes
-    /// (or the stretched interval, when that's longer).
     case backedOff(TimeInterval, api: RateAPI)
-    /// Nothing runs until `until`.
     case paused(until: Date, reason: PauseReason)
 
     /// How long to wait from `now`.
@@ -182,7 +169,6 @@ public struct RateBudget: Equatable, Sendable {
         costs[api] = recent
     }
 
-    /// Keeps the later of two pauses.
     private mutating func pauseUntil(_ until: Date, reason: PauseReason) {
         if let pause, pause.until >= until { return }
         pause = RatePause(until: until, reason: reason)
@@ -255,8 +241,6 @@ public struct RateBudget: Equatable, Sendable {
         return pause
     }
 
-    /// The share of `api`'s limit left, while its window lasts; `nil` when
-    /// unknown or when the window has reset since.
     private func share(of api: RateAPI, at now: Date) -> Double? {
         guard let limit = limits[api], limit.limit > 0, limit.resetAt > now else { return nil }
         return Double(max(0, limit.remaining)) / Double(limit.limit)

@@ -127,8 +127,6 @@ extension AppState: Codable {
     }
 }
 
-/// Decodes a value, or `nil` when it can't, so one unreadable entry doesn't
-/// fail the collection around it.
 private struct Lossy<Value: Decodable>: Decodable {
     var value: Value?
 
@@ -149,11 +147,8 @@ private struct Lossy<Value: Decodable>: Decodable {
 public final class AppStateStore {
     /// What `load` found.
     public enum LoadResult: Equatable, Sendable {
-        /// No file yet: a first run.
         case missing
         case loaded
-        /// The file was unreadable; it was moved to this URL and the state
-        /// starts empty.
         case setAside(URL)
     }
 
@@ -210,7 +205,6 @@ public final class AppStateStore {
         }
     }
 
-    /// Moves the unreadable file out of the way, keeping it for a look later.
     private func setAside(at now: Date) -> URL {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")

@@ -2,44 +2,22 @@ import Foundation
 
 /// What one read of the notes came to.
 public enum NotesReading: Equatable, Sendable {
-    /// Each project that has a notes database, by slug: its open notes, or
-    /// why its query failed. A project without a database isn't there.
     case read([String: Result<[Note], NotionError>])
-    /// No page in ntn's workspace is titled "Shipyard Notes": ntn's
-    /// default workspace isn't the notes workspace, or the page is gone.
     case noEntryPage
-    /// Nothing could be read (no ntn, ntn logged out, Notion out of
-    /// reach): every project's notes are unknown.
     case failed(NotionError)
 }
 
-/// Reads each project's open notes from Notion: finds the entry page
-/// ("Shipyard Notes") by search, then its child page "Projects", lists
-/// that page's child databases, matches each project to the one titled
-/// exactly its title, and queries that database's data source. The entry
-/// page, the Projects page, each database's data source and each untitled
-/// note's first line are remembered between reads, so a read costs one
-/// children listing and one query per project with a database; a page or
-/// database that went away is looked up again.
 @MainActor
 final class NotesReader {
-    /// The page every notes database hangs under, found by its exact title.
     nonisolated static let entryPageTitle = "Shipyard Notes"
-    /// The entry page's child page every project's database hangs under.
     nonisolated static let projectsPageTitle = "Projects"
 
-    /// The entry page's id, once search found it.
     private var entryPage: String?
-    /// The Projects page's id, once found under the entry page.
     private var projectsPage: String?
-    /// Each project's database, by slug, as the last read matched them.
     private(set) var databases: [String: String] = [:]
-    /// Each database's data source, by database id.
     private var dataSources: [String: String] = [:]
-    /// Each untitled note's first line, by page id, with the edit it was read at.
     private var firstLines: [String: (edited: Date, line: String?)] = [:]
 
-    /// Forgets everything found.
     func reset() {
         entryPage = nil
         projectsPage = nil
@@ -48,8 +26,6 @@ final class NotesReader {
         firstLines = [:]
     }
 
-    /// The open notes of each of `projects` that has a database, by slug,
-    /// through `client`.
     func read(projects: [(slug: String, title: String)], client: NotionClient) async -> NotesReading {
         do {
             guard let databases = try await databases(client) else {
@@ -77,17 +53,10 @@ final class NotesReader {
         }
     }
 
-    /// The project databases, under the entry page's Projects page; `nil`
-    /// when no page in ntn's workspace is titled "Shipyard Notes",
-    /// none when it has no Projects page yet.
     private func databases(_ client: NotionClient) async throws -> [(id: String, title: String)]? {
         try await entry(client)?.databases
     }
 
-    /// The entry page, its Projects page (`nil` while there's none) and that
-    /// page's child databases; `nil` when no page in ntn's workspace is
-    /// titled "Shipyard Notes". A remembered page that's gone (404) is
-    /// looked for again, once.
     private func entry(_ client: NotionClient) async throws -> (page: String, projects: String?, databases: [(id: String, title: String)])? {
         if let page = entryPage, let projects = projectsPage {
             do {
@@ -119,13 +88,6 @@ final class NotesReader {
         return (page, projects, try await client.childDatabases(of: projects))
     }
 
-    /// Starts a note in `project` (a slug), titled `title`: creates its
-    /// database under the Projects page (and that page under the entry
-    /// page, the first time) when none is titled exactly `title` (with the
-    /// fixed core and a prefix from the title that no other database's
-    /// `No.` uses), then an empty note in the database's data source.
-    /// Answers the note's Notion URL. A new database's data source is
-    /// remembered, so the next read finds it without asking.
     func startNote(in project: String, titled title: String, client: NotionClient) async -> Result<URL, NewNoteError> {
         do {
             guard let entry = try await entry(client) else { return .failure(.noEntryPage) }
@@ -162,7 +124,6 @@ final class NotesReader {
         }
     }
 
-    /// Database `database`'s data source: the remembered one, else its first.
     private func dataSource(of database: String, client: NotionClient) async throws -> String {
         if let known = dataSources[database] { return known }
         guard let first = try await client.dataSources(ofDatabase: database).first else {
@@ -172,7 +133,6 @@ final class NotesReader {
         return first
     }
 
-    /// The open notes of `database`, each untitled one with its body's first line.
     private func notes(in database: String, client: NotionClient) async -> Result<[Note], NotionError> {
         do {
             let source: String
@@ -201,8 +161,6 @@ final class NotesReader {
         }
     }
 
-    /// An untitled note's first line, read again only when the note was
-    /// edited since; a failed read shows the note as "Untitled" for now.
     private func firstLine(of note: Note, client: NotionClient) async -> String? {
         if let known = firstLines[note.id], known.edited == note.edited { return known.line }
         guard let line = try? await client.firstLine(ofPage: note.id) else { return nil }
@@ -213,10 +171,7 @@ final class NotesReader {
 
 /// Why the new-note icon couldn't start a note (`Shipyard.startNote`).
 public enum NewNoteError: Error, Equatable, Sendable {
-    /// This run reads no notes (a demo run).
     case notRead
-    /// ntn's workspace has no page titled "Shipyard Notes".
     case noEntryPage
-    /// A request to Notion failed.
     case notion(NotionError)
 }

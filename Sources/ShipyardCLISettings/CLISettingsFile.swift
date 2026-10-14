@@ -70,9 +70,7 @@ public struct CLISettingsFile: Equatable, Sendable {
     }
 
     private enum LoadFailure: Error {
-        /// The file is there but its bytes don't come.
         case unreadable(String)
-        /// The bytes come but don't read as settings.
         case invalid([CLISettingsIssue])
     }
 

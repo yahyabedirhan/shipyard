@@ -50,11 +50,7 @@ public struct PingList: Equatable, Sendable {
 
     /// Why a list doesn't read.
     public enum DecodeError: Error, Equatable, Sendable {
-        /// The list is another contract version, from the shipyard version
-        /// named (when it says): shipyard on that machine (or on the Mac, for
-        /// a newer one) needs updating.
         case unsupportedVersion(Int, shipyardVersion: String?)
-        /// Not a ping list: not JSON, or a field missing or of the wrong type.
         case unreadable(String)
 
         /// What to tell the user about `machine` (its Herdr label).
@@ -152,8 +148,6 @@ public struct PingList: Equatable, Sendable {
         var truncated: Bool
     }
 
-    /// A listed ping, read with only the fields it's sent with, and an
-    /// action of an unknown kind read as none.
     private struct ListedPing: Decodable {
         var ping: Ping
 
@@ -196,7 +190,6 @@ public struct PingList: Equatable, Sendable {
         }
     }
 
-    /// Strings, dates and URLs always encode, so neither of these fails.
     private static func document(_ list: PingList) -> String {
         String(decoding: try! encoder.encode(Envelope(list: list)), as: UTF8.self)
     }

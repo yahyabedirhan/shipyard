@@ -3,24 +3,17 @@ import Observation
 
 /// What the CLI link finds at a path, without following a symbolic link.
 public enum LinkEntry: Equatable, Sendable {
-    /// Nothing is there.
     case none
-    /// A symbolic link, with its destination as written (possibly relative).
     case link(destination: String)
-    /// A file, a folder, or anything else that isn't a link.
     case other
 }
 
 /// The few file operations the CLI link needs, so tests can fail one (no
 /// permission) without changing a real folder's permissions.
 public protocol LinkFileSystem: Sendable {
-    /// Whether a file is at `url`, following links.
     func fileExists(at url: URL) -> Bool
-    /// What is at `url` itself.
     func entry(at url: URL) -> LinkEntry
-    /// Creates the folder at `url` and any it's in; one already there is fine.
     func createDirectory(at url: URL) throws
-    /// Creates a symbolic link at `url` to `destination`.
     func createSymbolicLink(at url: URL, to destination: URL) throws
 }
 
@@ -63,17 +56,10 @@ public struct FileManagerLinkFileSystem: LinkFileSystem {
 public final class CLILink {
     /// What the link looks like now.
     public enum State: Equatable, Sendable {
-        /// No link yet: the offer to link.
         case unlinked
-        /// `~/.local/bin/shipyard` points at this app's CLI.
         case linked
-        /// Something else is at `~/.local/bin/shipyard`: a link to
-        /// `destination`, or a file or folder when it's `nil`.
         case occupied(destination: String?)
-        /// Making the link failed, with the system's reason (no permission).
         case failed(String)
-        /// This copy of the app has no CLI inside it (it isn't running from
-        /// `Shipyard.app`), so there's nothing to link.
         case missingCLI
         /// macOS runs this copy from a temporary, read-only path (App
         /// Translocation: the app was opened where it was downloaded, not
@@ -82,10 +68,8 @@ public final class CLILink {
         case translocated
     }
 
-    /// Where the link goes, as the user writes it.
     nonisolated public static let displayPath = "~/.local/bin/shipyard"
 
-    /// Where the app bundles its CLI: `Contents/Helpers/shipyard` in `bundle`.
     nonisolated public static func bundledCLI(in bundle: URL) -> URL {
         bundle.appendingPathComponent("Contents/Helpers/shipyard", isDirectory: false)
     }
@@ -154,7 +138,6 @@ public final class CLILink {
         }
     }
 
-    /// `path` as one shell word: as it is when it's plain, else single-quoted.
     nonisolated static func shellQuoted(_ path: String) -> String {
         let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-+")
         if !path.isEmpty, path.unicodeScalars.allSatisfy(plain.contains) { return path }

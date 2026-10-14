@@ -109,7 +109,6 @@ extension ConfigurationCheck: Encodable {
         try container.encode(warnings.map { Entry(issue: $0, name: name) }, forKey: .warnings)
     }
 
-    /// `date` in UTC, truncated to the second as `date -r` prints a file's time.
     private static func wholeSeconds(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.timeZone = TimeZone(identifier: "UTC")

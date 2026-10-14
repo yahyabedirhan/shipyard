@@ -91,8 +91,6 @@ public enum NoticeRules {
         return .success(first.title)
     }
 
-    /// Whether a project's rules (`settings.notifications`, its own list or
-    /// the defaults) select an agent's notice.
     static func selects(_ settings: ProjectSettings) -> Bool {
         settings.notifications.contains { $0.event == .agentNotice && $0.authors.isEmpty }
     }
@@ -135,10 +133,6 @@ public enum NoticeRules {
         public var machine: String?
     }
 
-    /// The URL that runs `action` of `notice` when its notification is
-    /// clicked or a button pressed: `clickURL` with the `Click` as JSON in
-    /// its `click` query item. The notice isn't kept, so the notification
-    /// carries what its click does.
     static func clickURL(for action: PingAction, in notice: Notice, machine: String?) -> URL {
         let herdr = if case .herdr = action { true } else { false }
         let click = Click(

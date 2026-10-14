@@ -161,8 +161,6 @@ public enum NotesCheck {
         report.problems += try await indexProblems(entry: entry, databases: found, client: client)
     }
 
-    /// What's wrong with a notes database's properties: the four the app
-    /// reads, with their types, a prefix, and Status's two options.
     static func schemaProblems(_ schema: [String: NotesSchemaProperty], database: String) -> [NotesCheckReport.Problem] {
         var problems: [NotesCheckReport.Problem] = []
         let expected: [(String, String)] = [
@@ -191,8 +189,6 @@ public enum NotesCheck {
         return problems
     }
 
-    /// What the home page's Projects index is missing or has wrong: a row
-    /// (project, prefix, …) for each database, with its prefix.
     private static func indexProblems(entry: String, databases: [String: String?], client: NotionClient) async throws -> [NotesCheckReport.Problem] {
         let rows = try await client.firstTableRows(onPage: entry).dropFirst()
         var listed: [String: String] = [:]

@@ -2,16 +2,11 @@ import AppKit
 import ShipyardCore
 import ShipyardPings
 
-/// Opens items in the browser, runs pings' link and app actions (and so
-/// brings `[herdr] terminal` forward), and opens documents in their editor,
-/// through `NSWorkspace`.
 struct WorkspaceActions: ActionRunning {
     func open(_ url: URL) {
         Task { @MainActor in NSWorkspace.shared.open(url) }
     }
 
-    /// Opens a ping's link in the app that handles it, or brings its app
-    /// forward (launching it when it isn't running).
     func run(_ action: PingAction) async -> ActionOutcome {
         switch action {
         case .url(let url):
@@ -24,8 +19,6 @@ struct WorkspaceActions: ActionRunning {
         }
     }
 
-    /// Launches or brings forward the app `app` names, by bundle id first,
-    /// then by name in the usual Applications folders.
     @MainActor
     private static func activate(_ app: String) async -> ActionOutcome {
         let workspace = NSWorkspace.shared
@@ -41,8 +34,6 @@ struct WorkspaceActions: ActionRunning {
         }
     }
 
-    /// `<name>.app` in `/Applications`, `~/Applications` or the system's
-    /// Applications folders, if it's there.
     private static func application(named name: String) -> URL? {
         let bundle = name.hasSuffix(".app") ? name : name + ".app"
         let folders = [
@@ -57,8 +48,6 @@ struct WorkspaceActions: ActionRunning {
             .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
-    /// Opens a local file in the app registered for its type, or in
-    /// TextEdit when none is (`.toml` often has no app).
     @MainActor
     func openDocument(_ url: URL) {
         let workspace = NSWorkspace.shared

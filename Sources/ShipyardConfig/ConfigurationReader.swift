@@ -48,8 +48,6 @@ extension Configuration {
 }
 
 extension ConfigurationIssue {
-    /// TOMLDecoder's parse errors carry the line only in their description,
-    /// as "(Line 3) Syntax error: …".
     init(invalidTOML error: any Error) {
         let (line, detail) = Self.splitLine(from: String(describing: error))
         self.init(line: line, message: "invalid TOML: \(detail)")
@@ -65,8 +63,6 @@ extension ConfigurationIssue {
     }
 }
 
-/// Walks the parsed document key by key, filling a `Configuration`,
-/// collecting errors (which reject the file) and warnings (which don't).
 final class ConfigurationReader {
     private let map: TOMLSourceMap
     private(set) var errors: [ConfigurationIssue] = []
@@ -74,7 +70,6 @@ final class ConfigurationReader {
 
     init(map: TOMLSourceMap) { self.map = map }
 
-    /// A table and where it sits in the file.
     struct Node {
         let table: TOMLTable
         let path: ConfigurationPath
@@ -219,16 +214,11 @@ final class ConfigurationReader {
         return config
     }
 
-    /// The warning for a file that sets keys without `version`.
     static let missingVersionMessage = "the file sets no `version`: add `version = \(Configuration.supportedVersion)` at the top; "
         + "from version 2, a file without it is an error"
 
-    /// The shortest `refresh-interval`, in seconds.
     static let shortestRefreshInterval: TimeInterval = 30
 
-    /// `[remote] machines`: Herdr labels, trimmed. A label that's empty,
-    /// starts with `-` (it would read as a flag of `herdr`), holds a
-    /// control character or comes twice is an error.
     private func readMachines(_ labels: [String], at path: ConfigurationPath) -> [String] {
         var machines: [String] = []
         for raw in labels {
@@ -300,10 +290,6 @@ final class ConfigurationReader {
         return project
     }
 
-    /// A project's `slug` and `title` (the slug when unset); `nil`, with
-    /// the errors recorded, when they don't read. The old `name` still
-    /// reads in their place, with a warning: its title is the name, and its
-    /// slug the name made into one (`Configuration.slug(from:)`).
     private func projectIdentity(_ node: Node) -> (slug: String, title: String)? {
         if node.table.contains(key: "name") { return oldProjectName(node) }
         guard node.table.contains(key: "slug") else {
@@ -329,8 +315,6 @@ final class ConfigurationReader {
         return validSlug ? (slug, title) : nil
     }
 
-    /// The old `name` of a project, as its slug and title, with a warning
-    /// giving them; with `slug` or `title` beside it, an error on its line.
     private func oldProjectName(_ node: Node) -> (slug: String, title: String)? {
         let path = node.path + [.key("name")]
         if node.table.contains(key: "slug") || node.table.contains(key: "title") {
@@ -354,10 +338,6 @@ final class ConfigurationReader {
         return (slug, name)
     }
 
-    /// `anywhere` finds only pull requests waiting on the user, so a project
-    /// using it must list exactly those: pull requests shown with
-    /// `review-requested = true` (in the project or its defaults), and no
-    /// issues or runs.
     private static func allowsAnywhere(_ project: Configuration.Project, defaults: Configuration.Defaults) -> Bool {
         let pullRequests = project.pullRequests.applied(to: defaults.pullRequests)
         return pullRequests.show && pullRequests.reviewRequested
@@ -367,8 +347,6 @@ final class ConfigurationReader {
 
     static let anywhereMessage = "`anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs"
 
-    /// The keys that arrange a project, written straight under `[defaults]`
-    /// or in a `[[projects]]` block.
     static let arrangementKeys = ["group-by", "subsections", "sort-by", "show-first"]
 
     private func arrangement(_ node: Node) -> ArrangementOverrides {
@@ -416,8 +394,6 @@ final class ConfigurationReader {
         )
     }
 
-    /// The filters pull requests, issues or runs take that pings don't: each
-    /// is rejected on its own line rather than ignored, so a wrong edit is caught.
     static let notPingKeys = ["states", "authors", "drafts", "review-requested"]
 
     private func pings(_ parent: Node) -> PingOverrides {
@@ -429,8 +405,6 @@ final class ConfigurationReader {
         return PingOverrides(show: bool(node, "show"), seenWindow: duration(node, "seen-window"))
     }
 
-    /// The filters other kinds take that notes don't: each is rejected on
-    /// its line, since a note lists while it's open in Notion.
     static let notNoteKeys = notPingKeys + ["seen-window"]
 
     private func notes(_ parent: Node) -> NoteOverrides {
@@ -442,9 +416,6 @@ final class ConfigurationReader {
         return NoteOverrides(show: bool(node, "show"))
     }
 
-    /// A kind's `states`: a list of the states that kind takes. Each one it
-    /// doesn't take is an error on its own line, with the nearest one it
-    /// does take suggested.
     private func states(_ node: Node, of kind: ItemKind) -> Set<StateGroup>? {
         guard let texts = strings(node, "states") else { return nil }
         let valid = StateGroup.all(for: kind).map(\.rawValue)
@@ -463,9 +434,6 @@ final class ConfigurationReader {
         return readable ? states : nil
     }
 
-    /// `[menu] header-counts`: a list of kind names. A name that isn't a
-    /// kind's is an error on its own line, with the nearest one suggested;
-    /// so is a name listed twice.
     private func headerCounts(_ node: Node) -> [ItemKind]? {
         guard let texts = strings(node, "header-counts") else { return nil }
         let path = node.path + [.key("header-counts")]
@@ -493,15 +461,12 @@ final class ConfigurationReader {
         return readable ? kinds : nil
     }
 
-    /// A kind's `authors = { show = [...], hide = [...] }`.
     private func authorFilter(_ parent: Node) -> AuthorFilterOverrides {
         guard let node = table(parent, "authors") else { return .init() }
         warnUnknownKeys(in: node, known: ["show", "hide"])
         return AuthorFilterOverrides(show: authorSelectors(node, "show"), hide: authorSelectors(node, "hide"))
     }
 
-    /// The old top-level `hide-authors`, a list of bare logins, read as a
-    /// `hide` of those logins in each kind's defaults, with a warning.
     private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigurationPath) {
         let selectors = logins.map { AuthorSelector.login($0.hasPrefix("@") ? String($0.dropFirst()) : $0) }
         defaults.pullRequests.authors.hide += selectors
@@ -515,10 +480,6 @@ final class ConfigurationReader {
         ))
     }
 
-    /// A `notifications` list: `[[defaults.notifications]]`, or a
-    /// project's own when `inProject`. An app control event
-    /// (`EventKind.isControl`) in a project's list, or with `authors`, is
-    /// read but warned about: neither applies to it.
     private func notifications(_ parent: Node, inProject: Bool = false) -> [NotificationRule]? {
         guard let rules = tables(parent, "notifications") else { return nil }
         return rules.compactMap { node in
@@ -534,9 +495,6 @@ final class ConfigurationReader {
         }
     }
 
-    /// The warning on a rule for an app control event: in a project's own
-    /// list it's ignored, since only the top-level rules decide control
-    /// events; otherwise its `authors` are, since no item's author sends one.
     private func warnControlRule(_ event: EventKind, at node: Node, inProject: Bool, authors: [AuthorSelector]) {
         let name = "`\(event.rawValue)`"
         if inProject {
@@ -552,8 +510,6 @@ final class ConfigurationReader {
         }
     }
 
-    /// A rule's `authors`: a list of author selectors, or one of the old
-    /// strings (`"any"`, `"me"`, `"others"`, `"bots"`), read with a warning.
     private func ruleAuthors(_ node: Node) -> [AuthorSelector]? {
         guard let old = try? node.table.string(forKey: "authors") else { return authorSelectors(node, "authors") }
         let path = node.path + [.key("authors")]
@@ -576,8 +532,6 @@ final class ConfigurationReader {
         return selectors
     }
 
-    /// A list of author selectors; each one that doesn't read is an error
-    /// on its own line.
     private func authorSelectors(_ node: Node, _ key: String) -> [AuthorSelector]? {
         guard let texts = strings(node, key) else { return nil }
         var selectors: [AuthorSelector] = []
@@ -593,10 +547,6 @@ final class ConfigurationReader {
         return valid ? selectors : nil
     }
 
-    /// A duration (`closed-window = "30m"`), in seconds. The old key, a
-    /// whole number of `unit`s (`closed-window-days = 7`), still reads,
-    /// with a warning naming the new one; both in one table is an error on
-    /// the old key's line.
     private func duration(_ node: Node, _ key: String, old: String, unit: Character) -> TimeInterval? {
         guard node.table.contains(key: old) else { return duration(node, key) }
         guard !setsBoth(node, key, old: old),
@@ -607,10 +557,6 @@ final class ConfigurationReader {
         return TimeInterval(count) * TimeInterval(seconds)
     }
 
-    /// A duration (`snooze-duration = "1h"`), in seconds, whose old key
-    /// was only named differently (`snooze`): it still reads, with a
-    /// warning naming the new one; both in one table is an error on the
-    /// old key's line.
     private func duration(_ node: Node, _ key: String, renamedFrom old: String) -> TimeInterval? {
         guard node.table.contains(key: old) else { return duration(node, key) }
         guard !setsBoth(node, key, old: old), let value = duration(node, old),
@@ -620,15 +566,12 @@ final class ConfigurationReader {
         return value
     }
 
-    /// Whether the table sets `key` and its old form `old` both, which is
-    /// an error on the old key's line.
     private func setsBoth(_ node: Node, _ key: String, old: String) -> Bool {
         guard node.table.contains(key: key) else { return false }
         error("`\(old)` is the old form of `\(key)`, which this table sets too; delete `\(old)`", at: node.path + [.key(old)])
         return true
     }
 
-    /// The warning on an old key, giving the new key and value it's read as.
     private func warnOldForm(_ node: Node, _ old: String, readAs key: String, value: String) {
         warnings.append(ConfigurationIssue(
             line: map.line(for: node.path + [.key(old)]),
@@ -636,8 +579,6 @@ final class ConfigurationReader {
         ))
     }
 
-    /// A window written as a whole number and one unit, in seconds; one that
-    /// doesn't read is rejected with what's allowed and the nearest spelling.
     private func duration(_ node: Node, _ key: String) -> TimeInterval? {
         guard node.table.contains(key: key) else { return nil }
         let path = node.path + [.key(key)]
@@ -659,10 +600,8 @@ final class ConfigurationReader {
         return nil
     }
 
-    /// What a window takes, as its rejections say it.
     static let windowForm = "a whole number and one unit, `s`, `m`, `h` or `d`, such as \"30m\""
 
-    /// A whole number, 0 or more: a count of rows, or an old window in days or hours.
     private func window(_ node: Node, _ key: String) -> Int? {
         guard let value = int(node, key) else { return nil }
         guard value >= 0 else {
@@ -672,7 +611,6 @@ final class ConfigurationReader {
         return value
     }
 
-    /// Why a project can't list `repository` again (in any letter case).
     static func duplicateRepositoryMessage(_ repository: String, project: String) -> String {
         "project `\(project)` lists repository `\(repository)` twice (names aren't case-sensitive)"
     }
@@ -738,7 +676,6 @@ final class ConfigurationReader {
         }
     }
 
-    /// An array of tables, written as `[[key]]` blocks or as `key = [{…}, …]`.
     private func tables(_ node: Node, _ key: String) -> [Node]? {
         guard node.table.contains(key: key) else { return nil }
         let array: TOMLArray
@@ -760,7 +697,6 @@ final class ConfigurationReader {
         return nodes
     }
 
-    /// A string that must be one of `T`'s values; a near miss is suggested.
     private func choice<T: CaseIterable & RawRepresentable>(
         _ node: Node, _ key: String, _ type: T.Type, noun: String = "value"
     ) -> T? where T.RawValue == String {
@@ -774,9 +710,6 @@ final class ConfigurationReader {
         return nil
     }
 
-    /// Warns about each key that's neither `known` nor an `old` form the
-    /// reader still takes; a misspelling is pointed at a `known` key only,
-    /// never at an old one.
     private func warnUnknownKeys(in node: Node, known: [String], old: [String] = []) {
         for key in node.table.keys where !known.contains(key) && !old.contains(key) {
             let path = node.path + [.key(key)]
@@ -796,11 +729,7 @@ final class ConfigurationReader {
     }
 }
 
-/// Picks the valid value a misspelt one most likely meant.
 enum Suggestion {
-    /// The closest candidate, if it's close enough to be a plausible typo:
-    /// the same letters ignoring case and `-`/`_`, or within an edit
-    /// distance of about a third of its length (at least 2).
     static func nearest(to input: String, in candidates: [String]) -> String? {
         let normalized = normalize(input)
         if let same = candidates.first(where: { normalize($0) == normalized }) { return same }
@@ -813,7 +742,6 @@ enum Suggestion {
         text.lowercased().filter { $0 != "-" && $0 != "_" }
     }
 
-    /// Levenshtein distance.
     static func distance(_ a: String, _ b: String) -> Int {
         let a = Array(a), b = Array(b)
         if a.isEmpty { return b.count }
@@ -836,7 +764,6 @@ enum Suggestion {
 }
 
 private extension ItemKind {
-    /// The kind as a state's message names it: "unknown issue state …".
     var noun: String {
         switch self {
         case .pullRequest: "pull request"

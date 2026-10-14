@@ -7,11 +7,7 @@ import Musl
 #endif
 import Foundation
 
-/// The few POSIX calls both ends of `control.sock` make, so the client here
-/// and the app's server build a socket's address, time out and write the
-/// same way. `package`: the app's server uses them, nothing outside does.
 package enum UnixSocket {
-    /// A new stream socket, or -1 with `errno` set.
     package static func make() -> Int32 {
         #if canImport(Glibc)
         socket(AF_UNIX, Int32(SOCK_STREAM.rawValue), 0)
@@ -20,16 +16,12 @@ package enum UnixSocket {
         #endif
     }
 
-    /// The longest path a socket's address holds (103 bytes on macOS),
-    /// since the address keeps it with its closing zero.
     package static let maximumPathLength = MemoryLayout.size(ofValue: sockaddr_un().sun_path) - 1
 
-    /// The refusal for a socket path longer than an address holds.
     package static func tooLong(_ path: String) -> String {
         "the socket's path is longer than \(maximumPathLength) bytes, the most a socket's address holds: \(path)"
     }
 
-    /// `path` as a socket address, or nil when it's too long.
     package static func address(_ path: String) -> sockaddr_un? {
         let bytes = Array(path.utf8)
         guard bytes.count <= maximumPathLength else { return nil }
@@ -42,7 +34,6 @@ package enum UnixSocket {
         return address
     }
 
-    /// `connect(2)` to `address`: 0, or -1 with `errno` set.
     package static func connectSocket(_ descriptor: Int32, to address: sockaddr_un) -> Int32 {
         var address = address
         return withUnsafePointer(to: &address) {
@@ -52,7 +43,6 @@ package enum UnixSocket {
         }
     }
 
-    /// `bind(2)` to `address`: 0, or -1 with `errno` set.
     package static func bindSocket(_ descriptor: Int32, to address: sockaddr_un) -> Int32 {
         var address = address
         return withUnsafePointer(to: &address) {
@@ -62,8 +52,6 @@ package enum UnixSocket {
         }
     }
 
-    /// Makes each read and write on `descriptor` give up after `seconds`
-    /// (`EAGAIN`).
     package static func configure(_ descriptor: Int32, timeout seconds: TimeInterval) {
         let whole = Int(seconds)
         var limit = timeval(tv_sec: whole, tv_usec: .init((seconds - Double(whole)) * 1_000_000))
@@ -94,17 +82,12 @@ package enum UnixSocket {
         }
     }
 
-    /// How reading to the end went.
     package enum Read {
         case data(Data)
-        /// A read waited longer than the socket's timeout.
         case timedOut
-        /// A read failed: the reason, from `errno`.
         case failed(String)
     }
 
-    /// Reads until the peer closes its side (or half-closes it), at most
-    /// `limit` bytes.
     package static func readToEnd(_ descriptor: Int32, limit: Int = 1 << 20) -> Read {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 4096)
@@ -125,7 +108,6 @@ package enum UnixSocket {
         return .failed("more than \(limit) bytes")
     }
 
-    /// Closes the writing side, so the peer reads to its end.
     package static func finishWriting(_ descriptor: Int32) {
         #if canImport(Glibc)
         shutdown(descriptor, Int32(SHUT_WR))
@@ -134,7 +116,6 @@ package enum UnixSocket {
         #endif
     }
 
-    /// `errno` in words.
     package static func reason(_ code: Int32 = errno) -> String {
         String(cString: strerror(code))
     }

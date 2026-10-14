@@ -8,30 +8,15 @@ import ShipyardConfig
 /// banner also opens its status view (`opens`).
 public struct PanelBanner: Equatable, Sendable, Identifiable {
     public enum Kind: Equatable, Sendable {
-        /// An agent holds app control's lease: the app draws it from the
-        /// lease, with its countdown and Stop.
         case lease
-        /// A holder the maintainer stopped is still barred: its quiet line,
-        /// whose Allow lets the holder (by its key) back.
         case stoppedHolder(key: String)
-        /// The configuration file was rejected.
         case configError
-        /// Settings the file has but shipyard ignores, or old forms it read.
         case configWarnings
-        /// Refreshing slower than configured because a rate limit is low
-        /// (backed off); an interval only stretched to stay within the
-        /// rate-limit share has no banner.
         case delay
-        /// Refreshing paused until a rate limit resets.
         case paused
-        /// The latest refresh failed; the rows are kept.
         case fetch
-        /// A remote machine's quiet line (`MachineNotice`).
         case machine
-        /// Notes can't be listed: no ntn, ntn logged out, or ntn's workspace has
-        /// no Shipyard Notes page.
         case notes
-        /// macOS doesn't let shipyard post notifications.
         case notificationsOff
     }
 

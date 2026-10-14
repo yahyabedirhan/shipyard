@@ -59,22 +59,13 @@ public struct DeviceAuthorization: Equatable, Sendable {
 
 /// Why the device flow ended without a token.
 public enum DeviceFlowError: Error, Equatable, Sendable {
-    /// The client ID is the placeholder.
     case clientIDMissing
-    /// The code expired (15 minutes) before the user entered it; start over.
     case expired
-    /// The user declined on github.com.
     case denied
-    /// GitHub answered 401.
     case unauthorized
-    /// GitHub answered with an error code the flow doesn't expect, for
-    /// example `device_flow_disabled` or `incorrect_client_credentials`.
     case rejected(String)
-    /// GitHub answered with an unexpected HTTP status.
     case http(Int)
-    /// The request didn't reach GitHub.
     case network(String)
-    /// GitHub's answer couldn't be read.
     case malformed
 }
 
@@ -88,7 +79,6 @@ public struct DeviceFlow: Sendable {
     static let defaultLifetime: TimeInterval = 900
     /// GitHub's minimum poll interval; used when the answer doesn't say.
     static let defaultInterval: TimeInterval = 5
-    /// What a `slow_down` answer adds to the interval.
     static let slowDownStep: TimeInterval = 5
 
     private let clientID: String
@@ -200,8 +190,6 @@ public struct DeviceFlow: Sendable {
         return answer
     }
 
-    /// `application/x-www-form-urlencoded`, keys sorted, escaping everything
-    /// but RFC 3986's unreserved characters.
     static func formEncoded(_ form: [String: String]) -> String {
         var unreserved = CharacterSet.alphanumerics
         unreserved.insert(charactersIn: "-._~")

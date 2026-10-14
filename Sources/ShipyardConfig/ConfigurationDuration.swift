@@ -1,22 +1,13 @@
 import Foundation
 
-/// How long a closed or finished item stays listed, as the file writes it:
-/// a whole number and one unit, `s`, `m`, `h` or `d` (`"45s"`, `"30m"`,
-/// `"12h"`, `"7d"`), or a bare `"0"`. No fractions, signs, spaces or
-/// combined units. The configuration holds the window in seconds.
 enum ConfigurationDuration {
-    /// The units a window takes, largest first, and their seconds.
     static let units: [(unit: Character, seconds: Int)] = [("d", 86_400), ("h", 3600), ("m", 60), ("s", 1)]
 
-    /// Why a window doesn't read.
     enum Rejection: Error, Equatable {
         case negative
-        /// Not a whole number and one unit; `suggestion` is the spelling it
-        /// most likely meant, when there is one.
         case malformed(suggestion: String?)
     }
 
-    /// The window `text` writes, in seconds.
     static func parse(_ text: String) throws(Rejection) -> TimeInterval {
         if text == "0" { return 0 }
         if text.hasPrefix("-") { throw .negative }
@@ -32,8 +23,6 @@ enum ConfigurationDuration {
         return TimeInterval(seconds)
     }
 
-    /// `seconds` in its largest whole unit: `604800` is `"7d"`, `5400` is
-    /// `"90m"`, and `0` is `"0"`.
     static func text(_ seconds: TimeInterval) -> String {
         let whole = Int(seconds.rounded(.down))
         guard whole > 0 else { return "0" }
@@ -41,7 +30,6 @@ enum ConfigurationDuration {
         return "\(whole / unit.seconds)\(unit.unit)"
     }
 
-    /// The words a unit is misspelt as, lowercased.
     private static let spellings: [String: Int] = {
         var words: [String: Int] = [:]
         for (seconds, names) in [
@@ -56,11 +44,6 @@ enum ConfigurationDuration {
         return words
     }()
 
-    /// What a near miss meant: numbers (fractions too) each followed by a
-    /// unit word, in any case and spacing (`"30min"`, `"2 hours"`,
-    /// `"1h30m"`, `"1.5h"`), added up and written in the largest whole
-    /// unit. `nil` when it doesn't read that way, or doesn't come to whole
-    /// seconds.
     private static func suggestion(for text: String) -> String? {
         let compact = text.lowercased().filter { !$0.isWhitespace }
         var rest = Substring(compact)

@@ -15,8 +15,6 @@ import Foundation
 /// ancestor is watched instead, so creating it is noticed.
 @MainActor
 final class ConfigurationWatcher {
-    /// What to watch: a file in its directory, or a folder alone, which
-    /// says where it is each time the watch opens (it may have been created).
     private enum Target {
         case file(URL)
         case folder(@MainActor () -> URL)
@@ -35,9 +33,6 @@ final class ConfigurationWatcher {
         self.onChange = onChange
     }
 
-    /// Watches the folder `folder` returns, asked again each time the watch
-    /// opens: a create, rename or delete in it, or the folder itself going.
-    /// Nothing beside it, such as a save to its parent.
     init(folder: @escaping @MainActor () -> URL, debounce: TimeInterval = 0.2, onChange: @escaping @MainActor () -> Void) {
         target = .folder(folder)
         self.debounce = debounce
@@ -53,7 +48,6 @@ final class ConfigurationWatcher {
         watch()
     }
 
-    /// (Re)opens both watches on whatever is at the paths now.
     private func watch() {
         directorySource?.cancel()
         fileSource?.cancel()
@@ -79,7 +73,6 @@ final class ConfigurationWatcher {
         return source
     }
 
-    /// Something changed: wait for the burst of events a save makes to end.
     private func changed() {
         pending?.cancel()
         let settle = DispatchWorkItem { [weak self] in
@@ -95,7 +88,6 @@ final class ConfigurationWatcher {
         onChange()
     }
 
-    /// `url`, or its closest ancestor that exists.
     private static func nearestExisting(_ url: URL) -> URL {
         var candidate = url.standardizedFileURL
         while !FileManager.default.fileExists(atPath: candidate.path), candidate.path != "/" {

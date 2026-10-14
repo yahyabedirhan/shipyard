@@ -2,23 +2,10 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-/// Onboarding's project step, shown while `phase` is `needsProjects`: the
-/// repositories the user was active in recently (`suggestedRepositories()`),
-/// a field to add any other by `owner/name` or link (`checkRepository(_:)`),
-/// and a project name under each chosen one. Chosen repositories given the
-/// same name are grouped into one project. Add writes them to the
-/// configuration (`addProjects(_:)`), which moves shipyard to `ready`: the
-/// panel shows the list without a restart. The rules live in `ProjectChoices`.
-///
-/// After a preset that needs repositories (`PresetPicker`), Add writes the
-/// preset with them instead (`add`), and a back button returns to the presets.
 struct ProjectPicker: View {
     let shipyard: Shipyard
-    /// The preset the repositories are for; `nil` for the plain picker.
     var preset: Preset?
-    /// What Add does with the projects; `nil` appends them (`addProjects`).
     var add: (([NewProject]) async throws -> ConfigurationStore.ReloadResult)?
-    /// Back to the presets; `nil` for the plain picker.
     var back: (() -> Void)?
 
     private enum Suggestions {
@@ -27,7 +14,6 @@ struct ProjectPicker: View {
         case failed(String)
     }
 
-    /// The tallest the repository list gets before it scrolls.
     private static let maxListHeight: CGFloat = 300
 
     @State private var choices = ProjectChoices()
@@ -152,7 +138,6 @@ struct ProjectPicker: View {
         }
     }
 
-    /// Scrolls inside a measured height, like the menu's list.
     private var list: some View {
         MeasuredScrollView(maxHeight: Self.maxListHeight) {
             VStack(alignment: .leading, spacing: 0) {
@@ -205,8 +190,6 @@ struct ProjectPicker: View {
         .animation(Motion.hover, value: choice != nil)
     }
 
-    /// The chosen repository's project name, and a menu that groups it with
-    /// another project by taking that project's name.
     private func projectName(_ choice: ProjectChoices.Choice) -> some View {
         let others = choices.projectNames.filter { $0 != choice.name }
         return HStack(spacing: 6) {

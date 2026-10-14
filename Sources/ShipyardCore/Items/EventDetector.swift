@@ -34,8 +34,6 @@ public struct Event: Equatable, Hashable, Sendable {
     /// title for `ping.sent`.
     public var headline: String { kind == .pingSent ? item.title : kind.headline(number: item.number) }
 
-    /// Whether the event is a remote ping's, listed in its machine's own
-    /// section (filed under no project), which bears the machine's label.
     var isInMachineSection: Bool {
         item.ping?.machine.map { $0 == project } ?? false
     }
@@ -45,26 +43,16 @@ public struct Event: Equatable, Hashable, Sendable {
 /// detector finds changes; `EventKind.of(_:for:)` names them per kind, so a
 /// new kind of item only adds names (and, for its own states, changes).
 public enum ItemChange: Equatable, Hashable, Sendable {
-    /// First listed, open (drafts included).
     case opened
-    /// Open before, merged now.
     case merged
-    /// Open before, closed (without merging) now.
     case closed
-    /// Closed before, open again.
     case reopened
-    /// Now asks for the viewer's review, and didn't before.
     case reviewRequested
-    /// Checks failed now, and hadn't before.
     case checksFailed
-    /// More comments and reviews than before.
     case commented
-    /// A workflow run failed: found failed, or failed after it wasn't (a re-run).
     case failed
-    /// A workflow run succeeded: found succeeded, or succeeded after it wasn't.
     case succeeded
 
-    /// Whether it can happen only once in an item's life.
     var happensOnce: Bool { self == .opened || self == .merged }
 }
 
@@ -244,23 +232,17 @@ public struct KnownItems: Equatable, Sendable {
 }
 
 extension ProjectSettings {
-    /// The sources a refresh fetches for this project: each repository, for
-    /// each kind the project shows.
     var fetchedSources: [ItemSource] {
         repositorySlugs.flatMap { repository in fetchedKinds.map { ItemSource(repository: repository, kind: $0) } }
             + (usesAnywhere ? [.anywhere] : [])
     }
 
-    /// Where the project's `item` came from: its repository, or the review
-    /// search for a pull request `anywhere` found in a repository the
-    /// project doesn't watch.
     func source(of item: Item) -> ItemSource {
         let watched = !usesAnywhere || item.kind != .pullRequest
             || repositorySlugs.contains { $0.caseInsensitiveCompare(item.repository) == .orderedSame }
         return watched ? ItemSource(repository: item.repository, kind: item.kind) : .anywhere
     }
 
-    /// The kinds this project shows, in the menu's order.
     var fetchedKinds: [ItemKind] {
         [ItemKind.pullRequest, .issue, .workflowRun].filter { shows($0) }
     }
@@ -311,11 +293,6 @@ public enum EventDetector {
         }
     }
 
-    /// What changed from `before` (`nil` when the item wasn't known) to `item`.
-    /// An item first found already closed makes nothing: it may be an old
-    /// one coming back into the closed list. A workflow run is different: one
-    /// first found finished ran between two refreshes (the runs asked for are
-    /// only recent ones), so it failed or succeeded now.
     static func changes(from before: KnownItem?, to item: Item) -> [ItemChange] {
         if item.kind == .workflowRun {
             if item.state == .failed, before?.state != .failed { return [.failed] }

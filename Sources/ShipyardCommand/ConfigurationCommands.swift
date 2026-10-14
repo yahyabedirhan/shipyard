@@ -44,8 +44,6 @@ public enum ConfigurationCommands {
         }
     }
 
-    /// One file's lines: its path and verdict, then each problem or warning
-    /// as the panel's banner words it.
     private static func text(_ check: ConfigurationCheck) -> String {
         let verdict = !check.accepted ? "rejected" : check.modified == nil ? "accepted (no file: the defaults)" : "accepted"
         let lines = ["\(check.file.path): \(verdict)"]

@@ -3,98 +3,55 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-/// The spacing grid: everything is a multiple of 2, most of 4.
 enum Grid {
-    /// The panel's width.
     static let panelWidth: CGFloat = 400
-    /// The panel's side padding.
     static let gutter: CGFloat = 12
-    /// The header's height.
     static let titleBarHeight: CGFloat = 38
-    /// One item.
     static let rowHeight: CGFloat = 24
-    /// A project's header.
     static let headerHeight: CGFloat = 26
-    /// The attention dot's column.
     static let dotColumn: CGFloat = 10
-    /// The state icon's column.
     static let iconColumn: CGFloat = 16
-    /// The number's column.
     static let numberColumn: CGFloat = 30
-    /// The author's, or the repository's, column.
     static let metaColumn: CGFloat = 74
-    /// A known agent's logo before a ping's sender: big enough for a logo
-    /// to read, small enough to leave the column the sender's name.
     static let agentMark: CGFloat = 14
-    /// The age's column.
     static let ageColumn: CGFloat = 26
-    /// The gap between a list header's count chips, wider than a chip's
-    /// own 4 pt padding so each chip reads as its own.
     static let chipGap: CGFloat = 6
-    /// How far a row's hover highlight sits in from the panel's edges.
     static let inset: CGFloat = 4
-    /// The tallest the scrolling area gets before it scrolls.
     static let maxListHeight: CGFloat = 560
-    /// Rounded corners: small controls, and cards and banners.
     static let smallRadius: CGFloat = 5
     static let radius: CGFloat = 7
-    /// The tabs layout: the widest a tab's title gets, how far the strip's
-    /// ends fade where tabs are hidden past them, and how far the list
-    /// slides when the tab changes.
     static let maxTabTitleWidth: CGFloat = 140
     static let tabFade: CGFloat = 24
     static let tabSlide: CGFloat = 40
 }
 
-/// The type scale: one family (SF Pro), a few sizes, weights for emphasis,
-/// monospaced digits wherever a number sits.
 enum TypeScale {
-    /// The panel's heading, and a screen's title.
     static let title = Font.system(size: 13, weight: .semibold)
-    /// A larger heading, on the connect screen.
     static let display = Font.system(size: 14, weight: .semibold)
-    /// Body text: a row's title, a screen's message.
     static let body = Font.system(size: 12)
     static let bodyEmphasis = Font.system(size: 12, weight: .semibold)
     static let button = Font.system(size: 12, weight: .medium)
-    /// Numbers, authors, ages; banner text.
     static let meta = Font.system(size: 11).monospacedDigit()
-    /// A project's title.
     static let section = Font.system(size: 11, weight: .semibold)
-    /// A small uppercase header over a kind's rows, in the tabs layout.
     static let eyebrow = Font.system(size: 10, weight: .semibold)
-    /// The footer, and small print.
     static let caption = Font.system(size: 10.5).monospacedDigit()
     static let captionEmphasis = Font.system(size: 10.5, weight: .medium)
-    /// A count in a capsule.
     static let badge = Font.system(size: 10, weight: .bold).monospacedDigit()
-    /// A command to copy, and a run's branch.
     static let code = Font.system(size: 12, weight: .medium, design: .monospaced)
     static let branch = Font.system(size: 10.5, weight: .medium, design: .monospaced)
 }
 
-/// The motion: springs for what moves, a short ease for hover.
 enum Motion {
-    /// A project collapsing or expanding.
     static let collapse = Animation.spring(duration: 0.32, bounce: 0.08)
-    /// A count rolling to its new number.
     static let count = Animation.spring(duration: 0.4, bounce: 0.2)
-    /// A count badge fading between the accent and muted.
     static let tint = Animation.easeInOut(duration: 0.2)
-    /// A banner sliding in or out.
     static let banner = Animation.spring(duration: 0.35, bounce: 0.1)
-    /// Marking seen: the dot fading, the title losing its weight.
     static let seen = Animation.easeOut(duration: 0.5)
-    /// Hover and press highlights.
     static let hover = Animation.easeOut(duration: 0.12)
-    /// A layout's row highlight gliding to the row under the pointer.
     static let highlight = Animation.spring(duration: 0.25, bounce: 0.1)
-    /// The tabs layout's selected pill sliding, and its list following.
     static let tab = Animation.spring(response: 0.36, dampingFraction: 0.86)
 }
 
-/// The colours, each resolving for light or dark: GitHub's colours for the
-/// menu model's semantic states, and the panel's surfaces.
 enum Palette {
 
     static let green = dynamic(light: 0x1A7F37, dark: 0x3FB950)
@@ -102,38 +59,21 @@ enum Palette {
     static let purple = dynamic(light: 0x8250DF, dark: 0xAB7DF8)
     static let red = dynamic(light: 0xD1242F, dark: 0xF85149)
     static let amber = dynamic(light: 0x9A6700, dark: 0xD29922)
-    /// The attention dot, the count badge, a prominent button.
     static let accent = dynamic(light: 0x006BED, dark: 0x4A94FF)
-    /// The lease's banner, in the yellow of the menu bar icon's dot (`LeaseDot`).
     static let lease = Color(nsColor: .systemYellow)
 
-    /// A project's header, opaque so rows scroll under it.
     static let header = dynamic(light: 0xF6F6F8, dark: 0x2A2A2D)
-    /// Under the check dot, to cut it out of the state icon.
     static let panel = dynamic(light: 0xFBFBFC, dark: 0x252528)
-    /// The footer.
     static let chrome = dynamic(light: 0xF3F3F5, dark: 0x202023, alpha: 0.6)
-    /// Hairlines between the header, the list and the footer, and between kinds.
     static let separator = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.065, darkAlpha: 0.07)
-    /// Around cards, command boxes and secondary buttons.
     static let border = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.1, darkAlpha: 0.12)
-    /// A hovered row or button.
     static let hover = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.045, darkAlpha: 0.075)
-    /// A pressed row or button.
     static let pressed = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.12)
-    /// A card's, command box's or chip's fill.
     static let fill = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.045, darkAlpha: 0.06)
-    /// The tabs layout's strip, sunk under its pills.
     static let track = dynamic(light: 0xE8E8EB, dark: 0x18181A)
-    /// The selected tab's pill, raised off the track, and its shadow.
     static let raised = dynamic(light: 0xFFFFFF, dark: 0x3F3F44)
     static let raisedShadow = dynamic(light: 0x000000, dark: 0x000000, lightAlpha: 0.08, darkAlpha: 0.35)
 
-    /// A row's colour, by kind: a pull request open green, draft gray,
-    /// merged purple, closed red; an issue open green, closed purple; a
-    /// workflow run running amber, succeeded green, failed red; a ping
-    /// gray, as a message (its dot and bold title say it's unseen); a note
-    /// gray too, as the user's own.
     static func color(_ state: ItemState, kind: ItemKind) -> Color {
         if kind == .ping || kind == .note { return gray }
         return switch state {
@@ -146,8 +86,6 @@ enum Palette {
         }
     }
 
-    /// The check dot: pending amber, passed green, failed red; no dot
-    /// when there are no checks.
     static func color(_ checks: ChecksState) -> Color? {
         switch checks {
         case .none: nil
@@ -157,8 +95,6 @@ enum Palette {
         }
     }
 
-    /// The rate-limit text: normal in the secondary colour, low amber,
-    /// exhausted red.
     static func color(_ level: RateLevel) -> Color {
         switch level {
         case .normal: .secondary
@@ -167,7 +103,6 @@ enum Palette {
         }
     }
 
-    /// The rate-limit bar: normal green, low amber, exhausted red.
     static func bar(_ level: RateLevel) -> Color {
         switch level {
         case .normal: green.opacity(0.65)
@@ -176,7 +111,6 @@ enum Palette {
         }
     }
 
-    /// The row's icon (SF Symbols has no GitHub octicons).
     static func symbol(_ state: ItemState, kind: ItemKind) -> String {
         switch (kind, state) {
         case (.pullRequest, .merged): "arrow.triangle.merge"
@@ -188,8 +122,6 @@ enum Palette {
         }
     }
 
-    /// A kind's icon whatever its state, from its rows' icons: a list
-    /// header's chip. A run's is the running icon's circle-path alone.
     static func symbol(_ kind: ItemKind) -> String {
         switch kind {
         case .pullRequest: "arrow.triangle.pull"
@@ -200,7 +132,6 @@ enum Palette {
         }
     }
 
-    /// A ping's icon: what clicking it does.
     static func symbol(_ icon: PingIcon) -> String {
         switch icon {
         case .link: "link"

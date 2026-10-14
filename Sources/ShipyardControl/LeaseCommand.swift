@@ -100,7 +100,6 @@ public enum LeaseCommand {
         return .success(Invocation(.controlTake(waitSeconds: wait, purpose: values["--for"]), key: values["--key"]))
     }
 
-    /// `line`, then where the usage is, on standard error: exit 2.
     private static func misread(_ line: String) -> CommandResult {
         .usage(line + ". Run `shipyard lease --help` for usage.")
     }

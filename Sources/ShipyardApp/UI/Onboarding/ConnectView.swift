@@ -1,39 +1,15 @@
 import ShipyardCore
 import SwiftUI
 
-/// Onboarding's connect step. Signed out, it greets the user, says what
-/// happened in a line or two, and stacks the ways in as full-width buttons
-/// in the order `PanelText.Connect.lead` gives, the main one prominent:
-/// Sign in with GitHub (the device flow) with the `gh` way folded in a
-/// disclosure under it; or the `gh auth login` box over Connect with gh,
-/// then Sign in with GitHub; or Connect with gh, when `gh` is signed in
-/// already, then a divider and Sign in with GitHub under a line of its
-/// own. Connect with gh looks for a token once more (`start()`). A build
-/// without an OAuth App client ID shows Sign in with GitHub disabled, with
-/// why (or not at all when `gh` is signed in), and `gh` leads. While the
-/// device flow waits (`connecting`) it shows the code (a click on it, or on
-/// its copy icon, copies it), a button that copies it and opens
-/// github.com/login/device, and Cancel. The words come from
-/// `PanelText.connect` and `PanelText.deviceCode`; `gh` in them is set in
-/// code font on a chip (`CodeText`).
-///
-/// `start()` clears the reason while it looks for a token, so the last one
-/// stays on screen during Connect with gh; before any is known (at launch)
-/// a spinner shows instead.
 struct ConnectView: View {
     let shipyard: Shipyard
 
     @State private var shown: Shipyard.SignedOutReason?
     @State private var isTrying = false
-    /// Sign in with GitHub was clicked and GitHub hasn't sent a code yet.
     @State private var isRequestingCode = false
-    /// Connect with gh left shipyard signed out: say so, or the click seems to do nothing.
     @State private var stillSignedOut = false
-    /// The `gh` disclosure under Sign in with GitHub is open.
     @State private var showsGh = false
-    /// The install hint's popover is open.
     @State private var showsInstallHint = false
-    /// The code is on the clipboard: the copy icon shows a checkmark.
     @State private var codeCopiedAt: Date?
 
     var body: some View {
@@ -57,10 +33,6 @@ struct ConnectView: View {
         .onChange(of: shipyard.phase) { isRequestingCode = false }
     }
 
-    /// Every state has one shape: the greeting, a line or two on what
-    /// happened, then the ways in as full-width buttons stacked in the
-    /// order `lead` gives, the main one prominent. When Sign in with GitHub
-    /// leads, the `gh` way folds into a disclosure under it.
     private func screen(_ text: PanelText.Connect) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
@@ -98,7 +70,6 @@ struct ConnectView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// A line of the screen's words, over the buttons it leads to.
     private func line(_ text: String) -> some View {
         markdown(text, size: 12)
             .foregroundStyle(.secondary)
@@ -106,8 +77,6 @@ struct ConnectView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// The `gh auth login` box, with the install hint beside it, over
-    /// Connect with gh.
     private func ghWay(prominent: Bool, installHint: Bool) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
@@ -118,9 +87,6 @@ struct ConnectView: View {
         }
     }
 
-    /// Looks for a token once more (`start()`), full width, and under it
-    /// why the last try found nothing. Never the default action: after
-    /// signing out of `gh`'s token, Return would connect straight back.
     private func connectWithGh(prominent: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(action: connectAgain) {
@@ -138,8 +104,6 @@ struct ConnectView: View {
         }
     }
 
-    /// The ⓘ beside the `gh` command: a popover with where to get `gh`,
-    /// and the Homebrew command to copy.
     private var installHintButton: some View {
         Button { showsInstallHint.toggle() } label: {
             Image(systemName: "info.circle")
@@ -159,11 +123,8 @@ struct ConnectView: View {
         }
     }
 
-    /// The height of the screen's stacked, full-width buttons.
     private static let actionHeight: CGFloat = 28
 
-    /// Sign in with GitHub, full width, and under it why the last one
-    /// failed, or why the build can't offer it.
     private func signIn(prominent: Bool, unavailable: String?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Button(action: beginSignIn) {
@@ -187,8 +148,6 @@ struct ConnectView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    /// Text from `PanelText` that may hold Markdown (`gh` in backticks, a
-    /// link), `size` points, with its code spans as code (`CodeText`).
     private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> Text {
         Text(markdown: text, size: size, weight: weight)
     }
@@ -224,10 +183,6 @@ struct ConnectView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// The code, large, in a card with the copy icon and its word ("Copy")
-    /// at its end. Clicking the code copies it too; either way the icon
-    /// turns into a checkmark and the word rolls to "Copied", the only
-    /// feedback: the code has no hover help.
     private func code(_ text: PanelText.DeviceCodeScreen) -> some View {
         Button(action: { copy(text.code) }) {
             Text(text.code)
@@ -273,8 +228,6 @@ struct ConnectView: View {
         }
     }
 
-    /// The code goes on the clipboard first: opening the browser may close
-    /// the menu, and the code is then ready to paste.
     private func copyAndOpen(_ code: String) {
         copy(code)
         shipyard.openVerificationPage()

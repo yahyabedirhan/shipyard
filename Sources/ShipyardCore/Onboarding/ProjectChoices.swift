@@ -112,8 +112,6 @@ public struct ProjectChoices: Equatable, Sendable {
         a.lowercased() == b.lowercased()
     }
 
-    /// The repository's name without its owner, or `owner/name` when a
-    /// project already has that name, so choosing never groups by accident.
     private func defaultName(for repository: RepoSummary) -> String {
         let name = String(repository.slug.split(separator: "/").last ?? Substring(repository.slug))
         return projectNames.contains(name) ? repository.slug : name

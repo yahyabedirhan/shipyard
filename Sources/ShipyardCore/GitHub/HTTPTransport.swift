@@ -7,8 +7,6 @@ import FoundationNetworking
 /// request shipyard makes to GitHub goes through this, so tests replace the
 /// network with recorded responses at this one layer.
 public protocol HTTPTransport: Sendable {
-    /// Transport failures (offline, timeout) throw; any HTTP status returns.
-    /// A cancelled task throws `CancellationError`.
     func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
 }
 
@@ -49,8 +47,6 @@ public struct URLSessionTransport: HTTPTransport {
     }
 }
 
-/// Holds the data task so a task cancelled before or after it starts still
-/// cancels it.
 private final class RunningTask: @unchecked Sendable {
     private let lock = NSLock()
     private var task: URLSessionDataTask?

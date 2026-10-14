@@ -28,11 +28,8 @@ public struct PluginNoticeRoute: NoticeRoute {
     /// queue: one the Mac already collected isn't reached from here.
     public static let withdrawnLine = "withdrawn if it was still waiting; one the Mac already showed stays"
 
-    /// The plugin's link, under the home folder.
     static let linkPath = ".local/bin/shipyard"
-    /// The plugin's `shipyard`, under its folder.
     static let binarySuffix = "/bin/shipyard"
-    /// The script that holds notices, under the plugin's folder.
     static let scriptPath = "scripts/notices.sh"
 
     private static let install = "herdr plugin install yahyabedirhan/herdr-shipyard"
@@ -73,13 +70,11 @@ public struct PluginNoticeRoute: NoticeRoute {
         }
     }
 
-    /// Why the notice can't be queued, as the agent reads it.
     struct Refusal: Error {
         var message: String
         init(_ message: String) { self.message = message }
     }
 
-    /// The plugin's `scripts/notices.sh`, or why it isn't there.
     func locateScript() -> Result<URL, Refusal> {
         let link = home.appendingPathComponent(Self.linkPath, isDirectory: false)
         guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path) else {
@@ -97,16 +92,11 @@ public struct PluginNoticeRoute: NoticeRoute {
         return .success(script)
     }
 
-    /// What a script run said on standard error, and its status.
     struct ScriptOutput {
         var status: Int32
         var error: String
     }
 
-    /// Runs `sh <script> <arguments>` with `input` on standard input,
-    /// standard output dropped; `nil` when it couldn't start. The input
-    /// goes through a temporary file, not a pipe, so a script that exits
-    /// without reading it can't break the write.
     static func run(script: URL, arguments: [String], input: Data) -> ScriptOutput? {
         let inputFile = FileManager.default.temporaryDirectory
             .appendingPathComponent("shipyard-notice-\(UUID().uuidString).json", isDirectory: false)
@@ -132,7 +122,6 @@ public struct PluginNoticeRoute: NoticeRoute {
         return ScriptOutput(status: process.terminationStatus, error: String(decoding: said, as: UTF8.self))
     }
 
-    /// The last line `text` holds, without the plugin's `herdr-shipyard: `.
     static func lastLine(_ text: String) -> String? {
         let line = text.split(whereSeparator: \.isNewline).last.map(String.init)?.trimmingCharacters(in: .whitespaces) ?? ""
         let plain = line.hasPrefix("herdr-shipyard: ") ? String(line.dropFirst("herdr-shipyard: ".count)) : line

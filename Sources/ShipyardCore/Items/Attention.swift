@@ -36,7 +36,6 @@ public struct Attention: Equatable, Sendable {
 
     /// How long a seen record outlives its item's last appearance.
     public static let retention: TimeInterval = 30 * 86_400
-    /// How stale `present` may get before a refresh bumps it.
     static let presenceResolution: TimeInterval = 86_400
 
     /// Seen records by item id (the item's URL).
@@ -68,20 +67,12 @@ public struct Attention: Equatable, Sendable {
 
     /// One of the reasons an item needs attention, as `[attention]` names them.
     public enum Reason: Equatable, Hashable, Sendable {
-        /// Never seen.
         case unseen
-        /// Changed since it was seen.
         case changed
-        /// Waits on the viewer's review.
         case reviewRequested
-        /// Its checks failed (a workflow run: it failed).
         case checksFailed
     }
 
-    /// Whether an item in this state may need attention at all: open ones
-    /// (drafts included, pings too) and failed workflow runs. Closed,
-    /// merged, running and succeeded never do, and neither does a note,
-    /// the user's own.
     static func canNeedAttention(_ item: Item) -> Bool {
         item.kind != .note && (item.state.isOpen || item.state == .failed)
     }

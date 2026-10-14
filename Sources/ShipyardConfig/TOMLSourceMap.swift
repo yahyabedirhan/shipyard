@@ -1,5 +1,3 @@
-/// One step in a path through the configuration: a table key or an index
-/// into an array (of tables).
 enum ConfigurationPathComponent: Hashable, Sendable {
     case key(String)
     case index(Int)
@@ -8,7 +6,6 @@ enum ConfigurationPathComponent: Hashable, Sendable {
 typealias ConfigurationPath = [ConfigurationPathComponent]
 
 extension Array where Element == ConfigurationPathComponent {
-    /// `projects[1].issues.show`
     var dotted: String {
         var out = ""
         for component in self {
@@ -24,25 +21,14 @@ extension Array where Element == ConfigurationPathComponent {
     }
 }
 
-/// Finds which line of the file a key path sits on, so validation messages
-/// can say "line 14". TOMLDecoder parses the document but doesn't expose
-/// where a value came from, so this does a light second pass over the text:
-/// it records every table header (`[a.b]`, `[[projects]]`, with array-of-
-/// tables indices) and every `key = value` line, skipping over strings,
-/// comments and multi-line arrays. It only runs on text TOMLDecoder already
-/// accepted.
 struct TOMLSourceMap {
-    /// A table header or a `key = value` the pass recorded.
     struct Entry {
         var path: ConfigurationPath
         var line: Int
-        /// The last line of the entry: the value's last line for a key, the
-        /// line before the next header for a header.
         var endLine: Int
         var isHeader: Bool
     }
 
-    /// Every header and key, in file order.
     private(set) var entries: [Entry] = []
     private let lines: [Substring]
 
@@ -99,11 +85,6 @@ struct TOMLSourceMap {
         }
     }
 
-    /// The line of the closest recorded ancestor of `path` (the key itself,
-    /// its table, or the table's header). With `value`, the first line in
-    /// that entry's span where `value` appears as a quoted string, which
-    /// places an element of a multi-line array; with `occurrence`, the line
-    /// of that appearance counting from 0 (a value listed twice).
     func line(for path: ConfigurationPath, value: String? = nil, occurrence: Int = 0) -> Int? {
         var prefix = path
         while !prefix.isEmpty {
@@ -132,7 +113,6 @@ struct TOMLSourceMap {
     }
 }
 
-/// A cursor over the file's text that knows enough TOML to skip values.
 private struct Scanner {
     private let text: [Unicode.Scalar]
     private var position = 0
@@ -169,8 +149,6 @@ private struct Scanner {
         }
     }
 
-    /// Reads a dotted key (bare or quoted parts) up to `terminator` or the
-    /// end of the line, leaving the terminator unread.
     mutating func readKey(until terminator: Unicode.Scalar) -> [String] {
         var parts: [String] = []
         while true {
@@ -212,8 +190,6 @@ private struct Scanner {
         return key
     }
 
-    /// Skips a value, including arrays and inline tables that span lines,
-    /// up to the end of its last line.
     mutating func skipValue() {
         var depth = 0
         while let char = peek() {

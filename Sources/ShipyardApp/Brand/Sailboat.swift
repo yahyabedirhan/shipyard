@@ -1,24 +1,10 @@
 import CoreGraphics
 
-/// shipyard's sailboat: the one figure behind the app icon, the menu bar item
-/// and the connect screen's badge. It's our own drawing, facing right: a jib
-/// with a bellied luff ahead of the mast, a taller mainsail whose luff bows
-/// forward and whose head rounds over into a full leech, a stub of mast down to
-/// the hull, a hull whose bottom edge rides the swell, and a wave line below.
-///
-/// CoreGraphics only, so the icon script (`Packaging/Icon/make-icon.swift`)
-/// compiles this same file: the icon and the app draw one path.
 enum Sailboat {
-    /// The figure on the app icon's 1024-point grid, y up, as one filled outline
-    /// (the wave is already stroked, and every corner softly rounded).
-    /// A `CGPath` is immutable once built, so sharing it across threads is safe.
     nonisolated(unsafe) static let path: CGPath = makePath()
 
-    /// The figure's own bounds on the 1024 grid.
     static var bounds: CGRect { path.boundingBoxOfPath }
 
-    /// The figure scaled to fit `rect` and centred in it. `yDown` flips it for
-    /// top-left-origin drawing (SwiftUI shapes, flipped views).
     static func path(in rect: CGRect, yDown: Bool = false) -> CGPath {
         let b = bounds
         let scale = min(rect.width / b.width, rect.height / b.height)
@@ -26,9 +12,6 @@ enum Sailboat {
         return path.copy(using: &t)!
     }
 
-    /// Maps the figure onto a drawing: its centre to `centre`, scaled by
-    /// `scale`, flipped by `yDown` for top-left-origin drawing. The one
-    /// centre-and-scale step behind `path(in:yDown:)` and the logo's figure.
     static func transform(centredAt centre: CGPoint, scale: CGFloat, yDown: Bool = false) -> CGAffineTransform {
         let b = bounds
         return CGAffineTransform(translationX: centre.x, y: centre.y)
@@ -36,7 +19,6 @@ enum Sailboat {
             .translatedBy(x: -b.midX, y: -b.midY)
     }
 
-    /// The gap between the jib and the mainsail, and the stub of mast in it.
     private static let slot: CGFloat = 44
 
     private static func makePath() -> CGPath {
@@ -93,7 +75,6 @@ enum Sailboat {
 
     private static let waveLeft: CGFloat = 272, waveRight: CGFloat = 764
 
-    /// Two whole swells across the wave line's width.
     private static func swell(_ x: CGFloat) -> CGFloat {
         let period = (waveRight - waveLeft) / 2
         return 24 * sin((x - waveLeft) / period * 2 * .pi)
