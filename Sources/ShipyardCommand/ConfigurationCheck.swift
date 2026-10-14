@@ -63,22 +63,6 @@ public struct ConfigurationCheck: Equatable, Sendable {
     }
 }
 
-// `config-status.json`, and each file's entry in `config check --json`:
-//
-//     {
-//       "version": 1,
-//       "checked": "2026-09-25T12:05:01Z",
-//       "config": "/Users/me/.config/shipyard/config.toml",
-//       "configModified": "2026-09-25T12:05:00Z",
-//       "accepted": false,
-//       "problems": [{ "line": 1, "message": "…", "banner": "config.toml line 1: …" }],
-//       "warnings": []
-//     }
-//
-// Times are UTC in whole seconds, so an agent can compare `configModified`
-// with `date -u -r <file> +%Y-%m-%dT%H:%M:%SZ` after its save. `configModified`
-// is null when there was no file, a problem's `line` null when it can't be
-// placed. `banner` is the problem's line in the panel's banner, word for word.
 extension ConfigurationCheck: Encodable {
     private enum CodingKeys: String, CodingKey {
         case version, checked, config, configModified, accepted, problems, warnings
