@@ -114,7 +114,6 @@ public final class RepositoryResolver {
         }
         for selector in project.repositories {
             guard let wanted = selector.lookup else {
-                // Named on its own: always listed, archived or a fork.
                 selector.slug.map(add)
                 continue
             }

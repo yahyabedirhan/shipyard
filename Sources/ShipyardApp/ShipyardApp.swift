@@ -35,7 +35,6 @@ struct MenuBarLabelView: View {
     let lease: LeaseIndicator
 
     var body: some View {
-        // Read in the view's body, so it redraws when the model, or the lease, changes.
         let menu = shipyard.menu
         let isLeased = lease.shown(at: Date()) != nil
         HStack(spacing: 3) {
@@ -132,12 +131,9 @@ final class AppServices {
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
-        // The notifications-off banner's condition, which only the notifier knows.
         notifier.onOffChange = { shipyard.notificationsAreOff = $0 }
-        // The lease's banners' conditions, which only the control server knows.
         leaseIndicator.onBannersChange = { if shipyard.lease != $0 { shipyard.lease = $0 } }
         notifier.onOpen = { [weak self] url in
-            // A lease's notification opens the panel, where the banner shows who holds shipyard.
             guard url != ControlNotice.panelURL else {
                 MenuBarWindow.open()
                 return
@@ -159,11 +155,6 @@ final class AppServices {
             Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
-        // The `shipyard` CLI writes one file per ping into the store's
-        // directory: watching that folder alone sees each one arrive, and
-        // not the app's own saves to `state.json` beside it. The folder is
-        // made before the watch opens (`Shipyard.start()` makes it too),
-        // so the watch is on it from the first moment.
         try? shipyard.pingStore.createDirectory()
         pingWatcher = ConfigurationWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
             Task { await shipyard.reloadPings() }
@@ -172,14 +163,9 @@ final class AppServices {
         wake = WakeObserver {
             Task { await shipyard.refresh() }
         }
-        // Before a click that launched the app is handled (it's queued
-        // behind this), `start()` has loaded the app state it marks seen in.
-        // The listener follows the configuration as soon as it's read,
-        // never waiting on GitHub, which `start()` and a reload then ask.
         followNoticeListening()
         Task { await shipyard.start() }
         Task { await notifier.checkPermission() }
-        // A build before notes went through ntn kept a Notion token: delete it once, off the main thread.
         if Self.files.demo == nil { Task.detached { Keychain.removeOldNotionToken() } }
         startControl()
     }
@@ -224,19 +210,13 @@ final class AppServices {
             socket: ControlSocket.url(in: Self.files.support),
             panel: panelControl,
             screenshotter: screenshotter,
-            // A relaunch through `shipyard app open` hands its holder's lease over.
             lease: ControlLease(environment: ProcessInfo.processInfo.environment, at: Date()),
             indicator: leaseIndicator,
-            // A lease that starts or ends notifies, when the top-level rules say so.
             transitioned: { transition in
                 guard let notice = ControlNotice(transition) else { return }
                 Task { await shipyard.notify(notice) }
             },
-            // An agent's notice is shown when its project's rules say so,
-            // or withdrawn.
             notices: { request in await shipyard.receive(request) },
-            // The notes check reads Notion through ntn, as the menu does,
-            // and like it runs no ntn before Connect with ntn.
             notesCheck: {
                 guard let report = await shipyard.checkNotes() else {
                     return .refused(PanelText.notesCheckRefusal(canReadNotes: shipyard.canReadNotes))
@@ -260,8 +240,6 @@ final class AppServices {
         noticeListener?.close()
         noticeListener = nil
     }
-
-    // MARK: - Layout actions
 
     /// What the menu's layout can do: open or mark seen a row, mark a
     /// project (or every project) seen, collapse a project, open a
@@ -290,15 +268,12 @@ final class AppServices {
                 self?.closeMenu()
             },
             startNote: { [weak self] project in
-                // The menu closes once Notion opens the note; a failure stays in view on the project.
                 Task { @MainActor in
                     if await shipyard.startNote(in: project.name) { self?.closeMenu() }
                 }
             }
         )
     }
-
-    // MARK: - Panel actions
 
     /// The header's avatar or handle: opens the account's profile on
     /// GitHub, then closes the menu, as opening a row does.
@@ -325,8 +300,6 @@ final class AppServices {
     /// costs no GitHub request, the timer keeps the data fresh.
     func panelOpened() {
         panelState.isOpen = true
-        // The settings menu's marks: the link may have been made or removed
-        // by hand, and the skill installed or removed in a terminal.
         cliLink.check()
         skillDetector.check()
         Task { await notifier.checkPermission() }
@@ -373,8 +346,6 @@ final class AppServices {
         opener.openDocument(url)
         closeMenu()
     }
-
-    // MARK: - Closing the menu
 
     /// Closes the menu's window after an action that opened something in
     /// another app (an item, a notification's item, the account's profile,

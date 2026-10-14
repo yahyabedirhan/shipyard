@@ -68,7 +68,6 @@ final class NoticeListener: @unchecked Sendable {
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         address.sin_family = sa_family_t(AF_INET)
         address.sin_port = in_port_t(UInt16(port).bigEndian)
-        // The loopback address alone: never the Mac's other interfaces.
         address.sin_addr = in_addr(s_addr: INADDR_LOOPBACK.bigEndian)
         let bound = withUnsafePointer(to: &address) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
@@ -139,8 +138,6 @@ final class NoticeListener: @unchecked Sendable {
         _ = UnixSocket.writeAll(connection, response(status: 503, verdict: busy))
         Darwin.close(connection)
     }
-
-    // MARK: - HTTP
 
     /// A request as far as it was read: its head and body, or the status
     /// and reason it was refused with before it was read through.

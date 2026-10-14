@@ -103,8 +103,6 @@ public struct ProjectChoices: Equatable, Sendable {
         chosen.contains { $0.name.isEmpty }
     }
 
-    // MARK: - Private
-
     private func index(of slug: String) -> Int? {
         chosen.firstIndex { Self.same($0.repository.slug, slug) }
     }

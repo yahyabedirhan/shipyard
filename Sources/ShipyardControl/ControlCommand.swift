@@ -158,7 +158,6 @@ public enum ControlCommand {
         case ("status", ["--json"]):
             return .success(.send(.appStatus(json: true)))
         case ("open", _), ("quit", _), ("status", _):
-            // The first word past the option this subcommand takes, if it led.
             let option = switch (subcommand, rest.first) {
             case ("status", "--json"): 1
             case ("open", "--demo"): 2
@@ -243,7 +242,6 @@ public enum ControlCommand {
         case .failure(.notRunning):
             break
         case let answer:
-            // It runs (or is there but failing): no second launch.
             return result(of: answer)
         }
         return launch(environment: [:], handing: handover, answeringAt: normal, context)
@@ -276,7 +274,6 @@ public enum ControlCommand {
             context
         )
         if outcome.status != 0 {
-            // No demo runs: later commands look for the normal app again.
             try? DemoPointer.remove(in: context.support)
         }
         return outcome
@@ -306,8 +303,6 @@ public enum ControlCommand {
         } catch {
             return .failed("shipyard app open: \(error.reason)")
         }
-        // A starting app may accept a connection before it can answer, so
-        // each look waits briefly and a slow one is looked at again.
         var look = client
         look.timeout = lookTimeout
         for _ in 0..<looks {

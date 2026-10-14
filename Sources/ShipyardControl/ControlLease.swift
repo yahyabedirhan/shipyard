@@ -201,7 +201,6 @@ public struct ControlLease: Equatable, Sendable {
     public static func handover(_ term: Term) -> [String: String] {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        // Encoding strings and numbers can't fail.
         return [handoverVariable: String(decoding: try! encoder.encode(term), as: UTF8.self)]
     }
 
@@ -229,7 +228,6 @@ public struct ControlLease: Equatable, Sendable {
             transitions.append(.ended(term.holder, term.ends >= term.capped ? .capped : .expired))
         }
         guard term == nil else { return transitions }
-        // A wait that ran out leaves the line; its `take` is refused as such.
         queue.removeAll { now >= $0.until }
         guard !queue.isEmpty else { return transitions }
         let next = queue.removeFirst()
@@ -244,14 +242,12 @@ public struct ControlLease: Equatable, Sendable {
     /// while `holder` is barred.
     public mutating func use(by holder: Holder, at now: Date) -> Decision {
         var transitions = settle(at: now)
-        // A barred holder never holds the lease: Stop ended it.
         guard !isBarred(holder) else { return Decision(answer: .failure(.stopped), transitions: transitions) }
         if var term {
             guard term.holder.key == holder.key else {
                 return Decision(answer: .failure(.inUse(term)), transitions: transitions)
             }
             term.ends = min(max(term.ends, now.addingTimeInterval(Self.renewal)), term.capped)
-            // The holder's name and place are as its latest request says.
             term.holder = holder
             self.term = term
             transitions.append(.renewed(holder))
@@ -312,8 +308,6 @@ public struct ControlLease: Equatable, Sendable {
         return transitions + [.ended(term.holder, .released)] + settle(at: now)
     }
 
-    // MARK: - What the holder is doing
-
     /// `holder` began `step` at `now`: the lease's activity, for the
     /// banner, when `holder` holds it; anyone else's step changes nothing.
     public mutating func began(_ step: ControlStep, by holder: Holder, at now: Date) {
@@ -330,8 +324,6 @@ public struct ControlLease: Equatable, Sendable {
         term.activity?.ended = now
         self.term = term
     }
-
-    // MARK: - The maintainer taking shipyard back
 
     /// The maintainer's Stop at `now`: the lease ends (`stopped`), its
     /// holder is barred for `bar`, and the first waiter gets the lease as

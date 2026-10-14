@@ -1,6 +1,5 @@
 import Foundation
 
-// The connect screen's words (`ConnectView`).
 extension PanelText {
     /// What the connect screen says, and which way in leads: a title, one
     /// line on what happened, then Sign in with GitHub and the `gh` way in
@@ -133,7 +132,6 @@ extension PanelText {
                 lead: .connectWithGh,
                 signInUnavailable: unavailable,
                 showsInstallHint: false,
-                // Without a client ID there's no second way to offer.
                 alternative: canSignIn ? "Alternatively, sign in with GitHub, if you'd rather:" : nil
             )
         case .rejected(.tokenStore):
@@ -142,7 +140,6 @@ extension PanelText {
                 message: "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.",
                 lead: signInOrGh,
                 signInUnavailable: unavailable,
-                // The `gh` way folds into the same disclosure as on first launch.
                 showsInstallHint: canSignIn
             )
         case .rejected(.gh):

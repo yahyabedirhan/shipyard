@@ -193,8 +193,6 @@ enum RepositoriesQuery {
         }
     }
 
-    // MARK: - Checking one
-
     /// `text` as `owner/name`: trimmed, and taken out of a github.com link
     /// (`https://github.com/owner/name`, with or without `.git` or a
     /// trailing slash). `nil` when it isn't a repository slug.
@@ -262,8 +260,6 @@ extension GitHubClient {
     }
 }
 
-// MARK: - Listing a group's or an owner's repositories
-
 /// The repository resolver's question to GitHub: every repository of a
 /// repository group, or of one owner, a page of 100 at a time. The query
 /// text and its parser live here, so they have one owner. Archived
@@ -284,9 +280,6 @@ enum RepositoryListQuery {
         }
         switch lookup {
         case .group(let group):
-            // `affiliations` is the viewer's relation, `ownerAffiliations` the
-            // owner's; for the viewer's own list both name the same account,
-            // and the second defaults to [OWNER, COLLABORATOR], so both are set.
             let affiliation = switch group {
             case .owned: "OWNER"
             case .organizations: "ORGANIZATION_MEMBER"
@@ -300,8 +293,6 @@ enum RepositoryListQuery {
 
                 """
         case .owner:
-            // Only what the owner owns: the default also lists repositories
-            // the owner collaborates on elsewhere.
             return """
                 query ShipyardOwnerRepositories($login: String!, $after: String) {
                   repositoryOwner(login: $login) { \(connection("ownerAffiliations: [OWNER], ")) }

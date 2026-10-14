@@ -1,9 +1,6 @@
 import Foundation
 import ShipyardPings
 
-// A ping as the app lists it: an item, its URL and its row's icon. The
-// ping itself is the agent's side (ShipyardPings); how it's listed is the
-// app's.
 extension Ping {
     /// The ping as a listed item: kind `ping`, with no number (0) until
     /// `Listing` gives it its section's (`PingNumbers`), always open, aged from when

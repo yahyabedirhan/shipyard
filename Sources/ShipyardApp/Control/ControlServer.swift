@@ -95,8 +95,6 @@ final class ControlServer {
         leaseChanged()
     }
 
-    // MARK: - Dispatch
-
     /// The answer to one request as the client sent it. A leased request
     /// asks the lease first: refused for anyone but its holder, with
     /// nothing done. A quit hands the lease back in its reply, for a
@@ -120,7 +118,6 @@ final class ControlServer {
             case .failure(let refusal): return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
             }
         }
-        // The holder's step shows on the banner while it runs, then as done.
         let step = message.request.step
         let began = now()
         if let step { lease.began(step, by: message.holder, at: began) }
@@ -129,7 +126,6 @@ final class ControlServer {
         case .controlTake(let seconds, let purpose):
             return await take(by: message.holder, waiting: seconds, purpose: purpose)
         case .controlRelease:
-            // The next waiter's take is answered as the lease changes (`leaseChanged`).
             apply(lease.release(by: message.holder, at: now()))
             return Answer(reply: .done("released shipyard\n"))
         case .appStatus(let json):
@@ -138,7 +134,6 @@ final class ControlServer {
         case .appOpen:
             return Answer(reply: .done(status().text))
         case .appQuit:
-            // The step isn't handed over: the relaunch ends it.
             granted?.activity = nil
             return Answer(reply: ControlReply(ok: true, output: "shipyard quit\n", lease: granted), quits: true)
         case .panelOpen:
@@ -173,14 +168,12 @@ final class ControlServer {
             }
         case .notify(let request):
             switch await notices(request) {
-            // The app shows a notice or refuses it; it never queues one.
             case .shown, .queued: return Answer(reply: .done(""))
             case .refused(let why): return Answer(reply: .refused(why))
             }
         case .notesCheck:
             switch await notesCheck() {
             case .inOrder(let report): return Answer(reply: .done(report))
-            // A report with errors exits 1; the whole report goes with it.
             case .refused(let report): return Answer(reply: .refused(report.trimmingCharacters(in: .newlines)))
             }
         }
@@ -192,8 +185,6 @@ final class ControlServer {
         status.lease = lease.status(at: now())
         return status
     }
-
-    // MARK: - Taking turns
 
     /// `lease take`: held to the cap at once when the lease is the
     /// holder's or free. While another holds it, refused at once without a
@@ -214,7 +205,6 @@ final class ControlServer {
         case .failure(let refusal):
             return Answer(reply: .refused(refusal.message(at: time, timeZone: timeZone)))
         }
-        // Queued only with a wait after now.
         let seconds = seconds ?? 0
         let deadline = time.addingTimeInterval(TimeInterval(seconds))
         let ticket = UUID()
@@ -232,7 +222,6 @@ final class ControlServer {
     /// it should it be free by now.
     private func waitRanOut(_ ticket: UUID, deadline: Date) {
         guard let waiter = waiters.removeValue(forKey: ticket) else { return }
-        // Never before the deadline the take was given, whatever the clock says.
         let time = max(now(), deadline)
         let decision = lease.giveUp(by: waiter.holder, waited: waiter.seconds, at: time)
         apply(decision.transitions)
@@ -262,8 +251,6 @@ final class ControlServer {
         apply(lease.release(by: granted.holder, at: now()))
     }
 
-    // MARK: - The maintainer taking shipyard back
-
     /// The banner's Stop: the holder's lease ends and it's barred
     /// (`ControlLease.stop`), and the first waiter in line gets the lease,
     /// its `take` answered as the lease changes. The maintainer's only way
@@ -276,8 +263,6 @@ final class ControlServer {
     func allow(_ key: String) {
         lease.allow(key, at: now())
     }
-
-    // MARK: - The lease's end
 
     /// Ends the lease if it has run out by now, handing it to the first
     /// waiter in line, and lifts the bars that have ended. A timer calls it
@@ -313,7 +298,6 @@ final class ControlServer {
         guard let next = lease.nextEnd(after: time) else { return }
         let left = next.timeIntervalSince(time)
         settling = Task { [weak self] in
-            // A wake before the end settles nothing, and sets the timer again.
             try? await Task.sleep(for: .seconds(left))
             guard !Task.isCancelled else { return }
             self?.settleLease()
@@ -328,8 +312,6 @@ final class ControlServer {
             return Answer(reply: .refused(error.reason))
         }
     }
-
-    // MARK: - Listening
 
     /// Starts listening, creating the support folder when it's missing. A
     /// socket file nothing answers on (left by an app that crashed) is
@@ -354,7 +336,6 @@ final class ControlServer {
         listener = nil
         settling?.cancel()
         settling = nil
-        // A take waiting in line hears why, rather than a dropped connection.
         for waiter in waiters.values {
             waiter.timeout?.cancel()
             waiter.answer.resume(returning: Answer(reply: .refused("shipyard is quitting")))
@@ -414,7 +395,6 @@ private final class Listener: @unchecked Sendable {
         }
         let descriptor = UnixSocket.make()
         guard descriptor >= 0 else { throw .init(description: "couldn't open a socket: \(UnixSocket.reason())") }
-        // Owner-only before anyone can connect: connections wait for listen(2).
         guard UnixSocket.bindSocket(descriptor, to: address) == 0, chmod(path, 0o600) == 0,
               listen(descriptor, 16) == 0, fcntl(descriptor, F_SETFL, O_NONBLOCK) == 0 else {
             let why = UnixSocket.reason()
@@ -443,7 +423,6 @@ private final class Listener: @unchecked Sendable {
         while true {
             let connection = accept(descriptor, nil, nil)
             guard connection >= 0 else { return }
-            // An accepted socket inherits O_NONBLOCK; its reads wait, up to the timeout.
             _ = fcntl(connection, F_SETFL, fcntl(connection, F_GETFL) & ~O_NONBLOCK)
             UnixSocket.configure(connection, timeout: Self.connectionTimeout)
             Self.queue.async { self.serve(connection) }

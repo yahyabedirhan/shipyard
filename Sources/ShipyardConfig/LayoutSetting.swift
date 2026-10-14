@@ -25,7 +25,6 @@ extension Configuration {
         } else if let header = map.entries.first(where: { $0.isHeader && $0.path == menu }) {
             lines.insert("layout = \(value)", at: header.line)
         } else if let other = map.entries.first(where: { $0.path.first == menu.first }) {
-            // `menu = { … }`, `menu.layout`-less dotted keys, `[menu.x]`.
             throw cantSetLayout(layout, line: other.line)
         } else if let uncommented = uncommentingMenuExample(in: lines, map: map, value: value) {
             lines = uncommented
@@ -51,13 +50,11 @@ extension Configuration {
     private static func uncommentingMenuExample(in lines: [String], map: TOMLSourceMap, value: String) -> [String]? {
         let starts = lines.indices.filter { lines[$0].wholeMatch(of: /[ \t]*#[ \t]*\[[ \t]*menu[ \t]*\][ \t]*(#.*)?\r?/) != nil }
         for start in starts {
-            let line = start + 1 // 1-based
+            let line = start + 1
             let nextTable = map.entries.first { $0.isHeader && $0.line > line }?.line ?? lines.count + 1
             guard !map.entries.contains(where: { !$0.isHeader && $0.line > line && $0.line < nextTable }) else { continue }
             var out = lines
             out[start] = uncommented(lines[start])
-            // The example's own lines: the comments right under it, up to a
-            // blank line or the next commented table.
             var index = start + 1
             while index < out.count, isComment(out[index]), !isCommentedTable(out[index]) {
                 if out[index].firstMatch(of: /^[ \t]*#[ \t]*layout[ \t]*=/) != nil {
@@ -79,14 +76,12 @@ extension Configuration {
         let table = ["[menu]", "layout = \(value)"]
         var out = lines
         guard let first = map.entries.first(where: \.isHeader) else {
-            // Drop the final newline's empty piece, then end with one again.
             if out.last == "" { out.removeLast() }
             if let last = out.last, !last.trimmingCharacters(in: .whitespaces).isEmpty { out.append("") }
             return out + table + [""]
         }
         var index = first.line - 1
         while index > 0, isComment(out[index - 1]) { index -= 1 }
-        // Never above the `#:schema` line or the file's opening comments.
         if index == 0 { index = first.line - 1 }
         var insertion = table + [""]
         if index > 0, !out[index - 1].trimmingCharacters(in: .whitespaces).isEmpty { insertion.insert("", at: 0) }

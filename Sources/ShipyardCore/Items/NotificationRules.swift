@@ -32,7 +32,6 @@ public enum NotificationRules {
     /// (`ControlNotice.panelURL`).
     public static func notification(for notice: ControlNotice, at now: Date) -> PostedNotification {
         PostedNotification(
-            // Unique per lease change, so one never replaces another.
             id: "\(notice.event.rawValue) \(Int64((now.timeIntervalSince1970 * 1000).rounded()))",
             event: notice.event,
             project: "",
@@ -51,7 +50,6 @@ public enum NotificationRules {
             project: event.project,
             headline: event.headline,
             itemTitle: event.item.ping?.notificationBody
-                // A run's title is its workflow; its branch says which change it tested.
                 ?? event.item.branch.map { "\(event.item.title) · \($0)" } ?? event.item.title,
             itemURL: event.item.url
         )
@@ -133,7 +131,6 @@ public struct NotifiedEvents: Equatable, Sendable {
         guard !gone.isEmpty else { return [] }
         record.events.subtract(gone)
         records[id] = record.events.isEmpty ? nil : record
-        // One passed over while unfiled posted nothing to take away.
         return gone.filter { !$0.hasPrefix(Self.unfiledPrefix) }.sorted().map { key in
             let parts = key.split(separator: " ", maxSplits: 1).map(String.init)
             return parts.count == 2 ? "\(parts[0]) \(id) \(parts[1])" : "\(key) \(id)"

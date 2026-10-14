@@ -25,7 +25,6 @@ final class ConfigurationWatcher {
     private let target: Target
     private let debounce: TimeInterval
     private let onChange: @MainActor () -> Void
-    // Written on the main actor only; `deinit` cancels them (closing the descriptors).
     nonisolated(unsafe) private var directorySource: (any DispatchSourceFileSystemObject)?
     nonisolated(unsafe) private var fileSource: (any DispatchSourceFileSystemObject)?
     private var pending: DispatchWorkItem?

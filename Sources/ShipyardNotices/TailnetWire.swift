@@ -42,13 +42,11 @@ extension NoticeVerdict {
         let wire: Wire
         switch self {
         case .shown: wire = Wire(shown: true)
-        // The app never queues a notice; written for completeness.
         case .queued: wire = Wire(queued: true)
         case .refused(let why): wire = Wire(refused: why)
         }
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        // Two optionals and a string: nothing that can fail to encode.
         return (try? encoder.encode(wire)) ?? Data()
     }
 

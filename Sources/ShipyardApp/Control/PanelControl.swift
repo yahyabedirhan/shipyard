@@ -60,9 +60,7 @@ final class PanelControl: PanelControlling {
             panelOpen: state.isOpen,
             view: state.openView?.commandName ?? SetupPart.projectsName,
             layout: configuration.menu.layout.rawValue,
-            // As `tab` accepts it: only while the menu draws tabs.
             tab: menu.layout == .tabs ? menu.tabTitle(menu.resolved(state.selectedTab)) : nil,
-            // As `fold` and `tab` accept them, remote machines included.
             projects: menu.projectNames,
             folded: menu.collapsedProjects,
             showingAll: menu.kindGroupsShowingAll.map { AppStatus.Group(project: $0.project, kind: $0.kind.commandName) },
@@ -103,7 +101,6 @@ final class PanelControl: PanelControlling {
             try? await Task.sleep(for: step)
             waited += step
         }
-        // A close that didn't happen isn't app control's any more.
         if !open, state.isOpen { state.closingByControl = false }
         return state.isOpen == open
     }

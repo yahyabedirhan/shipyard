@@ -1,8 +1,6 @@
 import Foundation
 import ShipyardConfig
 
-// The third writer (ADR 0001, amended): presets are the app's, so writing
-// one is the core's, over the store ShipyardConfig owns (ADR 0006).
 extension ConfigurationStore {
     /// Writes `preset`'s whole file, with `projects` as its picked
     /// repositories, for onboarding's first step: only when the file is
@@ -22,14 +20,12 @@ extension ConfigurationStore {
             guard let current = String(data: try read(), encoding: .utf8), Configuration.acceptsPreset(current) else {
                 throw Configuration.presetRefused
             }
-            // In place, as `setLayout`: a symlinked file stays a symlink.
             let handle = try FileHandle(forWritingTo: url)
             defer { try? handle.close() }
             try handle.truncate(atOffset: 0)
             try handle.write(contentsOf: Data(text.utf8))
         } else {
             try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            // `withoutOverwriting`: a file an editor wrote meanwhile wins.
             try Data(text.utf8).write(to: url, options: .withoutOverwriting)
         }
         return reload()

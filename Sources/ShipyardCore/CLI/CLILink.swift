@@ -128,7 +128,6 @@ public final class CLILink {
             try fileSystem.createSymbolicLink(at: link, to: cli)
             state = inspect()
         } catch {
-            // Something may have appeared meanwhile; say what's there if so.
             let now = inspect()
             state = now == .unlinked ? .failed(error.localizedDescription) : now
         }

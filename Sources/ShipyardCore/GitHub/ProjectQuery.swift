@@ -118,8 +118,6 @@ enum ProjectQuery {
         return nil
     }
 
-    // MARK: - Building
-
     /// The query text for `repositories`, with `$owner<i>`/`$name<i>`
     /// variables, and with `reviewSearch` the review search.
     static func document(_ repositories: [RepositoryRequest], reviewSearch: Bool = false) -> String {
@@ -177,7 +175,6 @@ enum ProjectQuery {
         }
         text += fields
         text += "  rateLimit { limit remaining used resetAt cost }\n}\n"
-        // GraphQL rejects a fragment no field uses.
         if reviewSearch || repositories.contains(where: \.pullRequests) {
             text += """
 
@@ -216,7 +213,6 @@ enum ProjectQuery {
         let request = Request(query: document(repositories, reviewSearch: reviewSearch), variables: variables)
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        // Encoding strings and a string dictionary can't fail.
         return (try? encoder.encode(request)) ?? Data()
     }
 
@@ -224,8 +220,6 @@ enum ProjectQuery {
         var query: String
         var variables: [String: String]
     }
-
-    // MARK: - Parsing
 
     /// What the answer held.
     struct Parsed: Equatable, Sendable {
@@ -305,8 +299,6 @@ enum ProjectQuery {
         }
         let limited = errors.filter { $0.type == resourceLimitsExceeded }
         parsed.resourceLimited = !limited.isEmpty
-        // Why `alias` isn't whole: GitHub's error on its path, else the
-        // query's first resource-limits error, else that a list had gaps.
         func incompleteMessage(_ alias: String) -> String {
             let onPath = limited.first { $0.path?.first == .key(alias) }
             return (onPath ?? limited.first)?.message ?? "GitHub left entries out of its answer."
@@ -355,8 +347,6 @@ enum ProjectQuery {
         }
         return parsed
     }
-
-    // MARK: - Response shape
 
     private struct Response: Decodable {
         var data: Payload?
@@ -536,7 +526,6 @@ enum ProjectQuery {
             case "CLOSED": .closed
             default: isDraft ? .draft : .open
             }
-            // Whether it waits on the viewer comes from the review search.
             return Item(
                 kind: .pullRequest,
                 repository: repository,

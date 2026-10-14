@@ -28,8 +28,6 @@ struct ListLayout: View {
         ScrollViewReader { proxy in
             MeasuredScrollView {
                 VStack(spacing: 0) {
-                    // The list's ends, outside the lazy stack, for ↑ and ↓ to
-                    // wrap to: always laid out, unlike the far end's rows.
                     RowListTop()
                     HighlightLayer(highlight: $highlight) {
                         LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
@@ -146,17 +144,11 @@ struct ListLayout: View {
                     .id(place)
                     .transition(Self.lineTransition)
             }
-            // Every row's number column holds the group's longest number, so
-            // its titles line up even past the column's width: "WORK-27"
-            // over "WORK-1".
             let widestNumber = group.rows.map(PanelText.number).max { $0.count < $1.count } ?? ""
-            // A folded subsection shows its subheader alone.
             ForEach(Array((group.isFolded ? [] : group.rows).enumerated()), id: \.element.id) { position, row in
                 let place = MenuRowPlace(section: section.name, row: row.id)
                 VStack(spacing: 0) {
                     if index > 0, position == 0, !group.showsHeader {
-                        // A line where one group ends and the next begins:
-                        // by default pull requests | issues | runs.
                         GroupDivider()
                     }
                     ListRow(row: row, showsRepository: section.showsRepository, widestNumber: widestNumber)
@@ -190,8 +182,6 @@ struct ListLayout: View {
     )
 }
 
-// MARK: - A project's header
-
 /// A project's header that reads whether it's highlighted in its own body,
 /// so a hover elsewhere in the list doesn't run the layout's body again.
 private struct HighlightedSectionHeader: View {
@@ -224,12 +214,8 @@ private struct ListSectionHeader: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // The fold button fills the header's left part; the chevron,
-            // folder and name are drawn over it and let clicks through,
-            // so only the open-in-browser icon beside the name takes its own.
             ZStack(alignment: .leading) {
                 Button {
-                    // Not animated (see `ListLayout.lineTransition`): the chevron, the chips and the lines animate themselves.
                     actions.toggleCollapsed(section)
                 } label: {
                     Color.clear
@@ -237,7 +223,6 @@ private struct ListSectionHeader: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                // No hover help: the chevron says it collapses. VoiceOver hears what a click does.
                 .accessibilityLabel(section.title)
                 .accessibilityValue(section.isCollapsed ? "Collapsed" : "Expanded")
                 .accessibilityHint(PanelText.sectionFoldHelp(section.title, isCollapsed: section.isCollapsed))
@@ -268,15 +253,12 @@ private struct ListSectionHeader: View {
                 .padding(.trailing, 8)
             }
             if let empty = PanelText.emptySection(section) {
-                // In place of the chips, right-aligned.
                 Text(empty)
                     .font(TypeScale.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .fixedSize()
             } else {
-                // The check stays laid out while hidden, so the chips
-                // never move on hover.
                 if section.attentionCount > 0 {
                     MarkAllSeenIcon {
                         withAnimation(.spring(duration: 0.45, bounce: 0.15)) { actions.markAllSeen(section) }
@@ -316,7 +298,6 @@ private struct ListSectionHeader: View {
             ZStack {
                 Palette.header
                 if isHighlighted {
-                    // The header's whole band, square: not the rows' rounded, inset shape.
                     Rectangle()
                         .fill(Palette.hover)
                         .transition(.opacity)
@@ -456,8 +437,6 @@ private struct ChipButtonBody: View {
     }
 }
 
-// MARK: - Rows
-
 /// One item on one line: the attention dot, the state icon (with a pull
 /// request's check dot on it), the number, the title (bold when it needs
 /// attention; a run's is its workflow's name, followed by its branch as a
@@ -477,12 +456,6 @@ private struct ListRow: View {
             AttentionDot(isOn: row.needsAttention)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             stateIcon
-            // A ping written before pings were numbered has none (0); the
-            // column stays, so titles line up. A note's carries its prefix.
-            // Digits of one width make the group's longest number the
-            // widest, since a project's notes share one prefix. A note's
-            // reference reads from its prefix, so it starts at the left,
-            // a little apart from the icon; a plain number ends at the right.
             ZStack(alignment: numberAlignment) {
                 Text(widestNumber).hidden()
                 Text(PanelText.number(row))
@@ -505,7 +478,6 @@ private struct ListRow: View {
             }
             Spacer(minLength: 8)
             if let meta {
-                // A known agent's logo sits a little apart from its name.
                 HStack(spacing: metaAgent == nil ? 3 : 5) {
                     if let agent = metaAgent {
                         AgentMarkView(agent: agent, size: Grid.agentMark)
@@ -541,7 +513,6 @@ private struct ListRow: View {
     private var stateIcon: some View {
         StateSymbol(row: row)
             .frame(width: Grid.iconColumn, alignment: .center)
-            // The check dot rides on the state icon, like a status badge.
             .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
     }
 

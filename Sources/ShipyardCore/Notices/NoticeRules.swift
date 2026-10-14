@@ -149,9 +149,7 @@ public enum NoticeRules {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        // Encoding strings and a URL can't fail.
         let json = String(decoding: try! encoder.encode(click), as: UTF8.self)
-        // ASCII only: `alphanumerics` would leave other letters bare.
         let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         var components = URLComponents(url: clickURL, resolvingAgainstBaseURL: false)!
         components.percentEncodedQuery = "click=" + json.addingPercentEncoding(withAllowedCharacters: unreserved)!

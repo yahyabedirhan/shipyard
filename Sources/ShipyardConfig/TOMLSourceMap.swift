@@ -92,7 +92,6 @@ struct TOMLSourceMap {
             }
         }
 
-        // A header's section runs to the line before the next header.
         let headerLines = entries.filter(\.isHeader).map(\.line)
         for position in entries.indices where entries[position].isHeader {
             let start = entries[position].line

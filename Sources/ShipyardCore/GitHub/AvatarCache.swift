@@ -51,8 +51,6 @@ public actor AvatarCache {
         let task = Task { await Self.download(url, transport: transport) }
         loading = (url, task)
         let data = await task.value
-        // An ask for another URL since (the avatar changed meanwhile) wins
-        // the disk and memory; this one only answers its caller.
         let superseded = loading.map { $0.url != url } ?? false
         if !superseded { loading = nil }
         guard let data else { return nil }
@@ -82,7 +80,6 @@ public actor AvatarCache {
             try data.write(to: imageFile, options: .atomic)
             try Data(url.absoluteString.utf8).write(to: urlFile, options: .atomic)
         } catch {
-            // Not kept on disk: memory still has it, and the next launch downloads it again.
         }
     }
 

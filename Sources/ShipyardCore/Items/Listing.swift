@@ -123,7 +123,6 @@ public enum Listing {
         case .pullRequest: project.pullRequests.closedWindow
         case .issue: project.issues.closedWindow
         case .workflowRun: project.workflowRuns.finishedWindow
-        // A ping's window is its seen-window, above; a note is always open.
         case .ping, .note: 0
         }
         guard window > 0, let closedAt = item.closedAt else { return false }

@@ -31,17 +31,12 @@ struct Panel: View {
         .frame(width: Grid.panelWidth)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
-        // An install that ended, from the Shipyard Skill view or onboarding's
-        // card, may have installed the skill: the view and the menu's mark follow.
         .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
     }
-
-    // MARK: - Header
 
     private var header: some View {
         let attention = shipyard.phase == .ready ? shipyard.menu.attention.total : 0
         return HStack(spacing: 8) {
-            // The account once it's known; "Shipyard" until then and after signing out.
             if let viewer = shipyard.viewer {
                 AccountButton(viewer: viewer, avatars: actions.avatars, action: actions.openProfile)
             } else {
@@ -56,8 +51,6 @@ struct Panel: View {
             }
             Spacer()
             if shipyard.phase == .ready {
-                // Shows the current layout; a click writes the next one to
-                // `[menu] layout`, and the menu follows the reload.
                 let layout = shipyard.menu.layout
                 Button(action: actions.switchToNextLayout) {
                     Image(systemName: layout.symbol)
@@ -69,9 +62,6 @@ struct Panel: View {
                 .accessibilityLabel(PanelText.layoutButton(layout))
             }
             Button(action: actions.refresh) {
-                // While a refresh runs, the native mini spinner (the one the
-                // footer shows) stands in for the arrow; the hidden arrow
-                // keeps the button's size, so the header doesn't shift.
                 Image(systemName: "arrow.clockwise")
                     .opacity(shipyard.isRefreshing ? 0 : 1)
                     .overlay {
@@ -82,7 +72,6 @@ struct Panel: View {
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut("r")
-            // The model's pause, as the banner and the menu bar icon show it.
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
             .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
@@ -109,8 +98,6 @@ struct Panel: View {
     /// mark on its right (a menu item's badge), and Sign out under a divider.
     @ViewBuilder
     private var settingsItems: some View {
-        // Once signed in: while `start()` still asks GitHub, the token is
-        // picked but the panel says it's connecting.
         let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
         let status = SetupStatus(
             cli: actions.cliLink.state,
@@ -131,8 +118,6 @@ struct Panel: View {
             }
         }
     }
-
-    // MARK: - Banners
 
     /// The core's banners (`Shipyard.banners(at:)`), each with its ✕: the
     /// lease's banner first, in every phase and layout, then a quiet line
@@ -226,15 +211,12 @@ struct Panel: View {
     /// each second, on the second the time left changes. The control
     /// server ends the lease when it runs out, which takes the banner away.
     private func leaseBanner(ends: Date, dismiss: @escaping () -> Void) -> some View {
-        // Whole seconds before the end: never later than now, since the cap counts from when it was taken.
         TimelineView(.periodic(from: ends.addingTimeInterval(-ControlLease.cap), by: 1)) { context in
             if let lease = actions.leaseIndicator.shown(at: context.date) {
                 LeaseBannerView(lease: lease, stop: actions.stopLease, dismiss: dismiss)
             }
         }
     }
-
-    // MARK: - Content
 
     /// The status view the settings menu or app control opened, in place
     /// of what fits the phase; else that.
@@ -251,12 +233,8 @@ struct Panel: View {
     private var phaseContent: some View {
         switch shipyard.phase {
         case .signedOut, .connecting:
-            // Signed out, or the device flow's code waiting for approval.
             ConnectView(shipyard: shipyard)
         case .needsProjects:
-            // Onboarding's preset step while the file holds nothing but
-            // `version`, else the plain picker; and its offers to install the
-            // skill and link the CLI.
             if shipyard.presets.isEmpty {
                 ProjectPicker(shipyard: shipyard)
             } else {
@@ -284,8 +262,6 @@ struct Panel: View {
             TabsLayout(model: shipyard.menu, panel: actions.panelState, actions: actions.layoutActions)
         }
     }
-
-    // MARK: - Footer
 
     private func footer(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -368,7 +344,6 @@ private struct AccountButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressButtonStyle())
-        // The hover fill reaches past the text, not the text past the gutter.
         .padding(.leading, -4)
         .onHover { inside in
             guard inside != hover else { return }
@@ -376,7 +351,6 @@ private struct AccountButton: View {
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
         .onDisappear {
-            // Clicking closes the menu under the pointer: give the cursor back.
             if hover { NSCursor.pop() }
             hover = false
         }
@@ -417,7 +391,6 @@ private struct AccountButton: View {
             avatar = nil
             return
         }
-        // Bytes that aren't an image leave the placeholder.
         avatar = await avatars.image(for: url).flatMap(NSImage.init(data:))
     }
 }

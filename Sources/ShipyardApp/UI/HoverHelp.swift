@@ -2,11 +2,6 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-// The panel's hover help, in place of macOS's native tooltips (`.help`):
-// `hoverHelp(_:)` on a view, and `hoverHelpHost()` once on the panel, which
-// draws it: a small card under or over the hovered view, gliding from view
-// to view like the row highlight (see `docs/references/macos-hover-help.md`).
-
 /// How the hover help looks and when it shows.
 enum HoverHelp {
     /// Where the help is, which decides its timing.
@@ -102,8 +97,6 @@ extension View {
     }
 }
 
-// MARK: - The source: a view with help
-
 /// What a hover card shows: a line or two of help, or a row's card.
 enum HoverHelpContent: Hashable {
     case text(String)
@@ -161,8 +154,6 @@ private struct HoverHelpSource: ViewModifier {
     }
 }
 
-// MARK: - The host: the card
-
 /// The hovered view's help, placed in the host's space.
 private struct HoverHelpRequest: Equatable {
     let id: UUID
@@ -197,14 +188,11 @@ private struct HoverHelpOverlay: View {
             }
         }
         .allowsHitTesting(false)
-        // VoiceOver reads the text as the hovered view's hint.
         .accessibilityHidden(true)
         .task(id: request?.key) { await follow(request) }
         .onChange(of: request) { _, request in
-            // The same view moved under a resting pointer (the list scrolled).
             if let request, request.key == shown?.key { shown = request }
         }
-        // The panel closed: open it again without the last card.
         .onDisappear { shown = nil }
     }
 
@@ -217,8 +205,6 @@ private struct HoverHelpOverlay: View {
             return
         }
         let timing = HoverHelp.timing(request.context)
-        // Glide from the card on show only within a context that glides;
-        // otherwise it goes before the next view's delay starts.
         if let current = shown, current.context != request.context || timing.warmth == 0 {
             hide()
         }
@@ -319,8 +305,6 @@ private struct RowCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            // The avatar and the title are the card's header: the avatar
-            // centres on the title, one line or three.
             HStack(alignment: .center, spacing: HoverHelp.avatarGap) {
                 if let agent = card.agent {
                     AgentMarkView(agent: agent, size: HoverHelp.avatarSize)
@@ -332,7 +316,6 @@ private struct RowCardView: View {
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            // The rest sits under the title, not the avatar.
             VStack(alignment: .leading, spacing: 3) {
                 if !card.reasons.isEmpty {
                     HStack(spacing: 4) {
@@ -434,7 +417,6 @@ private struct FactView: View {
         case .duration(let time, _):
             Text(time).monospacedDigit().foregroundStyle(.secondary)
         case .body(let text):
-            // A ping's body, whole: it wraps where other facts cut off.
             Text(text)
                 .foregroundStyle(.primary.opacity(0.78))
                 .lineLimit(8)

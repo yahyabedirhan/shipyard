@@ -78,8 +78,6 @@ enum WorkflowRuns {
         }
     }
 
-    // MARK: - Response shape
-
     private struct Response: Decodable {
         var workflow_runs: [Run]
     }
@@ -138,7 +136,7 @@ enum WorkflowRuns {
             case "success", "neutral": return (.succeeded, .passed)
             case "failure", "timed_out", "startup_failure": return (.failed, .failed)
             case "action_required": return (.running, .pending)
-            default: return nil  // cancelled, skipped, stale
+            default: return nil
             }
         }
 

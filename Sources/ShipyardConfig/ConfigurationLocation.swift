@@ -54,9 +54,6 @@ public enum ConfigurationLocation {
         support.appendingPathComponent(fileName, isDirectory: false)
     }
 
-    // `config-location.json`:
-    //
-    //     { "path": "/Users/me/.config/shipyard/config.toml", "version": 1 }
     private struct File: Codable {
         var version: Int
         var path: String

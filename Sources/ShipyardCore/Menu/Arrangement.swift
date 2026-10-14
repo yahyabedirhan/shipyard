@@ -71,10 +71,8 @@ public enum Arrangement {
     static func key(for item: Item, settings: ArrangementSettings, now: Date, calendar: Calendar) -> GroupKey {
         switch settings.groupBy {
         case .kind: .kind(item.kind)
-        // A ping with no repository or sender joins its kind's group, last.
         case .repository: item.repository.isEmpty ? .kind(item.kind) : .repository(item.repository)
         case .date: .date(DateBucket(sortDate(item, settings.sortBy == .created ? .created : .updated), now: now, calendar: calendar))
-        // A ping's author is who sent it (`--from`), a label, not a login.
         case .author where item.kind == .ping: item.ping?.sender.map(GroupKey.sender) ?? .kind(item.kind)
         case .author: item.author.isEmpty ? .kind(item.kind) : .author(item.author)
         case .none: .ungrouped
@@ -123,12 +121,10 @@ public enum Arrangement {
         case (.sender, .author):
             false
         case (.kind, _):
-            // A kind among repositories or authors: pings without one, last.
             false
         case (_, .kind):
             true
         default:
-            // One project's other groups all have the same kind of key.
             false
         }
     }
@@ -202,9 +198,6 @@ public struct GroupID: Hashable, Sendable {
     }
 }
 
-// In `state.json`: `{ "project": "shop", "group": "kind:pullRequest" }`. A
-// group key this build doesn't know fails the decode, and the app state
-// skips that entry.
 extension GroupID: Codable {
     private enum CodingKeys: String, CodingKey {
         case project

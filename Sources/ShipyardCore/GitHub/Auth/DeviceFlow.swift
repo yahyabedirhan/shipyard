@@ -156,8 +156,6 @@ public struct DeviceFlow: Sendable {
         }
     }
 
-    // MARK: - Requests
-
     private struct CodeAnswer: Decodable {
         var deviceCode: String?
         var userCode: String?

@@ -69,8 +69,6 @@ struct ProjectPicker: View {
         .task { await loadSuggestions() }
     }
 
-    // MARK: - Adding by name
-
     private var addField: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -115,8 +113,6 @@ struct ProjectPicker: View {
             }
         }
     }
-
-    // MARK: - The list
 
     @ViewBuilder
     private var repositories: some View {
@@ -186,7 +182,6 @@ struct ProjectPicker: View {
                         Image(systemName: "lock.fill")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            // No hover help: the lock says private.
                             .accessibilityLabel("Private")
                     }
                 }
@@ -237,8 +232,6 @@ struct ProjectPicker: View {
         }
     }
 
-    // MARK: - Adding
-
     private var footer: some View {
         VStack(alignment: .leading, spacing: 6) {
             let projects = choices.projects
@@ -278,16 +271,12 @@ struct ProjectPicker: View {
         Task {
             defer { isAdding = false }
             do {
-                // With projects, the phase moves to `ready` and the panel
-                // swaps this view for the list.
                 let result = if let add {
                     try await add(choices.projects)
                 } else {
                     try await shipyard.addProjects(choices.projects)
                 }
                 if case .invalid = result {
-                    // Written, but the file around them doesn't load: the
-                    // banner above says why. Don't write them twice.
                     choices = ProjectChoices(suggestions: choices.offered)
                     addError = PanelText.addedToBrokenFile
                 }

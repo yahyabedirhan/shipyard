@@ -60,7 +60,6 @@ final class NotesReader {
             var used: Set<String> = []
             var matched: [String: String] = [:]
             for (project, title) in projects {
-                // The first database titled exactly the project's title.
                 guard let database = databases.first(where: { $0.title == title })?.id else { continue }
                 used.insert(database)
                 matched[project] = database
@@ -108,7 +107,6 @@ final class NotesReader {
         do {
             pages = try await client.childPages(of: page)
         } catch NotionError.http(404, _, _) where entryPage != nil {
-            // The remembered entry page went: searched for again, once.
             entryPage = nil
             guard let found = try await client.searchPages(titled: Self.entryPageTitle).first else { return nil }
             page = found
@@ -189,7 +187,6 @@ final class NotesReader {
             do {
                 notes = try await client.openNotes(in: source)
             } catch let error as NotionError {
-                // The data source went (replaced, or no longer shared): look it up again next time.
                 if case .http(404, _, _) = error { dataSources[database] = nil }
                 throw error
             }

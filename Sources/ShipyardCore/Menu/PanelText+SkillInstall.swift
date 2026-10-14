@@ -1,6 +1,5 @@
 import Foundation
 
-// The skill install card's words (`SkillInstallCard`).
 extension PanelText {
     /// What the skill install card says: a title, what happened or what to
     /// do, the command's output, the command to copy, and its button.

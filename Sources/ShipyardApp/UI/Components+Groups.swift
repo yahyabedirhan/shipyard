@@ -15,7 +15,6 @@ struct GroupHeader: View {
 
     var body: some View {
         Button {
-            // Not animated, like a project's fold (see `ListLayout.lineTransition`).
             actions.toggleGroup(group)
         } label: {
             HStack(spacing: 5) {
@@ -36,14 +35,12 @@ struct GroupHeader: View {
                 Spacer()
             }
             .foregroundStyle(.secondary)
-            // The chevron in the rows' dot column, the title where it was.
             .padding(.leading, Grid.gutter - 4)
             .padding(.trailing, Grid.gutter)
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        // No hover help: the chevron says it folds. VoiceOver hears what a click does.
         .accessibilityLabel(group.title)
         .accessibilityHint(PanelText.groupFoldHelp(group))
         .accessibilityValue(PanelText.groupFoldState(group))
@@ -75,7 +72,6 @@ struct ShowMoreRow: View {
                     .foregroundStyle(.secondary)
                 Spacer()
             }
-            // Under the rows' titles.
             .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
             .padding(.trailing, Grid.gutter)
             .frame(height: Grid.rowHeight)

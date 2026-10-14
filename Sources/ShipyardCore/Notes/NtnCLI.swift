@@ -116,7 +116,6 @@ public struct NtnCLI: HTTPTransport {
                 status = failure.status
                 body = (try? JSONSerialization.data(withJSONObject: ["code": failure.code, "message": failure.message])) ?? Data()
             } else {
-                // A warning can come first: the error line is the one that says so.
                 let error = lines.first { $0.hasPrefix("error:") } ?? lines.first ?? "exit \(output.status)"
                 status = runFailed
                 body = (try? JSONSerialization.data(withJSONObject: ["message": "ntn: \(error)"])) ?? Data()
@@ -218,7 +217,6 @@ private final class NtnRun: @unchecked Sendable {
     /// Runs ntn and waits for it; `nil` when it couldn't start or was cancelled.
     func toEnd() -> NtnCLI.Output? {
         guard launch() else { return nil }
-        // Standard error is read on its own thread, so neither pipe can fill while the other is read.
         let errorRead = DispatchGroup()
         errorRead.enter()
         DispatchQueue.global(qos: .userInitiated).async {

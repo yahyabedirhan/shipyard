@@ -32,8 +32,6 @@ struct PresetPicker: View {
         }
     }
 
-    // MARK: - Choosing
-
     private var presets: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -118,9 +116,6 @@ struct PresetPicker: View {
         Task {
             defer { isWriting = false }
             do {
-                // The phase moves to `ready` and the panel swaps this view
-                // for the list; a refusal empties `presets`, and the panel
-                // shows the plain picker.
                 try await shipyard.choosePreset(preset, projects: choice.projects(from: []))
             } catch let error as ConfigurationError {
                 writeError = error.description

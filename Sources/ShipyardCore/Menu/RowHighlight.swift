@@ -105,8 +105,6 @@ public struct RowHighlight: Equatable, Sendable {
         self.place == place
     }
 
-    // MARK: - The pointer
-
     /// The pointer entered a row (or a project's header): it's the
     /// highlighted one now (unless the keys hold the highlight and the row
     /// only scrolled under the pointer).
@@ -136,8 +134,6 @@ public struct RowHighlight: Equatable, Sendable {
         followsPointer = true
         place = underPointer
     }
-
-    // MARK: - ↑ and ↓
 
     /// ↓: the row after the highlighted one in `places` (the layout's rows,
     /// top to bottom), or the first when none is highlighted or the
@@ -170,8 +166,6 @@ public struct RowHighlight: Equatable, Sendable {
         let count = places.count
         self.place = places[((index + step) % count + count) % count]
     }
-
-    // MARK: - ← and → in the list layout
 
     /// ←, as in an outline: from an item to its subsection's subheader, or
     /// to its project's header when its group has none; on an open
@@ -231,8 +225,6 @@ public struct RowHighlight: Equatable, Sendable {
         }
     }
 
-    // MARK: - ← and → on a tab's subheader
-
     /// ← on a tab's subheader: folds it if it's open. Returns the group
     /// to fold, if any; anywhere else in the tab, nothing happens (← there
     /// switches tabs).
@@ -248,8 +240,6 @@ public struct RowHighlight: Equatable, Sendable {
         guard let id = place?.group, let group = content.groups.first(where: { $0.id == id }) else { return nil }
         return foldRight(group, in: nil)
     }
-
-    // MARK: - Folding a subsection
 
     /// ← on `group`'s subheader: folds it unless it's folded already.
     private mutating func foldLeft(_ group: RowGroup) -> MenuFold? {
@@ -274,8 +264,6 @@ public struct RowHighlight: Equatable, Sendable {
         followsPointer = false
         self.place = place
     }
-
-    // MARK: - The rows
 
     /// The rows changed (a refresh, a collapse, another tab): a highlighted
     /// row that's no longer among `places` loses the highlight.

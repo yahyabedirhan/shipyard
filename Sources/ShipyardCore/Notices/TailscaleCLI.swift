@@ -38,8 +38,6 @@ public struct TailscaleCLI: TailnetIdentity {
     public func ownLogin() async -> Result<String, TailnetLoginUnknown> {
         guard let executable = locate() else { return .failure(TailnetLoginUnknown("the tailscale command wasn't found")) }
         let run = run
-        // Off the main actor, and never waited on past the timeout: a
-        // Tailscale that hangs refuses the notice rather than holding it.
         let output = await Self.firstOf(
             { run(executable, ["status", "--json"]) },
             orAfter: Self.timeout

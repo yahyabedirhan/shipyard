@@ -20,8 +20,6 @@ struct WorkspaceActions: ActionRunning {
         case .app(let app):
             return await Self.activate(app)
         case .herdr:
-            // `Shipyard` focuses Herdr itself (`HerdrFocus`) and asks for
-            // `[herdr] terminal` as an app; a Herdr action never comes here.
             return .failed("No focus", detail: "Couldn't focus Herdr")
         }
     }

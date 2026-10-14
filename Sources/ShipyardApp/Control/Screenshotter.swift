@@ -58,9 +58,6 @@ final class Screenshotter: Screenshotting {
         let previous = NSApp.appearance
         if let appearance { NSApp.appearance = ScreenshotImage.appearance(appearance) }
         defer { NSApp.appearance = previous }
-        // Counted, not saved and restored: overlapping captures each end
-        // their own hiding. One asking for the indicator while another
-        // hides it captures without the banner.
         if !withIndicator { Self.withoutAnimation { indicator.hideForCapture() } }
         defer { if !withIndicator { Self.withoutAnimation { indicator.showAfterCapture() } } }
 
@@ -70,9 +67,6 @@ final class Screenshotter: Screenshotting {
             image = try await capture()
             captureFailure = nil
         } catch let failure {
-            // A panel of its own, in the appearance asked for (or the app's
-            // as it is now): the open window's view drawn alone loses its
-            // vibrant colours and symbols, a fresh panel keeps them.
             if let drawn = await ScreenshotImage.render(freshPanel(), appearance: NSApp.effectiveAppearance, opaque: true) {
                 image = drawn
             } else {
@@ -85,8 +79,6 @@ final class Screenshotter: Screenshotting {
 
     func menuBarIcon(to file: URL, appearance: ControlRequest.Appearance?, withIndicator: Bool) async -> ScreenshotOutcome {
         let drawing = appearance.map(ScreenshotImage.appearance) ?? NSApp.effectiveAppearance
-        // Rendered, not captured: the live icon keeps its dot meanwhile,
-        // and another capture hiding the indicator doesn't drop it here.
         let dot = withIndicator && indicator.lease.status(at: Date()) != nil
         guard let image = await ScreenshotImage.menuBarIcon(appearance: drawing, leaseDot: dot) else {
             return .failed(why: "couldn't render the menu bar icon")
@@ -226,7 +218,6 @@ enum ScreenshotImage {
         window.contentView = host
         window.orderFrontRegardless()
         defer { window.orderOut(nil) }
-        // Each pass fits the window to what the view now asks for.
         for _ in 0..<3 {
             let fitting = host.fittingSize
             window.setContentSize(CGSize(width: fitting.width, height: min(fitting.height, maxHeight)))
@@ -244,7 +235,6 @@ enum ScreenshotImage {
         let side = SailboatImage.menuBarSide
         let icon: AnyView
         if leaseDot {
-            // In its own colours, the sailboat tinted for the appearance it's drawn in.
             let image = LeaseDot.image(on: .sailboat)
             icon = AnyView(Image(nsImage: image).frame(width: image.size.width, height: image.size.height))
         } else {

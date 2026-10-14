@@ -97,8 +97,6 @@ public struct Preset: Hashable, Sendable, Identifiable {
         }
     }
 
-    // MARK: - The files
-
     private static func myAgentsText(_ projects: [NewProject]) -> String {
         """
         #:schema \(Configuration.schemaURL)

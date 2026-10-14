@@ -79,15 +79,12 @@ public final class SkillInstallation {
         let outcome = await withTaskGroup(of: Outcome?.self) { group in
             group.addTask { .finished(await installer.install()) }
             group.addTask {
-                // `nil` when the sleep is cancelled: the install finished first.
                 guard (try? await sleep(timeout)) != nil else { return nil }
                 return .timedOut
             }
             var first: Outcome?
             for await outcome in group where first == nil {
                 first = outcome
-                // The other one stops: the timer, or the shell (whose runner
-                // returns at once when cancelled).
                 if outcome != nil { group.cancelAll() }
             }
             return first

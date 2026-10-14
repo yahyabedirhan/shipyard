@@ -73,7 +73,6 @@ public struct Holder: Codable, Hashable, Sendable {
     private static func ancestor(_ processes: any ProcessTable) -> ProcessRecord? {
         guard var pid = processes.process(processes.currentPID)?.parent else { return nil }
         var farthest: ProcessRecord?
-        // A process table is a tree, but never trust it not to loop.
         for _ in 0..<64 where pid > 1 {
             guard let process = processes.process(pid) else { break }
             let name = process.name.hasPrefix("-") ? String(process.name.dropFirst()) : process.name
@@ -124,7 +123,6 @@ public struct SystemProcessTable: ProcessTable {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var name: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
-        // A pid nobody has is no error: the answer is just empty.
         guard sysctl(&name, u_int(name.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
         let start = info.kp_proc.p_un.__p_starttime
         let command = withUnsafeBytes(of: info.kp_proc.p_comm) { bytes in

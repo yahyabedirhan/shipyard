@@ -97,8 +97,6 @@ extension PanelText {
             if !review.isEmpty { facts.append(review) }
             facts.append(activity(row, now: now))
         case .issue:
-            // An issue's card is its title and its tags; a
-            // lone "No comments" under them would be noise.
             let activity = activity(row, now: now).filter { $0 != .comments(0) }
             if !activity.isEmpty { facts.append(activity) }
         case .workflowRun:
@@ -106,14 +104,11 @@ extension PanelText {
             facts.append([.trigger(event: details.runEvent, by: row.author)] + attempt)
             facts.append([runTime(row, now: now)])
         case .ping:
-            // Its whole body (the row may cut it off), where clicking it
-            // takes you, and why that last failed.
             let ping = row.item.ping
             if let body = ping?.body { facts.append([.body(body)]) }
             if let ping { facts.append([ping.action.map { .action($0) } ?? .noAction]) }
             if let failure = ping?.failureDetail ?? ping?.failure { facts.append([.failure(failure)]) }
         case .note:
-            // Where clicking it takes you, and when it last changed.
             facts.append([.action(.url(row.url))])
             if let note = row.item.note, note.edited.timeIntervalSince(note.created) >= 60 {
                 facts.append([.updated(age(max(0, now.timeIntervalSince(note.edited))))])

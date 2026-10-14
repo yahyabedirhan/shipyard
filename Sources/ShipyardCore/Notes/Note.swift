@@ -92,7 +92,6 @@ public struct Note: Equatable, Hashable, Sendable {
             authorKind: .other,
             state: .open,
             createdAt: created,
-            // Created, not edited: an edit doesn't move a note up the list.
             updatedAt: created,
             note: self
         )

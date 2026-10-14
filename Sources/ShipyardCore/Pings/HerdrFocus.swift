@@ -71,7 +71,6 @@ public struct HerdrFocus: Sendable {
     /// tab only when Herdr finds no agent there; it fails too when the
     /// machine can't be reached or doesn't answer within `machineTimeout`.
     public func focus(_ id: String, on machine: String? = nil, inSession session: String? = nil) async -> ActionOutcome {
-        // A saved machine is reached in the session it names.
         let session = machine == nil ? session : nil
         var tab = id
         if !Self.isTab(id) {
@@ -136,7 +135,6 @@ public struct HerdrFocus: Sendable {
         case "tab_not_found": "Tab gone"
         case "server_not_running": "Herdr off"
         case nil where machine != nil:
-            // Herdr refused the label, or the machine never answered.
             HerdrCommand.refusal(output, machine: machine!) == nil ? "Offline" : "No machine"
         default: "No focus"
         }
@@ -152,8 +150,6 @@ public struct HerdrFocus: Sendable {
         case "tab_not_found": return "Herdr tab \(id) is gone\(on)"
         case "server_not_running": return session.map { "Herdr session \($0) isn't running" } ?? "Herdr isn't running\(on)"
         default:
-            // Without Herdr's JSON error the machine never answered: Herdr
-            // refused its label (`HerdrCommand.refusal`), or the connection failed.
             if let machine, code == nil {
                 return HerdrCommand.refusal(output, machine: machine) ?? "Couldn't reach \(machine) through Herdr"
             }

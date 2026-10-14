@@ -48,8 +48,6 @@ public struct URLSessionNoticeHTTP: NoticeHTTP {
             }
         }
         task.resume()
-        // A little past the request's own timeout, so its error usually
-        // says why; past that, it's given up here.
         guard result.done.wait(timeout: .now() + timeout + 0.5) == .success, let outcome = result.outcome else {
             session.invalidateAndCancel()
             return .timedOut

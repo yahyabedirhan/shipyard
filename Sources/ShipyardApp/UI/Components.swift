@@ -2,9 +2,6 @@ import AppKit
 import ShipyardCore
 import SwiftUI
 
-// The small pieces the frame and the layouts share, drawn from the tokens
-// in `Design.swift`.
-
 private struct PanelNowKey: EnvironmentKey {
     static var defaultValue: Date { .now }
 }
@@ -64,8 +61,6 @@ struct CountBadge: View {
             number.foregroundStyle(.secondary).opacity(muted ? 1 : 0)
             number.foregroundStyle(Color.white).opacity(muted ? 0 : 1)
         }
-        // Fixed, so a tab's label style changing around the badge doesn't
-        // restyle the muted number either.
         .foregroundStyle(Color.primary)
         .padding(.horizontal, 5)
         .frame(minWidth: 17, minHeight: 15)
@@ -101,8 +96,6 @@ struct BannerDismissButton: View {
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.dismissBanner)
         .accessibilityLabel(PanelText.dismissBanner)
-        // Centred on the first line, its hover fill reaching into the
-        // banner's padding, so the banner keeps its height.
         .padding(.vertical, -2)
         .padding(.trailing, -4)
     }
@@ -161,8 +154,6 @@ struct Banner: View {
     }
 }
 
-// MARK: - A row's pieces
-
 /// A row's state icon: its symbol in its state's colour, a running run
 /// pulsing; a ping's says what clicking it does.
 struct StateSymbol: View {
@@ -216,7 +207,6 @@ struct CheckDot: View {
                 Circle().fill(Palette.panel).frame(width: 8, height: 8)
                 Circle().fill(color).frame(width: 5.5, height: 5.5)
             }
-            // Its words are in the row's hover card (`PanelText.rowCard`).
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
     }
@@ -267,14 +257,12 @@ private struct ItemRow: ViewModifier {
     func body(content: Content) -> some View {
         Button(action: click) { content }
             .buttonStyle(RowButtonStyle())
-            // A ping's ✕, over its age while the row is highlighted.
             .overlay(alignment: .trailing) {
                 if row.item.ping != nil, highlight.isHighlighted(place) {
                     DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
                         .padding(.trailing, Grid.inset)
                 }
             }
-            // ⌥-click's equivalent for the keyboard and VoiceOver.
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
             .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
             .animation(Motion.seen, value: row.needsAttention)
@@ -436,7 +424,6 @@ struct CopyButton: View {
                     .contentTransition(.symbolEffect(.replace))
                 if let title {
                     let after = copiedTitle ?? title
-                    // Sized for the longer word, so the icon doesn't shift as it rolls.
                     ZStack(alignment: .leading) {
                         Text(title.count > after.count ? title : after).hidden()
                         Text(copied ? after : title)
@@ -449,7 +436,6 @@ struct CopyButton: View {
         }
         .buttonStyle(IconButtonStyle(labeled: title != nil))
         .accessibilityLabel(copied ? copiedLabel : label)
-        // Restarts with each copy and is cancelled when the button goes away.
         .task(id: copiedAt) {
             guard copiedAt != nil else { return }
             do { try await Task.sleep(for: Self.resetDelay) } catch { return }
@@ -479,8 +465,6 @@ struct CardBackground: ViewModifier {
 extension View {
     func card() -> some View { modifier(CardBackground()) }
 }
-
-// MARK: - Buttons
 
 /// A borderless icon button with hover and pressed states.
 struct IconButtonStyle: ButtonStyle {
@@ -568,7 +552,6 @@ struct RowButtonStyle: ButtonStyle {
         configuration.label
             .background {
                 if configuration.isPressed {
-                    // Over the hover highlight, the two add up to `Palette.pressed`.
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(Palette.hover)
                         .padding(.horizontal, Grid.inset)
@@ -576,8 +559,6 @@ struct RowButtonStyle: ButtonStyle {
             }
     }
 }
-
-// MARK: - The row highlight
 
 extension View {
     /// Draws `highlight` behind the rows in this view: one shape, at the
@@ -651,16 +632,12 @@ struct NewNoteIcon: View {
         Button(action: action) {
             Image(systemName: "square.and.pencil")
                 .font(.system(size: 9, weight: .semibold))
-                // The symbol draws its ink about half a point low and right
-                // of its box (measured at this size); moved back, it sits
-                // centred in its square, as the open-repository icon does.
                 .offset(x: -0.5, y: -0.5)
                 .opacity(state == .starting ? 0 : 1)
                 .overlay {
                     if state == .starting { ProgressView().controlSize(.mini).scaleEffect(0.8) }
                 }
         }
-        // The compact square of the header's other icons (Mark all seen, open repository).
         .buttonStyle(IconButtonStyle(compact: true))
         .disabled(state == .starting)
         .hoverHelp(PanelText.newNoteHelp(project))

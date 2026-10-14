@@ -1,6 +1,5 @@
 import Foundation
 
-// The Shipyard Skill view's words (`StatusView`).
 extension PanelText {
     /// The Shipyard Skill view while the skill `isInstalled` (`SkillDetector`)
     /// and the install is in `state`: installed, with Update; not installed,

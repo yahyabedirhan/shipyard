@@ -61,11 +61,8 @@ public enum RowScroll: Equatable, Sendable {
         guard let frame else {
             let index = places.firstIndex(of: target) ?? 0
             let from = previous.flatMap { places.firstIndex(of: $0) }
-            // A header's first item sits just under it; with the header
-            // pinned at the top, that item is scrolled away above.
             let underHeader = previous?.isHeader == true && previous?.section == target.section && from == index - 1
             let upward = underHeader || from.map { index < $0 } ?? (index == 0)
-            // Without the row's height, near enough: off by the row's share of the header.
             return upward ? .alignTop(anchor: anchor(clear, visibleHeight, rowHeight: 0)) : .alignBottom
         }
         if frame.top < clear { return .alignTop(anchor: anchor(clear, visibleHeight, rowHeight: frame.height)) }

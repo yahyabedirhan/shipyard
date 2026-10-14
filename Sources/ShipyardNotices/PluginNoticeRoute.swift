@@ -85,7 +85,6 @@ public struct PluginNoticeRoute: NoticeRoute {
         guard let target = try? FileManager.default.destinationOfSymbolicLink(atPath: link.path) else {
             return .failure(Refusal("\(link.path) isn't the herdr-shipyard plugin's link, so this notice can't wait for the Mac; install the plugin (\(Self.install))"))
         }
-        // The plugin links it by its absolute path; a relative one is from the link's folder.
         let binary = target.hasPrefix("/") ? target : link.deletingLastPathComponent().appendingPathComponent(target).path
         guard binary.hasSuffix(Self.binarySuffix) else {
             return .failure(Refusal("\(link.path) links to \(binary), not a herdr-shipyard plugin's shipyard, so this notice can't wait for the Mac; install the plugin (\(Self.install))"))

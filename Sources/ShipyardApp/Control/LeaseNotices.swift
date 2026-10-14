@@ -23,7 +23,6 @@ extension ControlNotice.Reason {
     /// Why a lease ended, as the notification words it.
     init(_ ending: ControlLease.Ending) {
         switch ending {
-        // Run out after the holder's last request, or at the cap.
         case .expired, .capped: self = .ranOut
         case .released: self = .released
         case .stopped: self = .stopped

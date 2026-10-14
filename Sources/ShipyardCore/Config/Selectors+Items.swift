@@ -1,9 +1,5 @@
 import ShipyardConfig
 
-// Matching an author or an item against the configuration's selectors is
-// the app's (ADR 0006): ShipyardConfig parses the selectors, and only the
-// app has items.
-
 extension AuthorSelector {
     /// Whether this selector covers an author. `viewer` is the signed-in
     /// login, when known; an author the fetch already marked `.me` is the

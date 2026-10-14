@@ -98,7 +98,6 @@ public struct MenuModel: Equatable, Sendable {
         now: Date
     ) -> MenuModel {
         guard let snapshot else {
-            // Not loaded yet, but its pings (the listing's only items) show.
             let sections = configuration.projects.map { project in
                 MenuSection(
                     name: project.slug,
@@ -128,7 +127,6 @@ public struct MenuModel: Equatable, Sendable {
         let sections = configuration.projects.map { project in
             let settings = configuration.settings(for: project)
             let items = listings[project.slug] ?? []
-            // What the refresh watched for it: its groups and wildcards resolved.
             let repositories = snapshot.repositories[project.slug] ?? settings.repositorySlugs
             return MenuSection(
                 name: project.slug,
@@ -142,9 +140,6 @@ public struct MenuModel: Equatable, Sendable {
                     expanded: expanded,
                     now: now
                 ),
-                // One row per selector that couldn't be resolved, then one
-                // per repository, for a kind this project shows: a runs
-                // failure isn't an error where runs are off.
                 errors: (snapshot.selectorErrors[project.slug] ?? []).map(MenuErrorRow.init)
                     + repositories.compactMap { repository in
                         settings.fetchedKinds.lazy
@@ -154,9 +149,7 @@ public struct MenuModel: Equatable, Sendable {
                     } + reviewSearchErrors(snapshot, settings: settings)
                     + noteErrorRows(notes, project: project.slug, configuration: configuration),
                 notes: reviewSearchNotes(snapshot, settings: settings),
-                // `anywhere` brings in pull requests from any repository.
                 showsRepository: repositories.count > 1 || settings.usesAnywhere,
-                // A project added since the snapshot was fetched isn't in it yet.
                 isLoaded: snapshot.items[project.slug] != nil,
                 repositories: repositories
             )

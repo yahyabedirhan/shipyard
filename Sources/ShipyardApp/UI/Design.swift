@@ -3,10 +3,6 @@ import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-// The panel's design tokens, shared by the frame (header, banners, footer,
-// onboarding) and every layout: the spacing grid, the type scale, the
-// colours for light and dark, and the motion.
-
 /// The spacing grid: everything is a multiple of 2, most of 4.
 enum Grid {
     /// The panel's width.
@@ -100,7 +96,6 @@ enum Motion {
 /// The colours, each resolving for light or dark: GitHub's colours for the
 /// menu model's semantic states, and the panel's surfaces.
 enum Palette {
-    // MARK: States
 
     static let green = dynamic(light: 0x1A7F37, dark: 0x3FB950)
     static let gray = dynamic(light: 0x59636E, dark: 0x9198A1)
@@ -111,8 +106,6 @@ enum Palette {
     static let accent = dynamic(light: 0x006BED, dark: 0x4A94FF)
     /// The lease's banner, in the yellow of the menu bar icon's dot (`LeaseDot`).
     static let lease = Color(nsColor: .systemYellow)
-
-    // MARK: Surfaces
 
     /// A project's header, opaque so rows scroll under it.
     static let header = dynamic(light: 0xF6F6F8, dark: 0x2A2A2D)
@@ -135,8 +128,6 @@ enum Palette {
     /// The selected tab's pill, raised off the track, and its shadow.
     static let raised = dynamic(light: 0xFFFFFF, dark: 0x3F3F44)
     static let raisedShadow = dynamic(light: 0x000000, dark: 0x000000, lightAlpha: 0.08, darkAlpha: 0.35)
-
-    // MARK: What the model says
 
     /// A row's colour, by kind: a pull request open green, draft gray,
     /// merged purple, closed red; an issue open green, closed purple; a
@@ -218,8 +209,6 @@ enum Palette {
         case .noAction: "bell.fill"
         }
     }
-
-    // MARK: Building them
 
     private static func dynamic(light: UInt32, dark: UInt32, alpha: CGFloat = 1) -> Color {
         dynamic(light: light, dark: dark, lightAlpha: alpha, darkAlpha: alpha)

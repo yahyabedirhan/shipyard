@@ -150,7 +150,6 @@ public struct AttentionCounts: Equatable, Sendable {
         case .issue: issues += 1
         case .workflowRun: workflowRuns += 1
         case .ping: pings += 1
-        // Never: a note doesn't need attention.
         case .note: break
         }
     }

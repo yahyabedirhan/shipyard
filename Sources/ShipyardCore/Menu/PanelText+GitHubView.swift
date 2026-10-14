@@ -1,7 +1,5 @@
 import Foundation
 
-// The GitHub view's words while signed in. Signed out, the view shows the
-// signed-out onboarding view's content instead (`PanelText.connect`).
 extension PanelText {
     /// The command that signs the GitHub CLI out, which shipyard's Sign out doesn't.
     public static let ghLogout = "gh auth logout"

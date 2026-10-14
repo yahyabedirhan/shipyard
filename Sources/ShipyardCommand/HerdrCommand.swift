@@ -81,12 +81,9 @@ public struct HerdrCommand: Sendable {
         let prefix = machine.map { ["--machine", $0] } ?? session.map { ["--session", $0] } ?? []
         let invocation = ShellInvocation(executable: herdr, arguments: prefix + arguments)
         let runner = runner, timeout = timeout, sleep = sleep
-        // Whichever ends first stops the other (the runner returns at once
-        // when cancelled, and `ProcessShellRunner` stops the process).
         return await withTaskGroup(of: Outcome?.self) { group in
             group.addTask { await runner.run(invocation).map(Outcome.finished) ?? .couldNotRun }
             group.addTask {
-                // `nil` when the sleep is cancelled: herdr answered first.
                 guard (try? await sleep(timeout)) != nil else { return nil }
                 return .timedOut
             }

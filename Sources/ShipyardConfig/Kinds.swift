@@ -56,9 +56,7 @@ public enum StateGroup: String, CaseIterable, Hashable, Sendable {
         case .pullRequest: [.open, .merged, .closed]
         case .issue: [.open, .closed]
         case .workflowRun: [.inProgress, .failed, .succeeded]
-        // A ping is always open; pings take no `states`.
         case .ping: [.open]
-        // The menu lists open notes only; notes take no `states`.
         case .note: [.open]
         }
     }

@@ -39,13 +39,11 @@ public enum GitRemote {
         let text = url.trimmingCharacters(in: .whitespacesAndNewlines)
         var path: Substring
         if let scheme = text.range(of: "://") {
-            // `scheme://[user@]host[:port]/path`: drop up to the host's end.
             guard text[..<scheme.lowerBound].lowercased() != "file" else { return nil }
             let rest = text[scheme.upperBound...]
             guard let slash = rest.firstIndex(of: "/") else { return nil }
             path = rest[rest.index(after: slash)...]
         } else if let colon = text.firstIndex(of: ":"), colon != text.startIndex, !text[..<colon].contains("/") {
-            // scp-like `[user@]host:path`.
             path = text[text.index(after: colon)...]
         } else {
             return nil

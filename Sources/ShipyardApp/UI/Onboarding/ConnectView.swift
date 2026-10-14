@@ -57,8 +57,6 @@ struct ConnectView: View {
         .onChange(of: shipyard.phase) { isRequestingCode = false }
     }
 
-    // MARK: - Signed out
-
     /// Every state has one shape: the greeting, a line or two on what
     /// happened, then the ways in as full-width buttons stacked in the
     /// order `lead` gives, the main one prominent. When Sign in with GitHub
@@ -195,8 +193,6 @@ struct ConnectView: View {
         Text(markdown: text, size: size, weight: weight)
     }
 
-    // MARK: - The code (connecting)
-
     private func codeScreen(_ text: PanelText.DeviceCodeScreen) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
@@ -267,15 +263,11 @@ struct ConnectView: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Actions
-
     private func beginSignIn() {
         isRequestingCode = true
         stillSignedOut = false
         let flow = shipyard.beginDeviceFlow()
         Task {
-            // Ends only when the whole flow does; a code arriving first
-            // clears the spinner through the phase change.
             await flow.value
             isRequestingCode = false
         }

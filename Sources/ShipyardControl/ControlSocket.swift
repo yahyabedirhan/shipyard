@@ -69,9 +69,6 @@ public enum DemoPointer {
         support.appendingPathComponent(fileName, isDirectory: false)
     }
 
-    // `demo.json`:
-    //
-    //     { "support": "/Users/me/demo/support", "version": 1 }
     private struct File: Codable {
         var version: Int
         var support: String

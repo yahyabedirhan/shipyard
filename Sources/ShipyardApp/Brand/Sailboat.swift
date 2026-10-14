@@ -36,8 +36,6 @@ enum Sailboat {
             .translatedBy(x: -b.midX, y: -b.midY)
     }
 
-    // MARK: - Drawing
-
     /// The gap between the jib and the mainsail, and the stub of mast in it.
     private static let slot: CGFloat = 44
 
@@ -49,9 +47,6 @@ enum Sailboat {
         var parts: [CGPath] = []
         var body = CGMutablePath()
 
-        // Mainsail: the luff bows forward from the tack up to the head, the
-        // head rounds over, and the leech bellies out aft and sweeps down to
-        // the clew. The foot curves up a little.
         let tack = CGPoint(x: 520, y: foot), head = CGPoint(x: 548, y: 808), clew = CGPoint(x: 722, y: foot)
         body.move(to: tack)
         body.addCurve(to: head, control1: CGPoint(x: 486, y: 560), control2: CGPoint(x: 500, y: 730))
@@ -60,8 +55,6 @@ enum Sailboat {
         body.closeSubpath()
         parts.append(body); body = CGMutablePath()
 
-        // Jib: its back edge follows the mainsail's luff a slot ahead of it,
-        // its luff bellies forward, and its foot curves up a little too.
         let jibHead = CGPoint(x: 518 - slot + 8, y: 734), jibTack = CGPoint(x: 312, y: foot)
         let jibClew = CGPoint(x: tack.x - slot, y: foot)
         body.move(to: jibClew)
@@ -71,11 +64,9 @@ enum Sailboat {
         body.closeSubpath()
         parts.append(body); body = CGMutablePath()
 
-        // Mast: a stub down from the sails' feet to the deck, in the slot.
         let mastX = tack.x - slot / 2
         parts.append(CGPath(rect: CGRect(x: mastX - 10, y: 370, width: 20, height: foot + 10 - 370), transform: nil))
 
-        // Hull: a straight deck, sides that curve in, and a bottom edge on the swell.
         let deck: CGFloat = 392, keel: CGFloat = 318
         body.move(to: CGPoint(x: 290, y: deck))
         body.addLine(to: CGPoint(x: 748, y: deck))
@@ -88,11 +79,9 @@ enum Sailboat {
         body.closeSubpath()
         parts.append(body)
 
-        // Round every corner a little.
         let rounded = parts.map { $0.union($0.copy(strokingWithWidth: 18, lineCap: .round, lineJoin: .round, miterLimit: 10)) }
             .reduce(CGMutablePath() as CGPath) { $0.union($1) }
 
-        // The wave line below the hull, on the same swell so the two run in step.
         let wave = CGMutablePath()
         for i in 0...160 {
             let x = waveLeft + (waveRight - waveLeft) * CGFloat(i) / 160

@@ -61,8 +61,6 @@ public struct Configuration: Equatable, Sendable {
     }
 }
 
-// MARK: - Top-level tables
-
 extension Configuration {
     /// `[menu-bar]`
     public struct MenuBar: Equatable, Sendable {
@@ -260,8 +258,6 @@ extension Configuration {
     }
 }
 
-// MARK: - Choices
-
 /// `[menu-bar] count`
 public enum MenuBarCount: String, CaseIterable, Sendable {
     case total
@@ -368,8 +364,6 @@ public struct NotificationRule: Equatable, Sendable {
         self.authors = authors
     }
 }
-
-// MARK: - Per-kind settings and their overrides
 
 /// `pull-requests`
 public struct PullRequestSettings: Equatable, Sendable {
@@ -712,15 +706,11 @@ public struct ProjectSettings: Equatable, Sendable {
         case .pullRequest: pullRequests.authors
         case .issue: issues.authors
         case .workflowRun: workflowRuns.authors
-        // A ping has no GitHub author: every one is listed.
         case .ping: AuthorFilter()
-        // A note is the user's own: every open one is listed.
         case .note: AuthorFilter()
         }
     }
 }
-
-// MARK: - Problems
 
 /// One problem found in the file, with the line it's on when known.
 public struct ConfigurationIssue: Hashable, Sendable, CustomStringConvertible {
@@ -759,8 +749,6 @@ public struct ConfigurationError: Error, Equatable, Sendable, CustomStringConver
         issues.map(\.description).joined(separator: "\n")
     }
 }
-
-// MARK: - Appending projects
 
 /// A project the picker adds: just a title and its repositories. Its slug
 /// is made from the title (`Configuration.slug(from:)`).

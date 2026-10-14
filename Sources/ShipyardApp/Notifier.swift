@@ -32,8 +32,6 @@ final class Notifier: NSObject, Notifying {
 
     private(set) var permission: Permission = .unknown {
         didSet {
-            // Its first reading too, off or not, so the app learns the
-            // banner's condition is known.
             if oldValue == .unknown || isOff != (oldValue == .denied) { onOffChange?(isOff) }
         }
     }
@@ -59,10 +57,8 @@ final class Notifier: NSObject, Notifying {
     nonisolated private static let buttonPrefix = "button "
 
     override init() {
-        // `UNUserNotificationCenter.current()` traps outside an app bundle.
         center = Bundle.main.isAppBundle ? .current() : nil
         super.init()
-        // Set before launch finishes, so a click that launched the app arrives.
         center?.delegate = self
     }
 
@@ -127,8 +123,6 @@ final class Notifier: NSObject, Notifying {
         case .silent: nil
         case .named(let name): UNNotificationSound(named: UNNotificationSoundName(name))
         }
-        // Groups a project's notifications together in Notification Center,
-        // or a notice's thread.
         content.threadIdentifier = notification.thread ?? notification.project
         if let level = notification.level {
             content.interruptionLevel = switch level {
@@ -172,8 +166,6 @@ final class Notifier: NSObject, Notifying {
             intentIdentifiers: []
         )
         center.setNotificationCategories(Set(categories.values))
-        // Reading them back waits until they're set, so the notification
-        // posted next shows its buttons.
         _ = await center.notificationCategories()
         return identifier
     }
@@ -210,7 +202,6 @@ final class Notifier: NSObject, Notifying {
         case .notDetermined: .notAsked
         case .denied: .denied
         case .authorized, .provisional, .ephemeral: .allowed
-        // A status added later: try to post; the center refuses harmlessly.
         @unknown default: .allowed
         }
     }

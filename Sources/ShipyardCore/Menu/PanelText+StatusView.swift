@@ -1,9 +1,6 @@
 import Foundation
 
-// The settings menu's words, and each status view's (`StatusView`): one
-// page shape for every part, in the signed-out onboarding view's style.
 extension PanelText {
-    // MARK: - The settings menu
 
     /// One item of the header's settings menu: its words, what a click
     /// does, and whether it shows the set-up mark on its right.
@@ -37,8 +34,6 @@ extension PanelText {
         if canSignOut { items.append(SettingsItem(title: "Sign out", action: .signOut)) }
         return items
     }
-
-    // MARK: - A status view
 
     /// What a status view shows, top to bottom, under its ‹ Back row: the
     /// logo badge and `title`, the `lead` line, the `status` line, a
@@ -130,8 +125,6 @@ extension PanelText {
         case .cli: "Your agents run the `shipyard` command to ping you, post notices and drive the app."
         }
     }
-
-    // MARK: - The Shipyard CLI view
 
     /// The Shipyard CLI view for `state`: the link's path once linked; the
     /// Link button and `command` to run by hand while unlinked; what's in

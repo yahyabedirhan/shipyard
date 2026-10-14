@@ -309,41 +309,25 @@ public final class Shipyard {
     /// touched.
     public func start() async {
         signedOutReason = nil
-        // The ping store's folder exists from the start, so the app's watch
-        // is on it alone and never on the support folder `state.json` is
-        // saved in. A folder that can't be made leaves the watch on its
-        // nearest existing ancestor.
         try? pingStore.createDirectory()
         appStateStore.load(at: clock.now)
         bannerSnoozes = appStateStore.state.bannerSnoozes
         restoredSnoozes = Set(bannerSnoozes.ends.keys)
         notionConnected = appStateStore.state.notionConnected
-        // For the CLI, beside `repositories.json`: which config.toml this
-        // app reads, whatever the agent's shell says. A file that can't be
-        // written leaves the CLI to its own lookup.
         try? ConfigurationLocation.record(configStore.url, in: repositoriesStore.directory)
         createConfigurationIfMissing()
         configStore.reload()
         publishConfigStatus()
         configurationRead = true
         followBannerConditions()
-        // Pings sent while the app wasn't running list and notify now,
-        // signed in or not, without waiting for GitHub.
         await reloadPings()
-        // So do the remote machines' pings, from their first poll.
         await followMachines()
-        // And the notes, from their first read, once Notion is connected and
-        // unless this run reads none.
         if readsNotes {
-            // The headers' new-note icons show at once, before any read.
             rebuildMenu(configStore.lastValid)
             armNotesTimer(after: 0)
         }
-        // A file broken since launch has no valid configuration behind it,
-        // only the defaults: leave the login item as it is until it's fixed.
         if configError == nil { followLaunchAtLogin() }
         let provider = tokenProvider
-        // `gh auth token` spawns a process; keep it off the main actor.
         let found = await Task.detached { provider.current() }.value
         guard let found else {
             apply(.signedOut)
@@ -352,8 +336,6 @@ public final class Shipyard {
         }
         await connect(with: found)
     }
-
-    // MARK: - Device flow
 
     /// Starts the device flow: requests a code, moves to `connecting` with it,
     /// and polls until the user approves. On success the token is saved to the
@@ -397,7 +379,6 @@ public final class Shipyard {
             let token = try await deviceFlow.waitForToken(authorization)
             guard generation == deviceFlowGeneration else { return }
             deviceFlowTask = nil
-            // A token the store can't keep still works until the app quits.
             try? tokenStore.save(token)
             await connect(with: FoundToken(value: token, source: .tokenStore))
         } catch {
@@ -411,8 +392,6 @@ public final class Shipyard {
             apply(.deviceFlowCancelled)
         }
     }
-
-    // MARK: - Signing in and out
 
     /// Signs in with `found`: asks GitHub who the token belongs to, then moves
     /// on to the picker or the projects. A 401 signs out instead; an
@@ -453,8 +432,6 @@ public final class Shipyard {
     /// GitHub rejected the token: forget it, and drop it from the token store
     /// when it came from there, so the next start can fall back to `gh`.
     private func signOutAfterUnauthorized() {
-        // A request only runs with a token, so the source is set; were it
-        // not, dropping the stored token is the safe side.
         let source = tokenSource ?? .tokenStore
         if source == .tokenStore { try? tokenStore.delete() }
         endSession()
@@ -484,14 +461,11 @@ public final class Shipyard {
         fetchError = nil
         menu = .empty
         budget = RateBudget()
-        // Another account reaches other repositories.
         resolver.reset()
         forceResolve = true
         timer.disarm()
         apply(.signedOut)
     }
-
-    // MARK: - Configuration
 
     /// Reads the configuration file again and follows it: a change with
     /// projects moves to `ready` and refreshes, one without moves to
@@ -511,20 +485,13 @@ public final class Shipyard {
     private func follow(_ result: ConfigurationStore.ReloadResult) async {
         publishConfigStatus()
         if case .changed(let configuration) = result {
-            // New selectors, or `archived` and `forks` changed: look them up now.
             forceResolve = true
             followLaunchAtLogin()
             await followMachines()
-            // A project added, renamed, or showing notes now: read them at once.
             if readsNotes { armNotesTimer(after: 0) }
             apply(.configurationChanged(hasProjects: configuration.hasProjects))
-            // Projects, filters, `[attention]` and `[menu-bar]` apply at
-            // once, even if the refresh below can't run (paused) or fails.
             rebuildMenu(configuration)
             if phase.canRefresh {
-                // So does `[rate-limit]`: the delay and the indicator follow
-                // the new share and `show` from the limits already heard,
-                // rather than wait for the refresh to come back.
                 publishRateStatus()
                 await refresh()
             } else {
@@ -553,8 +520,6 @@ public final class Shipyard {
     private func followLaunchAtLogin() {
         loginItem.setEnabled(configStore.lastValid.launchAtLogin)
     }
-
-    // MARK: - Project picker
 
     /// The repositories the picker suggests: the viewer's own and those they
     /// contributed to, most recently pushed first, without archived ones.
@@ -617,16 +582,12 @@ public final class Shipyard {
         do {
             result = try configStore.writePreset(preset, projects: projects)
         } catch let error as ConfigurationError where error == Configuration.presetRefused {
-            // The file changed since the last reload: read it, so the panel
-            // shows the plain picker.
             await reloadConfiguration()
             throw error
         }
         await follow(result)
         return result
     }
-
-    // MARK: - Layout button
 
     /// The header's layout button: writes the layout after the current one
     /// (`MenuLayout.next`, wrapping) to `[menu] layout` in the configuration
@@ -651,8 +612,6 @@ public final class Shipyard {
         budget.record(error, at: clock.now)
     }
 
-    // MARK: - Refreshing
-
     /// Fetches every project's items and publishes the menu model. The timer,
     /// ⌘R, waking and a configuration change all come here.
     /// It lists the pings again first, so a seen ping whose window has
@@ -666,8 +625,6 @@ public final class Shipyard {
     /// item whose window has passed leaves, and the timer comes back after
     /// the configured interval, or at the end of the pause when that's sooner.
     public func refresh() async {
-        // A seen ping whose seen-window has passed leaves the store too,
-        // and its notification Notification Center, signed in or not.
         listPings()
         await removeLeftBanners()
         guard phase.canRefresh else { return }
@@ -713,16 +670,12 @@ public final class Shipyard {
         let current = session
         let now = clock.now
         do {
-            // Groups and wildcards first: looked up at most hourly, or at once
-            // after a configuration change, ⌘R or signing in.
             let force = forceResolve
             forceResolve = false
             let resolved = try await resolver.resolve(configured, force: force, at: now) { lookup in
                 try await self.request { try await $0.repositories(of: lookup, at: now) }
             }
             guard current == session else { return }
-            // For the CLI; a file that can't be written leaves pings to
-            // match the configuration's `owner/name` selectors alone.
             let repositories = resolved.mapValues(\.repositories)
             resolvedRepositories = repositories
             try? repositoriesStore.record(repositories)
@@ -732,8 +685,6 @@ public final class Shipyard {
             self.snapshot = snapshot
             fetchError = nil
             budget.record(snapshot.rateLimits, at: clock.now)
-            // What each project has: the menu, the counts and the
-            // notifications below all read these, and nothing else.
             let listings = self.listings(for: projects, in: snapshot, configuration: configuration)
             var notifications: [PostedNotification] = []
             let listed = listedPings
@@ -758,35 +709,25 @@ public final class Shipyard {
                 notes: notesMenuState,
                 now: clock.now
             )
-            // A fold whose group is gone, or whose project is, goes too.
-            // A machine's section may only be waiting for its poll: its folds stay.
             let machines = Set(configuration.remote.machines)
             let folds = built.foldsToKeep(appStateStore.state.collapsedGroups)
                 .union(appStateStore.state.collapsedGroups.filter { machines.contains($0.project) })
             appStateStore.update { $0.collapsedGroups = folds }
             built.foldedGroups = folds
             built.machineNotices = MachineNotice.notices(remote)
-            // Kept until `publishRateStatus()` sets the next ones, so the
-            // delay's banner never seems to stop in between and lose its snooze.
             built.refreshDelay = menu.refreshDelay
             built.rateIndicator = menu.rateIndicator
             menu = built
             publishRateStatus()
             refreshEnded = true
             followBannerConditions()
-            // Recorded (and saved) before posting: a crash in between loses a
-            // notification rather than repeating one.
             for notification in notifications {
                 await notifier.post(notification)
             }
         } catch GitHubError.unauthorized {
-            // `request` has signed out already.
         } catch is CancellationError {
         } catch {
             guard current == session else { return }
-            // Keep the rows and when they were fetched; say why they're old.
-            // Rebuilt from the last snapshot (or none, listing every project
-            // as not loaded yet) under the configuration this refresh used.
             let failure = (error as? GitHubError) ?? .network(error.localizedDescription)
             rebuildMenu(configuration)
             fetchError = failure
@@ -817,7 +758,6 @@ public final class Shipyard {
             + EventDetector.pingEvents(listings: listings, projects: projects + machines)
         let notifications = select(events, listings: listings, projects: projects + machines, viewer: snapshot.viewerLogin, state: &state, at: now)
         state.known = state.known.updated(with: snapshot, projects: projects)
-        // A ping's record stays while the ping does, so it's never notified again.
         state.notified.prune(present: Array(state.known.items.keys) + pings.map(\.item.id), at: now)
         return notifications
     }
@@ -848,8 +788,6 @@ public final class Shipyard {
         for id in order {
             guard let occurrences = byID[id], let first = occurrences.first, !state.notified.contains(first) else { continue }
             let filed = occurrences.filter { listed[$0.project]?.contains($0.item.id) == true && settings[$0.project] != nil }
-            // A remote ping only its machine's section lists may be filed
-            // under a project later, once its selectors resolve.
             let unfiled = !filed.isEmpty && filed.allSatisfy(\.isInMachineSection)
             if unfiled && state.notified.passedOverUnfiled(first) { continue }
             let selected = filed.first { event in
@@ -857,7 +795,6 @@ public final class Shipyard {
             }
             if let selected {
                 var notification = NotificationRules.notification(for: selected)
-                // Titled by the project's title; the event knows its slug.
                 notification.project = settings[selected.project]?.title ?? selected.project
                 notifications.append(notification)
             }
@@ -886,7 +823,6 @@ public final class Shipyard {
         let delay = nextDelay()
         menu.refreshDelay = delay
         let configuration = configStore.lastValid
-        // REST serves workflow runs only: its line shows while some project shows them.
         let showsRuns = configuration.projects.contains { configuration.settings(for: $0).shows(.workflowRun) }
         menu.rateIndicator = budget.indicator(
             show: configuration.rateLimit.show,
@@ -913,15 +849,12 @@ public final class Shipyard {
         }
     }
 
-    // MARK: - User actions
-
     /// Opens the row's item on GitHub in the browser and marks it seen. A
     /// ping's row runs the ping's action instead (`runAction(ofPing:)`).
     /// Returns the work still running (a ping's action), for tests to
     /// await; the app doesn't wait for it.
     @discardableResult
     public func open(_ row: MenuRow) -> Task<Void, Never> {
-        // A note opens in Notion, and never needs attention to clear.
         if row.kind == .note {
             actions.open(row.url)
             return Task {}
@@ -968,9 +901,7 @@ public final class Shipyard {
     /// tests to await.
     @discardableResult
     public func openNotification(_ itemURL: URL) -> Task<Void, Never> {
-        // A lease notification's click opens the panel, which the app does.
         guard itemURL != ControlNotice.panelURL else { return Task {} }
-        // An agent's notice runs the action its click or button carries, if any.
         guard !NoticeRules.isNoticeURL(itemURL) else { return runAction(ofNotice: NoticeRules.click(from: itemURL)) }
         if let ping = Ping.id(from: itemURL) { return runAction(ofPing: ping) }
         guard Ping.remote(from: itemURL) == nil else { return runAction(ofRemotePing: itemURL) }
@@ -1054,7 +985,6 @@ public final class Shipyard {
         case .success(let own) where own != login:
             return .refused(NoticeRules.otherLogin(login))
         case .success:
-            // The request names no machine, so a Herdr action would focus the Mac's own Herdr.
             if case .show(let notice) = request, notice.focusesHerdr { return .refused(TailnetWire.herdrRefusal) }
             return await receive(request)
         }
@@ -1072,7 +1002,6 @@ public final class Shipyard {
     /// attention again only once it changes. A ping's action isn't run,
     /// and its failure, if it had one, is cleared.
     public func markSeen(_ row: MenuRow) {
-        // A note has nothing to see.
         guard row.kind != .note else { return }
         if let ping = row.item.ping {
             if ping.machine == nil { markPingsSeen([ping]) } else { markRemoteSeen([ping]) }
@@ -1125,8 +1054,6 @@ public final class Shipyard {
         return Task { await removeLeftBanners() }
     }
 
-    // MARK: - Pings
-
     /// Reads the ping store again and, when a ping arrived, changed or
     /// went, lists the pings at once from the last snapshot: no GitHub
     /// request. A new ping a project lists posts its `ping.sent`
@@ -1151,13 +1078,11 @@ public final class Shipyard {
         let projects = configured + Self.machineSettings(configuration)
         let events = EventDetector.pingEvents(listings: listings, projects: projects)
         let notified = appStateStore.state.notified
-        // One its machine's section passed over waits there for a project to file it.
         let unhandled = events.filter { !notified.contains($0) && !($0.isInMachineSection && notified.passedOverUnfiled($0)) }
         guard !unhandled.isEmpty else { return }
         let now = clock.now
         let viewer = snapshot?.viewerLogin
         var notifications: [PostedNotification] = []
-        // Recorded (and saved) before posting, as in a refresh.
         appStateStore.update { state in
             notifications = Self.select(unhandled, listings: listings, projects: projects, viewer: viewer, state: &state, at: now)
         }
@@ -1226,7 +1151,6 @@ public final class Shipyard {
             }
             switch outcome {
             case .done:
-                // The sending clicked, so one replaced meanwhile stays unseen.
                 markRemoteSeen([ping])
             case .failed(let reason, let detail):
                 remote.recordFailure(ping, reason: reason, detail: detail)
@@ -1266,8 +1190,6 @@ public final class Shipyard {
         guard focused == .done, let terminal = configStore.lastValid.herdr.terminal ?? sentFrom else { return focused }
         return await actions.run(.app(terminal))
     }
-
-    // MARK: - Remote machines
 
     /// The pings listed: the ping store's, then the remote machines' as
     /// the user's marks leave them (seen, dismissed: `RemotePingMarks`).
@@ -1395,7 +1317,6 @@ public final class Shipyard {
     /// running.
     private func followMachines() async {
         let labels = configStore.lastValid.remote.machines
-        // The defaults standing in for a file broken since launch don't say which machines went.
         let fromFile = configStore.error == nil
         guard labels != remote.labels || (fromFile && !followsConfiguredMachines) else { return }
         if fromFile { followsConfiguredMachines = true }
@@ -1403,7 +1324,6 @@ public final class Shipyard {
         pruneRemoteMarks()
         forgetLeftPings(stored: pings)
         rebuildMenu(configStore.lastValid)
-        // Here, since a refresh or a poll may not run (signed out, no projects, no machines left).
         await removeLeftBanners()
         armMachineTimer(after: 0)
     }
@@ -1426,8 +1346,6 @@ public final class Shipyard {
             await pollMachinesOnce()
         } while machineGate.finish() && machineGate.begin()
         pruneRemoteMarks()
-        // A seen remote ping may have passed its seen-window since, taking its banner;
-        // and the pings still waiting for their first numbers take them once every machine answered or failed.
         if listedPings.contains(where: { $0.machine != nil && $0.seen != nil }) || appStateStore.state.pingNumbers == nil {
             rebuildMenu(configStore.lastValid)
             forgetLeftPings(stored: pings)
@@ -1472,7 +1390,6 @@ public final class Shipyard {
         remote.record(result, for: label, at: clock.now)
         menu.machineNotices = MachineNotice.notices(remote)
         let after = remote.machine(label)
-        // Its first answer goes on even when empty: pings withdrawn while the app wasn't running leave.
         let firstAnswer = before?.answered == nil && after?.answered != nil
         guard after?.pings != before?.pings || firstAnswer else { return }
         rebuildMenu(configStore.lastValid)
@@ -1511,9 +1428,6 @@ public final class Shipyard {
         let now = clock.now
         let stored = pingStore.all().compactMap { ping -> Ping? in
             guard Self.hasLeft(ping, in: configuration, at: now) else { return ping }
-            // Removed only as it was read: one the CLI replaced or sent anew
-            // meanwhile is listed as it is now. One that can't be removed
-            // stays stored; no listing shows it.
             guard (try? pingStore.removeIfUnchanged(ping)) == false else { return nil }
             return pingStore.ping(id: ping.id)
         }
@@ -1607,8 +1521,6 @@ public final class Shipyard {
         listPings()
     }
 
-    // MARK: - Notes
-
     /// The menu opened: the notes are read again, so one just written
     /// shows (`refreshNotes()`), and why a note couldn't be started last
     /// time goes. Nothing else is fetched: GitHub's items keep to their timer.
@@ -1680,7 +1592,6 @@ public final class Shipyard {
         repeat {
             await readNotes()
         } while notesGate.finish() && notesGate.begin()
-        // Disconnected meanwhile: the timer stays off.
         if readsNotes { armNotesTimer(after: Self.notesInterval) }
     }
 
@@ -1691,7 +1602,6 @@ public final class Shipyard {
     public func checkNotes() async -> NotesCheckReport? {
         guard readsNotes, let notionRoute else { return nil }
         let configuration = configStore.lastValid
-        // Notion knows a project by its database's title: the project's title.
         let projects = configuration.projects.filter { configuration.settings(for: $0).notes.show }.map(\.title)
         return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
@@ -1738,7 +1648,6 @@ public final class Shipyard {
     /// at once. A demo run, which reads no notes, changes nothing.
     public func connectNotion() async {
         guard canReadNotes, !notionConnected else { return }
-        // ntn's workspace may have changed since a read before a Disconnect.
         notesReader.reset()
         setNotionConnected(true)
         rebuildMenu(configStore.lastValid)
@@ -1774,25 +1683,20 @@ public final class Shipyard {
         let reading = shown.isEmpty
             ? NotesReading.read([:])
             : await notesReader.read(projects: shown.map { ($0.slug, $0.title) }, client: NotionClient(transport: notionRoute))
-        // Disconnected while ntn answered: what it read isn't listed.
         guard readsNotes else { return }
         var read: [String: [Note]] = [:]
         var errors: [String: String] = [:]
         let blocked = NotesNotice(reading)
         if blocked != notesBlocked {
             notesBlocked = blocked
-            // The headers' new-note icons follow ntn.
             rebuildMenu(configStore.lastValid)
         }
         switch reading {
         case _ where blocked != nil:
-            // Nothing to list; the notes banner says why.
             break
         case .noEntryPage:
-            // `NotesNotice` always names it; listed for the switch to be whole.
             break
         case .failed(let error):
-            // Nothing is known: every project keeps its notes, with why.
             for project in projects {
                 read[project] = notes[project]
                 errors[project] = PanelText.noteError(error)
@@ -1913,8 +1817,6 @@ public final class Shipyard {
         menu.applyAttention(appStateStore.state, configuration: configuration)
         if phase != .ready { menu.menuBarLabel = .hidden }
     }
-
-    // MARK: - Banners
 
     /// Every panel banner whose condition holds now, snoozed or not.
     private var currentBanners: [PanelBanner] {

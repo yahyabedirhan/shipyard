@@ -47,9 +47,6 @@ public struct ResolvedRepositoriesStore: Sendable {
         try encoder.encode(File(version: Self.currentVersion, projects: projects)).write(to: url, options: .atomic)
     }
 
-    // `repositories.json`:
-    //
-    //     { "version": 1, "projects": { "shop": ["yahyabedirhan/shop", "yahyabedirhan/shop-api"] } }
     private struct File: Codable {
         var version: Int
         var projects: [String: [String]]

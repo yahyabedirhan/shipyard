@@ -79,8 +79,6 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// `error` and clears `warnings`; a valid one clears the error.
     @discardableResult
     public func reload() -> ReloadResult {
-        // Taken before the bytes: a save in between gets a later time and
-        // another reload, so the time never claims a newer file than was read.
         let modified = ConfigurationCheck.modificationDate(of: url)
         let outcome: Result<Configuration.Decoded, ConfigurationError>
         var acceptsPreset = false
@@ -98,7 +96,6 @@ public final class ConfigurationStore: @unchecked Sendable {
             switch outcome {
             case .failure(let error):
                 _error = error
-                // Warnings from an older read carry stale line numbers.
                 _warnings = []
                 return .invalid(error)
             case .success(let decoded):
@@ -143,7 +140,6 @@ public final class ConfigurationStore: @unchecked Sendable {
         let fileManager = FileManager.default
         guard !fileManager.fileExists(atPath: url.path) else { return }
         try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        // `withoutOverwriting`: a file an editor wrote meanwhile wins.
         try Data(Configuration.header.utf8).write(to: url, options: .withoutOverwriting)
     }
 
@@ -182,8 +178,6 @@ public final class ConfigurationStore: @unchecked Sendable {
             throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
         let edited = try Configuration.settingLayout(layout, in: text)
-        // In place, not by renaming a new file over it: a symlinked file
-        // (dotfiles) stays a symlink and keeps its permissions.
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.truncate(atOffset: 0)

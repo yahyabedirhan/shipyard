@@ -27,8 +27,6 @@ struct LeaseBannerView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if let detail = banner.detail {
-                    // A new step replaces the old one outright: a crossfade drew both at once.
-                    // Cut in the middle, so the step's "12s ago" and the queue stay whole.
                     Text(detail)
                         .font(TypeScale.meta)
                         .foregroundStyle(.secondary)
@@ -38,8 +36,6 @@ struct LeaseBannerView: View {
                 }
             }
             Spacer(minLength: 0)
-            // The countdown and Stop share the banner's centre line, so Stop
-            // sits where the stopped agent's Allow again does.
             Text(banner.timeLeft)
                 .font(TypeScale.meta)
                 .monospacedDigit()
@@ -60,8 +56,6 @@ struct LeaseBannerView: View {
         .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
         .help(banner.help)
-        // One element reading both lines as one, with Stop, and the ✕ when
-        // it's there, as its actions.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(banner.text)
         .accessibilityAction(named: LeaseBanner.stop, stop)

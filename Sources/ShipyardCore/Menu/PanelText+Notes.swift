@@ -1,7 +1,5 @@
 import Foundation
 
-// The words of notes: why a project's notes couldn't be read or a note
-// couldn't be started, and the notes banner.
 extension PanelText {
     /// Why notes couldn't be read, after "notes: " on the project's error
     /// row: "ntn isn't logged in; run ntn login in Terminal", "can't reach

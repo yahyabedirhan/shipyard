@@ -1,7 +1,6 @@
 import Foundation
 import ShipyardConfig
 
-// The words of a project's groups: their titles and the date buckets' names.
 extension PanelText {
     /// A group's title: its kind ("Pull requests"), repository
     /// ("owner/name"), date bucket ("Today"), author ("@login") or a
@@ -67,7 +66,6 @@ extension PanelText {
     }
 }
 
-// The note in a project using `anywhere`.
 extension PanelText {
     /// When the review search matched more pull requests than its one page:
     /// "Only the first 100 of 134 review requests are listed".

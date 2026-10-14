@@ -1,7 +1,5 @@
 import Foundation
 
-// The Notion view's words (`StatusView`): where ntn stands, what to run in
-// Terminal, Connect with ntn and Disconnect.
 extension PanelText {
     /// The command Notion's installer gives, which puts `ntn` in `~/.local/bin`.
     public static let ntnInstall = "curl -fsSL https://ntn.dev | bash"
@@ -20,7 +18,6 @@ extension PanelText {
     public static func notionStatus(_ status: NotionStatus?, connected: Bool) -> StatusPage {
         var page = StatusPage(title: statusTitle(.notion), lead: statusLead(.notion))
         let checkAgain = StatusPage.Button(title: "Check again", action: .checkNotion)
-        // Not connected, nothing is broken yet: what's left to do is neutral.
         let toDo: SkillInstall.Tone = connected ? .warning : .neutral
         switch status {
         case nil:
@@ -55,7 +52,6 @@ extension PanelText {
                 page.primary = .init(title: "Connect with ntn", action: .connectNotion)
             }
         case .failed(let error):
-            // "Can't reach Notion (…).", "Notion answered 503: …."
             let why = noteError(error)
             page.status = .init(text: why.prefix(1).uppercased() + why.dropFirst() + ".", tone: .warning)
             page.primary = checkAgain

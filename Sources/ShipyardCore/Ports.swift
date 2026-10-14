@@ -3,11 +3,6 @@ import ShipyardConfig
 import ShipyardNotices
 import ShipyardPings
 
-// What the app plugs into the core. Each port wraps an Apple-only service
-// (Keychain, notifications, the system clock, NSWorkspace) behind a small
-// protocol, so every rule in ShipyardCore builds and tests on Linux. The app
-// target supplies the real adapters; tests use in-memory doubles.
-
 /// Keeps the one GitHub token shipyard signed in with. The app stores it in
 /// the login Keychain.
 public protocol TokenStore: Sendable {

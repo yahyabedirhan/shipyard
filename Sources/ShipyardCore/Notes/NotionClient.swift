@@ -64,8 +64,6 @@ public struct NotionClient: Sendable {
         self.transport = transport
     }
 
-    // MARK: - Reads
-
     /// Checks the login: `GET /v1/users/me`, ntn's own bot user. Answers
     /// the name of the workspace ntn reads (its default workspace), the
     /// bot's `workspace_name`; `nil` when Notion didn't name it.
@@ -196,8 +194,6 @@ public struct NotionClient: Sendable {
         return rows.results.compactMap(\.cells)
     }
 
-    // MARK: - Creates
-
     /// Creates a project's notes database under page `pageID`, titled
     /// `title`, with the fixed core the shipyard skill's notes reference
     /// defines: `Name` (title), `No.` (unique ID with `prefix`), `Labels`
@@ -246,8 +242,6 @@ public struct NotionClient: Sendable {
         guard let url = page.url.flatMap(URL.init(string:)) else { throw NotionError.unreadable("POST pages") }
         return url
     }
-
-    // MARK: - Sending
 
     /// Sends one request to `path` under the API (`users/me`), with
     /// `query` and a JSON `body`, and decodes the answer as `T`. Every
@@ -347,8 +341,6 @@ enum NoteProperty {
     static let status = "Status"
 }
 
-// MARK: - What Notion answers
-
 /// `GET /v1/users/me` as ntn's bot user answers it: `{"type":"bot","bot":{"workspace_name":"Notes",…}}`.
 private struct BotUser: Decodable {
     struct Bot: Decodable {
@@ -413,7 +405,6 @@ private struct Block: Decodable {
         child_database = try container.decodeIfPresent(Child.self, forKey: .child_database)
         child_page = try container.decodeIfPresent(Child.self, forKey: .child_page)
         table_row = try container.decodeIfPresent(TableRow.self, forKey: .table_row)
-        // The text sits under the block's own type: {"type":"paragraph","paragraph":{"rich_text":[…]}}.
         let byType = try decoder.container(keyedBy: AnyKey.self)
         text = try? byType.decodeIfPresent(Text.self, forKey: AnyKey(type))
     }
@@ -482,7 +473,6 @@ private struct PageObject: Decodable {
             url: url,
             number: number?.number,
             prefix: number?.prefix,
-            // `Name` is the title property; read by its type, so a rename doesn't blank every row.
             title: plainTitle,
             labels: (properties?[NoteProperty.labels]?.multi_select ?? []).map(\.name),
             status: properties?[NoteProperty.status]?.select?.name,

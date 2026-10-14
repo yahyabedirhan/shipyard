@@ -1,10 +1,6 @@
 import Foundation
 import ShipyardCommand
 
-// Selectors name authors and repositories in the configuration (ADR 0002):
-// a bare word is a group, `@` marks a login and `/` a repository. The key a
-// selector sits under says which set it's from, so a group needs no symbol.
-
 /// One entry of an author filter: an author group or a single login.
 ///
 /// `me` is the signed-in account, so agents working as the user count as
@@ -108,8 +104,6 @@ public struct AuthorFilterOverrides: Equatable, Sendable {
         AuthorFilter(show: show ?? base.show, hide: hide ?? base.hide)
     }
 }
-
-// MARK: - Repositories
 
 /// A repository group that's looked up: every repository the signed-in
 /// account reaches one way, named after GitHub's own affiliations. The three

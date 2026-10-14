@@ -89,7 +89,6 @@ extension MenuModel {
                 settings: Self.allTabArrangement,
                 layout: .tabs,
                 folded: foldedGroups,
-                // Grouping by kind reads no dates.
                 now: lastUpdated ?? .distantPast
             )
         case .project:

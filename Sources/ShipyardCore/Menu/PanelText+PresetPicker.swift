@@ -1,6 +1,5 @@
 import Foundation
 
-// Onboarding's preset step's words (`PresetPicker`).
 extension PanelText {
     public static let presetTitle = "How will you use Shipyard?"
     public static let presetIntro = "Pick a starting point for your configuration. You can change it at any time."

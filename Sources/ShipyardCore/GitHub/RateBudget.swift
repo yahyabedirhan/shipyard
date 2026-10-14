@@ -136,8 +136,6 @@ public struct RateBudget: Equatable, Sendable {
 
     public init() {}
 
-    // MARK: - Recording
-
     /// What a successful refresh reported. An API the refresh didn't use
     /// (no limit reported, such as REST while runs are off) cost nothing;
     /// one that reported a limit without a cost keeps its average as it was.
@@ -189,8 +187,6 @@ public struct RateBudget: Equatable, Sendable {
         if let pause, pause.until >= until { return }
         pause = RatePause(until: until, reason: reason)
     }
-
-    // MARK: - Answering
 
     /// Whether a refresh may run now; false only while paused. ⌘R asks this.
     public func canRefresh(at now: Date) -> Bool {
@@ -253,8 +249,6 @@ public struct RateBudget: Equatable, Sendable {
         if show == .whenLow, indicator.level == .normal { return nil }
         return indicator
     }
-
-    // MARK: - Helpers
 
     private func activePause(at now: Date) -> RatePause? {
         guard let pause, pause.until > now else { return nil }

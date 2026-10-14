@@ -32,12 +32,10 @@ public enum PingCommands {
         guard let verb = arguments.first else {
             return CommandResult(error: PingCommand.usageText, status: CommandResult.usageStatus)
         }
-        // After `--` it's the title's, not a flag.
         let flags = arguments.prefix { $0 != "--" }
         if flags.contains("--help") || flags.contains("-h") { return CommandResult(output: PingCommand.usageText) }
         let rest = Array(arguments.dropFirst())
         switch verb {
-        // Withdrawing and listing never file, so a broken config.toml doesn't stop them.
         case "withdraw": return PingCommand.withdraw(rest, store: store)
         case "list": return PingCommand.list(rest, store: store, now: now)
         case "send": return PingCommand.run(rest, environment: environment, filing: filing, store: store, now: now)

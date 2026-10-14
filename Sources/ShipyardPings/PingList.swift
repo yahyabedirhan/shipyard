@@ -85,9 +85,6 @@ public struct PingList: Equatable, Sendable {
                 ping.herdrSession = nil
                 return ping
             }
-        // What the envelope costs with no pings (`false`, the longer of the
-        // two), plus each ping and a comma: the document's size or a byte
-        // over it, since the encoding is compact.
         let envelope = document(PingList(shipyardVersion: shipyardVersion, pings: [], truncated: false)).utf8.count
         var size = envelope
         var count = 0
@@ -99,8 +96,6 @@ public struct PingList: Equatable, Sendable {
         }
         var list = PingList(shipyardVersion: shipyardVersion, pings: Array(sorted.prefix(count)), truncated: count < sorted.count)
         var text = document(list)
-        // A safeguard: the size above is never short, but the document must never
-        // exceed the budget, whatever the encoder does.
         while text.utf8.count > byteBudget, !list.pings.isEmpty {
             list.pings.removeLast()
             list.truncated = true
@@ -120,7 +115,6 @@ public struct PingList: Equatable, Sendable {
     public static func decode(_ data: Data) throws(DecodeError) -> PingList {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        // The version first: another version's shape may not read at all.
         let header: Header
         do {
             header = try decoder.decode(Header.self, from: data)
@@ -142,8 +136,6 @@ public struct PingList: Equatable, Sendable {
             throw .unreadable(reason(error))
         }
     }
-
-    // MARK: - Encoding
 
     private enum CodingKeys: String, CodingKey {
         case version, shipyardVersion, pings, truncated

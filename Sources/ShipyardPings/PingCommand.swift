@@ -147,7 +147,6 @@ public enum PingCommand {
         case .failure(let error): return .usage("shipyard ping send: \(error.message)")
         }
         var sending = request
-        // An action the agent gives wins over the filing's.
         if sending.action == nil { sending.action = filing.defaultAction(environment) }
         var terminal: String?, session: String?
         if case .herdr = sending.action {
@@ -205,9 +204,6 @@ public enum PingCommand {
         }
         let replaced = store.ping(id: id)
         do {
-            // A replace is what the agent says now, so its age starts again;
-            // it keeps its instance, so it isn't notified again; seen and
-            // failure start over, so it needs attention again.
             try store.save(Ping(
                 id: id,
                 title: request.title,
@@ -297,8 +293,6 @@ public enum PingCommand {
     /// ids too. One rule for every id keeps it a safe file name and a URL
     /// path, the same on case-insensitive disks.
     public static func isID(_ id: String) -> Bool {
-        // `\A` and `\z`, not `^` and `$`, which also match before a
-        // trailing newline: "build-42\n" isn't an id.
         id.range(of: #"\A[a-z0-9][a-z0-9_-]{0,63}\z"#, options: .regularExpression) != nil
     }
 

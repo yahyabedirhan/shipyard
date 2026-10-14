@@ -92,7 +92,6 @@ extension ConfigurationCheck: Encodable {
 
         func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            // Explicit null rather than a missing key: easier to read for an agent.
             try container.encode(issue.line, forKey: .line)
             try container.encode(issue.message, forKey: .message)
             try container.encode(ConfigurationCheck.banner(issue, in: name), forKey: .banner)

@@ -38,7 +38,6 @@ public struct UnixSocketTransport: ControlTransport {
         UnixSocket.configure(descriptor, timeout: timeout)
         guard UnixSocket.connectSocket(descriptor, to: address) == 0 else {
             let code = errno
-            // No file, or a file nobody listens on (left by an app that crashed).
             if code == ENOENT || code == ECONNREFUSED { throw .notRunning }
             throw .failed("couldn't reach \(socket.path): \(UnixSocket.reason(code))")
         }

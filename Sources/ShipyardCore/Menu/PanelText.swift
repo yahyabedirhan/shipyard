@@ -74,17 +74,14 @@ public enum PanelText {
     }
 
     private static func detailParts(_ row: MenuRow, showingRepository: Bool) -> [String] {
-        // A note: its number with its prefix, then its labels.
         if let note = row.item.note { return (note.reference.map { [$0] } ?? []) + note.labels }
         let repository = showingRepository && !row.repository.isEmpty ? [repositoryName(row.repository)] : []
         let subject: [String] = switch row.kind {
         case .pullRequest, .issue: [row.author]
         case .workflowRun: (row.branch.map { [$0] } ?? []) + [state(row.state)]
         case .ping: pingDetail(row)
-        // Above: a note's line is its own.
         case .note: []
         }
-        // A ping written before pings were numbered has none (0).
         return (row.number > 0 ? ["#\(row.number)"] : []) + repository + subject
     }
 
@@ -243,8 +240,6 @@ public enum PanelText {
         return "Open \(page) on GitHub"
     }
 
-    // MARK: - The tabs layout
-
     /// The All tab's title; a project's tab is titled by its project's
     /// title (`MenuModel.tabTitle`).
     public static let allTabTitle = "All"
@@ -316,7 +311,6 @@ public enum PanelText {
         switch error {
         case .unauthorized: "GitHub rejected the token."
         case .http(let status): "GitHub answered with HTTP \(status)."
-        // The system's own text names an error domain and code; say it plainly.
         case .network: "Can't reach GitHub. Check your connection. Shipyard will try again."
         case .malformed: "GitHub's answer couldn't be read."
         case .graphQL(let message): "GitHub: \(message)"
@@ -345,14 +339,10 @@ public enum PanelText {
     /// (`PanelBanner.opens`).
     public static let openBannerView = "Open…"
 
-    // MARK: - Notifications
-
     /// The banner while macOS doesn't let shipyard post notifications.
     public static let notificationsOff = "Notifications are off for shipyard, so it can't tell you when something happens."
     /// Its button, to shipyard's page in System Settings.
     public static let openNotificationSettings = "Open notification settings"
-
-    // MARK: - The rate limit
 
     /// One API's line in the footer: "GraphQL 4,850 / 5,000 · resets 16:42".
     public static func rateUsage(_ usage: RateUsage, locale: Locale = .current, timeZone: TimeZone = .current) -> String {

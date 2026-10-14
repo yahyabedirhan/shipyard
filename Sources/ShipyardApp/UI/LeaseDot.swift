@@ -41,7 +41,6 @@ enum LeaseDot {
             guard let context = NSGraphicsContext.current?.cgContext else { return false }
             let iconRect = NSRect(origin: .zero, size: iconSize)
             icon.template.draw(in: iconRect)
-            // The template's pixels tinted like text, in the appearance being drawn.
             let isDark = NSAppearance.currentDrawing().bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             (isDark ? NSColor.white : NSColor.black).setFill()
             iconRect.fill(using: .sourceAtop)

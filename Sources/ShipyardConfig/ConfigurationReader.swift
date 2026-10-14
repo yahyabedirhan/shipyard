@@ -80,8 +80,6 @@ final class ConfigurationReader {
         let path: ConfigurationPath
     }
 
-    // MARK: The file's shape
-
     func configuration(from root: TOMLTable) -> Configuration {
         let node = Node(table: root, path: [])
         var config = Configuration()
@@ -101,7 +99,6 @@ final class ConfigurationReader {
         }
         if let interval = duration(node, "refresh-interval", old: "refresh-interval-seconds", unit: "s") {
             if interval < Self.shortestRefreshInterval {
-                // Named as the file sets it: the new key's text, else the old key's number.
                 if let text = try? node.table.string(forKey: "refresh-interval") {
                     error("`refresh-interval` must be at least \"30s\" (got \(Configuration.tomlString(text)))", at: node.path + [.key("refresh-interval")])
                 } else {
@@ -206,7 +203,6 @@ final class ConfigurationReader {
             var firstLine: [String: Int?] = [:]
             for node in projects {
                 guard let project = project(node, defaults: config.defaults) else { continue }
-                // The slug's line, or the old `name`'s it was made from.
                 let line = map.line(for: node.path + [.key(node.table.contains(key: "slug") ? "slug" : "name")])
                 if let first = firstLine[project.slug] {
                     let earlier = first.map { " (first on line \($0))" } ?? ""
@@ -257,7 +253,6 @@ final class ConfigurationReader {
             "slug", "title", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks",
         ] + Self.arrangementKeys, old: ["name"])
         let identity = projectIdentity(node)
-        // How the messages below name the project.
         let name = identity?.slug ?? (try? node.table.string(forKey: "slug")) ?? (try? node.table.string(forKey: "name"))
         let repositories = strings(node, "repositories")
         if repositories == nil && !node.table.contains(key: "repositories") {
@@ -269,7 +264,6 @@ final class ConfigurationReader {
         var spelled: [String: Int] = [:]
         var selectors: [RepositorySelector] = []
         for repository in repositories ?? [] {
-            // Which appearance of this exact spelling it is, to find its line.
             let occurrence = spelled[repository, default: 0]
             spelled[repository] = occurrence + 1
             let line = map.line(for: node.path + [.key("repositories")], value: repository, occurrence: occurrence)
@@ -480,7 +474,6 @@ final class ConfigurationReader {
         var spelled: [String: Int] = [:]
         var readable = true
         for text in texts {
-            // Which appearance of this exact spelling it is, to find its line.
             let occurrence = spelled[text, default: 0]
             spelled[text] = occurrence + 1
             let line = map.line(for: path, value: text, occurrence: occurrence)
@@ -684,11 +677,6 @@ final class ConfigurationReader {
         "project `\(project)` lists repository `\(repository)` twice (names aren't case-sensitive)"
     }
 
-    // MARK: Typed reads
-    //
-    // Each returns nil when the key is absent, and records an error (and
-    // returns nil) when it's present with the wrong type.
-
     private func int(_ node: Node, _ key: String) -> Int? {
         guard node.table.contains(key: key) else { return nil }
         do {
@@ -785,8 +773,6 @@ final class ConfigurationReader {
         error("unknown \(what) (\(hint))", at: node.path + [.key(key)], value: raw)
         return nil
     }
-
-    // MARK: Recording
 
     /// Warns about each key that's neither `known` nor an `old` form the
     /// reader still takes; a misspelling is pointed at a `known` key only,

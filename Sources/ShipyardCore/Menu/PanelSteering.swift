@@ -11,9 +11,6 @@ public struct PanelRefusal: Error, Equatable, Sendable {
     }
 }
 
-// What the `shipyard panel` command names, found in the menu as drawn:
-// a project's section, its group of one kind, a tab. Each refusal names
-// what exists, so an agent can try again without asking the status.
 extension MenuModel {
     /// The section of the project named `project`: by its slug (or a
     /// machine's label), else by its title.
@@ -94,8 +91,6 @@ extension MenuModel {
     }
 }
 
-// The orchestrator's operations behind `shipyard panel fold`, `unfold` and
-// `show-more`: the same ones a click runs, reached by name.
 extension Shipyard {
     /// Collapses (`collapsed` true) or expands the section of the project
     /// named `project`, through `toggleCollapsed`, only when it differs.

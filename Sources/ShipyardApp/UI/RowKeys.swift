@@ -2,10 +2,6 @@ import AppKit
 import ShipyardCore
 import SwiftUI
 
-// The row highlight's and the keys' plumbing, which the layouts share:
-// where each row is (for the highlight shape and for scrolling), the
-// pointer's enter and exit, the keys, and the focus on each open. What the highlight looks like is in `Components.swift`.
-
 /// A row's place in the list it's in: a tab (`list`), or the list
 /// layout's one list (`nil`). Tabs list a row at the same place, and while
 /// the list slides from one tab to the next both are on screen, so what
@@ -201,11 +197,7 @@ private struct Highlightable: ViewModifier {
                 report.last = span
                 frames?.report(span, at: slot, by: report.owner)
             }
-            // A row the lazy list dropped isn't where it last was.
             .onDisappear { frames?.forget(slot, by: report.owner) }
-            // A row the lazy list kept and shows again, where it was when
-            // it went (a wrap back to the list's end it wrapped from),
-            // sees no geometry change, so it reports its span again here.
             .onAppear {
                 if let last = report.last { frames?.report(last, at: slot, by: report.owner) }
             }
@@ -243,11 +235,6 @@ private struct RowKeys: ViewModifier {
             .coordinateSpace(.named(RowFrames.space))
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { frames.visibleHeight = $0 }
             .environment(\.rowFrames, frames)
-            // The panel's window is key while the menu is open, so the
-            // focused list gets the keys; closed, the panel isn't on
-            // screen and takes none. `.onAppear` alone isn't enough: the
-            // view outlives a closed menu, and focus set before its window
-            // is key is lost, so it's set again each time it becomes key.
             .focusable()
             .focusEffectDisabled()
             .focused($focused)
@@ -270,8 +257,6 @@ private struct RowKeys: ViewModifier {
             }
             .onKeyPress(.delete, phases: .down) { _ in latest.keys?.dismissHighlighted() ?? .ignored }
             .onContinuousHover(coordinateSpace: .global) { phase in
-                // Scrolling moves the rows under a resting pointer, not the
-                // pointer: only a new location hands the highlight back.
                 guard case .active(let location) = phase, location != pointer.location else { return }
                 pointer.location = location
                 latest.landing = nil
@@ -314,8 +299,6 @@ private struct RowKeys: ViewModifier {
         case .ignored, .moved:
             if let place = next.place { reveal(place, from: previous) }
         case .newList:
-            // Not to the highlighted row: the new tab isn't laid out yet,
-            // and the outgoing one has a row with the same id.
             scroll.scrollTo(RowListTop.id, anchor: .top)
         }
         return .handled
@@ -351,7 +334,6 @@ private struct RowKeys: ViewModifier {
         case .wrapToTop, .wrapToBottom:
             scrollToEnd(move)
             latest.landing = RowWrapLanding(move, to: place)
-            // Checked once this scroll is laid out, even if no row moved.
             rowsMoved()
         }
     }
@@ -466,7 +448,6 @@ private struct WindowBecameKey: NSViewRepresentable {
             }
         }
 
-        // Not in the way of the pointer.
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
