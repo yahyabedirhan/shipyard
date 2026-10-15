@@ -12,33 +12,18 @@
       "variants" : [
         {
           "keep" : false,
-          "label" : "V1",
-          "title" : "Before, maintainer volume"
-        },
-        {
-          "keep" : false,
-          "label" : "V2",
-          "title" : "Before, heavy volume"
-        },
-        {
-          "keep" : false,
-          "label" : "V3",
-          "title" : "Before, extreme volume"
-        },
-        {
-          "keep" : false,
           "label" : "V4",
-          "title" : "After, maintainer volume"
+          "title" : "Maintainer volume"
         },
         {
           "keep" : false,
           "label" : "V5",
-          "title" : "After, heavy volume"
+          "title" : "Heavy volume"
         },
         {
           "keep" : false,
           "label" : "V6",
-          "title" : "After, extreme volume"
+          "title" : "Extreme volume"
         }
       ]
     },
@@ -54,13 +39,8 @@
       "variants" : [
         {
           "keep" : false,
-          "label" : "V1",
-          "title" : "Before, heavy volume"
-        },
-        {
-          "keep" : false,
           "label" : "V2",
-          "title" : "After, heavy volume"
+          "title" : "Heavy volume"
         }
       ]
     }
