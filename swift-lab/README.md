@@ -10,12 +10,12 @@ This folder is the `shipyard` project of [Swift Lab](https://github.com/yahyabed
 | `atoms` | Count badges, state symbols with check and attention dots, agent marks, buttons, subheaders and Show more, error, note, empty and loading rows, hover cards. |
 | `elements` | The tab strip (3, 11 and 30 projects), the tabs layout's row, the list layout's row, the list's project header, and a project's tab. |
 | `compounds` | The whole panel in the tabs layout and in the list layout at a light volume, and the tabs layout at about the maintainer's volume, with nothing measuring it. |
-| `perf` | The tabs panel under load beside a meter of what drawing it costs: `V1` to `V3` before the performance fix and `V4` to `V6` after it, at the maintainer's, a heavy and an extreme volume, and the list layout at the heavy volume, before (`list-panel` `V1`) and after (`V2`). See [perf/FINDINGS.md](perf/FINDINGS.md). |
+| `perf` | The tabs panel under load beside a meter of what drawing it costs, at the maintainer's (`V4`), a heavy (`V5`) and an extreme (`V6`) volume, and the list layout at the heavy volume (`list-panel` `V2`). See [perf/FINDINGS.md](perf/FINDINGS.md) for how each performs. |
 
 Open one from the Swift Lab app's home window, or:
 
 ```sh
-swiftlab show perf tabs-panel V1 --project shipyard
+swiftlab show perf tabs-panel V4 --project shipyard
 ```
 
 ## The kit
@@ -31,10 +31,9 @@ Every variant links `kit/` through a `Kit` symlink in its folder, and one of `ve
 - `kit/App/LabPanel.swift`: the panel's frame (header, layout, footer) as `Panel.swift` draws it once ready, on a mock store whose actions change only the fixture model.
 - `kit/Perf/`: the probes, the main-thread meter, and the stress window (`PerfLab`).
 - `kit/Gallery/`: sample rows of every kind and state, and the specimen frames the galleries use.
-- `versions/before/`: the tabs and list layouts as they shipped at commit `54a4e4f`, before the performance fixes. Frozen: the perf session's `V1` to `V3` and `list-panel` `V1` link it, so the problems stay measurable.
-- `versions/after/`: the two layouts as the app has them now, with the same marked edits. The perf session's `V4` to `V6`, `list-panel` `V2` and every design session link it.
+- `versions/after/`: the tabs and list layouts as the app has them now, with the same marked edits. Every variant links it.
 
-The kit is a copy of the app, not a dependency: changing the app changes nothing here. When either layout changes in the app, copy it into `versions/after/` with the marked edits, so the design sessions show the app as it is. To compare another fix, add a folder under `versions/` and perf variants that link it, and keep `versions/before/` as it is.
+The kit is a copy of the app, not a dependency: changing the app changes nothing here. When either layout changes in the app, copy it into `versions/after/` with the marked edits, so every session shows the app as it is. To compare another fix, add a folder under `versions/` and perf variants that link it.
 
 A variant's own file names must differ from the kit's (`Logo.swift` in a variant clashes with `kit/Brand/Logo.swift`).
 
@@ -44,7 +43,7 @@ A variant's own file names must differ from the kit's (`Logo.swift` in a variant
 
 ```sh
 swift-lab/perf/stress.py                     # every perf variant
-swift-lab/perf/stress.py tabs-panel/V1       # one
+swift-lab/perf/stress.py tabs-panel/V4       # one
 ```
 
 It closes the session before each variant: one runner draws every window of a session, so a second window would share its main thread.
