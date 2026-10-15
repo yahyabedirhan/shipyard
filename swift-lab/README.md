@@ -6,10 +6,10 @@ This folder is the `shipyard` project of [Swift Lab](https://github.com/yahyabed
 
 | Session | What it shows |
 |---|---|
-| `brand` | The logo at every size and the menu bar mark, the palette in light and dark, the type scale, the spacing grid, radii and motion springs. |
-| `building-blocks` | Count badges, state symbols with check and attention dots, agent marks, buttons, subheaders and Show more, error, note, empty and loading rows, hover cards. |
-| `components` | The tab strip (3, 11 and 30 projects), the tabs layout's row, the list layout's row, the list's project header, and a project's tab. |
-| `app` | The whole panel in the tabs layout and in the list layout at a light volume, and the tabs layout at about the maintainer's volume, with nothing measuring it. |
+| `foundations` | The logo at every size and the menu bar mark, the palette in light and dark, the type scale, the spacing grid, radii and motion springs. |
+| `atoms` | Count badges, state symbols with check and attention dots, agent marks, buttons, subheaders and Show more, error, note, empty and loading rows, hover cards. |
+| `elements` | The tab strip (3, 11 and 30 projects), the tabs layout's row, the list layout's row, the list's project header, and a project's tab. |
+| `compounds` | The whole panel in the tabs layout and in the list layout at a light volume, and the tabs layout at about the maintainer's volume, with nothing measuring it. |
 | `perf` | The tabs panel under load beside a meter of what drawing it costs: `V1` to `V3` before the performance fix and `V4` to `V6` after it, at the maintainer's, a heavy and an extreme volume, and the list layout at the heavy volume, before (`list-panel` `V1`) and after (`V2`). See [perf/FINDINGS.md](perf/FINDINGS.md). |
 
 Open one from the Swift Lab app's home window, or:
