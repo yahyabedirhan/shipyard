@@ -1,0 +1,85 @@
+{
+  "components" : [
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "count-badge",
+      "title" : "Count badge",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "state-symbols",
+      "title" : "State symbols and dots",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "buttons",
+      "title" : "Buttons",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "group-rows",
+      "title" : "Subheaders, show more and dividers",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "status-rows",
+      "title" : "Error, note, empty and loading rows",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "hover-cards",
+      "title" : "Hover cards",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    }
+  ],
+  "source" : "/Users/yahyabedirhanpak/.treehouse/shipyard-1e47e3/6/shipyard",
+  "title" : "Atoms",
+  "version" : 2
+}

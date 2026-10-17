@@ -1,0 +1,59 @@
+{
+  "components" : [
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "logo",
+      "title" : "Logo and menu bar mark",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "palette",
+      "title" : "Palette",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "type",
+      "title" : "Type scale",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "grid-motion",
+      "title" : "Grid, radii and motion",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    }
+  ],
+  "source" : "/Users/yahyabedirhanpak/.treehouse/shipyard-1e47e3/6/shipyard",
+  "title" : "Foundations",
+  "version" : 2
+}

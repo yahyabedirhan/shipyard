@@ -1,0 +1,72 @@
+{
+  "components" : [
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "tab-strip",
+      "title" : "Tab strip",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "tab-row",
+      "title" : "Tab row",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "list-row",
+      "title" : "List row",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "list-section-header",
+      "title" : "List project header",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    },
+    {
+      "kind" : "component",
+      "lastLabel" : 1,
+      "slug" : "tab-list",
+      "title" : "A tab's list",
+      "variants" : [
+        {
+          "keep" : false,
+          "label" : "V1",
+          "title" : "V1"
+        }
+      ]
+    }
+  ],
+  "source" : "/Users/yahyabedirhanpak/.treehouse/shipyard-1e47e3/6/shipyard",
+  "title" : "Elements",
+  "version" : 2
+}
