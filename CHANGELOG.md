@@ -4,6 +4,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 ## Unreleased
 
+- **Apache 2.0 instead of MIT.** shipyard's code is now under the Apache License 2.0, with a `NOTICE` that asks for credit when you use or adapt it. The app carries both files. The name, the logo, the app icon and the screenshots are all rights reserved.
 - **A new profile picture shows within a day.** The panel's header downloads your GitHub avatar again once the kept one is a day old. GitHub sometimes keeps the picture's address when you change it, so the header kept showing the old one. When the download fails, the header keeps the picture it has.
 
 ## 0.7.1 (2026-10-15)

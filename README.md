@@ -185,4 +185,6 @@ Sign in with GitHub uses the OAuth App client ID compiled into the build. A fork
 
 ## License
 
-MIT, see [`LICENSE`](LICENSE). The bundled agent logos are their owners'; see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+The code is licensed under the [Apache License 2.0](LICENSE). See [LICENSE](LICENSE) and [NOTICE](NOTICE). If you use or adapt it, please credit Yahya Bedirhan Pak with a link to [yahyapak.dev](https://yahyapak.dev).
+
+The project name, the logo and app icon in `assets/images/` and the screenshots in `assets/screenshots/` are not covered by this license and are all rights reserved. The bundled agent and service logos are their owners'; see [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
