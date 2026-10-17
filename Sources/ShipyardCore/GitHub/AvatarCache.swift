@@ -4,27 +4,41 @@ import FoundationNetworking
 #endif
 
 /// The signed-in account's avatar for the panel's header, kept on
-/// disk: downloaded once, and again only when the viewer's `avatarURL`
-/// changes (GitHub changes its `v=` when the picture changes). The image
-/// bytes are handed back as they came; the app draws them clipped to a circle.
+/// disk: downloaded once, and again when the viewer's `avatarURL` changes
+/// or the kept one is a day old. GitHub sometimes keeps the URL (its `v=`)
+/// when the picture changes, so the URL alone can keep an old picture
+/// forever. The image bytes are handed back as they came; the app draws
+/// them clipped to a circle.
 ///
 /// It holds one avatar, the account's: `avatar` and the URL it came from,
-/// `avatar-url`, in `directory`. A failed download (offline, a non-200, an
-/// empty body) returns `nil` and stores nothing, so the header shows the
-/// handle alone and the next ask tries again. The request carries no
-/// token: avatars are public, served from `avatars.githubusercontent.com`.
+/// `avatar-url`, in `directory`; the image file's modification date is
+/// when it was downloaded. A failed download (offline, a non-200, an
+/// empty body) stores nothing and returns the kept avatar while it is for
+/// the same URL, else `nil`, so the header shows the handle alone; the
+/// next ask tries again. The request carries no token: avatars are
+/// public, served from `avatars.githubusercontent.com`.
 public actor AvatarCache {
     /// The size asked for, in pixels (`s=`): the header's 20 pt at 3×.
     public static let pixelSize = 60
+    /// How long a kept avatar is shown before it is downloaded again.
+    public static let maxAge: TimeInterval = 24 * 60 * 60
 
     private let directory: URL
     private let transport: any HTTPTransport
-    private var memory: (url: URL, data: Data)?
+    private let clock: any WallClock
+    private var memory: Kept?
     private var loading: (url: URL, task: Task<Data?, Never>)?
 
-    public init(directory: URL, transport: any HTTPTransport) {
+    private struct Kept {
+        var url: URL
+        var data: Data
+        var downloaded: Date
+    }
+
+    public init(directory: URL, transport: any HTTPTransport, clock: any WallClock = SystemClock()) {
         self.directory = directory
         self.transport = transport
+        self.clock = clock
     }
 
     /// The URL downloaded for `avatarURL`: the same, asking for `pixelSize`.
@@ -37,43 +51,47 @@ public actor AvatarCache {
     }
 
     /// The avatar at `url`: from memory, from disk when it was stored for
-    /// the same URL, else downloaded and stored. `nil` when the download fails.
+    /// the same URL less than `maxAge` ago, else downloaded and stored.
+    /// When the download fails, the kept avatar for `url` however old,
+    /// else `nil`.
     public func image(for url: URL) async -> Data? {
-        if let memory, memory.url == url { return memory.data }
-        if let stored = stored(for: url) {
-            memory = (url, stored)
-            return stored
-        }
-        if let loading, loading.url == url { return await loading.task.value }
+        if memory?.url != url { memory = stored(for: url) }
+        if let memory, clock.now.timeIntervalSince(memory.downloaded) < Self.maxAge { return memory.data }
+        let stale = memory?.data
+        if let loading, loading.url == url { return await loading.task.value ?? stale }
         let transport = transport
         let task = Task { await Self.download(url, transport: transport) }
         loading = (url, task)
         let data = await task.value
         let superseded = loading.map { $0.url != url } ?? false
         if !superseded { loading = nil }
-        guard let data else { return nil }
+        guard let data else { return stale }
         guard !superseded else { return data }
-        store(data, for: url)
-        memory = (url, data)
+        let now = clock.now
+        store(data, for: url, at: now)
+        memory = Kept(url: url, data: data, downloaded: now)
         return data
     }
 
     private var imageFile: URL { directory.appendingPathComponent("avatar") }
     private var urlFile: URL { directory.appendingPathComponent("avatar-url") }
 
-    private func stored(for url: URL) -> Data? {
+    private func stored(for url: URL) -> Kept? {
         guard let storedURL = try? String(contentsOf: urlFile, encoding: .utf8),
               storedURL == url.absoluteString,
               let data = try? Data(contentsOf: imageFile), !data.isEmpty else { return nil }
-        return data
+        let attributes = try? FileManager.default.attributesOfItem(atPath: imageFile.path)
+        let downloaded = attributes?[.modificationDate] as? Date ?? .distantPast
+        return Kept(url: url, data: data, downloaded: downloaded)
     }
 
-    private func store(_ data: Data, for url: URL) {
+    private func store(_ data: Data, for url: URL, at date: Date) {
         let manager = FileManager.default
         try? manager.removeItem(at: urlFile)
         do {
             try manager.createDirectory(at: directory, withIntermediateDirectories: true)
             try data.write(to: imageFile, options: .atomic)
+            try manager.setAttributes([.modificationDate: date], ofItemAtPath: imageFile.path)
             try Data(url.absoluteString.utf8).write(to: urlFile, options: .atomic)
         } catch {
         }

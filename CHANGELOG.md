@@ -2,6 +2,10 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
+## Unreleased
+
+- **A new profile picture shows within a day.** The panel's header downloads your GitHub avatar again once the kept one is a day old. GitHub sometimes keeps the picture's address when you change it, so the header kept showing the old one. When the download fails, the header keeps the picture it has.
+
 ## 0.7.1 (2026-10-15)
 
 The skill install output shows each line once, and the code explains itself without narration comments. It gathers [#262](https://github.com/yahyabedirhan/shipyard/pull/262) and [#273](https://github.com/yahyabedirhan/shipyard/pull/273).

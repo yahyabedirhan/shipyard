@@ -116,6 +116,46 @@ struct AccountTests {
         #expect(stub.requests.count == 2)
     }
 
+    @Test("an avatar kept for a day is downloaded again, since GitHub keeps its URL when the picture changes")
+    func avatarRecheckedDaily() async throws {
+        let directory = try temporaryDirectory()
+        let clock = ManualClock()
+        let stub = StubHTTP()
+        stub.on(AvatarCache.downloadURL(for: avatarURL), avatarBytesAnswer(avatarBytes), avatarBytesAnswer(newAvatarBytes))
+        let cache = AvatarCache(directory: directory, transport: stub, clock: clock)
+        _ = await cache.image(for: avatarURL)
+
+        clock.advance(by: AvatarCache.maxAge - 60)
+        let withinADay = await cache.image(for: avatarURL)
+        clock.advance(by: 120)
+        let afterADay = await cache.image(for: avatarURL)
+        let relaunched = StubHTTP()
+        let kept = await AvatarCache(directory: directory, transport: relaunched, clock: clock).image(for: avatarURL)
+
+        #expect(withinADay == avatarBytes)
+        #expect(afterADay == newAvatarBytes)
+        #expect(stub.requests.count == 2)
+        #expect(kept == newAvatarBytes)
+        #expect(relaunched.requests.isEmpty)
+    }
+
+    @Test("a day-old avatar stays when downloading it again fails, and the next ask tries again")
+    func staleAvatarKeptWhenRecheckFails() async throws {
+        let clock = ManualClock()
+        let stub = StubHTTP()
+        stub.on(AvatarCache.downloadURL(for: avatarURL), avatarBytesAnswer(avatarBytes), .failure(), avatarBytesAnswer(newAvatarBytes))
+        let cache = AvatarCache(directory: try temporaryDirectory(), transport: stub, clock: clock)
+        _ = await cache.image(for: avatarURL)
+        clock.advance(by: AvatarCache.maxAge + 60)
+
+        let failed = await cache.image(for: avatarURL)
+        let retried = await cache.image(for: avatarURL)
+
+        #expect(failed == avatarBytes)
+        #expect(retried == newAvatarBytes)
+        #expect(stub.requests.count == 3)
+    }
+
     @Test("a failed download leaves no avatar, and the next ask tries again", arguments: [
         StubHTTP.Answer.failure(),
         .status(404),
