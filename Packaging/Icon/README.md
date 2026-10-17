@@ -2,7 +2,7 @@
 
 `make-icon.swift` draws shipyard's app icon in one of eight variants. Every variant is built on the menu bar's sailboat, and each one has a simpler drawing below 64 pixels so it still reads at 16.
 
-The app's icon is shipyard's logo, `graphite`: the sailboat folded like paper, white on Swift Lab's graphite (`#222529` to `#131417`) with a double rim, in the style of Swift Lab's and the skills repository's logos. Each sail folds along a crease from its head to its foot, its forward face shaded (`#B9BEC4`) and its aft face white. It replaced `khaki-green`, the logo from 0.0.3 to 0.6.0. It's drawn from two files the app compiles too, `Sources/ShipyardApp/Brand/Sailboat.swift` (the figure) and `Brand/Logo.swift` (the squircle, the colours, the folds, the rims and the figure's size), so the icon, the menu bar item and the welcome screens' badge can't drift apart.
+The app's icon is shipyard's logo, `graphite`: the sailboat folded like paper, white on graphite (`#222529` to `#131417`) with a double rim, in the style of the skills repository's logo. Each sail folds along a crease from its head to its foot, its forward face shaded (`#B9BEC4`) and its aft face white. It replaced `khaki-green`, the logo from 0.0.3 to 0.6.0. It's drawn from two files the app compiles too, `Sources/ShipyardApp/Brand/Sailboat.swift` (the figure) and `Brand/Logo.swift` (the squircle, the colours, the folds, the rims and the figure's size), so the icon, the menu bar item and the welcome screens' badge can't drift apart.
 
 | Variant | What it is | Where it lives |
 | --- | --- | --- |

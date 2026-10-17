@@ -1,6 +1,6 @@
-# shipyard in Swift Lab
+# shipyard's lab
 
-This folder is the `shipyard` project of [Swift Lab](https://github.com/yahyabedirhan/swift-lab): the app's design pulled out into variants that run on fixture data, and a stress window that reproduces the tabs layout's performance problems. Nothing here is compiled into the app: `Package.swift` names its targets' paths, and this folder is not one of them.
+This folder is shipyard's lab, its `shipyard` project: the app's design pulled out into variants that run on fixture data, and a stress window that reproduces the tabs layout's performance problems. Nothing here is compiled into the app: `Package.swift` names its targets' paths, and this folder is not one of them.
 
 ## Sessions
 
@@ -12,10 +12,10 @@ This folder is the `shipyard` project of [Swift Lab](https://github.com/yahyabed
 | `compounds` | The whole panel in the tabs layout and in the list layout at a light volume, and the tabs layout at about the maintainer's volume, with nothing measuring it. |
 | `perf` | The tabs panel under load beside a meter of what drawing it costs, at the maintainer's (`V4`), a heavy (`V5`) and an extreme (`V6`) volume, and the list layout at the heavy volume (`list-panel` `V2`). See [perf/FINDINGS.md](perf/FINDINGS.md) for how each performs. |
 
-Open one from the Swift Lab app's home window, or:
+Open one from the lab app's home window, or with the lab's command, which `LAB_CLI` names:
 
 ```sh
-swiftlab show perf tabs-panel V4 --project shipyard
+$LAB_CLI show perf tabs-panel V4 --project shipyard
 ```
 
 ## The kit
@@ -25,7 +25,7 @@ Every variant links `kit/` through a `Kit` symlink in its folder, and one of `ve
 - `kit/Brand/`: the app's `Logo`, `Sailboat`, `LogoBadge` and `SailboatImage`, unchanged.
 - `kit/UI/`: the app's views from `Sources/ShipyardApp/UI/` (design tokens, components, row keys, hover help), with three kinds of edits, each marked in the code:
   - `// lab probe`: a counter the perf meter reads (`Probe.hit`). It counts; it changes nothing the view does.
-  - `// lab id`: a test identifier (`labID`), so `swiftlab interact` can click a tab.
+  - `// lab id`: a test identifier (`labID`), so the lab's `interact` command can click a tab.
   - `// lab: internal (private in the app), for the gallery`: a `private` view made internal, so a gallery variant can draw it alone.
 - `kit/Model/`: the menu model from `Sources/ShipyardCore/` (items, arrangement, tabs, highlight, panel text), trimmed of what reads `config.toml`, GitHub or Notion; `Stubs.swift` stands in for the types the views only pass through; `Fixtures.swift` makes projects with pull requests, issues, runs, pings and notes at any volume, the same for a seed.
 - `kit/App/LabPanel.swift`: the panel's frame (header, layout, footer) as `Panel.swift` draws it once ready, on a mock store whose actions change only the fixture model.
@@ -42,8 +42,8 @@ A variant's own file names must differ from the kit's (`Logo.swift` in a variant
 `perf/stress.py` drives each perf variant through the same phases in background windows (idle with and without pulsing runs, hovering rows, scrolling, switching tabs, a reload) and prints what each cost, from the meter's log:
 
 ```sh
-swift-lab/perf/stress.py                     # every perf variant
-swift-lab/perf/stress.py tabs-panel/V4       # one
+lab/perf/stress.py                     # every perf variant
+lab/perf/stress.py tabs-panel/V4       # one
 ```
 
 It closes the session before each variant: one runner draws every window of a session, so a second window would share its main thread.

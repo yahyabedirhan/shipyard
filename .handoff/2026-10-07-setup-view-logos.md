@@ -49,5 +49,5 @@ The session that wrote this runs in Herdr pane `w3B:p1`, in the setup-views work
 ## Suggested skills
 
 - `orchestrate-effort` and `orchestrating` to run the work through delegates.
-- `research` for the sources and terms, `logo-design` for the fit and the optical size, `swift-lab` if a quick SwiftUI sketch helps compare looks.
+- `research` for the sources and terms, `logo-design` for the fit and the optical size.
 - `implement` and `write-swift` for the build; `shipyard` for app control, screenshots and pings; `to-pr` for the pull request.

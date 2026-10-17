@@ -190,7 +190,7 @@ struct PerfMeter: View {
 }
 
 /// Each meter reading and scenario result as one JSON line, so a script
-/// driving the window with `swiftlab interact` can read what it cost.
+/// driving the window with the lab's `interact` command can read what it cost.
 enum PerfLog {
     static let url = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("shipyard-lab-perf.jsonl")
 

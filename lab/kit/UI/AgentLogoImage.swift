@@ -4,7 +4,7 @@ import AppKit
 /// PDFs, from the makers' SVGs by `make agent-logos`).
 enum AgentLogoImage {
     /// The app's own `AgentLogos`, read from the repository this lab sits in
-    /// (`swift-lab/kit/UI/` is three folders under its root): a variant
+    /// (`lab/kit/UI/` is three folders under its root): a variant
     /// target declares no resources, so the lab can't bundle them.
     static let resources: Bundle = {
         let root = URL(fileURLWithPath: #filePath).resolvingSymlinksInPath()

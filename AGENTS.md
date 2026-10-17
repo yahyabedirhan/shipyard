@@ -62,16 +62,16 @@ A machine Herdr can't reach (`herdr machine status`) is reported with the rest a
 .handoff/<date>-<topic>.md     tracked   handoffs between sessions
 assets/images/<topic>/         tracked   images the project uses, such as the logo and the app icon's drafts
 assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from issues, pull requests and docs
-swift-lab/                     tracked   the Swift Lab project: the app's design and the tabs layout's stress window, on fixture data
+lab/                           tracked   the lab project: the app's design and the tabs layout's stress window, on fixture data
 .scratch/                      ignored   notes, logs, temp files, raw captures and pull request description sources
 .claude/worktrees/             ignored   sub-agent worktrees
 ```
 
 `.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
 
-## Swift Lab
+## Lab
 
-`swift-lab/` is the `shipyard` project of Swift Lab (the **swift-lab** skill); `swift-lab/README.md` maps its sessions and its kit. The kit is a copy of the app's views and model, not a dependency: changing the app never changes it. The tabs and list layouts live in `versions/after/`, which follows the app. Measure a performance change as new `perf` variants that link a new folder under `versions/`, with `swift-lab/perf/stress.py`, and record how the app performs in `swift-lab/perf/FINDINGS.md`.
+`lab/` is shipyard's lab, where the panel is designed and stressed on fixture data; `lab/README.md` maps its sessions and its kit, and `LAB_CLI` names the lab's command. The kit is a copy of the app's views and model, not a dependency: changing the app never changes it. The tabs and list layouts live in `versions/after/`, which follows the app. Measure a performance change as new `perf` variants that link a new folder under `versions/`, with `lab/perf/stress.py`, and record how the app performs in `lab/perf/FINDINGS.md`.
 
 ## Agent skills
 

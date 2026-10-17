@@ -3,7 +3,7 @@
 what each phase cost, from the meter's log (`PerfLog` in kit/Perf).
 
 Each phase runs on the variant's real window in background placement,
-through `swiftlab interact`, under one held lease:
+through the lab's `interact` command, under one held lease:
 
   idle-all-pulse   All, untouched, with running workflow runs pulsing
   idle-all         All, untouched, every run finished
@@ -13,9 +13,10 @@ through `swiftlab interact`, under one held lease:
   idle-project     a project's tab, untouched, every run finished
   reload           the same volume loaded again, as a refresh does
 
-Usage: swift-lab/perf/stress.py [component/variant ...]
+Usage: lab/perf/stress.py [component/variant ...]
        (default: every perf variant: the tabs layout at each volume, then the list layout)
-Run it from the worktree whose sessions it should drive.
+Run it from the worktree whose sessions it should drive, with LAB_CLI set to
+the lab's command.
 """
 import glob
 import json
@@ -26,16 +27,18 @@ import time
 
 PROJECT = "shipyard"
 SESSION = "perf"
-ENV = dict(os.environ, SWIFTLAB_WINDOWS="background", SWIFTLAB_CONTROL_KEY="perf-stress")
+CLI = os.environ.get("LAB_CLI") or sys.exit("set LAB_CLI to the lab's command")
+# The lab reads its settings from variables named after its command.
+ENV = dict(os.environ, **{f"{CLI.upper()}_WINDOWS": "background", f"{CLI.upper()}_CONTROL_KEY": "perf-stress"})
 # Where the first rows and the list sit in the window, in points.
 ROW_X, FIRST_ROW_Y, ROW_STEP, ROWS = 220, 210, 41, 14
 SCROLL_AT = (220, 450)
 
 
 def lab(*args, check=True):
-    result = subprocess.run(["swiftlab", *args, "--project", PROJECT, "--wait", "120"] if args[0] == "interact" else ["swiftlab", *args, "--project", PROJECT], env=ENV, capture_output=True, text=True)
+    result = subprocess.run([CLI, *args, "--project", PROJECT, "--wait", "120"] if args[0] == "interact" else [CLI, *args, "--project", PROJECT], env=ENV, capture_output=True, text=True)
     if check and result.returncode != 0:
-        sys.exit(f"swiftlab {' '.join(args)}: {result.stderr.strip()}")
+        sys.exit(f"{CLI} {' '.join(args)}: {result.stderr.strip()}")
     return result.stdout
 
 

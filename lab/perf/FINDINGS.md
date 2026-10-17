@@ -52,8 +52,8 @@ Keep both when either layout changes. Measure late frames as well as the main th
 ## Run it yourself
 
 ```sh
-swiftlab show perf tabs-panel V4 --project shipyard   # the maintainer's volume
-swift-lab/perf/stress.py                              # every phase of every perf variant, as a table
+$LAB_CLI show perf tabs-panel V4 --project shipyard   # the maintainer's volume
+lab/perf/stress.py                                    # every phase of every perf variant, as a table
 ```
 
 In the meter, untick **Running workflow runs** to remove the pulse, and use **Switch tabs ×10** and **Reload**. Every reading is also a JSON line in the runner's temporary folder, `shipyard-lab-perf.jsonl`.

@@ -1,4 +1,4 @@
-# Swift Lab wrote this file. It keeps each section's generated files out of Git.
+# The lab wrote this file. It keeps each section's generated files out of Git.
 /sections/*/Package.swift
 /sections/*/Package.resolved
 /sections/*/.lab/
