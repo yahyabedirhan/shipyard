@@ -1191,7 +1191,8 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               opens the profile (openProfile, then closeMenu), pointer cursor, the full name in its hover
                               text (profileHelp), VoiceOver "Open @handle's profile on GitHub"; "Shipyard" while
                               viewer is nil (connecting, signed out, GitHub out of reach at sign-in); the avatar from
-                              AvatarCache, a plain circle until it's there or when it can't be had ·
+                              AvatarCache (downloaded again after a day, since GitHub can keep the URL when the picture
+                              changes), a plain circle until it's there or when it can't be had ·
                               "3 need attention" · Layout (ready only: the current layout's icon, list.bullet or
                               rectangle.split.3x1; hover help and VoiceOver PanelText.layoutButton, "Layout: list. Click
                               for tabs."; a click is switchToNextLayout) · Refresh (⌘R; while refreshing, the
@@ -1573,7 +1574,7 @@ shipyard/
 │   ├── GitHub/
 │   │   ├── HTTPTransport.swift       # the one request seam: URLSession in the app, recorded responses in tests
 │   │   ├── GitHubClient.swift        # transport (GraphQL + REST), errors, viewer (login, name, avatar, profile), rate-limit headers, ETags
-│   │   ├── AvatarCache.swift         # the account's avatar on disk: downloaded once (no token, s=60), again only when its URL changes
+│   │   ├── AvatarCache.swift         # the account's avatar on disk: downloaded once (no token, s=60), again when its URL changes or it is a day old
 │   │   ├── RateBudget.swift          # quota per API, refresh cost, next allowed delay, indicator
 │   │   ├── ProjectQuery.swift        # builds the GraphQL query and parses it into Items
 │   │   ├── Repositories.swift        # the picker's calls: recent repositories (GraphQL), checking a typed one (REST); RepoSummary, RepositoryCheck; a group's or owner's repositories, paged
