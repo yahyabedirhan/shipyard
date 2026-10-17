@@ -101,8 +101,8 @@ bundle: build
 	@# marks), where AgentLogoImage and SetupBadge look: in Resources, since a
 	@# bundle at the app's root breaks its signature.
 	cp -R "$$(swift build -c release --show-bin-path)/$(APP)_$(APP)App.bundle" $(CONTENTS)/Resources/
-	@# The logos' MIT notices travel with every copy of them.
-	cp LICENSE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
+	@# The license, its notice and the logos' MIT notices travel with every copy.
+	cp LICENSE NOTICE THIRD-PARTY-NOTICES.md $(CONTENTS)/Resources/
 	@printf 'APPL????' > $(CONTENTS)/PkgInfo
 	@# No Developer ID until the public launch: the local identity on a Mac
 	@# that has one (see SIGN_NAME), ad-hoc otherwise and for a release.
