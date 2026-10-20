@@ -452,6 +452,13 @@ struct CardBackground: ViewModifier {
 
 extension View {
     func card() -> some View { modifier(CardBackground()) }
+
+    /// A screen's text and controls in the theme: text the screen leaves
+    /// uncoloured draws in the primary text, and the controls and links
+    /// that take a tint take the accent.
+    func themedScreen() -> some View {
+        foregroundStyle(ThemeColor.textPrimary).tint(ThemeColor.accent)
+    }
 }
 
 /// What a command printed, in a filled box: a setup card's and a setup view's output.
@@ -485,17 +492,21 @@ private struct IconButtonBody: View {
     let labeled: Bool
     let compact: Bool
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.panelStyle) private var style
     @State private var hover = false
 
     var body: some View {
+        // The list layout's buttons are a size smaller: 14 pt square in a
+        // row of chips, and 22 by 20 on a 5 pt radius elsewhere.
+        let list = style == .list
         configuration.label
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(hover && isEnabled ? ThemeColor.textPrimary : ThemeColor.textSecondary)
             .opacity(isEnabled ? 1 : 0.4)
             .padding(.horizontal, labeled ? 6 : 0)
-            .frame(width: labeled ? nil : compact ? 16 : 24, height: compact ? 16 : 22)
+            .frame(width: labeled ? nil : compact ? (list ? 14 : 16) : (list ? 22 : 24), height: compact ? (list ? 14 : 16) : (list ? 20 : 22))
             .background(
-                RoundedRectangle(cornerRadius: compact ? 4 : 6, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 4 : list ? 5 : 6, style: .continuous)
                     .fill(configuration.isPressed ? ThemeColor.rowPressed : ThemeColor.rowHover.opacity(hover && isEnabled ? 1 : 0))
             )
             .contentShape(Rectangle())

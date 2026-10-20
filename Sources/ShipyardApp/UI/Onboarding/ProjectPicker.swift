@@ -36,13 +36,13 @@ struct ProjectPicker: View {
                         .disabled(isAdding)
                         Text(preset.title)
                             .font(TypeScale.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ThemeColor.textSecondary)
                     }
                 }
                 Text(PanelText.pickerTitle).font(TypeScale.display)
                 Text(PanelText.pickerIntro)
                     .font(TypeScale.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .lineSpacing(1.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -52,6 +52,7 @@ struct ProjectPicker: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .themedScreen()
         .task { await loadSuggestions() }
     }
 
@@ -71,7 +72,7 @@ struct ProjectPicker: View {
             if let rejection {
                 Text(LocalizedStringKey(rejection))
                     .font(TypeScale.caption)
-                    .foregroundStyle(Palette.red)
+                    .foregroundStyle(ThemeColor.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -108,7 +109,7 @@ struct ProjectPicker: View {
                 ProgressView().controlSize(.small)
                 Text(PanelText.findingSuggestions)
                     .font(TypeScale.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
             }
         case .failed(let message) where choices.offered.isEmpty:
             failed(message)
@@ -118,7 +119,7 @@ struct ProjectPicker: View {
                 if choices.offered.isEmpty {
                     Text(PanelText.noSuggestions)
                         .font(TypeScale.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ThemeColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     list
@@ -131,7 +132,7 @@ struct ProjectPicker: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(message)
                 .font(TypeScale.caption)
-                .foregroundStyle(Palette.amber)
+                .foregroundStyle(ThemeColor.pending)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Retry") { Task { await loadSuggestions() } }
                 .buttonStyle(TextButtonStyle())
@@ -166,7 +167,7 @@ struct ProjectPicker: View {
                     if repository.isPrivate {
                         Image(systemName: "lock.fill")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ThemeColor.textSecondary)
                             .accessibilityLabel("Private")
                     }
                 }
@@ -178,7 +179,7 @@ struct ProjectPicker: View {
             } else if let description = repository.description, !description.isEmpty {
                 Text(description)
                     .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .lineLimit(1)
                     .padding(.leading, 20)
             }
@@ -186,7 +187,7 @@ struct ProjectPicker: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(choice != nil ? Palette.accent.opacity(0.06) : .clear)
+        .background(ThemeColor.accent.opacity(choice != nil ? 0.06 : 0))
         .animation(Motion.hover, value: choice != nil)
     }
 
@@ -195,7 +196,7 @@ struct ProjectPicker: View {
         return HStack(spacing: 6) {
             Text("Project")
                 .font(TypeScale.meta)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColor.textSecondary)
             TextField("Project name", text: Binding(
                 get: { choice.project },
                 set: { choices.rename(choice.id, to: $0) }
@@ -221,12 +222,12 @@ struct ProjectPicker: View {
             if let summary = PanelText.pickedProjects(projects) {
                 Text(summary)
                     .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
                 if choices.hasUnnamedProject {
-                    Text(PanelText.unnamedProject).font(TypeScale.caption).foregroundStyle(Palette.red)
+                    Text(PanelText.unnamedProject).font(TypeScale.caption).foregroundStyle(ThemeColor.failure)
                 }
                 Spacer()
                 if isAdding {
@@ -240,7 +241,7 @@ struct ProjectPicker: View {
             if let addError {
                 Text(addError)
                     .font(TypeScale.caption)
-                    .foregroundStyle(Palette.red)
+                    .foregroundStyle(ThemeColor.failure)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -31,7 +31,7 @@ struct PresetPicker: View {
                 Text(PanelText.presetTitle).font(TypeScale.display)
                 Text(PanelText.presetIntro)
                     .font(TypeScale.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .lineSpacing(1.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -50,11 +50,12 @@ struct PresetPicker: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .themedScreen()
     }
 
     private func label(_ preset: Preset) -> some View {
         (Text(preset.title).font(TypeScale.bodyEmphasis)
-            + Text("\n" + preset.summary).font(TypeScale.meta).foregroundColor(.secondary))
+            + Text("\n" + preset.summary).font(TypeScale.meta).foregroundStyle(ThemeColor.textSecondary))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 2)
     }
@@ -70,7 +71,7 @@ struct PresetPicker: View {
             if choice.watchesOwned {
                 Text(PanelText.watchOwnedDetail)
                     .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -91,7 +92,7 @@ struct PresetPicker: View {
             if let writeError {
                 Text(writeError)
                     .font(TypeScale.caption)
-                    .foregroundStyle(Palette.red)
+                    .foregroundStyle(ThemeColor.failure)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

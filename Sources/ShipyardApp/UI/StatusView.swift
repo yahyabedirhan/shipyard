@@ -24,6 +24,7 @@ struct StatusView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .themedScreen()
         .onChange(of: part, initial: true) { lookAgain() }
     }
 
@@ -100,7 +101,7 @@ struct StatusView: View {
                 }
                 ForEach(text.alternatives.indices, id: \.self) { index in
                     let alternative = text.alternatives[index]
-                    Divider().padding(.vertical, 4)
+                    Hairline().padding(.vertical, 4)
                     line(alternative.line)
                     commands(alternative.commands)
                     if let button = alternative.button {
@@ -117,7 +118,7 @@ struct StatusView: View {
     @ViewBuilder
     private func commands(_ commands: [String]) -> some View {
         ForEach(commands, id: \.self) { command in
-            CommandBox(command: command, prompt: false, font: .system(size: 11, weight: .medium, design: .monospaced))
+            CommandBox(command: command, prompt: false)
         }
     }
 
@@ -135,7 +136,7 @@ struct StatusView: View {
 
     private func line(_ text: String) -> some View {
         MarkdownText(text, size: 12)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ThemeColor.textSecondary)
             .lineSpacing(1.5)
             .fixedSize(horizontal: false, vertical: true)
     }
