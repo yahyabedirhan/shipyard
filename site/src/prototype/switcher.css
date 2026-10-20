@@ -3,3 +3,4 @@
 .proto-switcher button{width:var(--copy);height:var(--copy);border:0;border-radius:var(--radius-pill);background:transparent;color:inherit;font:600 var(--type-body)/1 var(--sans);cursor:pointer}
 .proto-switcher button:hover{background:var(--tint-2)}
 .proto-label{padding:0 var(--sp-3);white-space:nowrap}
+.dx .proto-switcher b,.proto-switcher b{color:inherit;font-weight:700}
