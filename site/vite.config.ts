@@ -11,5 +11,5 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   server: { fs: { allow: ['..'] } },
   build: { rollupOptions: { input: 'index.html' } },
-  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}', 'plugins/**/*.test.ts', 'scripts/**/*.test.mjs'] },
+  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}', 'plugins/**/*.test.ts', 'scripts/**/*.test.mjs', 'worker/**/*.test.mjs'] },
 });

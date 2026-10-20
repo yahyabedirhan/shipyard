@@ -128,7 +128,7 @@ function rowsOf(owner: string, node: SchemaNode, defs: Record<string, SchemaNode
   return Object.entries(node.properties ?? {}).map(([key, n]) => {
     const target = n.$ref ? defs[refName(n.$ref)] : undefined;
     const t = describeType(n, defs);
-    const description = n.description ?? (target && target.type !== 'object' ? target.description : undefined) ?? '';
+    const description = n.description ?? target?.description ?? '';
     return {
       id: `${owner}.${key}`,
       owner,
