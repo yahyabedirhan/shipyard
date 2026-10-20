@@ -364,7 +364,7 @@ CLILink -> LinkFileSystem          fileExists(app's CLI), entry(~/.local/bin/shi
 ShipyardCLI -> ResolvedRepositoriesStore  load() -> each project's repositories as last resolved
 ShipyardCLI -> ConfigurationLocation      current(environment, support) -> the config.toml the app recorded, else its own lookup (#126)
 ShipyardCLI -> CLISettingsFile     beside(config:) on the Mac, withoutTheApp(environment:) elsewhere: where cli.toml is (#189); read() by the commands that need a setting
-ShipyardCLI -> ConfigurationCommands  entries(checks:): on the Mac ConfigurationStore.check(configURL, at:) and CLISettingsFile.check(at:), elsewhere the latter alone (#256)
+ShipyardCLI -> ConfigurationCommands  entries(checks:): on the Mac ConfigurationStore.checks(configURL, at:), config.toml's and each theme file's, and CLISettingsFile.check(at:), elsewhere the latter alone (#256)
 ShipyardCLI -> PingCommand         run(arguments, environment, configuration, resolved, store) -> output, exit status
 PingCommand -> GitRemoteLookup     origin(in: working folder) (through CommandEnvironment) -> the remote's URL
 PingCommand -> PingStore           save(ping) under the projects that watch its repository, or the one --project names (by slug, else title), by slug
@@ -976,7 +976,7 @@ Unknown keys are ignored with a warning, so a newer file doesn't break an older 
 
 State: `url` (`$XDG_CONFIG_HOME/shipyard/config.toml`, else `~/.config/shipyard/config.toml`), `lastValid: Configuration`, `error: ConfigurationError?`, `warnings: [ConfigurationIssue]`, `modified: Date?` (the file's modification time as the latest reload read it, taken before the bytes; `nil` with no file).
 Operations: `reload() -> changed(Configuration) | unchanged | invalid(ConfigurationError)`, `createIfMissing()` (writes the commented header alone when there's no file; never touches one that exists. `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file". The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults: `theme`, `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2), `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show`, a `[[defaults.notifications]]` rule, a comment pointing Herdr users at `[herdr] terminal` and `[rate-limit] max-share-percent`, top-level keys above every table so any example, or all of them, can be uncommented), `append(projects:)` (appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing; never rewrites, so comments survive; rejects bad slugs, a repository listed twice in one project and names already used before writing), `setLayout(layout)` (the layout button's writer: creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; throws and writes nothing when the edit is refused or the file system fails), `writePreset(preset, projects)` (the third writer, below) and `acceptsPreset` (whether the latest reload found a file a preset may be written over). The core has no file watcher; the app's `ConfigurationWatcher` calls `Shipyard.reloadConfiguration()`, which reloads the store and follows the result.
-The app's `ConfigurationWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms. A second watcher, `ConfigurationWatcher(files:matching:)`, watches the `themes` folder (its nearest existing ancestor while it's missing) and each `*.toml` file in it, listed again after every change, and calls the same `reloadConfiguration()`.
+The app's `ConfigurationWatcher` watches the **directory**, not just the file: editors and agents write by replacing the file (rename), which kills a watch on the old file descriptor. An in-place write (`>>`) doesn't touch the directory, so the file is watched too, and both watches are reopened after every change. A missing directory is watched through its nearest existing ancestor, so creating it is noticed. Changes are debounced 200 ms. A second watcher, `ConfigurationWatcher(files:matching:)`, watches the `themes` folder (its nearest existing ancestor while it's missing, where it calls only once the folder appears, so a save to `config.toml` doesn't reload twice) and each `*.toml` file in it, listed again after every change, and calls the same `reloadConfiguration()`.
 
 ### Themes — `ShipyardConfig/Theme/`, `ShipyardApp/UI/ThemeColor.swift` (ADR 0014)
 
@@ -988,7 +988,7 @@ The theme file format is in `skills/shipyard/references/themes.md`, and what to 
 
 **The model.**
 It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without AppKit.
-`ThemeToken` lists the 30 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`), and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
+`ThemeToken` lists the 30 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`); `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view yet, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
 A `ThemeValue` is a colour (`RGBA`) or `system`.
 `ThemeKnobs` holds what both appearances share: the font (`family`, `mono`, `size`), the density (a preset and the `row`, `header`, `bar` and `gutter` heights it sets), the corner radii (`small`, `medium`, `large`) and the material (`glass` or flat).
 `Theme` holds every token resolved for light and dark, its knobs, the `appearances` it fills itself, and its `source`, built in or a file; `Theme.drawn(_:)` gives the appearance it draws in while the system is in another.
@@ -1055,7 +1055,8 @@ It holds the frame's and the tabs layout's `Grid` and `TypeScale`, and the list 
 Under the Shipyard theme the type is the system text styles and the grid is the panel's long-standing one.
 Another theme's `[font]` sizes the type from its body size and picks its family.
 Its `[density]` sets the row, header, title bar and gutter, and the tabs layout's two-line row moves half a point of padding per point of row.
-Its `[shape]` gives the radii in points: `Grid.smallRadius`, `radius` and `largeRadius` are its `small`, `medium` and `large`, and the list's are 2 pt smaller, so Shipyard draws 6 and 8 pt corners.
+Its `[shape]` gives the radii in points: `Grid.smallRadius` and `radius` are its `small` and `medium`, so Shipyard draws 6 and 8 pt corners.
+`large` is read and checked but draws nothing yet, since the `MenuBarExtra` window draws the panel's own corner.
 The row highlight and the icon buttons keep the design lab's fixed radii.
 
 **What draws from tokens.**
@@ -1342,7 +1343,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               secondary gray, hover help and accessibility label "Mark all seen", there while
                               `attentionCount > 0`, shown on hover, kept laid out at opacity 0 while hidden so the
                               chips never move), then one count chip per kind in `headerCounts` (only the kinds this
-                              project has rows of), `Grid.chipGap` apart (`HeaderCountChip`: the kind's state-neutral
+                              project has rows of), `ListGrid.chipGap` apart (`HeaderCountChip`: the kind's state-neutral
                               row icon and its count, accent while it needs attention, expanded or collapsed, else
                               gray, with no background in either state; a pull request's, issue's or run's chip is a
                               button (`ChipButtonStyle`, a faint capsule on hover) over `pageLinks(for:)`: one link
@@ -1526,8 +1527,8 @@ table.add(PingCommands.entries(
 table.add(NoticeCommands.entries(route: ControlNoticeRoute(support: support)))   // notify over the socket (#190)
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 table.add(ConfigurationCommands.entries(checks: [   // config check (#256): config.toml as the app reads it, then cli.toml
-    { now in ConfigurationStore.check(configURL, at: now) },
-    { now in settings.check(at: now) }]))
+    { now in ConfigurationStore.checks(configURL, at: now) },   // and each theme file
+    { now in [settings.check(at: now)] }]))
 #else
 let settings = CLISettingsFile.withoutTheApp(environment: environment)   // cli.toml (#189)
 table.add(PingCommands.entries(filing: Unfiled(), store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))))
@@ -1631,7 +1632,7 @@ shipyard/
 │   ├── Selectors.swift               # (moved) AuthorSelector, AuthorFilter, RepositorySelector: parse, the hints (ADR 0002); matching items is Core's
 │   ├── ConfigurationDuration.swift   # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
-│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; check(at:) and check(_:at:), the verdict (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
+│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; check(at:), the verdict, and checks(_:at:), config.toml's and each theme file's (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
 │   ├── ConfigurationLocation.swift   # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
 │   ├── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)

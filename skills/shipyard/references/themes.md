@@ -82,7 +82,7 @@ A token that no theme in the `extends` chain sets is `system`.
 
 | Section | Token | Meaning |
 |---|---|---|
-| `surface` | `window` | The window behind the panel. |
+| `surface` | `window` | Reserved: accepted and checked, with no effect yet. |
 | | `panel` | The panel's surface. Text contrast is measured against it. |
 | | `header` | A project header in the list layout. Opaque, so rows scroll under it. |
 | | `chrome` | The footer's tint. |
@@ -95,12 +95,12 @@ A token that no theme in the `extends` chain sets is `system`.
 | | `seen` | The title of a row already seen. |
 | | `on-accent` | Text on an accent fill. |
 | `accent` | `accent` | The one accent: the attention dot, a prominent button, the active count. |
-| | `soft` | A tint of the accent for soft fills. |
+| | `soft` | Reserved: accepted and checked, with no effect yet. |
 | `line` | `separator` | Hairlines between parts. |
 | | `border` | Around cards and secondary buttons. |
-| `row` | `hover` | A hovered row or button. |
+| `row` | `hover` | A hovered row or button, and the keyboard-highlighted row. |
 | | `pressed` | A pressed row or button. |
-| | `selected` | A selected or keyboard-highlighted row. |
+| | `selected` | Reserved: accepted and checked, with no effect yet. The keyboard-highlighted row draws with `row.hover`. |
 | `state` | `open` | An open pull request or issue, a succeeded run. |
 | | `draft` | A draft pull request. |
 | | `merged` | A merged pull request, a closed issue. |
@@ -121,7 +121,7 @@ Knobs are shared by both appearances and sit in their own tables, with no `any`,
 |---|---|
 | `[font]` | `family`: `system`, `rounded`, `mono` or a font's name. `mono`: `system` or a font's name, for code. `size`: the body size in points, from 9 to 20; every other size follows it. The default is the system font at 12. |
 | `[density]` | `preset`: `compact`, `regular` or `comfortable`. Or `row`, `header`, `bar` and `gutter` in points, from 4 to 80; a key you set wins over the preset. |
-| `[shape]` | `small`, `medium` and `large` corner radii, from 0 to 30. |
+| `[shape]` | `small` and `medium` corner radii, from 0 to 30: small controls, and cards and banners. `large` is reserved: accepted and checked, with no effect yet. |
 | `[material]` | `style`: `flat` paints the panel with `surface.panel`; `glass` lays the system's material under a veil of `surface.panel`. |
 
 ### Contrast

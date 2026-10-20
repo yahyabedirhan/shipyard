@@ -10,10 +10,9 @@ struct PanelScaleTests {
         let scale = PanelScale(BuiltInThemes.shipyard.knobs)
         let grid = scale.grid
         #expect([grid.gutter, grid.titleBarHeight, grid.rowHeight, grid.headerHeight, grid.tabRowPadding] == [12, 38, 24, 26, 5])
-        #expect([grid.smallRadius, grid.radius, grid.largeRadius] == [6, 8, 10])
+        #expect([grid.smallRadius, grid.radius] == [6, 8])
         let list = scale.list
         #expect([list.gutter, list.rowHeight, list.headerHeight] == [12, 22, 22])
-        #expect([list.smallRadius, list.radius] == [4, 6])
         #expect(scale.type.body == Font.system(.callout))
         #expect(scale.type.title == Font.system(.headline, weight: .semibold))
         #expect(scale.listType.body == Font.system(size: 12, weight: .regular, design: .default))
@@ -29,7 +28,7 @@ struct PanelScaleTests {
         (knobs.small, knobs.medium) = (0, 12)
         let scale = PanelScale(knobs)
         #expect([scale.grid.rowHeight, scale.grid.tabRowPadding, scale.list.rowHeight, scale.list.headerHeight] == [28, 7, 26, 26])
-        #expect([scale.grid.smallRadius, scale.grid.radius, scale.list.smallRadius, scale.list.radius] == [0, 12, 0, 10])
+        #expect([scale.grid.smallRadius, scale.grid.radius] == [0, 12])
         #expect(scale.type.body == Font.system(size: 14, weight: .regular, design: .rounded))
         #expect(scale.listType.body == Font.system(size: 14, weight: .regular, design: .rounded))
     }

@@ -68,10 +68,9 @@ struct Grid: Equatable {
     /// row, half a point more or less for each point the row grows or shrinks.
     let tabRowPadding: CGFloat
     /// Rounded corners, each the theme's `[shape]` knob in points: small
-    /// controls, cards and banners, and the panel itself.
+    /// controls, and cards and banners.
     let smallRadius: CGFloat
     let radius: CGFloat
-    let largeRadius: CGFloat
 
     init(_ knobs: ThemeKnobs) {
         gutter = knobs.gutter
@@ -81,12 +80,11 @@ struct Grid: Equatable {
         tabRowPadding = max(1, 5 + (knobs.row - ThemeKnobs.standard.row) / 2)
         smallRadius = knobs.small
         radius = knobs.medium
-        largeRadius = knobs.large
     }
 }
 
 /// The list layout's tighter scale, from the frame's: rows 2 pt shorter,
-/// project headers 4 pt shorter, narrower columns and smaller radii.
+/// project headers 4 pt shorter and narrower columns.
 struct ListGrid: Equatable {
     static let dotColumn: CGFloat = 8
     static let iconColumn: CGFloat = 14
@@ -99,16 +97,11 @@ struct ListGrid: Equatable {
     let gutter: CGFloat
     let rowHeight: CGFloat
     let headerHeight: CGFloat
-    /// The frame's radii, 2 pt smaller, never below square.
-    let smallRadius: CGFloat
-    let radius: CGFloat
 
     init(_ knobs: ThemeKnobs) {
         gutter = knobs.gutter
         rowHeight = knobs.row - 2
         headerHeight = knobs.header - 4
-        smallRadius = max(0, knobs.small - 2)
-        radius = max(0, knobs.medium - 2)
     }
 }
 
@@ -157,8 +150,6 @@ struct TypeScale: Equatable {
     let button: Font
     /// Numbers, authors, ages; banner text.
     let meta: Font
-    /// A project's title.
-    let section: Font
     /// A small header over a kind's rows.
     let eyebrow: Font
     /// The footer, and small print.
@@ -177,7 +168,6 @@ struct TypeScale: Equatable {
         bodyEmphasis = FontKit.style(knobs, .callout, offset: 0, .semibold)
         button = FontKit.style(knobs, .callout, offset: 0, .medium)
         meta = FontKit.style(knobs, .subheadline, offset: -1).monospacedDigit()
-        section = FontKit.style(knobs, .subheadline, offset: -1, .semibold)
         eyebrow = FontKit.style(knobs, .caption, offset: -2, .semibold)
         caption = FontKit.style(knobs, .footnote, offset: -2).monospacedDigit()
         captionEmphasis = FontKit.style(knobs, .footnote, offset: -2, .medium)

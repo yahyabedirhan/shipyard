@@ -87,7 +87,6 @@ struct ThemeColor: ShapeStyle, Hashable {
         return opacity == 1 ? base : base.opacity(opacity)
     }
 
-    static let window = ThemeColor(.window)
     static let panel = ThemeColor(.panel)
     static let header = ThemeColor(.header)
     static let chrome = ThemeColor(.chrome)
@@ -100,12 +99,10 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let textSeen = ThemeColor(.textSeen)
     static let textOnAccent = ThemeColor(.textOnAccent)
     static let accent = ThemeColor(.accent)
-    static let accentSoft = ThemeColor(.accentSoft)
     static let separator = ThemeColor(.separator)
     static let border = ThemeColor(.border)
     static let rowHover = ThemeColor(.rowHover)
     static let rowPressed = ThemeColor(.rowPressed)
-    static let rowSelected = ThemeColor(.rowSelected)
     static let success = ThemeColor(.success)
     static let failure = ThemeColor(.failure)
     static let pending = ThemeColor(.pending)

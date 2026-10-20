@@ -6,7 +6,9 @@ import os
 /// watched as a folder instead (`init(folder:)`): only the folder itself,
 /// so a save beside it (`state.json`) doesn't fire. The theme files are
 /// watched as a folder and each `*.toml` file in it (`init(files:)`), so an
-/// in-place save to one fires too.
+/// in-place save to one fires too; while that folder is missing, a change
+/// beside it fires only when the folder appears, so a save to `config.toml`
+/// doesn't reload twice.
 ///
 /// Editors and agents usually save by writing a new file and renaming it
 /// over the old one, which leaves a watch on the old file's descriptor
@@ -41,6 +43,8 @@ final class ConfigurationWatcher {
     private let onChange: @MainActor () -> Void
     nonisolated private let handles = OSAllocatedUnfairLock(initialState: Handles())
     private var pending: DispatchWorkItem?
+    /// Whether the `files` target's folder existed at the last watch.
+    private var folderExisted = true
 
     init(file: URL, debounce: TimeInterval = 0.2, onChange: @escaping @MainActor () -> Void) {
         target = .file(file)
@@ -87,6 +91,7 @@ final class ConfigurationWatcher {
             directory = source(at: folder(), events: [.write, .delete, .rename])
             files = []
         case .files(let folder, let matching):
+            folderExisted = FileManager.default.fileExists(atPath: folder.path)
             directory = source(at: Self.nearestExisting(folder), events: [.write, .delete, .rename])
             files = matching(folder).compactMap { source(at: $0, events: fileEvents) }
         }
@@ -120,7 +125,9 @@ final class ConfigurationWatcher {
 
     private func settled() {
         pending = nil
+        let missedBefore = !folderExisted
         watch()
+        if case .files = target, missedBefore, !folderExisted { return }
         onChange()
     }
 

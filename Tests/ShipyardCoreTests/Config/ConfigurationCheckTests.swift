@@ -93,33 +93,6 @@ struct ConfigurationCheckTests {
         #expect(cli["config"] as? String == CLISettingsFile.beside(config: harness.configURL).url.path)
     }
 
-    @Test("an unknown theme is a problem on its line, in text and in --json, and exits 1; a built-in one is accepted")
-    func theme() throws {
-        let harness = try Harness(stored: nil, config: "theme = \"Papr\"\n\n" + projects)
-
-        let text = harness.cli("config", "check")
-        #expect(text.status == CommandResult.failedStatus)
-        #expect(text.output.contains("""
-            \(harness.configURL.path): rejected
-              problem: config.toml line 1: unknown theme `Papr` (did you mean `Paper`?)
-
-            """))
-
-        let json = harness.cli("config", "check", "--json")
-        #expect(json.status == CommandResult.failedStatus)
-        let checked = try #require(try JSONSerialization.jsonObject(with: Data(json.output.utf8)) as? [String: Any])
-        let config = try #require(checked["config.toml"] as? [String: Any])
-        #expect(config["accepted"] as? Bool == false)
-        let problems = try #require(config["problems"] as? [[String: Any]])
-        #expect(problems.count == 1)
-        #expect(problems.first?["line"] as? Int == 1)
-        #expect(problems.first?["message"] as? String == "unknown theme `Papr` (did you mean `Paper`?)")
-        #expect(problems.first?["banner"] as? String == "config.toml line 1: unknown theme `Papr` (did you mean `Paper`?)")
-
-        try harness.writeConfig("theme = \"paper\"\n\n" + projects)
-        #expect(harness.cli("config", "check").status == 0)
-    }
-
     @Test("each theme file is checked by its name, its problems on their lines, in text and in --json; one with a problem exits 1")
     func themeFiles() throws {
         let harness = try Harness(stored: nil, config: projects)
