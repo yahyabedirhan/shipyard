@@ -7,7 +7,7 @@ private typealias Listed = RepositoryListResponse.Repository
 
 private let shopAndBlog = """
     [remote]
-    machines = ["netcup-vps"]
+    machines = ["beta-vps"]
 
     [[projects]]
     slug = "shop"
@@ -32,7 +32,7 @@ private let bothRepositories = PullRequestsResponse.answer([
 private extension Harness {
     static func polled(_ config: String = shopAndBlog, graphQL: StubHTTP.Answer = bothRepositories, pings: [Ping]) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        await harness.startWithMachines(graphQL: graphQL, netcup: pings, polled: true)
+        await harness.startWithMachines(graphQL: graphQL, beta: pings, polled: true)
         return harness
     }
 
@@ -53,17 +53,17 @@ struct RemotePingFilingTests {
             #expect(harness.section(project)?.attentionCount == 2, "\(project)")
         }
         #expect(harness.pingTitles("blog").isEmpty)
-        #expect(harness.pingTitles("netcup-vps").isEmpty)
+        #expect(harness.pingTitles("beta-vps").isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 1)
         let row = try #require(harness.section("shop")?.rows.first { $0.kind == .ping })
-        #expect(row.machine == "netcup-vps")
+        #expect(row.machine == "beta-vps")
     }
 
     @Test("a repository a group brings in files a remote ping once the app has resolved it")
     func byResolvedRepository() async throws {
         let harness = try Harness(stored: "gho_stored", config: """
             [remote]
-            machines = ["netcup-vps"]
+            machines = ["beta-vps"]
 
             [[projects]]
             slug = "mine"
@@ -78,19 +78,19 @@ struct RemotePingFilingTests {
             answers: [RepositoryListResponse.page([Listed("yahyabedirhan/shop")])]
         )
         harness.graphQL([PullRequestsResponse.answer([PullRequestsResponse("yahyabedirhan/shop", [])])])
-        harness.herdr.addMachine("netcup-vps", pings: [remotePing("q1", "Ready", repository: "yahyabedirhan/Shop")])
+        harness.herdr.addMachine("beta-vps", pings: [remotePing("q1", "Ready", repository: "yahyabedirhan/Shop")])
         await harness.shipyard.start()
         await harness.machineTimer.fire()
 
         #expect(harness.pingTitles("mine") == ["Ready"])
-        #expect(harness.pingTitles("netcup-vps").isEmpty)
+        #expect(harness.pingTitles("beta-vps").isEmpty)
     }
 
     @Test("a repository no project watches lists the remote ping under its machine")
     func unwatchedRepository() async throws {
         let harness = try await Harness.polled(pings: [remotePing("q1", "Elsewhere", repository: "someone/else")])
 
-        #expect(harness.pingTitles("netcup-vps") == ["Elsewhere"])
+        #expect(harness.pingTitles("beta-vps") == ["Elsewhere"])
         for project in ["shop", "everything", "blog"] {
             #expect(harness.pingTitles(project).isEmpty, "\(project)")
         }
@@ -105,7 +105,7 @@ struct RemotePingFilingTests {
 
         #expect(harness.pingTitles("blog") == ["For the blog"])
         #expect(harness.pingTitles("everything").isEmpty)
-        #expect(harness.pingTitles("netcup-vps") == ["For a typo"])
+        #expect(harness.pingTitles("beta-vps") == ["For a typo"])
     }
 
     @Test("a remote ping from an older shipyard, naming a project by its old name, files under the project with that title")
@@ -116,7 +116,7 @@ struct RemotePingFilingTests {
         ])
 
         #expect(harness.pingTitles("blog") == ["For the blog"])
-        #expect(harness.pingTitles("netcup-vps").isEmpty)
+        #expect(harness.pingTitles("beta-vps").isEmpty)
         #expect(harness.section("blog")?.title == "My Blog")
     }
 
@@ -130,7 +130,7 @@ struct RemotePingFilingTests {
 
         #expect(harness.pingTitles("shop") == ["Deploy?"])
         #expect(harness.pingTitles("everything").isEmpty)
-        #expect(harness.pingTitles("netcup-vps").isEmpty)
+        #expect(harness.pingTitles("beta-vps").isEmpty)
     }
 
     @Test("grouped by repository, a remote ping joins its repository's group, spelled as the project knows it")

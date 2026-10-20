@@ -25,7 +25,7 @@ private let shopOnly = """
 
     """
 
-private let shopAndMachine = "[remote]\nmachines = [\"netcup-vps\"]\n\n" + shopOnly
+private let shopAndMachine = "[remote]\nmachines = [\"beta-vps\"]\n\n" + shopOnly
 
 private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullRequestsResponse.PullRequest(1)]).answer
 
@@ -118,12 +118,12 @@ struct PingNumberTests {
         harness.graphQL([onePullRequest])
         try harness.store("newer", "Sent a minute ago", minutes: 1, number: 2)
         try harness.store("older", "Sent three minutes ago", minutes: 3, number: 1)
-        harness.herdr.addMachine("netcup-vps")
+        harness.herdr.addMachine("beta-vps")
         harness.herdr.setListOutput(listed([
             (id: "q1", title: "Sent two minutes ago", projects: ["shop"], minutes: 2),
             (id: "q2", title: "Sent five minutes ago", projects: ["shop"], minutes: 5),
             (id: "q3", title: "Unfiled", projects: [], minutes: 4),
-        ]), on: "netcup-vps")
+        ]), on: "beta-vps")
 
         try harness.writeConfig("[[projects]\n")
         await harness.shipyard.start()
@@ -138,7 +138,7 @@ struct PingNumberTests {
             "Sent two minutes ago": 3,
             "Sent a minute ago": 4,
         ])
-        #expect(harness.numbers("netcup-vps") == ["Unfiled": 1])
+        #expect(harness.numbers("beta-vps") == ["Unfiled": 1])
     }
 
     @Test("a remote ping takes its number at the first poll that lists it, after the pings already numbered; a machine's own section counts on its own; one that leaves never gives its number back, and one sent again is new; one past the end of a list that stopped early keeps its number; a machine taken out of the configuration retires its pings' numbers")
@@ -146,7 +146,7 @@ struct PingNumberTests {
         let harness = try Harness(stored: "gho_stored", config: shopAndMachine)
         harness.stub.on(Harness.userURL, Harness.viewerAnswer)
         harness.graphQL([onePullRequest])
-        harness.herdr.addMachine("netcup-vps")
+        harness.herdr.addMachine("beta-vps")
         await harness.shipyard.start()
         await harness.machineTimer.fire()
         try await harness.send("local", "Local", "--project", "shop")
@@ -154,43 +154,43 @@ struct PingNumberTests {
         harness.herdr.setListOutput(listed([
             (id: "q1", title: "Merge it?", projects: ["shop"], minutes: 30),
             (id: "q2", title: "Deploy?", projects: [], minutes: 30),
-        ]), on: "netcup-vps")
+        ]), on: "beta-vps")
         await harness.machineTimer.fire()
         #expect(harness.numbers("shop") == ["Local": 1, "Merge it?": 2])
-        #expect(harness.numbers("netcup-vps") == ["Deploy?": 1])
+        #expect(harness.numbers("beta-vps") == ["Deploy?": 1])
 
         await harness.shipyard.dismiss(try #require(harness.section("shop")?.rows.first { $0.title == "Merge it?" })).value
         harness.herdr.setListOutput(listed([
             (id: "q1", title: "Merge it?", projects: ["shop"], minutes: 30),
-        ]), on: "netcup-vps")
+        ]), on: "beta-vps")
         await harness.machineTimer.fire()
         let latest = listed([
             (id: "q1", title: "Merge it?", projects: ["shop"], minutes: 30),
             (id: "q3", title: "Ship it?", projects: ["shop"], minutes: 1),
             (id: "q2", title: "Deploy?", projects: [], minutes: 1),
         ])
-        harness.herdr.setListOutput(latest, on: "netcup-vps")
+        harness.herdr.setListOutput(latest, on: "beta-vps")
         await harness.machineTimer.fire()
         #expect(harness.numbers("shop") == ["Local": 1, "Ship it?": 3])
-        #expect(harness.numbers("netcup-vps") == ["Deploy?": 2])
+        #expect(harness.numbers("beta-vps") == ["Deploy?": 2])
 
         let relaunched = harness.relaunched()
         relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
         relaunched.graphQL([onePullRequest])
-        relaunched.herdr.addMachine("netcup-vps")
-        relaunched.herdr.setListOutput(latest, on: "netcup-vps")
+        relaunched.herdr.addMachine("beta-vps")
+        relaunched.herdr.setListOutput(latest, on: "beta-vps")
         await relaunched.shipyard.start()
         await relaunched.machineTimer.fire()
         #expect(relaunched.numbers("shop") == ["Local": 1, "Ship it?": 3])
-        #expect(relaunched.numbers("netcup-vps") == ["Deploy?": 2])
+        #expect(relaunched.numbers("beta-vps") == ["Deploy?": 2])
 
         relaunched.herdr.setListOutput(listed([
             (id: "q2", title: "Deploy?", projects: [], minutes: 1),
-        ], truncated: true), on: "netcup-vps")
+        ], truncated: true), on: "beta-vps")
         await relaunched.machineTimer.fire()
-        #expect(relaunched.shipyard.remote.machine("netcup-vps")?.truncated == true)
+        #expect(relaunched.shipyard.remote.machine("beta-vps")?.truncated == true)
         #expect(relaunched.numbers("shop") == ["Local": 1])
-        relaunched.herdr.setListOutput(latest, on: "netcup-vps")
+        relaunched.herdr.setListOutput(latest, on: "beta-vps")
         await relaunched.machineTimer.fire()
         #expect(relaunched.numbers("shop") == ["Local": 1, "Ship it?": 3])
 
@@ -201,6 +201,6 @@ struct PingNumberTests {
         await relaunched.shipyard.reloadConfiguration()
         await relaunched.machineTimer.fire()
         #expect(relaunched.numbers("shop") == ["Local": 1, "Merge it?": 4, "Ship it?": 5])
-        #expect(relaunched.numbers("netcup-vps") == ["Deploy?": 3])
+        #expect(relaunched.numbers("beta-vps") == ["Deploy?": 3])
     }
 }

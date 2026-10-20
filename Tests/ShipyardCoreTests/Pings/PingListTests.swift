@@ -106,8 +106,8 @@ private func ping(_ id: String, minutesAgo: Int, title: String = "a question", b
         #expect(throws: PingList.DecodeError.unsupportedVersion(2, shipyardVersion: "0.1.0")) {
             try PingList.decode(text)
         }
-        let message = PingList.DecodeError.unsupportedVersion(2, shipyardVersion: "0.1.0").message(machine: "netcup-vps")
-        #expect(message.contains("update shipyard on netcup-vps"))
+        let message = PingList.DecodeError.unsupportedVersion(2, shipyardVersion: "0.1.0").message(machine: "beta-vps")
+        #expect(message.contains("update shipyard on beta-vps"))
     }
 
     @Test func unknownFieldsAndActionKindsAreIgnored() throws {

@@ -10,7 +10,7 @@ You orchestrate one ticket to a pull request: #153 "The Mac numbers pings per pr
 
 ## How it came about
 
-- In QA of remote pings (#134), the maintainer saw netcup-vps's pings with no number in the menu.
+- In QA of remote pings (#134), the maintainer saw beta-vps's pings with no number in the menu.
 - The cause: `PingList.ListedPing` in `Sources/ShipyardCore/Pings/PingList.swift` reads a fixed set of fields that predates #136, so it drops `number`.
 - Rather than fix that drop, the maintainer chose to replace #136's per-machine numbers with numbers the Mac gives out, one sequence per project. A number reads like an issue's: smaller means earlier. Every decision is in #153.
 
@@ -25,7 +25,7 @@ You orchestrate one ticket to a pull request: #153 "The Mac numbers pings per pr
 ## Things to know
 
 - **Remote QA is still going (#134):**
-  - Both VPSes (netcup-vps, hetzner-vps) run a `shipyard-cli` built from `edba8e1`, put in place by the herdr-shipyard plugin, which is linked from a local clone at `~/Developer/yahyabedirhan/herdr-shipyard`. They still number their own pings.
+  - Both VPSes (beta-vps, alpha-vps) run a `shipyard-cli` built from `edba8e1`, put in place by the herdr-shipyard plugin, which is linked from a local clone at `~/Developer/yahyabedirhan/herdr-shipyard`. They still number their own pings.
   - The Mac must ignore a `number` they list, which #153 requires.
   - After the merge, the VPSes need a rebuild so `shipyard ping` prints only the id. The build and install steps are in #134's body.
 - **Ping state on the Mac:** `~/Library/Application Support/Shipyard/state.json` keeps the remote pings' seen and dismiss marks under `remotePings`, keyed by the ping's URL. The new counters probably belong beside them. Settle that against `docs/low-level-design.md` and update the design in the same change.
