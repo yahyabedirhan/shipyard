@@ -71,16 +71,8 @@ struct Panel: View {
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
             .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
-            Menu {
-                settingsItems
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .frame(width: 24, height: 22)
-            .hoverHelp(PanelText.settings)
+            SettingsMenuButton { settingsItems }
+                .hoverHelp(PanelText.settings)
             .accessibilityLabel(PanelText.settings)
         }
         .padding(.leading, Grid.gutter)
@@ -285,6 +277,57 @@ struct Panel: View {
     }
 }
 
+/// The header's gear: the settings menu, drawn like the header's icon
+/// buttons. The system draws a borderless menu's own icon in the label
+/// colour, darker than the icons beside it, whatever style it's given; so
+/// the gear is an image already tinted with the theme's colour, secondary at
+/// rest and primary under the pointer, on the icon buttons' hover fill.
+private struct SettingsMenuButton<Items: View>: View {
+    @ViewBuilder let items: Items
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
+    @State private var hover = false
+
+    var body: some View {
+        let tint = hover ? ThemeColor.textPrimary : ThemeColor.textSecondary
+        Menu {
+            items
+        } label: {
+            Image(nsImage: SymbolImage.tinted("gearshape", NSColor(tint.color(in: theme, ThemeAppearance(scheme)))))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 24, height: 22)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(ThemeColor.rowHover.opacity(hover ? 1 : 0))
+        )
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .animation(Motion.hover, value: hover)
+    }
+}
+
+/// An SF Symbol drawn in one colour into an image that isn't a template, so
+/// AppKit draws it as it is rather than tinting it with the label colour.
+enum SymbolImage {
+    static func tinted(_ name: String, _ color: NSColor, pointSize: CGFloat = 12, weight: NSFont.Weight = .medium) -> NSImage {
+        let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        else { return NSImage() }
+        let image = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            color.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        image.isTemplate = false
+        return image
+    }
+}
+
 private struct AccountButton: View {
     let viewer: Viewer
     let avatars: AvatarCache
@@ -380,12 +423,12 @@ extension PanelBanner {
         }
     }
 
-    fileprivate var tint: Color {
+    fileprivate var tint: ThemeColor {
         switch kind {
-        case .configError, .paused: Palette.red
-        case .delay, .fetch: Palette.amber
-        case .lease: Palette.lease
-        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: Palette.gray
+        case .configError, .paused: ThemeColor.failure
+        case .delay, .fetch: ThemeColor.pending
+        case .lease: ThemeColor.lease
+        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: ThemeColor.neutral
         }
     }
 }

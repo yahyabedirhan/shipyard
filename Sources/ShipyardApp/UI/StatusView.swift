@@ -80,8 +80,8 @@ struct StatusView: View {
                 .padding(.bottom, 12)
             if let status = text.status {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    ToneIcon(tone: status.tone, neutral: "circle.dashed", neutralTint: .secondary)
-                    Text(markdown: status.text, size: 12, weight: .medium)
+                    ToneIcon(tone: status.tone, neutral: "circle.dashed", neutralTint: ThemeColor.textSecondary)
+                    MarkdownText(status.text, size: 12, weight: .medium)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.bottom, 8)
@@ -90,14 +90,7 @@ struct StatusView: View {
                 line(detail).padding(.bottom, 8)
             }
             if let output = text.output {
-                Text(output)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(8)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
+                OutputBox(output: output)
                     .padding(.bottom, 8)
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -141,7 +134,7 @@ struct StatusView: View {
     }
 
     private func line(_ text: String) -> some View {
-        Text(markdown: text, size: 12)
+        MarkdownText(text, size: 12)
             .foregroundStyle(.secondary)
             .lineSpacing(1.5)
             .fixedSize(horizontal: false, vertical: true)

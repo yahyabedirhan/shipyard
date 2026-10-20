@@ -1,4 +1,5 @@
 import AppKit
+import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
@@ -74,7 +75,7 @@ struct BannerDismissButton: View {
     var body: some View {
         Button(action: dismiss) {
             Image(systemName: "xmark")
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 8, weight: .semibold))
         }
         .buttonStyle(IconButtonStyle(compact: true))
         .hoverHelp(PanelText.dismissBanner)
@@ -87,7 +88,7 @@ struct BannerDismissButton: View {
 struct Banner: View {
     let symbol: String
     let text: String
-    let tint: Color
+    let tint: ThemeColor
     var action: (title: String, run: () -> Void)?
     var trailing = false
     var dismiss: (() -> Void)?
@@ -102,7 +103,7 @@ struct Banner: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(text)
                     .font(.system(size: 11))
-                    .foregroundStyle(.primary.opacity(0.78))
+                    .foregroundStyle(ThemeColor.textPrimary.opacity(0.78))
                     .lineSpacing(1)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
@@ -315,10 +316,11 @@ struct CommandBox: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if prompt {
-                Text("$").font(font).foregroundStyle(.tertiary)
+                Text("$").font(font).foregroundStyle(ThemeColor.textTertiary)
             }
             Text(command)
                 .font(font)
+                .foregroundStyle(ThemeColor.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -329,8 +331,8 @@ struct CommandBox: View {
         .padding(.trailing, 4)
         .padding(.vertical, 4)
         .frame(minHeight: 30)
-        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
-        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.field))
+        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
         .onChange(of: command) { copiedAt = nil }
     }
 }
@@ -391,13 +393,30 @@ enum Clipboard {
 struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .background(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).fill(Palette.fill))
-            .overlay(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).fill(ThemeColor.field))
+            .overlay(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
     }
 }
 
 extension View {
     func card() -> some View { modifier(CardBackground()) }
+}
+
+/// What a command printed, in a filled box: a setup card's and a setup view's output.
+struct OutputBox: View {
+    let output: String
+
+    var body: some View {
+        Text(output)
+            .font(TypeScale.branch)
+            .foregroundStyle(ThemeColor.textPrimary)
+            .textSelection(.enabled)
+            .lineLimit(8)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.field))
+    }
 }
 
 struct IconButtonStyle: ButtonStyle {
@@ -452,19 +471,18 @@ private struct PillButtonBody: View {
     var body: some View {
         configuration.label
             .font(TypeScale.button)
-            .foregroundStyle(prominent ? AnyShapeStyle(Color.white) : AnyShapeStyle(.primary))
+            .foregroundStyle(prominent ? ThemeColor.textOnAccent : ThemeColor.textPrimary)
             .padding(.horizontal, 12)
             .frame(height: height)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(prominent ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.07)))
+                    .fill(prominent ? ThemeColor.accent : ThemeColor.textPrimary.opacity(0.07))
                     .brightness(configuration.isPressed ? -0.08 : hover && isEnabled ? 0.04 : 0)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(prominent ? 0 : 0.08), lineWidth: 0.5)
+                    .strokeBorder(ThemeColor.textPrimary.opacity(prominent ? 0 : 0.08), lineWidth: 0.5)
             )
-            .shadow(color: prominent ? Palette.accent.opacity(0.3) : .clear, radius: 2, y: 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .opacity(isEnabled ? 1 : 0.5)
             .contentShape(Rectangle())
@@ -607,10 +625,13 @@ private struct TextButtonBody<Tint: ShapeStyle>: View {
 }
 
 enum CodeText {
-    static let chip = Color.primary.opacity(0.09)
+    /// The chip behind a code span.
+    static let chip = ThemeColor.textPrimary.opacity(0.09)
     static let padding = "\u{2009}"
 
-    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular) -> AttributedString {
+    /// `markdown` at `size`, each code span monospaced on `chip`: an
+    /// attributed string takes a `Color`, so the caller resolves `CodeText.chip`.
+    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular, chip: Color) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         let parsed = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
         let code = Font.system(size: size, weight: weight, design: .monospaced)
@@ -632,24 +653,40 @@ enum CodeText {
     }
 }
 
-extension Text {
-    init(markdown: String, size: CGFloat, weight: Font.Weight = .regular) {
-        self.init(CodeText.attributed(markdown, size: size, weight: weight))
+/// Inline Markdown from `PanelText` as the panel draws it (`CodeText`), its
+/// code chips in the environment's theme and appearance. The font is in the
+/// runs, so a `.font(_:)` on the view doesn't change it.
+struct MarkdownText: View {
+    let markdown: String
+    let size: CGFloat
+    var weight: Font.Weight = .regular
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
+
+    init(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular) {
+        self.markdown = markdown
+        self.size = size
+        self.weight = weight
+    }
+
+    var body: some View {
+        let chip = CodeText.chip.color(in: theme, ThemeAppearance(scheme))
+        Text(CodeText.attributed(markdown, size: size, weight: weight, chip: chip))
     }
 }
 
 struct ToneIcon: View {
     let tone: PanelText.SkillInstall.Tone
     let neutral: String
-    let neutralTint: Color
+    let neutralTint: ThemeColor
 
     var body: some View {
         Group {
             switch tone {
             case .success:
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Palette.green)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(ThemeColor.success)
             case .warning:
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.amber)
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(ThemeColor.pending)
             case .neutral:
                 Image(systemName: neutral).foregroundStyle(neutralTint)
             }

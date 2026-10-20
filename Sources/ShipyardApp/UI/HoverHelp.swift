@@ -221,7 +221,7 @@ private struct HoverHelpCard: View {
             .padding(.horizontal, HoverHelp.horizontalPadding)
             .padding(.vertical, content.isRow ? 7 : 5)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Grid.radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.border, lineWidth: 0.5))
+            .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
             .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
     }
 }
@@ -239,7 +239,8 @@ private struct HoverHelpBody: View {
         switch content {
         case .text(let text): HoverHelpText(text: text)
         case .markdown(let text):
-            Text(markdown: text, size: 11)
+            MarkdownText(text, size: 11)
+                .foregroundStyle(ThemeColor.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         case .row(let card): RowCardView(card: card)
         }
@@ -259,6 +260,7 @@ private struct RowCardView: View {
                 }
                 Text(card.headline)
                     .font(TypeScale.meta.weight(.semibold))
+                    .foregroundStyle(ThemeColor.textPrimary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -311,11 +313,11 @@ private struct AttentionTag: View {
         }
     }
 
-    private var tint: Color {
+    private var tint: ThemeColor {
         switch reason {
-        case .unseen, .changed: Palette.accent
-        case .reviewRequested: Palette.amber
-        case .checksFailed: Palette.red
+        case .unseen, .changed: ThemeColor.accent
+        case .reviewRequested: ThemeColor.pending
+        case .checksFailed: ThemeColor.failure
         }
     }
 }
@@ -327,7 +329,7 @@ private struct FactView: View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
                 .imageScale(.small)
-                .foregroundStyle(tint ?? .secondary)
+                .foregroundStyle(tint ?? ThemeColor.textSecondary)
                 .frame(width: 13)
             label
         }
@@ -341,32 +343,32 @@ private struct FactView: View {
         case .branches(let head, let base):
             HStack(spacing: 3) {
                 Text(head).truncationMode(.middle)
-                Image(systemName: "arrow.right").imageScale(.small).foregroundStyle(.tertiary)
+                Image(systemName: "arrow.right").imageScale(.small).foregroundStyle(ThemeColor.textTertiary)
                 Text(base)
             }
             .fontDesign(.monospaced)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ThemeColor.textSecondary)
         case .size(let additions, let deletions):
             HStack(spacing: 4) {
-                Text("+\(additions)").foregroundStyle(Palette.green)
-                Text("−\(deletions)").foregroundStyle(Palette.red)
+                Text("+\(additions)").foregroundStyle(ThemeColor.success)
+                Text("−\(deletions)").foregroundStyle(ThemeColor.failure)
             }
             .monospacedDigit()
         case .comments(let count), .reviews(let count):
-            Text("\(count)").monospacedDigit().foregroundStyle(.secondary)
+            Text("\(count)").monospacedDigit().foregroundStyle(ThemeColor.textSecondary)
         case .updated(let age):
-            Text(PanelText.updatedAge(age)).foregroundStyle(.secondary)
+            Text(PanelText.updatedAge(age)).foregroundStyle(ThemeColor.textSecondary)
         case .duration(let time, _):
-            Text(time).monospacedDigit().foregroundStyle(.secondary)
+            Text(time).monospacedDigit().foregroundStyle(ThemeColor.textSecondary)
         case .body(let text):
             Text(text)
-                .foregroundStyle(.primary.opacity(0.78))
+                .foregroundStyle(ThemeColor.textPrimary.opacity(0.78))
                 .lineLimit(8)
                 .fixedSize(horizontal: false, vertical: true)
         case .action, .noAction:
-            Text(PanelText.fact(fact)).foregroundStyle(.secondary).truncationMode(.middle)
+            Text(PanelText.fact(fact)).foregroundStyle(ThemeColor.textSecondary).truncationMode(.middle)
         default:
-            Text(PanelText.fact(fact)).foregroundStyle(tint ?? .secondary)
+            Text(PanelText.fact(fact)).foregroundStyle(tint ?? ThemeColor.textSecondary)
         }
     }
 
@@ -394,14 +396,11 @@ private struct FactView: View {
         }
     }
 
-    private var tint: Color? {
+    private var tint: ThemeColor? {
         switch fact {
-        case .review(.approved): Palette.green
-        case .review(.changesRequested): Palette.red
-        case .review(.reviewRequired): Palette.amber
-        case .checks(let state): Palette.color(state)
-        case .duration(_, running: true): Palette.amber
-        case .failure: Palette.red
+        case .review(.approved), .checks(.passed): ThemeColor.success
+        case .review(.changesRequested), .checks(.failed), .failure: ThemeColor.failure
+        case .review(.reviewRequired), .checks(.pending), .duration(_, running: true): ThemeColor.pending
         default: nil
         }
     }
@@ -428,11 +427,11 @@ private struct AuthorAvatar: View {
         } placeholder: {
             Image(systemName: "person.crop.circle.fill")
                 .resizable()
-                .foregroundStyle(.quaternary)
+                .foregroundStyle(ThemeColor.textTertiary.opacity(0.6))
         }
         .frame(width: HoverHelp.avatarSize, height: HoverHelp.avatarSize)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Palette.border, lineWidth: 0.5))
+        .overlay(Circle().strokeBorder(ThemeColor.border, lineWidth: 0.5))
     }
 }
 
@@ -445,7 +444,7 @@ private struct HoverHelpText: View {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 Text(line)
                     .font(TypeScale.meta)
-                    .foregroundStyle(index == 0 ? .primary : .secondary)
+                    .foregroundStyle(index == 0 ? ThemeColor.textPrimary : ThemeColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

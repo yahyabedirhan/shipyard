@@ -148,8 +148,8 @@ struct ConnectView: View {
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> Text {
-        Text(markdown: text, size: size, weight: weight)
+    private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        MarkdownText(text, size: size, weight: weight)
     }
 
     private func codeScreen(_ text: PanelText.DeviceCodeScreen) -> some View {

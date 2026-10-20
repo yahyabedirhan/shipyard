@@ -14,13 +14,13 @@ struct LeaseBannerView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(banner.headline)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.primary.opacity(0.85))
+                    .foregroundStyle(ThemeColor.textPrimary.opacity(0.85))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 if let detail = banner.detail {
                     Text(detail)
                         .font(TypeScale.meta)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ThemeColor.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .contentTransition(.identity)
@@ -30,11 +30,11 @@ struct LeaseBannerView: View {
             Text(banner.timeLeft)
                 .font(TypeScale.meta)
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .contentTransition(.numericText(countsDown: true))
                 .fixedSize()
             Button(LeaseBanner.stop, action: stop)
-                .buttonStyle(TextButtonStyle(tint: Palette.red))
+                .buttonStyle(TextButtonStyle(tint: ThemeColor.failure))
                 .fixedSize()
                 .layoutPriority(1)
             if let dismiss {
@@ -43,8 +43,8 @@ struct LeaseBannerView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.lease.opacity(0.14)))
-        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(Palette.lease.opacity(0.35), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.lease.opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
         .help(banner.help)
         .accessibilityElement(children: .ignore)
@@ -65,9 +65,9 @@ private struct LeaseAgentMark: View {
         } else {
             Image(systemName: "terminal.fill")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .frame(width: Self.size, height: Self.size)
-                .background(RoundedRectangle(cornerRadius: Self.size * 0.22, style: .continuous).fill(Palette.fill))
+                .background(RoundedRectangle(cornerRadius: Self.size * 0.22, style: .continuous).fill(ThemeColor.field))
                 .accessibilityHidden(true)
         }
     }
