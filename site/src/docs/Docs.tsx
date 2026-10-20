@@ -41,7 +41,7 @@ function Out({ href, target, children }: { href: string; target: OutboundTarget;
 function KeyTable({ g, prefix = 'keys' }: { g: KeyGroup; prefix?: string }) {
   return (
     <div className="keys" id={`${prefix}-${g.owner}`}>
-      <h3 className="keys-h"><code>{g.heading}</code>{g.also ? <span className="also">also {g.also}</span> : null}</h3>
+      <h3 className="keys-h">{/[[=]/.test(g.heading) ? <code>{g.heading}</code> : g.heading}{g.also ? <span className="also">also {g.also}</span> : null}</h3>
       {g.description ? <p className="keys-d">{g.description}</p> : null}
       <div className="tbl-wrap">
         <table className="tbl">
@@ -188,11 +188,11 @@ function Section({ s, index }: { s: DocSection; index: number }) {
       <Html as="p" className="lede" html={tidy(s.lede)} />
       {s.body ? <Html as="div" className="body" html={tidyParagraphs(withMarkers(s.body, numbers))} /> : null}
       {s.extra === 'install' ? <Extras s={s} /> : null}
-      {s.code && !s.after ? <CodeTabs code={s.code} target={() => (s.code![0].lang === 'toml' ? 'config' : 'command')} /> : null}
+      {s.code && !s.codeLast ? <CodeTabs code={s.code} target={(i) => (s.code![i].lang === 'toml' ? 'config' : 'command')} /> : null}
       {s.shots?.map((id) => <Shot key={id} id={id} />)}
       {s.extra && s.extra !== 'install' ? <Extras s={s} /> : null}
       {s.after ? <Html as="div" className="body after" html={tidyParagraphs(s.after)} /> : null}
-      {s.code && s.after ? <CodeTabs code={s.code} target={() => 'command'} /> : null}
+      {s.code && s.codeLast ? <CodeTabs code={s.code} target={() => 'command'} /> : null}
       <aside className="mar">
         {s.notes.map((n, j) => (
           <p className="sn" key={numbers[j]} id={`fn-${numbers[j]}`} data-ref={`fnref-${numbers[j]}`}>

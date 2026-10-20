@@ -25,6 +25,8 @@ export interface DocSection {
   extra?: 'install' | 'presets' | 'layouts' | 'explorer' | 'pings' | 'config' | 'commands' | 'limits' | 'troubleshooting' | 'changelog';
   /** Prose after the section's tables and figures. */
   after?: string;
+  /** The code comes last, after `after`, instead of under the prose. */
+  codeLast?: boolean;
 }
 
 export const GROUPS: { name: string; ids: string[] }[] = [
@@ -55,6 +57,7 @@ export const SECTIONS: DocSection[] = [
     ],
     extra: 'install',
     after: '<p>To uninstall, choose <b>Sign out</b> in the gear menu if you signed in with GitHub, quit shipyard, and delete the app and its files. Remove the agent skill with <code>npx skills remove shipyard -g</code> if you installed it.</p>',
+    codeLast: true,
     code: [{ lang: 'sh', code: 'rm -rf /Applications/Shipyard.app ~/.config/shipyard ~/Library/Application\\ Support/Shipyard' }],
   },
   {
