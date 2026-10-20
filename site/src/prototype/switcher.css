@@ -1,0 +1,5 @@
+/* The prototype's floating bar. Values come from tokens.css. */
+.proto-switcher{position:fixed;z-index:100;left:50%;bottom:var(--sp-10);transform:translateX(-50%);display:flex;align-items:center;gap:var(--sp-1);height:var(--proto-h);padding:0 var(--sp-2);border-radius:var(--radius-pill);background:var(--proto-bg);color:var(--proto-fg);box-shadow:var(--proto-shadow);font:500 var(--type-nav)/1 var(--sans)}
+.proto-switcher button{width:var(--copy);height:var(--copy);border:0;border-radius:var(--radius-pill);background:transparent;color:inherit;font:600 var(--type-body)/1 var(--sans);cursor:pointer}
+.proto-switcher button:hover{background:var(--tint-2)}
+.proto-label{padding:0 var(--sp-3);white-space:nowrap}
