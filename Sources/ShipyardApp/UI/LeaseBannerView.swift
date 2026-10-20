@@ -6,6 +6,7 @@ struct LeaseBannerView: View {
     let lease: AppStatus.Lease
     let stop: () -> Void
     var dismiss: (() -> Void)?
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         let banner = LeaseBanner(lease)
@@ -19,7 +20,7 @@ struct LeaseBannerView: View {
                     .truncationMode(.tail)
                 if let detail = banner.detail {
                     Text(detail)
-                        .font(TypeScale.meta)
+                        .font(scale.type.meta)
                         .foregroundStyle(ThemeColor.textSecondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -28,7 +29,7 @@ struct LeaseBannerView: View {
             }
             Spacer(minLength: 0)
             Text(banner.timeLeft)
-                .font(TypeScale.meta)
+                .font(scale.type.meta)
                 .monospacedDigit()
                 .foregroundStyle(ThemeColor.textSecondary)
                 .contentTransition(.numericText(countsDown: true))
@@ -43,8 +44,8 @@ struct LeaseBannerView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.lease.opacity(0.14)))
-        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.lease.opacity(0.35), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).fill(ThemeColor.lease.opacity(0.14)))
+        .overlay(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).strokeBorder(ThemeColor.lease.opacity(0.35), lineWidth: 0.5))
         .animation(Motion.count, value: banner.timeLeft)
         .help(banner.help)
         .accessibilityElement(children: .ignore)

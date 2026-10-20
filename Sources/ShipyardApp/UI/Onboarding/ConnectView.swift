@@ -11,6 +11,7 @@ struct ConnectView: View {
     @State private var showsGh = false
     @State private var showsInstallHint = false
     @State private var codeCopiedAt: Date?
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Group {
@@ -21,7 +22,7 @@ struct ConnectView: View {
             } else {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text(PanelText.connecting).font(TypeScale.body).foregroundStyle(ThemeColor.textSecondary)
+                    Text(PanelText.connecting).font(scale.type.body).foregroundStyle(ThemeColor.textSecondary)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -157,7 +158,7 @@ struct ConnectView: View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
             Text(text.message)
-                .font(TypeScale.body)
+                .font(scale.type.body)
                 .foregroundStyle(ThemeColor.textSecondary)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
@@ -167,7 +168,7 @@ struct ConnectView: View {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
                 Text(text.waiting)
-                    .font(TypeScale.caption)
+                    .font(scale.type.caption)
                     .foregroundStyle(ThemeColor.textSecondary)
             }
             HStack(spacing: 8) {
@@ -214,7 +215,7 @@ struct ConnectView: View {
     private func heading(_ title: String) -> some View {
         HStack(spacing: 10) {
             LogoBadge(side: 32)
-            Text(title).font(TypeScale.display)
+            Text(title).font(scale.type.display)
         }
         .padding(.bottom, 12)
     }

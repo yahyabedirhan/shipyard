@@ -7,6 +7,7 @@ struct GroupHeader: View {
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         let tight = style == .list
@@ -21,18 +22,18 @@ struct GroupHeader: View {
                     .frame(width: style.dotColumn)
                     .padding(.trailing, -1)
                 Text(PanelText.groupHeader(group))
-                    .font(style.eyebrow)
+                    .font(scale.eyebrow(style))
                     .tracking(tight ? 0.6 : 0.5)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(String(group.rows.count + group.hiddenCount))
-                    .font(style.eyebrow.monospacedDigit())
+                    .font(scale.eyebrow(style).monospacedDigit())
                     .foregroundStyle(ThemeColor.textTertiary)
                 Spacer()
             }
             .foregroundStyle(ThemeColor.textSecondary)
-            .padding(.leading, Grid.gutter - 4)
-            .padding(.trailing, Grid.gutter)
+            .padding(.leading, scale.grid.gutter - 4)
+            .padding(.trailing, scale.grid.gutter)
             .padding(.vertical, tight ? 2 : 4)
             .contentShape(Rectangle())
         }
@@ -42,7 +43,7 @@ struct GroupHeader: View {
         .accessibilityValue(PanelText.groupFoldState(group))
         .accessibilityAddTraits(.isHeader)
         .highlightable(place, $highlight)
-        .padding(.top, tight ? 6 : Grid.gutter - 4)
+        .padding(.top, tight ? 6 : scale.grid.gutter - 4)
     }
 }
 
@@ -52,6 +53,7 @@ struct ShowMoreRow: View {
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Button {
@@ -59,13 +61,13 @@ struct ShowMoreRow: View {
         } label: {
             HStack(spacing: 0) {
                 Text(PanelText.showMore(group))
-                    .font(style.meta)
+                    .font(scale.meta(style))
                     .foregroundStyle(ThemeColor.textSecondary)
                 Spacer()
             }
-            .padding(.leading, Grid.gutter + style.dotColumn + style.iconColumn)
-            .padding(.trailing, Grid.gutter)
-            .frame(height: style.rowHeight)
+            .padding(.leading, scale.grid.gutter + style.dotColumn + style.iconColumn)
+            .padding(.trailing, scale.grid.gutter)
+            .frame(height: scale.rowHeight(style))
             .contentShape(Rectangle())
         }
         .buttonStyle(RowButtonStyle())
@@ -76,10 +78,11 @@ struct ShowMoreRow: View {
 
 struct GroupDivider: View {
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Hairline()
-            .padding(.leading, Grid.gutter + style.dotColumn + style.iconColumn)
-            .padding(.trailing, Grid.gutter)
+            .padding(.leading, scale.grid.gutter + style.dotColumn + style.iconColumn)
+            .padding(.trailing, scale.grid.gutter)
     }
 }

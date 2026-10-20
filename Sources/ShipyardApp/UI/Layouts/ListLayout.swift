@@ -7,6 +7,7 @@ struct ListLayout: View {
     let model: MenuModel
     let actions: LayoutActions
     @State private var highlight = RowHighlight()
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -38,7 +39,7 @@ struct ListLayout: View {
             .rowKeys(
                 $highlight,
                 places: model.listRowPlaces,
-                pinnedHeader: ListGrid.headerHeight,
+                pinnedHeader: scale.list.headerHeight,
                 scroll: proxy,
                 left: { fold($0.moveLeft(in: model)) },
                 right: { fold($0.moveRight(in: model)) },
@@ -166,6 +167,7 @@ private struct ListSectionHeader: View {
     let isHighlighted: Bool
     let actions: LayoutActions
     @State private var hover = false
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 6) {
@@ -192,7 +194,7 @@ private struct ListSectionHeader: View {
                             .font(.system(size: 10.5))
                             .foregroundStyle(ThemeColor.textTertiary)
                         Text(section.title)
-                            .font(ListType.section)
+                            .font(scale.listType.section)
                             .foregroundStyle(ThemeColor.textPrimary)
                             .lineLimit(1)
                     }
@@ -208,7 +210,7 @@ private struct ListSectionHeader: View {
             }
             if let empty = PanelText.emptySection(section) {
                 Text(empty)
-                    .font(ListType.caption)
+                    .font(scale.listType.caption)
                     .foregroundStyle(ThemeColor.textTertiary)
                     .lineLimit(1)
                     .fixedSize()
@@ -247,7 +249,7 @@ private struct ListSectionHeader: View {
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
-        .frame(height: ListGrid.headerHeight)
+        .frame(height: scale.list.headerHeight)
         .background {
             ZStack {
                 Rectangle().fill(ThemeColor.header)
@@ -297,13 +299,14 @@ private struct OpenRepositoryIcon: View {
 
 private struct HeaderCountChip: View {
     let chip: HeaderCount
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 2) {
-            Image(systemName: Palette.symbol(chip.kind))
+            Image(systemName: ItemSymbol.name(chip.kind))
                 .font(.system(size: 8.5, weight: .semibold))
             Text(String(chip.count))
-                .font(ListType.badge)
+                .font(scale.listType.badge)
                 .contentTransition(.numericText(value: Double(chip.count)))
         }
         .lineLimit(1)
@@ -374,6 +377,7 @@ private struct ListRow: View {
     let showsRepository: Bool
     let widestNumber: String
     @Environment(\.panelNow) private var now
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 0) {
@@ -384,7 +388,7 @@ private struct ListRow: View {
                 Text(widestNumber).hidden()
                 Text(PanelText.number(row))
             }
-            .font(ListType.meta)
+            .font(scale.listType.meta)
             .monospacedDigit()
             .foregroundStyle(ThemeColor.textTertiary)
             .frame(minWidth: ListGrid.numberColumn, alignment: numberAlignment)
@@ -392,7 +396,7 @@ private struct ListRow: View {
             .padding(.leading, row.kind == .note ? 4 : 0)
             .padding(.trailing, 8)
             Text(row.title)
-                .font(row.needsAttention ? ListType.bodyEmphasis : ListType.body)
+                .font(row.needsAttention ? scale.listType.bodyEmphasis : scale.listType.body)
                 .foregroundStyle(row.state.isActive ? ThemeColor.textPrimary : ThemeColor.textSeen)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -411,7 +415,7 @@ private struct ListRow: View {
                             .foregroundStyle(ThemeColor.textTertiary)
                     }
                     Text(meta)
-                        .font(ListType.meta)
+                        .font(scale.listType.meta)
                         .foregroundStyle(row.actionError == nil ? ThemeColor.textTertiary : ThemeColor.failure)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -420,13 +424,13 @@ private struct ListRow: View {
                 .padding(.leading, 6)
             }
             Text(PanelText.age(row.age(at: now)))
-                .font(ListType.meta)
+                .font(scale.listType.meta)
                 .foregroundStyle(ThemeColor.textSecondary)
                 .frame(width: ListGrid.ageColumn, alignment: .trailing)
         }
-        .padding(.leading, ListGrid.gutter - 4)
-        .padding(.trailing, ListGrid.gutter)
-        .frame(height: ListGrid.rowHeight)
+        .padding(.leading, scale.list.gutter - 4)
+        .padding(.trailing, scale.list.gutter)
+        .frame(height: scale.list.rowHeight)
         .contentShape(Rectangle())
     }
 
@@ -469,12 +473,13 @@ private struct ListRow: View {
 
 private struct BranchChip: View {
     let branch: String
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: "arrow.branch").font(.system(size: 8.5, weight: .semibold))
             Text(branch)
-                .font(ListType.branch)
+                .font(scale.listType.branch)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -488,6 +493,7 @@ private struct BranchChip: View {
 private struct SkeletonRow: View {
     let width: CGFloat
     @State private var pulse = false
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 6) {
@@ -496,9 +502,9 @@ private struct SkeletonRow: View {
             Spacer()
             RoundedRectangle(cornerRadius: 3).fill(ThemeColor.textPrimary.opacity(0.06)).frame(width: 44, height: 9)
         }
-        .padding(.leading, ListGrid.gutter + ListGrid.dotColumn)
-        .padding(.trailing, ListGrid.gutter)
-        .frame(height: ListGrid.rowHeight)
+        .padding(.leading, scale.list.gutter + ListGrid.dotColumn)
+        .padding(.trailing, scale.list.gutter)
+        .frame(height: scale.list.rowHeight)
         .opacity(pulse ? 0.5 : 1)
         .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever()) { pulse = true } }
         .accessibilityHidden(true)

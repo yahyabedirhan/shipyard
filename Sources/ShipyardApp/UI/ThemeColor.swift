@@ -6,17 +6,23 @@ import SwiftUI
 
 // The token layer: views take each colour from the theme in their
 // environment, resolved for the appearance they draw in. Nothing here holds
-// a global active theme, so two parts of one window can draw two themes.
+// a global active theme, so two parts of one window can draw two themes,
+// each with its own sizes and type.
 
 private struct ThemeKey: EnvironmentKey {
     static let defaultValue = BuiltInThemes.shipyard
 }
 
 extension EnvironmentValues {
-    /// The theme the views below draw with: Shipyard unless a view above sets one.
+    /// The theme the views below draw with: Shipyard unless a view above sets
+    /// one. Setting it resolves its knobs into `panelScale` once, for every
+    /// view below to read.
     var theme: Theme {
         get { self[ThemeKey.self] }
-        set { self[ThemeKey.self] = newValue }
+        set {
+            self[ThemeKey.self] = newValue
+            if panelScale.knobs != newValue.knobs { panelScale = PanelScale(newValue.knobs) }
+        }
     }
 }
 

@@ -25,20 +25,23 @@ enum HoverHelp {
     static let maxWidth: CGFloat = 320
     static let margin: CGFloat = 6
     static let horizontalPadding: CGFloat = 8
-    static let rowInset = Grid.gutter + Grid.dotColumn + Grid.iconColumn - horizontalPadding
+    /// A row card's inset from the panel's leading edge, under the row's title.
+    static func rowInset(_ grid: Grid) -> CGFloat {
+        grid.gutter + Grid.dotColumn + Grid.iconColumn - horizontalPadding
+    }
 }
 
 extension View {
     func hoverHelp(
         _ text: String?,
         context: HoverHelp.Context = .toolbar,
-        leadingInset: CGFloat = Grid.gutter
+        leadingInset: CGFloat? = nil
     ) -> some View {
         modifier(HoverHelpSource(content: text.map(HoverHelpContent.text), context: context, leadingInset: leadingInset))
     }
 
     func hoverHelp(markdown text: String, context: HoverHelp.Context = .toolbar) -> some View {
-        modifier(HoverHelpSource(content: .markdown(text), context: context, leadingInset: Grid.gutter))
+        modifier(HoverHelpSource(content: .markdown(text), context: context, leadingInset: nil))
     }
 
     func hoverHelp(_ card: RowCard, leadingInset: CGFloat) -> some View {
@@ -95,15 +98,18 @@ private struct HoverHelpKey: PreferenceKey {
 private struct HoverHelpSource: ViewModifier {
     let content: HoverHelpContent?
     let context: HoverHelp.Context
-    let leadingInset: CGFloat
+    /// How far the card sits in from the panel's leading edge; `nil` is the gutter.
+    let leadingInset: CGFloat?
+    @Environment(\.panelScale) private var scale
     @State private var id = UUID()
     @State private var hovering = false
 
     func body(content: Content) -> some View {
         if let help = self.content {
+            let inset = leadingInset ?? scale.grid.gutter
             content
                 .anchorPreference(key: HoverHelpKey.self, value: .bounds) { anchor in
-                    hovering ? HoverHelpAnchor(id: id, content: help, context: context, anchor: anchor, leadingInset: leadingInset) : nil
+                    hovering ? HoverHelpAnchor(id: id, content: help, context: context, anchor: anchor, leadingInset: inset) : nil
                 }
                 .onHover { hovering = $0 }
                 .onDisappear { hovering = false }
@@ -215,13 +221,14 @@ extension HoverHelpPlacement.Rect {
 
 private struct HoverHelpCard: View {
     let content: HoverHelpContent
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HoverHelpBody(content: content)
             .padding(.horizontal, HoverHelp.horizontalPadding)
             .padding(.vertical, content.isRow ? 7 : 5)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Grid.radius, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
             .shadow(color: .black.opacity(0.14), radius: 6, y: 2)
     }
 }
@@ -249,6 +256,7 @@ private struct HoverHelpBody: View {
 
 private struct RowCardView: View {
     let card: RowCard
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -259,7 +267,7 @@ private struct RowCardView: View {
                     AuthorAvatar(url: card.avatarURL)
                 }
                 Text(card.headline)
-                    .font(TypeScale.meta.weight(.semibold))
+                    .font(scale.type.meta.weight(.semibold))
                     .foregroundStyle(ThemeColor.textPrimary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -290,13 +298,14 @@ private struct RowCardView: View {
 private struct AttentionTag: View {
     let reason: Attention.Reason
     let kind: ItemKind
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: symbol).imageScale(.small)
             Text(PanelText.attentionWord(reason, kind: kind))
         }
-        .font(TypeScale.meta.weight(.medium))
+        .font(scale.type.meta.weight(.medium))
         .foregroundStyle(tint)
         .lineLimit(1)
         .padding(.horizontal, 6)
@@ -324,6 +333,7 @@ private struct AttentionTag: View {
 
 private struct FactView: View {
     let fact: RowCard.Fact
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 4) {
@@ -333,7 +343,7 @@ private struct FactView: View {
                 .frame(width: 13)
             label
         }
-        .font(TypeScale.meta)
+        .font(scale.type.meta)
         .lineLimit(1)
     }
 
@@ -390,7 +400,7 @@ private struct FactView: View {
         case .attempt: "arrow.clockwise"
         case .duration(_, let running): running ? "hourglass" : "timer"
         case .body: "text.alignleft"
-        case .action(let action): Palette.symbol(action.icon)
+        case .action(let action): ItemSymbol.name(action.icon)
         case .noAction: "checkmark.circle"
         case .failure: "exclamationmark.triangle.fill"
         }
@@ -437,13 +447,14 @@ private struct AuthorAvatar: View {
 
 private struct HoverHelpText: View {
     let text: String
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         VStack(alignment: .leading, spacing: 2) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 Text(line)
-                    .font(TypeScale.meta)
+                    .font(scale.type.meta)
                     .foregroundStyle(index == 0 ? ThemeColor.textPrimary : ThemeColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

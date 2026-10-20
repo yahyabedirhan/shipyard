@@ -5,6 +5,7 @@ struct TabsLayout: View {
     let model: MenuModel
     let panel: PanelState
     let actions: LayoutActions
+    @Environment(\.panelScale) private var scale
 
     @State private var highlight = RowHighlight()
 
@@ -15,7 +16,7 @@ struct TabsLayout: View {
         let content = model.tabContent(for: tab)
         VStack(spacing: 0) {
             TabStrip(model: model, selection: tab, select: select)
-                .padding(.horizontal, Grid.gutter)
+                .padding(.horizontal, scale.grid.gutter)
                 .padding(.top, 8)
             summary(content)
             Hairline()
@@ -62,9 +63,9 @@ struct TabsLayout: View {
                 NewNoteIcon(project: section.title, state: newNote) { actions.startNote(section) }
             }
         }
-        .font(TypeScale.meta)
+        .font(scale.type.meta)
         .frame(height: 22)
-        .padding(.horizontal, Grid.gutter)
+        .padding(.horizontal, scale.grid.gutter)
         .padding(.vertical, 4)
         .animation(Motion.count, value: content.attentionCount)
     }
@@ -227,18 +228,19 @@ private struct TabPill: View {
     let action: () -> Void
     @State private var isHovered = false
     @State private var isTruncated = false
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Text(title)
-                    .font(TypeScale.button)
+                    .font(scale.type.button)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: Grid.maxTabTitleWidth)
                     .background {
                         Text(title)
-                            .font(TypeScale.button)
+                            .font(scale.type.button)
                             .fixedSize()
                             .hidden()
                             .onGeometryChange(for: Bool.self) { $0.size.width > Grid.maxTabTitleWidth } action: { isTruncated = $0 }
@@ -319,6 +321,7 @@ private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool
     @Environment(\.panelNow) private var now
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 0) {
@@ -327,14 +330,14 @@ private struct TabRow: View {
             StateSymbol(row: row)
                 .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: Grid.smallRadius + 1, style: .continuous)
+                    RoundedRectangle(cornerRadius: scale.grid.smallRadius + 1, style: .continuous)
                         .fill(ThemeColor.state(row.state, kind: row.kind).opacity(0.14))
                 )
                 .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
                 .padding(.trailing, 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
+                    .font(row.needsAttention ? scale.type.bodyEmphasis : scale.type.body)
                     .foregroundStyle(row.state.isActive || row.needsAttention ? ThemeColor.textPrimary : ThemeColor.textSeen)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -343,7 +346,7 @@ private struct TabRow: View {
                         AgentMarkView(agent: agent, size: Grid.agentMark)
                     }
                     Text(PanelText.rowDetail(row, showingRepository: showsRepository))
-                        .font(TypeScale.meta)
+                        .font(scale.type.meta)
                         .foregroundStyle(row.actionError == nil ? ThemeColor.textSecondary : ThemeColor.failure)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -351,13 +354,13 @@ private struct TabRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(PanelText.age(row.age(at: now)))
-                .font(TypeScale.meta)
+                .font(scale.type.meta)
                 .foregroundStyle(row.needsAttention ? ThemeColor.textSecondary : ThemeColor.textTertiary)
                 .padding(.leading, 8)
         }
-        .padding(.leading, Grid.gutter - 4)
-        .padding(.trailing, Grid.gutter)
-        .padding(.vertical, 5)
+        .padding(.leading, scale.grid.gutter - 4)
+        .padding(.trailing, scale.grid.gutter)
+        .padding(.vertical, scale.grid.tabRowPadding)
         .contentShape(Rectangle())
     }
 }
@@ -365,6 +368,7 @@ private struct TabRow: View {
 private struct EmptyTab: View {
     let text: String
     let isLoaded: Bool
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         VStack(spacing: 8) {
@@ -373,7 +377,7 @@ private struct EmptyTab: View {
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(isLoaded ? ThemeColor.success : ThemeColor.textTertiary)
             Text(text)
-                .font(TypeScale.button)
+                .font(scale.type.button)
                 .foregroundStyle(ThemeColor.textSecondary)
         }
         .frame(maxWidth: .infinity)

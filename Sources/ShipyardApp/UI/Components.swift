@@ -8,21 +8,13 @@ private struct PanelNowKey: EnvironmentKey {
 }
 
 /// Which layout a shared row piece draws in: the list layout sets `.list`
-/// on its rows for its tighter scale (`ListGrid`, `ListType`).
+/// on its rows for its tighter scale (`ListGrid`, `ListType`). The sizes
+/// that follow the theme are the `PanelScale`'s, by style.
 enum PanelStyle: Sendable {
     case tabs, list
 
     var dotColumn: CGFloat { self == .list ? ListGrid.dotColumn : Grid.dotColumn }
     var iconColumn: CGFloat { self == .list ? ListGrid.iconColumn : Grid.iconColumn }
-    var rowHeight: CGFloat { self == .list ? ListGrid.rowHeight : Grid.rowHeight }
-    var meta: Font { self == .list ? ListType.meta : TypeScale.meta }
-    var eyebrow: Font { self == .list ? ListType.eyebrow : TypeScale.eyebrow }
-
-    /// How far a ping row's ✕ sits from the row's trailing edge: just
-    /// before the age, so the age stays readable.
-    var dismissTrailing: CGFloat {
-        self == .list ? ListGrid.gutter + ListGrid.ageColumn + 2 : Grid.gutter + Grid.ageColumn + 2
-    }
 }
 
 private struct PanelStyleKey: EnvironmentKey {
@@ -79,19 +71,22 @@ struct Hairline: View {
 struct CountBadge: View {
     let count: Int
     var muted = false
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         ZStack {
-            number.foregroundStyle(.secondary).opacity(muted ? 1 : 0)
-            number.foregroundStyle(Color.white).opacity(muted ? 0 : 1)
+            number.foregroundStyle(ThemeColor.textSecondary).opacity(muted ? 1 : 0)
+            number.foregroundStyle(ThemeColor.textOnAccent).opacity(muted ? 0 : 1)
         }
-        .foregroundStyle(Color.primary)
+        // Fixed, so a tab's label style changing around the badge doesn't
+        // restyle the muted number either.
+        .foregroundStyle(ThemeColor.textPrimary)
         .padding(.horizontal, 5)
         .frame(minWidth: 17, minHeight: 15)
         .background {
             ZStack {
-                Capsule().fill(Color.primary.opacity(0.09)).opacity(muted ? 1 : 0)
-                Capsule().fill(Palette.accent).opacity(muted ? 0 : 1)
+                Capsule().fill(ThemeColor.rowPressed).opacity(muted ? 1 : 0)
+                Capsule().fill(ThemeColor.accent).opacity(muted ? 0 : 1)
             }
         }
         .animation(Motion.tint, value: muted)
@@ -102,7 +97,7 @@ struct CountBadge: View {
 
     private var number: some View {
         Text(String(count))
-            .font(TypeScale.badge)
+            .font(scale.type.badge)
             .contentTransition(.numericText(value: Double(count)))
     }
 }
@@ -130,6 +125,7 @@ struct Banner: View {
     var action: (title: String, run: () -> Void)?
     var trailing = false
     var dismiss: (() -> Void)?
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(alignment: trailing ? .center : .top, spacing: 8) {
@@ -161,8 +157,8 @@ struct Banner: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(tint.opacity(0.11)))
-        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(tint.opacity(0.18), lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).fill(tint.opacity(0.11)))
+        .overlay(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).strokeBorder(tint.opacity(0.18), lineWidth: 0.5))
     }
 
     private func button(_ action: (title: String, run: () -> Void)) -> some View {
@@ -176,7 +172,7 @@ struct StateSymbol: View {
     @Environment(\.panelStyle) private var style
 
     var body: some View {
-        Image(systemName: row.pingIcon.map { Palette.symbol($0) } ?? Palette.symbol(row.state, kind: row.kind))
+        Image(systemName: row.pingIcon.map { ItemSymbol.name($0) } ?? ItemSymbol.name(row.state, kind: row.kind))
             .symbolRenderingMode(.hierarchical)
             .font(.system(size: style == .list ? 11 : 11.5, weight: style == .list ? .medium : .semibold))
             .foregroundStyle(ThemeColor.state(row.state, kind: row.kind))
@@ -265,6 +261,7 @@ private struct ItemRow: ViewModifier {
     let actions: LayoutActions
     @Environment(\.panelNow) private var now
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     func body(content: Content) -> some View {
         let isHighlighted = highlight.isHighlighted(place)
@@ -273,11 +270,11 @@ private struct ItemRow: ViewModifier {
             .overlay(alignment: .trailing) {
                 if row.item.ping != nil, isHighlighted {
                     DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
-                        .padding(.trailing, style.dismissTrailing)
+                        .padding(.trailing, scale.dismissTrailing(style))
                 }
             }
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
-            .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset)
+            .hoverHelp(PanelText.rowCard(row, now: now), leadingInset: HoverHelp.rowInset(scale.grid))
             .animation(Motion.seen, value: row.needsAttention)
             .highlightable(place, $highlight)
     }
@@ -312,6 +309,7 @@ private struct DismissButton: View {
 struct NoteRow: View {
     let note: String
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -320,15 +318,15 @@ struct NoteRow: View {
                 .font(.system(size: 10.5))
                 .frame(width: style.iconColumn)
             Text(note)
-                .font(style.meta)
+                .font(scale.meta(style))
                 .foregroundStyle(ThemeColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.leading, Grid.gutter + style.dotColumn - 6)
-        .padding(.trailing, Grid.gutter)
+        .padding(.leading, scale.grid.gutter + style.dotColumn - 6)
+        .padding(.trailing, scale.grid.gutter)
         .padding(.vertical, style == .list ? 3 : 5)
-        .frame(minHeight: style.rowHeight)
+        .frame(minHeight: scale.rowHeight(style))
     }
 }
 
@@ -336,6 +334,7 @@ struct ErrorRow: View {
     let error: MenuErrorRow
     private static let maxLines = 3
     @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -345,33 +344,33 @@ struct ErrorRow: View {
                 .font(.system(size: 10.5))
                 .frame(width: style.iconColumn)
             Text(error.message)
-                .font(style.meta)
+                .font(scale.meta(style))
                 .foregroundStyle(ThemeColor.textPrimary.opacity(0.75))
                 .lineLimit(Self.maxLines)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
             Spacer(minLength: 0)
         }
-        .padding(.leading, Grid.gutter + style.dotColumn - 6)
-        .padding(.trailing, Grid.gutter)
+        .padding(.leading, scale.grid.gutter + style.dotColumn - 6)
+        .padding(.trailing, scale.grid.gutter)
         .padding(.vertical, style == .list ? 3 : 5)
-        .frame(minHeight: style.rowHeight)
+        .frame(minHeight: scale.rowHeight(style))
     }
 }
 
 struct CommandBox: View {
     let command: String
     var prompt = true
-    var font = TypeScale.code
+    @Environment(\.panelScale) private var scale
     @State private var copiedAt: Date?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if prompt {
-                Text("$").font(font).foregroundStyle(ThemeColor.textTertiary)
+                Text("$").font(scale.type.code).foregroundStyle(ThemeColor.textTertiary)
             }
             Text(command)
-                .font(font)
+                .font(scale.type.code)
                 .foregroundStyle(ThemeColor.textPrimary)
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -383,8 +382,8 @@ struct CommandBox: View {
         .padding(.trailing, 4)
         .padding(.vertical, 4)
         .frame(minHeight: 30)
-        .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.field))
-        .overlay(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
+        .background(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).fill(ThemeColor.field))
+        .overlay(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
         .onChange(of: command) { copiedAt = nil }
     }
 }
@@ -443,10 +442,12 @@ enum Clipboard {
 }
 
 struct CardBackground: ViewModifier {
+    @Environment(\.panelScale) private var scale
+
     func body(content: Content) -> some View {
         content
-            .background(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).fill(ThemeColor.field))
-            .overlay(RoundedRectangle(cornerRadius: Grid.radius + 1, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
+            .background(RoundedRectangle(cornerRadius: scale.grid.radius + 1, style: .continuous).fill(ThemeColor.field))
+            .overlay(RoundedRectangle(cornerRadius: scale.grid.radius + 1, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
     }
 }
 
@@ -464,17 +465,18 @@ extension View {
 /// What a command printed, in a filled box: a setup card's and a setup view's output.
 struct OutputBox: View {
     let output: String
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Text(output)
-            .font(TypeScale.branch)
+            .font(scale.type.branch)
             .foregroundStyle(ThemeColor.textPrimary)
             .textSelection(.enabled)
             .lineLimit(8)
             .fixedSize(horizontal: false, vertical: true)
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(ThemeColor.field))
+            .background(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).fill(ThemeColor.field))
     }
 }
 
@@ -529,11 +531,12 @@ private struct PillButtonBody: View {
     let prominent: Bool
     let height: CGFloat
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.panelScale) private var scale
     @State private var hover = false
 
     var body: some View {
         configuration.label
-            .font(TypeScale.button)
+            .font(scale.type.button)
             .foregroundStyle(prominent ? ThemeColor.textOnAccent : ThemeColor.textPrimary)
             .padding(.horizontal, 12)
             .frame(height: height)
@@ -605,7 +608,8 @@ struct RowHighlightShape: View {
     @Environment(\.panelStyle) private var style
 
     var body: some View {
-        RoundedRectangle(cornerRadius: style == .list ? ListGrid.radius : 6, style: .continuous).fill(ThemeColor.rowHover)
+        // Fixed, as the design lab draws it, under every theme's shape.
+        RoundedRectangle(cornerRadius: style == .list ? 5 : 6, style: .continuous).fill(ThemeColor.rowHover)
     }
 }
 
@@ -657,7 +661,8 @@ struct MarkSeenButton: View {
 
 struct TextButtonStyle<Tint: ShapeStyle>: ButtonStyle {
     var tint: Tint
-    var font: Font = TypeScale.captionEmphasis
+    /// The step of the environment's type scale the title draws in.
+    var font: KeyPath<TypeScale, Font> = \.captionEmphasis
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         TextButtonBody(configuration: configuration, tint: tint, font: font)
@@ -666,7 +671,7 @@ struct TextButtonStyle<Tint: ShapeStyle>: ButtonStyle {
 
 extension TextButtonStyle where Tint == ThemeColor {
     /// A text button in the accent.
-    init(font: Font = TypeScale.captionEmphasis) {
+    init(font: KeyPath<TypeScale, Font> = \.captionEmphasis) {
         self.init(tint: ThemeColor.accent, font: font)
     }
 }
@@ -674,18 +679,19 @@ extension TextButtonStyle where Tint == ThemeColor {
 private struct TextButtonBody<Tint: ShapeStyle>: View {
     let configuration: ButtonStyleConfiguration
     let tint: Tint
-    let font: Font
+    let font: KeyPath<TypeScale, Font>
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.panelScale) private var scale
     @State private var hover = false
 
     var body: some View {
         configuration.label
-            .font(font)
+            .font(scale.type[keyPath: font])
             .foregroundStyle(hover && isEnabled ? AnyShapeStyle(tint) : AnyShapeStyle(ThemeColor.textSecondary))
             .padding(.horizontal, 6)
             .frame(height: 18)
             .background(
-                RoundedRectangle(cornerRadius: Grid.smallRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: scale.grid.smallRadius, style: .continuous)
                     .fill(tint.opacity(configuration.isPressed ? 0.18 : hover && isEnabled ? 0.1 : 0))
             )
             .opacity(isEnabled ? 1 : 0.5)

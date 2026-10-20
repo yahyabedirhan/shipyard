@@ -5,6 +5,7 @@ struct StatusView: View {
     let part: SetupPart
     let actions: AppServices
     let back: () -> Void
+    @Environment(\.panelScale) private var scale
 
     private static let actionHeight: CGFloat = 28
 
@@ -13,9 +14,9 @@ struct StatusView: View {
             Button(action: back) {
                 Text(PanelText.back)
             }
-            .buttonStyle(TextButtonStyle(font: TypeScale.body))
+            .buttonStyle(TextButtonStyle(font: \.body))
             .accessibilityLabel("Back")
-            .padding(.horizontal, Grid.gutter)
+            .padding(.horizontal, scale.grid.gutter)
             .padding(.top, 10)
             if let text = page {
                 page(text)
@@ -74,7 +75,7 @@ struct StatusView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 SetupBadge(part: part, side: 32)
-                Text(text.title).font(TypeScale.display)
+                Text(text.title).font(scale.type.display)
             }
             .padding(.bottom, 12)
             line(text.lead)

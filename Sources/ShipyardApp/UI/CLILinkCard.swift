@@ -3,18 +3,19 @@ import SwiftUI
 
 struct CLILinkCard: View {
     let link: CLILink
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         let text = PanelText.cliLink(link.state, command: link.command)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 6) {
                 ToneIcon(tone: text.tone, neutral: "terminal", neutralTint: ThemeColor.accent)
-                Text(text.title).font(TypeScale.bodyEmphasis).foregroundStyle(ThemeColor.textPrimary)
+                Text(text.title).font(scale.type.bodyEmphasis).foregroundStyle(ThemeColor.textPrimary)
                 Spacer()
             }
             .frame(minHeight: 22)
             Text(text.message)
-                .font(TypeScale.body)
+                .font(scale.type.body)
                 .foregroundStyle(ThemeColor.textSecondary)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
