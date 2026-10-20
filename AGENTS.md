@@ -1,6 +1,6 @@
 # shipyard
 
-A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
+A macOS menu bar app for the pull requests your agents open.
 
 ## Changing The Maintainer's Shipyard
 

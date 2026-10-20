@@ -2,7 +2,7 @@
 
 <h1 align="center">shipyard</h1>
 
-A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
+A macOS menu bar app for the pull requests your agents open.
 
 **Status:** under construction; this README describes 0.7.1.
 
