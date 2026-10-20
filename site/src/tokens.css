@@ -40,12 +40,28 @@
   --mock-attention:#6aa8ff;
   --mock-shadow:0 18px 50px rgba(0,0,0,.45);
 
+  /* the prototype switcher: loud on purpose, so it never reads as part of a design */
+  --proto-bg:#ffd84d;
+  --proto-fg:#141414;
+  --proto-shadow:0 8px 30px rgba(0,0,0,.45);
+
+  /* the landing page */
+  --land-glow:rgba(169,199,228,.10);
+  --land-wave:rgba(236,235,232,.16);
+  --land-strip:rgba(28,28,31,.92);
+
   /* typefaces */
   --sans:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   --serif:Literata,Georgia,serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 
   /* type sizes */
+  --type-display:64px;
+  --type-display-phone:40px;
+  --type-hero:44px;
+  --type-hero-phone:30px;
+  --type-wordmark-big:120px;
+  --type-wordmark-big-phone:64px;
   --type-title:31px;
   --type-title-phone:26px;
   --type-sub:18px;
@@ -136,6 +152,12 @@
   --underline-offset:3px;
   --focus-offset:3px;
   --rock-lift:-1px;
+
+  --land-col:1120px;
+  --land-text:520px;
+  --land-shot:560px;
+  --strip-h:28px;
+  --proto-h:40px;
 
   /* motion */
   --ease:cubic-bezier(.2,.8,.2,1);

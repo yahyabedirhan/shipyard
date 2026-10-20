@@ -46,7 +46,7 @@ describe('page heads', () => {
   });
 
   it('route each path to its page', () => {
-    expect(routeOf('/')).toBe('docs');
+    expect(routeOf('/')).toBe('home');
     expect(routeOf('/docs/')).toBe('docs');
     expect(routeOf('/privacy')).toBe('privacy');
     expect(routeOf('/elsewhere')).toBe('not-found');
