@@ -7,18 +7,8 @@ export const NAME = 'shipyard';
 /** The category, as the messaging kit words it. */
 export const CATEGORY = 'A macOS menu bar app for pull requests.';
 
-/**
- * The one line. The positioning isn't chosen yet, so the three candidates are here by their kit ids, and every
- * surface uses A until one is picked.
- */
-export const LINES = {
-  A: 'A macOS menu bar app for the pull requests your agents open.',
-  B: 'See, review and triage what your coding agents ship, from the menu bar.',
-  C: "Your agents' pull requests, issues and runs, one click away in the menu bar.",
-} as const;
-export type LineId = keyof typeof LINES;
-export const LINE_ID: LineId = 'A';
-export const LINE = LINES[LINE_ID];
+/** The one line, positioning A of the messaging kit. */
+export const LINE = 'A macOS menu bar app for the pull requests your agents open.';
 
 /** One proof point after the line, for meta descriptions (the kit's "one line, then one proof point"). */
 export const PROOF = 'One number for what needs you, one file your agents edit, and pings from any machine.';
