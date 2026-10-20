@@ -8,7 +8,7 @@
 #   make signing-identity  make this Mac's local signing identity, once
 #   make install    bundle, then replace /Applications/Shipyard.app and open it
 #   make release    test, bundle, and zip it as build/Shipyard-<version>-macos.zip
-#                   (bump Version.swift first; README's Development section has the release order)
+#                   (bump Version.swift first; AGENTS.md's Releases section has the release order)
 #   make run        run the executable from .build, without a bundle
 #   make icon       redraw Packaging/Icon/AppIcon.icns from make-icon.swift (ICON=khaki-green)
 #   make icon-alternates  redraw the other variants into Packaging/Icon/alternates/
