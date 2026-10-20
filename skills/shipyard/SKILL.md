@@ -61,7 +61,7 @@ Top level:
 | Key | Default | Allowed |
 |---|---|---|
 | `version` | `1` | only `1` |
-| `theme` | `"Shipyard"` | the panel's theme, by name: `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight` or `Harbor`; an unknown name is an error |
+| `theme` | `"Shipyard"` | the panel's theme, by name: `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight`, `Harbor`, or the `name` of a theme file in `themes/*.toml` beside `config.toml`; an unknown name is an error. `shipyard config check` checks each theme file too |
 | `refresh-interval` | `"2m"` | a window (below), at least `"30s"`: how often the app refreshes; a floor it stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
 

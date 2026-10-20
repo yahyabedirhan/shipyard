@@ -13,8 +13,9 @@
       "default": 1
     },
     "theme": {
-      "description": "The theme the panel draws with, by name, ignoring case: one of the built-in themes Shipyard, Native, Graphite, Paper, Midnight and Harbor. An unknown name is an error; a theme whose text has too little contrast on its panel reads with a warning.",
+      "description": "The theme the panel draws with, by name, ignoring case: a built-in theme (Shipyard, Native, Graphite, Paper, Midnight or Harbor) or the name of a theme file in the themes folder beside config.toml. An unknown name is an error; a theme whose text has too little contrast on its panel reads with a warning.",
       "type": "string",
+      "examples": ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"],
       "default": "Shipyard"
     },
     "refresh-interval": {

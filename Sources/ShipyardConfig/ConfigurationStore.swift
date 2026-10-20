@@ -2,10 +2,11 @@ import Foundation
 import ShipyardCommand
 
 /// Owns `config.toml`: where it is, the last valid configuration read from
-/// it, and the error when the latest read failed.
+/// it, and the error when the latest read failed; and the theme files in the
+/// `themes` folder beside it, read on every reload.
 ///
-/// The core doesn't watch the file. The app's `ConfigurationWatcher` watches the
-/// directory and calls `reload()`; tests call it directly. A broken file
+/// The core doesn't watch the files. The app's `ConfigurationWatcher`s watch the
+/// directory and the `themes` folder and call `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
 /// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
 /// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and the
@@ -22,20 +23,24 @@ public final class ConfigurationStore: @unchecked Sendable {
     public static let fileName = "config.toml"
 
     public let url: URL
-    /// The themes `theme` may name.
-    public let themes: ThemeLibrary
+    /// The folder of the user's theme files: `themes` beside `url`.
+    public let themesFolder: URL
 
     private let lock = NSLock()
     private var _lastValid = Configuration()
     private var _theme = BuiltInThemes.shipyard
+    private var _themes = ThemeLibrary.builtIn
+    private var _themeFiles: [ThemeFiles.File] = []
+    /// The theme each file last read, kept while the file has a problem.
+    private var _lastGoodThemes: [URL: Theme] = [:]
     private var _error: ConfigurationError?
     private var _warnings: [ConfigurationIssue] = []
     private var _modified: Date?
     private var _acceptsPreset = true
 
-    public init(url: URL, themes: ThemeLibrary = .builtIn) {
+    public init(url: URL) {
         self.url = url
-        self.themes = themes
+        themesFolder = ThemeFiles.folder(beside: url)
     }
 
     /// `$XDG_CONFIG_HOME/shipyard/config.toml`, or `~/.config/shipyard/config.toml`
@@ -59,8 +64,21 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// or the defaults with no projects before any did.
     public var lastValid: Configuration { synchronized { _lastValid } }
 
-    /// The theme `lastValid` picks: Shipyard before any file read cleanly.
+    /// The theme `lastValid` picks, from the themes as the latest reload
+    /// read them: Shipyard before any file read cleanly, and while the
+    /// theme it names isn't one.
     public var theme: Theme { synchronized { _theme } }
+
+    /// The themes `theme` may name, as the latest reload read them: the
+    /// built-ins and the user's files', a file with a problem keeping the
+    /// theme it last read.
+    public var themes: ThemeLibrary { synchronized { _themes } }
+
+    /// Each theme file as the latest reload read it, by file name.
+    public var themeFiles: [ThemeFiles.File] { synchronized { _themeFiles } }
+
+    /// The theme files' problems, as the latest reload found them.
+    public var themeIssues: [ThemeIssue] { synchronized { _themeFiles.flatMap(\.issues) } }
 
     /// Why the latest reload failed; `nil` once a reload succeeds.
     public var error: ConfigurationError? { synchronized { _error } }
@@ -77,11 +95,15 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// app creates). `writePreset` checks the file again before writing.
     public var acceptsPreset: Bool { synchronized { _acceptsPreset } }
 
-    /// Reads the file again. A missing or empty file is the defaults with no
-    /// projects. A broken file keeps the last valid configuration, sets
-    /// `error` and clears `warnings`; a valid one clears the error.
+    /// Reads the theme files and the file again. A missing or empty file is
+    /// the defaults with no projects. A broken file keeps the last valid
+    /// configuration, sets `error` and clears `warnings`; a valid one clears
+    /// the error. The theme follows the theme files on every reload, so a
+    /// saved theme file applies though `config.toml` is `unchanged`.
     @discardableResult
     public func reload() -> ReloadResult {
+        let themeFiles = ThemeFiles.read(themesFolder)
+        let (themes, lastGoodThemes) = ThemeLibrary.with(themeFiles, keeping: synchronized { _lastGoodThemes })
         let modified = ConfigurationCheck.modificationDate(of: url)
         let outcome: Result<Configuration.Decoded, ConfigurationError>
         var acceptsPreset = false
@@ -96,6 +118,10 @@ public final class ConfigurationStore: @unchecked Sendable {
         return synchronized {
             _modified = modified
             _acceptsPreset = acceptsPreset
+            _themes = themes
+            _themeFiles = themeFiles
+            _lastGoodThemes = lastGoodThemes
+            defer { _theme = themes.theme(for: _lastValid) }
             switch outcome {
             case .failure(let error):
                 _error = error
@@ -107,7 +133,6 @@ public final class ConfigurationStore: @unchecked Sendable {
                 _warnings = decoded.warnings
                 guard decoded.configuration != _lastValid || hadError else { return .unchanged }
                 _lastValid = decoded.configuration
-                _theme = themes.theme(for: decoded.configuration)
                 return .changed(decoded.configuration)
             }
         }
@@ -128,12 +153,13 @@ public final class ConfigurationStore: @unchecked Sendable {
         }
     }
 
-    /// Reads the file at `url` as the app does, at `now`, for `shipyard
-    /// config check`: the same verdict without the app.
-    public static func check(_ url: URL, at now: Date) -> ConfigurationCheck {
+    /// Reads the file at `url` and the theme files beside it as the app
+    /// does, at `now`, for `shipyard config check`: `config.toml`'s verdict,
+    /// then each theme file's, by file name.
+    public static func checks(_ url: URL, at now: Date) -> [ConfigurationCheck] {
         let store = ConfigurationStore(url: url)
         store.reload()
-        return store.check(at: now)
+        return [store.check(at: now)] + store.themeFiles.map { $0.check(at: now) }
     }
 
     /// Creates the file (and its directory) with the commented header and
@@ -181,7 +207,7 @@ public final class ConfigurationStore: @unchecked Sendable {
         guard let text = String(data: try read(), encoding: .utf8) else {
             throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
-        let edited = try Configuration.settingLayout(layout, in: text)
+        let edited = try Configuration.settingLayout(layout, in: text, themes: themes)
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.truncate(atOffset: 0)

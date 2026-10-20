@@ -295,6 +295,14 @@ public enum PanelText {
         ConfigurationCheck.banner(ConfigurationCheck.Issue(issue), in: ConfigurationStore.fileName)
     }
 
+    /// The banner for theme files that don't read: each problem with its
+    /// file and line, "themes/Sunset.toml line 12: …", then that each theme
+    /// keeps its last good version; `nil` when there are none.
+    public static func themeIssues(_ issues: [ThemeIssue]) -> String? {
+        guard !issues.isEmpty else { return nil }
+        return (issues.map(\.description) + ["A theme keeps the version that last read until its file is fixed."]).joined(separator: "\n")
+    }
+
     /// The quiet banner for settings the file has but shipyard ignores, each
     /// with its line; `nil` when there are none.
     public static func configWarnings(_ warnings: [ConfigurationIssue]) -> String? {

@@ -180,8 +180,8 @@ struct Harness {
         let configURL = configURL
         let settings = CLISettingsFile.beside(config: configURL)
         table.add(ConfigurationCommands.entries(checks: [
-            { now in ConfigurationStore.check(configURL, at: now) },
-            { now in settings.check(at: now) },
+            { now in ConfigurationStore.checks(configURL, at: now) },
+            { now in [settings.check(at: now)] },
         ]))
         return table
     }

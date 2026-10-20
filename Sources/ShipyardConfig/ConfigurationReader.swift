@@ -718,11 +718,23 @@ final class ConfigurationReader {
     }
 
     /// `theme`: a theme of `themes`, by name, kept as the theme spells it.
-    /// Each text tier the theme can't make readable on its panel is a
+    /// An unknown name is a warning while a theme file doesn't read, since
+    /// the theme may be in it. Each text tier the theme can't make readable on its panel is a
     /// warning on the key's line.
     private func readTheme(_ name: String, into config: inout Configuration) {
         let path: ConfigurationPath = [.key("theme")]
         guard let theme = themes.theme(named: name) else {
+            if !themes.unread.isEmpty {
+                // The theme may be in a file that doesn't read yet: draw
+                // the default until it does, and keep the rest of the file.
+                config.theme = name
+                let files = themes.unread.map { "`\($0)`" }.joined(separator: ", ")
+                warnings.append(ConfigurationIssue(
+                    line: map.line(for: path),
+                    message: "theme `\(name)` isn't one shipyard has read, and \(files) has a problem; the panel draws \(ThemeLibrary.defaultName) until it reads"
+                ))
+                return
+            }
             let hint = Suggestion.nearest(to: name, in: themes.names).map { "did you mean `\($0)`?" }
                 ?? "expected one of " + themes.names.map { "`\($0)`" }.joined(separator: ", ")
             error("unknown theme `\(name)` (\(hint))", at: path, value: name)

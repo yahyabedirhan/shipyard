@@ -134,7 +134,7 @@ public struct ProjectFiling: PingFiling {
     static func readConfiguration(at url: URL) -> Result<Configuration, CommandResult> {
         guard let data = try? Data(contentsOf: url) else { return .success(Configuration()) }
         do {
-            return .success(try Configuration.decode(data).configuration)
+            return .success(try Configuration.decode(data, themes: .beside(config: url)).configuration)
         } catch {
             return .failure(.failed("shipyard: config.toml doesn't read (\(error.issues[0])); fix it, then try again"))
         }

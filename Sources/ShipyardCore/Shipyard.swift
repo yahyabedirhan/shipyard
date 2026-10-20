@@ -64,7 +64,7 @@ public final class Shipyard {
     }
     /// The theme the panel draws with: the one `theme` in the configuration
     /// names, kept from the last valid configuration while an edit is
-    /// rejected.
+    /// rejected, and following the theme files on every reload.
     public private(set) var theme = BuiltInThemes.shipyard
     private(set) var expandedGroups: Set<GroupID> = []
     private(set) var snapshot: Snapshot?
@@ -121,6 +121,12 @@ public final class Shipyard {
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
     public private(set) var configWarnings: [ConfigurationIssue] = [] {
+        didSet { followBannerConditions() }
+    }
+    /// The problems of the theme files beside the configuration file, for
+    /// the panel's banner; empty while every file reads. A file with a
+    /// problem keeps the theme it last read.
+    public private(set) var themeIssues: [ThemeIssue] = [] {
         didSet { followBannerConditions() }
     }
     /// Whether macOS lets shipyard post notifications, as the app's
@@ -449,6 +455,8 @@ public final class Shipyard {
         configWarnings = configStore.warnings
         let theme = configStore.theme
         if self.theme != theme { self.theme = theme }
+        let themeIssues = configStore.themeIssues
+        if self.themeIssues != themeIssues { self.themeIssues = themeIssues }
         presets = configStore.acceptsPreset ? Preset.all : []
         let notices = configStore.lastValid.notices
         let port = notices.listen ? notices.port : nil
@@ -1604,6 +1612,7 @@ public final class Shipyard {
             lease: lease,
             configError: configError,
             configWarnings: configWarnings,
+            themeIssues: themeIssues,
             ready: phase == .ready,
             menu: menu,
             notes: notesNotice,

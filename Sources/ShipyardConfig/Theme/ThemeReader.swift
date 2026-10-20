@@ -118,10 +118,13 @@ public enum ThemeReader {
     /// Resolves every definition, with `extends` looked up among them. Of two
     /// with one name (names aren't case-sensitive), the later wins, so a user
     /// file replaces a built-in theme. A definition that fails is left out,
-    /// and its problems returned.
-    public static func resolve(_ definitions: [ThemeDefinition]) -> (themes: [Theme], issues: [ThemeIssue]) {
+    /// and its problems returned. `base` (the built-ins, for the user's
+    /// files) is looked up by `extends` but not resolved itself.
+    public static func resolve(
+        _ definitions: [ThemeDefinition], extending base: [ThemeDefinition] = []
+    ) -> (themes: [Theme], issues: [ThemeIssue]) {
         var library: [String: ThemeDefinition] = [:]
-        for definition in definitions { library[definition.name.lowercased()] = definition }
+        for definition in base + definitions { library[definition.name.lowercased()] = definition }
         var themes: [Theme] = []
         var issues: [ThemeIssue] = []
         var seen = Set<String>()
