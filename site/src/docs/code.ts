@@ -7,7 +7,7 @@ const GRAMMARS: Record<Lang, RegExp | null> = {
   // comment, string, table header, key, number or boolean
   toml: /(#[^\n]*)|("(?:[^"\\\n]|\\.)*"|'[^'\n]*')|(^\s*\[\[?[^\]\n]+\]\]?)|([A-Za-z0-9_-]+(?=\s*=))|(\b\d+\b|\btrue\b|\bfalse\b)/gm,
   // comment, string, the command itself, a flag, a number
-  sh: /(#[^\n]*)|("(?:[^"\\]|\\.)*"|'[^']*')|(\b(?:shipyard|npx|herdr|git|make|curl|ntn|taplo|xattr|open|unzip|mv|rm|cd|brew)\b)|((?<=\s)--?[\w-]+)|(\b\d+\b)/g,
+  sh: /(#[^\n]*)|("(?:[^"\\]|\\.)*"|'[^']*')|((?<=^|&& |\| )(?:shipyard|npx|herdr|git|make|curl|ntn|taplo|xattr|open|unzip|mv|rm|cd|brew|bash)\b)|((?<=\s)--?[\w-]+)|(\b\d+\b)/gm,
   // string key, string, number or literal
   json: /("(?:[^"\\]|\\.)*"(?=\s*:))|("(?:[^"\\]|\\.)*")|(\b-?\d+(?:\.\d+)?\b|\btrue\b|\bfalse\b|\bnull\b)/g,
   text: null,

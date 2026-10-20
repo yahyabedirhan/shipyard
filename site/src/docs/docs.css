@@ -9,6 +9,7 @@ body{margin:0;background:var(--bg)}
 .dx a:hover{color:var(--fg);text-decoration-color:var(--fg)}
 .dx b,.dx strong{color:var(--fg);font-weight:500}
 .dx code{font:400 .86em/1.4 var(--mono);color:var(--fg);background:var(--tint);padding:var(--hair) var(--radius-xs);border-radius:var(--radius-xs);white-space:nowrap}
+.dx code,.dx pre{font-variant-ligatures:none}
 .dx pre code{background:none;padding:0;border-radius:0;white-space:pre;color:var(--text)}
 .dx :focus-visible{outline:var(--focus) solid var(--fg);outline-offset:var(--focus-offset);border-radius:var(--sp-1)}
 .dx img{display:block;max-width:100%;height:auto}
@@ -130,6 +131,7 @@ body{margin:0;background:var(--bg)}
 
 /* install */
 .dx .inst{display:grid;gap:var(--sp-8);margin-top:var(--sp-9)}
+.dx .inst>div,.dx .ex-code,.dx .preset{min-width:0}
 .dx .inst-t{display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-3);font:600 var(--type-label)/1 var(--sans);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--mut)}
 .dx main .inst-hint{margin:var(--sp-3) 0 0;font-size:var(--type-caption);color:var(--mut)}
 

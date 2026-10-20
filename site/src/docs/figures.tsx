@@ -28,7 +28,7 @@ export function Shot({ id, caption, className }: { id: string; caption?: string;
             <code className="shot-id">{id}</code>
           </div>
         )}
-      <figcaption className="cap">{caption ?? s.shows}</figcaption>
+      {caption || s.status === 'done' ? <figcaption className="cap">{caption ?? s.shows}</figcaption> : null}
     </figure>
   );
 }

@@ -39,10 +39,10 @@ export function sectionMd(s: DocSection, ref: ReferenceData): string {
     `# ${s.title}`,
     md(s.lede),
     s.body ? md(s.body) : '',
-    s.code && !s.after ? s.code.map((c) => fence(c.lang, c.code)).join('\n\n') : '',
+    s.code && !s.codeLast ? s.code.map((c) => fence(c.lang, c.code)).join('\n\n') : '',
     extra(s, ref),
     s.after ? md(s.after) : '',
-    s.code && s.after ? s.code.map((c) => fence(c.lang, c.code)).join('\n\n') : '',
+    s.code && s.codeLast ? s.code.map((c) => fence(c.lang, c.code)).join('\n\n') : '',
     s.notes.length ? `Notes:\n\n${s.notes.map((n) => `- ${md(n)}`).join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
 }
