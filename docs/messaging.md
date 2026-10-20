@@ -17,17 +17,16 @@ A macOS menu bar app for pull requests.
 
 ## One line
 
-The positioning is not chosen yet.
-Each candidate is under 80 characters, and each is a variant to show on the positioning board, with its id.
+The one line is `positioning/A`:
 
-| Id | One line | Characters |
-|---|---|---|
-| `positioning/A` | A macOS menu bar app for the pull requests your agents open. | 60 |
-| `positioning/B` | See, review and triage what your coding agents ship, from the menu bar. | 71 |
-| `positioning/C` | Your agents' pull requests, issues and runs, one click away in the menu bar. | 76 |
+> A macOS menu bar app for the pull requests your agents open.
 
-Until one is picked, every surface uses `positioning/A`.
-The README's current line, "A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.", is 96 characters, over the limit, and goes when the choice is made.
+It is 60 characters, under the 80 the channels allow.
+Every surface uses it.
+The README and `AGENTS.md` open with it.
+
+Considered and not chosen: `positioning/B`, "See, review and triage what your coding agents ship, from the menu bar", and `positioning/C`, "Your agents' pull requests, issues and runs, one click away in the menu bar".
+The maintainer chose A.
 
 ## Uses
 
