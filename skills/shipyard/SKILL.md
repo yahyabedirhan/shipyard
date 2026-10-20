@@ -44,7 +44,7 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show` and `seen-window`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show` and `seen-window`, `refresh-interval`, the five default `[[defaults.notifications]]` rules (`pr.opened`, `ping.sent`, `agent.notice`, `control.started`, `control.ended`) and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
@@ -82,9 +82,9 @@ Tables:
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
 | `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
-| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["netcup-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't start with `-` or be a project's slug or title |
+| `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["my-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't be empty, start with `-`, hold a control character, be listed twice, or be a project's slug or title |
 | `[notices] listen` | `false` | whether the app takes notices (`shipyard notice send`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
-| `[notices] port` | `47420` | the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
+| `[notices] port` | `47420` | `1` to `65535`: the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
 | `[banners] snooze-duration` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back. `[banners] snooze` is its old name: the app still reads it, with a warning; rename it to `snooze-duration` |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
@@ -197,7 +197,7 @@ The entries of `show` and `hide`, and of a notification rule's `authors`, are **
 
 ## Notification rules
 
-A rule, one element of a `notifications` list, is `{ event = "…", authors = [...] }`; `authors` is a list of author selectors and defaults to `[]`, everyone. An event is notified when a rule in the project's list names it and one of its `authors` matches the item's author. A rule only narrows what the project lists: an item the project's filters leave out (its `states`, `authors`, `drafts`, or a closed window of `0`) is never notified, whatever the rule says; so `pr.merged` needs `merged` in `states` and `closed-window-days` above `0`, and `run.failed` needs `failed` in `states` and `finished-window-hours` above `0`. Each event is notified once, and a project's existing items never notify when it's added.
+A rule, one element of a `notifications` list, is `{ event = "…", authors = [...] }`; `authors` is a list of author selectors and defaults to `[]`, everyone. An event is notified when a rule in the project's list names it and one of its `authors` matches the item's author. A rule only narrows what the project lists: an item the project's filters leave out (its `states`, `authors`, `drafts`, or a closed window of `0`) is never notified, whatever the rule says; so `pr.merged` needs `merged` in `states` and `closed-window` above `"0"`, and `run.failed` needs `failed` in `states` and `finished-window` above `"0"`. Each event is notified once, and a project's existing items never notify when it's added.
 
 | Event | When |
 |---|---|
@@ -474,7 +474,7 @@ To keep a project's pings out of its menu, `pings = { show = false }` in its blo
 
 ```toml
 [remote]
-machines = ["hetzner-vps"]
+machines = ["build-vps"]
 ```
 
 Then, on that machine, the user (or you, when you run there) installs the herdr-shipyard plugin, once per machine. It puts the `shipyard` command on that machine and pings for its blocked agents (see Sending pings):
@@ -649,7 +649,7 @@ shipyard lease release [--key <k>]
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
 
 ```text
-shipyard 0.2.0 is running
+shipyard 0.7.1 is running
 lease: free
 panel: closed
 view: projects
