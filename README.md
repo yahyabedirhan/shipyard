@@ -53,6 +53,17 @@ Everything lives in `~/.config/shipyard/config.toml`; **Open configuration file*
 
 The file sets the projects (each a section of the menu with its repositories), the layout (`list` or `tabs`), what's shown (pull requests, issues, workflow runs, and whose), how items are grouped and sorted, and which events notify you. [`skills/shipyard/SKILL.md`](skills/shipyard/SKILL.md) lists every key, its default and its allowed values, with worked examples; [`skills/shipyard/presets.md`](skills/shipyard/presets.md) has the three presets in full; and [`docs/configuration.md`](docs/configuration.md) explains how configuration works in the code, for maintainers.
 
+The panel's look is a **theme**, picked by name with the top-level `theme` key.
+Shipyard is the default, and five more come with the app: Native, Graphite, Paper, Midnight and Harbor.
+A theme of your own is a **theme file**, one TOML file in `~/.config/shipyard/themes/`, that names its colours by what they mean, such as `surface.panel` or `text.secondary`, and can extend a built-in theme to change only a few of them:
+
+```toml
+theme = "Midnight"
+```
+
+[`docs/themes/example-custom.toml`](docs/themes/example-custom.toml) is a commented theme file to start from, and [`skills/shipyard/references/themes.md`](skills/shipyard/references/themes.md) lists every token and setting.
+A theme file with a problem keeps the theme it last read, and the panel shows the file, the line and the problem; `shipyard config check` checks each theme file too.
+
 ## Use it with an agent
 
 Shipyard ships an agent skill that teaches coding agents (Claude Code, Codex and others that read skills) to edit its configuration file. Install it during onboarding or from a terminal; **Set up /shipyard skill** in the gear menu installs or updates it too:

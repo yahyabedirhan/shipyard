@@ -91,11 +91,12 @@ Agents edit the file but can't see the panel's banner, so after every reload (at
 
 `shipyard config check` gives the record's verdict without the app, so an agent can check an edit when the app isn't running, or on a machine without it. The skill's edit steps tell agents to run it after each edit.
 
-- `ConfigurationCommands` (in `Sources/ShipyardCommand/`) owns the command. The executable hands it one check per file, so the command never links a file's reader: the Mac's build checks `config.toml` with `ConfigurationStore.check(_:at:)`, a fresh store's `reload()`, and `cli.toml` with `CLISettingsFile.check(at:)`; the Linux build checks only `cli.toml` and never links `ShipyardConfig`.
-- On the Mac, `config.toml` is the file `config-location.json` names, as for `shipyard ping` (`ConfigurationLocation.current`), and `cli.toml` is beside it.
-- It prints each file's path and `accepted` or `rejected`, then a `problem:` or `warning:` line for each issue in the banner's words. A missing file is `accepted (no file: the defaults)`. It exits 1 when a file has a problem, else 0; a bad argument exits 2.
-- `--json` prints one object, each file's `ConfigurationCheck` under its name (`config.toml`, `cli.toml`), in the record's fields. Both encode through `ConfigurationCheck`, so the `config.toml` entry and `config-status.json` match field for field when they read the same file at the same time; `ConfigurationCheckTests` holds that.
-- A `cli.toml` has no warnings: what it doesn't know is a problem (see below).
+- `ConfigurationCommands` (in `Sources/ShipyardCommand/`) owns the command. The executable hands it one check per file, so the command never links a file's reader: the Mac's build checks `config.toml` and each theme file with `ConfigurationStore.checks(_:at:)`, a fresh store's `reload()`, and `cli.toml` with `CLISettingsFile.check(at:)`; the Linux build checks only `cli.toml` and never links `ShipyardConfig`.
+- On the Mac, `config.toml` is the file `config-location.json` names, as for `shipyard ping` (`ConfigurationLocation.current`), and the `themes` folder and `cli.toml` are beside it.
+- It prints `config.toml`, then each theme file in file-name order, then `cli.toml`: each file's path and `accepted` or `rejected`, then a `problem:` or `warning:` line for each issue in the banner's words. A missing file is `accepted (no file: the defaults)`. It exits 1 when a file has a problem, else 0; a bad argument exits 2.
+- `--json` prints one object, each file's `ConfigurationCheck` under its name (`config.toml`, `themes/<file>`, `cli.toml`), in the record's fields. Both encode through `ConfigurationCheck`, so the `config.toml` entry and `config-status.json` match field for field when they read the same file at the same time; `ConfigurationCheckTests` holds that.
+- A `cli.toml` has no warnings: what it doesn't know is a problem (see below). Neither has a theme file.
+- `config-status.json` holds `config.toml`'s verdict alone: a theme file's problems show in the panel's banner and in `config check` (ADR 0014).
 
 ## Configuration and app state
 
@@ -134,6 +135,18 @@ app-machine = "my-mac"
 - `version` is the file's format, `CLISettings.supportedVersion` (1). A file without it reads as version 1 with no warning, since a warning would print on every `shipyard notice send`; any other version is an error that names the version this build reads. An older `shipyard` rejects `version` as an unknown key, so a machine's `shipyard` is updated before its `cli.toml` gains the line.
 - `schema/cli.schema.json` is published as `config.schema.json` is: its `$id`, `CLISettings.schemaURL` and the `#:schema` line of the examples here and in `skills/shipyard/references/notices.md` are one URL on `main`, and `CLISettingsSchemaTests` keeps them equal. Its `additionalProperties: false` rejects unknown keys as the reader does, and the test checks it declares exactly the keys the reader takes, with its choices and port range.
 - A new `cli.toml` setting is a property on its table's struct, a key in `CLISettings.Reader`'s known list and its read, a property in the schema, a line in `CLISettingsSchemaTests`' `everyCLIKey` and its key list, read and rejection cases in `CLISettingsTests`, and the skill's notices reference.
+
+## Themes
+
+The `theme` key picks a theme by name, and its themes come from two places (ADR 0014): the six built-in themes, embedded in `Sources/ShipyardConfig/Theme/` as `BuiltInThemes+<Name>.swift`, and the user's theme files, every `*.toml` in the `themes` folder beside `config.toml`.
+The module design is the low-level design's *Themes*; this section is what to touch.
+The file format, for users and their agents, is `skills/shipyard/references/themes.md`, and `docs/themes/example-custom.toml` is the commented example theme the tests read.
+
+- **The reader.** `ThemeReader` in `ThemeReader.swift` reads a theme file with TOMLDecoder and `TOMLSourceMap`, as `ConfigurationReader` reads `config.toml`, but strictly: an unknown key, section or token is a problem, not a warning, since a mistyped colour would otherwise draw the default without a word.
+- **A file with a problem.** It keeps the theme it last read, and its problems reach the panel's banner through `Shipyard.themeIssues`; it never rejects `config.toml`. A `theme` that names a file that never read is a warning on its line.
+- **A new token.** A case in `ThemeToken` with its `section.name` and its `system(_:)` shade, a value in each built-in theme where `system` won't do, its row in the skill's themes reference, a `ThemeColor` name in the app, and a case in `ThemeReaderTests`.
+- **A new knob.** A field in `ThemeKnobs` with the Shipyard theme's default, its read and range in `ThemeReader`, its row in the skill's themes reference, and a case in `ThemeReaderTests`.
+- **A new built-in theme.** One `BuiltInThemes+<Name>.swift` holding the file as text, one line in `BuiltInThemes.sources`, the name in the schema's `theme` description and the skill's `theme` row, and the name in `ThemeReaderTests`' list of built-ins, which reads each one and runs the contrast check on it in both appearances.
 
 ## Adding or changing a setting
 
