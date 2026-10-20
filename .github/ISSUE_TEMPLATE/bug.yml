@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in shipyard does not work as it should.
+labels: ["needs-triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the panel.
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: The lines of `config.toml` that matter, and the output of `shipyard config check`. Remove private repository names.
+      render: toml
+  - type: input
+    id: version
+    attributes:
+      label: shipyard version
+      description: The output of `shipyard --version`.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+    validations:
+      required: true
