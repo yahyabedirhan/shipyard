@@ -95,22 +95,6 @@ enum Palette {
         }
     }
 
-    static func color(_ level: RateLevel) -> Color {
-        switch level {
-        case .normal: .secondary
-        case .low: amber
-        case .exhausted: red
-        }
-    }
-
-    static func bar(_ level: RateLevel) -> Color {
-        switch level {
-        case .normal: green.opacity(0.65)
-        case .low: amber
-        case .exhausted: red
-        }
-    }
-
     static func symbol(_ state: ItemState, kind: ItemKind) -> String {
         switch (kind, state) {
         case (.pullRequest, .merged): "arrow.triangle.merge"

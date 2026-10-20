@@ -33,7 +33,7 @@ struct MeasuredScrollView<Content: View>: View {
 
 struct Hairline: View {
     var body: some View {
-        Rectangle().fill(Palette.separator).frame(height: 1)
+        Rectangle().fill(ThemeColor.separator).frame(height: 1)
     }
 }
 
@@ -419,13 +419,13 @@ private struct IconButtonBody: View {
     var body: some View {
         configuration.label
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(hover && isEnabled ? .primary : .secondary)
+            .foregroundStyle(hover && isEnabled ? ThemeColor.textPrimary : ThemeColor.textSecondary)
             .opacity(isEnabled ? 1 : 0.4)
             .padding(.horizontal, labeled ? 6 : 0)
             .frame(width: labeled ? nil : compact ? 16 : 24, height: compact ? 16 : 22)
             .background(
                 RoundedRectangle(cornerRadius: compact ? 4 : 6, style: .continuous)
-                    .fill(configuration.isPressed ? Palette.pressed : hover && isEnabled ? Palette.hover : .clear)
+                    .fill(configuration.isPressed ? ThemeColor.rowPressed : ThemeColor.rowHover.opacity(hover && isEnabled ? 1 : 0))
             )
             .contentShape(Rectangle())
             .onHover { hover = $0 }
@@ -566,8 +566,8 @@ struct MarkSeenButton: View {
     }
 }
 
-struct TextButtonStyle: ButtonStyle {
-    var tint: Color = Palette.accent
+struct TextButtonStyle<Tint: ShapeStyle>: ButtonStyle {
+    var tint: Tint
     var font: Font = TypeScale.captionEmphasis
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
@@ -575,9 +575,16 @@ struct TextButtonStyle: ButtonStyle {
     }
 }
 
-private struct TextButtonBody: View {
+extension TextButtonStyle where Tint == ThemeColor {
+    /// A text button in the accent.
+    init(font: Font = TypeScale.captionEmphasis) {
+        self.init(tint: ThemeColor.accent, font: font)
+    }
+}
+
+private struct TextButtonBody<Tint: ShapeStyle>: View {
     let configuration: ButtonStyleConfiguration
-    let tint: Color
+    let tint: Tint
     let font: Font
     @Environment(\.isEnabled) private var isEnabled
     @State private var hover = false
@@ -585,7 +592,7 @@ private struct TextButtonBody: View {
     var body: some View {
         configuration.label
             .font(font)
-            .foregroundStyle(hover && isEnabled ? AnyShapeStyle(tint) : AnyShapeStyle(.secondary))
+            .foregroundStyle(hover && isEnabled ? AnyShapeStyle(tint) : AnyShapeStyle(ThemeColor.textSecondary))
             .padding(.horizontal, 6)
             .frame(height: 18)
             .background(

@@ -22,6 +22,7 @@ struct Panel: View {
             .hoverHelpHost()
         }
         .frame(width: Grid.panelWidth)
+        .background { PanelBackdrop() }
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
         .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
@@ -33,12 +34,14 @@ struct Panel: View {
             if let viewer = shipyard.viewer {
                 AccountButton(viewer: viewer, avatars: actions.avatars, action: actions.openProfile)
             } else {
-                Text(PanelText.title(for: nil)).font(TypeScale.title)
+                Text(PanelText.title(for: nil))
+                    .font(TypeScale.title)
+                    .foregroundStyle(ThemeColor.textPrimary)
             }
             if let summary = PanelText.attentionSummary(attention) {
                 Text(summary)
                     .font(TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .contentTransition(.numericText(value: Double(attention)))
                     .transition(.opacity)
             }
@@ -241,14 +244,14 @@ struct Panel: View {
                     ProgressView().controlSize(.mini)
                     Text("Refreshing…")
                         .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ThemeColor.textSecondary)
                 } else if let updated = PanelText.lastUpdated(shipyard.menu.lastUpdated, now: now) {
                     Image(systemName: "clock")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ThemeColor.textTertiary)
                     Text(updated)
                         .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ThemeColor.textSecondary)
                 }
                 Spacer()
                 if shipyard.phase == .ready, shipyard.menu.attention.total > 0 {
@@ -262,10 +265,10 @@ struct Panel: View {
                 Button(action: actions.quit) {
                     HStack(spacing: 4) {
                         Text("Quit")
-                        Text("⌘Q").foregroundStyle(.tertiary)
+                        Text("⌘Q").foregroundStyle(ThemeColor.textTertiary)
                     }
                 }
-                .buttonStyle(TextButtonStyle(tint: .primary, font: TypeScale.caption))
+                .buttonStyle(TextButtonStyle(tint: ThemeColor.textPrimary, font: TypeScale.caption))
                 .keyboardShortcut("q")
             }
             if shipyard.phase == .ready, let indicator = shipyard.menu.rateIndicator {
@@ -277,7 +280,7 @@ struct Panel: View {
         .padding(.leading, Grid.gutter)
         .padding(.trailing, Grid.gutter - 6)
         .padding(.vertical, 8)
-        .background(Palette.chrome)
+        .background(ThemeColor.chrome)
         .animation(.spring(duration: 0.5), value: shipyard.menu.rateIndicator)
     }
 }
@@ -297,6 +300,7 @@ private struct AccountButton: View {
                 avatarView
                 Text(PanelText.title(for: viewer))
                     .font(TypeScale.title)
+                    .foregroundStyle(ThemeColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -304,7 +308,7 @@ private struct AccountButton: View {
             .frame(height: 26)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(hover ? Palette.hover : .clear)
+                    .fill(ThemeColor.rowHover.opacity(hover ? 1 : 0))
             )
             .contentShape(Rectangle())
         }
@@ -337,17 +341,17 @@ private struct AccountButton: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Circle()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(ThemeColor.field)
                     .overlay(
                         Image(systemName: "person.fill")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(ThemeColor.textTertiary)
                     )
             }
         }
         .frame(width: Self.avatarSize, height: Self.avatarSize)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .overlay(Circle().strokeBorder(ThemeColor.border, lineWidth: 0.5))
         .accessibilityHidden(true)
     }
 
@@ -405,14 +409,14 @@ private struct RateLine: View {
     var body: some View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
-                Capsule().fill(Palette.bar(usage.level)).frame(width: 26 * fraction)
+                Capsule().fill(ThemeColor.track)
+                Capsule().fill(ThemeColor.rateBar(usage.level)).frame(width: 26 * fraction)
             }
             .frame(width: 26, height: 4)
             .accessibilityHidden(true)
             Text(PanelText.rateUsage(usage))
                 .font(TypeScale.caption)
-                .foregroundStyle(usage.level == .normal ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.color(usage.level)))
+                .foregroundStyle(ThemeColor.rate(usage.level))
         }
     }
 }
