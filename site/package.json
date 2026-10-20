@@ -1,0 +1,39 @@
+{
+  "name": "shipyard-site",
+  "private": true,
+  "license": "Apache-2.0",
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p . && vite build && node scripts/check-public-bundle.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "images": "node scripts/social.mjs && node scripts/shots.mjs",
+    "shots": "node scripts/shots.mjs",
+    "social": "node scripts/social.mjs",
+    "placeholders": "node scripts/placeholders.mjs",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@sentry/browser": "^11.8.0",
+    "posthog-js": "^1.438.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "happy-dom": "^21.0.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^4.151.1"
+  }
+}

@@ -1,0 +1,15 @@
+/* The plain pages (privacy and 404): the docs' text column alone. Values come from tokens.css. */
+.dx .plain{max-width:var(--col);margin:0 auto;padding:var(--sp-14) var(--gutter-phone) var(--sp-20)}
+.dx .plain>main{margin-top:var(--sp-14)}
+.dx .prose h2{margin:var(--sp-14) 0 var(--sp-5);font:600 var(--type-h2)/1.1 var(--serif);color:var(--fg)}
+.dx .prose p,.dx .prose li{color:var(--text)}
+.dx .prose ul{padding-left:var(--sp-8);margin:0 0 var(--sp-6)}
+.dx .prose li{margin-bottom:var(--sp-2)}
+.dx .prose .tbl-wrap{margin:var(--sp-7) 0}
+.dx .optout{margin-top:var(--sp-14);padding-top:var(--sp-9);border-top:var(--hair) solid var(--line)}
+.dx .optout-btns{display:flex;flex-wrap:wrap;gap:var(--sp-3)}
+.dx .chip{font:500 var(--type-small)/1 var(--sans);color:var(--fg);padding:var(--sp-3) var(--sp-5);border-radius:var(--radius-pill);background:var(--tint)}
+.dx .chip:hover{background:var(--tint-2)}
+.dx .plain-foot{display:flex;gap:var(--sp-7);margin-top:var(--sp-16);padding-top:var(--sp-9);border-top:var(--hair) solid var(--line)}
+.dx .plain-foot a{font-size:var(--type-caption);color:var(--mut);text-decoration:none}
+.dx .plain-foot a:hover{color:var(--fg)}

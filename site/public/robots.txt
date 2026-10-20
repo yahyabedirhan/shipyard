@@ -1,0 +1,9 @@
+# shipyard: https://shipyard.yahyapak.dev
+# Every crawler and AI agent is welcome.
+# Docs for AI agents: https://shipyard.yahyapak.dev/llms.txt
+# Everything in one file: https://shipyard.yahyapak.dev/llms-full.txt
+
+User-agent: *
+Allow: /
+
+Sitemap: https://shipyard.yahyapak.dev/sitemap.xml
