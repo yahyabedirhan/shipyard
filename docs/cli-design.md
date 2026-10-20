@@ -30,7 +30,7 @@ The design of the `shipyard` command line: who calls it, its command tree, its i
 | Wait | `lease take --wait` | Bounded: 0 to 3600 seconds |
 | Plumbing | `herdr-event` | Run by hooks; reads its input from the environment |
 
-**Runtime.** `ping`, `config check`, `help` and `herdr-event` need only local files and work offline. `notice` needs the running app on the Mac, the tailnet to the app machine, or the plugin. `app`, `panel`, `lease` and `notes` need the Mac's app; `app status` and `app open` work when it isn't running and say so.
+**Runtime.** `ping`, `config check`, `help` and `herdr-event` need only local files and work offline. `notice` needs the running app on the Mac, the tailnet to the app machine, or the plugin. `app`, `panel`, `lease` and `notes` need the Mac's app; `app open` works when it isn't running and starts it; `app status` says it isn't running and exits 1.
 
 **Out of scope.** No interactive prompts or pickers, no colour, no shell completions yet, no Windows build, and no command that changes `config.toml`: agents edit the file (ADR 0001).
 
@@ -160,7 +160,7 @@ shipyard --version
 | `lease take` / `release` | `you hold shipyard until <HH:mm:ss>` / one line | — | another agent holds it |
 | `notes check` | one line per project, then each problem | — | an error in the layout; the app isn't running |
 | `config check` | each file's verdict, problems and warnings: `config.toml`, each theme file in file-name order, `cli.toml` | each file's result by name: `config.toml`, `themes/<file>`, `cli.toml` | a file has a problem |
-| `help` | the top help, or a group's help | every command and every old name | — |
+| `help` | the top help, or a group's help | every command | — |
 
 **`config check`'s files.** The Mac's `shipyard` checks `config.toml`, then each `*.toml` theme file in the `themes` folder beside it, in file-name order, then `cli.toml`; the Linux `shipyard` checks `cli.toml` alone (ADR 0014).
 Each file prints its absolute path and `accepted` or `rejected`, then one indented `problem:` or `warning:` line per issue in the panel banner's words; a theme file's problems read `themes/<file> line N: …`, and a theme file has no warnings.
@@ -176,9 +176,9 @@ Each file prints its absolute path and `accepted` or `rejected`, then one indent
 
 **Exit codes**, the same on every command: 0 success; 1 failed or refused, with one line on why; 2 wrong usage, with one line and the help to read.
 
-**Errors** are one line on standard error that names the command, says what is wrong and ends with the way out: `shipyard panel show-tab: missing <name>. Run 'shipyard panel --help' for usage.` A mistyped group names the closest one and never runs it: `shipyard: unknown command 'pnig'. Did you mean 'shipyard ping'? Run 'shipyard --help' for the commands.` A Mac-only group on another machine says `shipyard: 'shipyard app' runs on the Mac, where the app is`.
+**Errors** are one line on standard error that names the command, says what is wrong and ends with the way out: ``shipyard panel show-tab: missing <name>. Run `shipyard panel --help` for usage.`` A mistyped group names the closest one and never runs it: ``shipyard: unknown command `pnig`. Did you mean `shipyard ping`? Run `shipyard --help` for the commands.`` A Mac-only group on another machine says ``shipyard: `shipyard app` runs on the Mac, where the app is``.
 
-**Old forms** are unknown commands: `shipyard notify` names `shipyard notice` as the closest group, and `shipyard ping "<title>"` says `shipyard ping: unknown command '<title>'; send a ping with 'shipyard ping send <title>'.`
+**Old forms** are unknown commands: `shipyard notify` names `shipyard notice` as the closest group, and `shipyard ping "<title>"` says ``shipyard ping: unknown command `<title>`; send a ping with `shipyard ping send <title>`. Run `shipyard ping --help` for usage.``
 
 ## Help
 
@@ -269,7 +269,7 @@ main.swift                    builds the table: ping, notice, app, panel, lease,
             └── ControlNoticeRoute → the app → "shown", exit 0
 ```
 
-**A refusal.** `shipyard app capture` with no file: `ShipyardCLI.run` finds `app`, its `run` sees `capture` and calls `ScreenshotCommand.parse([])`, which returns `.usage("shipyard app capture: missing <file.png>. Run 'shipyard app capture --help' for usage.")`, exit 2. Nothing is sent to the app.
+**A refusal.** `shipyard app capture` with no file: `ShipyardCLI.run` finds `app`, its `run` sees `capture` and calls `ScreenshotCommand.parse([])`, which returns ``.usage("shipyard app capture: missing <file.png>. Run `shipyard app capture --help` for usage.")``, exit 2. Nothing is sent to the app.
 
 **Contract tests** (`CommandTableTests`): every old form is refused in one line and runs nothing; every group's `--help` names each of its table commands; a mistyped group suggests the closest one in one line; `help --json` lists every command; `help <group>` is `<group> --help`. `SkillDocumentTests` checks that the skill teaches each command as it's built.
 

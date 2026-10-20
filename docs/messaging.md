@@ -27,7 +27,7 @@ Each candidate is under 80 characters, and each is a variant to show on the posi
 | `positioning/C` | Your agents' pull requests, issues and runs, one click away in the menu bar. | 76 |
 
 Until one is picked, every surface uses `positioning/A`.
-The README's current line, "A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.", is 94 characters, over the limit, and goes when the choice is made.
+The README's current line, "A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.", is 96 characters, over the limit, and goes when the choice is made.
 
 ## Uses
 
@@ -39,20 +39,20 @@ Every surface names both or neither.
 
 ## Reach
 
-Every GitHub repository your account can read, on github.com, from one Mac, with pings from any machine your agents run on.
+Every GitHub repository your account can read, on github.com, from one Mac, with pings from your machines that run Herdr with the herdr-shipyard plugin.
 
 ## Proof points
 
 Each one is true of the code today.
 
-- **One number in the menu bar:** how many items need attention: new, changed since you last opened them, waiting on your review, or failing their checks.
+- **One number in the menu bar,** by default: how many items need attention: new, changed since you last opened them, waiting on your review, or failing their checks.
 - **One file, edited by you or your agents:** everything lives in `~/.config/shipyard/config.toml`, every key is optional, and each save applies at once. A broken edit keeps the last good configuration and shows the error.
 - **An agent skill:** `npx skills add yahyabedirhan/shipyard -g -y` teaches coding agents to change the file in your words.
 - **Pings from agents:** `shipyard ping send` lists a message under the project the agent works in, with a notification, and its click opens a link, an app or the agent's Herdr pane.
-- **Pings from other machines:** the `shipyard` command runs on Linux too, and the Mac collects pings from machines it knows through Herdr.
+- **Pings from other machines:** the `shipyard` command runs on Linux too, and the Mac collects pings from the machines named in `[remote] machines`, which run Herdr with the herdr-shipyard plugin.
 - **Three presets:** `my-agents`, `incoming-contributions` and `review-queue`, offered on first launch.
 - **Notes in Notion:** optional, one database per project, listed beside the pull requests.
-- **Native and small:** a Swift app with no Dock icon, open source under Apache 2.0.
+- **Native and open:** a Swift app with no Dock icon, open source under Apache 2.0.
 
 ## Non-claims
 
@@ -79,7 +79,7 @@ Use only these words on public surfaces.
 | attention count | The number in the menu bar | badge, unread count |
 | preset | A ready-made configuration for one use | template, profile |
 | layout | `list` or `tabs` | view, mode |
-| ping | An agent's message to you, kept until you see it | notification, alert |
+| ping | An agent's message to you, listed until you have seen it and its `seen-window` passes | notification, alert |
 | notice | An agent's disposable status message, such as "tests running" | ping, toast |
 | notification | The macOS banner shipyard posts when a rule matches | ping, alert |
 | note | Your own note, kept in Notion per project | idea, memo |
