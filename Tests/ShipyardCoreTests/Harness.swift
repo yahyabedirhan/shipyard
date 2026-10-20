@@ -202,11 +202,11 @@ extension Harness {
         section(name)?.rows.map(\.title) ?? []
     }
 
-    func startWithMachines(graphQL answer: StubHTTP.Answer, hetzner: [Ping] = [], netcup: [Ping] = [], polled: Bool = false) async {
+    func startWithMachines(graphQL answer: StubHTTP.Answer, alpha: [Ping] = [], beta: [Ping] = [], polled: Bool = false) async {
         stub.on(Harness.userURL, Harness.viewerAnswer)
         graphQL([answer])
-        herdr.addMachine("hetzner-vps", pings: hetzner)
-        herdr.addMachine("netcup-vps", pings: netcup)
+        herdr.addMachine("alpha-vps", pings: alpha)
+        herdr.addMachine("beta-vps", pings: beta)
         await shipyard.start()
         if polled { await poll() }
     }

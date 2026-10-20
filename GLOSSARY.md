@@ -138,7 +138,7 @@ A coding agent shipyard recognises in a ping's sender, such as Claude Code or Co
 _Avoid_: Agent icon, monogram
 
 **Machine**:
-A computer where agents run in Herdr, known to the Mac's Herdr as a saved machine by its label, such as `netcup-vps`. The user names the machines shipyard asks for pings by those labels. The Mac itself is the local machine.
+A computer where agents run in Herdr, known to the Mac's Herdr as a saved machine by its label, such as `beta-vps`. The user names the machines shipyard asks for pings by those labels. The Mac itself is the local machine.
 _Avoid_: Host, server, remote (on its own)
 
 **Remote ping**:

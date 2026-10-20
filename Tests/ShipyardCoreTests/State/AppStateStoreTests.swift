@@ -196,7 +196,7 @@ struct AppStateStoreTests {
         store.load(at: now)
         var snoozes = BannerSnoozes()
         snoozes.snooze("fetch", at: now)
-        snoozes.snooze("machine-netcup-vps", at: now)
+        snoozes.snooze("machine-beta-vps", at: now)
         store.update { $0.bannerSnoozes = snoozes }
 
         let reloaded = AppStateStore(directory: directory)
@@ -279,8 +279,8 @@ struct AppStateStoreTests {
                 "https://github.com/o/r/pull/2": { "events": "pr.opened" }
               },
               "remotePings": {
-                "shipyard://ping/netcup-vps/q1": { "instance": "abc", "dismissed": false },
-                "shipyard://ping/netcup-vps/q2": { "dismissed": "yes" }
+                "shipyard://ping/beta-vps/q1": { "instance": "abc", "dismissed": false },
+                "shipyard://ping/beta-vps/q2": { "dismissed": "yes" }
               },
               "pingNumbers": { "shop": { "last": 3, "pings": { "shipyard://ping/k7qm2x": 1 } }, "blog": { "last": "many" } },
               "bannerSnoozes": { "fetch": "2026-09-25T13:00:00Z", "delay": "soon" }
@@ -294,7 +294,7 @@ struct AppStateStoreTests {
         #expect(store.state.known.sources == ["shop": Set([ItemSource(repository: "o/r", kind: .pullRequest)])])
         #expect(store.state.notified.records["https://github.com/o/r/pull/1"]?.events == Set(["pr.opened"]))
         #expect(store.state.notified.records["https://github.com/o/r/pull/2"] == nil)
-        #expect(store.state.remotePings.marks == ["shipyard://ping/netcup-vps/q1": .init(instance: "abc")])
+        #expect(store.state.remotePings.marks == ["shipyard://ping/beta-vps/q1": .init(instance: "abc")])
         #expect(store.state.pingNumbers == PingNumbers(sections: ["shop": .init(last: 3, pings: ["shipyard://ping/k7qm2x": 1])]))
         #expect(store.state.bannerSnoozes == BannerSnoozes(ends: ["fetch": now.addingTimeInterval(3600)]))
 

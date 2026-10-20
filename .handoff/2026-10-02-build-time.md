@@ -25,7 +25,7 @@ Its timing method:
 ## Decisions settled with the maintainer
 
 - **Do all four steps in #124.** The maintainer agreed to all of them, including running the release bundle only on `main` and tags. Say in the pull request what that gives up (a broken bundle shows up at merge, not on the branch).
-- **Don't block 0.0.6.** The `shipyard-0-0-6` orchestrator runs on netcup-vps on `effort/shipyard-0-0-6`. It changes tests and adds `.github/workflows/linux-cli.yml`. So:
+- **Don't block 0.0.6.** The `shipyard-0-0-6` orchestrator runs on beta-vps on `effort/shipyard-0-0-6`. It changes tests and adds `.github/workflows/linux-cli.yml`. So:
   - edit only `.github/workflows/ci.yml` and docs;
   - leave `Makefile`, `Package.swift`, `Sources/`, `Tests/` and `linux-cli.yml` alone;
   - file the follow-up for `linux-cli.yml`, the same caching and folded steps once 0.0.6 merges, as a ticket.

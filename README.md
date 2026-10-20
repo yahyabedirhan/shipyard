@@ -87,7 +87,7 @@ Then name them in `config.toml` by their Herdr labels:
 
 ```toml
 [remote]
-machines = ["hetzner-vps"]
+machines = ["alpha-vps"]
 ```
 
 Shipyard asks each machine for its pings through Herdr about every 30 seconds and files them under the projects that watch their repositories, or under the machine's name. Clicking one sent from a Herdr pane takes you to that agent. On those machines the plugin also pings you by itself when Herdr marks an agent blocked, and takes the ping back when the agent goes on. A machine that doesn't answer shows a quiet line and keeps its last pings.

@@ -8,8 +8,8 @@ struct ConfigurationRemoteTests {
     @Test("no machines in an empty file; labels are read in order, trimmed")
     func machines() throws {
         #expect(try #require(decoded("")).configuration.remote.machines == [])
-        let config = try #require(decoded("[remote]\nmachines = [\"netcup-vps\", \" My VPS \"]\n")).configuration
-        #expect(config.remote.machines == ["netcup-vps", "My VPS"])
+        let config = try #require(decoded("[remote]\nmachines = [\"beta-vps\", \" My VPS \"]\n")).configuration
+        #expect(config.remote.machines == ["beta-vps", "My VPS"])
     }
 
     @Test("a label starting with -, an empty one, or one listed twice is rejected at its line")

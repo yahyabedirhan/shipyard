@@ -109,7 +109,7 @@ public enum PanelText {
     }
 
     /// What a ping's row names in the list layout's narrow column: the
-    /// machine a remote ping came from and its sender, "netcup-vps ·
+    /// machine a remote ping came from and its sender, "beta-vps ·
     /// claude-code", either alone when the other isn't there; `nil` when
     /// neither is.
     public static func pingMeta(_ row: MenuRow) -> String? {

@@ -6,7 +6,7 @@ import Testing
 
 private let twoMachines = """
     [remote]
-    machines = ["hetzner-vps", "netcup-vps"]
+    machines = ["alpha-vps", "beta-vps"]
 
     [[projects]]
     slug = "shop"
@@ -33,9 +33,9 @@ private func queued(_ title: String, minutes: Double = 1, project: String = "sho
 
 @MainActor
 private extension Harness {
-    static func withMachines(netcup: [Ping] = []) async throws -> Harness {
+    static func withMachines(beta: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: twoMachines)
-        await harness.startWithMachines(graphQL: onePullRequest, netcup: netcup)
+        await harness.startWithMachines(graphQL: onePullRequest, beta: beta)
         return harness
     }
 
@@ -48,21 +48,21 @@ struct RemoteNoticeTests {
     @Test("the poll shows the notices waiting on a machine, oldest first, then removes them there, so the next poll shows nothing again")
     func shownThenRemoved() async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.queue(queued("Tests running", minutes: 3), on: "netcup-vps")
-        harness.herdr.queue(queued("Done"), on: "netcup-vps")
+        harness.herdr.queue(queued("Tests running", minutes: 3), on: "beta-vps")
+        harness.herdr.queue(queued("Done"), on: "beta-vps")
 
         await harness.poll()
 
         #expect(harness.noticeTitles == ["shop · Tests running", "shop · Done"])
         #expect(harness.notifier.posted.last?.body == "from claude")
-        #expect(harness.herdr.queued(on: "netcup-vps").isEmpty)
-        let runs = harness.herdr.runs(on: "netcup-vps").filter { $0.starts(with: ["plugin", "action"]) }
+        #expect(harness.herdr.queued(on: "beta-vps").isEmpty)
+        let runs = harness.herdr.runs(on: "beta-vps").filter { $0.starts(with: ["plugin", "action"]) }
         #expect(runs == [
             ["plugin", "action", "invoke", "list"] + plugin,
             ["plugin", "action", "invoke", "notices"] + plugin,
             ["plugin", "action", "invoke", "notices-read"] + plugin,
         ])
-        #expect(harness.titles("netcup-vps").isEmpty)
+        #expect(harness.titles("beta-vps").isEmpty)
         #expect(harness.shipyard.menu.attention.pings == 0)
 
         await harness.poll()
@@ -77,49 +77,49 @@ struct RemoteNoticeTests {
     ])
     func dropsStale(minutes: Double, shown: Bool) async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.queue(queued("Deployed", minutes: minutes), on: "netcup-vps")
+        harness.herdr.queue(queued("Deployed", minutes: minutes), on: "beta-vps")
 
         await harness.poll()
 
         #expect(harness.noticeTitles == (shown ? ["shop · Deployed"] : []))
-        #expect(harness.herdr.queued(on: "netcup-vps").isEmpty)
+        #expect(harness.herdr.queued(on: "beta-vps").isEmpty)
     }
 
     @Test("the rules apply as to any notice: a project whose rules leave agent.notice out, or no project, shows nothing")
     func rulesApply() async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.queue(queued("Quiet run", project: "quiet"), on: "hetzner-vps")
-        harness.herdr.queue(queued("Nowhere", project: "gone"), on: "hetzner-vps")
-        harness.herdr.queue(queued("Shown"), on: "hetzner-vps")
+        harness.herdr.queue(queued("Quiet run", project: "quiet"), on: "alpha-vps")
+        harness.herdr.queue(queued("Nowhere", project: "gone"), on: "alpha-vps")
+        harness.herdr.queue(queued("Shown"), on: "alpha-vps")
 
         await harness.poll()
 
         #expect(harness.noticeTitles == ["shop · Shown"])
-        #expect(harness.herdr.queued(on: "hetzner-vps").isEmpty)
+        #expect(harness.herdr.queued(on: "alpha-vps").isEmpty)
     }
 
     @Test("a notice that doesn't read is dropped; the others show")
     func unreadable() async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.queue(#"{"id":"x","sent":"yesterday"}"#, on: "netcup-vps")
-        harness.herdr.queue(queued("Done"), on: "netcup-vps")
+        harness.herdr.queue(#"{"id":"x","sent":"yesterday"}"#, on: "beta-vps")
+        harness.herdr.queue(queued("Done"), on: "beta-vps")
 
         await harness.poll()
 
         #expect(harness.noticeTitles == ["shop · Done"])
-        #expect(harness.herdr.queued(on: "netcup-vps").isEmpty)
+        #expect(harness.herdr.queued(on: "beta-vps").isEmpty)
     }
 
     @Test("pings are unaffected: they list and notify beside the notices, and a plugin from before notices leaves them as they were")
     func pingsUnaffected() async throws {
-        let harness = try await Harness.withMachines(netcup: [remotePing("q1", "Deploy?")])
-        harness.herdr.withoutNotices(on: "netcup-vps")
-        harness.herdr.queue(queued("Done"), on: "hetzner-vps")
+        let harness = try await Harness.withMachines(beta: [remotePing("q1", "Deploy?")])
+        harness.herdr.withoutNotices(on: "beta-vps")
+        harness.herdr.queue(queued("Done"), on: "alpha-vps")
 
         await harness.poll()
 
-        #expect(harness.titles("netcup-vps") == ["Deploy?"])
-        #expect(harness.pingNotifications.map(\.title) == ["netcup-vps · Deploy?"])
+        #expect(harness.titles("beta-vps") == ["Deploy?"])
+        #expect(harness.pingNotifications.map(\.title) == ["beta-vps · Deploy?"])
         #expect(harness.noticeTitles == ["shop · Done"])
         #expect(harness.shipyard.menu.machineNotices.isEmpty)
         #expect(harness.machineTimer.armed == 30)
@@ -128,16 +128,16 @@ struct RemoteNoticeTests {
     @Test("a machine whose pings couldn't be read isn't asked for its notices; they wait for a poll that reaches it")
     func unreachableKeepsThem() async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.queue(queued("Done"), on: "netcup-vps")
-        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        harness.herdr.queue(queued("Done"), on: "beta-vps")
+        harness.herdr.setReach(.unreachable, on: "beta-vps")
 
         await harness.poll()
 
         #expect(harness.noticeTitles.isEmpty)
-        #expect(harness.herdr.queued(on: "netcup-vps").count == 1)
-        #expect(!harness.herdr.runs(on: "netcup-vps").contains(["plugin", "action", "invoke", "notices"] + plugin))
+        #expect(harness.herdr.queued(on: "beta-vps").count == 1)
+        #expect(!harness.herdr.runs(on: "beta-vps").contains(["plugin", "action", "invoke", "notices"] + plugin))
 
-        harness.herdr.setReach(.up, on: "netcup-vps")
+        harness.herdr.setReach(.up, on: "beta-vps")
         await harness.poll()
         #expect(harness.noticeTitles == ["shop · Done"])
     }
@@ -145,21 +145,21 @@ struct RemoteNoticeTests {
     @Test("a Herdr click or button on a notice from a machine focuses the pane on that machine, as a remote ping's click does; a link opens on the Mac")
     func herdrOnItsMachine() async throws {
         let harness = try await Harness.withMachines()
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "netcup-vps")
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "hetzner-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "beta-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "alpha-vps")
         let link = URL(string: "https://example.com/run/1")!
         var waiting = queued("Done")
         waiting.notice.action = .herdr("w1:p3")
         waiting.notice.buttons = [NoticeButton(label: "Run", action: .url(link))]
-        harness.herdr.queue(waiting, on: "netcup-vps")
+        harness.herdr.queue(waiting, on: "beta-vps")
         await harness.poll()
         let posted = try #require(harness.notifier.posted.first { $0.event == .agentNotice })
 
         await harness.shipyard.openNotification(posted.itemURL).value
         await harness.shipyard.openNotification(try #require(posted.buttons.first).url).value
 
-        #expect(harness.herdr.runs(on: "netcup-vps").filter { $0.first != "plugin" } == [["agent", "focus", "w1:p3"]])
-        #expect(harness.herdr.runs(on: "hetzner-vps").filter { $0.first != "plugin" }.isEmpty)
+        #expect(harness.herdr.runs(on: "beta-vps").filter { $0.first != "plugin" } == [["agent", "focus", "w1:p3"]])
+        #expect(harness.herdr.runs(on: "alpha-vps").filter { $0.first != "plugin" }.isEmpty)
         #expect(harness.herdr.focused.isEmpty)
         #expect(harness.actions.ran.last == .url(link))
     }

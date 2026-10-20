@@ -13,7 +13,7 @@ You run the test audit in issue #122 "Prune tests that don't earn their keep, wi
 ## Decisions settled with the maintainer
 
 - **Start now, alongside 0.0.6.** The maintainer asked for it now rather than after 0.0.6.
-  - The `shipyard-0-0-6` orchestrator runs on netcup-vps on `effort/shipyard-0-0-6`, also cut from 0.0.5. It extends the ping, CLI and Herdr tests and the `Harness` and `FakeHerdr` doubles.
+  - The `shipyard-0-0-6` orchestrator runs on beta-vps on `effort/shipyard-0-0-6`, also cut from 0.0.5. It extends the ping, CLI and Herdr tests and the `Harness` and `FakeHerdr` doubles.
   - So leave those alone: nothing under the ping and CLI test folders, nothing in `FakeHerdr`, and nothing in the ping parts of `Harness`. Everything else is in scope.
 - **Discovery report first.** Post it as a comment on #122 before deleting anything. List every candidate with every evidence field, and the false positives you keep.
   - Then prune in coherent batches by area, one commit per batch.

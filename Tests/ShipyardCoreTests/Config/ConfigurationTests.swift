@@ -68,7 +68,7 @@ let everyKey = """
     terminal = "Ghostty"
 
     [remote]
-    machines = ["hetzner-vps", "netcup-vps"]
+    machines = ["alpha-vps", "beta-vps"]
 
     [notices]
     listen = true
@@ -231,7 +231,7 @@ struct ConfigurationDecodingTests {
         #expect(config.rateLimit == .init(show: .whenLow, maxSharePercent: 25))
         #expect(config.attention == .init(unseen: false, changed: false, reviewRequested: false, checksFailed: false))
         #expect(config.herdr == .init(terminal: "Ghostty"))
-        #expect(config.remote == .init(machines: ["hetzner-vps", "netcup-vps"]))
+        #expect(config.remote == .init(machines: ["alpha-vps", "beta-vps"]))
         #expect(config.notices == .init(listen: true, port: 50000))
         #expect(config.banners == .init(snoozeDuration: 10))
         #expect(config.defaults.pullRequests == .init(
