@@ -23,6 +23,7 @@ struct Panel: View {
         }
         .frame(width: Grid.panelWidth)
         .background { PanelBackdrop() }
+        .theme(shipyard.theme)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
         .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }

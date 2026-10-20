@@ -22,16 +22,20 @@ public final class ConfigurationStore: @unchecked Sendable {
     public static let fileName = "config.toml"
 
     public let url: URL
+    /// The themes `theme` may name.
+    public let themes: ThemeLibrary
 
     private let lock = NSLock()
     private var _lastValid = Configuration()
+    private var _theme = BuiltInThemes.shipyard
     private var _error: ConfigurationError?
     private var _warnings: [ConfigurationIssue] = []
     private var _modified: Date?
     private var _acceptsPreset = true
 
-    public init(url: URL) {
+    public init(url: URL, themes: ThemeLibrary = .builtIn) {
         self.url = url
+        self.themes = themes
     }
 
     /// `$XDG_CONFIG_HOME/shipyard/config.toml`, or `~/.config/shipyard/config.toml`
@@ -54,6 +58,9 @@ public final class ConfigurationStore: @unchecked Sendable {
     /// The configuration the app runs on: the last file that read cleanly,
     /// or the defaults with no projects before any did.
     public var lastValid: Configuration { synchronized { _lastValid } }
+
+    /// The theme `lastValid` picks: Shipyard before any file read cleanly.
+    public var theme: Theme { synchronized { _theme } }
 
     /// Why the latest reload failed; `nil` once a reload succeeds.
     public var error: ConfigurationError? { synchronized { _error } }
@@ -80,7 +87,7 @@ public final class ConfigurationStore: @unchecked Sendable {
         var acceptsPreset = false
         do throws(ConfigurationError) {
             let data = try read()
-            outcome = .success(try Configuration.decode(data))
+            outcome = .success(try Configuration.decode(data, themes: themes))
             acceptsPreset = String(data: data, encoding: .utf8).map(Configuration.acceptsPreset) ?? false
         } catch {
             outcome = .failure(error)
@@ -100,6 +107,7 @@ public final class ConfigurationStore: @unchecked Sendable {
                 _warnings = decoded.warnings
                 guard decoded.configuration != _lastValid || hadError else { return .unchanged }
                 _lastValid = decoded.configuration
+                _theme = themes.theme(for: decoded.configuration)
                 return .changed(decoded.configuration)
             }
         }

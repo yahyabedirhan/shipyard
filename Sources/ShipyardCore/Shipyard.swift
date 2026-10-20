@@ -62,6 +62,10 @@ public final class Shipyard {
     public private(set) var menu = MenuModel.empty {
         didSet { followBannerConditions() }
     }
+    /// The theme the panel draws with: the one `theme` in the configuration
+    /// names, kept from the last valid configuration while an edit is
+    /// rejected.
+    public private(set) var theme = BuiltInThemes.shipyard
     private(set) var expandedGroups: Set<GroupID> = []
     private(set) var snapshot: Snapshot?
     /// The pings in the ping store, as last read: at start and whenever the
@@ -443,6 +447,8 @@ public final class Shipyard {
     private func publishConfigStatus() {
         configError = configStore.error
         configWarnings = configStore.warnings
+        let theme = configStore.theme
+        if self.theme != theme { self.theme = theme }
         presets = configStore.acceptsPreset ? Preset.all : []
         let notices = configStore.lastValid.notices
         let port = notices.listen ? notices.port : nil

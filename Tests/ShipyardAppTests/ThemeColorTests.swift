@@ -35,4 +35,17 @@ struct ThemeColorTests {
         #expect(drawn(.textPrimary, theme: Self.theme, .light) != drawn(.textPrimary, theme: Self.theme, .dark))
         #expect(abs(drawn(.panel.opacity(0.5), theme: Self.theme, .light).opacity - 0.5) < 0.001)
     }
+
+    @Test("each built-in theme passes the contrast check with the live macOS colours, as with the reference ones the command uses")
+    func liveContrast() {
+        let live: (SystemShade, ThemeAppearance) -> RGBA = { shade, appearance in
+            var environment = EnvironmentValues()
+            environment.colorScheme = ColorScheme(appearance)
+            let color = SystemColors.color(shade, appearance).resolve(in: environment)
+            return RGBA(r: Double(color.red), g: Double(color.green), b: Double(color.blue), a: Double(color.opacity))
+        }
+        for theme in BuiltInThemes.themes {
+            #expect(ThemeContrast.shortfalls(theme, system: live).isEmpty, "\(theme.name): \(ThemeContrast.shortfalls(theme, system: live))")
+        }
+    }
 }

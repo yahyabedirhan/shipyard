@@ -32,11 +32,21 @@ public struct ThemeDefinition: Sendable {
     var fillsDark: Bool { !(tokens[.dark] ?? [:]).isEmpty || !(palette[.dark] ?? [:]).isEmpty }
     var fillsAny: Bool { !(tokens[.any] ?? [:]).isEmpty || !(palette[.any] ?? [:]).isEmpty }
 
-    /// The one appearance a theme with no `extends` and no `[any.*]` fills,
-    /// which it then draws in both; `nil` when it fills both or extends another.
+    /// The one appearance a theme with no `extends` fills, which it then
+    /// draws in both; `nil` when it fills both or extends another. It fills
+    /// one when it writes `[light.*]` or `[dark.*]` tables for that one
+    /// alone, and its `[any.*]` tokens, if any, read that appearance's own
+    /// palette: Paper's `[any.*]` tokens name `[light.palette]` colours, so
+    /// it fills light, where `[any.*]` tokens with a `[dark.*]` override
+    /// still set both appearances.
     var single: ThemeAppearance? {
-        guard extends == nil, !fillsAny, fillsLight != fillsDark else { return nil }
-        return fillsLight ? .light : .dark
+        guard extends == nil, fillsLight != fillsDark else { return nil }
+        let one: Layer = fillsLight ? .light : .dark
+        let appearance: ThemeAppearance = fillsLight ? .light : .dark
+        let shared = tokens[.any] ?? [:]
+        guard !shared.isEmpty else { return appearance }
+        let onlyThere = Set((palette[one] ?? [:]).keys).subtracting((palette[.any] ?? [:]).keys)
+        return shared.values.contains { onlyThere.contains($0.text) } ? appearance : nil
     }
 }
 

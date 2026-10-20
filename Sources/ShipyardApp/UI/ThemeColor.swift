@@ -26,6 +26,33 @@ extension ThemeAppearance {
     }
 }
 
+extension ColorScheme {
+    init(_ appearance: ThemeAppearance) {
+        self = appearance == .dark ? .dark : .light
+    }
+}
+
+extension View {
+    /// Draws the views below with `theme`. A theme that fills one appearance
+    /// draws it in both: the views below get that appearance, so what the
+    /// theme leaves to the system (its `system` values, text and controls
+    /// with no colour of their own) draws for its surfaces too.
+    func theme(_ theme: Theme) -> some View {
+        modifier(ThemeScope(theme: theme))
+    }
+}
+
+private struct ThemeScope: ViewModifier {
+    let theme: Theme
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.theme, theme)
+            .environment(\.colorScheme, ColorScheme(theme.drawn(ThemeAppearance(scheme))))
+    }
+}
+
 /// A token of the theme in the environment, resolved when it's drawn for the
 /// environment's appearance. A `ShapeStyle`: use it where a colour goes in
 /// `foregroundStyle`, `fill`, `background`, `stroke` and `overlay`.

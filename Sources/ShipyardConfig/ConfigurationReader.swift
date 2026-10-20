@@ -16,11 +16,11 @@ extension Configuration {
 
     /// Reads and validates `config.toml`. Empty data is the default
     /// configuration with no projects.
-    public static func decode(_ data: Data) throws(ConfigurationError) -> Decoded {
+    public static func decode(_ data: Data, themes: ThemeLibrary = .builtIn) throws(ConfigurationError) -> Decoded {
         guard let text = String(data: data, encoding: .utf8) else {
             throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
         }
-        return try decode(text)
+        return try decode(text, themes: themes)
     }
 
     /// Reads and validates the text of `config.toml`.
@@ -32,15 +32,17 @@ extension Configuration {
     /// interval under 30 s, a rate-limit share outside 1–50 and an
     /// unsupported `version`. Unknown keys are warnings, so a newer file
     /// doesn't break an older app; so are old keys (read as their new
-    /// form) and a file that sets keys without `version`.
-    public static func decode(_ text: String) throws(ConfigurationError) -> Decoded {
+    /// form) and a file that sets keys without `version`. `theme` must name
+    /// one of `themes`; the theme it names having too little contrast is a
+    /// warning.
+    public static func decode(_ text: String, themes: ThemeLibrary = .builtIn) throws(ConfigurationError) -> Decoded {
         let root: TOMLTable
         do {
             root = try TOMLTable(source: text)
         } catch {
             throw ConfigurationError([ConfigurationIssue(invalidTOML: error)])
         }
-        let reader = ConfigurationReader(map: TOMLSourceMap(text))
+        let reader = ConfigurationReader(map: TOMLSourceMap(text), themes: themes)
         let configuration = reader.configuration(from: root)
         if !reader.errors.isEmpty { throw ConfigurationError(reader.errors) }
         return Decoded(configuration: configuration, warnings: reader.warnings)
@@ -65,10 +67,14 @@ extension ConfigurationIssue {
 
 final class ConfigurationReader {
     private let map: TOMLSourceMap
+    private let themes: ThemeLibrary
     private(set) var errors: [ConfigurationIssue] = []
     private(set) var warnings: [ConfigurationIssue] = []
 
-    init(map: TOMLSourceMap) { self.map = map }
+    init(map: TOMLSourceMap, themes: ThemeLibrary = .builtIn) {
+        self.map = map
+        self.themes = themes
+    }
 
     struct Node {
         let table: TOMLTable
@@ -79,7 +85,7 @@ final class ConfigurationReader {
         let node = Node(table: root, path: [])
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
-            "version", "refresh-interval", "launch-at-login", "hide-authors",
+            "version", "theme", "refresh-interval", "launch-at-login", "hide-authors",
             "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "banners", "defaults", "projects",
         ], old: ["refresh-interval-seconds"])
 
@@ -104,6 +110,7 @@ final class ConfigurationReader {
             }
         }
         if let value = bool(node, "launch-at-login") { config.launchAtLogin = value }
+        if let name = string(node, "theme") { readTheme(name, into: &config) }
         let hiddenAuthors = strings(node, "hide-authors")
 
         if let menuBar = table(node, "menu-bar") {
@@ -708,6 +715,23 @@ final class ConfigurationReader {
         let what = noun == "value" ? "value `\(raw)` for `\(key)`" : "\(noun) `\(raw)`"
         error("unknown \(what) (\(hint))", at: node.path + [.key(key)], value: raw)
         return nil
+    }
+
+    /// `theme`: a theme of `themes`, by name, kept as the theme spells it.
+    /// Each text tier the theme can't make readable on its panel is a
+    /// warning on the key's line.
+    private func readTheme(_ name: String, into config: inout Configuration) {
+        let path: ConfigurationPath = [.key("theme")]
+        guard let theme = themes.theme(named: name) else {
+            let hint = Suggestion.nearest(to: name, in: themes.names).map { "did you mean `\($0)`?" }
+                ?? "expected one of " + themes.names.map { "`\($0)`" }.joined(separator: ", ")
+            error("unknown theme `\(name)` (\(hint))", at: path, value: name)
+            return
+        }
+        config.theme = theme.name
+        for shortfall in ThemeContrast.shortfalls(theme) {
+            warnings.append(ConfigurationIssue(line: map.line(for: path), message: "theme `\(theme.name)`: \(shortfall), so it may be hard to read"))
+        }
     }
 
     private func warnUnknownKeys(in node: Node, known: [String], old: [String] = []) {

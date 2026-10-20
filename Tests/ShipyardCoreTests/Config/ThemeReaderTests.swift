@@ -71,6 +71,17 @@ struct ThemeReaderTests {
             #expect(theme.value(.panel, .dark) == blue)
             #expect(theme.appearances == [.dark])
         },
+        Valid(name: "[any.*] tokens that read one appearance's own palette make a theme that fills that one", text: """
+            name = "Cream"
+            version = 1
+            [light.palette]
+            ink = "#ff0000"
+            [any.text]
+            primary = "ink"
+            """) { theme in
+            #expect(theme.appearances == [.light])
+            #expect(theme.value(.textPrimary, .dark) == red)
+        },
         Valid(name: "extends fills every token and knob the file leaves out, and its palette names carry over", text: """
             name = "Harbor at night"
             version = 1
@@ -239,5 +250,47 @@ struct ThemeReaderTests {
         #expect(theme.value(.accent, .dark) == .color(RGBA(hex: "#6D9CFF")!))
         #expect(theme.value(.panel, .light) == .system)
         #expect(theme.knobs == .standard)
+    }
+
+    @Test("each built-in theme reads with no problem and passes the contrast check in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
+    func builtIn(_ name: String) throws {
+        #expect(BuiltInThemes.issues.isEmpty, "\(BuiltInThemes.issues)")
+        let theme = try #require(BuiltInThemes.named(name))
+        #expect(ThemeContrast.shortfalls(theme).isEmpty, "\(ThemeContrast.shortfalls(theme))")
+        // Paper fills light and Midnight dark; each draws its one in both appearances.
+        let fills: [ThemeAppearance] = switch name {
+        case "Paper": [.light]
+        case "Midnight": [.dark]
+        default: [.light, .dark]
+        }
+        #expect(theme.appearances == fills)
+        for appearance in ThemeAppearance.allCases {
+            #expect(fills.contains(theme.drawn(appearance)))
+        }
+    }
+
+    @Test("a text tier with too little contrast on the panel is a shortfall, named with its ratio and the one it needs")
+    func contrastShortfall() throws {
+        let (theme, issues) = ThemeReader.theme("""
+            name = "Faint"
+            version = 1
+            [any.surface]
+            panel = "#ffffff"
+            [any.text]
+            primary = "#000000"
+            secondary = "#000000"
+            seen = "#000000"
+            tertiary = "#b0b0b0"
+            [dark.surface]
+            panel = "#00000080"
+            """, file: "Faint.toml", source: .builtIn, library: BuiltInThemes.definitions)
+        #expect(issues.isEmpty)
+        let shortfalls = ThemeContrast.shortfalls(try #require(theme))
+        #expect(shortfalls.map(\.description) == [
+            "light `text.tertiary` is 2.1:1 on `surface.panel`; it needs 3:1",
+            "dark `text.primary` is 1:1 on `surface.panel`; it needs 4.5:1",
+            "dark `text.secondary` is 1:1 on `surface.panel`; it needs 4.5:1",
+            "dark `text.seen` is 1:1 on `surface.panel`; it needs 4.5:1",
+        ])
     }
 }

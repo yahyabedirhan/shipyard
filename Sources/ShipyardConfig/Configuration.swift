@@ -13,6 +13,9 @@ public struct Configuration: Equatable, Sendable {
     public static let supportedVersion = 1
 
     public var version: Int = Configuration.supportedVersion
+    /// `theme`: the name of the theme the panel draws with, as the theme
+    /// spells it; Shipyard when the key is missing.
+    public var theme: String = ThemeLibrary.defaultName
     /// `refresh-interval`: a floor in seconds (at least 30); the rate
     /// budget may stretch it.
     public var refreshInterval: TimeInterval = 120

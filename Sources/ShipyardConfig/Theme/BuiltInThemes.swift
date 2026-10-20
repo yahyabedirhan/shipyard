@@ -6,6 +6,11 @@ public enum BuiltInThemes {
     /// Each built-in file's name and text, in the order themes are listed.
     static let sources: [(file: String, text: String)] = [
         ("Shipyard.toml", shipyardSource),
+        ("Native.toml", nativeSource),
+        ("Graphite.toml", graphiteSource),
+        ("Paper.toml", paperSource),
+        ("Midnight.toml", midnightSource),
+        ("Harbor.toml", harborSource),
     ]
 
     /// Each built-in file parsed, for user themes to extend.
