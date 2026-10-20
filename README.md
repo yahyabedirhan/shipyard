@@ -71,7 +71,14 @@ open /Applications/Shipyard.app
 Then quit shipyard and delete the app and its files:
 
 ```sh
-rm -rf /Applications/Shipyard.app ~/.config/shipyard ~/Library/Application\ Support/Shipyard
+rm -rf /Applications/Shipyard.app ~/.config/shipyard ~/Library/Application\ Support/Shipyard ~/.local/bin/shipyard
+```
+
+A source build also leaves its module cache and its signing keychain:
+
+```sh
+rm -rf ~/Library/Caches/shipyard
+security delete-keychain ~/Library/Keychains/shipyard-signing.keychain-db
 ```
 
 ## First run
@@ -83,7 +90,7 @@ shipyard lives in the menu bar, with no Dock icon.
    - `my-agents`: the pull requests and issues you and your agents open, one project per repository.
    - `incoming-contributions`: what other people open on your repositories, bots left out, and the pull requests waiting on your review anywhere.
    - `review-queue`: only the pull requests waiting on your review, in any repository.
-3. Choose the repositories to watch.
+3. Choose what to watch: `my-agents` asks for the repositories, `incoming-contributions` offers all your repositories or the ones you pick, and `review-queue` asks for nothing.
 
 Then:
 
@@ -266,7 +273,7 @@ version = 1
 - shipyard runs on macOS 14 or later. The `shipyard` command also runs on Linux, without the app.
 - It reads github.com only, not GitHub Enterprise Server.
 - The download is not notarized yet, and there is no Homebrew cask or automatic update yet.
-- Most settings live in `config.toml`, edited by you or your agents. The app's own controls are the layout button and the setup views in the gear menu.
+- Most settings live in `config.toml`, edited by you or your agents. The app itself writes the file only for the preset and repositories chosen during onboarding, and for the layout button in the panel's header.
 - With Herdr 0.9.3, clicking another machine's ping focuses its pane on that machine, but your Mac's Herdr window moves there only when it already shows that machine. Otherwise nothing visible happens and the ping is marked seen; switch Herdr to that machine yourself. Herdr has no command yet that switches an open window to a saved machine.
 
 ## Development
