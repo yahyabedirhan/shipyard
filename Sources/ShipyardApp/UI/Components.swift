@@ -7,10 +7,48 @@ private struct PanelNowKey: EnvironmentKey {
     static var defaultValue: Date { .now }
 }
 
+/// Which layout a shared row piece draws in: the list layout sets `.list`
+/// on its rows for its tighter scale (`ListGrid`, `ListType`).
+enum PanelStyle: Sendable {
+    case tabs, list
+
+    var dotColumn: CGFloat { self == .list ? ListGrid.dotColumn : Grid.dotColumn }
+    var iconColumn: CGFloat { self == .list ? ListGrid.iconColumn : Grid.iconColumn }
+    var rowHeight: CGFloat { self == .list ? ListGrid.rowHeight : Grid.rowHeight }
+    var meta: Font { self == .list ? ListType.meta : TypeScale.meta }
+    var eyebrow: Font { self == .list ? ListType.eyebrow : TypeScale.eyebrow }
+
+    /// How far a ping row's ✕ sits from the row's trailing edge: in the
+    /// list, just before the age column, so the age stays readable.
+    var dismissTrailing: CGFloat {
+        self == .list ? ListGrid.gutter + ListGrid.ageColumn + 2 : Grid.inset
+    }
+}
+
+private struct PanelStyleKey: EnvironmentKey {
+    static let defaultValue = PanelStyle.tabs
+}
+
+private struct RowBackdropKey: EnvironmentKey {
+    static let defaultValue: ThemeColor? = nil
+}
+
 extension EnvironmentValues {
     var panelNow: Date {
         get { self[PanelNowKey.self] }
         set { self[PanelNowKey.self] = newValue }
+    }
+
+    var panelStyle: PanelStyle {
+        get { self[PanelStyleKey.self] }
+        set { self[PanelStyleKey.self] = newValue }
+    }
+
+    /// The fill under a row while it's highlighted, which a cut-out such as
+    /// the check dot must match; `nil` when the row isn't highlighted.
+    var rowBackdrop: ThemeColor? {
+        get { self[RowBackdropKey.self] }
+        set { self[RowBackdropKey.self] = newValue }
     }
 }
 
@@ -135,12 +173,13 @@ struct Banner: View {
 
 struct StateSymbol: View {
     let row: MenuRow
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         Image(systemName: row.pingIcon.map { Palette.symbol($0) } ?? Palette.symbol(row.state, kind: row.kind))
             .symbolRenderingMode(.hierarchical)
-            .font(.system(size: 11.5, weight: .semibold))
-            .foregroundStyle(Palette.color(row.state, kind: row.kind))
+            .font(.system(size: style == .list ? 11 : 11.5, weight: style == .list ? .medium : .semibold))
+            .foregroundStyle(ThemeColor.state(row.state, kind: row.kind))
             .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
             .accessibilityLabel(PanelText.stateLabel(row))
     }
@@ -171,12 +210,19 @@ struct AgentMarkView: View {
 
 struct CheckDot: View {
     let checks: ChecksState?
+    @Environment(\.panelStyle) private var style
+    @Environment(\.rowBackdrop) private var backdrop
 
     var body: some View {
-        if let checks, let color = Palette.color(checks) {
+        if let checks, let color = ThemeColor.checks(checks) {
+            let cut: CGFloat = style == .list ? 7 : 8
+            let dot: CGFloat = style == .list ? 5 : 5.5
             ZStack {
-                Circle().fill(Palette.panel).frame(width: 8, height: 8)
-                Circle().fill(color).frame(width: 5.5, height: 5.5)
+                Circle().fill(ThemeColor.panel).frame(width: cut, height: cut)
+                if let backdrop {
+                    Circle().fill(backdrop).frame(width: cut, height: cut)
+                }
+                Circle().fill(color).frame(width: dot, height: dot)
             }
             .accessibilityLabel(PanelText.checks(checks) ?? "")
         }
@@ -185,11 +231,13 @@ struct CheckDot: View {
 
 struct AttentionDot: View {
     let isOn: Bool
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
+        let size: CGFloat = style == .list ? 5 : 6
         Circle()
-            .fill(Palette.accent)
-            .frame(width: 6, height: 6)
+            .fill(ThemeColor.attention)
+            .frame(width: size, height: size)
             .opacity(isOn ? 1 : 0)
             .scaleEffect(isOn ? 1 : 0.2)
             .accessibilityHidden(!isOn)
@@ -216,14 +264,16 @@ private struct ItemRow: ViewModifier {
     let showsRepository: Bool
     let actions: LayoutActions
     @Environment(\.panelNow) private var now
+    @Environment(\.panelStyle) private var style
 
     func body(content: Content) -> some View {
-        Button(action: click) { content }
+        let isHighlighted = highlight.isHighlighted(place)
+        Button(action: click) { content.environment(\.rowBackdrop, isHighlighted ? ThemeColor.rowHover : nil) }
             .buttonStyle(RowButtonStyle())
             .overlay(alignment: .trailing) {
-                if row.item.ping != nil, highlight.isHighlighted(place) {
+                if row.item.ping != nil, isHighlighted {
                     DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
-                        .padding(.trailing, Grid.inset)
+                        .padding(.trailing, style.dismissTrailing)
                 }
             }
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
@@ -246,13 +296,13 @@ private struct DismissButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 8, weight: .semibold))
         }
         .buttonStyle(IconButtonStyle(compact: true))
         .background(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Palette.panel)
-                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Palette.hover))
+                .fill(ThemeColor.panel)
+                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(ThemeColor.rowHover))
         )
         .hoverHelp(PanelText.dismissPing)
         .accessibilityLabel(PanelText.dismissPing)
@@ -261,49 +311,51 @@ private struct DismissButton: View {
 
 struct NoteRow: View {
     let note: String
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "info.circle")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .font(.system(size: 10.5))
-                .frame(width: Grid.iconColumn)
+                .frame(width: style.iconColumn)
             Text(note)
-                .font(TypeScale.meta)
-                .foregroundStyle(.secondary)
+                .font(style.meta)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
-        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
+        .padding(.leading, Grid.gutter + style.dotColumn - 6)
         .padding(.trailing, Grid.gutter)
-        .padding(.vertical, 5)
-        .frame(minHeight: Grid.rowHeight)
+        .padding(.vertical, style == .list ? 3 : 5)
+        .frame(minHeight: style.rowHeight)
     }
 }
 
 struct ErrorRow: View {
     let error: MenuErrorRow
     private static let maxLines = 3
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, Palette.amber)
+                .foregroundStyle(.white, ThemeColor.pending)
                 .font(.system(size: 10.5))
-                .frame(width: Grid.iconColumn)
+                .frame(width: style.iconColumn)
             Text(error.message)
-                .font(TypeScale.meta)
-                .foregroundStyle(.primary.opacity(0.75))
+                .font(style.meta)
+                .foregroundStyle(ThemeColor.textPrimary.opacity(0.75))
                 .lineLimit(Self.maxLines)
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
             Spacer(minLength: 0)
         }
-        .padding(.leading, Grid.gutter + Grid.dotColumn - 6)
+        .padding(.leading, Grid.gutter + style.dotColumn - 6)
         .padding(.trailing, Grid.gutter)
-        .padding(.vertical, 5)
-        .frame(minHeight: Grid.rowHeight)
+        .padding(.vertical, style == .list ? 3 : 5)
+        .frame(minHeight: style.rowHeight)
     }
 }
 
@@ -491,13 +543,14 @@ private struct PillButtonBody: View {
     }
 }
 
+/// A row, a subheader or Show more: while pressed, a second highlight shape
+/// over the layout's gliding one, so the two add up to a darker band.
 struct RowButtonStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         configuration.label
             .background {
                 if configuration.isPressed {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Palette.hover)
+                    RowHighlightShape()
                         .padding(.horizontal, Grid.inset)
                 }
             }
@@ -522,19 +575,26 @@ extension View {
     }
 }
 
+/// Draws the highlight behind `content`'s rows. It tags every row inside
+/// with its `list`, so a row composed into the layer is lit whether or not
+/// it was tagged itself.
 struct HighlightLayer<Content: View>: View {
     @Binding var highlight: RowHighlight
     var list: AnyHashable? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
-        content.rowHighlight(highlight, in: list)
+        content
+            .rowsTagged(list)
+            .rowHighlight(highlight, in: list)
     }
 }
 
 struct RowHighlightShape: View {
+    @Environment(\.panelStyle) private var style
+
     var body: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover)
+        RoundedRectangle(cornerRadius: style == .list ? ListGrid.radius : 6, style: .continuous).fill(ThemeColor.rowHover)
     }
 }
 

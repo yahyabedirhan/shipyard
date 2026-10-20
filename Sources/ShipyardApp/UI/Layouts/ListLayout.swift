@@ -38,7 +38,7 @@ struct ListLayout: View {
             .rowKeys(
                 $highlight,
                 places: model.listRowPlaces,
-                pinnedHeader: Grid.headerHeight,
+                pinnedHeader: ListGrid.headerHeight,
                 scroll: proxy,
                 left: { fold($0.moveLeft(in: model)) },
                 right: { fold($0.moveRight(in: model)) },
@@ -47,6 +47,7 @@ struct ListLayout: View {
             )
         }
         .onChange(of: model.listRowPlaces) { _, places in highlight.keep(in: places) }
+        .environment(\.panelStyle, .list)
     }
 
     private func fold(_ change: MenuFold?) -> RowKeyMove {
@@ -183,17 +184,16 @@ private struct ListSectionHeader: View {
                 HStack(spacing: 6) {
                     Group {
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.tertiary)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(ThemeColor.textTertiary)
                             .animation(Motion.collapse) { $0.rotationEffect(.degrees(section.isCollapsed ? 0 : 90)) }
-                            .frame(width: Grid.dotColumn)
-                        Image(systemName: "folder.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .frame(width: ListGrid.dotColumn)
+                        Image(systemName: "folder")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(ThemeColor.textTertiary)
                         Text(section.title)
-                            .font(TypeScale.section)
-                            .foregroundStyle(.primary.opacity(0.9))
+                            .font(ListType.section)
+                            .foregroundStyle(ThemeColor.textPrimary)
                             .lineLimit(1)
                     }
                     .allowsHitTesting(false)
@@ -208,8 +208,8 @@ private struct ListSectionHeader: View {
             }
             if let empty = PanelText.emptySection(section) {
                 Text(empty)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(ListType.caption)
+                    .foregroundStyle(ThemeColor.textTertiary)
                     .lineLimit(1)
                     .fixedSize()
             } else {
@@ -219,7 +219,7 @@ private struct ListSectionHeader: View {
                     }
                     .opacity(hover ? 1 : 0)
                 }
-                HStack(spacing: Grid.chipGap) {
+                HStack(spacing: ListGrid.chipGap) {
                     ForEach(section.headerCounts) { chip in
                         let links = section.pageLinks(for: chip.kind)
                         if !links.isEmpty {
@@ -247,20 +247,19 @@ private struct ListSectionHeader: View {
         }
         .padding(.leading, 6)
         .padding(.trailing, 8)
-        .frame(height: Grid.headerHeight)
+        .frame(height: ListGrid.headerHeight)
         .background {
             ZStack {
-                Palette.header
+                Rectangle().fill(ThemeColor.header)
                 if isHighlighted {
                     Rectangle()
-                        .fill(Palette.hover)
+                        .fill(ThemeColor.rowHover)
                         .transition(.opacity)
                 }
             }
             .animation(Motion.hover, value: isHighlighted)
         }
         .overlay(alignment: .bottom) { Hairline() }
-        .overlay(alignment: .top) { Hairline().opacity(0.6) }
         .onHover { hover = $0 }
         .animation(.easeOut(duration: 0.15), value: hover)
         .animation(Motion.count, value: section.attentionCount)
@@ -302,15 +301,15 @@ private struct HeaderCountChip: View {
     var body: some View {
         HStack(spacing: 2) {
             Image(systemName: Palette.symbol(chip.kind))
-                .font(.system(size: 9, weight: .semibold))
+                .font(.system(size: 8.5, weight: .semibold))
             Text(String(chip.count))
-                .font(TypeScale.badge)
+                .font(ListType.badge)
                 .contentTransition(.numericText(value: Double(chip.count)))
         }
         .lineLimit(1)
-        .foregroundStyle(chip.needsAttention ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(.secondary))
-        .padding(.horizontal, 4)
-        .frame(height: 16)
+        .foregroundStyle(chip.needsAttention ? ThemeColor.accent : ThemeColor.textSecondary)
+        .padding(.horizontal, 3)
+        .frame(height: 14)
         .animation(Motion.tint, value: chip.needsAttention)
         .animation(Motion.count, value: chip.count)
         .accessibilityElement(children: .ignore)
@@ -362,7 +361,7 @@ private struct ChipButtonBody: View {
     var body: some View {
         configuration.label
             .background {
-                Capsule().fill(configuration.isPressed ? Palette.pressed : hover ? Palette.hover : .clear)
+                Capsule().fill(configuration.isPressed ? ThemeColor.rowPressed : ThemeColor.rowHover.opacity(hover ? 1 : 0))
             }
             .contentShape(Capsule())
             .onHover { hover = $0 }
@@ -379,22 +378,22 @@ private struct ListRow: View {
     var body: some View {
         HStack(spacing: 0) {
             AttentionDot(isOn: row.needsAttention)
-                .frame(width: Grid.dotColumn, alignment: .leading)
+                .frame(width: ListGrid.dotColumn, alignment: .leading)
             stateIcon
             ZStack(alignment: numberAlignment) {
                 Text(widestNumber).hidden()
                 Text(PanelText.number(row))
             }
-            .font(TypeScale.meta)
+            .font(ListType.meta)
             .monospacedDigit()
-            .foregroundStyle(.tertiary)
-            .frame(minWidth: Grid.numberColumn, alignment: numberAlignment)
+            .foregroundStyle(ThemeColor.textTertiary)
+            .frame(minWidth: ListGrid.numberColumn, alignment: numberAlignment)
             .fixedSize()
             .padding(.leading, row.kind == .note ? 4 : 0)
             .padding(.trailing, 8)
             Text(row.title)
-                .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
-                .foregroundStyle(row.state.isActive ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .font(row.needsAttention ? ListType.bodyEmphasis : ListType.body)
+                .foregroundStyle(row.state.isActive ? ThemeColor.textPrimary : ThemeColor.textSeen)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .layoutPriority(1)
@@ -405,29 +404,29 @@ private struct ListRow: View {
             if let meta {
                 HStack(spacing: metaAgent == nil ? 3 : 5) {
                     if let agent = metaAgent {
-                        AgentMarkView(agent: agent, size: Grid.agentMark)
+                        AgentMarkView(agent: agent, size: ListGrid.agentMark)
                     } else if let symbol = metaSymbol {
                         Image(systemName: symbol)
                             .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(ThemeColor.textTertiary)
                     }
                     Text(meta)
-                        .font(TypeScale.meta)
-                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.red))
+                        .font(ListType.meta)
+                        .foregroundStyle(row.actionError == nil ? ThemeColor.textTertiary : ThemeColor.failure)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
-                .frame(width: Grid.metaColumn, alignment: .leading)
+                .frame(width: ListGrid.metaColumn, alignment: .leading)
                 .padding(.leading, 6)
             }
             Text(PanelText.age(row.age(at: now)))
-                .font(TypeScale.meta)
-                .foregroundStyle(.secondary)
-                .frame(width: Grid.ageColumn, alignment: .trailing)
+                .font(ListType.meta)
+                .foregroundStyle(ThemeColor.textSecondary)
+                .frame(width: ListGrid.ageColumn, alignment: .trailing)
         }
-        .padding(.leading, Grid.gutter - 4)
-        .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
+        .padding(.leading, ListGrid.gutter - 4)
+        .padding(.trailing, ListGrid.gutter)
+        .frame(height: ListGrid.rowHeight)
         .contentShape(Rectangle())
     }
 
@@ -437,7 +436,7 @@ private struct ListRow: View {
 
     private var stateIcon: some View {
         StateSymbol(row: row)
-            .frame(width: Grid.iconColumn, alignment: .center)
+            .frame(width: ListGrid.iconColumn, alignment: .center)
             .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
     }
 
@@ -475,14 +474,14 @@ private struct BranchChip: View {
         HStack(spacing: 3) {
             Image(systemName: "arrow.branch").font(.system(size: 8.5, weight: .semibold))
             Text(branch)
-                .font(TypeScale.branch)
+                .font(ListType.branch)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 5)
-        .frame(height: 16)
-        .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Palette.fill))
+        .foregroundStyle(ThemeColor.textSecondary)
+        .padding(.horizontal, 4)
+        .frame(height: 14)
+        .background(RoundedRectangle(cornerRadius: 3, style: .continuous).fill(ThemeColor.field))
     }
 }
 
@@ -492,14 +491,14 @@ private struct SkeletonRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle().fill(Color.primary.opacity(0.08)).frame(width: 12, height: 12)
-            RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.08)).frame(width: width, height: 9)
+            Circle().fill(ThemeColor.textPrimary.opacity(0.08)).frame(width: 12, height: 12)
+            RoundedRectangle(cornerRadius: 3).fill(ThemeColor.textPrimary.opacity(0.08)).frame(width: width, height: 9)
             Spacer()
-            RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.06)).frame(width: 44, height: 9)
+            RoundedRectangle(cornerRadius: 3).fill(ThemeColor.textPrimary.opacity(0.06)).frame(width: 44, height: 9)
         }
-        .padding(.leading, Grid.gutter + Grid.dotColumn)
-        .padding(.trailing, Grid.gutter)
-        .frame(height: Grid.rowHeight)
+        .padding(.leading, ListGrid.gutter + ListGrid.dotColumn)
+        .padding(.trailing, ListGrid.gutter)
+        .frame(height: ListGrid.rowHeight)
         .opacity(pulse ? 0.5 : 1)
         .onAppear { withAnimation(.easeInOut(duration: 0.9).repeatForever()) { pulse = true } }
         .accessibilityHidden(true)

@@ -25,6 +25,36 @@ enum Grid {
     static let tabSlide: CGFloat = 40
 }
 
+/// The list layout's tighter scale, from the frame's: 22 pt rows, a 22 pt
+/// project header, narrower columns and smaller radii.
+enum ListGrid {
+    static let gutter = Grid.gutter
+    static let rowHeight = Grid.rowHeight - 2
+    static let headerHeight = Grid.headerHeight - 4
+    static let dotColumn: CGFloat = 8
+    static let iconColumn: CGFloat = 14
+    static let numberColumn: CGFloat = 28
+    static let metaColumn: CGFloat = 68
+    static let agentMark: CGFloat = 12
+    static let ageColumn: CGFloat = 24
+    static let chipGap: CGFloat = 4
+    static let radius: CGFloat = 5
+}
+
+/// The list layout's type: smaller steps from the 12 pt body, with
+/// hierarchy by weight and by the text tiers.
+enum ListType {
+    private static let base: CGFloat = 12
+    static let body = Font.system(size: base)
+    static let bodyEmphasis = Font.system(size: base, weight: .semibold)
+    static let meta = Font.system(size: base - 1.5).monospacedDigit()
+    static let section = Font.system(size: base - 0.5, weight: .semibold)
+    static let eyebrow = Font.system(size: base - 2.5, weight: .semibold)
+    static let caption = Font.system(size: base - 2).monospacedDigit()
+    static let badge = Font.system(size: base - 2, weight: .medium).monospacedDigit()
+    static let branch = Font.system(size: base - 2, design: .monospaced)
+}
+
 enum TypeScale {
     static let title = Font.system(size: 13, weight: .semibold)
     static let display = Font.system(size: 14, weight: .semibold)

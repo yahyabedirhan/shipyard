@@ -80,6 +80,31 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let attention = ThemeColor(.attention)
     static let lease = ThemeColor(.lease)
 
+    /// A row's state icon, by kind: each state has its token, so the theme
+    /// decides whether open is green or quiet ink. A succeeded run takes the
+    /// open token and a closed issue the merged one; a ping or a note is neutral.
+    static func state(_ state: ItemState, kind: ItemKind) -> ThemeColor {
+        if kind == .ping || kind == .note { return neutral }
+        return switch state {
+        case .open, .succeeded: ThemeColor(.open)
+        case .draft: ThemeColor(.draft)
+        case .merged: ThemeColor(.merged)
+        case .closed: kind == .issue ? ThemeColor(.merged) : ThemeColor(.closed)
+        case .running: ThemeColor(.running)
+        case .failed: failure
+        }
+    }
+
+    /// A pull request's check dot; none when it has no checks.
+    static func checks(_ checks: ChecksState) -> ThemeColor? {
+        switch checks {
+        case .none: nil
+        case .pending: pending
+        case .passed: success
+        case .failed: failure
+        }
+    }
+
     /// The rate-limit text: the tertiary text while normal, then pending, then failure.
     static func rate(_ level: RateLevel) -> ThemeColor {
         switch level {

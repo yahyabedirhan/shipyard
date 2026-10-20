@@ -6,41 +6,43 @@ struct GroupHeader: View {
     let place: MenuRowPlace
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
+        let tight = style == .list
         Button {
             actions.toggleGroup(group)
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 7.5, weight: .bold))
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: tight ? 7 : 7.5, weight: .bold))
+                    .foregroundStyle(ThemeColor.textTertiary)
                     .animation(Motion.collapse) { $0.rotationEffect(.degrees(group.isFolded ? 0 : 90)) }
-                    .frame(width: Grid.dotColumn)
+                    .frame(width: style.dotColumn)
                     .padding(.trailing, -1)
                 Text(PanelText.groupHeader(group))
-                    .font(TypeScale.eyebrow)
-                    .tracking(0.5)
+                    .font(style.eyebrow)
+                    .tracking(tight ? 0.6 : 0.5)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Text(String(group.rows.count + group.hiddenCount))
-                    .font(TypeScale.eyebrow.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+                    .font(style.eyebrow.monospacedDigit())
+                    .foregroundStyle(ThemeColor.textTertiary)
                 Spacer()
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ThemeColor.textSecondary)
             .padding(.leading, Grid.gutter - 4)
             .padding(.trailing, Grid.gutter)
-            .padding(.vertical, 4)
+            .padding(.vertical, tight ? 2 : 4)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RowButtonStyle())
         .accessibilityLabel(group.title)
         .accessibilityHint(PanelText.groupFoldHelp(group))
         .accessibilityValue(PanelText.groupFoldState(group))
         .accessibilityAddTraits(.isHeader)
         .highlightable(place, $highlight)
-        .padding(.top, Grid.gutter - 4)
+        .padding(.top, tight ? 6 : Grid.gutter - 4)
     }
 }
 
@@ -49,6 +51,7 @@ struct ShowMoreRow: View {
     let place: MenuRowPlace
     @Binding var highlight: RowHighlight
     let actions: LayoutActions
+    @Environment(\.panelStyle) private var style
 
     var body: some View {
         Button {
@@ -56,25 +59,27 @@ struct ShowMoreRow: View {
         } label: {
             HStack(spacing: 0) {
                 Text(PanelText.showMore(group))
-                    .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    .font(style.meta)
+                    .foregroundStyle(ThemeColor.textSecondary)
                 Spacer()
             }
-            .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
+            .padding(.leading, Grid.gutter + style.dotColumn + style.iconColumn)
             .padding(.trailing, Grid.gutter)
-            .frame(height: Grid.rowHeight)
+            .frame(height: style.rowHeight)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(RowButtonStyle())
         .accessibilityLabel(PanelText.showMore(group))
         .highlightable(place, $highlight)
     }
 }
 
 struct GroupDivider: View {
+    @Environment(\.panelStyle) private var style
+
     var body: some View {
         Hairline()
-            .padding(.leading, Grid.gutter + Grid.dotColumn + Grid.iconColumn)
+            .padding(.leading, Grid.gutter + style.dotColumn + style.iconColumn)
             .padding(.trailing, Grid.gutter)
     }
 }
