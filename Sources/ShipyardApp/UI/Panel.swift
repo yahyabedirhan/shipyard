@@ -23,6 +23,7 @@ struct Panel: View {
         }
         .frame(width: Grid.panelWidth)
         .background { PanelBackdrop() }
+        .background { if !isSnapshot { PanelWindowAnchor(isOpen: actions.panelState.isOpen) } }
         .theme(shipyard.theme)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
