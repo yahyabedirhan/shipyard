@@ -6,7 +6,7 @@ import { buildAgentFiles, pagePath } from '../plugins/agents';
 import { REPO_DIR, SITE_DIR, referenceData } from '../plugins/repo';
 import { headFor, pageForPath, sitemap } from '../plugins/site';
 import { SECTIONS } from './docs/content';
-import { LINE, LINES } from './messaging';
+import { LINE } from './messaging';
 import { PAGES } from './pages';
 import { routeOf } from './route';
 
@@ -52,9 +52,9 @@ describe('page heads', () => {
     expect(routeOf('/elsewhere')).toBe('not-found');
   });
 
-  it('use the one line from the messaging kit, A until one is picked', () => {
-    expect(LINE).toBe(LINES.A);
-    expect(Object.values(LINES).every((l) => l.length < 80)).toBe(true);
+  it('use the one line from the messaging kit, positioning A', () => {
+    expect(LINE).toBe('A macOS menu bar app for the pull requests your agents open.');
+    expect(LINE.length).toBeLessThan(80);
   });
 });
 

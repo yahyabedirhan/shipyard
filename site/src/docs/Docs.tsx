@@ -5,7 +5,7 @@ import { ASK_AGENT, CHANGELOG, HERDR_PLUGIN, INSTALL, LICENSE, LINE, NAME, PERSO
 import { inlineMd, type KeyGroup } from '../reference/parse';
 import { CodeBlock, CodeTabs } from './CodeBlocks';
 import { GROUPS, INSTALL_WAYS, LIMITS, QUESTIONS, SECTIONS, byId, type DocSection } from './content';
-import { ConfigExplorer, RINGS, Shot, ringFrom, type RingId } from './figures';
+import { ConfigExplorer, SAILBOAT, Shot } from './figures';
 import { tidy, tidyParagraphs, withMarkers } from './text';
 import './docs.css';
 
@@ -247,9 +247,6 @@ export function Docs({ home = '/' }: { home?: string }) {
   const navlist = useRef<HTMLUListElement>(null);
   const ring = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(SECTIONS[0].id);
-  const [ringId, setRingId] = useState<RingId>('A');
-
-  useEffect(() => { setRingId(ringFrom(location.search, import.meta.env.DEV)); }, []);
 
   // Margin notes follow their markers as screenshots load and the window resizes.
   useEffect(() => {
@@ -327,7 +324,7 @@ export function Docs({ home = '/' }: { home?: string }) {
             {REF.version ? <span className="ver" title="The version these docs describe">{REF.version}</span> : null}
           </div>
           <div className="secs">
-            <div className={`ring ring-${ringId}`} ref={ring} aria-hidden="true" data-ring={ringId}>{RINGS[ringId]}</div>
+            <div className="ring" ref={ring} aria-hidden="true">{SAILBOAT}</div>
             <ul ref={navlist}>
               {GROUPS.map((g) => [
                 <li className="grp" key={`g-${g.name}`} aria-hidden="true" />,

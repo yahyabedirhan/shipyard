@@ -72,7 +72,7 @@ export function MockPanel({ config }: { config: MockConfig }) {
   const sub = config.subsections ?? config.layout === 'tabs';
   return (
     <div className="mock" aria-label="A mock of the shipyard panel, drawn for these docs">
-      <div className="m-bar"><span className="m-icon" aria-hidden="true">{RINGS.A}</span><span className="m-count">{panel.attention}</span><span className="m-badge">Mock</span></div>
+      <div className="m-bar"><span className="m-icon" aria-hidden="true">{SAILBOAT}</span><span className="m-count">{panel.attention}</span><span className="m-badge">Mock</span></div>
       <div className="m-panel">
         {panel.tabs ? <div className="m-tabs" role="presentation">{panel.tabs.map((t, i) => <span key={t} className={i === 0 ? 'on' : undefined}>{t}</span>)}</div> : null}
         {panel.projects.map((p) => (
@@ -109,41 +109,16 @@ export function ConfigExplorer() {
   );
 }
 
-/* ---------------------------------------------------------------- the sidebar ring */
+/* ---------------------------------------------------------------- the sidebar mark */
 
 /**
- * The small mark beside the current section in the nav, after topographic's ring of contours: three strokes,
- * faint to strong, that glide to the section being read with a wobble. A is the logo's sailboat, B a hull on two
- * waves, C three swells. `?ring=A|B|C` switches it in development; a build shows the default.
+ * The small mark beside the current section in the nav: the logo's sailboat, three strokes, faint to strong, that
+ * glides to the section being read with a rock.
  */
-export const RINGS = {
-  A: (
-    <svg viewBox="0 0 34 24" aria-hidden="true">
-      <path d="M5 16.5h24l-3.6 4.5H8.6z" />
-      <path d="M15.5 5.5v9h-7.5z" />
-      <path d="M17.5 2.5v12h9.5z" />
-    </svg>
-  ),
-  B: (
-    <svg viewBox="0 0 34 24" aria-hidden="true">
-      <path d="M2 21c3-2 6-2 9 0s6 2 9 0 6-2 9 0 3 1.4 3 1.4" />
-      <path d="M3.5 17.2c2.6-1.7 5.3-1.7 7.9 0s5.3 1.7 7.9 0 5.3-1.7 7.9 0 3 1.2 3 1.2" />
-      <path d="M9.5 10.5h15l-2.6 4H12.1zM17 10.5V3l5 6.2" />
-    </svg>
-  ),
-  C: (
-    <svg viewBox="0 0 34 24" aria-hidden="true">
-      <path d="M2.5 19.5c4-11 25-11 29 0" />
-      <path d="M7.5 19.5c3-6.6 16-6.6 19 0" />
-      <path d="M12.5 19.5c1.8-3 7.2-3 9 0" />
-    </svg>
-  ),
-} as const;
-export type RingId = keyof typeof RINGS;
-export const DEFAULT_RING: RingId = 'A';
-
-/** The ring for this page: `?ring=` in development, the default otherwise. */
-export function ringFrom(search: string, dev: boolean): RingId {
-  const q = new URLSearchParams(search).get('ring')?.toUpperCase();
-  return dev && q && q in RINGS ? (q as RingId) : DEFAULT_RING;
-}
+export const SAILBOAT = (
+  <svg viewBox="0 0 34 24" aria-hidden="true">
+    <path d="M5 16.5h24l-3.6 4.5H8.6z" />
+    <path d="M15.5 5.5v9h-7.5z" />
+    <path d="M17.5 2.5v12h9.5z" />
+  </svg>
+);
