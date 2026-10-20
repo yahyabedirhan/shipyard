@@ -1,5 +1,5 @@
 {
-  "about": "Every screenshot the site and the README use, by id. A source marks where one goes with SHOT:<id>, and site/src/docs/Shot.tsx shows its placeholder frame until status is done. To finish one: run its capture steps on the Mac (the shipyard skill's Driving the app), check the picture, and set status to done. npm run shots redraws the placeholder PNG of each shot still marked placeholder; npm run placeholders lists what is open. Run the capture steps from the repository root.",
+  "about": "Every screenshot the site and the README use, by id. A source marks where one goes with SHOT:<id>, and site/src/docs/Shot.tsx shows its placeholder frame until status is done. To finish one: run its capture steps on the Mac (the shipyard skill's Driving the app), check the picture, and set status to done. npm run shots redraws the placeholder PNG of each shot still marked placeholder; npm run placeholders lists what is open. Run the capture steps from the repository root. GitHub answers a refresh of several large repositories with HTTP 502 or 504 now and then, and the panel then shows Not loaded yet: capture again until the panel holds data.",
   "shots": [
     {
       "id": "readme-hero-light",
@@ -25,7 +25,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "readme-hero-dark",
@@ -52,7 +52,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "onboarding-presets-dark",
@@ -77,7 +77,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "view-github-dark",
@@ -129,7 +129,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "preset-incoming-contributions-dark",
@@ -154,7 +154,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "preset-review-queue-dark",
@@ -204,7 +204,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "panel-tabs-dark",
@@ -230,7 +230,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "panel-pings-dark",
@@ -334,7 +334,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "view-cli-dark",
@@ -360,7 +360,7 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done"
     },
     {
       "id": "menu-bar-icon-dark",
@@ -385,7 +385,8 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done",
+      "notes": "The capture is the template glyph alone, white on transparent for dark, with no attention count: the count is menu bar text outside the icon. Place it on a dark bar."
     }
   ]
 }
