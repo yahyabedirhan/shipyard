@@ -174,11 +174,24 @@ struct MenuTabsTests {
 
     @Test("the line under the tabs counts what needs attention, and All its projects")
     func summary() {
-        #expect(PanelText.tabSummary(attention: 5, projects: 4, tab: .all) == "5 need attention · 4 projects")
-        #expect(PanelText.tabSummary(attention: 1, projects: 1, tab: .all) == "1 needs attention · 1 project")
-        #expect(PanelText.tabSummary(attention: 0, projects: 3, tab: .all) == "All caught up · 3 projects")
-        #expect(PanelText.tabSummary(attention: 2, projects: 1, tab: .project("shipyard")) == "2 need attention")
-        #expect(PanelText.tabSummary(attention: 0, projects: 1, tab: .project("shipyard")) == "All caught up")
+        #expect(PanelText.tabSummary(attention: 5, projects: 4, isLoaded: true, tab: .all) == "5 need attention · 4 projects")
+        #expect(PanelText.tabSummary(attention: 1, projects: 1, isLoaded: true, tab: .all) == "1 needs attention · 1 project")
+        #expect(PanelText.tabSummary(attention: 0, projects: 3, isLoaded: true, tab: .all) == "All caught up · 3 projects")
+        #expect(PanelText.tabSummary(attention: 2, projects: 1, isLoaded: true, tab: .project("shipyard")) == "2 need attention")
+        #expect(PanelText.tabSummary(attention: 0, projects: 1, isLoaded: true, tab: .project("shipyard")) == "All caught up")
+    }
+
+    @Test("before the first refresh, the line under the tabs never says All caught up")
+    func summaryBeforeFirstRefresh() {
+        #expect(PanelText.tabSummary(attention: 0, projects: 3, isLoaded: false, tab: .all) == "3 projects")
+        #expect(PanelText.tabSummary(attention: 0, projects: 1, isLoaded: false, tab: .project("shipyard")) == "")
+        // What's already known still shows while the rest loads.
+        #expect(PanelText.tabSummary(attention: 2, projects: 3, isLoaded: false, tab: .all) == "2 need attention · 3 projects")
+        let unloaded = model([section("shipyard", [], isLoaded: false)])
+        #expect(!unloaded.tabContent(for: .all).isCaughtUp)
+        #expect(!unloaded.tabContent(for: .project("shipyard")).isCaughtUp)
+        let loaded = model([section("shipyard", [])])
+        #expect(loaded.tabContent(for: .all).isCaughtUp)
     }
 
     @Test("All marks every project seen; a project's tab marks it seen")

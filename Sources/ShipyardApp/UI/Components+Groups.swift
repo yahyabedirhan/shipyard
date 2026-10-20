@@ -15,7 +15,7 @@ struct GroupHeader: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: tight ? 7 : 7.5, weight: .bold))
+                    .font(.system(size: tight ? 7 : 7.5, weight: tight ? .bold : .semibold))
                     .foregroundStyle(ThemeColor.textTertiary)
                     .animation(Motion.collapse) { $0.rotationEffect(.degrees(group.isFolded ? 0 : 90)) }
                     .frame(width: style.dotColumn)

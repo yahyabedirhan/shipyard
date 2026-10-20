@@ -18,10 +18,10 @@ enum PanelStyle: Sendable {
     var meta: Font { self == .list ? ListType.meta : TypeScale.meta }
     var eyebrow: Font { self == .list ? ListType.eyebrow : TypeScale.eyebrow }
 
-    /// How far a ping row's ✕ sits from the row's trailing edge: in the
-    /// list, just before the age column, so the age stays readable.
+    /// How far a ping row's ✕ sits from the row's trailing edge: just
+    /// before the age, so the age stays readable.
     var dismissTrailing: CGFloat {
-        self == .list ? ListGrid.gutter + ListGrid.ageColumn + 2 : Grid.inset
+        self == .list ? ListGrid.gutter + ListGrid.ageColumn + 2 : Grid.gutter + Grid.ageColumn + 2
     }
 }
 

@@ -240,11 +240,15 @@ public enum PanelText {
 
     /// The line under the tab strip: "5 need attention · 4 projects" on
     /// All, "2 need attention" on a project's tab, and "All caught up" in
-    /// place of the count when nothing needs attention.
-    public static func tabSummary(attention: Int, projects: Int, tab: MenuTab) -> String {
+    /// place of the count when nothing needs attention. Before the tab is
+    /// loaded nothing is known to be caught up, so with no count the line
+    /// names only how many projects All holds, and is empty on a project's tab.
+    public static func tabSummary(attention: Int, projects: Int, isLoaded: Bool, tab: MenuTab) -> String {
+        let projectCount = "\(projects) \(projects == 1 ? "project" : "projects")"
+        guard attention > 0 || isLoaded else { return tab == .all ? projectCount : "" }
         let count = attention == 0 ? "All caught up" : attentionCount(attention)
         guard tab == .all else { return count }
-        return "\(count) · \(projects) \(projects == 1 ? "project" : "projects")"
+        return "\(count) · \(projectCount)"
     }
 
     /// The button next to that line: All marks every project seen, a
