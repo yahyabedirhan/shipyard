@@ -26,8 +26,8 @@ function placeholder(s, [w, h]) {
   <defs><pattern id="p" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="16" fill="${stripe}"/></pattern></defs>
   <rect width="${w}" height="${h}" rx="28" fill="${bg}"/><rect width="${w}" height="${h}" rx="28" fill="url(#p)"/>
   <rect x="1" y="1" width="${w - 2}" height="${h - 2}" rx="27" fill="none" stroke="${mut}" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="10 8"/>
-  <text x="${pad}" y="${h * 0.38}" font-family="Inter" font-weight="600" font-size="${Math.round(size * 0.62)}" letter-spacing="2" fill="${mut}">SCREENSHOT TO COME · ${esc(s.appearance.toUpperCase())} · ${esc(s.layout.toUpperCase())}</text>
-  ${lines.map((l, i) => `<text x="${pad}" y="${h * 0.38 + size * 1.9 + i * size * 1.35}" font-family="Inter" font-weight="500" font-size="${size}" fill="${fg}">${esc(l)}</text>`).join('\n  ')}
+  <text x="${pad}" y="${h * 0.38}" font-family="Geist" font-weight="600" font-size="${Math.round(size * 0.62)}" letter-spacing="2" fill="${mut}">SCREENSHOT TO COME · ${esc(s.appearance.toUpperCase())} · ${esc(s.layout.toUpperCase())}</text>
+  ${lines.map((l, i) => `<text x="${pad}" y="${h * 0.38 + size * 1.9 + i * size * 1.35}" font-family="Geist" font-weight="500" font-size="${size}" fill="${fg}">${esc(l)}</text>`).join('\n  ')}
   <text x="${pad}" y="${h * 0.38 + size * 2.6 + lines.length * size * 1.35}" font-family="JetBrains Mono" font-size="${Math.round(size * 0.7)}" fill="${mut}">SHOT:${esc(s.id)}</text>
 </svg>`;
 }

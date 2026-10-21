@@ -10,7 +10,7 @@ export const REPO = join(SITE, '..');
 const CACHE = join(SITE, '.cache/fonts');
 
 // The site's three faces, as TrueType from Google Fonts (an old user agent gets .ttf links). Cached in site/.cache.
-const FONTS = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400';
+const FONTS = 'https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=IBM+Plex+Serif:wght@600&family=JetBrains+Mono:wght@400';
 
 export async function fonts() {
   await mkdir(CACHE, { recursive: true });
@@ -35,7 +35,7 @@ export async function fonts() {
 }
 
 export function png(svg, fontFiles, width) {
-  const r = new Resvg(svg, { font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'Inter' }, fitTo: width ? { mode: 'width', value: width } : { mode: 'original' } });
+  const r = new Resvg(svg, { font: { fontFiles, loadSystemFonts: false, defaultFontFamily: 'Geist' }, fitTo: width ? { mode: 'width', value: width } : { mode: 'original' } });
   return r.render().asPng();
 }
 
