@@ -173,6 +173,31 @@ struct DemoRunTests {
         #expect(try harness.store.token() == "gho_stored")
     }
 
+    @Test("the launch screenshots' demo folder, assets/demo, reads cleanly: its configuration, its avatar, and demo-items.json with items and notes for every project")
+    func launchDemo() async throws {
+        let folder = repositoryRoot.appendingPathComponent("assets/demo", isDirectory: true)
+        let store = ConfigurationStore(url: folder.appendingPathComponent("shipyard/config.toml"))
+        store.reload()
+        #expect(store.error == nil)
+        #expect(store.warnings.isEmpty)
+        let items = try #require(DemoItems.read(in: folder, at: Harness.now))
+        #expect(items.problem == nil)
+        let avatar = try #require(try await items.viewer().avatarURL)
+        #expect(FileManager.default.fileExists(atPath: avatar.path))
+
+        let configuration = store.lastValid
+        let projects = configuration.projects.map(configuration.settings(for:))
+        let snapshot = try await items.fetch(projects: projects, resolved: [:], at: Harness.now)
+        guard case .read(let notes) = items.notes(for: projects.map { ($0.slug, $0.title) }) else {
+            Issue.record("the notes don't read")
+            return
+        }
+        for project in projects {
+            #expect(snapshot.items[project.slug]?.isEmpty == false, "\(project.slug) lists no items")
+            #expect((try? notes[project.slug]?.get())?.isEmpty == false, "\(project.slug) lists no notes")
+        }
+    }
+
     @Test("a demo-items.json that doesn't read fails every refresh with its reason, and never falls back to the user's GitHub")
     func unreadableDemoItems() async throws {
         let demo = try DemoFolder(

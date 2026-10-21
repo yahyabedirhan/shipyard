@@ -1,0 +1,26 @@
+version = 1
+
+# The launch screenshots' demo: four public repositories, with made-up items
+# from ../demo-items.json in place of GitHub's and Notion's.
+
+[defaults.issues]
+show = true
+
+[defaults.workflow-runs]
+show = true
+
+[[projects]]
+slug = "shipyard"
+repositories = ["yahyabedirhan/shipyard"]
+
+[[projects]]
+slug = "havooch"
+repositories = ["yahyabedirhan/havooch"]
+
+[[projects]]
+slug = "topographic"
+repositories = ["yahyabedirhan/topographic"]
+
+[[projects]]
+slug = "skills"
+repositories = ["yahyabedirhan/skills"]
