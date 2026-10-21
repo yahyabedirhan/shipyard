@@ -1,49 +1,103 @@
 # GitHub rate limits
 
+GitHub's GraphQL and REST rate limits, what a query costs, the query and resource limits, and how to poll cheaply.
+Shipyard's refresh, its repository batches and its rate budget depend on them.
+
+## Sources
+
 Checked 2026-09-25 against:
+
 - [Rate limits and query limits for the GraphQL API](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api)
 - [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 - [Best practices for using the REST API](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api)
 - [GraphQL reference: RateLimit](https://docs.github.com/en/graphql/reference/objects#ratelimit)
 
-## Two separate limits, both shared with the user's other tools
+[Query limits](#query-limits) was checked 2026-09-26 against the GraphQL rate-limits page.
+[Resource limits](#resource-limits) was checked 2026-10-06 against the same page ("Other resource limits" and "Query optimization strategies"), and measured the same day (issue #222).
+
+## Primary limits
+
+Two separate limits, both shared with the user's other tools.
 
 - **GraphQL:** 5,000 points per hour per user (10,000 for enterprise members). "This includes requests made with a personal access token as well as requests made by a GitHub App or OAuth app on behalf of a user."
 - **REST:** 5,000 requests per hour per user. "All of these requests count towards your personal rate limit of 5,000 requests per hour", whether they come from personal access tokens, GitHub Apps or OAuth apps.
 
-So shipyard shares both limits with `gh` and with every agent acting as the user. Its own usage has to stay a small share.
+So shipyard shares both limits with `gh` and with every agent acting as the user.
+Its own usage has to stay a small share.
 
-## What a GraphQL query costs
+## Query cost
 
 - Add up the requests needed to fulfil each connection in the query (a nested list counts once per parent node), divide by 100 and round. The minimum is 1 point.
 - Nested per-item lists dominate. Fifty PRs, each asking for `reviewRequests(first: 10)` and `commits(last: 1)`, add about 100 requests on top of the PR list itself.
 - `rateLimit(dryRun: true) { cost limit remaining resetAt }` returns a query's cost without spending it.
-- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**. Since 0.0.2 the query no longer reads `reviewRequests`; one review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
 
-## Query limits, and why shipyard sends repositories in batches
+### Measured costs
 
-Checked 2026-09-26 against the GraphQL rate-limits page above.
+- **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**.
+- Since 0.0.2 the query no longer reads `reviewRequests`. One review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
+- **Measured 2026-09-26 (issue #72), `rateLimit(dryRun: true)`:** the query shape above over 5 repositories (without `reviewRequests`) costs **4 points**.
+- Adding `labels(first: 20) { totalCount nodes { name color } }` to every pull request and issue raises it to **11**, and to open ones only to **9**: a nested connection is paid for per parent node, whatever its `first`.
+- Plain fields (`avatarUrl`, `additions`, `reviewDecision`…) cost nothing. So the row's hover card shows no labels.
 
-- **Measured 2026-09-26 (issue #72), `rateLimit(dryRun: true)`:** the query shape above over 5 repositories (without `reviewRequests`) costs **4 points**. Adding `labels(first: 20) { totalCount nodes { name color } }` to every pull request and issue raises it to **11**, and to open ones only to **9**: a nested connection is paid for per parent node, whatever its `first`. Plain fields (`avatarUrl`, `additions`, `reviewDecision`…) cost nothing. So the row's hover card shows no labels.
+## Query limits
+
+Checked 2026-09-26.
+
 - **Nodes:** "Individual calls cannot request more than 500,000 total nodes." Nodes multiply down nested connections (50 repositories × 10 issues each = 500 nodes).
 - **Time:** "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate the request and you will receive a timeout response."
 - GitHub's advice for both: "Break up complex queries into multiple simpler queries."
-- **Shipyard's batch:** 5 repositories per GraphQL request since issue #222 (25 before), sent one after another (never in parallel, per the secondary limits below). The node limit alone would allow far more: one repository asks for at most about 210 nodes (70 pull requests, each with 1 commit, plus 70 issues), so 25 repositories stay near 5,000 nodes. GitHub's other resource limits (below) came first: 11 repositories in one query were cut short, and any 5 of them were answered whole. Five repositories ask for at most 700 pull requests and issues, plus the review search's 100 in the first batch, under the "thousands of objects" GitHub names as too many. A user with 5 repositories or fewer still sends one request.
-- **Cost of batches:** each request's cost is rounded on its own and has the minimum of 1 point, so several batches can cost a point or two more than one request would. Shipyard's rate budget records the batches' sum as the refresh's cost, and the last batch's headers as where the limit stands. Five repositories with issues cost about 4 points (measured above), so 11 repositories in three batches cost about the 9 points the single cut-short query did.
 
-## Resource limits: an answer cut short
+### Shipyard's batches
 
-Checked 2026-10-06 against the GraphQL rate-limits page above ("Other resource limits" and "Query optimization strategies"), and measured the same day (issue #222).
+- Shipyard sends 5 repositories per GraphQL request since issue #222 (25 before), one after another (never in parallel, per the [secondary limits](#secondary-limits)).
+- The node limit alone would allow far more: one repository asks for at most about 210 nodes (70 pull requests, each with 1 commit, plus 70 issues), so 25 repositories stay near 5,000 nodes.
+- GitHub's other [resource limits](#resource-limits) came first: 11 repositories in one query were cut short, and any 5 of them were answered whole.
+- Five repositories ask for at most 700 pull requests and issues, plus the review search's 100 in the first batch, under the "thousands of objects" GitHub names as too many.
+- A user with 5 repositories or fewer still sends one request.
 
-- GitHub's words: "If your GraphQL query consumes too many resources, GitHub will terminate the request and return partial results along with an error indicating that resource limits were exceeded." It names "requesting thousands of objects or deeply nested relationships in a single query", "using large `first` or `last` arguments in multiple connections simultaneously" and "fetching extensive details for each object". It gives no number: the limit is separate from the node limit and the point cost.
-- **What the answer looks like (measured):** status **200**, `data` present, and an `errors` list whose entries have `"type": "RESOURCE_LIMITS_EXCEEDED"` and `"message": "Resource limits for this query exceeded."`. Each error's `path` points into a node GitHub didn't fill, for example `["repo10", "closedIssues", "nodes", 9, "comments", "totalCount"]` or `["reviewSearch", "nodes", 0, "repository", "nameWithOwner"]`. Every repository alias was there (not `null`), but every entry of its `nodes` lists was `null`, the review search's too; `rateLimit` still answered, with the query's cost (9 points), and the headers still counted it. `gh api graphql` printed the body and exited with "gh: Resource limits for this query exceeded."
-- **Shape that hit it:** 11 repositories, each asking for open pull requests (first 50), closed ones (first 20), open issues (first 50) and closed ones (first 20), with each pull request's comment and review counts and last commit's check state, and the review search (first 100). Any 5 of those repositories in one query came back whole.
-- A list of `null` entries is not an empty list: reading the answer by dropping the `null`s shows every repository as having nothing.
+### Cost of batches
+
+- Each request's cost is rounded on its own and has the minimum of 1 point, so several batches can cost a point or two more than one request would.
+- Shipyard's rate budget records the batches' sum as the refresh's cost, and the last batch's headers as where the limit stands.
+- Five repositories with issues cost about 4 points (measured above), so 11 repositories in three batches cost about the 9 points the single cut-short query did.
+
+## Resource limits
+
+An answer cut short.
+Checked 2026-10-06, and measured the same day (issue #222).
+
+### GitHub's terms
+
+- GitHub's words: "If your GraphQL query consumes too many resources, GitHub will terminate the request and return partial results along with an error indicating that resource limits were exceeded."
+- It names "requesting thousands of objects or deeply nested relationships in a single query", "using large `first` or `last` arguments in multiple connections simultaneously" and "fetching extensive details for each object".
+- It gives no number: the limit is separate from the node limit and the point cost.
 - GitHub's advice: "Split large queries: Break up complex queries into multiple simpler queries", and use smaller `first`/`last`.
-- **What shipyard does:** an answer with a `RESOURCE_LIMITS_EXCEEDED` error is not read as the truth. The batch is asked again in halves, recursively, down to one repository, with the review search on its own last (`ProjectQuery.split`); the cut-short answers' cost counts toward the refresh's. A repository that still comes back cut short, or with `null` entries in its lists and no error, is that repository's error ("couldn't be read whole"), and it keeps the pull requests and issues last read whole. The review search fails the same way and keeps its last pull requests.
+
+### Cut-short answer shape
+
+Measured:
+
+- Status **200**, `data` present, and an `errors` list whose entries have `"type": "RESOURCE_LIMITS_EXCEEDED"` and `"message": "Resource limits for this query exceeded."`.
+- Each error's `path` points into a node GitHub didn't fill, for example `["repo10", "closedIssues", "nodes", 9, "comments", "totalCount"]` or `["reviewSearch", "nodes", 0, "repository", "nameWithOwner"]`.
+- Every repository alias was there (not `null`), but every entry of its `nodes` lists was `null`, the review search's too.
+- `rateLimit` still answered, with the query's cost (9 points), and the headers still counted it.
+- `gh api graphql` printed the body and exited with "gh: Resource limits for this query exceeded."
+- A list of `null` entries is not an empty list: reading the answer by dropping the `null`s shows every repository as having nothing.
+
+### Query that hit the limit
+
+- 11 repositories, each asking for open pull requests (first 50), closed ones (first 20), open issues (first 50) and closed ones (first 20), with each pull request's comment and review counts and last commit's check state, and the review search (first 100).
+- Any 5 of those repositories in one query came back whole.
+
+### Shipyard's handling
+
+- An answer with a `RESOURCE_LIMITS_EXCEEDED` error is not read as the truth.
+- The batch is asked again in halves, recursively, down to one repository, with the review search on its own last (`ProjectQuery.split`); the cut-short answers' cost counts toward the refresh's.
+- A repository that still comes back cut short, or with `null` entries in its lists and no error, is that repository's error ("couldn't be read whole"), and it keeps the pull requests and issues last read whole.
+- The review search fails the same way and keeps its last pull requests.
 - A cut-short query costs points, and GitHub's secondary limits count "requests that consume excessive compute resources in a short period of time". That is why the batch is small enough to stay under the limit, and the split is the fallback, not the usual path.
 
-## Knowing where you stand
+## Rate-limit headers
 
 - REST responses carry `x-ratelimit-limit`, `x-ratelimit-remaining`, `x-ratelimit-used`, `x-ratelimit-reset` (UTC epoch seconds) and `x-ratelimit-resource`.
 - GraphQL has the same headers, and a `rateLimit` object with `cost`, `limit`, `remaining`, `used` and `resetAt`. GitHub recommends reading the headers rather than querying the object where possible.
@@ -60,7 +114,9 @@ Checked 2026-10-06 against the GraphQL rate-limits page above ("Other resource l
 - GraphQL: no more than 2,000 points per minute. REST: 900 points per minute across REST endpoints, and 90 seconds of CPU time per 60 seconds of real time.
 - Send requests one after another, not in parallel: "To avoid exceeding secondary rate limits, you should make requests serially instead of concurrently."
 
-## Polling cheaply over REST
+## Conditional requests
+
+Polling cheaply over REST.
 
 - A conditional request (`If-None-Match` with the last `ETag`) that returns `304 Not Modified` "does not count against your primary rate limit".
 - Stable, narrow requests return 304 more often: "A smaller, more specific response changes less often."

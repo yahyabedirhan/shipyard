@@ -1,6 +1,6 @@
 # shipyard
 
-A macOS menu bar app for seeing and reviewing the pull requests your agents open on your behalf.
+A macOS menu bar app for keeping up with your projects while your agents work.
 
 ## Changing The Maintainer's Shipyard
 
@@ -67,6 +67,8 @@ assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from 
 ```
 
 `.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
+
+Only the repository's root has a `README.md`. A folder's own index, which says what the folder holds and how its files are shaped, is `index.md`, as in `docs/references/index.md`.
 
 ## Agent skills
 

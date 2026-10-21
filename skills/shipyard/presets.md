@@ -17,7 +17,7 @@ A preset is a ready-made configuration for one main use of shipyard. The app off
 
 ## `my-agents`
 
-Everything the user and their agents open in their repositories: pull requests and issues, grouped by kind, one project per repository. Notifications are the default: every new pull request.
+Everything the user and their agents open in their repositories: pull requests and issues, grouped by kind, one project per repository. Notifications are the defaults: every new pull request, every ping and notice, and an agent starting or stopping with the app.
 
 ```toml
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
@@ -49,7 +49,7 @@ repositories = ["octocat/Spoon-Knife"]
 
 ## `incoming-contributions`
 
-What other people open on the user's repositories, with their own (and their agents') and bots' items hidden, grouped by repository under subheaders, and a second project of the pull requests waiting on their review in any repository. It notifies when someone else opens a pull request or an issue, on each new review request, and on each ping.
+What other people open on the user's repositories, with their own (and their agents') and bots' items hidden, grouped by repository under subheaders, and a second project of the pull requests waiting on their review in any repository. It notifies when someone else opens a pull request or an issue, on each new review request, on each ping and notice, and when an agent starts or stops using the app.
 
 ```toml
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json

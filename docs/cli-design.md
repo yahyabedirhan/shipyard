@@ -1,16 +1,31 @@
 # CLI design
 
-The design of the `shipyard` command line: who calls it, its command tree, its inputs, outputs and help, how the code keeps it, and how it changes. Its commands, flags, output shapes and exit codes are a contract with agents, scripts and the herdr-shipyard plugin (ADR 0004). `docs/low-level-design.md` holds the modules behind it; this page holds what a caller sees.
+The design of the `shipyard` command line: who calls it, its command tree, its inputs, outputs and help, how the code keeps it, and how it changes.
+Its commands, flags, output shapes and exit codes are a contract with agents, scripts and the herdr-shipyard plugin (ADR 0004).
+`docs/low-level-design.md` holds the modules behind it; this page holds what a caller sees.
+
+The page follows the CLI design delivery framework, one section per stage, in order:
+
+1. **Requirements:** the callers, their jobs, the command roles, what each command needs to run, and what is out of scope.
+2. **Command model:** the command tree, its nouns, verbs and targets, the previous command forms, and the renames from them.
+3. **Inputs:** every command's usage line, its flags, the environment and the configuration.
+4. **Output and errors:** what each command prints, its `--json`, its refusals, the exit codes and the error messages.
+5. **Help:** the top help, the group help and the machine-readable listing.
+6. **Implementation:** the files, the command table, one command's path, one refusal, and the contract tests.
+7. **Evolution:** the likely changes and the rules for changing the contract.
+8. **Verification:** the CLI checked against the framework's checklist.
 
 ## Requirements
 
-**Callers**
+### Callers
 
 1. Coding agents on the Mac and on the user's other machines, the main caller of every command. They learn the CLI from the shipyard skill and from `--help`.
 2. Programs: the herdr-shipyard plugin runs `herdr-event` from Herdr's hooks and `ping list --json` for the Mac's poll; the session-status mod runs `ping send` and `ping withdraw`; the workstation's `notification-method` runs `notice send`.
 3. The maintainer at a terminal, now and then: checking the setup, listing pings, driving a demo.
 
-**Jobs.** A caller should be able to:
+### Jobs
+
+A caller should be able to:
 
 1. Ping the user and wait for them, replace or withdraw that ping, and list the machine's pings.
 2. Tell the user about progress with a notice that isn't kept, and take it away.
@@ -19,7 +34,7 @@ The design of the `shipyard` command line: who calls it, its command tree, its i
 5. Check `config.toml`, the theme files beside it, `cli.toml` and the notes workspace after an edit.
 6. Let Herdr's hooks ping when an agent is blocked.
 
-**Roles**
+### Roles
 
 | Role | Commands | Rules |
 |---|---|---|
@@ -30,30 +45,25 @@ The design of the `shipyard` command line: who calls it, its command tree, its i
 | Wait | `lease take --wait` | Bounded: 0 to 3600 seconds |
 | Plumbing | `herdr-event` | Run by hooks; reads its input from the environment |
 
-**Runtime.** `ping`, `config check`, `help` and `herdr-event` need only local files and work offline. `notice` needs the running app on the Mac, the tailnet to the app machine, or the plugin. `app`, `panel`, `lease` and `notes` need the Mac's app; `app status` and `app open` work when it isn't running and say so.
+### Runtime
 
-**Out of scope.** No interactive prompts or pickers, no colour, no shell completions yet, no Windows build, and no command that changes `config.toml`: agents edit the file (ADR 0001).
+- `ping`, `config check`, `help` and `herdr-event` need only local files and work offline.
+- `notice` needs the running app on the Mac, the tailnet to the app machine, or the plugin.
+- `app`, `panel`, `lease` and `notes` need the Mac's app.
+- `app open` works when the app isn't running and starts it.
+- `app status` says the app isn't running and exits 1.
 
-## The CLI before this design
+### Out of scope
 
-Shipyard 0.6.0 had nine top-level commands in a flat list, each module writing its own help lines.
-
-| Finding | Evidence | Checklist item |
-|---|---|---|
-| Sending was the group itself: `ping "<title>"` and `notify "<title>"`, while `ping withdraw` and `ping list` were verbs. A title equal to a verb needed `--` (`shipyard ping -- withdraw`). | `PingCommands.swift`, `NotifyCommand.swift` | 2 |
-| The same idea had two names: the noun is *notice* (GLOSSARY.md) but the command was `notify`; the noun is *lease* but the command was `control`. | GLOSSARY.md "Notice", "Lease" | 3 |
-| `screenshot` was a top-level verb about the app, beside `app`; GLOSSARY.md says *capture* is the act. | GLOSSARY.md "Screenshot" | 3, 4 |
-| `panel tab <name>` and `panel view <name>` used nouns as verbs. | `PanelCommand.swift` | 2 |
-| The top help was written by hand, twice per command, and had drifted: it left `--for` out of `control take`, and cut `notify`'s flags to `…`. | `ControlCommands.swift` `controlHelp` | 9 |
-| `help ping` printed the top help and ignored `ping`; `ping list --help` printed `ping`'s help. | run the 0.6.0 binary | 1 |
-| A mistyped command printed the whole top help, 40 lines, after one line of error; so did every argument error in `app`, `panel`, `control` and `screenshot`. | `ShipyardCLI.run`, each `misread` | 7 |
-| `ping list` refused to run without `--json`. | `PingCommand.list` | 6 |
-| `herdr-event` was listed among the everyday commands, though only hooks run it, and `herdr-event --help` exited 2. | `PingCommands.swift` | 4 |
-| No machine-readable listing of the commands for agents. | — | 9 |
-
-What held: exit codes 0, 1 and 2 on every command; data on standard output and messages on standard error; no prompts; every wait bounded; `--json` on `app status` and `config check`; the Mac-only refusal on Linux.
+- No interactive prompts or pickers.
+- No colour.
+- No shell completions yet.
+- No Windows build.
+- No command that changes `config.toml`: agents edit the file (ADR 0001).
 
 ## Command model
+
+### Command tree
 
 ```text
 shipyard
@@ -69,9 +79,15 @@ shipyard
 └── help          [<group> | --json]
 ```
 
-Nouns are the glossary's: ping, notice, app, panel, lease, notes, config. Every group is a noun, and every command is `shipyard <noun> <verb>`, two levels at most. `herdr-event` is the one exception, kept whole because the plugin's hooks call it by that name and no person runs it.
+### Nouns
 
-**Verbs**, one meaning each:
+Nouns are the glossary's: ping, notice, app, panel, lease, notes, config.
+Every group is a noun, and every command is `shipyard <noun> <verb>`, two levels at most.
+`herdr-event` is the one exception, kept whole because the plugin's hooks call it by that name and no person runs it.
+
+### Verbs
+
+One meaning each:
 
 | Verb | Meaning | Used on |
 |---|---|---|
@@ -87,11 +103,42 @@ Nouns are the glossary's: ping, notice, app, panel, lease, notes, config. Every 
 | `show-*` | bring one part of the panel into view: more rows, a tab, a status view | panel |
 | `take` / `release` | hold or give up the lease | lease |
 
-**Targets.** A command names what it acts on with a required word (`ping withdraw <id>`, `panel fold <project>`). A ping or notice is filed by the working folder's repository unless `--repo` or `--project` names one: the current default, overridden by a flag.
+### Targets
 
-## Renames
+A command names what it acts on with a required word (`ping withdraw <id>`, `panel fold <project>`).
+A ping or notice is filed by the working folder's repository unless `--repo` or `--project` names one: the current default, overridden by a flag.
 
-Each old form is replaced, with no alias: an old form is refused like any unknown command (exit 2, one line). The CLI, the skill and the callers move together in one release.
+### Previous command forms
+
+Shipyard 0.6.0 had nine top-level commands in a flat list, each module writing its own help lines.
+The last column names the item in Verification that each finding fails.
+
+| Finding | Evidence | Verification item |
+|---|---|---|
+| Sending was the group itself: `ping "<title>"` and `notify "<title>"`, while `ping withdraw` and `ping list` were verbs. A title equal to a verb needed `--` (`shipyard ping -- withdraw`). | `PingCommands.swift`, `NotifyCommand.swift` | 2 |
+| The same idea had two names: the noun is *notice* (GLOSSARY.md) but the command was `notify`; the noun is *lease* but the command was `control`. | GLOSSARY.md "Notice", "Lease" | 3 |
+| `screenshot` was a top-level verb about the app, beside `app`; GLOSSARY.md says *capture* is the act. | GLOSSARY.md "Screenshot" | 3, 4 |
+| `panel tab <name>` and `panel view <name>` used nouns as verbs. | `PanelCommand.swift` | 2 |
+| The top help was written by hand, twice per command, and had drifted: it left `--for` out of `control take`, and cut `notify`'s flags to `…`. | `ControlCommands.swift` `controlHelp` | 9 |
+| `help ping` printed the top help and ignored `ping`; `ping list --help` printed `ping`'s help. | run the 0.6.0 binary | 1 |
+| A mistyped command printed the whole top help, 40 lines, after one line of error; so did every argument error in `app`, `panel`, `control` and `screenshot`. | `ShipyardCLI.run`, each `misread` | 7 |
+| `ping list` refused to run without `--json`. | `PingCommand.list` | 6 |
+| `herdr-event` was listed among the everyday commands, though only hooks run it, and `herdr-event --help` exited 2. | `PingCommands.swift` | 4 |
+| No machine-readable listing of the commands for agents. | — | 9 |
+
+What held from 0.6.0:
+
+- Exit codes 0, 1 and 2 on every command.
+- Data on standard output and messages on standard error.
+- No prompts.
+- Every wait bounded.
+- `--json` on `app status` and `config check`.
+- The Mac-only refusal on Linux.
+
+### Renames
+
+Each old form is replaced, with no alias: an old form is refused like any unknown command (exit 2, one line).
+The CLI, the skill and the callers move together in one release.
 
 | Before | After | Rule it broke |
 |---|---|---|
@@ -106,6 +153,8 @@ Each old form is replaced, with no alias: an old form is refused like any unknow
 Unchanged: `ping withdraw`, `ping list --json`, `app open|quit|status`, `panel open|close|fold|unfold|show-more`, `notes check`, `config check`, `herdr-event`, and every flag.
 
 ## Inputs
+
+### Usage lines
 
 ```text
 shipyard ping send <title> [--body <text>] [--from <label>] [--id <id>]
@@ -137,14 +186,32 @@ shipyard help [<group> | --json]
 shipyard --version
 ```
 
-- A title, an id, a file and a project are words, in their natural order; everything else is a long flag. The same flag means the same thing on `ping send` and `notice send`.
+### Words and flags
+
+- A title, an id, a file and a project are words, in their natural order; everything else is a long flag.
+- The same flag means the same thing on `ping send` and `notice send`.
 - `--` ends the flags of `ping send` and `notice send`, so a title can start with a dash.
 - `-h` and `--help` print help wherever they appear before `--`.
-- **Environment:** `SHIPYARD_CONTROL_KEY` names the lease holder (`--key` wins); `HERDR_PANE_ID` is the pane `--herdr` focuses with no id; `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON` are `herdr-event`'s input. `SHIPYARD_SUPPORT_DIR` and `XDG_CONFIG_HOME` move the files, for demo runs and tests.
-- **Configuration:** flags, then `cli.toml` (where a notice goes), then built-in defaults. The command never reads `config.toml` for its own behaviour, only to file a ping on the Mac.
-- No command prompts, and none takes a secret.
+
+### Environment
+
+- `SHIPYARD_CONTROL_KEY` names the lease holder (`--key` wins).
+- `HERDR_PANE_ID` is the pane `--herdr` focuses with no id.
+- `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON` are `herdr-event`'s input.
+- `SHIPYARD_SUPPORT_DIR` and `XDG_CONFIG_HOME` move the files, for demo runs and tests.
+
+### Configuration
+
+Precedence: flags, then `cli.toml` (where a notice goes), then built-in defaults.
+The command never reads `config.toml` for its own behaviour, only to file a ping on the Mac.
+
+### Interaction
+
+No command prompts, and none takes a secret.
 
 ## Output and errors
+
+### Output by command
 
 | Command | Standard output | `--json` | Refusals (exit 1) |
 |---|---|---|---|
@@ -160,10 +227,17 @@ shipyard --version
 | `lease take` / `release` | `you hold shipyard until <HH:mm:ss>` / one line | — | another agent holds it |
 | `notes check` | one line per project, then each problem | — | an error in the layout; the app isn't running |
 | `config check` | each file's verdict, problems and warnings: `config.toml`, each theme file in file-name order, `cli.toml` | each file's result by name: `config.toml`, `themes/<file>`, `cli.toml` | a file has a problem |
-| `help` | the top help, or a group's help | every command and every old name | — |
+| `help` | the top help, or a group's help | every command | — |
 
-**`config check`'s files.** The Mac's `shipyard` checks `config.toml`, then each `*.toml` theme file in the `themes` folder beside it, in file-name order, then `cli.toml`; the Linux `shipyard` checks `cli.toml` alone (ADR 0014).
-Each file prints its absolute path and `accepted` or `rejected`, then one indented `problem:` or `warning:` line per issue in the panel banner's words; a theme file's problems read `themes/<file> line N: …`, and a theme file has no warnings.
+### `config check` output
+
+Files checked (ADR 0014):
+
+- The Mac's `shipyard` checks `config.toml`, then each `*.toml` theme file in the `themes` folder beside it, in file-name order, then `cli.toml`.
+- The Linux `shipyard` checks `cli.toml` alone.
+
+Each file prints its absolute path and `accepted` or `rejected`, then one indented `problem:` or `warning:` line per issue in the panel banner's words.
+A theme file's problems read `themes/<file> line N: …`, and a theme file has no warnings.
 
 ```text
 /Users/me/.config/shipyard/config.toml: accepted
@@ -174,17 +248,38 @@ Each file prints its absolute path and `accepted` or `rejected`, then one indent
 
 `--json` prints one object with a key per file, `config.toml`, `themes/<file>` and `cli.toml`, each in `config-status.json`'s fields: `config` is the file's path and `configModified` its modification time.
 
-**Exit codes**, the same on every command: 0 success; 1 failed or refused, with one line on why; 2 wrong usage, with one line and the help to read.
+### Exit codes
 
-**Errors** are one line on standard error that names the command, says what is wrong and ends with the way out: `shipyard panel show-tab: missing <name>. Run 'shipyard panel --help' for usage.` A mistyped group names the closest one and never runs it: `shipyard: unknown command 'pnig'. Did you mean 'shipyard ping'? Run 'shipyard --help' for the commands.` A Mac-only group on another machine says `shipyard: 'shipyard app' runs on the Mac, where the app is`.
+The same on every command:
 
-**Old forms** are unknown commands: `shipyard notify` names `shipyard notice` as the closest group, and `shipyard ping "<title>"` says `shipyard ping: unknown command '<title>'; send a ping with 'shipyard ping send <title>'.`
+| Code | Meaning |
+|---|---|
+| 0 | success |
+| 1 | failed or refused, with one line on why |
+| 2 | wrong usage, with one line and the help to read |
+
+### Error messages
+
+Errors are one line on standard error that names the command, says what is wrong and ends with the way out.
+
+- Wrong usage: ``shipyard panel show-tab: missing <name>. Run `shipyard panel --help` for usage.``
+- A mistyped group names the closest one and never runs it: ``shipyard: unknown command `pnig`. Did you mean `shipyard ping`? Run `shipyard --help` for the commands.``
+- A Mac-only group on another machine: ``shipyard: `shipyard app` runs on the Mac, where the app is``.
+
+### Old forms
+
+Old forms are unknown commands.
+
+- `shipyard notify` names `shipyard notice` as the closest group.
+- `shipyard ping "<title>"` says ``shipyard ping: unknown command `<title>`; send a ping with `shipyard ping send <title>`. Run `shipyard ping --help` for usage.``
 
 ## Help
 
 Three levels, each made from the same table.
 
-**Top help** (`shipyard --help`, `shipyard help`), grouped by job:
+### Top help
+
+`shipyard --help` and `shipyard help` print the top help, grouped by job:
 
 ```text
 shipyard: your pull requests, issues, runs and agents' pings, from the menu bar
@@ -235,11 +330,26 @@ Learn more: docs/cli-design.md in github.com/yahyabedirhan/shipyard.
 
 A build lists only the groups it links: on Linux the "Drive the app" section and `notes` are left out.
 
-**Group help** (`shipyard <group> --help`, `shipyard help <group>`, `shipyard <group>` alone on standard error): a summary line, a `Usage:` block with every command's full usage, examples, then each command's details and the group's exit codes. `ping` and `notice` hold every flag there, since `send` is where they're used.
+### Group help
 
-**Machine-readable listing** (`shipyard help --json`): `version`, `commands` (each `group`, `usage`, `summary`, `section`). Agents read it to learn the build's commands without parsing text.
+`shipyard <group> --help`, `shipyard help <group>`, and `shipyard <group>` alone on standard error print the group help, in this order:
+
+1. A summary line.
+2. A `Usage:` block with every command's full usage.
+3. Examples.
+4. Each command's details.
+5. The group's exit codes.
+
+`ping` and `notice` hold every flag there, since `send` is where they're used.
+
+### Machine-readable listing
+
+`shipyard help --json` prints `version` and `commands` (each `group`, `usage`, `summary`, `section`).
+Agents read it to learn the build's commands without parsing text.
 
 ## Implementation
+
+### Files
 
 ```text
 Sources/
@@ -255,9 +365,16 @@ Sources/
 └── ShipyardCLI/main.swift          assembles the build's table and prints what ShipyardCLI.run returns
 ```
 
-**The table.** `CommandTable.Entry` is one group: `name`, `section`, `commands` and `run`. `CommandTable.Command` is one command: its `usage` after the group's name, verb first, and its one-line `summary`. The top help and `help --json` are made from these, so a group a build doesn't link is never listed. Each group's detailed help (`usageText`) lives beside its parser, and a contract test checks it names every command in the table.
+### Command table
 
-**One path.** `shipyard notice send "done" --from claude`:
+- `CommandTable.Entry` is one group: `name`, `section`, `commands` and `run`.
+- `CommandTable.Command` is one command: its `usage` after the group's name, verb first, and its one-line `summary`.
+- The top help and `help --json` are made from these, so a group a build doesn't link is never listed.
+- Each group's detailed help (`usageText`) lives beside its parser, and a contract test checks it names every command in the table.
+
+### Command path
+
+`shipyard notice send "done" --from claude`:
 
 ```text
 main.swift                    builds the table: ping, notice, app, panel, lease, notes, config, herdr-event
@@ -269,11 +386,34 @@ main.swift                    builds the table: ping, notice, app, panel, lease,
             └── ControlNoticeRoute → the app → "shown", exit 0
 ```
 
-**A refusal.** `shipyard app capture` with no file: `ShipyardCLI.run` finds `app`, its `run` sees `capture` and calls `ScreenshotCommand.parse([])`, which returns `.usage("shipyard app capture: missing <file.png>. Run 'shipyard app capture --help' for usage.")`, exit 2. Nothing is sent to the app.
+### Refusal path
 
-**Contract tests** (`CommandTableTests`): every old form is refused in one line and runs nothing; every group's `--help` names each of its table commands; a mistyped group suggests the closest one in one line; `help --json` lists every command; `help <group>` is `<group> --help`. `SkillDocumentTests` checks that the skill teaches each command as it's built.
+`shipyard app capture` with no file:
+
+```text
+ShipyardCLI.run(["app", "capture"])
+└── table.entry(named: "app")
+    └── run sees "capture" → ScreenshotCommand.parse([])
+        └── .usage("shipyard app capture: missing <file.png>. Run `shipyard app capture --help` for usage."), exit 2
+```
+
+Nothing is sent to the app.
+
+### Contract tests
+
+`CommandTableTests` checks that:
+
+- Every old form is refused in one line and runs nothing.
+- Every group's `--help` names each of its table commands.
+- A mistyped group suggests the closest one in one line.
+- `help --json` lists every command.
+- `help <group>` is `<group> --help`.
+
+`SkillDocumentTests` checks that the skill teaches each command as it's built.
 
 ## Evolution
+
+### Likely changes
 
 | Change | What you touch |
 |---|---|
@@ -283,14 +423,15 @@ main.swift                    builds the table: ping, notice, app, panel, lease,
 | A rename | the parser, the table's `Command`, the skill, the docs, and every caller in the same release |
 | A `--json` on `notes check` | the app's `notes.check` reply and the command: the reply is text today |
 
-**Rules for changing the contract**
+### Contract rules
 
 - Add before changing: a new command, flag or JSON field breaks no caller.
 - A rename is a breaking change: it ships with the skill, the herdr-shipyard plugin and every caller updated in the same release, and the changelog says so. No aliases are kept.
 - `ping list --json`'s shape is read by older Macs through Herdr: change it only by adding fields.
-- The skill, the herdr-shipyard plugin and the docs ship with the release that changes a command. The callers outside this repository (the session-status mod's `ping`, the workstation's `notification-method`) move to the new forms in the same release, since the new `shipyard` refuses the old ones and an older one doesn't know the new ones.
+- The skill, the herdr-shipyard plugin and the docs ship with the release that changes a command.
+- The callers outside this repository (the session-status mod's `ping`, the workstation's `notification-method`) move to the new forms in the same release, since the new `shipyard` refuses the old ones and an older one doesn't know the new ones.
 
-## Review checklist
+## Verification
 
 | # | Item | Status |
 |---|---|---|

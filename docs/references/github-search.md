@@ -1,6 +1,17 @@
 # GitHub search for review requests
 
-Checked 2026-09-26 against [Searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests), [GraphQL: search](https://docs.github.com/en/graphql/reference/search) and [GraphQL rate and query limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api).
+How GitHub's search finds the pull requests waiting on the user's review, and its limits.
+Shipyard's review search, and every `anywhere` project and `review-requested` count, depend on it.
+
+## Sources
+
+Checked 2026-09-26 against:
+
+- [Searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)
+- [GraphQL: search](https://docs.github.com/en/graphql/reference/search)
+- [GraphQL rate and query limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api)
+
+## Shipyard's query
 
 Shipyard asks once per refresh, in the first GraphQL batch: `search(type: ISSUE, query: "is:pr is:open archived:false review-requested:@me", first: 100)`.
 
@@ -19,7 +30,9 @@ Shipyard asks once per refresh, in the first GraphQL batch: `search(type: ISSUE,
 - A search returns "a maximum of 1,000 results" across all pages, whatever the number of matches.
 - The search is part of a GraphQL request, so its cost is part of that request's `rateLimit.cost`, which the rate budget records (see [github-rate-limits.md](github-rate-limits.md)).
 
-## Not confirmed against the docs
+## Gaps
+
+Not confirmed against the docs:
 
 - A search that fails on its own comes back as `"reviewSearch": null` with an error whose `path` is `["reviewSearch"]`, while the repositories in the same request still answer. This is how GraphQL reports a field that failed; shipyard then keeps the last pull requests the search found and shows an error row where review requests were needed.
 - GitHub's search index can lag a pull request's latest change by a short while.

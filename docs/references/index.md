@@ -1,6 +1,15 @@
 # References
 
-Facts from outside documentation that shipyard depends on, with their sources. Read the file for an area before working in it. When a fact changes, update it here with the new check date.
+Facts from outside documentation that shipyard depends on, with their sources.
+Read the file for an area before working in it.
+When a fact changes, update it here with the new check date.
+
+This page has two sections:
+
+1. Files
+2. Reference file framework
+
+## Files
 
 | File | Covers |
 |---|---|
@@ -16,5 +25,20 @@ Facts from outside documentation that shipyard depends on, with their sources. R
 | [macos-end-to-end-testing.md](macos-end-to-end-testing.md) | End-to-end testing options for a SwiftUI menu bar app without Xcode, and what shipyard adopts |
 | [macos-hover-help.md](macos-hover-help.md) | Hover help in the panel instead of native tooltips: packages, native options (popover, a drawn card, inline text), what menu bar apps do, and each call site |
 | [screencapturekit-own-windows.md](screencapturekit-own-windows.md) | Capturing shipyard's own panel window with ScreenCaptureKit (`SCShareableContent.currentProcess`, macOS 14.4) without the Screen Recording permission, and the first real capture's outcome |
-| [agent-icons.md](agent-icons.md) | Where each coding agent's icon is published and under what terms; why shipyard draws its own marks instead of bundling them |
+| [agent-icons.md](agent-icons.md) | Where each coding agent's icon is published and under what terms, and the decision to bundle each agent's real logo |
 | [service-icons.md](service-icons.md) | Where GitHub's and Notion's marks for their status views come from, under what licence and brand terms, and the look the maintainer chose |
+
+## Reference file framework
+
+Every reference file has these sections, in this order.
+A file leaves out an optional section it has nothing for.
+
+1. **Title and job.** An `#` title that names the area, then one or two sentences: what the file covers and what in shipyard depends on it.
+2. **`## Sources`.** Each source with its link and the date it was checked, read or measured. A section checked on another date says so in its first line.
+3. **`## Decision`** (optional). The choice the file records, with its issue, its date and who made it. A file whose choice nobody has made yet names this section `## Recommendation`.
+4. **Topic sections.** One `##` section per topic, named with a short technical noun phrase, such as `Per-app limits` or `Running out`. Each fact is a bullet, in the source's words where they matter. `###` sub-sections split a long topic.
+5. **`## Shipyard's use`** (optional). How shipyard relies on the facts: the code, settings, ADRs and issues. Use it bullets can also close a topic section, when they belong to that topic only.
+6. **`## Gaps`** (optional). Facts not yet confirmed against a source, and open questions, each with where it came from.
+
+Each file keeps every fact, source link and check date.
+A measured fact says so, with its date ("Measured 2026-09-25").

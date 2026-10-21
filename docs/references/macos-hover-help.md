@@ -1,34 +1,59 @@
 # Hover help in a macOS menu bar panel
 
-Checked 2026-09-26 for issue #72, against the sources listed at the end. The question: what should replace SwiftUI's `.help(...)` (macOS's native tooltips, "help tags") in shipyard's panel, a `MenuBarExtra` in `.window` style, 400 points wide, whose lists scroll inside it. Toolchain as checked: Swift 6.3 with Command Line Tools, macOS 26, deployment target macOS 14.
+What should replace SwiftUI's `.help(...)` (macOS's native tooltips, "help tags") in shipyard's panel, a `MenuBarExtra` in `.window` style, 400 points wide, whose lists scroll inside it (issue #72).
+The panel's hover help (`hoverHelp(_:)`, `hoverHelpHost()`, `HoverHelpPlacement`) depends on it.
 
-## Recommendation
+## Sources
+
+Checked 2026-09-26 for issue #72.
+Toolchain as checked: Swift 6.3 with Command Line Tools, macOS 26, deployment target macOS 14.
+
+- Apple, [help(_:)](https://developer.apple.com/documentation/swiftui/view/help(_:)-6oiyb) (macOS 11+), [accessibilityHint(_:)](https://developer.apple.com/documentation/swiftui/view/accessibilityhint(_:)) (macOS 13+), [onHover(perform:)](https://developer.apple.com/documentation/swiftui/view/onhover(perform:)) (macOS 10.15+), [popover(isPresented:attachmentAnchor:arrowEdge:content:)](https://developer.apple.com/documentation/swiftui/view/popover(ispresented:attachmentanchor:arrowedge:content:)) (macOS 10.15+): checked 2026-09-26.
+- Apple, [NSPopover](https://developer.apple.com/documentation/appkit/nspopover), [show(relativeTo:of:preferredEdge:)](https://developer.apple.com/documentation/appkit/nspopover/show(relativeto:of:preferrededge:)), [behavior](https://developer.apple.com/documentation/appkit/nspopover/behavior-swift.property), [NSVisualEffectView.Material.toolTip](https://developer.apple.com/documentation/appkit/nsvisualeffectview/material-swift.enum/tooltip): checked 2026-09-26.
+- Apple, [TipKit](https://developer.apple.com/documentation/tipkit) (macOS 14+): checked 2026-09-26.
+- Apple Human Interface Guidelines, [Offering help](https://developer.apple.com/design/human-interface-guidelines/offering-help) (tips; macOS tooltips) and [Popovers](https://developer.apple.com/design/human-interface-guidelines/popovers): checked 2026-09-26.
+- GitHub repositories, read through the GitHub API on 2026-09-26 (README, `Package.swift`, releases and tags, last commit on the default branch): [quassum/SwiftUI-Tooltip](https://github.com/quassum/SwiftUI-Tooltip) (`Sources/SwiftUITooltip/TooltipModifier.swift`), [jasudev/AxisTooltip](https://github.com/jasudev/AxisTooltip) (`Sources/AxisTooltip/AxisTooltip.swift`), [chipjarred/CustomToolTip](https://github.com/chipjarred/CustomToolTip) (`CustomToolTipWindow.swift`), [iSapozhnik/Popover](https://github.com/iSapozhnik/Popover), [MutatingFunc/Tooltips](https://github.com/MutatingFunc/Tooltips), [oahhariri/SwiftyTooltip](https://github.com/oahhariri/SwiftyTooltip), [DominikButz/DYPopoverView](https://github.com/DominikButz/DYPopoverView).
+- Menu bar apps' source, read on 2026-09-26: [p0deje/Maccy](https://github.com/p0deje/Maccy) (`Maccy/Views/ListItemView.swift`, `ToolbarView.swift`, `SlideoutContentView.swift`), [exelban/stats](https://github.com/exelban/stats), [steipete/CodexBar](https://github.com/steipete/CodexBar), [jordanbaird/Ice](https://github.com/jordanbaird/Ice); latest releases from each repository's releases page.
+
+## Decision
 
 **A small SwiftUI card that the panel draws itself (`hoverHelp(_:)` on a view, `hoverHelpHost()` once on the panel), placed by a pure, tested rule in the core. No package.**
 
 - It looks like the panel: the system's `.regularMaterial`, the panel's hairline and corner radius, the panel's type scale. Its motion is the system spring the row highlight already uses, and an opacity fade. Nothing is hand-drawn beyond a rounded rectangle, and nothing is hand-animated.
-- It meets each thing the ticket asks for. It never covers the row the pointer is on: it sits under the hovered view, or over it when there's no room below. The panel's edge can't cut it off, because it's placed inside the panel's bounds with a margin, and it's drawn at the panel's frame, so the scroll view's clip doesn't cut it either. On the header's buttons it shows after a 0.5 s rest and at once while warm, as native tooltips do, gliding from one to the next. On the item rows it waits 1 s and closes as the pointer leaves, so it doesn't follow the pointer down the list and cover the rows under it. It never takes the pointer, the keyboard focus or the key window.
+- It meets each thing the ticket asks for:
+  - It never covers the row the pointer is on: it sits under the hovered view, or over it when there's no room below.
+  - The panel's edge can't cut it off, because it's placed inside the panel's bounds with a margin, and it's drawn at the panel's frame, so the scroll view's clip doesn't cut it either.
+  - On the header's buttons it shows after a 0.5 s rest and at once while warm, as native tooltips do, gliding from one to the next.
+  - On the item rows it waits 1 s and closes as the pointer leaves, so it doesn't follow the pointer down the list and cover the rows under it.
+  - It never takes the pointer, the keyboard focus or the key window.
 - VoiceOver keeps the text: `.help` set the view's accessibility hint (Apple: "Adding help to a view configures the view's accessibility hint and its help tag"), so `hoverHelp(_:)` sets `.accessibilityHint` with the same words, and the card itself is hidden from accessibility.
 - The placement rule is `HoverHelpPlacement` in `ShipyardCore/Menu/`, with tests.
 
-**Runner-up: SwiftUI's own `.popover`, shown on hover.** It's the most native look (the system's popover chrome and arrow), and it's its own window, so it can sit beside the panel and cover no rows at all. It isn't the default because the risks can only be checked in the real menu, which agents can't drive:
+### Runner-up
+
+**SwiftUI's own `.popover`, shown on hover.**
+It's the most native look (the system's popover chrome and arrow), and it's its own window, so it can sit beside the panel and cover no rows at all.
+It isn't the default because the risks can only be checked in the real menu, which agents can't drive:
 
 - An `NSPopover` is a window, and its behavior decides "which user interactions will cause the popover to close". A transient popover closes on most interactions. A popover that takes the key window could take the arrow keys from the list, which depends on the panel's window being key.
 - Apple's guidance is to "show one popover at a time", and a hover popover per row means closing one popover and opening the next on every row the pointer crosses.
 - The HIG places popovers for "a small amount of information or functionality" that people interact with, not for passive help. The HIG entry for passive help is the tooltip.
 
-It was first built as a second style, `HoverHelp.Style.popover`, one line away from the card, to try against it. It was never tried in the real menu, and the maintainer chose to remove it rather than keep it to try later (#84, #160). Trying the popover again means building it anew (`popover(isPresented:arrowEdge:)` on the hovered view after its context's delay), then checking the risks above.
+It was first built as a second style, `HoverHelp.Style.popover`, one line away from the card, to try against it.
+It was never tried in the real menu, and the maintainer chose to remove it rather than keep it to try later (#84, #160).
+Trying the popover again means building it anew (`popover(isPresented:arrowEdge:)` on the hovered view after its context's delay), then checking the risks above.
 
-## What the options were measured against
+## Criteria
 
 - Native SwiftUI over hand-rolled drawing or animation (the maintainer rejected a hand-rolled animation before), and no dated-looking native tooltip.
 - Never covers the hovered row; never cut off at the panel's edge (a `MenuBarExtra` `.window` panel 400 pt wide, lists in a `ScrollView`).
 - VoiceOver still gets the words.
 - A package only if it clearly beats the native options: maintained, licensed, macOS 14 or earlier, and able to leave the scroll view's clip.
 
-## Packages (Swift Package Manager)
+## Packages
 
-Searched on GitHub (`tooltip swiftui`, `tooltip macos language:swift`, `popover language:swift macos`, by stars) on 2026-09-26. Every package that supports macOS and has more than a handful of stars:
+Swift Package Manager packages, searched on GitHub (`tooltip swiftui`, `tooltip macos language:swift`, `popover language:swift macos`, by stars) on 2026-09-26.
+Every package that supports macOS and has more than a handful of stars:
 
 | Package | Licence | Last release / tag | Last commit | macOS min | Stars | How it draws | Verdict |
 |---|---|---|---|---|---|---|---|
@@ -38,9 +63,16 @@ Searched on GitHub (`tooltip swiftui`, `tooltip macos language:swift`, `popover 
 | [iSapozhnik/Popover](https://github.com/iSapozhnik/Popover) | MIT | 1.1.1, 2021-08-05 | 2021-08-05 | 10.11 | 130 | A custom status-bar popover window | For a status item's main window, not hover help; dormant |
 | [MutatingFunc/Tooltips](https://github.com/MutatingFunc/Tooltips) | MIT | tag 1.1.0 (no release) | 2024-11-13 | 14 | 0 | "SwiftUI tooltips, stylised like macOS" | No users, no releases |
 
-Others found are iOS-only (`oahhariri/SwiftyTooltip`, released 2026-09-23, `.iOS(.v15)` only; `DominikButz/DYPopoverView`, iOS 13) or unlicensed single-author snippets. **No package clearly beats the native options.** None is maintained and SwiftUI-native on macOS. The SwiftUI ones draw an overlay on the hovered view, which the panel's scroll view clips, and the one that escapes the panel is dormant AppKit.
+Others found are iOS-only (`oahhariri/SwiftyTooltip`, released 2026-09-23, `.iOS(.v15)` only; `DominikButz/DYPopoverView`, iOS 13) or unlicensed single-author snippets.
 
-Apple's **TipKit** (macOS 14+) has `popoverTip`, but it's for feature discovery, not hover help: "Use TipKit to show contextual tips that highlight new, interesting, or unused features people haven't discovered on their own yet … avoid displaying tips each time someone uses your app." Its rules and display frequency are the opposite of help on every hover.
+**No package clearly beats the native options.**
+None is maintained and SwiftUI-native on macOS.
+The SwiftUI ones draw an overlay on the hovered view, which the panel's scroll view clips, and the one that escapes the panel is dormant AppKit.
+
+### TipKit
+
+Apple's **TipKit** (macOS 14+) has `popoverTip`, but it's for feature discovery, not hover help: "Use TipKit to show contextual tips that highlight new, interesting, or unused features people haven't discovered on their own yet … avoid displaying tips each time someone uses your app."
+Its rules and display frequency are the opposite of help on every hover.
 
 ## Native options
 
@@ -53,6 +85,8 @@ Apple's **TipKit** (macOS 14+) has `popoverTip`, but it's for feature discovery,
 | Text inline in the row | Plain text | n/a | n/a | None | Right where the text is short or the row can grow (note and error rows); the item rows can't hold their full detail on one line |
 | No help | n/a | n/a | n/a | None | Right where the control is self-explanatory (chevrons, ✕, the copy icon, the lock) |
 
+### API facts
+
 The facts behind the table:
 
 - `help(_:)` "configures the view's accessibility hint and its help tag (also called a tooltip) in macOS" (macOS 11+). So dropping `.help` drops the hint unless the replacement sets `accessibilityHint(_:)` (macOS 13+, "Communicates to the user what happens after performing the view's action").
@@ -63,7 +97,7 @@ The facts behind the table:
 - HIG, Offering help: tooltips should "describe only the control that people indicate interest in", "avoid repeating a control's name in its tooltip", be "60 to 75 characters" at most, and use sentence case. It also suggests "an inline view that succinctly describes the task" for simple tasks.
 - HIG, Popovers: "Ideally, a popover doesn't cover the element that revealed it"; "Show one popover at a time"; "Use a popover to expose a small amount of information or functionality".
 
-## How menu bar apps show hover help
+## Menu bar app survey
 
 Read in each app's source on 2026-09-26:
 
@@ -72,9 +106,12 @@ Read in each app's source on 2026-09-26:
 - **CodexBar** ([steipete/CodexBar](https://github.com/steipete/CodexBar), v0.67.0, 2026-09-26) uses native `.help` (18 files) and `toolTip` in its `NSMenu` rows. It has no `NSPopover`.
 - **Ice** ([jordanbaird/Ice](https://github.com/jordanbaird/Ice), 0.11.12, 2024-10-29) uses native `.help` in its settings.
 
-None of them ships a custom tooltip. They use native help tags and move the long content into the layout (Maccy's slide-out). So shipyard's card is a step past what these apps do. It keeps their idea of short help on hover, with long text in the layout (the note and error rows now wrap), and makes the help itself look like the panel.
+None of them ships a custom tooltip.
+They use native help tags and move the long content into the layout (Maccy's slide-out).
+So shipyard's card is a step past what these apps do.
+It keeps their idea of short help on hover, with long text in the layout (the note and error rows now wrap), and makes the help itself look like the panel.
 
-## Each call site
+## Call sites
 
 The 14 `.help(` sites in `Sources/ShipyardApp`, and what each became:
 
@@ -94,12 +131,3 @@ The 14 `.help(` sites in `Sources/ShipyardApp`, and what each became:
 | Command box's Copy | No hover help | The icon turns into a checkmark; the VoiceOver label stays |
 | Skill card's Close | No hover help | An ✕ in a card's corner; the VoiceOver label stays |
 | Picker's lock | No hover help; VoiceOver label "Private" | The lock says private |
-
-## Sources
-
-- Apple, [help(_:)](https://developer.apple.com/documentation/swiftui/view/help(_:)-6oiyb) (macOS 11+), [accessibilityHint(_:)](https://developer.apple.com/documentation/swiftui/view/accessibilityhint(_:)) (macOS 13+), [onHover(perform:)](https://developer.apple.com/documentation/swiftui/view/onhover(perform:)) (macOS 10.15+), [popover(isPresented:attachmentAnchor:arrowEdge:content:)](https://developer.apple.com/documentation/swiftui/view/popover(ispresented:attachmentanchor:arrowedge:content:)) (macOS 10.15+): checked 2026-09-26.
-- Apple, [NSPopover](https://developer.apple.com/documentation/appkit/nspopover), [show(relativeTo:of:preferredEdge:)](https://developer.apple.com/documentation/appkit/nspopover/show(relativeto:of:preferrededge:)), [behavior](https://developer.apple.com/documentation/appkit/nspopover/behavior-swift.property), [NSVisualEffectView.Material.toolTip](https://developer.apple.com/documentation/appkit/nsvisualeffectview/material-swift.enum/tooltip): checked 2026-09-26.
-- Apple, [TipKit](https://developer.apple.com/documentation/tipkit) (macOS 14+): checked 2026-09-26.
-- Apple Human Interface Guidelines, [Offering help](https://developer.apple.com/design/human-interface-guidelines/offering-help) (tips; macOS tooltips) and [Popovers](https://developer.apple.com/design/human-interface-guidelines/popovers): checked 2026-09-26.
-- GitHub repositories, read through the GitHub API on 2026-09-26 (README, `Package.swift`, releases and tags, last commit on the default branch): [quassum/SwiftUI-Tooltip](https://github.com/quassum/SwiftUI-Tooltip) (`Sources/SwiftUITooltip/TooltipModifier.swift`), [jasudev/AxisTooltip](https://github.com/jasudev/AxisTooltip) (`Sources/AxisTooltip/AxisTooltip.swift`), [chipjarred/CustomToolTip](https://github.com/chipjarred/CustomToolTip) (`CustomToolTipWindow.swift`), [iSapozhnik/Popover](https://github.com/iSapozhnik/Popover), [MutatingFunc/Tooltips](https://github.com/MutatingFunc/Tooltips), [oahhariri/SwiftyTooltip](https://github.com/oahhariri/SwiftyTooltip), [DominikButz/DYPopoverView](https://github.com/DominikButz/DYPopoverView).
-- Menu bar apps' source, read on 2026-09-26: [p0deje/Maccy](https://github.com/p0deje/Maccy) (`Maccy/Views/ListItemView.swift`, `ToolbarView.swift`, `SlideoutContentView.swift`), [exelban/stats](https://github.com/exelban/stats), [steipete/CodexBar](https://github.com/steipete/CodexBar), [jordanbaird/Ice](https://github.com/jordanbaird/Ice); latest releases from each repository's releases page.
