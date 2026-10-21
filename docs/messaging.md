@@ -4,6 +4,21 @@ The one source of truth for what every public surface says about shipyard: the R
 Every surface quotes this file, and nothing contradicts it.
 When the product changes, change this file first, then the surfaces.
 
+Its sections, in order:
+
+1. Name
+2. Category
+3. One line
+4. Uses
+5. Reach
+6. Proof points
+7. Non-claims
+8. Glossary
+9. Install
+10. Links
+11. Channel lengths
+12. Rules
+
 ## Name
 
 - **Name:** `shipyard`, always lowercase in prose, headings and copy, also at the start of a sentence.
