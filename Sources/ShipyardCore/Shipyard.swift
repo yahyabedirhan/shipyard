@@ -117,7 +117,7 @@ public final class Shipyard {
     public private(set) var configError: ConfigurationError? {
         didSet { followBannerConditions() }
     }
-    /// Unknown settings the last clean read ignored, and old forms it read,
+    /// Unknown settings the last clean read ignored, and other warnings,
     /// for the panel's quiet banner; empty when there are none or the latest
     /// read failed.
     public private(set) var configWarnings: [ConfigurationIssue] = [] {

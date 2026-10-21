@@ -68,10 +68,6 @@ Top level:
 | `refresh-interval` | `"2m"` | a window (below), at least `"30s"`: how often the app refreshes; a floor it stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
 
-`hide-authors` (a top-level list of logins) is the old way to hide authors. The app still reads it, as a `hide` in each kind's defaults, with a warning; replace it with `authors` (see Whose items).
-
-`refresh-interval-seconds` (a whole number of seconds) is the old form of `refresh-interval`. The app still reads it, with a warning that gives the new key: replace `refresh-interval-seconds = 90` with `refresh-interval = "90s"`. The two together are an error.
-
 Tables:
 
 | Key | Default | Allowed |
@@ -89,7 +85,7 @@ Tables:
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["beta-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't be empty, start with `-`, hold a control character, be listed twice, or be a project's slug or title |
 | `[notices] listen` | `false` | whether the app takes notices (`shipyard notice send`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
 | `[notices] port` | `47420` | `1` to `65535`: the port on 127.0.0.1 it listens on, which `tailscale serve` exposes to your tailnet |
-| `[banners] snooze-duration` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back. `[banners] snooze` is its old name: the app still reads it, with a warning; rename it to `snooze-duration` |
+| `[banners] snooze-duration` | `"1h"` | a window (below), more than `0`: how long a banner above the projects stays hidden after its ✕ is clicked. After it, the banner shows again if its condition still holds; a condition that stops and starts again shows its banner at once. A short one, such as `"10s"`, makes it quick to check that banners come back |
 
 What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`, `[defaults.workflow-runs]`, `[defaults.pings]` and `[defaults.notes]` (and `[[defaults.notifications]]`), and what a project may override in its own block:
 
@@ -116,8 +112,6 @@ What every project shows, set in `[defaults.pull-requests]`, `[defaults.issues]`
 | `notifications` | five rules: `pr.opened`, `ping.sent`, `agent.notice`, `control.started` and `control.ended`, each `authors = []` | a list of rules (below) |
 
 A **window** is a string: a whole number and one unit, `s`, `m`, `h` or `d`, such as `"45s"`, `"30m"`, `"12h"` or `"7d"`; `"0"` hides closed (or finished) items at once. No fractions, negatives, spaces or two units: write `"90m"`, not `"1.5h"` or `"1h30m"`. A bad one is rejected with its line and the nearest spelling: "`closed-window` must be a whole number and one unit, `s`, `m`, `h` or `d`, such as "30m" (got "30min"; did you mean "30m"?)". An item leaves within one refresh of its window passing, without a click.
-
-`pull-requests.closed-window-days`, `issues.closed-window-days` and `workflow-runs.finished-window-hours` (a whole number of days or hours) are the old forms. The app still reads them, with a warning; replace each with the new key (`closed-window-days = 3` is `closed-window = "3d"`, `finished-window-hours = 4` is `finished-window = "4h"`). Setting the old and the new key in one table is an error.
 
 How every project's items are grouped and sorted in the menu, set straight under `[defaults]` (not in a sub-table), and what a project may override in its own block:
 
@@ -148,8 +142,6 @@ A project, one `[[projects]]` block each, shown as sections in file order:
 | `group-by`, `subsections`, `sort-by`, `show-first` | no | as under `[defaults]` above |
 | `archived`, `forks` | no | booleans, overriding `[defaults]` for this project |
 | `notifications` | no | a list of rules |
-
-A `[[projects]]` block's `name` is the old form of `slug` and `title`. The app still reads it, with a warning that gives both: the title is the name, and the slug is the name in lowercase, with each run of other characters changed to one hyphen (`name = "Review queue"` reads as `slug = "review-queue"` and `title = "Review queue"`). Replace `name` with the two keys; `name` beside `slug` or `title` is an error.
 
 ## Overrides
 
@@ -223,8 +215,6 @@ A rule, one element of a `notifications` list, is `{ event = "…", authors = [.
 | `agent.notice` | an agent posted a notice with `shipyard notice send`: titled with the project and the notice's title, over its body and sender. Each notice is its own notification unless an `--id` replaces one, never listed or kept. A project whose rules leave it out refuses the notice, and the agent is told. Notices have no author, so a rule with `authors` never selects one |
 
 Issue events need the project to show issues, and run events to show workflow runs.
-
-Older files write a rule's `authors` as one string: `"any"`, `"me"`, `"others"` or `"bots"`. The app still reads them, with a warning; when you touch such a rule, write the list instead (`authors = ["others"]`; `"any"` is `[]`, or leave `authors` out).
 
 ## Checking an edit
 
@@ -343,9 +333,7 @@ For every project instead, write `[[defaults.notifications]]` blocks.
 authors = { hide = ["@dependabot[bot]"] }
 ```
 
-When the file still has an old `hide-authors` list, move its logins into these `hide` lists (each with `@`) and delete the `hide-authors` line.
-
-**"Keep merged and closed items for 30 minutes."** Set `closed-window` in each kind's defaults (`finished-window` for runs), or inside one project's block for that project alone. Replace an old `closed-window-days` line rather than adding beside it.
+**"Keep merged and closed items for 30 minutes."** Set `closed-window` in each kind's defaults (`finished-window` for runs), or inside one project's block for that project alone.
 
 ```toml
 [defaults.pull-requests]
@@ -662,7 +650,7 @@ shipyard lease release [--key <k>]
 `app status` prints lines; `demo:` appears only in a demo run, `tab:` only in the tabs layout:
 
 ```text
-shipyard 0.7.1 is running
+shipyard <version> is running
 lease: free
 panel: closed
 view: projects

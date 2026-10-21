@@ -172,8 +172,6 @@ struct NotificationTests {
         AuthorCase(authors: #"["others"]"#, expected: [3]),
         AuthorCase(authors: #"["bots"]"#, expected: [4, 5]),
         AuthorCase(authors: #"["@octocat", "@renovate[bot]"]"#, expected: [3, 5]),
-        AuthorCase(authors: #""any""#, expected: [2, 3, 4, 5]),
-        AuthorCase(authors: #""others""#, expected: [3]),
     ])
     func authorFilter(_ author: AuthorCase) async throws {
         let config = """

@@ -254,7 +254,7 @@ struct ProjectPickerTests {
         let existing = """
             #:schema \(Configuration.schemaURL)
             # my settings, projects come later
-            refresh-interval-seconds = 300   # slow is fine
+            refresh-interval = "300s"   # slow is fine
 
             [attention]
             unseen = false

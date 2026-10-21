@@ -59,7 +59,7 @@ struct ConfigStatusTests {
     func rejectedThenFixed() async throws {
         let harness = try await Harness.started(config: projects, graphQL: Harness.fixture("graphql-pull-requests.json"))
 
-        try harness.writeConfig("refresh-interval-seconds = 5\n\n" + projects + "[[projects]]\nslug = \"shop\"\nrepositories = [\"o/s\"]\n")
+        try harness.writeConfig("refresh-interval = \"5s\"\n\n" + projects + "[[projects]]\nslug = \"shop\"\nrepositories = [\"o/s\"]\n")
         try touch(harness, at: date("2026-09-25T12:05:00Z"))
         harness.clock.set(date("2026-09-25T12:05:01Z"))
         await harness.shipyard.reloadConfiguration()

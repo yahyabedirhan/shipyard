@@ -34,7 +34,7 @@ Its own usage has to stay a small share.
 ### Measured costs
 
 - **Measured 2026-09-25:** the shipyard query shape (open PRs first 50, closed PRs first 20, open issues first 50, closed issues first 20; per PR: comment and review counts, `reviewRequests(first: 10)`, last commit's `statusCheckRollup`) over 5 repositories costs **7 points**.
-- Since 0.0.2 the query no longer reads `reviewRequests`. One review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
+- The query doesn't read `reviewRequests`. One review search (a page of up to 100 PRs, see [github-search.md](github-search.md)) in the first batch answers it instead, and its cost is part of that batch's `rateLimit.cost`. Not measured again yet.
 - **Measured 2026-09-26 (issue #72), `rateLimit(dryRun: true)`:** the query shape above over 5 repositories (without `reviewRequests`) costs **4 points**.
 - Adding `labels(first: 20) { totalCount nodes { name color } }` to every pull request and issue raises it to **11**, and to open ones only to **9**: a nested connection is paid for per parent node, whatever its `first`.
 - Plain fields (`avatarUrl`, `additions`, `reviewDecision`…) cost nothing. So the row's hover card shows no labels.

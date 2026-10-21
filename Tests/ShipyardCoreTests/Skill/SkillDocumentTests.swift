@@ -339,7 +339,7 @@ struct SkillDocumentTests {
     @Test("every choice, event and author filter is listed")
     func choices() throws {
         let text = try skill()
-        let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description) + NotificationRule.legacyAuthors
+        let values = EventKind.allCases.map(\.rawValue) + AuthorSelector.groups.map(\.description)
             + MenuBarCount.allCases.map(\.rawValue) + MenuLayout.allCases.map(\.rawValue) + RateLimitDisplay.allCases.map(\.rawValue)
             + WorkflowRunBranches.allCases.map(\.rawValue) + GroupBy.allCases.map(\.rawValue) + SortBy.allCases.map(\.rawValue)
             + StateGroup.allCases.map(\.rawValue) + RepositoryGroup.allCases.map(\.rawValue)

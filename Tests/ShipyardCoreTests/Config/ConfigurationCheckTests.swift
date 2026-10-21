@@ -7,7 +7,7 @@ import Testing
 
 private let projects = """
     [[projects]]
-    name = "shop"
+    slug = "shop"
     repositories = ["o/r"]
 
     """
@@ -33,7 +33,7 @@ struct ConfigurationCheckTests {
 
     @Test("a file with problems prints each problem with its line, and exits 1")
     func rejected() throws {
-        let harness = try Harness(stored: nil, config: "launch-at-login = \"yes\"\nhide-authors = 3\n\n" + projects)
+        let harness = try Harness(stored: nil, config: "refresh-interval = 3\nlaunch-at-login = \"yes\"\n\n" + projects)
 
         let result = harness.cli("config", "check")
 
@@ -41,8 +41,8 @@ struct ConfigurationCheckTests {
         #expect(result.output.contains("\(harness.configURL.path): rejected\n"))
         let problems = result.output.split(separator: "\n").filter { $0.hasPrefix("  problem: ") }
         #expect(problems.count >= 2)
-        #expect(problems.first?.hasPrefix("  problem: config.toml line 1: `launch-at-login`") == true)
-        #expect(problems.dropFirst().first?.hasPrefix("  problem: config.toml line 2: `hide-authors`") == true)
+        #expect(problems.first?.hasPrefix("  problem: config.toml line 1: `refresh-interval`") == true)
+        #expect(problems.dropFirst().first?.hasPrefix("  problem: config.toml line 2: `launch-at-login`") == true)
     }
 
     @Test("missing files are the defaults, accepted")

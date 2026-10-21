@@ -25,12 +25,11 @@ The closing sections:
 ### Sources
 
 - The design was agreed 2026-09-25.
-- The 0.0.2 changes were agreed 2026-09-26.
-  Their decisions, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003.
+- The decisions on filters, repository selectors and arrangement, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003.
 - Terms are the ones in `GLOSSARY.md`.
 - The configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`.
 - Facts about GitHub's API are in `docs/references/`.
-- The module split agreed for 0.1.0 (effort `clean-slate`, spec #160) is ADR 0006 and [Modules and what each build links](#modules-and-what-each-build-links).
+- The module split (effort `clean-slate`, spec #160) is ADR 0006 and [Modules and what each build links](#modules-and-what-each-build-links).
 
 When the code and this document disagree, fix one of them in the same change.
 
@@ -83,14 +82,14 @@ Inside the app, `Shipyard` (the orchestrator) owns the app's lifecycle and runs 
 A refresh takes these steps:
 
 1. It reads the **configuration**.
-2. It **resolves** each project's repository selectors (groups such as `owned`, and wildcards such as `owner/*`) into repositories (0.0.2).
-3. It fetches every project's items from GitHub, the repositories in batches, with one **review search**: the open PRs waiting on the user, teams included (0.0.2).
-4. It works from each project's **listing**: the items its filters keep (0.0.2).
+2. It **resolves** each project's repository selectors (groups such as `owned`, and wildcards such as `owner/*`) into repositories.
+3. It fetches every project's items from GitHub, the repositories in batches, with one **review search**: the open PRs waiting on the user, teams included.
+4. It works from each project's **listing**: the items its filters keep.
    The menu, the counts and the notifications all read the listing.
 5. It compares the result with what it saw last time to find **events**.
 6. It sends the notifications the **rules** allow.
 7. It publishes a **menu model** the SwiftUI panel draws.
-   An **arrangement** groups, sorts and caps the listing for the panel (0.0.2).
+   An **arrangement** groups, sorts and caps the listing for the panel.
 
 Everything the app remembers about the user (seen items, collapsed sections, the last items it knew) is **app state**, kept apart from the configuration.
 
@@ -113,7 +112,7 @@ GitHub ◀── GitHubClient ◀── Shipyard (refresh) ──▶ Notifier �
 
 ### Pings
 
-Agents send the user **pings** with the `shipyard` command line, a second executable bundled in the app (0.0.5, ADR 0004).
+Agents send the user **pings** with the `shipyard` command line, a second executable bundled in the app (ADR 0004).
 The **ping command** files a ping under the projects that watch the repository of the agent's working folder (or `--repo`, or the one `--project` names).
 It matches against the configuration and the repository lists the app last resolved.
 It writes the ping to the **ping store**, one file per ping in Application Support, which the app watches.
@@ -151,9 +150,9 @@ The app decides whether to show it by the project's rules (`agent.notice`) (Trac
 
 ### App control
 
-Agents steer and capture the app with **app control** (0.1.0).
+Agents steer and capture the app with **app control**.
 `shipyard app`, `panel` and `lease` on the Mac send one JSON request over a Unix socket in the app's support folder, and the app's **control server** answers it (Trace 10).
-App control is **leased** since 0.2.0 (ADR 0007): each request carries its **holder**, and the server refuses another agent's while one holds the lease (Trace 13).
+App control is **leased** (ADR 0007): each request carries its **holder**, and the server refuses another agent's while one holds the lease (Trace 13).
 
 ---
 
@@ -164,7 +163,7 @@ App control is **leased** since 0.2.0 (ADR 0007): each request carries its **hol
 Each requirement has an ID that other sections and traces cite.
 The groups are in the order they were added.
 
-#### App (0.0.1)
+#### App
 
 - **R1.** Live in the macOS menu bar as an icon plus one **attention count**; clicking it opens a panel.
 - **R2.** Show one collapsible section per **project**, in configuration order.
@@ -183,9 +182,9 @@ The groups are in the order they were added.
   Closed items never do.
 - **R9.** Send macOS notifications for **events** matched by **notification rules** (event + scope + author selectors, F2).
   - Default: `pr.opened`, any author, all projects.
-  - Since 0.0.5, `ping.sent` too (N7).
-  - Since 0.2.0, app control's `control.started` and `control.ended`, which only the top-level rules decide (L9).
-  - Since effort `notes-and-notify`, `agent.notice`, an agent's notice (T2).
+  - `ping.sent` too (N7).
+  - App control's `control.started` and `control.ended`, which only the top-level rules decide (L9).
+  - `agent.notice`, an agent's notice (T2).
 - **R10.** Refresh on an interval (default 120 s), when the Mac wakes, when the configuration changes, and on ⌘R.
   Opening the panel doesn't refresh: it shows the last fetched data and spends no GitHub request.
 - **R11.** Read everything the user controls in the app from `~/.config/shipyard/config.toml` (honouring `$XDG_CONFIG_HOME`).
@@ -208,13 +207,10 @@ The groups are in the order they were added.
   Configurable: `always` (default), `when-low`, `never`.
   When paused, the menu bar icon changes and a banner says why.
 
-#### Filters, repositories and arrangement (0.0.2)
-
-Added in effort `shipyard-0-0-2`.
+#### Filters, repositories and arrangement
 
 - **F1.** Each kind (`pull-requests`, `issues`, `workflow-runs`) takes `authors = { show = […], hide = […] }`, in `[defaults.*]` and per project.
   An item is listed when its author matches `show` (empty: everyone) and doesn't match `hide`; `hide` wins.
-  It replaces the top-level `hide-authors`.
 - **F2.** An **author selector** is an author group (`me`, `others`, `bots`) or a login written `@login` (`@dependabot[bot]`), matched ignoring case (ADR 0002).
   - `me` is the signed-in account, so agents working as the user count as `me`.
   - `bots` is a GitHub `Bot` account or a login ending in `[bot]`.
@@ -262,11 +258,11 @@ Added in effort `shipyard-0-0-2`.
   - The token goes to the login Keychain and survives restarts; Sign out deletes it; a revoked token returns to the connect screen.
   - The README says how a fork sets its own OAuth App client ID.
 
-#### Pings (0.0.5)
+#### Pings
 
-Added in effort `shipyard-0-0-5` (pings, spec #96); Trace 6 follows one ping through them.
+Spec #96; Trace 6 follows one ping through them.
 
-- **N1.** `shipyard ping send "<title>"` stores a **ping**, filed as N6 says or under the one project `--project <name>` names, prints its id (`k7qm2x`) and exits 0; the Mac numbers it (N14).
+- **N1.** `shipyard ping send "<title>"` stores a **ping**, filed as N6 says or under the one project `--project <name>` names, prints its id (`k7qm2x`) and exits 0; the Mac numbers it (N17).
   - A `--project` the configuration doesn't name fails with the projects listed and exit 1; arguments that don't read fail with exit 2.
   - Exit 0 is done, 1 refused, 2 a usage error, and every error is one line on standard error (#97).
 - **N2.** The `shipyard` CLI is a second executable in `Shipyard.app` (`Contents/Helpers/shipyard`), a thin wrapper over the core's `ShipyardCLI`; `ping` is its one command so far (ADR 0004).
@@ -330,7 +326,7 @@ Added in effort `shipyard-0-0-5` (pings, spec #96); Trace 6 follows one ping thr
   - `--id <id>` names a ping (1 to 64 lowercase letters, digits, `-` and `_`, starting with a letter or digit; anything else is exit 2); without it one is made up and printed.
   - Sending an id that's stored replaces that ping: title, body, sender, action and filing are the new ones, and its sent time is the replace's, so its age starts again (a replace is what the agent says now, #150).
     It's unseen again with no failure (so it needs attention again), and no second notification is posted, since it keeps its instance.
-    It keeps its number too (N14), since a ping is known by its URL.
+    It keeps its number too (N17), since a ping is known by its URL.
   - `shipyard ping withdraw <id>` removes the ping, prints the id and exits 0; the app takes it out of the menu and its notification out of Notification Center.
     An id no ping has fails with one line and exit 1; no id, two, or one that isn't an id is exit 2.
     Withdraw reads no `config.toml`.
@@ -340,13 +336,13 @@ Added in effort `shipyard-0-0-5` (pings, spec #96); Trace 6 follows one ping thr
   - It covers when to ping, every flag, the exit codes, where a ping is filed, replacing and withdrawing, and worked examples ("ping me when the PR is ready", "bring me back to this pane" with `--herdr`, "withdraw it when I've answered").
   - It says a file that lists its own notification rules needs `ping.sent` added, and lists `[defaults.pings]` and `[herdr]` with the other keys.
   - A test checks the skill against `PingCommand`'s help and reads each example command as the CLI does.
-- **N14.** `[remote] machines` (0.0.6, #111) names the user's other machines by their Herdr saved-machine labels.
+- **N14.** `[remote] machines` (#111) names the user's other machines by their Herdr saved-machine labels.
   - **The setting:** empty by default; a label starting with `-`, empty, listed twice or equal to a project's slug or title is a configuration error.
   - **The poll:** the Mac asks each one for its pings through Herdr (ADR 0005): `herdr --machine <label> plugin action invoke list --plugin yahyabedirhan.herdr-shipyard`, then `herdr --machine <label> plugin log list --plugin … --limit 10` for that `log_id`, asking again while it's `running`.
     These run directly (no shell, no `ssh`) behind `ShellRunning`, with `herdr` found as `HerdrFocus` finds it.
     Machines are polled concurrently every 30 seconds on a timer of their own (no GitHub request), each read racing a 15-second timeout; a machine that fails keeps its last pings and records why.
   - **Remote pings:** a **remote ping** is known as `shipyard://ping/<label>/<id>`, so the same id on two machines, or on the Mac, stays apart.
-  - **Filing:** the Mac files it as a local ping (N6), under every project that watches its repository against its configuration and last resolved repositories, else the project its `--project` names, by slug and then by title, so an older `shipyard` sending a project's old name still files (#115, #255).
+  - **Filing:** the Mac files it as a local ping (N6), under every project that watches its repository against its configuration and last resolved repositories, else the project its `--project` names, by slug and then by title, so an older `shipyard` sending a project's title still files (#115, #255).
     One filed under no project, or under a name the configuration lacks, lists in its machine's own section, named after the label, after the projects.
     It needs attention until seen, and its row names its machine.
   - **Seen and dismiss** (#118) are kept on the Mac, in the app state, by the ping's URL and instance.
@@ -354,11 +350,11 @@ Added in effort `shipyard-0-0-5` (pings, spec #96); Trace 6 follows one ping thr
     ✕ and ⌫ hide it until its machine stops listing that instance.
     Marks for pings no machine lists any more are pruned, except those past the end of a list that stopped early.
 
-#### Ping numbers and agent logos (0.0.7)
+#### Ping numbers and agent logos
 
-Added in effort `shipyard-0-0-7` (spec #125).
+Spec #125.
 
-- **N14.** The Mac numbers pings, one sequence per section, like issues in a repository (#153, replacing #136's per-machine numbers).
+- **N17.** The Mac numbers pings, one sequence per section, like issues in a repository (#153, replacing #136's per-machine numbers).
   - Each project counts from `#1`, and so does each machine's own section of unfiled pings.
   - A ping takes its section's next number the first time the Mac lists it there (a local ping when it's saved or first read, a remote ping at the first poll that lists it), never in `sent` order, so a number never changes once given.
   - A ping filed under two projects has each one's number.
@@ -376,7 +372,7 @@ Added in effort `shipyard-0-0-7` (spec #125).
   - **Matching:** one table, `KnownAgent`, maps senders to agents, ignoring case and punctuation and allowing words after the agent's name ("Claude Code", "claude-code", "cursor-agent", "claude: fix totals").
   - **Unknown:** an unknown sender, or none, keeps the plain look: no mark on the row, the avatar's empty placeholder in the card.
 
-#### Modules and app control (0.1.0)
+#### Modules and app control
 
 Added in effort `clean-slate` (spec #160); the modules are ADR 0006, and Traces 8–11 follow them.
 
@@ -409,7 +405,7 @@ Added in effort `clean-slate` (spec #160); the modules are ADR 0006, and Traces 
   - When capture fails or is refused, the app renders the panel itself, writes that image instead and says so on standard error, still exit 0.
     When both fail, it exits 1.
   - `--menu-bar-icon` renders the menu bar icon on its own.
-  - The lease's dot and banner are left out of either unless `--with-indicator` keeps them (0.2.0, #180).
+  - The lease's dot and banner are left out of either unless `--with-indicator` keeps them (#180).
 - **C4a.** After the panel closes by anything but app control (the user's click elsewhere, Escape, the icon, a row), `panel open` is refused for 30 seconds: "you closed the panel N seconds ago; app control can open it again at HH:MM:SS", exit 1.
   A close by `panel close` starts no wait.
   `PanelReopenGuard` (`ShipyardControl`, pure) holds the rule; `PanelState` keeps it and whether app control asked for the close.
@@ -431,7 +427,7 @@ Added in effort `clean-slate` (spec #160); the modules are ADR 0006, and Traces 
   - 1 refused: the app isn't running ("shipyard isn't running; `shipyard app open`"); an unknown project, kind or tab, with the valid names listed; `tab` in the list layout; `panel open` within 30 seconds of the user's close; both captures failed.
   - 2 for arguments that don't read.
 
-#### Lease (0.2.0)
+#### Lease
 
 Added in effort `agent-lease` (spec #176); the lease is ADR 0007, and Trace 13 follows it.
 
@@ -525,9 +521,9 @@ Added in effort `notes-and-notify` (spec #187); Trace 14 follows a read, Trace 1
 - **NT9.** A failure to start a note opens nothing, leaves the menu open, and shows on the project as an error row, "new note: <why>", until the menu opens again or a note starts there (#196).
   The failures: a demo run (`NewNoteError.notRead`); no "Shipyard Notes" page in ntn's workspace; ntn missing or logged out; Notion out of reach.
 
-#### Notes banner, check and opt-in (after 0.3.0)
+#### Notes banner, check and opt-in
 
-Changed after 0.3.0: the notes' Projects page and their checks (ADR 0011; no issue numbers yet; Traces 14 and 16 follow the new layout, Trace 17 the check).
+The notes' Projects page and their checks (ADR 0011; no issue numbers yet; Traces 14 and 16 follow the layout, Trace 17 the check).
 
 - **NT10.** The **notes banner** (kind `notes`, banner key `notes`, gray, dismissable like the others).
   - **When it shows:** once ready, while notes are read, a project shows notes, and the last read could list none (`Shipyard.notesBlocked`, a `NotesNotice`; #234).
@@ -642,7 +638,7 @@ Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 
   Every other change comes from the user or their agents editing the file.
 - Resolved repository lists are app memory, not app state: they're resolved again at launch.
-  Since 0.0.5 each resolve also writes them to `repositories.json` for the `shipyard` CLI (`ResolvedRepositoriesStore`), which the app never reads back.
+  Each resolve also writes them to `repositories.json` for the `shipyard` CLI (`ResolvedRepositoriesStore`), which the app never reads back.
 - Every fetched item is recorded as known, listed or not, so an item a later filter change brings into view doesn't notify as though it were new (ADR 0003).
 - The first time shipyard sees a project, it records its items as known **without** notifying (no flood on first launch or on adding a project).
   This is ghbar's "bootstrap" lesson.
@@ -668,28 +664,28 @@ Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 | A group resolves to no repositories | The project shows "Nothing open", not an error |
 | Resolving fails (network, rate limit) | Keep the last resolved lists and fetch with them; the fetch error shows as today |
 | The review search fails | Watched repositories still list; `review-requested` projects and `anywhere` show the search's error row |
-| An old `hide-authors`, or an old notification `authors = "others"` | Read as the new form with a warning (the quiet banner and `config-status.json`), so the file keeps working |
+| A notification rule's `authors` written as one string (`authors = "others"`) | Rejected: "`authors` is a list: write `authors = ["others"]`" |
 
 ### Out of scope
 
 | Excluded | Why |
 |---|---|
 | Reviewing inside the app (diff, comments), merge/close actions | Agreed: click-through to GitHub for now. |
-| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's settings menu opens the file ("Open configuration file"); its status views (N16) show and set up the parts shipyard uses, never a setting. The `shipyard` CLI sends pings (0.0.5, ADR 0004) and, since 0.1.0, controls the app, but never edits the configuration. |
+| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's settings menu opens the file ("Open configuration file"); its status views (N16) show and set up the parts shipyard uses, never a setting. The `shipyard` CLI sends pings (ADR 0004) and, controls the app, but never edits the configuration. |
 | GitLab, GitHub Enterprise, several accounts | Nobody asked; the GraphQL host is one constant if GHE comes up. |
 | Telling agent PRs from hand-written ones | Agreed: not reliable today (see Extensibility). |
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
-| Developer ID signing, notarization | Agreed: ad-hoc signed zips and the `xattr` line until 0.1.0 at the earliest. |
+| Developer ID signing, notarization | Agreed: ad-hoc signed zips and the `xattr` line for now. |
 | Push updates (webhooks) | Needs a server; polling is enough at this scale. |
-| Deployments waiting for the user's approval | Deferred from 0.0.2: a later `workflow-runs` filter |
+| Deployments waiting for the user's approval | Deferred: a later `workflow-runs` filter |
 | `assigned` and `mentioned` filters | Nobody needs them yet; each is a field and one check in `Listing` later |
 | Oldest first, a sort direction, nested grouping | Not asked for; each is one more choice later |
 | Folding busy projects automatically (ghbar folds repositories with more than three items) | Deferred: the maintainer doesn't need it yet |
-| The picker offering repository groups other than a preset's `owned` | Groups come through the skill in 0.0.2 |
+| The picker offering repository groups other than a preset's `owned` | Groups come through the skill |
 | More than 100 review requests at once | The search returns the first 100; the section says so when there are more |
 | More than one action per ping, buttons on its notification, or a shell command as an action | Spec #96: one clear action, and nothing a ping runs beyond opening, activating or focusing |
 | Pings filed under no project, a maximum age for unseen pings, a sender inferred from Herdr | Spec #96: a ping is always filed, stays until seen, and says only what the agent passes |
-| Syncing pings between machines, writing back to a machine (seen and dismiss stay on the Mac) | ADR 0005 (0.0.6): the Mac reads remote pings through Herdr and never writes to a machine; it supersedes 0.0.5's "pings from other machines" |
+| Syncing pings between machines, writing back to a machine (seen and dismiss stay on the Mac) | ADR 0005: the Mac reads remote pings through Herdr and never writes to a machine |
 | Clicking, hovering or typing in the panel through app control; capturing the real menu bar strip or a hover card | Spec #160: app control steers the panel through the app's own operations, and ScreenCaptureKit captures only the app's own window |
 | Controlling the app on another machine; switching the layout through app control | Spec #160: control is a socket only the Mac's user can reach, and the layout stays a `config.toml` edit (ADR 0001) |
 | Writing notes from the app, or a `shipyard note` command; writing the entry page, the Agent guide or the Projects index | Spec #187: agents write notes in Notion with their own tools; the app only reads them (and, with the new-note icon, #196, creates an empty page, a database or the Projects page). The icon leaves the Projects index's prefixes to agents (ADR 0009: shipyard only lists and starts notes; ADR 0011) |
@@ -742,41 +738,41 @@ Each one is an entity, a value, a port or a field on another entity.
 | Remote ping reader | **Entity** (`RemotePingReader`, over `HerdrCommand` and the `ShellRunning` port): asks one machine for its `PingList`, or says why it couldn't. |
 | Remote machines | **Entity** (value, `RemoteMachines`): each machine's last pings, whether that list was truncated, its latest failure and when it last answered. |
 | Ping command | **Entity** (pure, over the store): reads `shipyard ping`'s arguments, files and saves the ping. |
-| Filing (0.1.0) | **Interface** (`PingFiling`, in Pings) with two implementations: `Unfiled` (Pings), which keeps a ping as sent, with an expiry and the agent's pane as its default action; and `ProjectFiling` (Config), which files against the configuration and the last resolved repositories, or refuses |
+| Filing | **Interface** (`PingFiling`, in Pings) with two implementations: `Unfiled` (Pings), which keeps a ping as sent, with an expiry and the agent's pane as its default action; and `ProjectFiling` (Config), which files against the configuration and the last resolved repositories, or refuses |
 
-#### Command line (0.1.0)
-
-| Noun | Entity or field? |
-|---|---|
-| Command table (0.1.0) | **Value** (`CommandTable`, in Command): the groups a build links, by name, each with its commands' usage and summary, from which the top help and `help --json` are made; `main.swift` assembles it |
-| Record store (0.1.0) | **Entity** (store, `RecordStore`, in Command): one JSON file per record in a folder, replaced atomically; `PingStore` is built on it |
-| Support folder (0.1.0) | **Value** (`SupportFolder`, in Command): where the app's files live (`~/Library/Application Support/Shipyard`, or `SHIPYARD_SUPPORT_DIR`), and the XDG data folder on a machine without the app; the one definition the CLI and the app share |
-
-#### App control (0.1.0, 0.2.0)
+#### Command line
 
 | Noun | Entity or field? |
 |---|---|
-| Control request and reply (0.1.0) | **Values** (`ControlRequest`, `ControlReply`, in Control): what an agent asks of the app and its answer, `{ ok, output, error }` |
-| Control client (0.1.0) | **Entity** (`ControlClient`, in Control, over the `ControlTransport` port): sends one request over `control.sock` and reads the reply |
-| App launcher (0.1.0) | **Port** (`AppLaunching`, in Control): launches the app by bundle id in the background, with a demo run's environment |
-| Control server (0.1.0) | **Entity** (`ControlServer`, in App): listens on `control.sock` while the app runs, and answers each request through `PanelControlling` and `Screenshotting` |
-| Panel control and panel state (0.1.0) | **Port** (`PanelControlling`) and **entity** (`PanelState`, in App): whether the panel is open, the status view and the tab it shows; opens and closes it, and folds and shows more through `Shipyard` |
-| Screenshotter (0.1.0) | **Port** (`Screenshotting`) and its implementation (in App): captures the app's own window, or renders the panel, to a PNG |
-| App files (0.1.0) | **Value** (`AppFiles`, in Core): where the app reads and writes, decided once from its launch environment. See [App files and the lease](#app-files-and-the-lease). |
-| Demo pointer (0.1.0) | **Value** (`DemoPointer`, in Control): `demo.json` in the user's support folder, naming a demo run's support folder; written by `app open --demo`, removed by plain `app open`, followed by `ControlSocket.locate` (#168) |
-| Lease (0.2.0) | **Value** (`ControlLease`, in Control, pure, given the time on each call): the held `Term` (holder, taken, ends) or free. See [App files and the lease](#app-files-and-the-lease). |
-| Holder (0.2.0) | **Value** (`Holder`, in Control): who sends a request, `{ key, name, place }`, worked out by the CLI on each call (`Holder.find`) through the `ProcessTable` **port** (`SystemProcessTable`, macOS's `sysctl`; tests use a fake) (#177) |
-| Control message (0.2.0) | **Value** (`ControlMessage`, in Control): a `ControlRequest` with its `Holder`, as it goes over the socket (protocol version 2) (#177) |
+| Command table | **Value** (`CommandTable`, in Command): the groups a build links, by name, each with its commands' usage and summary, from which the top help and `help --json` are made; `main.swift` assembles it |
+| Record store | **Entity** (store, `RecordStore`, in Command): one JSON file per record in a folder, replaced atomically; `PingStore` is built on it |
+| Support folder | **Value** (`SupportFolder`, in Command): where the app's files live (`~/Library/Application Support/Shipyard`, or `SHIPYARD_SUPPORT_DIR`), and the XDG data folder on a machine without the app; the one definition the CLI and the app share |
+
+#### App control
+
+| Noun | Entity or field? |
+|---|---|
+| Control request and reply | **Values** (`ControlRequest`, `ControlReply`, in Control): what an agent asks of the app and its answer, `{ ok, output, error }` |
+| Control client | **Entity** (`ControlClient`, in Control, over the `ControlTransport` port): sends one request over `control.sock` and reads the reply |
+| App launcher | **Port** (`AppLaunching`, in Control): launches the app by bundle id in the background, with a demo run's environment |
+| Control server | **Entity** (`ControlServer`, in App): listens on `control.sock` while the app runs, and answers each request through `PanelControlling` and `Screenshotting` |
+| Panel control and panel state | **Port** (`PanelControlling`) and **entity** (`PanelState`, in App): whether the panel is open, the status view and the tab it shows; opens and closes it, and folds and shows more through `Shipyard` |
+| Screenshotter | **Port** (`Screenshotting`) and its implementation (in App): captures the app's own window, or renders the panel, to a PNG |
+| App files | **Value** (`AppFiles`, in Core): where the app reads and writes, decided once from its launch environment. See [App files and the lease](#app-files-and-the-lease). |
+| Demo pointer | **Value** (`DemoPointer`, in Control): `demo.json` in the user's support folder, naming a demo run's support folder; written by `app open --demo`, removed by plain `app open`, followed by `ControlSocket.locate` (#168) |
+| Lease | **Value** (`ControlLease`, in Control, pure, given the time on each call): the held `Term` (holder, taken, ends) or free. See [App files and the lease](#app-files-and-the-lease). |
+| Holder | **Value** (`Holder`, in Control): who sends a request, `{ key, name, place }`, worked out by the CLI on each call (`Holder.find`) through the `ProcessTable` **port** (`SystemProcessTable`, macOS's `sysctl`; tests use a fake) (#177) |
+| Control message | **Value** (`ControlMessage`, in Control): a `ControlRequest` with its `Holder`, as it goes over the socket (protocol version 2) (#177) |
 
 ##### App files and the lease
 
-`AppFiles` (0.1.0):
+`AppFiles`:
 
 - It holds `config.toml`, the support folder, and the demo folder when the app was launched with `SHIPYARD_SUPPORT_DIR` (a **demo run**), which `status` reports.
 - In a demo run, `loginItem(_:)` gives a login item that changes nothing (#168).
 - In a demo run, `notionRoute(_:)` (#234; `notionTokenStore(_:)` before) gives no notes transport, so a demo never reads through the user's ntn login or lists their notes.
 
-`ControlLease` (0.2.0, #177, ADR 0007):
+`ControlLease` (#177, ADR 0007):
 
 - It answers a leased request with the term or a `Refusal`, and the `Transition`s on the way (started, renewed, ended with an `Ending`).
 - It handles `lease take` and `release` (#178), and a first-come-first-served line of waiting `take`s, each with the time its wait runs out.
@@ -890,7 +886,7 @@ HerdrEvent -> PingStore            remove(id: herdr-<pane>) when the agent goes 
 Shipyard -> EventDetector          events(known, snapshot, projects) -> [Event]; pingEvents(listings, projects) -> a ping.sent per unseen listed ping
 Shipyard -> NotificationRules      shouldNotify(event, project settings, viewer) -> Bool   (only for listed items)
 Shipyard -> Notifier               post(notification); removeDelivered(id) for a ping that left (#102)
-Notifier -> Shipyard               openNotification(itemURL) on a click; a lease's (ControlNotice.panelURL) opens the panel instead (0.2.0, #182)
+Notifier -> Shipyard               openNotification(itemURL) on a click; a lease's (ControlNotice.panelURL) opens the panel instead (#182)
 Shipyard -> NotesReader            read(projects showing notes, client) -> NotesReading, on the notes timer and when the menu opens (#192)
 NotesReader -> NotionClient        searchPages(titled: "Shipyard Notes") once; childPages(of: entry page) once, for "Projects" (ADR 0011); childDatabases(of: Projects page) each read; dataSources(ofDatabase:) once per database; openNotes(in: data source) per project; firstLine(ofPage:) per untitled note, once per edit
 NotesReader -> NotionClient        startNote (#196): childDatabases(of: Projects page); with no database titled the project's title, dataSources(ofDatabase:) and notePrefix(ofDataSource:) per database, createPage(under: entry page, "Projects", 📂) when there's no Projects page, then createNotesDatabase(under: Projects page); then createEmptyNote(in: data source)
@@ -921,9 +917,9 @@ Snapshot  has  [Project -> [Item]], reviewRequested: Set<ItemID>, the search's P
 Configuration has [Project], Defaults, [NotificationRule]
 ```
 
-#### Command line and app control (0.1.0)
+#### Command line and app control
 
-Since 0.1.0 (ADR 0006) the command line is assembled per build, and filing and app control sit behind interfaces:
+The command line is assembled per build (ADR 0006), and filing and app control sit behind interfaces:
 
 ```text
 main.swift -> CommandTable                 add(PingCommands.entries(filing:, store:)) and add(NoticeCommands.entries(route:)) (#190: ControlNoticeRoute on macOS, RemoteNoticeRoute elsewhere); on macOS also add(ControlCommands.entries(support:))
@@ -933,21 +929,21 @@ Unfiled -.implements.-> PingFiling         files as sent, never refuses; a day's
 ProjectFiling -.implements.-> PingFiling   reads ConfigurationStore (lazily) + ResolvedRepositoriesStore; refuses as N1, N6, #127
 Shipyard -> ProjectFiling                  filed(remote: ping) for each remote ping it lists (#115)
 PingStore -> RecordStore                   all, record(id), save, remove(id), removeIfUnchanged; drops expired pings as it reads
-ControlCommands -> Holder                  find(variables, workingDirectory, processes) on each call, for the call's ControlClient (0.2.0)
-Holder -> ProcessTable                     currentPID, process(pid) -> pid, parent, start time, name; walked up past the shells (0.2.0)
+ControlCommands -> Holder                  find(variables, workingDirectory, processes) on each call, for the call's ControlClient
+Holder -> ProcessTable                     currentPID, process(pid) -> pid, parent, start time, name; walked up past the shells
 ControlCommand -> ControlClient            send(ControlRequest) -> ControlReply | notRunning
 ControlCommand -> AppLaunching             launch(bundleID, environment) for app open (and --demo), then polls status
 ControlClient -> ControlTransport          one connection to SupportFolder/control.sock: write the ControlMessage (request + holder), read the reply
-ControlServer -> ControlLease              use(by: holder, at: now) before every request but app.status, control.*, notify and notes.check -> granted | refused; take(by:at:waitingUntil:), release(by:at:), giveUp(by:waited:at:) and settle(at:) at nextEnd(after:), the lease's or a bar's (#178, #181); stop(at:) and allow(key, at:) for the maintainer (#181); status(at: now) for app.status (0.2.0)
-AppServices -> ControlServer               stopLease() from the banner's Stop, allow(key) from a quiet line's Allow: the maintainer's only way into the lease (0.2.0, #181)
+ControlServer -> ControlLease              use(by: holder, at: now) before every request but app.status, control.*, notify and notes.check -> granted | refused; take(by:at:waitingUntil:), release(by:at:), giveUp(by:waited:at:) and settle(at:) at nextEnd(after:), the lease's or a bar's (#178, #181); stop(at:) and allow(key, at:) for the maintainer (#181); status(at: now) for app.status
+AppServices -> ControlServer               stopLease() from the banner's Stop, allow(key) from a quiet line's Allow: the maintainer's only way into the lease (#181)
 ControlServer -> PanelControlling          status, open, close, fold(project), unfold(project), showMore(project, kind), selectTab(name)
-ControlServer -> LeaseIndicator            update(lease, at: now), after each change and when its timer settles it at its end (0.2.0, #180)
+ControlServer -> LeaseIndicator            update(lease, at: now), after each change and when its timer settles it at its end (#180)
 LeaseIndicator -> AppServices              onBannersChange(PanelBanner.Lease) → Shipyard.lease: the lease's banners' conditions (#220)
-ControlServer -> AppServices               transitioned(transition) for each lease change, in order; a start or an end → Shipyard.notify(ControlNotice) (0.2.0, #182)
-Shipyard -> NotificationRules              shouldNotify(notice, configuration) -> Bool: the top-level rules only (0.2.0, #182)
+ControlServer -> AppServices               transitioned(transition) for each lease change, in order; a start or an end → Shipyard.notify(ControlNotice) (#182)
+Shipyard -> NotificationRules              shouldNotify(notice, configuration) -> Bool: the top-level rules only (#182)
 ControlServer -> Screenshotting            capturePanel(to: file, appearance, withIndicator) / menuBarIcon(to: file, appearance, withIndicator) -> captured | rendered(why) | failed(why)
-Screenshotter -> LeaseIndicator            hideForCapture() while it captures without --with-indicator, showAfterCapture() after (0.2.0, #180)
-Panel, MenuBarLabelView -> LeaseIndicator  shown(at: now), shownEnd(at: now), isHiddenForCapture: the banner's countdown and the dot, read only (0.2.0, #180, #181); which lease banners show is the core's (#220)
+Screenshotter -> LeaseIndicator            hideForCapture() while it captures without --with-indicator, showAfterCapture() after (#180)
+Panel, MenuBarLabelView -> LeaseIndicator  shown(at: now), shownEnd(at: now), isHiddenForCapture: the banner's countdown and the dot, read only (#180, #181); which lease banners show is the core's (#220)
 PanelControl -> Shipyard                   setCollapsed(project, collapsed) (toggleCollapsed when it differs), showMore(project, kind) (showMore(group)), menu.tab(named:)
 PanelControl -> MenuBarWindow              open(), close(): the status item, as a click on the icon
 PanelControl -> PanelState                 isOpen, openView (showView; the settings menu and ‹ Back set it too), selectedTab (the tabs layout reads and sets it)
@@ -992,9 +988,9 @@ Where each rule lives, by subsystem.
 | How a machine is asked for its pings | `RemotePingReader` |
 | What each remote machine last listed, and why its last poll failed | `RemoteMachines`, in `Shipyard.remote` |
 | Which section a remote ping lists in | `Listing.sections(of:projects:machines:)`, which `Listing.listings(…, machines:)` lists from |
-| A ping's number in its section; the last number each section gave | `PingNumbers`, in `AppState.pingNumbers`, given and retired by `Shipyard.numberPings` each time it lists (N14) |
-| Which projects a remote ping is filed under | `PingCommand.filed(remote:configuration:resolved:)`, the local ping's rule, applied by `Shipyard` against the last valid configuration and `ResolvedRepositoriesStore` each time it lists (#115); since 0.1.0 `ProjectFiling.filed(remote:)` |
-| Whether a sent ping is filed, kept unfiled or refused; whether it expires; its default action (0.1.0) | the build's `PingFiling`: `Unfiled` or `ProjectFiling` |
+| A ping's number in its section; the last number each section gave | `PingNumbers`, in `AppState.pingNumbers`, given and retired by `Shipyard.numberPings` each time it lists (N17) |
+| Which projects a remote ping is filed under | `ProjectFiling.filed(remote:)`, the local ping's rule, applied by `Shipyard` against the last valid configuration and `ResolvedRepositoriesStore` each time it lists (#115) |
+| Whether a sent ping is filed, kept unfiled or refused; whether it expires; its default action | the build's `PingFiling`: `Unfiled` or `ProjectFiling` |
 | Whether a ping has expired | `PingStore` (as it reads), by the ping's `expires` |
 
 #### Command line and app control
@@ -1007,12 +1003,12 @@ Where each rule lives, by subsystem.
 | Which status view and tab the panel shows; whether it's open | `PanelState` |
 | Which parts the settings menu marks as set up; a status view's words | `SetupStatus`, `PanelText.settingsMenu` and `PanelText.cliStatus` (Core, #238); `Shipyard.gitHubConnection` and `PanelText.gitHubStatus` (Core, #240); `SkillDetector` and `PanelText.skillStatus` (Core, #239); `NotionStatus` and `PanelText.notionStatus` (Core, #241) |
 | Whether the app runs ntn and reads notes (#241, ADR 0013) | `AppState.notionConnected`, followed by `Shipyard.readsNotes` |
-| Who holds app control, until when; whether a request is granted or refused, and the refusal's words; who waits in line, and until when; who the maintainer stopped, and until when (0.2.0) | `ControlLease`, asked by `ControlServer` before it dispatches |
-| Who a request comes from (0.2.0) | `Holder.find`, in the CLI, on each call |
-| What the lease's banner says: the agent, its place, the countdown, how many wait (0.2.0) | `LeaseBanner`, from `ControlLease.status(at:)` |
-| Whether the dot and the banner are drawn (0.2.0) | `LeaseIndicator`: while the lease is held, unless a capture hides them; a quiet line per stopped holder while its bar lasts (#181) |
+| Who holds app control, until when; whether a request is granted or refused, and the refusal's words; who waits in line, and until when; who the maintainer stopped, and until when | `ControlLease`, asked by `ControlServer` before it dispatches |
+| Who a request comes from | `Holder.find`, in the CLI, on each call |
+| What the lease's banner says: the agent, its place, the countdown, how many wait | `LeaseBanner`, from `ControlLease.status(at:)` |
+| Whether the dot and the banner are drawn | `LeaseIndicator`: while the lease is held, unless a capture hides them; a quiet line per stopped holder while its bar lasts (#181) |
 | Whether the lease banner and the quiet lines are hidden while snoozed (#220) | `Shipyard.banners(at:)`; the dot never is |
-| Whether a lease that starts or ends notifies, and its words (0.2.0, #182) | `NotificationRules.shouldNotify(_:configuration:)` (the top-level rules only) and `ControlNotice`, posted by `Shipyard.notify(_:)`; which transitions make a notice: `ControlNotice(transition)` in the app |
+| Whether a lease that starts or ends notifies, and its words (#182) | `NotificationRules.shouldNotify(_:configuration:)` (the top-level rules only) and `ControlNotice`, posted by `Shipyard.notify(_:)`; which transitions make a notice: `ControlNotice(transition)` in the app |
 | Whether a screenshot was captured or rendered | `Screenshotter` |
 
 #### Notices
@@ -1058,11 +1054,11 @@ A module's section names its files, says its job in a sentence or two, then uses
 
 ### Modules and what each build links
 
-Agreed for 0.1.0 as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules.
-Built for 0.1.0 by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core) and #166–#169 (Control and the app's side of it).
+Agreed as "A+" (ADR 0006): modules follow concerns, and agent-side code never links the app's rules.
+Built by #164 (Command, Pings and the Linux build), #165 (Config, and the Mac build without Core) and #166–#169 (Control and the app's side of it).
 The class sections after this one and the [folder tree](#folder-tree) name each file where it is.
 
-#### Built in 0.1.0
+#### Built modules
 
 ShipyardCommand, ShipyardPings, ShipyardConfig and ShipyardControl exist.
 The Linux `shipyard` links Command and Pings only, and the Mac `shipyard` Command, Pings, Config and Control, never Core; each build's link check says so.
@@ -1081,7 +1077,7 @@ Core and the app reach a few of Config's internals (`ConfigurationStore`'s `read
 | **ShipyardCLISettings** | The command's own settings, `cli.toml` (ADR 0008, #189): `CLISettings` (its tables; `[notices]`, `NoticeSettings`, which the notice commands fill in), `CLISettingsIssue` and `CLISettingsError`, and `CLISettingsFile` (where it is on each kind of machine, `read()`, and `check(at:)` for `config check`) | Command, TOMLDecoder | every build (the app only through Notices, and never reads `cli.toml`) |
 | **ShipyardNotices** | The agent's side of notices (effort `notes-and-notify`, #190): `Notice` (title, body, sender, and the project or repository it's filed by; since #193 subtitle, `NoticeImage`, `NoticeSound`, thread, `NoticeLevel`, id, a click's `PingAction`, `NoticeButton`s, and the terminal and Herdr session a Herdr action was sent from; its JSON is the one shape every route carries), `NoticeRequest` (show a notice, or withdraw an id, #193), `NoticeVerdict` (done, queued for the Mac's poll, or refused with why), the `NoticeRoute` port a build gives its route through, `QueuedNotice` and `PluginNoticeRoute` (the poll route, #195), `RemoteNoticeRoute` (another machine's choice of route, from `cli.toml`), `TailnetNoticeRoute`, `TailnetWire` and the `NoticeHTTP` port with `URLSessionNoticeHTTP` (the tailnet route, #194), `NotifyCommand` (parsing, the image file, the checkout's `origin`, `withdraw`, the exit codes) and `NoticeCommands` (its `notify` entry for the table). It files nothing: the app does. It reads `cli.toml`'s `[notices]` only, through CLISettings | Command, Pings, CLISettings (FoundationNetworking on Linux) | both `shipyard` builds, the app |
 | **ShipyardConfig** | Reading `config.toml`: `Configuration` and its value types (`ItemKind`, `StateGroup`, `EventKind`, `MenuLayout`, `NewProject`), `ConfigurationReader`, `TOMLSourceMap`, `Selectors` (parsing), `ConfigurationDuration`, `LayoutSetting`, `ConfigurationStore` (path, reload, last valid, append, set layout), `ConfigurationLocation` (the path the app recorded, #126), `ResolvedRepositoriesStore`, and `ProjectFiling` | Command, Pings, TOMLDecoder | the Mac `shipyard`, the app |
-| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlMessage` (a request with its holder, 0.2.0), `ControlReply`, `ControlLease` (the lease's rules, which the app's server drives, 0.2.0), `Holder` with the `ProcessTable` port and `SystemProcessTable` (0.2.0), `LeaseBanner` (the banner's words, 0.2.0), `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand`, `PanelCommand`, `ScreenshotCommand` and `LeaseCommand` (parsing `app`, `panel`, `screenshot` and `control` into an invocation, and a reply into a `CommandResult`; `ControlCommands` reads `notes check` itself, ADR 0011), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), `ControlCommands` (its entries for the table), and `ControlNoticeRoute` (a notice's route on the Mac, the socket, #190) | Command, Notices | the Mac `shipyard`, the app (the wire types and the socket calls) |
+| **ShipyardControl** | The client side of app control: `ControlRequest`, `ControlMessage` (a request with its holder), `ControlReply`, `ControlLease` (the lease's rules, which the app's server drives), `Holder` with the `ProcessTable` port and `SystemProcessTable`, `LeaseBanner` (the banner's words), `AppStatus` (what `app status` reports, as lines or JSON), `ControlSocket` (the socket's path, and the client's one lookup of it) and `DemoPointer`, `ControlCommand`, `PanelCommand`, `ScreenshotCommand` and `LeaseCommand` (parsing `app`, `panel`, `screenshot` and `control` into an invocation, and a reply into a `CommandResult`; `ControlCommands` reads `notes check` itself, ADR 0011), `ControlClient` over `ControlTransport` (`UnixSocketTransport`), `UnixSocket` (the POSIX calls both ends make, `package` so the app's server shares them), `AppLaunching` with its `NSWorkspace` launcher (compiled only where AppKit exists), `ControlCommands` (its entries for the table), and `ControlNoticeRoute` (a notice's route on the Mac, the socket, #190) | Command, Notices | the Mac `shipyard`, the app (the wire types and the socket calls) |
 | **ShipyardCore** | The app's rules: `Shipyard` and its lifecycle, GitHub, items, attention, events, notification rules, the menu, app state and `AppFiles`, onboarding, `Presets` and `PresetSetting`, `ConfigStatusStore`, `CLILink`, `Skill/`; the Mac's side of pings: `RemotePingReader`, `RemoteMachines`, `RemotePingMarks`, `PingNumbers`, `KnownAgent`, `HerdrFocus`, a ping as an item (`Ping.item`, `PingIcon`); the Mac's side of notices, `Notices/`: `NoticeRules` (#190), `RemotePingReader.takeNotices` (the poll, #195) and `TailscaleCLI` behind the `TailnetIdentity` port (#194); and the user's notes, `Notes/`: `Note`, `NotionClient`, `NotesReader` (#192), `NotePrefix` (#196) and `NotesCheck` (ADR 0011), with `NotesMenuState` and `NotesNotice` in `Menu/` | Command, Pings, Notices, Config | the app |
 | **ShipyardApp** | The Apple-framework layer, plus `Control/`: `ControlServer`, `LeaseIndicator`, `LeaseNotices`, `PanelControl` and `PanelState`, `Screenshotter`; and `NoticeListener`, the HTTP listener for notices from other machines (#194) | Command, Pings, Notices, Config, Control, Core (CLISettings through Notices) | the app |
 
@@ -1152,7 +1148,7 @@ They check a debug build of `shipyard-cli`: the release binaries are stripped, a
 A type moves down to the lowest module that needs it.
 Code that matches an item or touches the menu stays in Core, as an extension:
 
-| Before 0.1.0 | Since 0.1.0 | Why |
+| Was | Now | Why |
 |---|---|---|
 | `CommandResult`, `CommandEnvironment` in `CLI/ShipyardCLI.swift` | Command | every command returns and reads them |
 | `CommandEnvironment.platform`, `CommandPlatform` | removed | the filing and the table replace every platform check (M3) |
@@ -1167,7 +1163,7 @@ Code that matches an item or touches the menu stays in Core, as an extension:
 | `PingCommand`'s filing (`watchers`, `filing`, `filed(remote:)`) | `ProjectFiling` in Config | it reads the configuration |
 | `PingCommand.send(…, platform:, unfiled:)` | `send(…, filing:, whenNoProject:)` | the platform becomes the filing; `unfiled` becomes `.keepUnfiled` |
 | `Ping.item`, its URLs (`url(id:)`, `url(machine:id:)`, `id(from:)`, `remote(from:)`), `PingAction.icon` and `PingIcon` in `Pings/Ping.swift` | Core, `Items/Ping+Item.swift` | `Item`, the item's URL and the row's icon are the app's; nothing on the agent's side uses them |
-| `PingCommand.workingRepository` | stayed in Pings in 0.1.0; since #190 `GitRemote.workingRepository(folder:git:filing:)` in Command, its reasons naming what's filed ("ping", "notice") | a notice is filed by the working folder's `origin` too, and Notices' `NotifyCommand` looks it up the same way |
+| `PingCommand.workingRepository` | `GitRemote.workingRepository(folder:git:filing:)` in Command (#190), its reasons naming what's filed ("ping", "notice") | a notice is filed by the working folder's `origin` too, and Notices' `NotifyCommand` looks it up the same way |
 | `ItemKind`, `StateGroup` in `Items/Item.swift` | Config, `Config/Kinds.swift` | the configuration's vocabulary |
 | `NotificationRule.covers(item)`, `AuthorSelector.matches(item)` and `matches(author:kind:viewer:)`, `AuthorFilter.includes(item)` and `includes(author:kind:viewer:)` | Core, `Config/Selectors+Items.swift` | matching an `Item` is the app's; the author forms take an `AuthorKind`, which is the item's and stays in Core's `Items/Item.swift` (#165) |
 | `ProjectSettings.resolved(by:)` | Core, an extension in `GitHub/RepositoryResolver.swift` | it takes the resolver's `ResolvedRepositories` (#165) |
@@ -1175,7 +1171,7 @@ Code that matches an item or touches the menu stays in Core, as an extension:
 | `Configuration.acceptsPreset` in `Config/PresetSetting.swift` | Config, beside `ConfigurationStore` | `reload()` records it; `PresetSetting.swift` keeps `presetRefused` (#165) |
 | `KnownAgent`, `HerdrFocus` and the remote ping files in `Pings/` | stay in Core's `Pings/` | the Mac's side of pings |
 
-### PingFiling, Unfiled and ProjectFiling — `ShipyardPings/PingFiling.swift`, `ShipyardConfig/ProjectFiling.swift` (0.1.0, #164, #165)
+### PingFiling, Unfiled and ProjectFiling — `ShipyardPings/PingFiling.swift`, `ShipyardConfig/ProjectFiling.swift` (#164, #165)
 
 The one place the two `shipyard` builds differ.
 `PingCommand` and `HerdrEvent` take `any PingFiling` and never ask the platform.
@@ -1217,7 +1213,7 @@ public struct Filing { public var projects: [String]; public var repository: Str
 The CLI tests that were parameterised by platform are parameterised by filing (`RemotePingCommandTests`' `filing:`, `HerdrEventTests`' `filing:`, both `Unfiled()` or the Mac's `ProjectFiling`).
 Each case runs through `ShipyardCLI.run` with the table `main.swift` would build (`CommandTable.commands(filing:store:)` in the tests' `Harness.swift`) (#164).
 
-### CommandTable and RecordStore — `ShipyardCommand/` (0.1.0, #164)
+### CommandTable and RecordStore — `ShipyardCommand/` (#164)
 
 The command table every build assembles, the one-file-per-record store, and the support folder every store builds on.
 
@@ -1267,7 +1263,7 @@ An agent's shell has no `SHIPYARD_SUPPORT_DIR`, so during a demo run it files pi
 
 The override's table in `DemoRunTests` (`Tests/ShipyardCoreTests/State/`).
 
-### App control: the client — `ShipyardControl/` (0.1.0, #166–#169)
+### App control: the client — `ShipyardControl/` (#166–#169)
 
 The client side of app control: the wire format, the `app`, `panel`, `screenshot` and `lease` commands, the holder and the lease's rules.
 
@@ -1282,23 +1278,23 @@ request  {"command":"panel.fold","holder":{"key":"CLAUDE_CODE_SESSION_ID=5f1c","
 reply    {"ok":true,"output":"folded shop\n","error":""}                  one JSON object, then the server closes
 ```
 
-Since 0.2.0 (#177) the protocol is at version 2: every request is a `ControlMessage`, the `ControlRequest` with its `holder`.
+The protocol is at version 2 (#177): every request is a `ControlMessage`, the `ControlRequest` with its `holder`.
 A request without one is refused as unreadable ("the control command `panel.open` needs its `holder`").
 A version-1 request is refused naming both versions.
 
 | `ControlRequest` | From | Reply's `output` |
 |---|---|---|
-| `app.status` (`json: Bool`) | `shipyard app status [--json]` | `AppStatus` as lines (`shipyard 0.2.0 is running`, `demo: <folder>` in a demo run only, `lease: free` or `lease: Claude Code in /Users/me/shop, 48s left, 0 waiting` (0.2.0), `panel: closed`, `layout: tabs`, `tab: All` in the tabs layout only, `projects: shop, blog`, `folded: none`, `showing all: pull-requests in shop`), or as one JSON object on one line, keys sorted: `demo` (the demo folder, `null` outside a demo; #168), `folded` (the collapsed projects), `layout`, `lease` (`null` when free, else `{"holder","place","secondsLeft","waiting"}`; 0.2.0), `panelOpen`, `projects` (every section's name: the projects', then the remote machines'), `running` (always true), `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`, the groups by kind Show more opened), `tab` (the selected tab's title, `null` in the list layout), `version` |
-| `app.open` (0.2.0, #179) | `shipyard app open` when the app it looks for runs | the status as lines, as `app.status`; unlike it, leased, so the opener's lease is renewed (and another holder's `app open` refused) |
-| `app.quit` | `shipyard app quit` | `shipyard quit`, with the lease the quit renewed in the reply's `lease` (`{"ends","holder","taken"}`, times in seconds since 1970; 0.2.0, #179), for a relaunch to hand over; the app replies, then terminates and removes the socket. The CLI prints it once nothing answers on the socket (a look every quarter second, each with a 1 s timeout, up to 10 s; still answering: exit 1), so a following `app open` launches a new app instead of finding the old one |
+| `app.status` (`json: Bool`) | `shipyard app status [--json]` | `AppStatus` as lines (`shipyard <version> is running`, `demo: <folder>` in a demo run only, `lease: free` or `lease: Claude Code in /Users/me/shop, 48s left, 0 waiting`, `panel: closed`, `layout: tabs`, `tab: All` in the tabs layout only, `projects: shop, blog`, `folded: none`, `showing all: pull-requests in shop`), or as one JSON object on one line, keys sorted: `demo` (the demo folder, `null` outside a demo; #168), `folded` (the collapsed projects), `layout`, `lease` (`null` when free, else `{"holder","place","secondsLeft","waiting"}`), `panelOpen`, `projects` (every section's name: the projects', then the remote machines'), `running` (always true), `showingAll` (`[{"kind":"pull-requests","project":"shop"}]`, the groups by kind Show more opened), `tab` (the selected tab's title, `null` in the list layout), `version` |
+| `app.open` (#179) | `shipyard app open` when the app it looks for runs | the status as lines, as `app.status`; unlike it, leased, so the opener's lease is renewed (and another holder's `app open` refused) |
+| `app.quit` | `shipyard app quit` | `shipyard quit`, with the lease the quit renewed in the reply's `lease` (`{"ends","holder","taken"}`, times in seconds since 1970; #179), for a relaunch to hand over; the app replies, then terminates and removes the socket. The CLI prints it once nothing answers on the socket (a look every quarter second, each with a 1 s timeout, up to 10 s; still answering: exit 1), so a following `app open` launches a new app instead of finding the old one |
 | `panel.open`, `panel.close` | `shipyard panel open`, `close` | `panel open`, `panel closed`, once the panel's appearing (or disappearing) set `PanelState.isOpen`; not within 2 s: refused, "the panel didn't open within 2 seconds; click shipyard's menu bar icon" (or close). Already so: done at once |
 | `panel.fold`, `panel.unfold` (`project`) | `shipyard panel fold <project>`, `unfold <project>` | `folded <project>`, `unfolded <project>`, also when it already was |
 | `panel.showMore` (`project`, `kind`) | `shipyard panel show-more <project> <kind>` (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`) | `showing all <kind> in <project>`, also for a group under its cap; until the panel closes, as Show more |
 | `panel.tab` (`name`) | `shipyard panel show-tab <name>` (a project's slug or else its title, or `All` in any case unless a project has that name) | `showing <title>` (`All`, or the project's title, `MenuModel.tabTitle`) |
 | `panel.view` (`name`, #238) | `shipyard panel show-view <name>` (`github`, `notion`, `skill`, `cli` or `projects`, in any case) | `showing <title>` (`Shipyard CLI`), or `showing projects`; another name refused, "no view is named `gh`; the views are `github`, `notion`, `skill`, `cli`, or `projects` for the projects". The view stays set while the panel is closed and shows when it opens; the panel's closing clears it |
-| `screenshot` (`path`, `appearance`, `menuBarIcon`, `withIndicator` (0.2.0, #180; read as false when it's missing)) | `shipyard app capture <file.png> [--appearance light\|dark] [--menu-bar-icon] [--with-indicator]` | the absolute path written; `error` holds the fallback's note when the panel was rendered ("captured by rendering: <why>"). The app refuses a `path` that isn't absolute and an `appearance` other than `light` or `dark` as unreadable |
-| `control.take` (`waitSeconds`, optional, 0 to 3600, `ControlRequest.longestWait`, a request outside it unreadable; 0.2.0, #178) | `shipyard lease take [--wait <seconds>] [--key <k>]` | `you hold shipyard until <HH:mm:ss>`, the lease held to its cap; another agent's lease: refused at once as L2, or with `waitSeconds`, the reply held back until the lease is this holder's (the same line) or the wait runs out (refused, "waited <n>s; shipyard is still in use by …"). The client's read timeout is `waitSeconds` plus 15 s |
-| `control.release` (0.2.0, #178) | `shipyard lease release [--key <k>]` | `released shipyard`, also when this holder didn't hold the lease |
+| `screenshot` (`path`, `appearance`, `menuBarIcon`, `withIndicator` (#180; read as false when it's missing)) | `shipyard app capture <file.png> [--appearance light\|dark] [--menu-bar-icon] [--with-indicator]` | the absolute path written; `error` holds the fallback's note when the panel was rendered ("captured by rendering: <why>"). The app refuses a `path` that isn't absolute and an `appearance` other than `light` or `dark` as unreadable |
+| `control.take` (`waitSeconds`, optional, 0 to 3600, `ControlRequest.longestWait`, a request outside it unreadable; #178) | `shipyard lease take [--wait <seconds>] [--key <k>]` | `you hold shipyard until <HH:mm:ss>`, the lease held to its cap; another agent's lease: refused at once as L2, or with `waitSeconds`, the reply held back until the lease is this holder's (the same line) or the wait runs out (refused, "waited <n>s; shipyard is still in use by …"). The client's read timeout is `waitSeconds` plus 15 s |
+| `control.release` (#178) | `shipyard lease release [--key <k>]` | `released shipyard`, also when this holder didn't hold the lease |
 | `notes.check` (ADR 0011) | `shipyard notes check` | the notes check's report (NT13), from `Shipyard.checkNotes()`; not leased and no step on the lease's banner; `wait` 45 s, so the client reads for 60 s (about four Notion reads per project at three a second). A report with errors is refused with the whole report as `error` (exit 1, on standard error); a run that reads no notes (a demo run) is refused, "this run doesn't read notes" (#234) |
 
 #### Operations
@@ -1329,7 +1325,7 @@ Whether a project, kind or tab exists is the app's to say, exit 1.
 - **Plain `open`.** When a `DemoPointer` is in the support folder, the demo app it names is quit (when it answers, waiting until it's gone, as `app quit` does) and the pointer removed. Then `ControlCommand` sends `app.open` to the user's own socket: when the app answers (or is there but fails to, or refuses another holder's open), that's the result and nothing is launched.
 - **`open --demo <folder>`.** `DemoPointer.record(<folder>/support)` writes the pointer first (when it can't, exit 1 with nothing quit). Then whatever answers, at the socket `ControlSocket.locate` found and at the user's own, is quit the same way, and the launch below has the demo's environment (C5). A quit that fails, a launch that fails, or a demo that never answers removes the pointer again.
 
-**The handover (0.2.0, #179).**
+**The handover (#179).**
 A quit on the way (the demo's for plain `open`, the running app's for `--demo`) is leased, so another holder's is refused and nothing is launched.
 Its reply carries the lease the quit renewed, and the launch adds it to the environment as `ControlLease.handover(term)`: `SHIPYARD_CONTROL_LEASE={"ends":<s>,"holder":{"key","name","place"},"taken":<s>}`.
 The CLI learns the lease from the quit's own reply, not from a status read before it: `app.status` reports only what people read (name, place, seconds left), and the quit renews the lease anyway, so its reply is the term as it stands when the app goes.
@@ -1357,7 +1353,7 @@ Every write on the socket, the client's and the server's, passes `MSG_NOSIGNAL` 
 The server reads that failure as the client gone, and gives back a lease the reply granted (`ControlServer.undelivered`).
 `SO_NOSIGPIPE` isn't enough on macOS, which refuses it on an accepted socket whose peer has already closed.
 
-**The holder and the lease (0.2.0, #177, ADR 0007).**
+**The holder and the lease (#177, ADR 0007).**
 `ControlCommands.entries(support:launcher:transport:processes:pause:)` builds each call's `ControlClient` with the holder `Holder.find(variables:workingDirectory:processes:)` works out from that call's environment:
 
 | | Key | Name |
@@ -1384,8 +1380,8 @@ The place is `Herdr pane <HERDR_PANE_ID>` when that's set, else the working fold
 | `stop(at: now) -> [Transition]` (#181) | the maintainer's Stop: settles first; a held lease ends, `ended(holder, .stopped)`, its holder is barred until `now + bar` (5 minutes; a second stop of the same key replaces its bar), and the next waiter's `started` follows, as on a release; while free: nothing. The holder is never in the line (its own `take` renews), so nothing there is dropped |
 | `allow(key, at: now)` (#181) | the maintainer's Allow: the bar on `key` is lifted; no transition |
 | `stopped(at: now) -> [Bar]`, `nextEnd(after: now) -> Date?` (#181) | the barred holders whose bars haven't ended, the latest stopped first (the panel's quiet lines); the earliest of the lease's end and the bars' ends, for the app's one timer, nil when there's neither |
-| `init(environment:at:)` (0.2.0, #179) | the lease an app launched with that environment starts with: the term in `SHIPYARD_CONTROL_LEASE` held, its `taken` (so its cap) kept, its end cut to the cap, and no transition; free when the variable is missing, doesn't read, or the term has ended by `now` |
-| `handover(term) -> [String: String]` (0.2.0, #179) | the variable a relaunch adds to the launched app's environment: `SHIPYARD_CONTROL_LEASE` as one JSON object, keys sorted, times in seconds since 1970 (`Term` is `Codable` so, whatever the coder's date strategy) |
+| `init(environment:at:)` (#179) | the lease an app launched with that environment starts with: the term in `SHIPYARD_CONTROL_LEASE` held, its `taken` (so its cap) kept, its end cut to the cap, and no transition; free when the variable is missing, doesn't read, or the term has ended by `now` |
+| `handover(term) -> [String: String]` (#179) | the variable a relaunch adds to the launched app's environment: `SHIPYARD_CONTROL_LEASE` as one JSON object, keys sorted, times in seconds since 1970 (`Term` is `Codable` so, whatever the coder's date strategy) |
 | `current(at:) -> Term?`, `waiting(at:) -> Int`, `status(at:) -> AppStatus.Lease?` | the term held at a time; how many wait in line, their waits not run out; `app status`'s lease, its seconds left rounded up, and the waiters |
 | `Refusal.message(at:timeZone:)` | `inUse` (and `queued`, which the server never sends): "shipyard is in use by <name> in <place> until <HH:mm:ss> (<n>s left); `shipyard lease take --wait <seconds>` to queue"; `waitedOut`: "waited <n>s; shipyard is still in use by <name> in <place> until <HH:mm:ss> (<n>s left)"; `stopped`: "the user took shipyard back; ask them before using it again" (#181) |
 | `Term.held(timeZone:)` | "you hold shipyard until <HH:mm:ss>" |
@@ -1418,7 +1414,7 @@ The launch's failures:
 A Unix socket's path is at most 103 bytes on macOS (the address holds 104 with the closing zero).
 `UnixSocketTransport` and the server refuse a longer one with a line naming the path, so a demo folder nested deep needs a shorter path.
 
-### App control: the app's side — `ShipyardApp/Control/` (0.1.0, #166–#169)
+### App control: the app's side — `ShipyardApp/Control/` (#166–#169)
 
 The app's end of app control: the server and its lease, the panel's state and control, and the screenshotter.
 
@@ -1426,13 +1422,13 @@ The app's end of app control: the server and its lease, the panel's state and co
 
 | Type | Owns | Operations |
 |---|---|---|
-| `ControlServer` (main actor) | the lease (`ControlLease`, since 0.2.0, #177), decided at its `now` clock and refused in its `timeZone`: before dispatching a leased request (`ControlRequest.isLeased`: any but `app.status`, `notify` and `notes.check`, and `control.take` and `control.release`, which ask the lease themselves) it asks `lease.use(by: holder, at: now)`, and a refusal is the reply, with nothing done; `app.status` sets `AppStatus.lease` from `lease.status(at: now)`, and `app.quit`'s reply carries the term the quit was granted. `AppServices` starts it with `ControlLease(environment: ProcessInfo.processInfo.environment, at: Date())`, the lease a relaunch handed over (#179), shown and timed from the start. `control.take` and `control.release` ask the lease themselves (#178); a `take` that's queued suspends on a continuation, kept by ticket with a timer for its wait, so the main actor answers every other request meanwhile, and a wait that runs out asks `giveUp`. Every change to the lease (`lease`'s `didSet`, `leaseChanged()`) is written to the `LeaseIndicator` (#180), answers the waiting `take`s of a holder that got the lease from the line (#178), and sets the one timer for the next end, the lease's or a bar's (a `Task` sleeping until `lease.nextEnd(after:)`, replaced at each change, cancelled by `stop()`), which calls `settleLease()`: the lease ends with no request, so the dot and the banner go, and the next waiter gets it; a bar ends, so its quiet line goes (#181). `stopLease()` (the banner's Stop, through `AppServices.stopLease`) asks `lease.stop(at: now)` and `allow(key)` (a quiet line's Allow, through `AppServices.allowLeaseHolder`) asks `lease.allow`: the maintainer's only way into the lease (#181). `stop()` answers the takes still waiting, "shipyard is quitting". Every transition the lease reports, from `use`, `take`, `release`, `giveUp`, `settle` and `stop` (started, renewed, ended with its reason), goes through `apply(_:)`, which hands each, in order, to its `transitioned` closure (0.2.0, #182); `AppServices` wires it to `Shipyard.notify(_:)` through `ControlNotice(transition)`. A screenshot request passes `withIndicator` to the `Screenshotting`. The listening socket: `start()` at launch (`AppServices.start`) on `ControlSocket.url(in: SupportFolder.app)`, creating the folder when it's missing; a file nothing answers on (left by a crash) replaced, one another app answers on left alone (this app then runs without control, saying why in the log); `chmod 0600` before `listen`; `stop()` at quit (`applicationWillTerminate`) removes it. One request per connection, read on a background queue with a 5 s timeout (a connection that sends nothing gets no reply), answered on the main actor, written back, closed. The client half-closes once it has sent, so a client that has gone (stopped, or cut off by its harness's timeout while its `take` waited in line) shows only when its reply can't be written: when that reply granted the lease (`Answer.granted`), the listener hands it back to `undelivered(_:)` on the main actor, which releases the lease for that holder (`ended(.released)`, the next waiter served as usual), unless the lease has moved on to another holder or term meanwhile, so a grant to nobody doesn't sit until the cap | `reply(to data) async -> Answer` (`reply`, `quits` for `app.quit`, which quits once the reply is written, and `granted`, the term a `take`'s reply grants): the dispatch, tested in `ShipyardAppTests` with a fake `PanelControlling` and a fake `Screenshotting`, while the names a panel request resolves and its refusals' words are tested through the orchestrator in `Tests/ShipyardCoreTests/PanelSteeringTests.swift` (`Harness`); the real socket, from `ControlClient` to the server and back in a temporary folder, tested there too, a `take` waiting in line while the holder's status and release are answered among them, and a waiting `take` whose client closed before its grant giving the lease straight to the next waiter; after Stop, the stopped holder's leased requests and `take` refused with the stop's words and nothing done until Allow, and a waiting `take` answered at once (#181) |
-| `LeaseIndicator` (`@Observable`, main actor, owned by `AppServices`, 0.2.0, #180) | `lease` (the `ControlLease` as the server last left it) and `capturesHiding`, the captures under way without `--with-indicator`, counted up and down by `Screenshotter` through `hideForCapture()` and `showAfterCapture()` (a count, since one holder's parallel captures overlap; `isHiddenForCapture` while it's above 0). Read only by the views: of the maintainer's clicks, only Stop and Allow reach the lease, through `AppServices` to the control server (#181) | `shown(at: now) -> AppStatus.Lease?` and `shownEnd(at: now) -> Date?`: the lease to draw, nil while it's free or hidden; `MenuBarLabelView` draws the dot by it, `Panel` the banner's countdown. `update(lease, at:)` keeps the server's lease and hands `banners(of:at:)` (`PanelBanner.Lease`: the held term, `holder key@taken`, with its headline, and each stopped holder's quiet line) to `onBannersChange`, which `AppServices` points at `Shipyard.lease`, so the lease's banners snooze in the core like the others (#220). Tested in `ControlServerTests` (shown from the request that takes the lease, unchanged by another holder's refusal, free once settled at its end, hidden for a capture) |
+| `ControlServer` (main actor) | the lease (`ControlLease`, #177), decided at its `now` clock and refused in its `timeZone`: before dispatching a leased request (`ControlRequest.isLeased`: any but `app.status`, `notify` and `notes.check`, and `control.take` and `control.release`, which ask the lease themselves) it asks `lease.use(by: holder, at: now)`, and a refusal is the reply, with nothing done; `app.status` sets `AppStatus.lease` from `lease.status(at: now)`, and `app.quit`'s reply carries the term the quit was granted. `AppServices` starts it with `ControlLease(environment: ProcessInfo.processInfo.environment, at: Date())`, the lease a relaunch handed over (#179), shown and timed from the start. `control.take` and `control.release` ask the lease themselves (#178); a `take` that's queued suspends on a continuation, kept by ticket with a timer for its wait, so the main actor answers every other request meanwhile, and a wait that runs out asks `giveUp`. Every change to the lease (`lease`'s `didSet`, `leaseChanged()`) is written to the `LeaseIndicator` (#180), answers the waiting `take`s of a holder that got the lease from the line (#178), and sets the one timer for the next end, the lease's or a bar's (a `Task` sleeping until `lease.nextEnd(after:)`, replaced at each change, cancelled by `stop()`), which calls `settleLease()`: the lease ends with no request, so the dot and the banner go, and the next waiter gets it; a bar ends, so its quiet line goes (#181). `stopLease()` (the banner's Stop, through `AppServices.stopLease`) asks `lease.stop(at: now)` and `allow(key)` (a quiet line's Allow, through `AppServices.allowLeaseHolder`) asks `lease.allow`: the maintainer's only way into the lease (#181). `stop()` answers the takes still waiting, "shipyard is quitting". Every transition the lease reports, from `use`, `take`, `release`, `giveUp`, `settle` and `stop` (started, renewed, ended with its reason), goes through `apply(_:)`, which hands each, in order, to its `transitioned` closure (#182); `AppServices` wires it to `Shipyard.notify(_:)` through `ControlNotice(transition)`. A screenshot request passes `withIndicator` to the `Screenshotting`. The listening socket: `start()` at launch (`AppServices.start`) on `ControlSocket.url(in: SupportFolder.app)`, creating the folder when it's missing; a file nothing answers on (left by a crash) replaced, one another app answers on left alone (this app then runs without control, saying why in the log); `chmod 0600` before `listen`; `stop()` at quit (`applicationWillTerminate`) removes it. One request per connection, read on a background queue with a 5 s timeout (a connection that sends nothing gets no reply), answered on the main actor, written back, closed. The client half-closes once it has sent, so a client that has gone (stopped, or cut off by its harness's timeout while its `take` waited in line) shows only when its reply can't be written: when that reply granted the lease (`Answer.granted`), the listener hands it back to `undelivered(_:)` on the main actor, which releases the lease for that holder (`ended(.released)`, the next waiter served as usual), unless the lease has moved on to another holder or term meanwhile, so a grant to nobody doesn't sit until the cap | `reply(to data) async -> Answer` (`reply`, `quits` for `app.quit`, which quits once the reply is written, and `granted`, the term a `take`'s reply grants): the dispatch, tested in `ShipyardAppTests` with a fake `PanelControlling` and a fake `Screenshotting`, while the names a panel request resolves and its refusals' words are tested through the orchestrator in `Tests/ShipyardCoreTests/PanelSteeringTests.swift` (`Harness`); the real socket, from `ControlClient` to the server and back in a temporary folder, tested there too, a `take` waiting in line while the holder's status and release are answered among them, and a waiting `take` whose client closed before its grant giving the lease straight to the next waiter; after Stop, the stopped holder's leased requests and `take` refused with the stop's words and nothing done until Allow, and a waiting `take` answered at once (#181) |
+| `LeaseIndicator` (`@Observable`, main actor, owned by `AppServices`, #180) | `lease` (the `ControlLease` as the server last left it) and `capturesHiding`, the captures under way without `--with-indicator`, counted up and down by `Screenshotter` through `hideForCapture()` and `showAfterCapture()` (a count, since one holder's parallel captures overlap; `isHiddenForCapture` while it's above 0). Read only by the views: of the maintainer's clicks, only Stop and Allow reach the lease, through `AppServices` to the control server (#181) | `shown(at: now) -> AppStatus.Lease?` and `shownEnd(at: now) -> Date?`: the lease to draw, nil while it's free or hidden; `MenuBarLabelView` draws the dot by it, `Panel` the banner's countdown. `update(lease, at:)` keeps the server's lease and hands `banners(of:at:)` (`PanelBanner.Lease`: the held term, `holder key@taken`, with its headline, and each stopped holder's quiet line) to `onBannersChange`, which `AppServices` points at `Shipyard.lease`, so the lease's banners snooze in the core like the others (#220). Tested in `ControlServerTests` (shown from the request that takes the lease, unchanged by another holder's refusal, free once settled at its end, hidden for a capture) |
 | `PanelState` (`@Observable`, main actor, owned by `AppServices`) | `isOpen`, set by the panel's appearing and disappearing (`AppServices.panelOpened`/`panelClosed`); `openView: SetupPart?`, the status view in place of the panel's content, set by the settings menu's items, ‹ Back and `showView`, and cleared by `panelClosed` (#238); `selectedTab` and `movedForward` (which way the list slides), moved out of `TabsLayout`'s private `@State`, so a click and a command set the same value. The tab is kept while the panel closes and opens, so one chosen while it's closed is the one it opens on; `MenuTabs`' fallback to All still applies | `select(tab, from: shown, in: tabs)`; read by `TabsLayout` (passed by `Panel`) and `PanelControl` |
 | `PanelControl: PanelControlling` | nothing of its own: `PanelState`, `Shipyard` and `MenuBarWindow` | `status() -> AppStatus` from the last valid configuration (layout), the menu (`MenuModel.projectNames`: every section's name, a project's slug or a remote machine's label, as `fold` and `tab` accept them, which take a project's title too; the selected tab resolved, `collapsedProjects`, `kindGroupsShowingAll`) and `ShipyardVersion`; `open()`, `close()` (async: through `MenuBarWindow`, then waiting up to 2 s, a look every 50 ms, for `PanelState.isOpen` to follow; refused when it doesn't); `fold(project)`, `unfold(project)` (`Shipyard.setCollapsed`, which calls `toggleCollapsed` only when it differs); `showMore(project, kind)` (`Shipyard.showMore(_:kind:)`, which calls `showMore(group)` on the project's group of that kind); `selectTab(name) -> title` (`MenuModel.tab(named:)`, then `PanelState.select`, animated). Each refuses with a `PanelRefusal` naming what exists: "no project is named `shopp`; the projects are `shop`, `blog`", "no kind is named `prs`; the kinds are `pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`", "`shop` lists no workflow-runs; its kinds are `pull-requests`, `issues`", "`blog` lists no group by kind; show-more needs `group-by = \"kind\"`, the default", "no tab is named `x`; the tabs are `All`, `shop`, `blog`", or `tab` in the list layout ("the menu uses the list layout; tabs need `[menu] layout = \"tabs\"`"). The names are the menu's sections, so a remote machine's own section counts as a project. `showView(name)` (#238): `SetupPart.named(name)` sets `PanelState.openView` (nil for `projects`) and returns the view's title, or `projects`; `status()` reports `openView`'s `commandName`, or `projects` |
 | `MenuBarWindow` (`ShipyardApp/MenuBarWindow.swift`) | nothing: opens and closes the `MenuBarExtra` window as a click on the icon does, on the next turn of the main loop. On macOS 26 and earlier through the status item's button, clicked when whether the panel's window is on screen differs from what's wanted (the button's on state drifts from the window's on macOS 26.5, reading off while the panel shows); on macOS 27 the expanded-interface session is cancelled to close, and opening clicks the button, best effort (its target is nil there, so `open` may be refused after its wait). Private selectors are called only when they take no argument and return an object | `open()`, `close()`; `AppServices.closeMenu()` closes through it; `panelWindow`: the panel's window while it's on screen (the `MenuBarExtra` window, else the largest visible window above the status bar's level; the panel's window answers `statusItem` too, so the level tells it from the status bar's), which `Screenshotter` captures |
 | `PanelWindowAnchor` (`ShipyardApp/PanelWindowAnchor.swift`) | the window's x read when the panel opens, nil while it's closed | an `NSViewRepresentable` behind `Panel` (not in a snapshot), handed `PanelState.isOpen`. SwiftUI lines the `MenuBarExtra` window up under the status item again on every resize, so a count that widens the item while the panel is open ("1" to "26") made the next tab switch slide the panel sideways. It reads the window's left edge when the window becomes key after opening, and on each `didMove` or `didResize` (selector observers, inside the frame change, before it's drawn) sets the origin back to that x, kept inside the screen's visible frame; y and size stay SwiftUI's. Closing forgets the edge, so the panel lines up with the item again when it next opens. No private API. No unit test: the behaviour lives in SwiftUI's window, so it's checked with real clicks in the app |
-| `Screenshotter: Screenshotting` | nothing of its own: `PanelControlling` to open the panel, and a fresh `Panel` (`isSnapshot`, so its appearing isn't the panel opening) for the fallback | `capturePanel(to:appearance:)`: sets `NSApp.appearance` to the one asked for (restored once the PNG is written), opens the panel through `PanelControlling.open()` when it's closed, waits 350 ms for it to settle, then captures `MenuBarWindow.panelWindow` with `SCScreenshotManager.captureImage`, filtered to that window from `SCShareableContent.currentProcess` (macOS 14.4), which lists this process's own windows and needs no Screen Recording permission (`docs/references/screencapturekit-own-windows.md`). The capture is the window as composited on screen, so a light panel over a dark desktop shows its material greyed by what's behind it. When opening, finding the window or capturing fails, it renders a fresh `Panel` and returns `rendered(why)`: in an `NSHostingView` in a borderless, invisible window off screen, fitted to the panel's size over three 100 ms passes (its lists measure themselves), drawn at the screen's scale in the appearance asked for and laid on the window background colour, since the material behind the rows isn't drawn and would leave light text on transparency (`ScreenshotImage`, tested in `ShipyardAppTests`). The open window's own view isn't drawn instead: drawn alone it loses its vibrant colours and symbols. Nothing drawn: `failed`; a PNG that can't be written (its folder missing): `failed` naming the path, with no fallback, since it would fail too. `menuBarIcon(to:appearance:)`: `SailboatImage` alone at the menu bar's 16 points on transparency, black in light and white in dark as the menu bar tints its template image; the panel isn't opened. Hover cards and the menu bar strip are never captured. Since 0.2.0 (#180) both take `withIndicator`: without it, `capturePanel` counts itself in `LeaseIndicator.hideForCapture()` with animations off for the whole capture (the open panel drops its banner before the 350 ms settle, and the fallback's fresh panel draws none), and out through `showAfterCapture()` in a `defer`, so overlapping captures leave the indicator shown once the last ends; a capture with the flag overlapping one without draws no banner. `NSApp.appearance` is still saved and restored per capture. `menuBarIcon` draws the lease's dot (`LeaseDot`) only with it and while the lease is held (read from the lease, not the hidden indicator), leaving the live icon alone. Tested in `ScreenshotImageTests`: the fallback drawn with the indicator hidden by default and shown with the flag, then restored; two overlapping captures leaving it shown; the rendered icon's yellow dot only when asked |
+| `Screenshotter: Screenshotting` | nothing of its own: `PanelControlling` to open the panel, and a fresh `Panel` (`isSnapshot`, so its appearing isn't the panel opening) for the fallback | `capturePanel(to:appearance:)`: sets `NSApp.appearance` to the one asked for (restored once the PNG is written), opens the panel through `PanelControlling.open()` when it's closed, waits 350 ms for it to settle, then captures `MenuBarWindow.panelWindow` with `SCScreenshotManager.captureImage`, filtered to that window from `SCShareableContent.currentProcess` (macOS 14.4), which lists this process's own windows and needs no Screen Recording permission (`docs/references/screencapturekit-own-windows.md`). The capture is the window as composited on screen, so a light panel over a dark desktop shows its material greyed by what's behind it. When opening, finding the window or capturing fails, it renders a fresh `Panel` and returns `rendered(why)`: in an `NSHostingView` in a borderless, invisible window off screen, fitted to the panel's size over three 100 ms passes (its lists measure themselves), drawn at the screen's scale in the appearance asked for and laid on the window background colour, since the material behind the rows isn't drawn and would leave light text on transparency (`ScreenshotImage`, tested in `ShipyardAppTests`). The open window's own view isn't drawn instead: drawn alone it loses its vibrant colours and symbols. Nothing drawn: `failed`; a PNG that can't be written (its folder missing): `failed` naming the path, with no fallback, since it would fail too. `menuBarIcon(to:appearance:)`: `SailboatImage` alone at the menu bar's 16 points on transparency, black in light and white in dark as the menu bar tints its template image; the panel isn't opened. Hover cards and the menu bar strip are never captured. Both take `withIndicator` (#180): without it, `capturePanel` counts itself in `LeaseIndicator.hideForCapture()` with animations off for the whole capture (the open panel drops its banner before the 350 ms settle, and the fallback's fresh panel draws none), and out through `showAfterCapture()` in a `defer`, so overlapping captures leave the indicator shown once the last ends; a capture with the flag overlapping one without draws no banner. `NSApp.appearance` is still saved and restored per capture. `menuBarIcon` draws the lease's dot (`LeaseDot`) only with it and while the lease is held (read from the lease, not the hidden indicator), leaving the live icon alone. Tested in `ScreenshotImageTests`: the fallback drawn with the indicator hidden by default and shown with the flag, then restored; two overlapping captures leaving it shown; the rendered icon's yellow dot only when asked |
 | `AppServices` (in `ShipyardApp.swift`) | building the app on `AppFiles(environment:)` (#168); the one `LeaseIndicator` (#180), given to the control server, the screenshotter, the menu bar label and the panel; `stopLease()` and `allowLeaseHolder(key)`, the panel's Stop and Allow, passed to the control server (#181) | every store, the avatar cache and the control server's socket on its paths, and the login item through `files.loginItem(LaunchAtLogin())`; `PanelControl` gets its `demo` for `status` |
 
 ### Shipyard (orchestrator) — `ShipyardCore/Shipyard.swift`
@@ -1484,7 +1480,7 @@ loginItem: LoginItem               (port; told launch-at-login at start and on e
 | Operation | Does | Rejects / edge |
 |---|---|---|
 | `start()` | record `configStore.url` for the CLI (`ConfigurationLocation.record`, `config-location.json` beside `repositories.json`, #126; a failed write is ignored); create `config.toml` with its commented header when it's missing (`configStore.createIfMissing()`, on every start, not only the first; an existing file is never touched; a failed write is ignored and the missing file reads as the defaults); load config; `reloadPings()`, so pings sent while the app wasn't running list and notify at once, signed in or not, and those that left take their banners; `loginItem.setEnabled(launch-at-login)`; resolve token → phase; in `ready`, the first refresh. The connect screen's Connect with `gh` calls it too | no token → `signedOut` with `noToken`; a file broken at launch leaves the login item alone (the defaults would re-register one the user turned off) |
-| `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()`, and `pollMachines()` beside it (0.0.6, #119), so every machine is asked at once too | as `refresh()`; an existing file is never touched |
+| `refreshNow()` | the header's Refresh button (⌘R): creates `config.toml` with its commented header when it's missing, as `start()` does, then `refresh()`, and `pollMachines()` beside it (#119), so every machine is asked at once too | as `refresh()`; an existing file is never touched |
 | `refresh()` | the refresh pipeline (§4), which resolves repository selectors first (forced after a configuration change and on ⌘R, else at most hourly); the timer, wake and a configuration change call it, and ⌘R through `refreshNow()` (opening the panel doesn't); arms the timer after with the budget's delay outside `ready` it only lists the pings again (below), so a seen ping past its window leaves, with its banner, even signed out; while one runs, returns at once and the running one goes again after (several calls make one more run); while the budget pauses, sends nothing, rebuilds the menu from the last snapshot (so a closed item past its window leaves) and re-arms the timer for the configured interval or the pause's end, whichever is sooner. Each call first reads the pings again (`listPings()`), removing the seen ones past their seen-window (#103), and removes the banners of those that left, before the phase check |
 | `canRefreshNow` | false only while the budget pauses (⌘R and the Refresh button read it; `menu.canRefreshNow` says the same) | — |
 | `reloadConfiguration()` | `configStore.reload()`; on a change, `loginItem.setEnabled(launch-at-login)` (so the switch applies live), phase follows `hasProjects`, the menu is rebuilt at once from the last snapshot (or none) under the new configuration, keeping `fetchError` (so an edit shows even while refreshing is paused or failing: a project added since shows "Not loaded yet", a removed one disappears); while refreshes may run, `refreshDelay` and `rateIndicator` are worked out again at once from the rate budget under the new `[rate-limit]`, before the refresh comes back; then it refreshes (or disarms the timer) | a rejected edit changes nothing but `configError`, which the panel's banner shows (set at `start()`, every reload and `addProjects`, in `publishConfigStatus()`, which also writes the verdict to `configStatusStore`, accepted, rejected or unchanged); `configWarnings`, set alongside it, lists the unknown settings the last clean read ignored for the panel's quiet banner, and is emptied when a read fails so only the error shows |
@@ -1494,11 +1490,11 @@ loginItem: LoginItem               (port; told launch-at-login at start and on e
 | `openRepository(of: section)` | Return on a project's header (#45), or a click on its open-in-browser icon: opens the section's `repositoryURL`, the first repository the configuration lists for the project, on GitHub; marks nothing seen | a section without repositories opens nothing |
 | `openPage(link)` | a click on a list header's count chip, or a choice from its menu: opens the `PageLink`'s URL, from `MenuSection.pageLinks(for: kind)`: each repository's `/pulls`, `/issues` or `/actions`, or for notes the project's notes database in Notion (ADR 0011), with how many of the section's rows of that kind are from it, the configured repositories first, then any other a row comes from (`anywhere`); marks nothing seen | pings, notes before a read matched a database, and a section without repositories have no links |
 | `openProfile()` | a click on the header's account (#49): opens `viewer.profileURL` through `ActionRunning`; the app then closes the menu, as for a row | opens nothing while `viewer` is `nil` |
-| `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh). A ping's URL (`shipyard://ping/<id>`, `Ping.id(from:)`) runs the ping's action as its row does (`runAction(ofPing:)`, #100); returns that `Task` (discardable). A lease's URL (`ControlNotice.panelURL`, `shipyard://panel`) does nothing here: the app opens the panel for it (0.2.0, #182). A notice's (`shipyard://notice…`, #193) runs the action its URL carries (`NoticeRules.click(from:)`, `runAction(ofNotice:)`), or nothing | an item neither lists is only opened; a ping gone from the store changes nothing |
+| `openNotification(itemURL)` | a notification was clicked: opens the URL and marks the item seen, the version in the last snapshot, else the one in `known` (a click that launched the app before its first refresh). A ping's URL (`shipyard://ping/<id>`, `Ping.id(from:)`) runs the ping's action as its row does (`runAction(ofPing:)`, #100); returns that `Task` (discardable). A lease's URL (`ControlNotice.panelURL`, `shipyard://panel`) does nothing here: the app opens the panel for it (#182). A notice's (`shipyard://notice…`, #193) runs the action its URL carries (`NoticeRules.click(from:)`, `runAction(ofNotice:)`), or nothing | an item neither lists is only opened; a ping gone from the store changes nothing |
 | `receive(request, from: login)` (async, #194) | a notice request (show or withdraw) from another machine, from the app's `NoticeListener`, with the request's `Tailscale-User-Login`: asks `tailnet.ownLogin()` (the `TailnetIdentity` port, `TailscaleCLI` in the app) and, when `login` is exactly it, `receive(request)` | no or an empty login (`NoticeRules.noLogin`), another (`otherLogin`, naming the sender's, never the Mac's), or the Mac's own unknown (`ownLoginUnknown(reason)`): `.refused(why)`, the rules never asked; from the Mac's own login, a notice that focuses Herdr (`Notice.focusesHerdr`): `.refused(TailnetWire.herdrRefusal)` |
 | `noticeListenerPort` (#194) | `lastValid`'s `[notices]`: its `port` when `listen`, else `nil`; an observed property set by every read of the configuration (`publishConfigStatus`), before any GitHub request; the app follows it through observation, so the listener never waits on a refresh (it once did: a slow first refresh left nothing listening) | |
 | `show(notice)` (async, #190) | an agent's `Notice`, through `receive(request)` (below) from the app's `ControlServer` (`ControlRequest.notify`), the tailnet listener or the poll: `NoticeRules.project(for:configuration:resolved:)` files it against `lastValid` and the resolved repositories (kept, or `repositoriesStore`'s), and when a project takes it and `notifier.canShow()` (not turned off in System Settings), posts `NoticeRules.notification(for:project:id:)` under `agent.notice <id>` for a notice with an `id` (replacing one shown under it, #193), else a fresh one (`agent.notice <uuid>`), and returns `.shown`; `show(notice, from: machine)` is a notice the poll took off a remote machine, whose Herdr click and buttons focus there (#193). `receive(request)` (#193) is the routes' entry: `.show` → `show`, `.withdraw(id)` → `withdrawNotice(id:)`, which removes `agent.notice <id>` (`removeDelivered`) and returns `.shown` whether or not one was shown. Nothing is recorded, stored or listed, and the menu doesn't change | no project named or watching it, or every one it's filed under leaves out `agent.notice`, or the user turned shipyard's notifications off: `.refused(why)`, nothing posted |
-| `notify(notice)` (async, 0.2.0, #182) | app control's lease started or ended (`ControlNotice`, from the app's `ControlServer` transitions): posts `NotificationRules.notification(for: notice, at: clock.now)` when `shouldNotify(notice, configuration: lastValid)`; nothing is recorded, since the app hands each start and end over once | a written `[[defaults.notifications]]` without the event: nothing |
+| `notify(notice)` (async, #182) | app control's lease started or ended (`ControlNotice`, from the app's `ControlServer` transitions): posts `NotificationRules.notification(for: notice, at: clock.now)` when `shouldNotify(notice, configuration: lastValid)`; nothing is recorded, since the app hands each start and end over once | a written `[[defaults.notifications]]` without the event: nothing |
 | `markAllSeen(project?)` | marks every open row of that project (or of all projects) seen, pings in the ping store | rows hidden by the configuration are left alone |
 | `dismiss(row)` | a ping row's ✕ or ⌫ (#103): `pingStore.remove(id)`, then the pings are listed again; the ping leaves every project it was filed under, seen or not, with its failure, and its notification leaves Notification Center (#102). Returns that removal's `Task` (discardable), which tests await | any other row changes nothing; a store that can't be written leaves the ping listed |
 | `listPings()` (private) | reads the ping store; a seen ping whose seen-window has passed in every project it's filed under (a project no longer configured counts with `[defaults.pings]`'s window) is removed from the store (`removeIfUnchanged`: only as it was read, so one the CLI replaced or sent anew meanwhile is listed as it is now) and not listed; when what's left differs from `pings`, rebuilds the menu. `refresh()`, `reloadPings()`, a click, ⌥-click, Mark all seen and a dismiss all go through it (#103). Each time, `forgetLeftPings` drops from `notified` every ping's `ping.sent` record that names no stored ping, or another instance than the stored one (withdrawn and sent anew), and queues those notifications' ids; `refresh()`, `reloadPings()` and `dismiss` then call `notifier.removeDelivered` for each (`removeLeftBanners()`), before posting anything (#102) | a ping that can't be removed stays in the store, but `Listing` leaves it out anyway |
@@ -1516,7 +1512,7 @@ loginItem: LoginItem               (port; told launch-at-login at start and on e
 | `disconnectNotion()` (#241) | Disconnect: clears the flag here and in `state.json`, disarms the notes timer, clears the new-note errors and forgets every note (no banner, no icons). A read ntn was still answering is dropped when it comes back | — |
 | `checkNotes() -> NotesCheckReport?` (async, ADR 0011) | `shipyard notes check`, from the app's `ControlServer`: `NotesCheck.run` over the projects that show notes in the last valid configuration, with a `NotionClient` over the same `notion` transport (ntn, #234), so it reports what the menu can see; changes nothing | `nil` in a run that reads no notes (a demo run, or Notion not connected, #241), which the app refuses as NT13 |
 | `open(row)` / `markSeen(row)` on a note (#192) | `open` opens the page's Notion URL through the action port; nothing is marked seen, and `markSeen` does nothing | — |
-| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. Built and tested in the core since 0.0.1; since 0.0.2 the connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder; shipyard's own is compiled in since #23) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
+| `beginDeviceFlow()` / `cancelDeviceFlow()` | drives `Auth`; the code shows as `connecting(code)`; the token is saved to the token store. The connect screen's Sign in with GitHub calls it (S1), offered while `canSignInWithGitHub` (the client ID isn't the placeholder; shipyard's own is compiled in since #23) | only in `signedOut`; expiry, denial or failure → `signedOut` with `signInError`, and it can begin again; with the placeholder client ID, `signInError` is `clientIDMissing` and GitHub is never asked |
 | `openVerificationPage()` | the code screen's Copy code and open GitHub (the app copies the code first): opens the code's `verificationURL` (github.com/login/device) through `ActionRunning` | only while `connecting(code)`; otherwise does nothing |
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
@@ -1556,9 +1552,8 @@ Defaults shown, as the file a user would write:
 version = 1
 
 theme = "Shipyard"               # Shipyard, Native, Graphite, Paper, Midnight, Harbor or a theme file's name, ignoring case; an unknown name is an error
-refresh-interval = "2m"          # at least "30s"; a floor, stretched by the rate budget if needed (was refresh-interval-seconds = 120, still read with a warning)
+refresh-interval = "2m"          # at least "30s"; a floor, stretched by the rate budget if needed
 launch-at-login = true
-# hide-authors: removed in 0.0.2; read as a hide in each kind's authors, with a warning
 
 [menu-bar]
 count = "total"                  # "total" | "per-kind" | "none"
@@ -1588,7 +1583,7 @@ checks-failed = true
 # port: 47420 (1–65535; NoticePort.default, shared with cli.toml's)
 
 [banners]
-snooze-duration = "1h"                    # how long a dismissed banner stays hidden (was snooze, still read with a warning)
+snooze-duration = "1h"                    # how long a dismissed banner stays hidden
 
 # What every project shows, unless the project overrides it.
 [defaults.pull-requests]
@@ -1642,7 +1637,7 @@ event = "control.ended"                   # its lease ended: released, ran out, 
 
 # One [[projects]] block per project, shown in this order. slug is its ID (lowercase
 # letters and digits joined by single hyphens), title what the menu shows (the slug
-# when unset); the old name still reads as both, with a warning (#255).
+# when unset).
 [[projects]]
 slug = "e-commerce"
 repositories = ["yahyabedirhan/e-commerce-frontend", "yahyabedirhan/e-commerce-backend"]
@@ -1675,16 +1670,16 @@ Per-project overrides are written as inline tables so each `[[projects]]` block 
 
 **Events.**
 `pr.opened pr.merged pr.closed pr.reopened pr.review_requested pr.checks_failed pr.commented issue.opened issue.closed issue.commented run.failed run.succeeded ping.sent agent.notice control.started control.ended`.
-`ping.sent` came in 0.0.5, the two `control.*` in 0.2.0 and `agent.notice` in effort `notes-and-notify`, all in the default rules beside `pr.opened`; the `control.*` events are decided by the top-level rules only (L9).
+`ping.sent`, the two `control.*` and `agent.notice` are all in the default rules beside `pr.opened`; the `control.*` events are decided by the top-level rules only (L9).
 
 **Author selectors.**
-`me`, `others`, `bots` or `@login` (ADR 0002); the old notification strings `any | me | others | bots` still read, with a warning.
+`me`, `others`, `bots` or `@login` (ADR 0002), always in a list; a rule's `authors` written as one string is rejected.
 
 #### Operations
 
 | Operation | Returns / rejects |
 |---|---|
-| `static decode(Data) throws(ConfigurationError) -> Decoded` | the configuration plus warnings; rejects, each with a line and a message (every problem is listed, not only the first): invalid TOML, a value of the wrong type, an unknown choice (event, author filter, count style…) with the nearest valid one suggested, bad repo slug (`owner/name`), a project without a slug (or old `name`) or repositories, a slug that isn't lowercase letters and digits joined by single hyphens (the nearest one suggested), an empty title, a repository listed twice in one project (ignoring case), two projects with one slug (on the second one's line), an old `name` beside `slug` or `title`, a window that isn't a whole number and one unit (`s`, `m`, `h`, `d`) with the nearest spelling suggested, an old `closed-window-days`, `finished-window-hours`, `refresh-interval-seconds` or `[banners] snooze` beside its new key in one table (alone, the old key reads as its new one, with a warning; an old `name` reads as the title, with a slug made of it), an interval under 30 seconds, share outside 1–50, a `version` other than 1; a file that sets keys without `version` reads, with a warning |
+| `static decode(Data) throws(ConfigurationError) -> Decoded` | the configuration plus warnings; rejects, each with a line and a message (every problem is listed, not only the first): invalid TOML, a value of the wrong type, an unknown choice (event, author filter, count style…) with the nearest valid one suggested, bad repo slug (`owner/name`), a project without a slug or repositories, a slug that isn't lowercase letters and digits joined by single hyphens (the nearest one suggested), an empty title, a repository listed twice in one project (ignoring case), two projects with one slug (on the second one's line), a window that isn't a whole number and one unit (`s`, `m`, `h`, `d`) with the nearest spelling suggested, an interval under 30 seconds, share outside 1–50, a `version` other than 1; a file that sets keys without `version` reads, with a warning |
 | `settings(for: Project) -> ProjectSettings` | defaults merged with the project's overrides (objects merge by field; `notifications` replaces) |
 | `appendText(projects:) -> String` | the `[[projects]]` blocks the picker appends; the app never rewrites the file as a whole |
 | `settingLayout(layout, in: text) throws(ConfigurationError) -> String` (`LayoutSetting.swift`) | the file's text with `[menu] layout` set and every other line kept: replaces an existing value (keeping its comment), adds the key under an existing `[menu]`, uncomments the header's `# [menu]` example when no live key follows it before the next table, else adds `[menu]` before the first table (or at the end); rejects a file that doesn't read (its own error), a `[menu]` in another form (inline table, dotted keys, `[menu.x]`) and any result that wouldn't read back as the same configuration with only the layout changed |
@@ -1704,7 +1699,7 @@ All merge key by key in `settings(for:)`.
 The cross-key rule for `anywhere` (G2) is checked in the reader.
 
 **Compatibility.**
-The schema keeps `hide-authors` and the old notification strings, marked deprecated, so `taplo check` still passes on files the app accepts.
+The reader keeps no old forms, and the schema marks nothing deprecated: a renamed key is dropped outright.
 Unknown keys are ignored with a warning, so a newer file doesn't break an older app.
 
 **Line numbers.**
@@ -1724,7 +1719,7 @@ Reads, watches and writes `config.toml`, and keeps the last valid configuration.
 The header, `Configuration.header`, shows the settings people reach for first commented out at their defaults:
 
 - `theme`.
-- `[defaults.pull-requests] authors` (in place of `hide-authors` since 0.0.2).
+- `[defaults.pull-requests] authors`.
 - `[menu] layout`, `[menu-bar] count`.
 - `[defaults] group-by`, `sort-by` and `show-first`.
 - `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show`.
@@ -1911,7 +1906,7 @@ The text is a whole commented configuration file (the `#:schema` line, a comment
 | Preset | Contents |
 |---|---|
 | `my-agents` | issues shown (`[defaults.issues] show = true`); `[defaults] group-by = "kind"`; each of `projects` as its own block (onboarding passes one per chosen repository); the default notification. The maintainer's setup. |
-| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`, `ping.sent` (0.0.5), `agent.notice` (#190) and the two `control.*` (0.2.0). Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested, ping.sent, agent.notice]`, since a request, not a new PR, is its news. ghbar's view. |
+| `incoming-contributions` | in the defaults, so projects added later are the same: `authors = { hide = ["me", "bots"] }` for pull requests and issues, issues shown, `group-by = "repository"`, `subsections = true`, notifications `pr.opened` and `issue.opened` from `others`, `ping.sent`, `agent.notice` (#190) and the two `control.*`. Then `projects` as given, or, when empty, a project "Incoming" (`Preset.incomingProjectName`) with `owned`; then a project "Review requests" with `anywhere`, `review-requested = true`, `issues = { show = false }` (`anywhere` lists no issues, and the defaults show them) and its own `notifications = [pr.review_requested, ping.sent, agent.notice]`, since a request, not a new PR, is its news. ghbar's view. |
 | `review-queue` | one project, "Review queue", with `anywhere`, `review-requested = true`, `group-by = "repository"`, `subsections = true`; notifications `pr.review_requested`, `ping.sent` and `agent.notice`. Ignores `projects`. |
 
 #### Operations
@@ -1939,9 +1934,8 @@ Finds the GitHub token, runs the device flow, and keeps the token in the Keychai
 
 #### State
 
-**0.0.1 connected through `gh` only; 0.0.2 adds the device flow (S1).**
-In 0.0.1 the app read `gh auth token` silently, never started the device flow, and kept tokens in a session-only store.
-0.0.2 compiles in shipyard's OAuth App client ID (`OAuthApp.clientID`, one line, registered under the maintainer's account in #23), makes `Keychain` the app's token store, and puts **Sign in with GitHub** on the connect screen; the `gh` token stays the silent path for anyone who has it.
+**`gh` or the device flow (S1).**
+The app compiles in shipyard's OAuth App client ID (`OAuthApp.clientID`, one line, registered under the maintainer's account in #23), makes `Keychain` the app's token store, and puts **Sign in with GitHub** on the connect screen; the `gh` token stays the silent path for anyone who has it.
 A build whose client ID is the placeholder (a fork's, before it sets its own) shows Sign in with GitHub disabled, with why, and connects through `gh` only.
 
 #### Operations
@@ -1991,7 +1985,7 @@ An alias that comes back `null` with a `NOT_FOUND` (missing, or no access) or `F
 **Pull request fields.**
 Per repository alias it asks for open PRs (first 50) and PRs closed or merged ordered by `UPDATED_AT` (first 20, filtered by `closedAt` locally).
 Per PR it asks for `isDraft`, `author { login, __typename, avatarUrl }`, for the row's hover card `baseRefName`, `additions`, `deletions`, `changedFiles` and `reviewDecision` (plain fields, which add nothing to the query's cost), `updatedAt`, `closedAt`, `mergedAt`, comment + review counts, and the head commit's `statusCheckRollup.state`.
-Since 0.0.2 it doesn't ask for `reviewRequests`: the review search, below, says which PRs wait on the viewer.
+It doesn't ask for `reviewRequests`: the review search, below, says which PRs wait on the viewer.
 
 **Issue fields.**
 Issues are asked for the same way (`openIssues`: open, first 50; `closedIssues`: closed, first 20, both by `UPDATED_AT`; per issue `state`, `author { login, __typename }`, `createdAt`, `updatedAt`, `closedAt` and the comment count, with no nested lists).
@@ -2012,7 +2006,7 @@ The runs are parsed once per repository and filtered per project: `branches = "a
 The GraphQL query supplies both for those repositories (`defaultBranchRef { name }`, `headRefName` in `PullRequestFields`, and, where no project shows the repository's pull requests, `openPullRequestHeads: pullRequests(states: OPEN, first: 50) { nodes { headRefName } }`), so no extra REST calls.
 The window itself is the menu model's.
 
-**Batches (since 0.0.2).**
+**Batches.**
 `fetch(projects, resolved:)` sends the repository aliases in batches per GraphQL request, one after another, so one request stays inside GitHub's node limit (500,000), its 10-second timeout and its other resource limits however many repositories a group brings in (see `docs/references/github-rate-limits.md`).
 The cost is their sum, which `RateBudget` measures as today, and the limit is the last batch's headers.
 The batches were 25 repositories until #222 and are **5** since: 11 repositories with issues in one query came back cut short, any 5 whole.
@@ -2045,7 +2039,7 @@ A project using `anywhere` (G2, #61) gets the search's PRs among its items in th
 Because the search sees only open PRs, `KnownItems.updated` keeps the review request a closed PR had, so reopening it is `pr.reopened` without a second `pr.review_requested`.
 The search's facts are in `docs/references/github-search.md`.
 
-### RepositoryResolver — `ShipyardCore/GitHub/RepositoryResolver.swift` (0.0.2)
+### RepositoryResolver — `ShipyardCore/GitHub/RepositoryResolver.swift`
 
 A `@MainActor` class `Shipyard` owns, which turns each project's repository selectors into the repositories they name.
 
@@ -2107,8 +2101,8 @@ Item
   note: Note?                 (#192, kind note only: the note it lists: its number's prefix and labels for the row. A note's item is
                                open, numbered by its `No.`, under no repository and with no GitHub author, created and updated
                                when the page was created (so an edit doesn't move it), and known by its Notion URL)
-  ping: Ping?                 (0.0.5, kind ping only: the ping it lists, whose `seen` attention reads. A ping's item is open,
-                               has its section's number (`Listing` from `PingNumbers`, N14; 0 before it has one) and no GitHub author (its sender stays on the ping, so author filters and rules
+  ping: Ping?                 (kind ping only: the ping it lists, whose `seen` attention reads. A ping's item is open,
+                               has its section's number (`Listing` from `PingNumbers`, N17; 0 before it has one) and no GitHub author (its sender stays on the ping, so author filters and rules
                                never see it), its repository only when filed by one, is aged from when it was sent or last replaced, and is
                                known by shipyard://ping/<id>, which no GitHub item can be. `MenuRow.pingIcon`, `sender`, `agent`
                                (the `KnownAgent` its sender names, #137) and `actionError` read it for the row)
@@ -2120,15 +2114,15 @@ Snapshot
   errors: [ItemSource: RepositoryError]      (per repository + kind; notFound | forbidden | other, GitHub's message)
   rateLimits: { graphql: RateLimit?, rest: RateLimit? }   (limit, remaining, used, resetAt, cost of this refresh: GraphQL's `rateLimit.cost`; REST's counted (non-304) requests)
   viewerLogin
-  reviewRequested: Set<ItemID>               (0.0.2: open PRs waiting on the user, teams included, from the review search)
-  searchPullRequests: [Item]                 (0.0.2: the search's PRs, in any repository, for `anywhere`; at most one page of 100)
-  reviewSearchTotal: Int                     (0.0.2: how many PRs the search matched in all, its `issueCount`)
-  reviewSearchError: RepositoryError?        (0.0.2: the search failed; the two above are then the last search's)
-  repositories: [ProjectName: [String]]      (0.0.2: what each project watched, its groups and wildcards resolved; the menu's error rows and repository names read it)
-  selectorErrors: [ProjectName: [RepositoryError]]   (0.0.2: the selectors that couldn't be resolved, each an error row named after the selector)
+  reviewRequested: Set<ItemID>               (open PRs waiting on the user, teams included, from the review search)
+  searchPullRequests: [Item]                 (the search's PRs, in any repository, for `anywhere`; at most one page of 100)
+  reviewSearchTotal: Int                     (how many PRs the search matched in all, its `issueCount`)
+  reviewSearchError: RepositoryError?        (the search failed; the two above are then the last search's)
+  repositories: [ProjectName: [String]]      (what each project watched, its groups and wildcards resolved; the menu's error rows and repository names read it)
+  selectorErrors: [ProjectName: [RepositoryError]]   (the selectors that couldn't be resolved, each an error row named after the selector)
 ```
 
-### Listing — `ShipyardCore/Items/Listing.swift` (0.0.2)
+### Listing — `ShipyardCore/Items/Listing.swift`
 
 Pure, and the only place that decides what a project has (ADR 0003).
 
@@ -2137,14 +2131,13 @@ Pure, and the only place that decides what a project has (ADR 0003).
 | Operation | Returns |
 |---|---|
 | `items(for: ProjectSettings, in: Snapshot, viewer, now) -> [Item]` | the snapshot's items for the project (from its resolved repositories, and for `anywhere` the search's PRs, which the fetch puts among them) that pass every check, combined with AND: kind shown, `states`, the window, `drafts`, `authors`, `review-requested` |
-| `listings(for: [ProjectSettings], in: Snapshot?, pings: [Ping], machines: [ProjectSettings], numbers: PingNumbers?, now) -> [Name: [Item]]` | every project's listing, the viewer being the snapshot's `viewerLogin`: its fetched items, then the pings filed under it, through the same checks (a ping passes on `pings.show` alone). A project with neither (added since the snapshot) has none; without a snapshot a project lists its pings alone. Whether a section is loaded is the snapshot's to say, not the listing's. `pings` holds the local and the remote pings alike; a remote ping filed under none of `projects` is listed by its machine instead, under its label, with `machines`' settings (`Configuration.settings(forMachine:)`, the defaults) (0.0.6, #111) |
+| `listings(for: [ProjectSettings], in: Snapshot?, pings: [Ping], machines: [ProjectSettings], numbers: PingNumbers?, now) -> [Name: [Item]]` | every project's listing, the viewer being the snapshot's `viewerLogin`: its fetched items, then the pings filed under it, through the same checks (a ping passes on `pings.show` alone). A project with neither (added since the snapshot) has none; without a snapshot a project lists its pings alone. Whether a section is loaded is the snapshot's to say, not the listing's. `pings` holds the local and the remote pings alike; a remote ping filed under none of `projects` is listed by its machine instead, under its label, with `machines`' settings (`Configuration.settings(forMachine:)`, the defaults) (#111) |
 | `listings(…, notes: [Name: [Note]], …)` (#192) | each project's notes come after its pings, archived ones left out, passing `notes.show` alone; like pings, a project lists its notes before GitHub answers |
 | `sections(of: [Ping], projects: [Name], machines: [Name]) -> [Name: [Ping]]` | where pings are filed, before any filter: each project its pings name, and each machine its remote pings filed under none of the projects; sections with no ping left out. `listings` lists from it, giving each ping's item its number in that section from `numbers` (0 before it has one, #153), and `Shipyard.numberPings` numbers by it, so the two can't disagree |
 
 #### Rules
 
 `MenuModel`, `Attention.counts` and the notification filter all take a listing, so they can't disagree.
-The two `hide-authors` checks (in `MenuModel` and in `Shipyard`'s notification step) go.
 
 ### Attention — `ShipyardCore/Items/Attention.swift`
 
@@ -2168,7 +2161,7 @@ It's keyed on the generic `Item`, so issues and runs reuse it.
 #### Rules
 
 A note (#192) never needs attention: `canNeedAttention` is false for kind `note`, so it has no reasons, `counts` never counts one, and Mark all seen leaves it out.
-A ping (0.0.5) is the exception: it needs attention (`unseen`) until it's seen, whatever `[attention]` says.
+A ping is the exception: it needs attention (`unseen`) until it's seen, whatever `[attention]` says.
 Whether it was seen is the `seen` time on the ping, in the ping store, so a seen-window can count from it later without GitHub data; `counts` has a `pings` kind.
 
 ### EventDetector — `ShipyardCore/Items/EventDetector.swift`
@@ -2220,13 +2213,13 @@ Both recur (a re-run that fails again is a new occurrence).
 Runs of one repository are a source of their own, so turning runs on is a silent first sight.
 Pull requests and issues of one repository are separate sources, so showing issues in a project that already has its pull requests known is a silent first sight.
 
-**`anywhere` (since 0.0.2).**
+**`anywhere`.**
 A project using `anywhere` has one more source, `ItemSource.anywhere` (the review search), for its PRs from repositories it doesn't watch.
 Its first answer is a silent first sight (and a failed search's stand-in isn't one).
 After that a PR the search finds for the first time is `pr.opened` and `pr.review_requested` both, since it's a new item and a request that just arrived, whatever rules pick.
 While a project uses `anywhere`, `KnownItems.updated` keeps known items of any repository for their retention, so a PR that leaves the search and comes back isn't new again.
 
-**Pings (since 0.0.5).**
+**Pings.**
 `pingEvents(listings:projects:)` makes a `ping.sent` (no occurrence) for every unseen ping each project lists.
 Pings aren't fetched, so they aren't compared with `KnownItems`: a ping is new until its `ping.sent` is in `NotifiedEvents`, keyed by the ping's URL (its id), with the ping's `instance` as its occurrence.
 The CLI makes a new instance each time an id is sent as a new ping and a replace keeps it.
@@ -2402,7 +2395,7 @@ Decides which events notify, and makes the notification each one posts.
 
 #### Operations
 
-- `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, pure, asked only for items the project lists (since 0.0.2; before, it took `hiddenAuthors`).
+- `shouldNotify(event, settings: ProjectSettings, viewer) -> Bool`, pure, asked only for items the project lists.
 - `notification(for: event)` makes the `PostedNotification`: event id, project, title text ("New PR #57", "Run #41 failed"), the item's title (for a run, "CI · main": workflow and branch) and URL.
   A `ping.sent`'s title text is the ping's title and its body `Ping.notificationBody` (the body, then "from <sender>").
 - `shouldNotify(notice, configuration:)` and `notification(for: notice, at: now)`, for app control's lease (below).
@@ -2416,7 +2409,7 @@ Decides which events notify, and makes the notification each one posts.
 An event notifies when the project's rule list contains the event, and the rule's author selectors match the item's author (`me` = viewer, `bots` = `Bot` type or `[bot]` login, `others` = neither, or an `@login`).
 `NotificationRule.covers` never lets a rule with `authors` cover a ping.
 
-**App control's lease (since 0.2.0, #182).**
+**App control's lease (#182).**
 The lease has two events of its own, `control.started` and `control.ended` (`EventKind.isControl`).
 They aren't an item's, so `shouldNotify(notice, configuration:)` asks only the top-level rules (`Configuration.defaults.notifications`: `[[defaults.notifications]]`, or the built-in list, which holds both), never a project's own list, and ignores a rule's `authors`.
 The reader warns about a control rule in a project's list or with `authors`.
@@ -2463,8 +2456,8 @@ A fold is written as its project (empty for the All tab) and its key as text (`k
 
 #### State
 
-`AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks`, `pingNumbers: PingNumbers?` (N14) and `bannerSnoozes: BannerSnoozes` (#221).
-Since 0.0.2 it also holds `collapsedGroups: Set<GroupID>` (a project and a group key), optional when read, so no version bump.
+`AppState` holds `attention` (seen records), `collapsed: Set<ProjectName>`, `known: KnownItems` (written as `known` and `knownProjects`), `notified: NotifiedEvents`, `remotePings: RemotePingMarks`, `pingNumbers: PingNumbers?` (N17) and `bannerSnoozes: BannerSnoozes` (#221).
+It also holds `collapsedGroups: Set<GroupID>` (a project and a group key), optional when read, so no version bump.
 Since #241 it also holds `notionConnected` (ADR 0013): whether the user pressed Connect with ntn.
 That field is optional when read, so no version bump; missing or unreadable reads as not connected, so an existing user runs no `ntn` until they connect, and it holds no secret.
 
@@ -2516,9 +2509,9 @@ Notifications are shown even while the panel is open (the app is then frontmost)
 
 **Clicks.**
 Clicking the notification calls `Shipyard.openNotification(itemURL)`, which opens the item and marks it seen.
-A lease's notification (0.2.0, #182), whose URL is `ControlNotice.panelURL`, opens the panel instead (`MenuBarWindow.open()`), where the banner shows who holds shipyard.
+A lease's notification (#182), whose URL is `ControlNotice.panelURL`, opens the panel instead (`MenuBarWindow.open()`), where the banner shows who holds shipyard.
 
-**Removing (since 0.0.5).**
+**Removing.**
 `removeDelivered(id:)` takes a notification out of Notification Center by its request identifier (the event id), for a ping that left (#102).
 It's queued behind the deliveries, so a notification still waiting to be posted is posted, then removed.
 
@@ -2580,7 +2573,7 @@ All of R3–R6's display rules live here, where tests can reach them without Swi
 
 Each project's section holds:
 
-- The items `Listing` lists: kind shown, states, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), drafts and `authors`.
+- The items `Listing` lists: kind shown, states, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window`, running ones always), drafts and `authors`.
 - `groups: [RowGroup]`, as `Arrangement` groups, sorts and caps them.
   The defaults, `group-by = "kind"` and `sort-by = "updated"`, give the old order: pull requests, then issues, then runs, open or running first.
   `expanded` holds the groups Show more revealed past their cap.
@@ -2618,7 +2611,7 @@ The model as a whole holds:
 - `layout`: `list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel.
 - `menuBarLabel`: `total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0.
   `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count.
-- `machineSections` (0.0.6), after the projects: one per machine in `[remote] machines` whose listing has rows, named after its label, arranged with the defaults, with `machine` set to the label (`nil` on a project's section).
+- `machineSections`, after the projects: one per machine in `[remote] machines` whose listing has rows, named after its label, arranged with the defaults, with `machine` set to the label (`nil` on a project's section).
 
 #### Rules
 
@@ -2698,7 +2691,7 @@ Before them all, in every phase, come the lease's banners from `PanelBanner.Leas
 
 - Owner test: `BannerSnoozeTests` (`Harness`, manual clock).
 
-### Arrangement — `ShipyardCore/Menu/Arrangement.swift` (0.0.2)
+### Arrangement — `ShipyardCore/Menu/Arrangement.swift`
 
 Groups, sorts, folds and caps a section's rows.
 
@@ -2888,7 +2881,7 @@ Each layout highlights at most one row, and keeps which one in a `RowHighlight` 
 
 - A row is known by its `MenuRowPlace`: its project in the list layout (where one item can be listed under two projects) and its row id.
   For a project's header in the list layout it is `.header(project)` (no row id): headers are rows the pointer and the keys highlight like items.
-- Since 0.0.2 a place is a `MenuRowPlace.Kind`: an item, a project's header (`.header(project)`), or a subsection's subheader (`.groupHeader(GroupID, in: section)`, the section `nil` in a tab), which the highlight rests on like a row.
+- A place is a `MenuRowPlace.Kind`: an item, a project's header (`.header(project)`), or a subsection's subheader (`.groupHeader(GroupID, in: section)`, the section `nil` in a tab), which the highlight rests on like a row.
 - `RowGroup.places(in:)` gives a group's places: its subheader, then, unless folded, its rows and its Show more row (`.showMore(GroupID, in: section)`).
   It is the one seam a new stop extends.
 - The rows a highlight can rest on, top to bottom, are `MenuModel.listRowPlaces` (each project's header, then, while it's expanded, its groups' places) and `MenuTabContent.rowPlaces` (its groups' places).
@@ -3217,7 +3210,7 @@ Every question takes `now`, so it stays pure.
   Each such firing sends nothing and only lists again from the last snapshot, so a closed item leaves within an interval of its window passing even while paused.
 - Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
-### PingStore — `ShipyardPings/PingStore.swift` (0.0.5; over `RecordStore` since 0.1.0, #164)
+### PingStore — `ShipyardPings/PingStore.swift` (over `RecordStore`, #164)
 
 The pings agents send.
 
@@ -3231,7 +3224,7 @@ The pings agents send.
   Each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet.
 - A plain `struct`, not tied to the main actor, since the CLI uses it too.
 
-On a machine without the app (0.0.6, #110):
+On a machine without the app (#110):
 
 - The CLI keeps its pings in `$XDG_DATA_HOME/shipyard/pings` (`~/.local/share/shipyard/pings` when it's unset or not absolute), in the same format: `PingStore.directoryWithoutTheApp(environment:home:)`, in `SupportFolder.withoutTheApp`.
 - There a ping carries `expires`, a day after its sending or its last replace (`PingCommand.lifetimeWithoutTheApp`, which `Unfiled.expiry` gives), since no one sees it there.
@@ -3256,7 +3249,7 @@ On a machine without the app (0.0.6, #110):
 | `ping(id:) -> Ping?` | one live ping |
 | `save(ping) throws` | creates the directory when missing; replaces the ping's file atomically |
 | `markSeen(ping, at:) throws` | sets `seen` once (a second click keeps the first time) and clears `failure`. The ping is read again just before the write, and only the same sending as `ping` (`Ping.isSameSending`: same id, instance and content, whatever `seen` and `failure` say) is written: one withdrawn meanwhile stays gone, one replaced or sent anew stays unseen |
-| `recordFailure(ping, reason:detail:) throws` | sets `failure` (a few words, about 9 characters, to fit the row's meta column) and `failureDetail` (the whole reason, for the hover card; `nil` when the short one says it all, and on a failure written by 0.0.5), leaving `seen` as it is; only on the same sending, as `markSeen` (#100) |
+| `recordFailure(ping, reason:detail:) throws` | sets `failure` (a few words, about 9 characters, to fit the row's meta column) and `failureDetail` (the whole reason, for the hover card; `nil` when the short one says it all, and on a failure written by an older build), leaving `seen` as it is; only on the same sending, as `markSeen` (#100) |
 | `removeIfUnchanged(ping) throws -> Bool` | removes the ping only while the store holds it exactly as `ping` (read again just before), for a seen ping past its window: one replaced, sent anew or seen again since stays; whether it's gone |
 | `remove(id:) throws` | deletes the ping's file, its failure with it; an unknown id changes nothing (#103) |
 
@@ -3268,13 +3261,13 @@ On a machine without the app (0.0.6, #110):
 - Should the directory be removed later, the watch falls back to its nearest existing ancestor, so creating it again is seen.
 - The watch reopens after each change.
 
-### PingList — `ShipyardPings/PingList.swift` (0.0.6)
+### PingList — `ShipyardPings/PingList.swift`
 
 The remote ping list: the JSON `shipyard ping list --json` prints on a machine and the Mac's shipyard reads from it through Herdr (#109).
 
 #### State
 
-- Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"0.0.6","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds.
+- Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"<version>","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds.
 - `version` is the contract's major version (`PingList.currentVersion`, 1): a field a reader can ignore keeps it, anything else bumps it.
 - Each ping carries what it's sent with (id, instance, title, body, sender, repository, projects, action, sent); `seen` and `failure` stay on the machine that recorded them.
 - Which pings to list (the machine's live ones) is the caller's choice.
@@ -3286,7 +3279,7 @@ The remote ping list: the JSON `shipyard ping list --json` prints on a machine a
 | `PingList.encode(pings, shipyardVersion) -> String` | newest first (by `sent`, then id), at most `maxPings` (100), stopping at the first ping that would take the document over `byteBudget` (48 KiB, well under Herdr's 64 KiB action output); `truncated` when it stops early. Always a whole document |
 | `PingList.decode(text or data) throws(DecodeError) -> PingList` | reads `version` first: another one is `.unsupportedVersion(version, shipyardVersion:)`, whose `message(machine:)` says to update shipyard on that machine; not JSON, or a field missing or mistyped, is `.unreadable(reason)`. Unknown fields are ignored, and so is an action of a kind it doesn't know (the ping reads without one) |
 
-### HerdrCommand — `ShipyardCommand/HerdrCommand.swift` (0.0.6, #111)
+### HerdrCommand — `ShipyardCommand/HerdrCommand.swift` (#111)
 
 Runs `herdr` for the app, directly (no shell) behind `ShellRunning`.
 
@@ -3298,7 +3291,7 @@ Runs `herdr` for the app, directly (no shell) behind `ShellRunning`.
 - `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say.
 - Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
 
-### HerdrFocus on a machine — `ShipyardCore/Pings/HerdrFocus.swift` (0.0.6, #117)
+### HerdrFocus on a machine — `ShipyardCore/Pings/HerdrFocus.swift` (#117)
 
 #### Operations
 
@@ -3318,7 +3311,7 @@ Runs `herdr` for the app, directly (no shell) behind `ShellRunning`.
 **Known limit:** a focus through `--machine` moves the Mac's Herdr window only when it already shows that machine.
 When it shows another, the machine's workspace turns red in Herdr's sidebar, and opening it lands on the agent: one extra click, which Herdr's API doesn't let shipyard take.
 
-### RemotePingReader — `ShipyardCore/Pings/RemotePingReader.swift` (0.0.6, #111)
+### RemotePingReader — `ShipyardCore/Pings/RemotePingReader.swift` (#111)
 
 #### Operations
 
@@ -3344,7 +3337,7 @@ The whole read races `timeout` (15 s).
 - "Herdr lost <label>'s ping list" (no record with that id);
 - or `PingList.DecodeError.message(machine:)` (another contract version, or a list that doesn't read).
 
-### RemoteMachines — `ShipyardCore/Pings/RemoteMachines.swift` (0.0.6, #111)
+### RemoteMachines — `ShipyardCore/Pings/RemoteMachines.swift` (#111)
 
 #### State
 
@@ -3369,7 +3362,7 @@ Pure state, kept by `Shipyard` as `remote`: one `Machine` per label in configura
 - Seen and dismissed are the app state's (`RemotePingMarks`).
 - A remote ping's `Ping.machine` isn't encoded, so it never reaches a store or a list.
 
-### RemotePingMarks — `ShipyardCore/Pings/RemotePingMarks.swift` (0.0.6, #118)
+### RemotePingMarks — `ShipyardCore/Pings/RemotePingMarks.swift` (#118)
 
 #### State
 
@@ -3385,11 +3378,11 @@ Pure state, kept by `Shipyard` as `remote`: one `Machine` per label in configura
   A mark for another instance under the URL isn't applied.
 - `prune(listed:, keeping:)` drops marks whose URL and instance aren't listed, except for the machines in `keeping`.
 
-### PingNumbers — `ShipyardCore/Pings/PingNumbers.swift` (0.0.7, #153)
+### PingNumbers — `ShipyardCore/Pings/PingNumbers.swift` (#153)
 
 #### State
 
-- Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`: the numbers the Mac gives pings (0.0.7's N14).
+- Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`: the numbers the Mac gives pings (N17).
 - One `Sequence` per section (a project's slug, or a machine's label for its own section):
   - `last`, the last number it gave;
   - `pings`, each listed ping's number by its URL.
@@ -3438,7 +3431,7 @@ Every reason names its machine.
 
 A machine Herdr can't connect to ends with Rust's Debug form of the error, which isn't read: "Couldn't reach <label> through Herdr".
 
-### ResolvedRepositoriesStore — `ShipyardConfig/ResolvedRepositoriesStore.swift` (0.0.5)
+### ResolvedRepositoriesStore — `ShipyardConfig/ResolvedRepositoriesStore.swift`
 
 Each project's repositories as the app last resolved them, so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub.
 
@@ -3463,11 +3456,11 @@ Each project's repositories as the app last resolved them, so the CLI can file a
 | `load() -> [ProjectName: [String]]` | the lists; empty when nothing reads |
 | `record(lists) throws` | replaces the file atomically; writes nothing when it already holds `lists` (the parent directory is watched for the ping store, so a needless write would wake it) |
 
-### PingCommand and ShipyardCLI — `ShipyardPings/PingCommand.swift`, `ShipyardPings/PingCommands.swift`, `ShipyardCommand/CommandTable.swift`, `ShipyardCommand/GitRemote.swift` (0.0.5; split by module in 0.1.0, #164)
+### PingCommand and ShipyardCLI — `ShipyardPings/PingCommand.swift`, `ShipyardPings/PingCommands.swift`, `ShipyardCommand/CommandTable.swift`, `ShipyardCommand/GitRemote.swift` (#164)
 
 #### Operations
 
-- `ShipyardCLI.run(arguments, table, environment, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and the commands of the build's `CommandTable` ([CommandTable](#commandtable-and-recordstore--shipyardcommand-010-164)).
+- `ShipyardCLI.run(arguments, table, environment, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and the commands of the build's `CommandTable` ([CommandTable](#commandtable-and-recordstore--shipyardcommand-164)).
 - `PingCommands.entries(filing:store:)` gives two entries:
   - `ping`, which answers its own `--help`, sends `withdraw` and `list` on without filing, and runs `PingCommand.run` with the filing;
   - `herdr-event`, which takes no arguments.
@@ -3479,11 +3472,11 @@ Each project's repositories as the app last resolved them, so the CLI can file a
 | `PingCommand.run(arguments, environment, filing, store, now, newID) -> CommandResult` (the refusals for projects are `ProjectFiling`'s) | `<title>` with `--repo <owner/name>` or `--project <name>` or neither, `--body`, `--from`, and one action flag at most (`actionFlags`: `--open <url>`, `--app <bundle id or name>`, `--herdr [<tab or pane id>]`), in any order; `--herdr` takes the next argument when `isHerdrID` (`<workspace>:t<n>` or `:p<n>`), else `HERDR_PANE_ID` (#101); the body, sender and action are saved with the ping (#100). `--project`: filed under that project, with no repository. Otherwise the repository is `--repo`'s, else the working folder's `origin`, and it's filed under every project (in configuration order) whose `owner/name` selectors or `resolved` list include it, ignoring case; the ping keeps the repository as the first such project spells it (GitHub's spelling once resolved), which `Ping.item` fills. Saves `Ping(id, title, projects, sent: now, repository)` and prints `<id>`. The id is `newID()` (`Ping.newID`: six letters and digits without `0 o 1 l i`), drawn again while the store has it, since ids are global | no title, two titles, an unknown option, a flag without its value, `--repo` that isn't `owner/name`, `--repo` with `--project`, two action flags, `--open` without a scheme, an empty `--app`, or `--herdr` without an id outside Herdr: exit 2; a project the configuration doesn't name: exit 1, listing them (or saying there are none); no `origin`, or one that isn't `owner/name`: exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; a repository no project watches: exit 1, listing the projects; every project it would be filed under hides pings (`pings.show = false`): exit 1, naming them and the projects that show pings, or saying none does (#127); a store that can't be written: exit 1 |
 | `PingCommand.run`, `--id <id>` (#102) | names the ping; `isID` (`\A[a-z0-9][a-z0-9_-]{0,63}\z`, anchored so a trailing newline isn't accepted, which generated ids also match, and which keeps it a safe file name and URL path on a case-insensitive disk). A stored id is replaced: the new title, body, sender, action, projects and repository, `sent` now (its age starts again, #150), the stored `instance` kept, `seen` and `failure` cleared. A new ping gets a new `instance` (a UUID). Without it, `newID()` as above | an id that isn't one: exit 2 |
 | `PingCommand.withdraw(arguments, store) -> CommandResult` (#102) | `shipyard ping withdraw <id>`: `store.remove(id:)`, prints the id. The `ping` entry sends `ping withdraw …` here without filing, so a broken `config.toml` doesn't stop it | no id, two, or one that isn't an id: exit 2; an id no ping has: exit 1 ("no ping has the id …"); a store that can't be written: exit 1 |
-| `PingCommand.list(arguments, store, now) -> CommandResult` (0.0.6, #110) | `shipyard ping list --json`: the store's live pings at `now` (`Ping.isLive`) as `PingList.encode` gives them, newest first and capped, plus a newline. Reads no `config.toml`. Works on macOS too, where every stored ping is live | anything but exactly `--json`: exit 2 |
+| `PingCommand.list(arguments, store, now) -> CommandResult` (#110) | `shipyard ping list --json`: the store's live pings at `now` (`Ping.isLive`) as `PingList.encode` gives them, newest first and capped, plus a newline. Reads no `config.toml`. Works on macOS too, where every stored ping is live | anything but exactly `--json`: exit 2 |
 
 - `PingCommand.Request.parse` reads the arguments after the `ping` entry has checked for `withdraw` or `list` as the first one.
   `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`), `list` or a word starting with `--`, and `--help` after it isn't help.
-- `PingCommand.send(request, terminal, folder, git, filing, store, now, newID, whenNoProject)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path ([the pseudocode](#pingcommandsend-through-a-filing-010-164)).
+- `PingCommand.send(request, terminal, folder, git, filing, store, now, newID, whenNoProject)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path ([the pseudocode](#pingcommandsend-through-a-filing-164)).
   `folder` is where the repository is looked up (`nil`: nowhere).
   `whenNoProject: .keepUnfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
 
@@ -3501,7 +3494,7 @@ Each project's repositories as the app last resolved them, so the CLI can file a
 
 #### Without the app
 
-On a machine without the app (0.0.6, #110; the filing since 0.1.0, #164), the build's filing decides: on Linux, `Unfiled`.
+On a machine without the app (#110, #164), the build's filing decides: on Linux, `Unfiled`.
 
 - There's no app to file a ping for, and the Linux build doesn't link the code that reads `config.toml` or `repositories.json`.
   So `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it.
@@ -3509,12 +3502,10 @@ On a machine without the app (0.0.6, #110; the filing since 0.1.0, #164), the bu
   An action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win.
 - The ping gets `expires`, a day from its sending or its replace, and `PingStore` drops expired pings as it reads.
   So an expired ping can't be listed or withdrawn, and its id sent again is a new ping.
-- With the Mac's filing nothing changes from 0.0.5.
 
-Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPlatform`), and `ShipyardCLI` removed expired pings before `ping` and `herdr-event` on Linux.
-#164 replaced both with the filing and the store's rule ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)), with the same behaviour.
+The filing and the store's expiry rule decide this, and no code asks the platform (#164, [PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-164-165)).
 
-### HerdrEvent — `ShipyardPings/HerdrEvent.swift` (0.0.6, #112)
+### HerdrEvent — `ShipyardPings/HerdrEvent.swift` (#112)
 
 `shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to.
 
@@ -3540,7 +3531,7 @@ Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPl
 - A `config.toml` that doesn't read (blocked only), a store that can't be written, or (for a closed tab or workspace) a `herdr pane list` that didn't answer: exit 1.
 - `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
 
-### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
+### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift`
 
 A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status.
 Its product is `shipyard-cli`, since on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file.
@@ -3549,7 +3540,7 @@ It builds on Linux too, like the core.
 
 #### Command table
 
-Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else.
+It assembles the build's `CommandTable` and nothing else (#164, #165, #166).
 As built by #126, #166 and #168 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
 
 ```swift
@@ -3600,7 +3591,7 @@ The app never reads it; `config.toml` stays the app's, and no setting is in both
   - a table of files that don't read (invalid TOML, an unknown key in `[notices]`, an unknown table, `notify` not a table, not UTF-8), each exit 1 with the path and the problem.
 - The commands that read it test their own behaviour with a file missing, set or malformed.
 
-### CLILink — `ShipyardCore/CLI/CLILink.swift` (0.0.5)
+### CLILink — `ShipyardCore/CLI/CLILink.swift`
 
 Puts the CLI on the user's PATH (N10), through onboarding's card and the Shipyard CLI view (N16, `PanelText.cliStatus`).
 Linking is instant, so there's no running state, timeout or cancel, unlike the skill install.
@@ -3667,7 +3658,7 @@ Installs the shipyard skill.
 #### Operations
 
 - It runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path), so nvm/asdf/Homebrew `PATH` setups are loaded.
-- Spawning sits behind the `ShellRunning` port (ShipyardCommand's `Shell.swift` since 0.1.0), so tests use a fake shell.
+- Spawning sits behind the `ShellRunning` port (ShipyardCommand's `Shell.swift`), so tests use a fake shell.
   `ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together.
 - Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`).
   An interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open.
@@ -3698,8 +3689,8 @@ The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInst
 
 ### Folder tree
 
-The layout since 0.1.0 (ADR 0006).
-`(0.1.0)` marks a file 0.1.0 added and `(moved)` one it moved to another module; #164–#169 built them.
+The layout follows concerns (ADR 0006).
+`(moved)` marks a file the module split moved to another module (#164–#169).
 
 ```text
 shipyard/
@@ -3716,7 +3707,7 @@ shipyard/
 ├── docs/adr/                        # decisions; 0006: modules follow concerns, agent-side code never links the app's rules; 0007: app control is leased, enforced by the app; 0008: configuration has two files, config.toml the app's and cli.toml the command's; 0009: notes live in Notion, shipyard only lists and starts them; 0010: notices may reach in over the tailnet; 0011: the app reads notes with an internal connection, under a Projects page; 0012: the app reads notes through ntn and keeps no Notion secret, superseding 0011's route; 0013: notes are opt-in, the app runs no ntn until Connect with ntn
 ├── assets/images/<topic>/           # the README's logo (logo/), by relative path; the app icon's comparison sheets (app-icon/, with exploration/ from `make icon-exploration`); the known agents' logos as published (agent-logos/*.svg), the sources `make agent-logos` converts; GitHub's and Notion's marks as published (service-logos/*.svg), the sources `make service-logos` converts (#249)
 ├── assets/screenshots/<topic>/      # screenshots embedded in issues and pull requests, by commit-pinned raw URL (docs/agents/issue-tracker.md); the README's example screenshots (0.1.0/, and the presets one in shipyard-0.0.2/), by relative path
-├── Sources/ShipyardCommand/          # (0.1.0) foundation any command needs on any machine; Foundation only
+├── Sources/ShipyardCommand/          # foundation any command needs on any machine; Foundation only
 │   ├── CommandResult.swift           # (moved) output, error text, exit status: 0 done, 1 refused, 2 usage
 │   ├── CommandEnvironment.swift      # (moved) working folder, variables, the git lookup and program-run ports; no platform
 │   ├── CommandTable.swift            # (moved from Core's CLI/ShipyardCLI.swift) the build's commands by name, their help lines; ShipyardCLI.run routes over it; macOnly: the Mac-only names' exit 2
@@ -3726,19 +3717,19 @@ shipyard/
 │   ├── Version.swift                 # (moved) ShipyardVersion.current: the one place the version is recorded
 │   ├── GitRemote.swift               # (moved from Core's CLI/) the GitRemoteLookup port, GitCLI (git remote get-url origin), a remote's URL → owner/name, isRepositorySlug; workingRepository, a ping's or notice's origin (moved from PingCommand, #190)
 │   ├── HerdrCommand.swift            # (moved from Core's Pings/) runs herdr (found on known paths, then PATH), optionally --machine <label>, racing a timeout, over ShellRunning
-│   ├── RecordStore.swift             # (0.1.0) one JSON file per record in a folder, atomic replace, remove if unchanged
+│   ├── RecordStore.swift             # one JSON file per record in a folder, atomic replace, remove if unchanged
 │   ├── ConfigurationCheck.swift      # (#256) a settings file's verdict: problems, warnings, the banner's words, the config-status.json shape
 │   ├── ConfigurationCommands.swift   # (#256) shipyard config check [--json]: one check per file the build hands it; exit 1 on a problem
 │   ├── NoticePort.swift              # (#194) the port notices from other machines travel to (47420): config.toml's and cli.toml's [notices] port default, and the range both accept
-│   └── SupportFolder.swift           # (0.1.0) the app's support folder (SHIPYARD_SUPPORT_DIR overrides it) and the XDG data folder without the app
-├── Sources/ShipyardPings/            # (0.1.0) the agent's side of pings; Command only
+│   └── SupportFolder.swift           # the app's support folder (SHIPYARD_SUPPORT_DIR overrides it) and the XDG data folder without the app
+├── Sources/ShipyardPings/            # the agent's side of pings; Command only
 │   ├── Ping.swift                    # (moved) a ping: id, instance, title, projects, sent, seen, repository, body, sender, action, terminal, failure, expires; new ids; PingAction
 │   ├── PingStore.swift               # (moved) pings over RecordStore: same-sending writes, expired pings dropped as read
 │   ├── PingCommand.swift             # (moved) shipyard ping send: arguments → a ping filed through PingFiling, saved; withdraw; list --json
-│   ├── PingFiling.swift              # (0.1.0) the PingFiling interface, FilingTarget, NoProject, Filing; Unfiled (as sent, a day's expiry, the pane as default action)
+│   ├── PingFiling.swift              # the PingFiling interface, FilingTarget, NoProject, Filing; Unfiled (as sent, a day's expiry, the pane as default action)
 │   ├── PingList.swift                # (moved) the remote ping list (ping list --json): versioned, newest first, capped and never cut off; DecodeError
 │   ├── HerdrEvent.swift              # (moved) shipyard herdr-event: a blocked agent's ping herdr-<pane>, sent, replaced and withdrawn
-│   └── PingCommands.swift            # (0.1.0) the `ping` and `herdr-event` entries for the CommandTable, over a filing and a store
+│   └── PingCommands.swift            # the `ping` and `herdr-event` entries for the CommandTable, over a filing and a store
 ├── Sources/ShipyardCLISettings/      # (#189) the command's own cli.toml; Command and TOMLDecoder
 │   ├── CLISettings.swift             # its tables ([notices]), the reader: unknown keys and tables are errors; CLISettingsIssue, CLISettingsError
 │   └── CLISettingsFile.swift         # where it is (beside config.toml on the Mac, the XDG config folder elsewhere); read(): defaults, or exit 1 with what's wrong; check(at:) for config check
@@ -3750,7 +3741,7 @@ shipyard/
 │   ├── RemoteNoticeRoute.swift       # (#194) a machine without the app's choice of route from cli.toml; TailnetNoticeRoute, the POST to the app machine
 │   ├── NoticeHTTP.swift              # (#194) the NoticeHTTP port and URLSessionNoticeHTTP, given up past the timeout
 │   └── TailnetWire.swift             # (#194) /notify, Tailscale-User-Login, the 3 s timeout; a verdict's JSON
-├── Sources/ShipyardConfig/           # (0.1.0) reading config.toml; Command, Pings and TOMLDecoder
+├── Sources/ShipyardConfig/           # reading config.toml; Command, Pings and TOMLDecoder
 │   ├── Configuration.swift           # (moved) file model, defaults, per-project merge, append text; EventKind, MenuLayout, NewProject
 │   ├── Kinds.swift                   # (moved from Items/Item.swift) ItemKind, StateGroup: the configuration's vocabulary; ItemKind's names (`pull-requests` …), shared by `[menu] header-counts` and `shipyard panel`
 │   ├── ConfigurationReader.swift     # (moved) decode + validation: typed reads, errors, unknown-key warnings, suggestions
@@ -3759,9 +3750,9 @@ shipyard/
 │   ├── ConfigurationDuration.swift   # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
 │   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; check(at:), the verdict, and checks(_:at:), config.toml's and each theme file's (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
-│   ├── ConfigurationLocation.swift   # (0.1.0, #126) the config.toml path the app recorded, which the CLI reads
+│   ├── ConfigurationLocation.swift   # (#126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
-│   ├── ProjectFiling.swift           # (0.1.0) PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
+│   ├── ProjectFiling.swift           # PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
 │   └── Theme/                        # pure: a theme's tokens and knobs, the theme file reader, the built-in themes, the theme files, the contrast check (ADR 0014)
 │       ├── ThemeToken.swift          # ThemeAppearance, ThemeToken (section.name, what `system` means), SystemColor, SystemShade, RGBA, ThemeValue
 │       ├── Theme.swift               # Theme (every token for light and dark), ThemeKnobs (font, density, shape, material), ThemeSource, ThemeIssue
@@ -3771,19 +3762,19 @@ shipyard/
 │       ├── ThemeLibrary.swift        # the themes `theme` can pick, by name; the default name
 │       ├── ThemeFiles.swift          # the themes folder beside config.toml, its files in file-name order, each file's verdict; ThemeLibrary.with(_:keeping:), beside(config:)
 │       └── ThemeContrast.swift       # the contrast check of the text tiers on surface.panel
-├── Sources/ShipyardControl/          # (0.1.0) the client side of app control; Command and Notices (AppKit only for the real launcher)
+├── Sources/ShipyardControl/          # the client side of app control; Command and Notices (AppKit only for the real launcher)
 │   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), which need the lease, and notify (#190), which doesn't; ControlMessage: a request with its holder, versioned JSON (2); ControlProtocolError
 │   ├── ControlReply.swift            # { ok, output, error }
-│   ├── ControlLease.swift            # (0.2.0, #177, #178, #181) the lease's rules, pure, given the time: take, renew, cap, expiry, release, the line of waiting takes, Stop's bars and Allow, refusal; its transitions
-│   ├── Holder.swift                  # (0.2.0, #177) who sends a request: session variable, else the nearest non-shell ancestor (ProcessTable port, SystemProcessTable on sysctl); its place
-│   ├── LeaseBanner.swift             # (0.2.0, #180) the lease banner's words: agent, short place, countdown, how many wait
+│   ├── ControlLease.swift            # (#177, #178, #181) the lease's rules, pure, given the time: take, renew, cap, expiry, release, the line of waiting takes, Stop's bars and Allow, refusal; its transitions
+│   ├── Holder.swift                  # (#177) who sends a request: session variable, else the nearest non-shell ancestor (ProcessTable port, SystemProcessTable on sysctl); its place
+│   ├── LeaseBanner.swift             # (#180) the lease banner's words: agent, short place, countdown, how many wait
 │   ├── AppStatus.swift               # what app status reports (demo folder, the lease, panel open, layout, tab, projects, folded, showing all): as lines, or one JSON object
 │   ├── ControlSocket.swift           # control.sock in the support folder (url(in:)); where clients look for it (locate(support:)), following DemoPointer (demo.json) to a demo run's
 │   ├── UnixSocket.swift              # the POSIX calls both ends make (package): address, timeouts, MSG_NOSIGNAL writes, reading to the end; the 103-byte path limit
 │   ├── ControlCommand.swift          # app arguments → an invocation; a reply → CommandResult; app open's launch and wait, app quit's wait
 │   ├── ScreenshotCommand.swift       # screenshot arguments → its request, the path made absolute against the working folder
 │   ├── PanelCommand.swift            # (#167) panel arguments → a ControlRequest; the panel usage
-│   ├── LeaseCommand.swift            # (0.2.0, #178) control take/release arguments → a ControlRequest and the --key; the control usage
+│   ├── LeaseCommand.swift            # (#178) control take/release arguments → a ControlRequest and the --key; the control usage
 │   ├── ControlClient.swift           # one request per connection over ControlTransport (UnixSocketTransport), 15 s timeout, plus a take's wait
 │   ├── AppLauncher.swift             # AppLaunching port; WorkspaceLauncher: NSWorkspace.openApplication by bundle id, in the background, with a demo's environment
 │   ├── ControlCommands.swift         # the `app`, `panel`, `screenshot` and `control` entries for the CommandTable
@@ -3818,8 +3809,8 @@ shipyard/
 │   │   ├── Listing.swift             # the one filter: what a project lists (ADR 0003)
 │   │   ├── Attention.swift           # needs-attention rule, seen records, counts
 │   │   ├── EventDetector.swift       # known items + snapshot → events; Event, ItemChange, KnownItems
-│   │   ├── NotificationRules.swift   # event + project settings → notify?; a lease's notice + the top-level rules → notify? (0.2.0, #182); what to post; NotifiedEvents
-│   │   └── ControlNotice.swift       # (0.2.0, #182) a lease that started or ended, as the user hears of it: its event, title, body; panelURL
+│   │   ├── NotificationRules.swift   # event + project settings → notify?; a lease's notice + the top-level rules → notify? (#182); what to post; NotifiedEvents
+│   │   └── ControlNotice.swift       # (#182) a lease that started or ended, as the user hears of it: its event, title, body; panelURL
 │   ├── Notices/
 │   │   ├── NoticeRules.swift         # (#190) the Mac's side of notices: filing, the agent.notice rule, what to post; clickURL and the Click a notice's click or button carries (#193); the poll route's ten-minute age (#195)
 │   │   ├── RemoteNotices.swift       # (#195) RemotePingReader.takeNotices: the plugin's notices then notices-read; the listing's JSON
@@ -3830,12 +3821,12 @@ shipyard/
 │   │   ├── RemotePingReader.swift    # asks a machine for its pings: plugin action invoke list, then plugin log list for its log_id; any plugin action's output the same way (output(of:on:), #195)
 │   │   ├── RemoteMachines.swift      # each remote machine's last pings, truncated, latest failure
 │   │   ├── RemotePingMarks.swift     # remote pings seen and dismissed on the Mac, by URL and instance, pruned when no machine lists them
-│   │   └── PingNumbers.swift         # the numbers the Mac gives pings: one sequence per project or machine section, by URL, never reused (N14)
+│   │   └── PingNumbers.swift         # the numbers the Mac gives pings: one sequence per project or machine section, by URL, never reused (N17)
 │   ├── CLI/
 │   │   └── CLILink.swift             # links ~/.local/bin/shipyard to the app's CLI, or says what's in the way (LinkFileSystem port, FileManagerLinkFileSystem)
 │   ├── State/
 │   │   ├── AppStateStore.swift       # AppState + state.json: seen, collapsed, known items and sources, notified, remote ping marks, ping numbers, banner snoozes; tolerant, versioned
-│   │   └── AppFiles.swift            # (0.1.0) where the app reads and writes, from its launch environment: config.toml, the support folder, the demo folder in a demo run (which leaves the login item alone)
+│   │   └── AppFiles.swift            # where the app reads and writes, from its launch environment: config.toml, the support folder, the demo folder in a demo run (which leaves the login item alone)
 │   ├── Notes/                        # (#192) the user's notes in Notion
 │   │   ├── Note.swift                # a note: number and prefix, title or first line, labels, status; as an Item
 │   │   ├── NotionClient.swift        # Notion's REST API at 2025-09-03 over HTTPTransport: me, search, child pages and databases, data sources, the open-notes query, a page's first line; a data source's prefix, the database and empty-note creates (#196); the Projects page's create, a data source's schema, a page's first table, a page's web address (ADR 0011); NotionError
@@ -3886,14 +3877,14 @@ shipyard/
 │   ├── ConfigurationWatcher.swift    # watches the config directory (and file), calls Shipyard.reloadConfiguration(); the themes folder and its files (init(files:matching:)), the same; the ping store's directory alone (init(folder:)), calling reloadPings()
 │   ├── Wake.swift                    # NSWorkspace wake → refresh trigger
 │   ├── Workspace.swift               # ActionRunning on NSWorkspace (open a URL, launch or bring forward an app by bundle id or name); opens config.toml in its editor (TextEdit when none)
-│   ├── Keychain.swift                # TokenStore on the login keychain: the GitHub token since 0.0.2 (S1); the old Notion token's one-time delete (#234)
+│   ├── Keychain.swift                # TokenStore on the login keychain: the GitHub token (S1); the old Notion token's one-time delete (#234)
 │   ├── Notifier.swift                # Notifying on UNUserNotificationCenter; permission on first post; click → openNotification
 │   ├── NoticeListener.swift          # (#194, ADR 0010) notices from other machines: HTTP on 127.0.0.1 only while [notices] listen, each one to Shipyard.receive(_:from:)
 │   ├── LaunchAtLogin.swift           # LoginItem on SMAppService.mainApp: registers or removes the running .app; a repeat, or an item the user switched off in System Settings, is left as it is
-│   ├── Control/                      # (0.1.0) the app's side of app control
+│   ├── Control/                      # the app's side of app control
 │   │   ├── ControlServer.swift       # control.sock (0600, removed at quit): one request per connection; owns the ControlLease and refuses another holder's leased request, shows it on the LeaseIndicator and settles it at its end; reply(to:) dispatches over PanelControlling and Screenshotting
-│   │   ├── LeaseIndicator.swift      # (0.2.0, #180) @Observable: the lease as the dot and the banner show it, hidden for a capture, owned by AppServices; hands the lease's banners to the core (#220)
-│   │   ├── LeaseNotices.swift        # (0.2.0, #182) a lease transition → ControlNotice: started and ended make one, a renewal none; Ending → Reason
+│   │   ├── LeaseIndicator.swift      # (#180) @Observable: the lease as the dot and the banner show it, hidden for a capture, owned by AppServices; hands the lease's banners to the core (#220)
+│   │   ├── LeaseNotices.swift        # (#182) a lease transition → ControlNotice: started and ended make one, a renewal none; Ending → Reason
 │   │   ├── PanelControl.swift        # PanelControlling: status (#166), with the demo folder (#168); open and close the panel through MenuBarWindow, waiting for PanelState, fold, Show more, tab (#167), view (#238)
 │   │   ├── PanelState.swift          # (#167) @Observable: isOpen, the open status view (#238), selectedTab and which way it moved, owned by AppServices
 │   │   └── Screenshotter.swift       # Screenshotting: ScreenCaptureKit on this process's panel window, else the panel rendered (ScreenshotImage); the menu bar icon alone; the lease's dot and banner hidden unless --with-indicator
@@ -3911,8 +3902,8 @@ shipyard/
 │       ├── AgentLogoImage.swift      # loads a known agent's logo from the app's resource bundle (Contents/Resources in the app, beside the build otherwise), for light or dark, as a template where it's one glyph
 │       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, a known agent's logo (AgentMarkView), an item row's click, hover help and highlight (itemRow), the new-note icon (#196), Mark seen button, button styles, the row highlight's shape (rowHighlight), a tone's icon (ToneIcon, #238)
 │       ├── HoverHelp.swift           # hoverHelp(_:) in place of .help: the card the panel draws (hoverHelpHost), its timing and style, VoiceOver's hint
-│       ├── LeaseBannerView.swift     # (0.2.0, #180, #181) the lease's banner: the agent's logo (or a generic mark), LeaseBanner's words, the countdown, Stop
-│       ├── LeaseDot.swift            # (0.2.0, #180) the menu bar icon with the lease's yellow dot: one image in its own colours, the icon tinted for the menu bar's appearance
+│       ├── LeaseBannerView.swift     # (#180, #181) the lease's banner: the agent's logo (or a generic mark), LeaseBanner's words, the countdown, Stop
+│       ├── LeaseDot.swift            # (#180) the menu bar icon with the lease's yellow dot: one image in its own colours, the icon tinted for the menu bar's appearance
 │       ├── RowKeys.swift             # the highlight's and keys' plumbing: rows reporting their bounds and spans by tab (highlightable, rowList, RowFrames), the row keys (focus on each open, held-key repeats, scrolling the highlight into view, the list's top and bottom for a wrap or a tab switch)
 │       ├── SkillInstallCard.swift    # onboarding's skill install: offer, Cancel, result, command to copy
 │       ├── CLILinkCard.swift         # onboarding's CLI link: offer, linked, what's in the way with the command to copy
@@ -3927,7 +3918,7 @@ shipyard/
 │           ├── ConnectView.swift     # why signed out, Sign in with GitHub (the code, Cancel), the gh way (gh auth login, Connect with gh, install hint)
 │           ├── PresetPicker.swift    # onboarding's first step: choose a preset
 │           └── ProjectPicker.swift   # suggestions, a typed repository, names and grouping, Add
-├── Tests/ShipyardControlTests/       # (0.1.0) app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport, launcher and process table (AppCommandTests, PanelCommandTests, ScreenshotCommandTests, HolderTests, LeaseCommandTests, NotifyCommandTests and NotifyOptionsTests (#190, #193), NotesCommandTests (`notes check`'s wire, wait, exit codes and usage, ADR 0011), Doubles); the lease's rules (ControlLeaseTests, 0.2.0) and its banner's words (LeaseBannerTests, 0.2.0)
+├── Tests/ShipyardControlTests/       # app control through ShipyardCLI.run: parsing, encoding, exit codes, with a fake transport, launcher and process table (AppCommandTests, PanelCommandTests, ScreenshotCommandTests, HolderTests, LeaseCommandTests, NotifyCommandTests and NotifyOptionsTests (#190, #193), NotesCommandTests (`notes check`'s wire, wait, exit codes and usage, ADR 0011), Doubles); the lease's rules (ControlLeaseTests) and its banner's words (LeaseBannerTests)
 ├── Tests/ShipyardCoreTests/          # end-to-end through Shipyard + focused tests per pure module; imports every library, so the ping, config and cli.toml (CLISettings/) suites stay here
 │   ├── Harness.swift                 # the main seam: a Shipyard over the doubles, temp config + support folders built through AppFiles (or the app as launched with an environment), fixture answers, relaunch
 │   ├── PullRequestsResponse.swift    # builds a GraphQL answer (PRs and, when asked, issues per repository), for scenarios that change an item between refreshes
@@ -3949,15 +3940,15 @@ shipyard/
 │   ├── Skill/                        # the installer against a fake shell, SkillInstallation against a hanging one; SkillDetector against temporary home folders (#239); the skill document against the code and the schema
 │   ├── Fixtures/                     # recorded-shape GitHub responses (GraphQL, REST runs, errors); excluded from the target, read from the source tree
 │   └── Doubles/                      # in-memory ports: token store, recording notifier, manual clock, manual refresh timer, recording URL opener, recording login item; stub HTTP transport (with Notion's answers, StubHTTP+Notion, #192), FakeNtnRoute (ntn missing, logged out or logged in over that stub, #234), fake gh, fake git remote (a fake working folder), fake shell, hanging shell, instant sleeper, FakeHerdr (a machine's plugin, its pings and notices), FakeTailnet (the Mac's own Tailscale login, #194)
-└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control and screenshotter, its real socket in a temporary folder, and the screenshot's rendering and PNG writing (0.1.0); NoticeListenerTests, the tailnet listener on a real 127.0.0.1 socket (#194); AgentLogoTests and ServiceLogoTests (#249), the bundled logos loading from the app's resources
+└── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control and screenshotter, its real socket in a temporary folder, and the screenshot's rendering and PNG writing; NoticeListenerTests, the tailnet listener on a real 127.0.0.1 socket (#194); AgentLogoTests and ServiceLogoTests (#249), the bundled logos loading from the app's resources
 ```
 
 #### Platforms and builds
 
 - Shipyard is a macOS app and only ships for macOS.
 - Linux is a development environment, where agents build and test every library, and a platform only for the `shipyard` command.
-  Since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005).
-- Since 0.1.0 the package follows concerns (ADR 0006).
+  It runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005).
+- The package follows concerns (ADR 0006).
   The libraries on the agent's side (Command, Pings, CLISettings, Notices, Config, Control) and `ShipyardCore` build on Linux, importing only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder (CLISettings' and Config's), with AppKit only behind `#if canImport(AppKit)` in Control's launcher.
 - Each build links what it uses (the table in [Modules and what each build links](#modules-and-what-each-build-links)).
 - `ShipyardCore` holds the app's rules: the GitHub client, attention, events, notification rules, the rate budget, the menu model and the orchestrator itself.
@@ -3992,9 +3983,9 @@ refresh()
   config = configStore.lastValid
   configured = config.projects.map(config.settings)   // each project's settings, before its groups and wildcards resolve
   do
-    resolved = await resolver.resolve(configured, force: forceResolve, now) { request { github.repositories(of: $0) } }   // 0.0.2: hourly unless forced (launch, config change, ⌘R, sign-in)
+    resolved = await resolver.resolve(configured, force: forceResolve, now) { request { github.repositories(of: $0) } }   // hourly unless forced (launch, config change, ⌘R, sign-in)
     forceResolve = false
-    try? repositoriesStore.record(resolved.mapValues(\.repositories))   // 0.0.5: for the shipyard CLI to file pings by repository
+    try? repositoriesStore.record(resolved.mapValues(\.repositories))   // for the shipyard CLI to file pings by repository
     projects = configured.map { $0.resolved(by: resolved[$0.slug]) }   // the repositories the known sources and events are about
     snapshot = await request { github.fetch(projects: configured, resolved: resolved, at: clock.now) }   // batches of 5 (halved when cut short) + the review search; every call goes through request (401 → signedOut)
   catch unauthorized
@@ -4005,10 +3996,10 @@ refresh()
   catch other
     rebuildMenu(config)
     fetchError = other; menu.fetchError = other; gate.finish(); return   // keep old snapshot, rows and lastUpdated
-  listings = projects.map { Listing.items(for: $0, in: snapshot, viewer, now) }   // 0.0.2: what each project has
+  listings = projects.map { Listing.items(for: $0, in: snapshot, viewer, now) }   // what each project has
   appStateStore.update { state in                     // saves only if it changed
     events = EventDetector.events(state.known, snapshot, projects)   // first sight of a project's source: none
-      + EventDetector.pingEvents(listings, projects)  // 0.0.5: a ping.sent per unseen listed ping
+      + EventDetector.pingEvents(listings, projects)  // a ping.sent per unseen listed ping
     for id, occurrences in events grouped by id where id ∉ state.notified   // an item in two projects: one event
       if first occurrence listed by its project (listings) and selected by its rules (NotificationRules.shouldNotify)
         toPost.append(NotificationRules.notification(for: it))
@@ -4019,7 +4010,7 @@ refresh()
   self.snapshot = snapshot; fetchError = nil
   budget.record(snapshot.rateLimits, now)
   menu = MenuModel.build(listings, snapshot (errors, fetchedAt), config, appState, expandedGroups, now)   // Panel re-renders from it
-  appStateStore.update { $0.collapsedGroups = menu.foldsToKeep($0.collapsedGroups) }   // 0.0.2: a fold whose group or project is gone goes too
+  appStateStore.update { $0.collapsedGroups = menu.foldsToKeep($0.collapsedGroups) }   // a fold whose group or project is gone goes too
   menu.foldedGroups = appState.collapsedGroups
   delay = budget.nextDelay(config.refreshInterval, config.rateLimit.maxSharePercent, now)
   menu.refreshDelay = delay; menu.rateIndicator = budget.indicator(config.rateLimit.show, in: [graphql] + [rest if any project shows runs], now)
@@ -4037,7 +4028,7 @@ The windows count back from the clock at each listing, not from the fetch, so a 
 
 A `closed-window = "30m"` item is gone within one interval of its 30 minutes passing.
 
-#### Listing.items (0.0.2)
+#### Listing.items
 
 ```text
 items(for project, in snapshot, viewer, now)
@@ -4046,13 +4037,13 @@ items(for project, in snapshot, viewer, now)
     project.shows(item.kind)
     and kindSettings.states contains item.state.group           // StateGroup: open | merged | closed | in-progress | failed | succeeded
     and inWindow(item, kindSettings, now)                       // closed-window / finished-window, in seconds, counted back from now
-                                                                // a ping: unseen, or seen less than pings.seen-window ago (0.0.5)
+                                                                // a ping: unseen, or seen less than pings.seen-window ago
     and (kind != pullRequest or drafts or not item.isDraft)
     and kindSettings.authors.includes(item.author, viewer)
     and (not reviewRequested or snapshot.reviewRequested contains item.id)
 ```
 
-#### Arrangement.groups (0.0.2)
+#### Arrangement.groups
 
 ```text
 groups(items, project, settings, layout, folded, expanded, now, calendar)
@@ -4095,7 +4086,7 @@ onDirectoryEvent (debounced)
     configStatusStore.record(rejected: each issue with its line and banner text)
 ```
 
-#### PingCommand.send through a filing (0.1.0, #164)
+#### PingCommand.send through a filing (#164)
 
 ```text
 run(arguments, environment, filing, store, now):
@@ -4121,7 +4112,7 @@ send(request, terminal, folder, git, filing, store, now, newID, whenNoProject):
 No `if` names a platform.
 `withdraw` and `list` never call the filing, so `ProjectFiling` never reads `config.toml` for them.
 
-#### ControlServer.reply(to:) (0.1.0, #166–#169; the lease since 0.2.0, #177)
+#### ControlServer.reply(to:) (#166–#169, #177)
 
 ```text
 reply(to data):
@@ -4174,7 +4165,7 @@ A 120 s interval is 30 refreshes an hour.
 | REST runs, 10 repositories, all changed | 10 requests | 300 | 6% |
 
 GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists dominate it.
-To keep it low, the head commit is asked for `last: 1` and closed items for `first: 20`; 0.0.1 also read each PR's `reviewRequests` (`first: 10`), which 0.0.2's single review search (one page of 100 PRs, in the first batch) replaces.
+To keep it low, the head commit is asked for `last: 1` and closed items for `first: 20`, and review requests come from the single review search (one page of 100 PRs, in the first batch), not from each PR's `reviewRequests`.
 
 The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it.
 The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table.
@@ -4227,7 +4218,7 @@ Several agents are running `gh` heavily.
 | 5 | menu bar icon shows the paused glyph; ⌘R does nothing and says why | last snapshot still listed, "Last updated 14 min ago" |
 | 6 | every 120 s meanwhile the timer lists again from the last snapshot, sending nothing; 16:42: the firing at `pausedUntil` refreshes | quota back to 5,000; next delay 120 s; banner gone |
 
-#### Trace 4: `incoming-contributions` with `owned` (0.0.2, happy path)
+#### Trace 4: `incoming-contributions` with `owned` (happy path)
 
 | Step | State after |
 |---|---|
@@ -4239,14 +4230,14 @@ Several agents are running `gh` heavily.
 | `MenuModel` + `Arrangement`: group by repository, subsections | "Incoming" shows 4 repository subheaders; the menu bar counts 10 listed items, not 40 |
 | Next refresh: someone opens a PR on one of the user's repositories | `pr.opened` from `others`, listed, so it notifies |
 
-#### Trace 5: `anywhere` misused (0.0.2, rejection)
+#### Trace 5: `anywhere` misused (rejection)
 
 | Step | State after |
 |---|---|
 | An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
 | `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
 
-#### Trace 6: an agent pings, from the CLI to a click (0.0.5)
+#### Trace 6: an agent pings, from the CLI to a click
 
 Setup: projects `shop` (`repositories = ["yahyabedirhan/shop"]`) and `blog`, the default notification rules, `[herdr] terminal = "Ghostty"`.
 The app is running; its last refresh listed one PR in `shop`, attention count 1.
@@ -4259,7 +4250,7 @@ An agent works in a clone of `yahyabedirhan/shop`, in Herdr pane `w1:p3`, and ne
 | 3 | `GitCLI.origin(in:)` → `GitRemote.repository(fromURL:)` → `PingCommand.watchers(of:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `[shop]` with that repository (N6) |
 | 4 | `PingStore.save` | `cache-question` isn't stored: a new ping, `sent` now, a new `instance`; `Pings/cache-question.json` written atomically; prints `cache-question`, exit 0 (N1, N12) |
 | 5 | `ConfigurationWatcher` on the store's directory → `Shipyard.reloadPings()` → `listPings()` | `pings` has the new one; no GitHub request (N4) |
-| 6 | `Shipyard.numberPings` → `Listing.listings(…, pings:, numbers:)` → `MenuModel.build` → `Arrangement` | `cache-question` is new to `shop`, so it takes `shop`'s next number in `AppState.pingNumbers` (say 1, N14); `shop` lists the PR, then a "Pings" group with the ping: a terminal icon, its number 1, "#1 · claude" on its second line; unseen, so it needs attention; count **2** (N3, N8) |
+| 6 | `Shipyard.numberPings` → `Listing.listings(…, pings:, numbers:)` → `MenuModel.build` → `Arrangement` | `cache-question` is new to `shop`, so it takes `shop`'s next number in `AppState.pingNumbers` (say 1, N17); `shop` lists the PR, then a "Pings" group with the ping: a terminal icon, its number 1, "#1 · claude" on its second line; unseen, so it needs attention; count **2** (N3, N8) |
 | 7 | `EventDetector.pingEvents` → `NotificationRules` (the default rules hold `ping.sent`) → `AppStateStore.update` → `Notifier.post` | `notified` has `ping.sent` for `shipyard://ping/cache-question` with its `instance`; banner "shop · Waiting for your input" over "from claude" (N7) |
 | 8 | ten minutes on, the agent sends the same command titled "Still waiting (10 min)" → steps 1–5 again | a replace: `sent` now, so the row's age starts again, the stored `instance` kept, and its URL keeps its number, with the new title; the row shows it; still count **2**, and `pingEvents`' event is already in `notified`, so no second banner (N12) |
 | 9 | user clicks the banner → `Shipyard.openNotification` → `runAction(ofPing:)` → `runHerdr`: `HerdrFocus.focus("w1:p3")` (`herdr pane get w1:p3` → tab `w1:t1` → `herdr tab focus w1:t1`) → `done` → `ActionRunning.run(.app("Ghostty"))` → `done` → `markPingsSeen` | Herdr shows the agent's tab and Ghostty comes forward; `seen` set in the ping's file; count **1**, and still after a relaunch (N8, N11) |
@@ -4283,7 +4274,7 @@ The other ways through:
 | `--herdr` alone outside Herdr, two action flags, `--repo` with `--project`, an id that isn't one | exit 2, one line on standard error; nothing written (N8, N11, N12) |
 | `shipyard ping withdraw cache-question` after the user dismissed it | exit 1: "no ping has the id `cache-question`; …" (N12) |
 
-#### Trace 7: a machine's pings reach the menu (0.0.6, #111)
+#### Trace 7: a machine's pings reach the menu (#111)
 
 Setup: `[remote] machines = ["alpha-vps", "beta-vps"]` beside project `shop`; the Mac's Herdr has both as saved machines, each with the herdr-shipyard plugin.
 On `beta-vps`, an agent outside any watched repository runs `shipyard ping "Deploy?" --id q1 --from claude`: saved unfiled there (`projects: []`).
@@ -4295,7 +4286,7 @@ On `beta-vps`, an agent outside any watched repository runs `shipyard ping "Depl
 | 3 | `herdr --machine beta-vps plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` | `plugin_action_invoked`, `log.log_id` `plugin-log-7`, `status` `running` |
 | 4 | `herdr --machine beta-vps plugin log list --plugin yahyabedirhan.herdr-shipyard` | `plugin-log-7` still `running`: wait 0.25 s and ask again; then `succeeded`, its `stdout` the `PingList` |
 | 5 | `PingList.decode` → each ping's `machine = "beta-vps"` → `RemoteMachines.record` | `remote.machine("beta-vps").pings` = [q1]; `failure` nil |
-| 6 | `rebuildMenu` → `Listing.listings(…, pings: local + remote, machines:)` → `MenuModel.build` → `machineSections` | sections `shop`, then `beta-vps` with "Deploy?" (`shipyard://ping/beta-vps/q1`), numbered `#1` in that section (its first ping, 0.0.7's N14), its second line "#1 · beta-vps · claude"; unseen, so it needs attention; count **+1**. `alpha-vps` lists nothing, so it has no section (N14) |
+| 6 | `rebuildMenu` → `Listing.listings(…, pings: local + remote, machines:)` → `MenuModel.build` → `machineSections` | sections `shop`, then `beta-vps` with "Deploy?" (`shipyard://ping/beta-vps/q1`), numbered `#1` in that section (its first ping, N17), its second line "#1 · beta-vps · claude"; unseen, so it needs attention; count **+1**. `alpha-vps` lists nothing, so it has no section (N14) |
 | 7 | `machineTimer.arm(after: 30)` | the next poll in 30 s, apart from the refresh's timer; no GitHub request was made |
 
 | Variant | What happens |
@@ -4309,7 +4300,7 @@ On `beta-vps`, an agent outside any watched repository runs `shipyard ping "Depl
 | ⌥-click on "Deploy?" | `markSeen(row)` → `AppState.remotePings` marks that sending seen; count **−1**; after `[defaults.pings] seen-window` a poll leaves it out (#118) |
 | ✕ or ⌫ on "Deploy?" | `dismiss(row)` → marked dismissed: hidden, replaced or not, until `beta-vps` stops listing that instance; then the mark is pruned (#118) |
 
-#### Trace 8: a local ping through the modules (0.1.0, #165)
+#### Trace 8: a local ping through the modules (#165)
 
 Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an agent in a clone of `yahyabedirhan/shop`.
 The CLI is the macOS build (Command, Pings, CLISettings, Notices, Config, Control).
@@ -4326,7 +4317,7 @@ The CLI is the macOS build (Command, Pings, CLISettings, Notices, Config, Contro
 Nothing in steps 1–5 is in ShipyardCore.
 The CLI binary doesn't contain it (M2).
 
-#### Trace 9: a remote ping, from a Linux machine to the Mac (0.1.0, #164)
+#### Trace 9: a remote ping, from a Linux machine to the Mac (#164)
 
 Setup: as Trace 7: `[remote] machines = ["beta-vps"]`, project `shop` watching `yahyabedirhan/shop`.
 On `beta-vps` the Linux `shipyard` (Command and Pings only) runs in a Herdr pane `w2:p1`, in a clone of `yahyabedirhan/shop`.
@@ -4344,7 +4335,7 @@ On `beta-vps` the Linux `shipyard` (Command and Pings only) runs in a Herdr pane
 
 The filing rule the Mac applies in step 7 is the one `ProjectFiling` applies to a local ping in Trace 8, step 4, so the two can't drift apart.
 
-#### Trace 10: a screenshot (0.1.0, #169)
+#### Trace 10: a screenshot (#169)
 
 Setup: the app runs in the tabs layout with projects `shop` and `blog`, the panel closed.
 An agent wants a dark screenshot of `shop`'s tab for a QA ticket.
@@ -4366,11 +4357,11 @@ An agent wants a dark screenshot of `shop`'s tab for a QA ticket.
 | the PNG's folder doesn't exist | reply `{ ok: false, error: "couldn't write <path>: …" }`; exit 1, without the fallback |
 | rendering fails too | reply `{ ok: false, error: … }`; exit 1 |
 | `--menu-bar-icon` | `SailboatImage` rendered alone at the menu bar's 16 points, black in light and white in dark; the panel isn't opened |
-| an agent holds the lease (it must be the one capturing) | the open panel's banner is hidden, with no animation, for the capture and comes back afterwards; the fallback's fresh panel draws none; `--menu-bar-icon` draws no dot (0.2.0, #180) |
-| `--with-indicator` | the banner stays in the capture, and `--menu-bar-icon` draws the yellow dot beside the sailboat (0.2.0, #180) |
+| an agent holds the lease (it must be the one capturing) | the open panel's banner is hidden, with no animation, for the capture and comes back afterwards; the fallback's fresh panel draws none; `--menu-bar-icon` draws no dot (#180) |
+| `--with-indicator` | the banner stays in the capture, and `--menu-bar-icon` draws the yellow dot beside the sailboat (#180) |
 | a demo run | the same steps, on `<folder>/support/control.sock`; the client finds it through `ControlSocket.locate`, which follows the pointer `app open --demo` wrote in the normal support folder (#168) |
 
-#### Trace 11: a refusal, a tab in the list layout (0.1.0, #167)
+#### Trace 11: a refusal, a tab in the list layout (#167)
 
 Setup: `[menu] layout = "list"`, the app running.
 
@@ -4388,7 +4379,7 @@ Setup: `[menu] layout = "list"`, the app running.
 | `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "shipyard: `shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
 | `shipyard ping "x" --repo yahyabedirhan/shop` on the Mac when `shop` sets `pings = { show = false }` | `ProjectFiling` refuses: every project the ping lands in hides pings, exit 1; nothing written (#127) |
 
-#### Trace 12: a demo run (0.1.0, #168)
+#### Trace 12: a demo run (#168)
 
 Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Application Support/Shipyard/`.
 An agent has `~/demo/shipyard/config.toml`, naming only public repositories, and wants screenshots of it.
@@ -4397,7 +4388,7 @@ An agent has `~/demo/shipyard/config.toml`, naming only public repositories, and
 |---|---|---|
 | 1 | `shipyard app open --demo ~/demo` → `ControlCommand.parse` (Control) | `open(demo: Demo(folder: /Users/me/demo, ghConfig: ~/.config/gh))`: a folder, and `demo/support/control.sock` fits a socket's address |
 | 2 | `DemoPointer.record(~/demo/support, in: ~/Library/Application Support/Shipyard)` | `demo.json` in the user's support folder: the only file the run writes outside `~/demo`; written first, so nothing is quit when it can't be |
-| 3 | `ControlCommand.run` → `app.status`, then `app.quit` (leased), to the user's socket; looks until nothing answers | the user's app has quit and removed its socket; its reply held the agent's lease, renewed by the quit (since 0.2.0, #179) |
+| 3 | `ControlCommand.run` → `app.status`, then `app.quit` (leased), to the user's socket; looks until nothing answers | the user's app has quit and removed its socket; its reply held the agent's lease, renewed by the quit (#179) |
 | 4 | `WorkspaceLauncher.launch(environment: XDG_CONFIG_HOME, SHIPYARD_SUPPORT_DIR, GH_CONFIG_DIR, SHIPYARD_CONTROL_LEASE)` (Control, AppKit) | Launch Services starts `Shipyard.app` with those variables |
 | 5 | `AppServices` (App) → `AppFiles(environment:)` (Core), `ControlLease(environment:at:)` (Control) | `config = ~/demo/shipyard/config.toml`, `support = ~/demo/support`, `demo = ~/demo`; every store, `Avatar/` and the `ControlServer` on them; the server holds the agent's lease, its cap unchanged, nothing posted |
 | 6 | `Shipyard.start()` (Core): token from the Keychain or `gh auth token` (with the user's `GH_CONFIG_DIR`), refresh | `state.json`, `config-status.json`, `repositories.json`, `config-location.json` written under `~/demo/support` |
@@ -4420,7 +4411,7 @@ Known limits of a demo run:
 - **An app without app control isn't quit.** `app open --demo` quits only an app that answers on a socket.
   A user's app whose control server couldn't start (it logs why) keeps running: Launch Services hands it back without the demo's environment, the demo never answers, and the command exits 1 with the pointer removed.
 
-#### Trace 13: two agents and the lease (0.2.0, #177)
+#### Trace 13: two agents and the lease (#177)
 
 Setup: the app runs, the lease is free.
 Agent A is Claude Code (`CLAUDE_CODE_SESSION_ID=5f1c`) in `~/shop`; agent B is `codex` in Herdr pane `w1-2`, exporting no session id.
@@ -4440,7 +4431,7 @@ Times are the app's clock.
 | Variant | What happens |
 |---|---|
 | A keeps working past 12:05:00 | each renewal stops at the cap (`taken + 5 min`); at 12:05:00 the lease ends (`capped`) and A's next command takes a new one, unless another holder got there first |
-| a `shipyard` of 0.1.0 against this app | its version-1 request is refused: "the shipyard command speaks control version 1 and the app version 2: reinstall shipyard so both come from one build", exit 1 |
+| an older `shipyard`, which speaks control version 1 | its version-1 request is refused: "the shipyard command speaks control version 1 and the app version 2: reinstall shipyard so both come from one build", exit 1 |
 | A runs a command in a subshell, or through `sh -c` | the session variable is inherited, so it's still A |
 | A relaunches, `shipyard app open --demo ~/demo` (#179) | the running app's `app.quit` renews A's lease and returns it; the demo app is launched with it in `SHIPYARD_CONTROL_LEASE` and starts with A holding it, until the same end and cap, posting nothing; B's commands are refused there as before. B's own `app open` or `app open --demo` while A holds it: `app.open` or `app.quit` refused, nothing launched, exit 1 |
 | A runs `shipyard app quit`, then `shipyard app open`, as two commands | not a handover: the second command finds nothing to quit, so the launched app starts free and A's next command takes a new lease |
@@ -4475,7 +4466,7 @@ Variant, ntn's default workspace isn't the notes workspace (ADR 0011, #234): at 
 The read is `.noEntryPage`: no notes and no error rows, `notesBlocked = .noEntryPage`, and the panel shows the notes banner, "ntn's workspace has no Shipyard Notes page. Run ntn doctor…".
 Once ntn's default workspace is the notes workspace, the next read finds it and the banner goes.
 
-Variant, a workspace from 0.3.0: `shop` and `Shop` sit directly under "Shipyard Notes" and there's no Projects page.
+Variant, a workspace in ADR 0009's layout: `shop` and `Shop` sit directly under "Shipyard Notes" and there's no Projects page.
 At step 2 the read finds none: no notes, no error, no banner.
 `shipyard notes check` names both databases as errors (Trace 17).
 
@@ -4585,8 +4576,8 @@ Its sections, in order:
 | Oldest first | a `sort-by` choice in `Arrangement`, the schema |
 | A new preset | `Presets.swift` and `skills/shipyard/presets.md` (the test compares them) |
 | Another ping action | a `PingAction` case (its coding key) and its `PingIcon`, `PingCommand.actionFlags` and its parse case, `PanelText.fact`/`stateLabel`, `ItemSymbol.name(PingIcon)`, and either the app's `WorkspaceActions.run` (what `NSWorkspace` does) or, like Herdr's (#101), a core runner `Shipyard.runAction(ofPing:)` calls |
-| Another CLI command | an entry in its module's `…Commands.entries` and one `table.add` line in `main.swift` (0.1.0) |
-| Another app control command | a `ControlRequest` case (its `command` name and fields in `ControlMessage.Wire`; leased unless `isLeased` says otherwise, since 0.2.0), its parse case in `ControlCommand`, its line in `ControlServer.reply`, and the operation on `PanelControlling`; a new top-level command also its entry in `ControlCommands.entries` and its name in `CommandTable.macOnly` |
+| Another CLI command | an entry in its module's `…Commands.entries` and one `table.add` line in `main.swift` |
+| Another app control command | a `ControlRequest` case (its `command` name and fields in `ControlMessage.Wire`; leased unless `isLeased` says otherwise), its parse case in `ControlCommand`, its line in `ControlServer.reply`, and the operation on `PanelControlling`; a new top-level command also its entry in `ControlCommands.entries` and its name in `CommandTable.macOnly` |
 | Another notice option | an optional field on `Notice` (left out of the JSON when unset, so older apps and commands still read it), its flag in `NotifyCommand`, and its use in `NoticeRules.notification` and the `Notifier` (#193) |
 | Another notice route from another machine | a `NoticeRoute` in Notices, chosen in `RemoteNoticeRoute` by a `cli.toml` setting (`NoticeSettings`); on the Mac, the entry it arrives by calls `Shipyard.receive` (#194, #195) |
 | Another refusal on the Mac only (like #127) | `ProjectFiling` alone; the Linux build doesn't change |
@@ -4594,10 +4585,9 @@ Its sections, in order:
 
 ### Future feature placement
 
-Where a future feature lands (0.1.0, ADR 0006).
+Where a future feature lands (ADR 0006).
 The design's test is a hypothetical **handoff**: an agent leaving the user a longer report than a ping, kept on its machine and read later.
 It's out of scope and isn't built.
-0.1.0 used notes as this example; the user's notes became a feature of their own in Notion, read by the app alone, with no agent-side module: see the `notes-and-notify` requirements and Trace 14.
 It shows where each part of a new agent-facing feature goes:
 
 | Part of handoffs | Lands in | What you touch |
@@ -4616,39 +4606,33 @@ Refused for now:
 
 - A plugin system for item kinds: one registration seam for a change that happens rarely.
 - A protocol over `GitHubClient` for other forges: one implementation.
-- A CLI for the configuration (ADR 0001): the CLI sends pings (ADR 0004), and since 0.1.0 controls the app, never the file.
+- A CLI for the configuration (ADR 0001): the CLI sends pings (ADR 0004), and controls the app, never the file.
 - Multi-account support.
-
-Since 0.1.0 also:
-
 - A second executable for app control.
 - A plugin seam for commands: a table entry is enough.
 - The app filing every ping (ADR 0006).
-
-Since 0.0.2 also:
-
 - A filter expression language: independent fields with AND cover every case, and agents can write them (ADR 0003).
 - Nested grouping: a second level of folds, keys and layout.
-- Reading resolved repositories back at launch: resolving costs a few points once an hour; since 0.0.5 they're written for the CLI only.
+- Reading resolved repositories back at launch: resolving costs a few points once an hour; they're written for the CLI only.
 - A plugin seam for filters: each is a field and one line in `Listing`.
 
 ---
 
 ## Decisions taken in review
 
-The choices settled in review, newest release first, then the ones that hold across releases.
+The choices settled in review, the most recent first.
 
-- **0.2.0, app control is leased, enforced by the app** (ADR 0007): one holder at a time, renewed by each command for a minute and capped at five, refused at the socket for anyone else; the holder is worked out by the CLI from the agent's session, else its process.
+- **App control is leased, enforced by the app** (ADR 0007): one holder at a time, renewed by each command for a minute and capped at five, refused at the socket for anyone else; the holder is worked out by the CLI from the agent's session, else its process.
   Rejected: a plain lock (a crashed agent keeps it), a lock file the CLI checks (another build ignores it), a holder the agent passes (it gets it wrong), Herdr's pane as the key (reused).
   Spec #176.
-- **0.1.0, modules follow concerns ("A+")** (ADR 0006): the agent's side (Command, Pings, Config, Control) never links the app's rules (Core).
+- **Modules follow concerns ("A+")** (ADR 0006): the agent's side (Command, Pings, Config, Control) never links the app's rules (Core).
   Rejected: one core with a command table (the Linux binary would still carry everything), two executables (a second name, no more isolation), the app filing every ping (no refusal while the app is quit).
-- **0.1.0, app control is one Unix socket in the support folder**, owner-only, one JSON request per connection.
+- **App control is one Unix socket in the support folder**, owner-only, one JSON request per connection.
   Launching the app goes around it, by bundle id, since the app may not be running.
   Spec #160.
-- **0.0.2, review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh.
+- **Review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh.
   Cost accepted: GitHub's search index can lag a PR by a short while, and it returns at most 100.
-- **0.0.2, `subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
+- **`subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
 - **Panel technology: SwiftUI `MenuBarExtra` in `.window` style**, not AppKit `NSMenu`.
   The panel stays open while sections collapse and ⌥-clicks happen, colours and rows are fully controlled, and onboarding lives in the same panel.
   Cost accepted: it doesn't behave exactly like a native menu (no type-to-select).
@@ -4664,7 +4648,6 @@ The choices settled in review, newest release first, then the ones that hold acr
   - Open PRs capped at 50 and closed at 20 per repository per refresh.
   - Launch at login on by default.
   - The device flow needs an OAuth App registered under the maintainer's account (one-time, free).
-  - Versions start at 0.0.1 and stay below 0.1.0 until the public launch.
 
 ---
 

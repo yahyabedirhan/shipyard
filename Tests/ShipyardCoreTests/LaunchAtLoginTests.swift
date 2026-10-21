@@ -38,7 +38,7 @@ struct LaunchAtLoginTests {
 
     @Test("a file that's broken at launch leaves the login item alone, rather than applying the default")
     func brokenAtLaunch() async throws {
-        let harness = try Harness(config: "version = 1\nlaunch-at-login = false\nrefresh-interval-seconds = \"oops\"\n")
+        let harness = try Harness(config: "version = 1\nlaunch-at-login = false\nrefresh-interval = \"oops\"\n")
         await harness.shipyard.start()
         #expect(harness.shipyard.configError != nil)
         #expect(harness.loginItem.settings.isEmpty)

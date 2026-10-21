@@ -140,23 +140,6 @@ func declaredPaths(_ raw: [String: Any], root: [String: Any], at path: String = 
     return paths
 }
 
-func deprecatedPaths(_ raw: [String: Any], root: [String: Any], at path: String = "") -> Set<String> {
-    let schema = resolve(raw, root: root)
-    var paths: Set<String> = []
-    if let properties = schema["properties"] as? [String: Any] {
-        for (key, child) in properties {
-            let childPath = path.isEmpty ? key : path + "." + key
-            let childSchema = child as! [String: Any]
-            if childSchema["deprecated"] as? Bool == true { paths.insert(childPath) }
-            paths.formUnion(deprecatedPaths(childSchema, root: root, at: childPath))
-        }
-    }
-    if let items = schema["items"] as? [String: Any] {
-        paths.formUnion(deprecatedPaths(items, root: root, at: path + "[]"))
-    }
-    return paths
-}
-
 private func setPaths(_ value: Value, at path: String = "") -> Set<String> {
     switch value {
     case .object(let object):
@@ -192,40 +175,7 @@ struct ConfigSchemaTests {
     func describesEveryKey() throws {
         let schema = try loadSchema()
         let everyKeyValue = value(of: try TOMLTable(source: everyKey))
-        let deprecated = deprecatedPaths(schema, root: schema)
-        #expect(deprecated == [
-            "hide-authors", "refresh-interval-seconds", "banners.snooze", "projects[].name",
-            "defaults.pull-requests.closed-window-days", "defaults.issues.closed-window-days", "defaults.workflow-runs.finished-window-hours",
-            "projects[].pull-requests.closed-window-days", "projects[].issues.closed-window-days", "projects[].workflow-runs.finished-window-hours",
-        ])
-        #expect(declaredPaths(schema, root: schema) == setPaths(everyKeyValue).union(deprecated))
-    }
-
-    @Test("the old forms still validate, so taplo passes every file shipyard reads")
-    func oldFormsValidate() throws {
-        let old = """
-            refresh-interval-seconds = 90
-            hide-authors = ["dependabot[bot]"]
-            [banners]
-            snooze = "1h"
-            [[projects]]
-            name = "Review queue"
-            repositories = ["anywhere"]
-            pull-requests = { review-requested = true }
-            [defaults.pull-requests]
-            closed-window-days = 3
-            [defaults.issues]
-            closed-window-days = 0
-            [defaults.workflow-runs]
-            finished-window-hours = 4
-            [[defaults.notifications]]
-            event = "pr.opened"
-            authors = "others"
-            [[defaults.notifications]]
-            event = "pr.merged"
-            authors = "any"
-            """
-        #expect(try violations(old, schema: try loadSchema()) == [])
+        #expect(declaredPaths(schema, root: schema) == setPaths(everyKeyValue))
     }
 
     @Test("the schema's author selectors are the ones the reader takes")
@@ -292,9 +242,6 @@ struct ConfigSchemaTests {
             return node?["enum"] as? [String]
         }
         #expect(enumValues(["notification-rule", "properties", "event"], in: definitions) == EventKind.allCases.map(\.rawValue))
-        let ruleAuthors = try #require((definitions["notification-rule"] as? [String: Any])?["properties"] as? [String: Any])["authors"] as? [String: Any]
-        let oldAuthors = (ruleAuthors?["anyOf"] as? [[String: Any]])?.compactMap { $0["enum"] as? [String] }
-        #expect(oldAuthors == [NotificationRule.legacyAuthors])
         #expect(enumValues(["workflow-runs", "properties", "branches"], in: definitions) == WorkflowRunBranches.allCases.map(\.rawValue))
         for (kind, table) in [(ItemKind.pullRequest, "pull-requests"), (.issue, "issues"), (.workflowRun, "workflow-runs")] {
             #expect(enumValues([table, "properties", "states", "items"], in: definitions) == StateGroup.all(for: kind).map(\.rawValue))
@@ -317,7 +264,6 @@ struct ConfigSchemaTests {
         let schema = try loadSchema()
         let bad = """
             refresh-interval = "10s"
-            refresh-interval-seconds = 10
             colour = "red"
             [rate-limit]
             max-share-percent = 60
@@ -338,14 +284,13 @@ struct ConfigSchemaTests {
         let found = Set(try violations(bad, schema: schema))
         #expect(found == [
             ".refresh-interval: 10s doesn't match ^0*([3-9][0-9]|[1-9][0-9]{2,})s$|^0*[1-9][0-9]*[mhd]$",
-            ".refresh-interval-seconds: below 30",
             ".projects[1].slug: Bad Slug doesn't match \(Configuration.slugPattern)",
             ".projects[1].title:  doesn't match \\S",
             ".projects[2]: matches none of anyOf",
             ": unknown key colour",
             ".rate-limit.max-share-percent: above 50",
             ".defaults.notifications[0].event: pr.openned not in enum",
-            ".defaults.notifications[0].authors: matches none of anyOf",
+            ".defaults.notifications[0].authors: expected array, got a string",
             ".projects[0].repositories[0]: not-a-slug doesn't match ^([A-Za-z0-9-]+/([A-Za-z0-9._-]+|\\*)|owned|organizations|collaborator|anywhere)$",
             ".projects[0].repositories: items not unique",
             ".projects[0].issues.closed-window: -1d doesn't match ^(0|[0-9]+[smhd])$",

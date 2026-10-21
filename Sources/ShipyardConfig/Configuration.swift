@@ -350,10 +350,6 @@ public enum EventKind: String, CaseIterable, Sendable {
 /// It only narrows what the project lists: an item the listing leaves out
 /// is never notified (ADR 0003).
 public struct NotificationRule: Equatable, Sendable {
-    /// The strings `authors` took before selectors, still read with a
-    /// warning: `any` is everyone, the others one author group each.
-    public static let legacyAuthors = ["any", "me", "others", "bots"]
-
     public var event: EventKind
     /// Author selectors; empty is everyone.
     public var authors: [AuthorSelector]

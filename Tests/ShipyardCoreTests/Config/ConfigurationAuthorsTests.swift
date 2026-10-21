@@ -48,64 +48,13 @@ struct ConfigurationAuthorsTests {
         #expect(result.warnings.map(\.message) == ["unknown setting `defaults.issues.authors.mute` (ignored)"])
     }
 
-    @Test("an old hide-authors is read as a hide in each kind's defaults, with a warning")
-    func oldHideAuthors() throws {
-        let result = try #require(decoded("""
-            version = 1
-            hide-authors = ["dependabot[bot]", "Renovate[bot]"]
-
-            [defaults.issues]
-            authors = { hide = ["me"] }
-            """))
-        let hidden: [AuthorSelector] = [.login("dependabot[bot]"), .login("Renovate[bot]")]
-        let defaults = result.configuration.defaults
-        #expect(defaults.pullRequests.authors == AuthorFilter(hide: hidden))
-        #expect(defaults.issues.authors == AuthorFilter(hide: [.me] + hidden))
-        #expect(defaults.workflowRuns.authors == AuthorFilter(hide: hidden))
-        #expect(result.warnings == [ConfigurationIssue(
-            line: 2,
-            message: "`hide-authors` is the old form: it's read as `authors = { hide = [\"@dependabot[bot]\", \"@Renovate[bot]\"] }` "
-                + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
-        )])
-    }
-
-    @Test("old notification author strings are read as selectors, with a warning each")
-    func oldNotificationAuthors() throws {
-        let result = try #require(decoded("""
-            version = 1
-            [[defaults.notifications]]
-            event = "pr.opened"
-            authors = "any"
-
-            [[defaults.notifications]]
-            event = "pr.merged"
-            authors = "others"
-
-            [[projects]]
-            slug = "a"
-            repositories = ["o/a"]
-            notifications = [{ event = "run.failed", authors = "me" }, { event = "pr.opened", authors = "bots" }]
-            """))
-        #expect(result.configuration.defaults.notifications == [
-            NotificationRule(event: .prOpened, authors: []),
-            NotificationRule(event: .prMerged, authors: [.others]),
-        ])
-        #expect(result.configuration.projects.first?.notifications == [
-            NotificationRule(event: .runFailed, authors: [.me]),
-            NotificationRule(event: .prOpened, authors: [.bots]),
-        ])
-        let old = "is the old form of a notification rule's authors"
-        #expect(result.warnings == [
-            ConfigurationIssue(line: 4, message: "`authors = \"any\"` \(old); write `authors = []`, or leave it out, for everyone"),
-            ConfigurationIssue(line: 8, message: "`authors = \"others\"` \(old); write `authors = [\"others\"]`"),
-            ConfigurationIssue(line: 13, message: "`authors = \"me\"` \(old); write `authors = [\"me\"]`"),
-            ConfigurationIssue(line: 13, message: "`authors = \"bots\"` \(old); write `authors = [\"bots\"]`"),
-        ])
-    }
-
-    @Test("a single selector written as a string is rejected: authors is a list")
+    @Test("a single selector or a group written as a string is rejected: authors is a list")
     func singleStringSelector() {
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"@octocat\"\n")
             == [ConfigurationIssue(line: 3, message: "`authors` is a list: write `authors = [\"@octocat\"]`")])
+        #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"others\"\n")
+            == [ConfigurationIssue(line: 3, message: "`authors` is a list: write `authors = [\"others\"]`")])
+        #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"any\"\n")
+            == [ConfigurationIssue(line: 3, message: "unknown author `any` (an empty list means everyone)")])
     }
 }
