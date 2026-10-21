@@ -68,6 +68,8 @@ assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from 
 
 `.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
 
+Only the repository's root has a `README.md`. A folder's own index, which says what the folder holds and how its files are shaped, is `index.md`, as in `docs/references/index.md`.
+
 ## Agent skills
 
 ### Issue tracker
