@@ -1,0 +1,19 @@
+// Cloudflare Worker that serves the built site as static assets, at shipyard.yahyapak.dev.
+// Files come from site/dist, and site/public/_headers (copied into dist) sets their headers.
+// /docs and /privacy are served from docs.html and privacy.html. A request that matches no file
+// reaches worker/index.js, which answers with a 404: the 404 page for a browser, plain text otherwise.
+// Deploy from site/: `npm run deploy`. The analytics keys come from the build environment, never this file.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "shipyard-site",
+  "compatibility_date": "2026-10-17",
+  "main": "./worker/index.js",
+  // Cloudflare creates the DNS record and certificate for this hostname.
+  "routes": [{ "pattern": "shipyard.yahyapak.dev", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}

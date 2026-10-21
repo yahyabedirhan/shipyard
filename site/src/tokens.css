@@ -1,0 +1,197 @@
+/* Every colour, typeface, type size, spacing and size the site uses, in one place. The other stylesheets only read
+   these variables, so a new look is a change to this file. The look today is the topographic docs' dark theme. */
+:root{
+  /* surfaces and text */
+  --bg:#0b0b0d;
+  --code:#0f0f12;
+  --card:#131316;
+  --fg:#ecebe8;
+  --text:#c9c8c3;
+  --mut:#8b8a86;
+  --faint:#5f5e5a;
+  --line:rgba(255,255,255,.075);
+  --line-2:rgba(255,255,255,.12);
+  --ok:#9dcec0;
+  --link-line:rgba(255,255,255,.22);
+  --tint:rgba(255,255,255,.06);
+  --tint-2:rgba(255,255,255,.07);
+  --stripe:rgba(255,255,255,.025);
+  --selection:rgba(169,199,228,.28);
+  --flash:rgba(169,199,228,.45);
+  --bar:rgba(11,11,13,.82);
+  --on-fg:#0b0b0d;
+
+  /* code */
+  --tk-k:#7f7e7a;
+  --tk-s:#a9c7e4;
+  --tk-n:#e0b089;
+  --tk-t:#c9b6ea;
+  --tk-a:#9dcec0;
+  --tk-c:#5f5e5a;
+
+  /* the mock panel: item states, as GitHub colours them */
+  --mock-bg:#1c1c1f;
+  --mock-head:#232327;
+  --mock-open:#7ccf8a;
+  --mock-draft:#8b8a86;
+  --mock-merged:#b69cf0;
+  --mock-closed:#ec7f7f;
+  --mock-running:#e0c36a;
+  --mock-attention:#6aa8ff;
+  --mock-shadow:0 18px 50px rgba(0,0,0,.45);
+
+  /* the landing page */
+  --land-glow:rgba(169,199,228,.10);
+  --land-wave:rgba(236,235,232,.16);
+
+  /* typefaces */
+  --sans:Geist,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --serif:'IBM Plex Serif',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* type sizes */
+  --type-display:64px;
+  --type-display-phone:40px;
+  --type-wordmark-big:64px;
+  --type-wordmark-big-phone:64px;
+  --type-title:31px;
+  --type-title-phone:26px;
+  --type-sub:18px;
+  --type-sub-phone:17px;
+  --type-h2:18px;
+  --type-wordmark:17px;
+  --type-wordmark-bar:16px;
+  --type-lede:15.5px;
+  --type-body:15px;
+  --type-faq:14.5px;
+  --type-dl:14px;
+  --type-nav:13.5px;
+  --type-table:13.5px;
+  --type-select:13px;
+  --type-caption:12.5px;
+  --type-code:12.5px;
+  --type-small:12px;
+  --type-th:11.5px;
+  --type-mono-small:11.5px;
+  --type-micro:11px;
+  --type-label:10.5px;
+  --type-sup:10px;
+  --type-mock:12px;
+  --type-mock-small:10.5px;
+  --leading:1.62;
+  --leading-tight:1.14;
+  --leading-code:1.72;
+  --tracking-title:-.022em;
+  --tracking-tight:-.01em;
+  --tracking-label:.08em;
+  --tracking-lede:-.005em;
+
+  /* spacing */
+  --sp-0:2px;
+  --sp-1:4px;
+  --sp-2:6px;
+  --sp-3:8px;
+  --sp-4:10px;
+  --sp-5:12px;
+  --sp-6:14px;
+  --sp-7:16px;
+  --sp-8:18px;
+  --sp-9:22px;
+  --sp-10:24px;
+  --sp-11:28px;
+  --sp-12:34px;
+  --sp-13:44px;
+  --sp-14:48px;
+  --sp-15:52px;
+  --sp-16:56px;
+  --sp-17:64px;
+  --sp-18:72px;
+  --sp-19:76px;
+  --sp-20:160px;
+
+  /* sizes */
+  --col:640px;
+  --nav:250px;
+  --mar:224px;
+  --g1:72px;
+  --gutter:24px;
+  --gutter-phone:16px;
+  --phone-col:640px;
+  --hair:1px;
+  --half-hair:.5px;
+  --focus:1.5px;
+  --radius-xs:5px;
+  --radius-sm:7px;
+  --radius:8px;
+  --radius-md:12px;
+  --radius-lg:14px;
+  --radius-pill:999px;
+  --bar-h:52px;
+  --ring-w:34px;
+  --ring-h:24px;
+  --nav-logo:26px;
+  --copy:28px;
+  --copy-icon:14px;
+  --icon:18px;
+  --code-tab-h:38px;
+  --limit-dt:180px;
+  --shot-h:420px;
+  --shot-h-phone:300px;
+  --mock-w:340px;
+  --mock-row:30px;
+  --dot:7px;
+  --blur:14px;
+  --scroll-pad:40px;
+  --underline-offset:3px;
+  --focus-offset:3px;
+  --rock-lift:-1px;
+
+  --land-col:1120px;
+  --land-shot:560px;
+  --land-logo:104px;
+  --land-logo-gap:calc(.22em + 12px);
+  --btn-h:40px;
+
+  /* motion */
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --glide:.5s;
+  --quick:.15s;
+}
+@media (max-width:1180px){:root{--mar:200px;--g1:48px;--nav:160px;--col:520px}}
+
+/* the docs' diagrams, in the Graphite look: folded white paper on a dark granite tile, as the logo is drawn */
+:root{
+  --dg-tile-top:#222529;
+  --dg-tile-bottom:#131417;
+  --dg-node:#222529;
+  --dg-ink:#e4e6e9;
+  --dg-muted:#8b9097;
+  --dg-soft:#6b7078;
+  --dg-line:rgba(255,255,255,.16);
+  --dg-zone:rgba(255,255,255,.03);
+  --dg-zone-line:rgba(255,255,255,.12);
+  --dg-fold:#ffffff;
+  --dg-shade:#b9bec4;
+  --dg-on-fold:#131417;
+  --dg-fold-muted:#4f545b;
+  --dg-fold-chip:#f1f2f4;
+  --dg-fold-line:rgba(19,20,23,.16);
+  --dg-rim-top:rgba(255,255,255,.32);
+  --dg-rim-bottom:rgba(255,255,255,.08);
+  --dg-rim-in-top:rgba(255,255,255,.14);
+  --dg-rim-in-bottom:rgba(255,255,255,.03);
+
+  /* sizes in the diagram's own units, which scale with it */
+  --dg-type-name:14px;
+  --dg-type-sub:10.5px;
+  --dg-type-tag:8.5px;
+  --dg-type-label:9px;
+  --dg-type-chip:12px;
+  --dg-type-callout:12px;
+  --dg-tracking-tag:.1em;
+  --dg-tracking-label:.08em;
+  --dg-dash:4 3;
+  --dg-zone-dash:3 4;
+  /* the narrowest a diagram draws before it scrolls inside its box */
+  --dg-min:480px;
+}

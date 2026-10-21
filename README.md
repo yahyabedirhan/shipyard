@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/images/logo/shipyard.png" width="128" alt="shipyard's logo: a white sailboat with folded sails on two waves, on a dark graphite tile"></p>
+<p align="center"><img src="assets/images/logo/shipyard.png" width="104" alt="shipyard's logo: a white sailboat with folded sails on two waves, on a dark graphite tile"></p>
 
 <h1 align="center">shipyard</h1>
 
@@ -10,16 +10,13 @@
   <a href="https://github.com/yahyabedirhan/shipyard/releases/latest">Download</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
-<!-- PLACEHOLDER: the Site and Docs links go live with shipyard.yahyapak.dev at launch. -->
 
 **Status:** under construction; this README describes 0.7.1.
 
-<!-- SHOT:readme-hero-light SHOT:readme-hero-dark -->
+<!-- SHOT:landing-tabs-dark SHOT:landing-list-light -->
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/themed-look/tabs-shipyard-dark.png">
-    <img src="assets/screenshots/themed-look/tabs-shipyard-light.png" width="420" alt="The shipyard panel in the Shipyard theme, in the tabs layout on its All tab: pull requests from two public repositories, each row with its number, repository and author">
-  </picture>
+  <img src="assets/screenshots/launch/landing-tabs-dark.png" width="320" alt="The shipyard panel in dark mode, in the tabs layout on one project's tab: pull requests, pings from agents, issues and runs">
+  <img src="assets/screenshots/launch/landing-list-light.png" width="320" alt="The shipyard panel in the Paper theme, in the list layout: four projects, each with its pull requests, pings, issues and runs">
 </p>
 
 ```sh
@@ -57,7 +54,6 @@ make install    # builds, signs and copies Shipyard.app to /Applications, then o
 **From the download.** Get `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest).
 It is not notarized yet, so clear the quarantine flag before the first launch:
 
-<!-- PLACEHOLDER: the notarized download replaces the xattr step, and a Homebrew cask line joins this section, at the last launch step. -->
 
 ```sh
 unzip Shipyard-<version>-macos.zip

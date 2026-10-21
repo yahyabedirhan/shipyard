@@ -1,0 +1,50 @@
+name: site
+
+# The website in site/ has its own Node build, apart from the Swift package. It runs only when the site, or a
+# repository file the site is generated from, changes: the schemas, the skill, the command table's Swift sources,
+# the changelog and the launch screenshots.
+on:
+  push:
+    paths:
+      - 'site/**'
+      - 'schema/**'
+      - 'skills/shipyard/**'
+      - 'Sources/**/*Command*.swift'
+      - 'Sources/ShipyardCommand/Version.swift'
+      - 'CHANGELOG.md'
+      - 'assets/screenshots/launch/**'
+      - 'assets/images/logo/**'
+      - '.github/workflows/site.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'schema/**'
+      - 'skills/shipyard/**'
+      - 'Sources/**/*Command*.swift'
+      - 'Sources/ShipyardCommand/Version.swift'
+      - 'CHANGELOG.md'
+      - 'assets/screenshots/launch/**'
+      - 'assets/images/logo/**'
+      - '.github/workflows/site.yml'
+
+jobs:
+  site:
+    name: site tests and build
+    # A pull request from a branch here was already tested by its push run.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      # Lists what is still open before a launch; it doesn't fail the run.
+      - run: npm run placeholders
