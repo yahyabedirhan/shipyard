@@ -9,7 +9,7 @@ private let config = """
     terminal = "Ghostty"
 
     [remote]
-    machines = ["hetzner-vps", "netcup-vps"]
+    machines = ["alpha-vps", "beta-vps"]
 
     [[projects]]
     slug = "shop"
@@ -21,17 +21,17 @@ private let onePullRequest = PullRequestsResponse("yahyabedirhan/shop", [PullReq
 
 @MainActor
 private extension Harness {
-    static func polled(hetzner: [Ping] = [], netcup: [Ping] = []) async throws -> Harness {
+    static func polled(alpha: [Ping] = [], beta: [Ping] = []) async throws -> Harness {
         let harness = try Harness(stored: "gho_stored", config: config)
-        await harness.startWithMachines(graphQL: onePullRequest, hetzner: hetzner, netcup: netcup, polled: true)
+        await harness.startWithMachines(graphQL: onePullRequest, alpha: alpha, beta: beta, polled: true)
         return harness
     }
 
-    func remoteRow(_ title: String, on machine: String = "netcup-vps") throws -> MenuRow {
+    func remoteRow(_ title: String, on machine: String = "beta-vps") throws -> MenuRow {
         try #require(section(machine)?.rows.first { $0.title == title })
     }
 
-    func clickRemote(_ title: String, on machine: String = "netcup-vps") async throws {
+    func clickRemote(_ title: String, on machine: String = "beta-vps") async throws {
         await shipyard.open(try remoteRow(title, on: machine)).value
     }
 
@@ -46,14 +46,14 @@ struct RemoteClickTests {
 
     @Test("a pane's agent is focused on its machine, then the terminal comes forward, and the ping is seen")
     func focusesAgent() async throws {
-        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "netcup-vps")
+        let harness = try await Harness.polled(beta: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "beta-vps")
         #expect(harness.shipyard.menu.attention.pings == 1)
 
         try await harness.clickRemote("Deploy?")
 
-        #expect(harness.focusRuns(on: "netcup-vps") == [["agent", "focus", "w1:p3"]])
-        #expect(harness.focusRuns(on: "hetzner-vps").isEmpty)
+        #expect(harness.focusRuns(on: "beta-vps") == [["agent", "focus", "w1:p3"]])
+        #expect(harness.focusRuns(on: "alpha-vps").isEmpty)
         #expect(harness.herdr.runs.allSatisfy { $0.first == "--machine" })
         #expect(harness.actions.ran == [.app("Ghostty")])
         #expect(try !harness.remoteRow("Deploy?").needsAttention)
@@ -62,49 +62,49 @@ struct RemoteClickTests {
 
     @Test("a pane no agent occupies is focused by its tab; a tab is focused at once")
     func focusesTab() async throws {
-        let harness = try await Harness.polled(netcup: [
+        let harness = try await Harness.polled(beta: [
             remotePing("q1", "Shell", action: .herdr("w1:p4")),
             remotePing("q2", "Tab", action: .herdr("w1:t5")),
         ])
-        harness.herdr.open(pane: "w1:p4", tab: "w1:t2", agent: false, on: "netcup-vps")
-        harness.herdr.open(pane: "w1:p6", tab: "w1:t5", on: "netcup-vps")
+        harness.herdr.open(pane: "w1:p4", tab: "w1:t2", agent: false, on: "beta-vps")
+        harness.herdr.open(pane: "w1:p6", tab: "w1:t5", on: "beta-vps")
 
         try await harness.clickRemote("Shell")
         try await harness.clickRemote("Tab")
 
-        #expect(harness.focusRuns(on: "netcup-vps") == [
+        #expect(harness.focusRuns(on: "beta-vps") == [
             ["agent", "focus", "w1:p4"],
             ["pane", "get", "w1:p4"],
             ["tab", "focus", "w1:t2"],
             ["tab", "focus", "w1:t5"],
         ])
         #expect(harness.actions.ran == [.app("Ghostty"), .app("Ghostty")])
-        #expect(harness.section("netcup-vps")?.rows.allSatisfy { !$0.needsAttention } == true)
+        #expect(harness.section("beta-vps")?.rows.allSatisfy { !$0.needsAttention } == true)
     }
 
     @Test("the same id on two machines: the click focuses its own machine")
     func ownMachine() async throws {
         let harness = try await Harness.polled(
-            hetzner: [remotePing("q1", "From hetzner", action: .herdr("w1:p3"))],
-            netcup: [remotePing("q1", "From netcup", action: .herdr("w1:p3"))]
+            alpha: [remotePing("q1", "From alpha", action: .herdr("w1:p3"))],
+            beta: [remotePing("q1", "From beta", action: .herdr("w1:p3"))]
         )
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "hetzner-vps")
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "netcup-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "alpha-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t1", on: "beta-vps")
 
-        try await harness.clickRemote("From netcup")
+        try await harness.clickRemote("From beta")
 
-        #expect(harness.focusRuns(on: "netcup-vps") == [["agent", "focus", "w1:p3"]])
-        #expect(harness.focusRuns(on: "hetzner-vps").isEmpty)
+        #expect(harness.focusRuns(on: "beta-vps") == [["agent", "focus", "w1:p3"]])
+        #expect(harness.focusRuns(on: "alpha-vps").isEmpty)
     }
 
     @Test("its notification runs the action as its row does")
     func notification() async throws {
-        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "netcup-vps")
+        let harness = try await Harness.polled(beta: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "beta-vps")
 
-        await harness.shipyard.openNotification(Ping.url(machine: "netcup-vps", id: "q1")).value
+        await harness.shipyard.openNotification(Ping.url(machine: "beta-vps", id: "q1")).value
 
-        #expect(harness.focusRuns(on: "netcup-vps") == [["agent", "focus", "w1:p3"]])
+        #expect(harness.focusRuns(on: "beta-vps") == [["agent", "focus", "w1:p3"]])
         #expect(harness.actions.ran == [.app("Ghostty")])
         #expect(try !harness.remoteRow("Deploy?").needsAttention)
     }
@@ -112,7 +112,7 @@ struct RemoteClickTests {
     @Test("a link or an app opens on the Mac, as a local ping's does, nothing runs on the machine, and each is seen; so is one without an action")
     func onTheMac() async throws {
         let link = URL(string: "https://github.com/yahyabedirhan/shop/pull/1")!
-        let harness = try await Harness.polled(netcup: [
+        let harness = try await Harness.polled(beta: [
             remotePing("l1", "Review this", action: .url(link)),
             remotePing("a1", "Look at the simulator", action: .app("Simulator")),
             remotePing("n1", "FYI"),
@@ -123,25 +123,25 @@ struct RemoteClickTests {
         try await harness.clickRemote("FYI")
 
         #expect(harness.actions.ran == [.url(link), .app("Simulator")])
-        #expect(harness.focusRuns(on: "netcup-vps").isEmpty)
-        #expect(harness.section("netcup-vps")?.rows.allSatisfy { !$0.needsAttention } == true)
+        #expect(harness.focusRuns(on: "beta-vps").isEmpty)
+        #expect(harness.section("beta-vps")?.rows.allSatisfy { !$0.needsAttention } == true)
     }
 
     @Test("a pane that's gone says so on the row and stays unseen, across polls; a later click that works clears it")
     func paneGone() async throws {
-        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
+        let harness = try await Harness.polled(beta: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
 
         try await harness.clickRemote("Deploy?")
 
         var row = try harness.remoteRow("Deploy?")
         #expect(row.actionError == "Pane gone")
-        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Herdr pane w1:p3 is gone on netcup-vps")
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Herdr pane w1:p3 is gone on beta-vps")
         #expect(row.needsAttention)
         #expect(harness.actions.ran.isEmpty)
         _ = await harness.machineTimer.fire()
         #expect(try harness.remoteRow("Deploy?").actionError == "Pane gone")
 
-        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "netcup-vps")
+        harness.herdr.open(pane: "w1:p3", tab: "w1:t2", on: "beta-vps")
         try await harness.clickRemote("Deploy?")
 
         row = try harness.remoteRow("Deploy?")
@@ -151,25 +151,25 @@ struct RemoteClickTests {
 
     @Test("a machine Herdr can't reach says so on the row, and the ping stays unseen")
     func unreachable() async throws {
-        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
-        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        let harness = try await Harness.polled(beta: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
+        harness.herdr.setReach(.unreachable, on: "beta-vps")
 
         try await harness.clickRemote("Deploy?")
 
         let row = try harness.remoteRow("Deploy?")
         #expect(row.actionError == "Offline")
-        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Couldn't reach netcup-vps through Herdr")
+        #expect(PanelText.rowCard(row, now: harness.clock.now).lines.last == "Couldn't reach beta-vps through Herdr")
         #expect(row.needsAttention)
         #expect(harness.actions.ran.isEmpty)
     }
 
     @Test("a ping replaced on its machine loses its old sending's failure")
     func replaced() async throws {
-        let harness = try await Harness.polled(netcup: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
+        let harness = try await Harness.polled(beta: [remotePing("q1", "Deploy?", action: .herdr("w1:p3"))])
         try await harness.clickRemote("Deploy?")
         #expect(try harness.remoteRow("Deploy?").actionError != nil)
 
-        harness.herdr.setPings([remotePing("q1", "Deploy now?", action: .herdr("w1:p3"))], on: "netcup-vps")
+        harness.herdr.setPings([remotePing("q1", "Deploy now?", action: .herdr("w1:p3"))], on: "beta-vps")
         _ = await harness.machineTimer.fire()
 
         #expect(try harness.remoteRow("Deploy now?").actionError == nil)
@@ -188,7 +188,7 @@ struct HerdrMachineFocusTests {
             runner: shell,
             machineTimeout: 0.01
         )
-        #expect(await focus.focus("w1:p3", on: "netcup-vps") == .failed("No answer", detail: "netcup-vps didn't answer in time"))
+        #expect(await focus.focus("w1:p3", on: "beta-vps") == .failed("No answer", detail: "beta-vps didn't answer in time"))
         #expect(shell.started == 1)
         #expect(shell.cancelled == 1)
     }

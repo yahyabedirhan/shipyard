@@ -144,7 +144,7 @@
       "additionalProperties": false,
       "properties": {
         "machines": {
-          "description": "The machines to ask for their pings, by the labels your Herdr knows them by as saved machines (\"netcup-vps\"): never a host or an address. Each machine's pings list in a section named after it, after the projects. A label can't start with \"-\" or be a project's slug or title.",
+          "description": "The machines to ask for their pings, by the labels your Herdr knows them by as saved machines (\"beta-vps\"): never a host or an address. Each machine's pings list in a section named after it, after the projects. A label can't start with \"-\" or be a project's slug or title.",
           "type": "array",
           "items": { "type": "string", "pattern": "^\\s*[^\\s-]" },
           "uniqueItems": true,

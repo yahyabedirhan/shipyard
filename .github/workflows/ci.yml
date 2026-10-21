@@ -5,9 +5,20 @@ name: ci
 # here. A pull request from a branch of this repository skips both jobs: the
 # push run has already tested its head commit, and its checks show on the pull
 # request. Only push runs save the cache, so the push run is the one kept.
+# A change to nothing but the website (site/ has its own workflow) or the
+# launch images skips both jobs: no Swift source reads them. A tag push ignores
+# the path filters, so a release tag still runs the bundle.
 on:
   push:
+    paths-ignore:
+      - site/**
+      - assets/screenshots/launch/**
+      - assets/images/social/**
   pull_request:
+    paths-ignore:
+      - site/**
+      - assets/screenshots/launch/**
+      - assets/images/social/**
 
 # .build is cached between runs (docs/references/github-actions-cache.md). The
 # key is the workflow and job, the OS, the exact toolchain (hashed), the

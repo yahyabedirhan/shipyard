@@ -810,8 +810,8 @@ extension Configuration {
         # [defaults.pull-requests]
         # authors = { show = [], hide = [] }
 
-        # How each project's items are grouped: "kind" (pull requests, issues,
-        # runs), "repository", "date", "author" or "none"; sorted within a
+        # How each project's items are grouped: "kind" (pull requests, pings,
+        # issues, runs, notes), "repository", "date", "author" or "none"; sorted within a
         # group: "updated", "created" or "title"; and how many rows a group
         # shows before a Show more row (0: all). A project can set its own.
         # [defaults]

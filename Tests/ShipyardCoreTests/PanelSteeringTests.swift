@@ -45,17 +45,17 @@ private let shopPullRequests = GroupID(project: "shop", key: .kind(.pullRequest)
 struct PanelSteeringTests {
     @Test("fold and unfold collapse and expand a project's or a machine's section by name, only when it differs; the status lists both")
     func foldUnfold() async throws {
-        let harness = try Harness(stored: "gho_stored", config: "[remote]\nmachines = [\"netcup-vps\"]\n\n" + config())
-        await harness.startWithMachines(graphQL: answer, netcup: [remotePing("q1", "Deploy?")], polled: true)
-        #expect(harness.shipyard.menu.projectNames == ["shop", "blog", "netcup-vps"])
+        let harness = try Harness(stored: "gho_stored", config: "[remote]\nmachines = [\"beta-vps\"]\n\n" + config())
+        await harness.startWithMachines(graphQL: answer, beta: [remotePing("q1", "Deploy?")], polled: true)
+        #expect(harness.shipyard.menu.projectNames == ["shop", "blog", "beta-vps"])
 
         try harness.shipyard.setCollapsed("blog", true)
         try harness.shipyard.setCollapsed("blog", true)
-        try harness.shipyard.setCollapsed("netcup-vps", true)
+        try harness.shipyard.setCollapsed("beta-vps", true)
 
         #expect(harness.section("blog")?.isCollapsed == true)
-        #expect(harness.shipyard.menu.collapsedProjects == ["blog", "netcup-vps"])
-        try harness.shipyard.setCollapsed("netcup-vps", false)
+        #expect(harness.shipyard.menu.collapsedProjects == ["blog", "beta-vps"])
+        try harness.shipyard.setCollapsed("beta-vps", false)
 
         try harness.shipyard.setCollapsed("blog", false)
         try harness.shipyard.setCollapsed("blog", false)

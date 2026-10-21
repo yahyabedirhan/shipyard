@@ -87,25 +87,25 @@ struct BannerSnoozeTests {
 
     @Test("one machine's snooze hides only its own line, whatever its words become")
     func oneMachine() async throws {
-        let harness = try Harness(stored: "gho_stored", config: "version = 1\n[remote]\nmachines = [\"hetzner-vps\", \"netcup-vps\"]\n\n" + shop)
+        let harness = try Harness(stored: "gho_stored", config: "version = 1\n[remote]\nmachines = [\"alpha-vps\", \"beta-vps\"]\n\n" + shop)
         await harness.startWithMachines(graphQL: onePullRequest)
-        harness.herdr.setReach(.unreachable, on: "hetzner-vps")
-        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        harness.herdr.setReach(.unreachable, on: "alpha-vps")
+        harness.herdr.setReach(.unreachable, on: "beta-vps")
         await harness.poll()
-        #expect(harness.bannerKeys == ["machine-hetzner-vps", "machine-netcup-vps"])
+        #expect(harness.bannerKeys == ["machine-alpha-vps", "machine-beta-vps"])
 
-        harness.shipyard.dismissBanner("machine-netcup-vps")
-        #expect(harness.bannerKeys == ["machine-hetzner-vps"])
+        harness.shipyard.dismissBanner("machine-beta-vps")
+        #expect(harness.bannerKeys == ["machine-alpha-vps"])
 
-        harness.herdr.setReach(.disabled, on: "netcup-vps")
+        harness.herdr.setReach(.disabled, on: "beta-vps")
         await harness.poll()
-        #expect(harness.bannerKeys == ["machine-hetzner-vps"])
+        #expect(harness.bannerKeys == ["machine-alpha-vps"])
 
-        harness.herdr.setReach(.up, on: "netcup-vps")
+        harness.herdr.setReach(.up, on: "beta-vps")
         await harness.poll()
-        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        harness.herdr.setReach(.unreachable, on: "beta-vps")
         await harness.poll()
-        #expect(harness.bannerKeys == ["machine-hetzner-vps", "machine-netcup-vps"])
+        #expect(harness.bannerKeys == ["machine-alpha-vps", "machine-beta-vps"])
     }
 
     @Test("a refresh delay whose words change stays hidden, since the snooze is the delay's, not its words'")
@@ -145,20 +145,20 @@ struct BannerSnoozeTests {
 
     @Test("a restart keeps the snoozes through the first refresh, the first machine poll and the notifier's first word, and the banners show again when the hour ends")
     func keptAcrossRestart() async throws {
-        let config = "version = 1\n[remote]\nmachines = [\"netcup-vps\"]\n\n" + shop
+        let config = "version = 1\n[remote]\nmachines = [\"beta-vps\"]\n\n" + shop
         let harness = try Harness(stored: "gho_stored", config: config)
         await harness.startWithMachines(graphQL: .failure())
-        harness.herdr.setReach(.unreachable, on: "netcup-vps")
+        harness.herdr.setReach(.unreachable, on: "beta-vps")
         await harness.poll()
         harness.shipyard.notificationsAreOff = true
-        #expect(harness.bannerKeys == ["fetch", "machine-netcup-vps", "notifications"])
+        #expect(harness.bannerKeys == ["fetch", "machine-beta-vps", "notifications"])
         for key in harness.bannerKeys { harness.shipyard.dismissBanner(key) }
         #expect(harness.bannerKeys.isEmpty)
 
         harness.clock.advance(by: 30 * 60)
         let relaunched = harness.relaunched()
-        relaunched.herdr.addMachine("netcup-vps")
-        relaunched.herdr.setReach(.unreachable, on: "netcup-vps")
+        relaunched.herdr.addMachine("beta-vps")
+        relaunched.herdr.setReach(.unreachable, on: "beta-vps")
         relaunched.stub.on(Harness.userURL, Harness.viewerAnswer)
         relaunched.graphQL([.failure()])
         await relaunched.shipyard.start()
@@ -169,7 +169,7 @@ struct BannerSnoozeTests {
         #expect(relaunched.shipyard.bannerSnoozeEnds == [end, end, end])
 
         relaunched.clock.advance(by: 30 * 60)
-        #expect(relaunched.bannerKeys == ["fetch", "machine-netcup-vps", "notifications"])
+        #expect(relaunched.bannerKeys == ["fetch", "machine-beta-vps", "notifications"])
         await relaunched.refreshNow(answering: .failure())
         #expect(relaunched.shipyard.appStateStore.state.bannerSnoozes == BannerSnoozes())
     }
