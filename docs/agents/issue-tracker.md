@@ -1,6 +1,18 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues in `yahyabedirhan/shipyard`, so the repo has no `.efforts/` folder. Use the `gh` CLI for all operations.
+Issues and specs for this repo live as GitHub issues in `yahyabedirhan/shipyard`, so the repo has no `.efforts/` folder.
+Use the `gh` CLI for all operations.
+
+Its sections, in order:
+
+1. Conventions
+2. Title prefixes
+3. Efforts
+4. Bugs and screenshots
+5. Pull requests as a triage surface
+6. When a skill says "publish to the issue tracker"
+7. When a skill says "fetch the relevant ticket"
+8. Wayfinding operations
 
 ## Conventions
 
@@ -16,14 +28,16 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 
 ## Title prefixes
 
-Start every issue title with one prefix, then `: ` and a capitalized title with no trailing period, for example `QA: Pings, remote pings and the panel`. When more than one prefix fits, use the first one in this order:
+Start every issue title with one prefix, then `: ` and a capitalized title with no trailing period, for example `QA: Pings, remote pings and the panel`.
+When more than one prefix fits, use the first one in this order:
 
 1. `QA`: manual work for the maintainer.
 2. A semantic prefix from the list below: one area of this project.
 3. `Bug`, `Feature`, `Chore` or `Spec`: the kind of work.
 4. `Research`: a question to answer before the work starts.
 
-Write each prefix the way its maker writes it. Use a semantic prefix before a generic one when one fits.
+Write each prefix the way its maker writes it.
+Use a semantic prefix before a generic one when one fits.
 
 ### Semantic prefixes
 
@@ -33,20 +47,31 @@ Write each prefix the way its maker writes it. Use a semantic prefix before a ge
 - `Lease`: the agent lease, which lets one agent at a time hold app control.
 - `Tailscale`: Tailscale and the tailnet between the Mac and other machines.
 
-Reuse a prefix from this list before you add a new one. Add a new one when no prefix fits and the issue belongs to one tool, product, skill or workflow. Add it to this list in the same change.
+Reuse a prefix from this list before you add a new one.
+Add a new one when no prefix fits and the issue belongs to one tool, product, skill or workflow.
+Add it to this list in the same change.
 
 ## Efforts
 
 An **effort** is one spec issue and the tickets that build it.
 
-- **Tickets under the spec**: each ticket is a GitHub sub-issue of its spec (`gh api --method POST repos/<owner>/<repo>/issues/<spec>/sub_issues -F sub_issue_id=<ticket-db-id>`), with `## Parent` naming the spec in its body. Moving a ticket to another effort means removing it from the old spec's sub-issues and adding it to the new one's.
+- **Tickets under the spec**: each ticket is a GitHub sub-issue of its spec (`gh api --method POST repos/<owner>/<repo>/issues/<spec>/sub_issues -F sub_issue_id=<ticket-db-id>`), with `## Parent` naming the spec in its body.
+  - Moving a ticket to another effort means removing it from the old spec's sub-issues and adding it to the new one's.
 - **Order**: GitHub's native "blocked by" dependencies, as described under Wayfinding operations below. A blocking edge may cross efforts.
-- **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:shipyard-0-0-2` on #54 and its tickets). When publishing a new spec, create its label if it's missing (`gh label create effort:<name> --color f9d0c4`; every effort label shares this pale brick, since the name tells them apart) and apply it to the spec and each ticket; a ticket moved to another effort swaps its label too. Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
+- **Name**: every effort has a kebab-case name, carried as the label `effort:<name>` on the spec and on every one of its tickets (for example `effort:shipyard-0-0-1` on #1 and its tickets, `effort:shipyard-0-0-2` on #54 and its tickets).
+  - When publishing a new spec, create its label if it's missing (`gh label create effort:<name> --color f9d0c4`; every effort label shares this pale brick, since the name tells them apart) and apply it to the spec and each ticket.
+  - A ticket moved to another effort swaps its label too.
+  - Refer to an effort by this name, and list it with `gh issue list --state all --label effort:<name>`.
 
 ## Bugs and screenshots
 
 - A bug found while building or checking the app gets a ticket, labelled `bug`, in the effort it belongs to, and blocks that effort's verification ticket. If an open ticket already owns the behaviour, update that ticket instead.
-- Attach a screenshot when it shows the bug. `gh` can't upload images to an issue, so screenshots are committed to the repository under `assets/screenshots/<topic>/` (for example `assets/screenshots/bugs/`, or the effort's folder such as `assets/screenshots/shipyard-0.0.2/`) on the working branch, and pushed. Embed the raw URL pinned to the commit that added the file, not a branch name: `![what it shows](https://raw.githubusercontent.com/yahyabedirhan/shipyard/<commit>/assets/screenshots/<topic>/<name>.png)`. Check it loads (`curl -s -o /dev/null -w "%{http_code}" <url>` prints `200`) before posting. Pull requests here merge with merge commits, so the pinned commit stays reachable from `main` after the merge; don't squash or rebase a branch whose commits are embedded. The orphan branch `issue-assets` is retired: don't add to it.
+- Attach a screenshot when it shows the bug:
+  - `gh` can't upload images to an issue, so screenshots are committed to the repository under `assets/screenshots/<topic>/` (for example `assets/screenshots/bugs/`, or the effort's folder such as `assets/screenshots/shipyard-0.0.2/`) on the working branch, and pushed.
+  - Embed the raw URL pinned to the commit that added the file, not a branch name: `![what it shows](https://raw.githubusercontent.com/yahyabedirhan/shipyard/<commit>/assets/screenshots/<topic>/<name>.png)`.
+  - Check it loads (`curl -s -o /dev/null -w "%{http_code}" <url>` prints `200`) before posting.
+  - Pull requests here merge with merge commits, so the pinned commit stays reachable from `main` after the merge; don't squash or rebase a branch whose commits are embedded.
+  - The orphan branch `issue-assets` is retired: don't add to it.
 - Agents don't open or click the real menu (see Testing in `AGENTS.md`); screenshots of it come from the maintainer.
 
 ## Pull requests as a triage surface
@@ -63,7 +88,9 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue. When it belongs to an effort, make sure the `effort:<effort>` label exists before `gh issue create`, because `--label` fails on a label the repo does not have yet. List labels and create it, in the Efforts section's color, only when that exact name is missing, so a later ticket of the same effort does not try to recreate it:
+Create a GitHub issue.
+When it belongs to an effort, make sure the `effort:<effort>` label exists before `gh issue create`, because `--label` fails on a label the repo does not have yet.
+List labels and create it, in the Efforts section's color, only when that exact name is missing, so a later ticket of the same effort does not try to recreate it:
 
 ```bash
 gh label list --limit 1000 --json name --jq '.[] | select(.name == "effort:<effort>") | .name'
@@ -71,7 +98,8 @@ gh label create "effort:<effort>" --color f9d0c4
 gh issue create --title "..." --body "..." --label "effort:<effort>"
 ```
 
-Run `gh label create` only when the list prints nothing. An issue that is not part of an effort is `gh issue create --title "..." --body "..."` with no label.
+Run `gh label create` only when the list prints nothing.
+An issue that is not part of an effort is `gh issue create --title "..." --body "..."` with no label.
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -79,11 +107,19 @@ Run `gh issue view <number> --comments`.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
+Used by `/wayfinder`.
+The **map** is a single issue with **child** issues as tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
-- **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
+- **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint).
+  - Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body.
+  - Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`).
+  - Once claimed, the ticket is assigned to the driving dev.
+- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation.
+  - Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`).
+  - GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate).
+  - Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body.
+  - A ticket is unblocked when every blocker is closed.
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.

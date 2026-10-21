@@ -1,6 +1,12 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+The skills speak in terms of five canonical triage roles.
+This file maps those roles to the actual label strings used in this repo's issue tracker.
+
+Its sections, in order:
+
+1. Role table: the table below, under this introduction
+2. After the build: the `ready-for-qa` label, and blocking and non-blocking QA
 
 | Label in mattpocock/skills | Label in our tracker | Meaning                                  |
 | -------------------------- | -------------------- | ---------------------------------------- |
@@ -14,8 +20,17 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 ## After the build
 
-One more label, not one of the triage roles: `ready-for-qa`. It marks a ticket that is built, committed and installed, and is waiting for the maintainer to use it in the real app. Such a ticket is assigned to the maintainer and carries a comment on how to use and try the change. The maintainer closes it when it's done, or comments with feedback, which sends it back to `ready-for-agent`. Agents don't close a ticket that's in QA.
+One more label, not one of the triage roles: `ready-for-qa`.
 
-QA is **blocking** or **non-blocking**. Blocking QA holds the pull request: it doesn't merge until the QA ticket is closed. For non-blocking QA, the original ticket is closed and a new QA ticket, linked to it both ways, carries the steps to try. The maintainer says which; in effort `shipyard-0-0-1` every change is blocking.
+- It marks a ticket that is built, committed and installed, and is waiting for the maintainer to use it in the real app.
+- Such a ticket is assigned to the maintainer and carries a comment on how to use and try the change.
+- The maintainer closes it when it's done, or comments with feedback, which sends it back to `ready-for-agent`.
+- Agents don't close a ticket that's in QA.
+
+QA is **blocking** or **non-blocking**:
+
+- **Blocking** QA holds the pull request: it doesn't merge until the QA ticket is closed.
+- For **non-blocking** QA, the original ticket is closed and a new QA ticket, linked to it both ways, carries the steps to try.
+- The maintainer says which; in effort `shipyard-0-0-1` every change is blocking.
 
 Edit the right-hand column to match whatever vocabulary you actually use.
