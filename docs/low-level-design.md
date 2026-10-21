@@ -3970,7 +3970,19 @@ shipyard/
 
 ## 4. Implementation
 
-### Shipyard.refresh() — the pipeline
+The methods that carry the logic, as pseudocode, and concrete scenarios traced step by step through the modules.
+Its sections, in order:
+
+- **Pipelines**: the refresh, listing, arrangement, attention, configuration change, ping filing and control server methods, then the rate limit arithmetic the refresh rests on.
+- **Traces**: numbered scenarios, each a table of calls with the owner beside each call and the state after it, then its variants and rejections.
+- **Findings**: what the traces turned up.
+
+### Pipelines
+
+Each pipeline is pseudocode: the happy path, with its edge cases as branches and inline comments.
+The last, the rate limit arithmetic, is the cost the refresh's timing rests on.
+
+#### Shipyard.refresh() — the pipeline
 
 ```text
 refresh()
@@ -4018,9 +4030,14 @@ refresh()
 
 Every fetched item stays known even when its project doesn't list it, so an item a filter change brings into view later doesn't notify as though it were new.
 
-The windows count back from the clock at each listing, not from the fetch, so a closed item leaves on time on its own: every timer firing lists again (after a fetch, after a failed one from the last snapshot, and while paused from the last snapshot without a request), and the timer fires at least every refresh interval (stretched or backed off by the budget, and during a pause at most the configured interval). A `closed-window = "30m"` item is gone within one interval of its 30 minutes passing.
+The windows count back from the clock at each listing, not from the fetch, so a closed item leaves on time on its own:
 
-### Listing.items (0.0.2)
+- Every timer firing lists again: after a fetch, after a failed one from the last snapshot, and while paused from the last snapshot without a request.
+- The timer fires at least every refresh interval, stretched or backed off by the budget, and during a pause at most the configured interval.
+
+A `closed-window = "30m"` item is gone within one interval of its 30 minutes passing.
+
+#### Listing.items (0.0.2)
 
 ```text
 items(for project, in snapshot, viewer, now)
@@ -4035,7 +4052,7 @@ items(for project, in snapshot, viewer, now)
     and (not reviewRequested or snapshot.reviewRequested contains item.id)
 ```
 
-### Arrangement.groups (0.0.2)
+#### Arrangement.groups (0.0.2)
 
 ```text
 groups(items, project, settings, layout, folded, expanded, now, calendar)
@@ -4052,7 +4069,8 @@ groups(items, project, settings, layout, folded, expanded, now, calendar)
                   isFolded: showsHeader and id in folded,
                   attentionCount: every row's needsAttention, hidden ones too)
 ```
-### Attention.needsAttention(item)
+
+#### Attention.needsAttention(item)
 
 ```text
 needsAttention(item, t)
@@ -4063,7 +4081,7 @@ needsAttention(item, t)
   /* seen, then changed */ return t.changed or (t.reviewRequested and …) or (t.checksFailed and …)
 ```
 
-### ConfigurationStore on change
+#### ConfigurationStore on change
 
 ```text
 onDirectoryEvent (debounced)
@@ -4077,125 +4095,7 @@ onDirectoryEvent (debounced)
     configStatusStore.record(rejected: each issue with its line and banner text)
 ```
 
-### Rate limit arithmetic: does 2 minutes fit?
-
-Two separate hourly limits, both 5,000 for a signed-in user, and **both shared with every other tool using your GitHub account**, including your agents' `gh` calls. Shipyard's budget at 10% is 500 of each per hour. A 120 s interval is 30 refreshes an hour.
-
-| Budget line | Per refresh | Per hour at 120 s | Share of 5,000 |
-|---|---|---|---|
-| GraphQL, 5 repositories, PRs + issues (**measured**: dry run on job-search, e-commerce-×2, blog-×2) | 7 points | 210 | 4.2% |
-| GraphQL, 10 repositories, PRs + issues | ~14 points | ~420 | 8.4% |
-| GraphQL, 20 repositories, PRs + issues | ~28 points | → stretched to ~200 s | 10% |
-| REST runs, 10 repositories, nothing changed (304) | 10 requests, 0 counted | 0 | 0% |
-| REST runs, 10 repositories, all changed | 10 requests | 300 | 6% |
-
-GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists dominate it. To keep it low, the head commit is asked for `last: 1` and closed items for `first: 20`; 0.0.1 also read each PR's `reviewRequests` (`first: 10`), which 0.0.2's single review search (one page of 100 PRs, in the first batch) replaces. The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it. The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table. So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your GraphQL rate limit (a refresh costs 56 points)".
-
-### Trace 1: an agent opens a PR (happy path)
-
-Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backend's 3 open PRs, attention count 0. An agent opens e-commerce-backend#57.
-
-| Step | Call (owner) | State after |
-|---|---|---|
-| 1 | refresh timer fires → `Shipyard.refresh()` | gate running |
-| 2 | `GitHubClient.fetch` (GitHub/) | snapshot has 4 open PRs, #57 `checks: pending`, `author: me` |
-| 3 | `EventDetector.events` (Items/) | `[pr.opened #57 author=me]` |
-| 4 | `NotificationRules.shouldNotify` (Items/) | default rule `pr.opened any` → true |
-| 5 | `AppStateStore.update` (saved before posting) | `notified` has #57's `pr.opened`; `known` has #57 (checks pending) |
-| 6 | `Notifier.post` | macOS notification "e-commerce · New PR #57" / "Add order export" |
-| 7 | `MenuModel.build` → `MenuBarLabel` | #57 unseen → count **1**, green row, gray check dot |
-| 8 | 2 min later CI fails; refresh | fingerprint changed; event `pr.checks_failed` (no rule → silent); still unseen → count 1, red check dot |
-| 9 | user clicks #57 → `Shipyard.open` → `Attention.markSeen` | `seen[#57] = fingerprint`; count **0**; browser opens |
-| 10 | agent pushes a fix; refresh | `updatedAt` changed → fingerprint changed → count **1** again |
-
-### Trace 2: a broken edit (rejection)
-
-| Step | Call | State after |
-|---|---|---|
-| 1 | agent writes `config.toml` with `event = "pr.openned"` | — |
-| 2 | directory watch → `ConfigurationStore` → `Configuration.decode` throws `unknownEvent("pr.openned", line 14)` | `lastValid` unchanged, `error` set; `config-status.json` says `"accepted": false` with the problem at line 14 and the file's modification time |
-| 3 | `Panel` | banner: "config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?). Using the last valid configuration." |
-| 4 | refreshes keep running with `lastValid` | list unchanged |
-| 5 | agent reads `config-status.json`, fixes the file, reads it again | `error = nil`, banner gone, record says `"accepted": true` for the new modification time, refresh triggered |
-
-### Trace 4: `incoming-contributions` with `owned` (0.0.2, happy path)
-
-| Step | State after |
-|---|---|
-| Onboarding: choose `incoming-contributions` with "all my repositories" | `writePreset` writes the file; the reload has "Incoming" (`owned`) and "Review requests" (`anywhere`); phase `ready` |
-| `refresh()`: the resolver pages `viewer.repositories(affiliations: OWNER, isArchived: false)` | "Incoming" resolves to 14 repositories; `anywhere` to none |
-| `fetch`: one batch of 14 aliases plus the review search | the snapshot has 40 items; `reviewRequested` has 3 PRs, 2 in other people's repositories |
-| `Listing`: "Incoming" drops the 31 items by `me` and 2 by `dependabot[bot]`; "Review requests" takes the 3 search PRs | listings of 7 and 3 |
-| `EventDetector`: first sight of every source | no events, nothing notified (bootstrap) |
-| `MenuModel` + `Arrangement`: group by repository, subsections | "Incoming" shows 4 repository subheaders; the menu bar counts 10 listed items, not 40 |
-| Next refresh: someone opens a PR on one of the user's repositories | `pr.opened` from `others`, listed, so it notifies |
-
-### Trace 5: `anywhere` misused (0.0.2, rejection)
-
-| Step | State after |
-|---|---|
-| An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
-| `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
-### Trace 6: an agent pings, from the CLI to a click (0.0.5)
-
-Setup: projects `shop` (`repositories = ["yahyabedirhan/shop"]`) and `blog`, the default notification rules, `[herdr] terminal = "Ghostty"`. The app is running; its last refresh listed one PR in `shop`, attention count 1. An agent works in a clone of `yahyabedirhan/shop`, in Herdr pane `w1:p3`, and needs the user's answer.
-
-| Step | Call (owner) | State after |
-|---|---|---|
-| 1 | agent runs `shipyard ping "Waiting for your input" --from claude --herdr --id cache-question` → `ShipyardCLI.run` (CLI/) | `config.toml` read (projects `shop`, `blog`), and `repositories.json` (the lists the app last resolved) |
-| 2 | `PingCommand.Request.parse` (Pings/) | title, sender `claude`, id `cache-question`; `--id` isn't shaped like a Herdr id, so `--herdr` takes `HERDR_PANE_ID`: action `.herdr("w1:p3")` (N11) |
-| 3 | `GitCLI.origin(in:)` → `GitRemote.repository(fromURL:)` → `PingCommand.watchers(of:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `[shop]` with that repository (N6) |
-| 4 | `PingStore.save` | `cache-question` isn't stored: a new ping, `sent` now, a new `instance`; `Pings/cache-question.json` written atomically; prints `cache-question`, exit 0 (N1, N12) |
-| 5 | `ConfigurationWatcher` on the store's directory → `Shipyard.reloadPings()` → `listPings()` | `pings` has the new one; no GitHub request (N4) |
-| 6 | `Shipyard.numberPings` → `Listing.listings(…, pings:, numbers:)` → `MenuModel.build` → `Arrangement` | `cache-question` is new to `shop`, so it takes `shop`'s next number in `AppState.pingNumbers` (say 1, N14); `shop` lists the PR, then a "Pings" group with the ping: a terminal icon, its number 1, "#1 · claude" on its second line; unseen, so it needs attention; count **2** (N3, N8) |
-| 7 | `EventDetector.pingEvents` → `NotificationRules` (the default rules hold `ping.sent`) → `AppStateStore.update` → `Notifier.post` | `notified` has `ping.sent` for `shipyard://ping/cache-question` with its `instance`; banner "shop · Waiting for your input" over "from claude" (N7) |
-| 8 | ten minutes on, the agent sends the same command titled "Still waiting (10 min)" → steps 1–5 again | a replace: `sent` now, so the row's age starts again, the stored `instance` kept, and its URL keeps its number, with the new title; the row shows it; still count **2**, and `pingEvents`' event is already in `notified`, so no second banner (N12) |
-| 9 | user clicks the banner → `Shipyard.openNotification` → `runAction(ofPing:)` → `runHerdr`: `HerdrFocus.focus("w1:p3")` (`herdr pane get w1:p3` → tab `w1:t1` → `herdr tab focus w1:t1`) → `done` → `ActionRunning.run(.app("Ghostty"))` → `done` → `markPingsSeen` | Herdr shows the agent's tab and Ghostty comes forward; `seen` set in the ping's file; count **1**, and still after a relaunch (N8, N11) |
-| 10 | the user answers in the pane; the agent runs `shipyard ping withdraw cache-question` → `PingCommand.withdraw` → `PingStore.remove` | prints `cache-question`, exit 0; reads no `config.toml` (N12) |
-| 11 | `reloadPings()` → `listPings()` → `forgetLeftPings` → `removeLeftBanners` → `Notifier.removeDelivered` | the row leaves `shop`; the banner leaves Notification Center; the `ping.sent` record is forgotten, so `cache-question` sent again later is a new ping that notifies again (N12) |
-
-Had the agent not withdrawn it, the seen ping would stay listed for `shop`'s `seen-window` (24 h), then leave the listing and the store at the next refresh or store change (N9). The other ways through:
-
-| Variant | What happens |
-|---|---|
-| `--open https://claude.ai/artifact/42` or `--app Claude` instead of `--herdr` | the row shows a link or app icon; a click runs `ActionRunning.run(.url(…))` or `.app("Claude")` through the action port, then `markPingsSeen` (N8) |
-| the action fails: the pane closed (`failed("Pane gone", detail: "Herdr pane w1:p3 is gone")`) or no app named Claude | `PingStore.recordFailure`; the ping stays unseen, count **2**; its row reads the short reason in red (the hover card has the whole one) until the next click that works, ⌥-click, Mark all seen or a dismiss (N8) |
-| no action | a click only marks it seen (N8) |
-| ⌥-click, Mark all seen | marked seen, no action run (N3, N9) |
-| the ✕ on the highlighted row, or ⌫ | `Shipyard.dismiss` → `PingStore.remove`; it leaves every project at once, banner and record as in step 11 (N9) |
-| the app isn't running at step 4 | the file waits in the store; at launch the pings are listed (and notified) before GitHub answers (N4) |
-| `--project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written (N1) |
-| a folder whose `origin` no project watches, or no `origin` | exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; nothing written (N6) |
-| a folder whose `origin` only `shop` watches, and `shop` sets `pings = { show = false }` | exit 1: "no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`"; nothing written (N6, #127) |
-| `--herdr` alone outside Herdr, two action flags, `--repo` with `--project`, an id that isn't one | exit 2, one line on standard error; nothing written (N8, N11, N12) |
-| `shipyard ping withdraw cache-question` after the user dismissed it | exit 1: "no ping has the id `cache-question`; …" (N12) |
-
-### Trace 7: a machine's pings reach the menu (0.0.6, #111)
-
-Setup: `[remote] machines = ["alpha-vps", "beta-vps"]` beside project `shop`; the Mac's Herdr has both as saved machines, each with the herdr-shipyard plugin. On `beta-vps`, an agent outside any watched repository runs `shipyard ping "Deploy?" --id q1 --from claude`: saved unfiled there (`projects: []`).
-
-| # | Flow | Result |
-|---|---|---|
-| 1 | `Shipyard.start()` → `followMachines()` → `RemoteMachines.follow(["alpha-vps", "beta-vps"])` → `machineTimer.arm(after: 0)` | both machines known, empty; nothing listed yet; the GitHub refresh goes on as usual |
-| 2 | the machine timer fires → `pollMachines()` → a task group, one `RemotePingReader.list(machine:)` each | both asked at once |
-| 3 | `herdr --machine beta-vps plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` | `plugin_action_invoked`, `log.log_id` `plugin-log-7`, `status` `running` |
-| 4 | `herdr --machine beta-vps plugin log list --plugin yahyabedirhan.herdr-shipyard` | `plugin-log-7` still `running`: wait 0.25 s and ask again; then `succeeded`, its `stdout` the `PingList` |
-| 5 | `PingList.decode` → each ping's `machine = "beta-vps"` → `RemoteMachines.record` | `remote.machine("beta-vps").pings` = [q1]; `failure` nil |
-| 6 | `rebuildMenu` → `Listing.listings(…, pings: local + remote, machines:)` → `MenuModel.build` → `machineSections` | sections `shop`, then `beta-vps` with "Deploy?" (`shipyard://ping/beta-vps/q1`), numbered `#1` in that section (its first ping, 0.0.7's N14), its second line "#1 · beta-vps · claude"; unseen, so it needs attention; count **+1**. `alpha-vps` lists nothing, so it has no section (N14) |
-| 7 | `machineTimer.arm(after: 30)` | the next poll in 30 s, apart from the refresh's timer; no GitHub request was made |
-
-| Variant | What happens |
-|---|---|
-| `beta-vps` doesn't answer within 15 s, or Herdr can't reach it, or has it disabled | `Failure` recorded on the machine; its last pings stay listed; the panel shows one gray line (`MachineNotice`), "beta-vps is disabled in Herdr. Its last pings stay listed."; the next good poll clears both; `alpha-vps` is listed as it answers, never waiting for it |
-| its list is truncated | what came is listed, and one gray line: "beta-vps has more pings than it could send. Showing its newest 100." |
-| ⌘R | `refreshNow()` runs `pollMachines()` beside the GitHub refresh: both machines asked at once, then the machine timer re-armed at 30 s |
-| its `shipyard` lists contract version 2 | `failure`: "beta-vps lists pings in version 2 …: update shipyard on beta-vps"; its last pings stay |
-| `q1` also on `alpha-vps`, and on the Mac | three rows, `shipyard://ping/alpha-vps/q1`, `shipyard://ping/beta-vps/q1`, `shipyard://ping/q1`: never one another |
-| an edit removes `beta-vps` | `followMachines()`: its section and pings leave at once, their marks are pruned and their banners removed, signed in or not; with no machines left the machine timer is disarmed |
-| ⌥-click on "Deploy?" | `markSeen(row)` → `AppState.remotePings` marks that sending seen; count **−1**; after `[defaults.pings] seen-window` a poll leaves it out (#118) |
-| ✕ or ⌫ on "Deploy?" | `dismiss(row)` → marked dismissed: hidden, replaced or not, until `beta-vps` stops listing that instance; then the mark is pruned (#118) |
-
-### PingCommand.send through a filing (0.1.0, #164)
+#### PingCommand.send through a filing (0.1.0, #164)
 
 ```text
 run(arguments, environment, filing, store, now):
@@ -4218,9 +4118,10 @@ send(request, terminal, folder, git, filing, store, now, newID, whenNoProject):
     return id (exit 0)
 ```
 
-No `if` names a platform. `withdraw` and `list` never call the filing, so `ProjectFiling` never reads `config.toml` for them.
+No `if` names a platform.
+`withdraw` and `list` never call the filing, so `ProjectFiling` never reads `config.toml` for them.
 
-### ControlServer.reply(to:) (0.1.0, #166–#169; the lease since 0.2.0, #177)
+#### ControlServer.reply(to:) (0.1.0, #166–#169; the lease since 0.2.0, #177)
 
 ```text
 reply(to data):
@@ -4258,9 +4159,160 @@ reply(to data):
 
 Every refusal is a reply, never a dropped connection, so the client always has a line to print.
 
-### Trace 8: a local ping through the modules (0.1.0, #165)
+#### Rate limit arithmetic: does 2 minutes fit?
 
-Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an agent in a clone of `yahyabedirhan/shop`. The CLI is the macOS build (Command, Pings, CLISettings, Notices, Config, Control).
+Two separate hourly limits, both 5,000 for a signed-in user, and **both shared with every other tool using your GitHub account**, including your agents' `gh` calls.
+Shipyard's budget at 10% is 500 of each per hour.
+A 120 s interval is 30 refreshes an hour.
+
+| Budget line | Per refresh | Per hour at 120 s | Share of 5,000 |
+|---|---|---|---|
+| GraphQL, 5 repositories, PRs + issues (**measured**: dry run on job-search, e-commerce-×2, blog-×2) | 7 points | 210 | 4.2% |
+| GraphQL, 10 repositories, PRs + issues | ~14 points | ~420 | 8.4% |
+| GraphQL, 20 repositories, PRs + issues | ~28 points | → stretched to ~200 s | 10% |
+| REST runs, 10 repositories, nothing changed (304) | 10 requests, 0 counted | 0 | 0% |
+| REST runs, 10 repositories, all changed | 10 requests | 300 | 6% |
+
+GraphQL points are GitHub's estimate: roughly the total nodes the query could return ÷ 100, and the nested per-PR lists dominate it.
+To keep it low, the head commit is asked for `last: 1` and closed items for `first: 20`; 0.0.1 also read each PR's `reviewRequests` (`first: 10`), which 0.0.2's single review search (one page of 100 PRs, in the first batch) replaces.
+
+The 5-repository row is measured with `rateLimit(dryRun: true)` against the query shape above; the others scale it.
+The real cost comes back in `rateLimit.cost` on every response, and `RateBudget` uses the measured figure, not this table.
+So a user with 10 repositories gets their 2 minutes; a user with 40 gets about 7 minutes and a panel line "Refreshing every 7 min to stay within 10% of your GraphQL rate limit (a refresh costs 56 points)".
+
+### Traces
+
+Each trace opens with its setup, then its steps, then a table of variants or a rejection where it has them.
+Later traces build on the setup of earlier ones.
+
+#### Trace 1: an agent opens a PR (happy path)
+
+Setup: phase `ready`, project `e-commerce` known, `known` holds e-commerce-backend's 3 open PRs, attention count 0.
+An agent opens e-commerce-backend#57.
+
+| Step | Call (owner) | State after |
+|---|---|---|
+| 1 | refresh timer fires → `Shipyard.refresh()` | gate running |
+| 2 | `GitHubClient.fetch` (GitHub/) | snapshot has 4 open PRs, #57 `checks: pending`, `author: me` |
+| 3 | `EventDetector.events` (Items/) | `[pr.opened #57 author=me]` |
+| 4 | `NotificationRules.shouldNotify` (Items/) | default rule `pr.opened any` → true |
+| 5 | `AppStateStore.update` (saved before posting) | `notified` has #57's `pr.opened`; `known` has #57 (checks pending) |
+| 6 | `Notifier.post` | macOS notification "e-commerce · New PR #57" / "Add order export" |
+| 7 | `MenuModel.build` → `MenuBarLabel` | #57 unseen → count **1**, green row, gray check dot |
+| 8 | 2 min later CI fails; refresh | fingerprint changed; event `pr.checks_failed` (no rule → silent); still unseen → count 1, red check dot |
+| 9 | user clicks #57 → `Shipyard.open` → `Attention.markSeen` | `seen[#57] = fingerprint`; count **0**; browser opens |
+| 10 | agent pushes a fix; refresh | `updatedAt` changed → fingerprint changed → count **1** again |
+
+#### Trace 2: a broken edit (rejection)
+
+| Step | Call | State after |
+|---|---|---|
+| 1 | agent writes `config.toml` with `event = "pr.openned"` | — |
+| 2 | directory watch → `ConfigurationStore` → `Configuration.decode` throws `unknownEvent("pr.openned", line 14)` | `lastValid` unchanged, `error` set; `config-status.json` says `"accepted": false` with the problem at line 14 and the file's modification time |
+| 3 | `Panel` | banner: "config.toml line 14: unknown event `pr.openned` (did you mean `pr.opened`?). Using the last valid configuration." |
+| 4 | refreshes keep running with `lastValid` | list unchanged |
+| 5 | agent reads `config-status.json`, fixes the file, reads it again | `error = nil`, banner gone, record says `"accepted": true` for the new modification time, refresh triggered |
+
+#### Trace 3: agents drain the limit (rejection by budget)
+
+Setup: 10 repositories, one refresh measured at 14 GraphQL points.
+Several agents are running `gh` heavily.
+
+| Step | Call (owner) | State after |
+|---|---|---|
+| 1 | refresh → `fetch` returns `graphql.remaining = 900 / 5,000` (18%) | snapshot fine |
+| 2 | `RateBudget.nextDelay(120, 10%)` | below 20% → `backedOff(600 s)` |
+| 3 | `Panel` | amber footer `GraphQL 900 / 5,000 · resets 16:42`, banner "Your GraphQL rate limit is low (other tools are using it). Refreshing every 10 min." |
+| 4 | agents keep going; next refresh gets 403, `x-ratelimit-remaining: 0`, `x-ratelimit-reset` = 16:42 | `pausedUntil = 16:42`, `fetchError = rateLimited` |
+| 5 | menu bar icon shows the paused glyph; ⌘R does nothing and says why | last snapshot still listed, "Last updated 14 min ago" |
+| 6 | every 120 s meanwhile the timer lists again from the last snapshot, sending nothing; 16:42: the firing at `pausedUntil` refreshes | quota back to 5,000; next delay 120 s; banner gone |
+
+#### Trace 4: `incoming-contributions` with `owned` (0.0.2, happy path)
+
+| Step | State after |
+|---|---|
+| Onboarding: choose `incoming-contributions` with "all my repositories" | `writePreset` writes the file; the reload has "Incoming" (`owned`) and "Review requests" (`anywhere`); phase `ready` |
+| `refresh()`: the resolver pages `viewer.repositories(affiliations: OWNER, isArchived: false)` | "Incoming" resolves to 14 repositories; `anywhere` to none |
+| `fetch`: one batch of 14 aliases plus the review search | the snapshot has 40 items; `reviewRequested` has 3 PRs, 2 in other people's repositories |
+| `Listing`: "Incoming" drops the 31 items by `me` and 2 by `dependabot[bot]`; "Review requests" takes the 3 search PRs | listings of 7 and 3 |
+| `EventDetector`: first sight of every source | no events, nothing notified (bootstrap) |
+| `MenuModel` + `Arrangement`: group by repository, subsections | "Incoming" shows 4 repository subheaders; the menu bar counts 10 listed items, not 40 |
+| Next refresh: someone opens a PR on one of the user's repositories | `pr.opened` from `others`, listed, so it notifies |
+
+#### Trace 5: `anywhere` misused (0.0.2, rejection)
+
+| Step | State after |
+|---|---|
+| An agent writes `repositories = ["anywhere"]` with `issues = { show = true }` | `ConfigurationReader` records "line 12: `anywhere` needs `pull-requests = { review-requested = true }`, and lists no issues or runs" |
+| `reloadConfiguration()` | `configError` set; the last valid configuration keeps running; `config-status.json` says `accepted: false` with the line |
+
+#### Trace 6: an agent pings, from the CLI to a click (0.0.5)
+
+Setup: projects `shop` (`repositories = ["yahyabedirhan/shop"]`) and `blog`, the default notification rules, `[herdr] terminal = "Ghostty"`.
+The app is running; its last refresh listed one PR in `shop`, attention count 1.
+An agent works in a clone of `yahyabedirhan/shop`, in Herdr pane `w1:p3`, and needs the user's answer.
+
+| Step | Call (owner) | State after |
+|---|---|---|
+| 1 | agent runs `shipyard ping "Waiting for your input" --from claude --herdr --id cache-question` → `ShipyardCLI.run` (CLI/) | `config.toml` read (projects `shop`, `blog`), and `repositories.json` (the lists the app last resolved) |
+| 2 | `PingCommand.Request.parse` (Pings/) | title, sender `claude`, id `cache-question`; `--id` isn't shaped like a Herdr id, so `--herdr` takes `HERDR_PANE_ID`: action `.herdr("w1:p3")` (N11) |
+| 3 | `GitCLI.origin(in:)` → `GitRemote.repository(fromURL:)` → `PingCommand.watchers(of:)` | `git@github.com:yahyabedirhan/shop.git` → `yahyabedirhan/shop`; `shop` names it, so the ping is filed under `[shop]` with that repository (N6) |
+| 4 | `PingStore.save` | `cache-question` isn't stored: a new ping, `sent` now, a new `instance`; `Pings/cache-question.json` written atomically; prints `cache-question`, exit 0 (N1, N12) |
+| 5 | `ConfigurationWatcher` on the store's directory → `Shipyard.reloadPings()` → `listPings()` | `pings` has the new one; no GitHub request (N4) |
+| 6 | `Shipyard.numberPings` → `Listing.listings(…, pings:, numbers:)` → `MenuModel.build` → `Arrangement` | `cache-question` is new to `shop`, so it takes `shop`'s next number in `AppState.pingNumbers` (say 1, N14); `shop` lists the PR, then a "Pings" group with the ping: a terminal icon, its number 1, "#1 · claude" on its second line; unseen, so it needs attention; count **2** (N3, N8) |
+| 7 | `EventDetector.pingEvents` → `NotificationRules` (the default rules hold `ping.sent`) → `AppStateStore.update` → `Notifier.post` | `notified` has `ping.sent` for `shipyard://ping/cache-question` with its `instance`; banner "shop · Waiting for your input" over "from claude" (N7) |
+| 8 | ten minutes on, the agent sends the same command titled "Still waiting (10 min)" → steps 1–5 again | a replace: `sent` now, so the row's age starts again, the stored `instance` kept, and its URL keeps its number, with the new title; the row shows it; still count **2**, and `pingEvents`' event is already in `notified`, so no second banner (N12) |
+| 9 | user clicks the banner → `Shipyard.openNotification` → `runAction(ofPing:)` → `runHerdr`: `HerdrFocus.focus("w1:p3")` (`herdr pane get w1:p3` → tab `w1:t1` → `herdr tab focus w1:t1`) → `done` → `ActionRunning.run(.app("Ghostty"))` → `done` → `markPingsSeen` | Herdr shows the agent's tab and Ghostty comes forward; `seen` set in the ping's file; count **1**, and still after a relaunch (N8, N11) |
+| 10 | the user answers in the pane; the agent runs `shipyard ping withdraw cache-question` → `PingCommand.withdraw` → `PingStore.remove` | prints `cache-question`, exit 0; reads no `config.toml` (N12) |
+| 11 | `reloadPings()` → `listPings()` → `forgetLeftPings` → `removeLeftBanners` → `Notifier.removeDelivered` | the row leaves `shop`; the banner leaves Notification Center; the `ping.sent` record is forgotten, so `cache-question` sent again later is a new ping that notifies again (N12) |
+
+Had the agent not withdrawn it, the seen ping would stay listed for `shop`'s `seen-window` (24 h), then leave the listing and the store at the next refresh or store change (N9).
+The other ways through:
+
+| Variant | What happens |
+|---|---|
+| `--open https://claude.ai/artifact/42` or `--app Claude` instead of `--herdr` | the row shows a link or app icon; a click runs `ActionRunning.run(.url(…))` or `.app("Claude")` through the action port, then `markPingsSeen` (N8) |
+| the action fails: the pane closed (`failed("Pane gone", detail: "Herdr pane w1:p3 is gone")`) or no app named Claude | `PingStore.recordFailure`; the ping stays unseen, count **2**; its row reads the short reason in red (the hover card has the whole one) until the next click that works, ⌥-click, Mark all seen or a dismiss (N8) |
+| no action | a click only marks it seen (N8) |
+| ⌥-click, Mark all seen | marked seen, no action run (N3, N9) |
+| the ✕ on the highlighted row, or ⌫ | `Shipyard.dismiss` → `PingStore.remove`; it leaves every project at once, banner and record as in step 11 (N9) |
+| the app isn't running at step 4 | the file waits in the store; at launch the pings are listed (and notified) before GitHub answers (N4) |
+| `--project shopp` | exit 1: "no project is named `shopp`; the projects are `shop`, `blog`"; nothing written (N1) |
+| a folder whose `origin` no project watches, or no `origin` | exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; nothing written (N6) |
+| a folder whose `origin` only `shop` watches, and `shop` sets `pings = { show = false }` | exit 1: "no project shows the ping: `shop` hides pings (pings.show = false); pass --project <name> to file it under one that shows them; the projects that show pings are `blog`"; nothing written (N6, #127) |
+| `--herdr` alone outside Herdr, two action flags, `--repo` with `--project`, an id that isn't one | exit 2, one line on standard error; nothing written (N8, N11, N12) |
+| `shipyard ping withdraw cache-question` after the user dismissed it | exit 1: "no ping has the id `cache-question`; …" (N12) |
+
+#### Trace 7: a machine's pings reach the menu (0.0.6, #111)
+
+Setup: `[remote] machines = ["alpha-vps", "beta-vps"]` beside project `shop`; the Mac's Herdr has both as saved machines, each with the herdr-shipyard plugin.
+On `beta-vps`, an agent outside any watched repository runs `shipyard ping "Deploy?" --id q1 --from claude`: saved unfiled there (`projects: []`).
+
+| # | Flow | Result |
+|---|---|---|
+| 1 | `Shipyard.start()` → `followMachines()` → `RemoteMachines.follow(["alpha-vps", "beta-vps"])` → `machineTimer.arm(after: 0)` | both machines known, empty; nothing listed yet; the GitHub refresh goes on as usual |
+| 2 | the machine timer fires → `pollMachines()` → a task group, one `RemotePingReader.list(machine:)` each | both asked at once |
+| 3 | `herdr --machine beta-vps plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` | `plugin_action_invoked`, `log.log_id` `plugin-log-7`, `status` `running` |
+| 4 | `herdr --machine beta-vps plugin log list --plugin yahyabedirhan.herdr-shipyard` | `plugin-log-7` still `running`: wait 0.25 s and ask again; then `succeeded`, its `stdout` the `PingList` |
+| 5 | `PingList.decode` → each ping's `machine = "beta-vps"` → `RemoteMachines.record` | `remote.machine("beta-vps").pings` = [q1]; `failure` nil |
+| 6 | `rebuildMenu` → `Listing.listings(…, pings: local + remote, machines:)` → `MenuModel.build` → `machineSections` | sections `shop`, then `beta-vps` with "Deploy?" (`shipyard://ping/beta-vps/q1`), numbered `#1` in that section (its first ping, 0.0.7's N14), its second line "#1 · beta-vps · claude"; unseen, so it needs attention; count **+1**. `alpha-vps` lists nothing, so it has no section (N14) |
+| 7 | `machineTimer.arm(after: 30)` | the next poll in 30 s, apart from the refresh's timer; no GitHub request was made |
+
+| Variant | What happens |
+|---|---|
+| `beta-vps` doesn't answer within 15 s, or Herdr can't reach it, or has it disabled | `Failure` recorded on the machine; its last pings stay listed; the panel shows one gray line (`MachineNotice`), "beta-vps is disabled in Herdr. Its last pings stay listed."; the next good poll clears both; `alpha-vps` is listed as it answers, never waiting for it |
+| its list is truncated | what came is listed, and one gray line: "beta-vps has more pings than it could send. Showing its newest 100." |
+| ⌘R | `refreshNow()` runs `pollMachines()` beside the GitHub refresh: both machines asked at once, then the machine timer re-armed at 30 s |
+| its `shipyard` lists contract version 2 | `failure`: "beta-vps lists pings in version 2 …: update shipyard on beta-vps"; its last pings stay |
+| `q1` also on `alpha-vps`, and on the Mac | three rows, `shipyard://ping/alpha-vps/q1`, `shipyard://ping/beta-vps/q1`, `shipyard://ping/q1`: never one another |
+| an edit removes `beta-vps` | `followMachines()`: its section and pings leave at once, their marks are pruned and their banners removed, signed in or not; with no machines left the machine timer is disarmed |
+| ⌥-click on "Deploy?" | `markSeen(row)` → `AppState.remotePings` marks that sending seen; count **−1**; after `[defaults.pings] seen-window` a poll leaves it out (#118) |
+| ✕ or ⌫ on "Deploy?" | `dismiss(row)` → marked dismissed: hidden, replaced or not, until `beta-vps` stops listing that instance; then the mark is pruned (#118) |
+
+#### Trace 8: a local ping through the modules (0.1.0, #165)
+
+Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an agent in a clone of `yahyabedirhan/shop`.
+The CLI is the macOS build (Command, Pings, CLISettings, Notices, Config, Control).
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4271,11 +4323,13 @@ Setup: as Trace 6, on the Mac: projects `shop` and `blog`, the app running, an a
 | 5 | `defaultAction` → `nil`; `expiry` → `nil`; `PingStore.save` → `RecordStore.save` (Command) | `Pings/k7qm2x.json` written atomically; prints `k7qm2x`, exit 0 |
 | 6 | the app (Core): `ConfigurationWatcher` → `Shipyard.reloadPings()` → `numberPings` → `Listing` → `MenuModel` | as Trace 6, steps 5–7: listed under `shop` as `#1`, notified once |
 
-Nothing in steps 1–5 is in ShipyardCore. The CLI binary doesn't contain it (M2).
+Nothing in steps 1–5 is in ShipyardCore.
+The CLI binary doesn't contain it (M2).
 
-### Trace 9: a remote ping, from a Linux machine to the Mac (0.1.0, #164)
+#### Trace 9: a remote ping, from a Linux machine to the Mac (0.1.0, #164)
 
-Setup: as Trace 7: `[remote] machines = ["beta-vps"]`, project `shop` watching `yahyabedirhan/shop`. On `beta-vps` the Linux `shipyard` (Command and Pings only) runs in a Herdr pane `w2:p1`, in a clone of `yahyabedirhan/shop`.
+Setup: as Trace 7: `[remote] machines = ["beta-vps"]`, project `shop` watching `yahyabedirhan/shop`.
+On `beta-vps` the Linux `shipyard` (Command and Pings only) runs in a Herdr pane `w2:p1`, in a clone of `yahyabedirhan/shop`.
 
 | Step | Call (module, machine) | State after |
 |---|---|---|
@@ -4290,9 +4344,10 @@ Setup: as Trace 7: `[remote] machines = ["beta-vps"]`, project `shop` watching `
 
 The filing rule the Mac applies in step 7 is the one `ProjectFiling` applies to a local ping in Trace 8, step 4, so the two can't drift apart.
 
-### Trace 10: a screenshot (0.1.0, #169)
+#### Trace 10: a screenshot (0.1.0, #169)
 
-Setup: the app runs in the tabs layout with projects `shop` and `blog`, the panel closed. An agent wants a dark screenshot of `shop`'s tab for a QA ticket.
+Setup: the app runs in the tabs layout with projects `shop` and `blog`, the panel closed.
+An agent wants a dark screenshot of `shop`'s tab for a QA ticket.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4315,7 +4370,7 @@ Setup: the app runs in the tabs layout with projects `shop` and `blog`, the pane
 | `--with-indicator` | the banner stays in the capture, and `--menu-bar-icon` draws the yellow dot beside the sailboat (0.2.0, #180) |
 | a demo run | the same steps, on `<folder>/support/control.sock`; the client finds it through `ControlSocket.locate`, which follows the pointer `app open --demo` wrote in the normal support folder (#168) |
 
-### Trace 11: a refusal, a tab in the list layout (0.1.0, #167)
+#### Trace 11: a refusal, a tab in the list layout (0.1.0, #167)
 
 Setup: `[menu] layout = "list"`, the app running.
 
@@ -4333,9 +4388,10 @@ Setup: `[menu] layout = "list"`, the app running.
 | `shipyard app status` on Linux | `CommandTable` lacks `app`, a name in `macOnly`: "shipyard: `shipyard app` runs on the Mac, where the app is", exit 2 (M5) |
 | `shipyard ping "x" --repo yahyabedirhan/shop` on the Mac when `shop` sets `pings = { show = false }` | `ProjectFiling` refuses: every project the ping lands in hides pings, exit 1; nothing written (#127) |
 
-### Trace 12: a demo run (0.1.0, #168)
+#### Trace 12: a demo run (0.1.0, #168)
 
-Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Application Support/Shipyard/`. An agent has `~/demo/shipyard/config.toml`, naming only public repositories, and wants screenshots of it.
+Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Application Support/Shipyard/`.
+An agent has `~/demo/shipyard/config.toml`, naming only public repositories, and wants screenshots of it.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4356,13 +4412,19 @@ Setup: the user's app runs on `~/.config/shipyard/config.toml` and `~/Library/Ap
 | the launch fails, or the demo never answers | exit 1, and the pointer is removed again |
 
 Known limits of a demo run:
-- **The token is shared.** The demo reads the user's Keychain token and `gh`, as it must to read GitHub, so signing in or out from the demo's panel changes the user's token too. Agents don't click, so only a person can do this.
-- **A crashed demo can hide the user's app.** `locate` follows the pointer while the demo's socket file exists. A demo that crashed leaves the file, so `app status` says shipyard isn't running even while a user's app started from Finder runs. The next plain `app open` removes the pointer and finds it.
-- **An app without app control isn't quit.** `app open --demo` quits only an app that answers on a socket. A user's app whose control server couldn't start (it logs why) keeps running: Launch Services hands it back without the demo's environment, the demo never answers, and the command exits 1 with the pointer removed.
+- **The token is shared.** The demo reads the user's Keychain token and `gh`, as it must to read GitHub, so signing in or out from the demo's panel changes the user's token too.
+  Agents don't click, so only a person can do this.
+- **A crashed demo can hide the user's app.** `locate` follows the pointer while the demo's socket file exists.
+  A demo that crashed leaves the file, so `app status` says shipyard isn't running even while a user's app started from Finder runs.
+  The next plain `app open` removes the pointer and finds it.
+- **An app without app control isn't quit.** `app open --demo` quits only an app that answers on a socket.
+  A user's app whose control server couldn't start (it logs why) keeps running: Launch Services hands it back without the demo's environment, the demo never answers, and the command exits 1 with the pointer removed.
 
-### Trace 13: two agents and the lease (0.2.0, #177)
+#### Trace 13: two agents and the lease (0.2.0, #177)
 
-Setup: the app runs, the lease is free. Agent A is Claude Code (`CLAUDE_CODE_SESSION_ID=5f1c`) in `~/shop`; agent B is `codex` in Herdr pane `w1-2`, exporting no session id. Times are the app's clock.
+Setup: the app runs, the lease is free.
+Agent A is Claude Code (`CLAUDE_CODE_SESSION_ID=5f1c`) in `~/shop`; agent B is `codex` in Herdr pane `w1-2`, exporting no session id.
+Times are the app's clock.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4385,9 +4447,10 @@ Setup: the app runs, the lease is free. Agent A is Claude Code (`CLAUDE_CODE_SES
 | at step 4, B runs `shipyard lease take --wait 120` instead (#178) | `lease.take(by: B, …, waitingUntil: 12:02:20)` → `queued`; B's connection stays open (its client reads for 135 s) while A's commands are answered; `app status` says `1 waiting`. At 12:00:45 A runs `shipyard lease release`: `ended(A, .released)`, then B `started`, held until 12:05:45; B prints "you hold shipyard until 12:05:45", exit 0. Had A kept working past 12:02:20, B's wait would run out: "waited 120s; shipyard is still in use by Claude Code in /Users/me/shop until … (…s left)", exit 1 |
 | with B waiting so, at 12:00:45 the maintainer clicks Stop in the banner instead (#181) | `AppServices.stopLease()` → `ControlServer.stopLease()` → `lease.stop(at: 12:00:45)`: `ended(A, .stopped)` ("Claude Code is done with shipyard", "you stopped it"), A barred until 12:05:45, then B `started`, held until 12:05:45, its waiting `take` answered at once. The banner shows B, and under it the quiet line "You took shipyard back from Claude Code" with Allow. A's next command, `lease take` or `take --wait` included: "the user took shipyard back; ask them before using it again", exit 1. Allow lifts the bar at once; otherwise the timer settles it at 12:05:45 and the line goes |
 
-### Trace 14: a note written in Notion reaches the menu (#192)
+#### Trace 14: a note written in Notion reaches the menu (#192)
 
-Setup: `ntn` is installed and logged in, its default workspace the notes workspace (#234), and the user pressed Connect with ntn in the Notion view (#241); projects `shop` and `blog`; under "Shipyard Notes" its pages "Agent guide" and "Projects", and under "Projects" a database titled `shop` and one titled `Shop` (ADR 0011). An agent has just written SHOP-7 into `shop`'s database through its own Notion tools.
+Setup: `ntn` is installed and logged in, its default workspace the notes workspace (#234), and the user pressed Connect with ntn in the Notion view (#241); projects `shop` and `blog`; under "Shipyard Notes" its pages "Agent guide" and "Projects", and under "Projects" a database titled `shop` and one titled `Shop` (ADR 0011).
+An agent has just written SHOP-7 into `shop`'s database through its own Notion tools.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4400,17 +4463,26 @@ Setup: `ntn` is installed and logged in, its default workspace the notes workspa
 | 7 | The notes timer is armed for 60 s | the next read in a minute |
 | 8 | The user clicks SHOP-7: `Shipyard.open(row)` → `ActionRunning.open(notion URL)` | Notion opens the page; nothing is marked seen |
 
-Rejection: Notion is out of reach at step 3 (ntn exits with neither 0, 4 nor 5: a 599, `NotionError.network`). The read is `.failed(.network(…))`: `shop` and `blog` (both show notes) each get the row "notes: can't reach Notion (…)", and `shop` keeps SHOP-7, SHOP-6 and SHOP-5 under it.
+Rejection: Notion is out of reach at step 3 (ntn exits with neither 0, 4 nor 5: a 599, `NotionError.network`).
+The read is `.failed(.network(…))`: `shop` and `blog` (both show notes) each get the row "notes: can't reach Notion (…)", and `shop` keeps SHOP-7, SHOP-6 and SHOP-5 under it.
 
-Rejection, ntn logged out (#234): ntn exits 4 at step 3, read as a 401. The read is `.failed(.unauthorized)`: no notes and no error rows, `notesBlocked = .ntnLoggedOut`, the new-note icons go, and the notes banner says "ntn isn't logged in. Run ntn login in Terminal…". With no `ntn` at all the read is `.failed(.ntnMissing)`, the same with `.ntnMissing`'s words. The timer reads again a minute later, so `ntn login` shows the notes without a restart.
+Rejection, ntn logged out (#234): ntn exits 4 at step 3, read as a 401.
+The read is `.failed(.unauthorized)`: no notes and no error rows, `notesBlocked = .ntnLoggedOut`, the new-note icons go, and the notes banner says "ntn isn't logged in. Run ntn login in Terminal…".
+With no `ntn` at all the read is `.failed(.ntnMissing)`, the same with `.ntnMissing`'s words.
+The timer reads again a minute later, so `ntn login` shows the notes without a restart.
 
-Variant, ntn's default workspace isn't the notes workspace (ADR 0011, #234): at step 2 search finds no "Shipyard Notes". The read is `.noEntryPage`: no notes and no error rows, `notesBlocked = .noEntryPage`, and the panel shows the notes banner, "ntn's workspace has no Shipyard Notes page. Run ntn doctor…". Once ntn's default workspace is the notes workspace, the next read finds it and the banner goes.
+Variant, ntn's default workspace isn't the notes workspace (ADR 0011, #234): at step 2 search finds no "Shipyard Notes".
+The read is `.noEntryPage`: no notes and no error rows, `notesBlocked = .noEntryPage`, and the panel shows the notes banner, "ntn's workspace has no Shipyard Notes page. Run ntn doctor…".
+Once ntn's default workspace is the notes workspace, the next read finds it and the banner goes.
 
-Variant, a workspace from 0.3.0: `shop` and `Shop` sit directly under "Shipyard Notes" and there's no Projects page. At step 2 the read finds none: no notes, no error, no banner. `shipyard notes check` names both databases as errors (Trace 17).
+Variant, a workspace from 0.3.0: `shop` and `Shop` sit directly under "Shipyard Notes" and there's no Projects page.
+At step 2 the read finds none: no notes, no error, no banner.
+`shipyard notes check` names both databases as errors (Trace 17).
 
-### Trace 15: an agent's notice on the Mac (#190)
+#### Trace 15: an agent's notice on the Mac (#190)
 
-Setup: the app runs; `config.toml` has projects `shop` (`yahyabedirhan/shop`) and `blog`, with the built-in rules. Agent A holds the lease; agent B, in `~/shop`, runs `shipyard notice send "Tests running" --body "12 of 40 passed" --from claude`.
+Setup: the app runs; `config.toml` has projects `shop` (`yahyabedirhan/shop`) and `blog`, with the built-in rules.
+Agent A holds the lease; agent B, in `~/shop`, runs `shipyard notice send "Tests running" --body "12 of 40 passed" --from claude`.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4430,9 +4502,10 @@ Setup: the app runs; `config.toml` has projects `shop` (`yahyabedirhan/shop`) an
 | B runs it on `beta-vps`, whose `cli.toml` has `[notices] app-machine = "my-mac"` (#194) | steps 2 and 3 become: `RemoteNoticeRoute` reads `cli.toml`; `TailnetNoticeRoute` posts `{"body":…,"title":"Tests running"}` to `http://my-mac:47420/notify`; `tailscale serve` on the Mac hands it to `NoticeListener` on 127.0.0.1:47420 with `Tailscale-User-Login: me@example.com`; `Shipyard.receive(_:from:)` asks `TailscaleCLI` for the Mac's own login, the same, so steps 4 and 5 run; the listener answers `{"shown":true}`; B prints `shown`. Another login, or none: `{"refused":…}`, exit 1. The Mac asleep: "… didn't answer within 3 seconds …", exit 1 |
 | B runs it on `beta-vps`, whose `cli.toml` has no `app-machine` (#195) | steps 2 to 5 become: `PluginNoticeRoute.deliver` runs `sh ~/…/herdr-shipyard/scripts/notices.sh add <uuid>` with `{"id":"<uuid>","notice":{…},"sent":"<now>"}`; B prints `queued; shown within about 30 seconds if the Mac is awake`, exit 0. On the Mac's next poll of `beta-vps`, once its pings are recorded, `takeNotices` invokes `notices` then `notices-read`, and `showQueued` hands the notice to `Shipyard.show` (step 4 on): the banner "shop · Tests running", unless `sent` is more than ten minutes back, when it's dropped. Nobody is told either way |
 
-### Trace 16: the new-note icon starts `blog`'s first note (#196)
+#### Trace 16: the new-note icon starts `blog`'s first note (#196)
 
-Setup: as Trace 14; `blog` has no database. `shop`'s `No.` prefix is SHOP, `Shop`'s SHO.
+Setup: as Trace 14; `blog` has no database.
+`shop`'s `No.` prefix is SHOP, `Shop`'s SHO.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4444,13 +4517,17 @@ Setup: as Trace 14; `blog` has no database. `shop`'s `No.` prefix is SHOP, `Shop
 | 6 | `Shipyard` drops `blog` from `startingNotes`, `ActionRunning.open(URL)`; the app closes the menu | Notion opens BLOG-1 for the user to type or dictate |
 | 7 | `refreshNotes()`, as Trace 14 from step 2 | `blog` gets a Notes group with BLOG-1, "Untitled" until it has a title or a line |
 
-Rejection: ntn exits 4 at step 5 (logged out meanwhile, a 401). `startNote` answers `false`, nothing opens, the menu stays open, and `blog` gets the row "new note: ntn isn't logged in; run ntn login in Terminal" until the menu opens again. The database made at step 4 stays, so the next click makes only the page.
+Rejection: ntn exits 4 at step 5 (logged out meanwhile, a 401).
+`startNote` answers `false`, nothing opens, the menu stays open, and `blog` gets the row "new note: ntn isn't logged in; run ntn login in Terminal" until the menu opens again.
+The database made at step 4 stays, so the next click makes only the page.
 
-Variant, no Projects page yet (ADR 0011): at step 2 the entry page has no `child_page` titled "Projects", so there are no databases to take prefixes from. Before step 4, `createPage(under: entry page, title: "Projects", icon: 📂)` (`POST /v1/pages`) makes it, and it's remembered; the database goes under it.
+Variant, no Projects page yet (ADR 0011): at step 2 the entry page has no `child_page` titled "Projects", so there are no databases to take prefixes from.
+Before step 4, `createPage(under: entry page, title: "Projects", icon: 📂)` (`POST /v1/pages`) makes it, and it's remembered; the database goes under it.
 
-### Trace 17: `shipyard notes check` (ADR 0011)
+#### Trace 17: `shipyard notes check` (ADR 0011)
 
-Setup: as Trace 14; `blog` has no database; a database `drafts` matching no project also sits under Projects; the home page's Projects index lists `shop` with SHOP, and nothing else. Agent A holds the lease; agent B runs `shipyard notes check`.
+Setup: as Trace 14; `blog` has no database; a database `drafts` matching no project also sits under Projects; the home page's Projects index lists `shop` with SHOP, and nothing else.
+Agent A holds the lease; agent B runs `shipyard notes check`.
 
 | Step | Call (module) | State after |
 |---|---|---|
@@ -4463,26 +4540,30 @@ Setup: as Trace 14; `blog` has no database; a database `drafts` matching no proj
 | 7 | `firstTableRows(onPage: entry page)`: the first table's rows after its header | the index has no row for `Shop` or `drafts`: two more warnings |
 | 8 | `report.hasErrors` is false: `.inOrder(report.text)` → reply `{ ok, output }` | B prints the lines, the warnings and "0 errors, 4 warnings", exit 0 |
 
-Rejection: a database `notes` also sits directly under "Shipyard Notes". Step 4 adds the error "the database \"notes\" is directly under Shipyard Notes, where the app doesn't look: move it under Projects"; the closure answers `.refused(report.text)`, and B prints the whole report on standard error, exit 1. With ntn logged out, step 4's search fails: the report holds one error, "Notion: ntn isn't logged in; run ntn login in Terminal", exit 1. In a demo run step 3 answers `nil`: "this run doesn't read notes", exit 1 (#234).
+Rejection: a database `notes` also sits directly under "Shipyard Notes".
+Step 4 adds the error "the database \"notes\" is directly under Shipyard Notes, where the app doesn't look: move it under Projects"; the closure answers `.refused(report.text)`, and B prints the whole report on standard error, exit 1.
+With ntn logged out, step 4's search fails: the report holds one error, "Notion: ntn isn't logged in; run ntn login in Terminal", exit 1.
+In a demo run step 3 answers `nil`: "this run doesn't read notes", exit 1 (#234).
 
-### Trace 3: agents drain the limit (rejection by budget)
+### Findings
 
-Setup: 10 repositories, one refresh measured at 14 GraphQL points. Several agents are running `gh` heavily.
+What the traces turned up and the design now handles:
 
-| Step | Call (owner) | State after |
-|---|---|---|
-| 1 | refresh → `fetch` returns `graphql.remaining = 900 / 5,000` (18%) | snapshot fine |
-| 2 | `RateBudget.nextDelay(120, 10%)` | below 20% → `backedOff(600 s)` |
-| 3 | `Panel` | amber footer `GraphQL 900 / 5,000 · resets 16:42`, banner "Your GraphQL rate limit is low (other tools are using it). Refreshing every 10 min." |
-| 4 | agents keep going; next refresh gets 403, `x-ratelimit-remaining: 0`, `x-ratelimit-reset` = 16:42 | `pausedUntil = 16:42`, `fetchError = rateLimited` |
-| 5 | menu bar icon shows the paused glyph; ⌘R does nothing and says why | last snapshot still listed, "Last updated 14 min ago" |
-| 6 | every 120 s meanwhile the timer lists again from the last snapshot, sending nothing; 16:42: the firing at `pausedUntil` refreshes | quota back to 5,000; next delay 120 s; banner gone |
-
-What the traces turned up and the design now handles: the first refresh after adding a project must not notify for every existing PR (the first-sight guard in step 3: a project's sources not fetched before make no events), and `pr.checks_failed` has to be an event whether or not a rule is enabled, so a rule added later behaves the same.
+- The first refresh after adding a project must not notify for every existing PR: the first-sight guard in Trace 1, step 3, where a project's sources not fetched before make no events.
+- `pr.checks_failed` has to be an event whether or not a rule is enabled, so a rule added later behaves the same.
 
 ---
 
 ## 5. Extensibility
+
+The changes likely to come next, and the part of the design that absorbs each.
+Its sections, in order:
+
+- **Likely changes**: each change and what it touches.
+- **Future feature placement**: where each part of a new agent-facing feature goes, tested on a hypothetical handoff.
+- **Refused changes**: what the design doesn't make room for yet.
+
+### Likely changes
 
 | Change | What you touch |
 |---|---|
@@ -4511,7 +4592,13 @@ What the traces turned up and the design now handles: the first refresh after ad
 | Another refusal on the Mac only (like #127) | `ProjectFiling` alone; the Linux build doesn't change |
 | The picker offering more groups | `PresetChoice` and `PresetPicker` only |
 
-**Where a future feature lands (0.1.0, ADR 0006).** The design's test is a hypothetical **handoff**: an agent leaving the user a longer report than a ping, kept on its machine and read later. It's out of scope and isn't built. (0.1.0 used notes as this example; the user's notes became a feature of their own in Notion, read by the app alone, with no agent-side module: see the `notes-and-notify` requirements and Trace 14.) It shows where each part of a new agent-facing feature goes:
+### Future feature placement
+
+Where a future feature lands (0.1.0, ADR 0006).
+The design's test is a hypothetical **handoff**: an agent leaving the user a longer report than a ping, kept on its machine and read later.
+It's out of scope and isn't built.
+0.1.0 used notes as this example; the user's notes became a feature of their own in Notion, read by the app alone, with no agent-side module: see the `notes-and-notify` requirements and Trace 14.
+It shows where each part of a new agent-facing feature goes:
 
 | Part of handoffs | Lands in | What you touch |
 |---|---|---|
@@ -4523,27 +4610,68 @@ What the traces turned up and the design now handles: the first refresh after ad
 
 A change that touched Pings, or made the Linux build link Config or Core, would mean the boundary had slipped.
 
-Refused for now: a plugin system for item kinds (one registration seam for a change that happens rarely), a protocol over `GitHubClient` for other forges (one implementation), a CLI for the configuration (ADR 0001; the CLI sends pings, ADR 0004, and since 0.1.0 controls the app, never the file), multi-account support. Since 0.1.0 also: a second executable for app control, a plugin seam for commands (a table entry is enough), and the app filing every ping (ADR 0006). Since 0.0.2 also: a filter expression language (independent fields with AND cover every case, and agents can write them; ADR 0003), nested grouping (a second level of folds, keys and layout), reading resolved repositories back at launch (resolving costs a few points once an hour; since 0.0.5 they're written for the CLI only), and a plugin seam for filters (each is a field and one line in `Listing`).
+### Refused changes
+
+Refused for now:
+
+- A plugin system for item kinds: one registration seam for a change that happens rarely.
+- A protocol over `GitHubClient` for other forges: one implementation.
+- A CLI for the configuration (ADR 0001): the CLI sends pings (ADR 0004), and since 0.1.0 controls the app, never the file.
+- Multi-account support.
+
+Since 0.1.0 also:
+
+- A second executable for app control.
+- A plugin seam for commands: a table entry is enough.
+- The app filing every ping (ADR 0006).
+
+Since 0.0.2 also:
+
+- A filter expression language: independent fields with AND cover every case, and agents can write them (ADR 0003).
+- Nested grouping: a second level of folds, keys and layout.
+- Reading resolved repositories back at launch: resolving costs a few points once an hour; since 0.0.5 they're written for the CLI only.
+- A plugin seam for filters: each is a field and one line in `Listing`.
 
 ---
 
 ## Decisions taken in review
-- **0.2.0, app control is leased, enforced by the app** (ADR 0007): one holder at a time, renewed by each command for a minute and capped at five, refused at the socket for anyone else; the holder is worked out by the CLI from the agent's session, else its process. Rejected: a plain lock (a crashed agent keeps it), a lock file the CLI checks (another build ignores it), a holder the agent passes (it gets it wrong), Herdr's pane as the key (reused). Spec #176.
-- **0.1.0, modules follow concerns ("A+")** (ADR 0006): the agent's side (Command, Pings, Config, Control) never links the app's rules (Core). Rejected: one core with a command table (the Linux binary would still carry everything), two executables (a second name, no more isolation), the app filing every ping (no refusal while the app is quit).
-- **0.1.0, app control is one Unix socket in the support folder**, owner-only, one JSON request per connection. Launching the app goes around it, by bundle id, since the app may not be running. Spec #160.
-- **0.0.2, review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh. Cost accepted: GitHub's search index can lag a PR by a short while, and it returns at most 100.
-- **0.0.2, `subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
 
-- **Panel technology: SwiftUI `MenuBarExtra` in `.window` style**, not AppKit `NSMenu`. The panel stays open while sections collapse and ⌥-clicks happen, colours and rows are fully controlled, and onboarding lives in the same panel. Cost accepted: it doesn't behave exactly like a native menu (no type-to-select).
-- **A click clears everything about an item until it changes again**, including a review request or failed checks. The attention count means "things to look at", not "work outstanding".
-- **Workflow runs come from REST, one conditional request per repository per refresh**, sent one after another, and only when runs are shown. GraphQL can't list runs.
-- **Decided without asking, for review when building:** macOS 14 minimum (the only platform shipped; `ShipyardCore` builds on Linux for development only); one dependency (dduan/TOMLDecoder, MIT, decode-only); 120 s default refresh (min 30), stretched by a 10% rate budget, backing off below 20% remaining; rate-limit indicator shown `always`; open PRs capped at 50 and closed at 20 per repository per refresh; launch at login on by default; the device flow needs an OAuth App registered under the maintainer's account (one-time, free); versions start at 0.0.1 and stay below 0.1.0 until the public launch.
+The choices settled in review, newest release first, then the ones that hold across releases.
+
+- **0.2.0, app control is leased, enforced by the app** (ADR 0007): one holder at a time, renewed by each command for a minute and capped at five, refused at the socket for anyone else; the holder is worked out by the CLI from the agent's session, else its process.
+  Rejected: a plain lock (a crashed agent keeps it), a lock file the CLI checks (another build ignores it), a holder the agent passes (it gets it wrong), Herdr's pane as the key (reused).
+  Spec #176.
+- **0.1.0, modules follow concerns ("A+")** (ADR 0006): the agent's side (Command, Pings, Config, Control) never links the app's rules (Core).
+  Rejected: one core with a command table (the Linux binary would still carry everything), two executables (a second name, no more isolation), the app filing every ping (no refusal while the app is quit).
+- **0.1.0, app control is one Unix socket in the support folder**, owner-only, one JSON request per connection.
+  Launching the app goes around it, by bundle id, since the app may not be running.
+  Spec #160.
+- **0.0.2, review requests come from one search** (`review-requested:@me`), not from each PR's review requests: it includes team requests, answers `anywhere` in the same request, and costs one search per refresh.
+  Cost accepted: GitHub's search index can lag a PR by a short while, and it returns at most 100.
+- **0.0.2, `subsections` unset keeps each layout's look**: the list's dividers and the tabs' subheaders, so no existing menu changes; a value set applies to both.
+- **Panel technology: SwiftUI `MenuBarExtra` in `.window` style**, not AppKit `NSMenu`.
+  The panel stays open while sections collapse and ⌥-clicks happen, colours and rows are fully controlled, and onboarding lives in the same panel.
+  Cost accepted: it doesn't behave exactly like a native menu (no type-to-select).
+- **A click clears everything about an item until it changes again**, including a review request or failed checks.
+  The attention count means "things to look at", not "work outstanding".
+- **Workflow runs come from REST, one conditional request per repository per refresh**, sent one after another, and only when runs are shown.
+  GraphQL can't list runs.
+- **Decided without asking, for review when building:**
+  - macOS 14 minimum: the only platform shipped; `ShipyardCore` builds on Linux for development only.
+  - One dependency: dduan/TOMLDecoder, MIT, decode-only.
+  - 120 s default refresh (min 30), stretched by a 10% rate budget, backing off below 20% remaining.
+  - Rate-limit indicator shown `always`.
+  - Open PRs capped at 50 and closed at 20 per repository per refresh.
+  - Launch at login on by default.
+  - The device flow needs an OAuth App registered under the maintainer's account (one-time, free).
+  - Versions start at 0.0.1 and stay below 0.1.0 until the public launch.
 
 ---
 
 ## References (GitHub documentation)
 
-The facts are written up in `docs/references/` (committed with the repo). Read the one for an area before implementing it; checked 2026-09-25.
+The facts are written up in `docs/references/` (committed with the repo).
+Read the one for an area before implementing it; checked 2026-09-25.
 
 | Topic | Page | What the design takes from it |
 |---|---|---|
