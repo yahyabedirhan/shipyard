@@ -5,6 +5,7 @@ struct StatusView: View {
     let part: SetupPart
     let actions: AppServices
     let back: () -> Void
+    @Environment(\.panelScale) private var scale
 
     private static let actionHeight: CGFloat = 28
 
@@ -13,9 +14,9 @@ struct StatusView: View {
             Button(action: back) {
                 Text(PanelText.back)
             }
-            .buttonStyle(TextButtonStyle(font: TypeScale.body))
+            .buttonStyle(TextButtonStyle(font: \.body))
             .accessibilityLabel("Back")
-            .padding(.horizontal, Grid.gutter)
+            .padding(.horizontal, scale.grid.gutter)
             .padding(.top, 10)
             if let text = page {
                 page(text)
@@ -24,6 +25,7 @@ struct StatusView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .themedScreen()
         .onChange(of: part, initial: true) { lookAgain() }
     }
 
@@ -73,15 +75,15 @@ struct StatusView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 SetupBadge(part: part, side: 32)
-                Text(text.title).font(TypeScale.display)
+                Text(text.title).font(scale.type.display)
             }
             .padding(.bottom, 12)
             line(text.lead)
                 .padding(.bottom, 12)
             if let status = text.status {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    ToneIcon(tone: status.tone, neutral: "circle.dashed", neutralTint: .secondary)
-                    Text(markdown: status.text, size: 12, weight: .medium)
+                    ToneIcon(tone: status.tone, neutral: "circle.dashed", neutralTint: ThemeColor.textSecondary)
+                    MarkdownText(status.text, size: 12, weight: .medium)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.bottom, 8)
@@ -90,14 +92,7 @@ struct StatusView: View {
                 line(detail).padding(.bottom, 8)
             }
             if let output = text.output {
-                Text(output)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(8)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: Grid.radius, style: .continuous).fill(Palette.fill))
+                OutputBox(output: output)
                     .padding(.bottom, 8)
             }
             VStack(alignment: .leading, spacing: 8) {
@@ -107,7 +102,7 @@ struct StatusView: View {
                 }
                 ForEach(text.alternatives.indices, id: \.self) { index in
                     let alternative = text.alternatives[index]
-                    Divider().padding(.vertical, 4)
+                    Hairline().padding(.vertical, 4)
                     line(alternative.line)
                     commands(alternative.commands)
                     if let button = alternative.button {
@@ -124,7 +119,7 @@ struct StatusView: View {
     @ViewBuilder
     private func commands(_ commands: [String]) -> some View {
         ForEach(commands, id: \.self) { command in
-            CommandBox(command: command, prompt: false, font: .system(size: 11, weight: .medium, design: .monospaced))
+            CommandBox(command: command, prompt: false)
         }
     }
 
@@ -141,8 +136,8 @@ struct StatusView: View {
     }
 
     private func line(_ text: String) -> some View {
-        Text(markdown: text, size: 12)
-            .foregroundStyle(.secondary)
+        MarkdownText(text, size: 12)
+            .foregroundStyle(ThemeColor.textSecondary)
             .lineSpacing(1.5)
             .fixedSize(horizontal: false, vertical: true)
     }

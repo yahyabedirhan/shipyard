@@ -77,6 +77,7 @@ final class AppServices {
     private let notifier = Notifier()
     private let opener = WorkspaceActions()
     private var configWatcher: ConfigurationWatcher?
+    private var themeWatcher: ConfigurationWatcher?
     private var pingWatcher: ConfigurationWatcher?
     private var wake: WakeObserver?
     let panelState = PanelState()
@@ -122,6 +123,10 @@ final class AppServices {
             Task { await shipyard.reloadConfiguration() }
         }
         configWatcher?.start()
+        themeWatcher = ConfigurationWatcher(files: shipyard.configStore.themesFolder, matching: ThemeFiles.urls) {
+            Task { await shipyard.reloadConfiguration() }
+        }
+        themeWatcher?.start()
         try? shipyard.pingStore.createDirectory()
         pingWatcher = ConfigurationWatcher(folder: { shipyard.pingStore.watchedDirectory }) {
             Task { await shipyard.reloadPings() }

@@ -44,6 +44,7 @@ func designExample() throws -> String {
 let everyKey = """
     #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
     version = 1
+    theme = "Paper"
     refresh-interval = "5m"
     launch-at-login = false
 
@@ -156,6 +157,7 @@ struct ConfigurationDecodingTests {
     func defaults() {
         let config = Configuration()
         #expect(config.version == 1)
+        #expect(config.theme == "Shipyard")
         #expect(config.refreshInterval == 120)
         #expect(config.launchAtLogin)
         #expect(config.menuBar.count == .total)
@@ -223,6 +225,7 @@ struct ConfigurationDecodingTests {
         let result = try #require(decoded(everyKey))
         #expect(result.warnings.isEmpty)
         let config = result.configuration
+        #expect(config.theme == "Paper")
         #expect(config.refreshInterval == 300)
         #expect(!config.launchAtLogin)
         #expect(config.menuBar.count == .perKind)
@@ -400,6 +403,41 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 2, message: "unknown value `sometimes` for `show` (expected one of `always`, `when-low`, `never`)")])
         #expect(rejection("[defaults.workflow-runs]\nbranches = \"al\"\n")
             == [ConfigurationIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
+    }
+
+    @Test("theme names a theme, ignoring case, kept as the theme spells it; missing, it's Shipyard; an unknown name is rejected on its line")
+    func theme() {
+        #expect(decoded("version = 1\n")?.configuration.theme == "Shipyard")
+        for name in ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"] {
+            let result = decoded("version = 1\ntheme = \"\(name.uppercased())\"\n")
+            #expect(result?.configuration.theme == name)
+            #expect(result?.warnings == [])
+        }
+        #expect(rejection("version = 1\ntheme = \"Papr\"\n")
+            == [ConfigurationIssue(line: 2, message: "unknown theme `Papr` (did you mean `Paper`?)")])
+        #expect(rejection("version = 1\ntheme = \"Solarized\"\n")
+            == [ConfigurationIssue(line: 2, message: "unknown theme `Solarized` (expected one of `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight`, `Harbor`)")])
+        #expect(rejection("version = 1\ntheme = 3\n")
+            == [ConfigurationIssue(line: 2, message: "`theme` must be a string")])
+    }
+
+    @Test("a theme with too little contrast on its panel reads, with a warning on the theme line")
+    func themeContrast() throws {
+        let faint = Theme(name: "Faint") { token, _ in
+            switch token {
+            case .panel: .color(RGBA(r: 1, g: 1, b: 1))
+            case .textTertiary: .color(RGBA(r: 0.8, g: 0.8, b: 0.8))
+            case .textPrimary, .textSecondary, .textSeen: .color(RGBA(r: 0, g: 0, b: 0))
+            default: .system
+            }
+        }
+        let library = ThemeLibrary(BuiltInThemes.themes + [faint])
+        let result = try Configuration.decode("version = 1\n\ntheme = \"faint\"\n", themes: library)
+        #expect(result.configuration.theme == "Faint")
+        #expect(result.warnings == [
+            ConfigurationIssue(line: 3, message: "theme `Faint`: light `text.tertiary` is 1.6:1 on `surface.panel`; it needs 3:1, so it may be hard to read"),
+            ConfigurationIssue(line: 3, message: "theme `Faint`: dark `text.tertiary` is 1.6:1 on `surface.panel`; it needs 3:1, so it may be hard to read"),
+        ])
     }
 
     @Test("header-counts lists the kinds with a header slot, each once, globally")
@@ -744,7 +782,7 @@ struct ConfigurationWarningTests {
     func unknownKeys() throws {
         let result = try #require(decoded("""
             refreshInterval = "60s"
-            theme = "dark"
+            wallpaper = "dark"
 
             [attention]
             unseeen = false
@@ -760,7 +798,7 @@ struct ConfigurationWarningTests {
         #expect(Set(result.warnings) == [
             ConfigurationIssue(line: nil, message: ConfigurationReader.missingVersionMessage),
             ConfigurationIssue(line: 1, message: "unknown setting `refreshInterval` (ignored; did you mean `refresh-interval`?)"),
-            ConfigurationIssue(line: 2, message: "unknown setting `theme` (ignored)"),
+            ConfigurationIssue(line: 2, message: "unknown setting `wallpaper` (ignored)"),
             ConfigurationIssue(line: 5, message: "unknown setting `attention.unseeen` (ignored; did you mean `unseen`?)"),
             ConfigurationIssue(line: 10, message: "unknown setting `projects[0].colour` (ignored)"),
         ])

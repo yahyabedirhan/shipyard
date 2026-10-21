@@ -240,11 +240,15 @@ public enum PanelText {
 
     /// The line under the tab strip: "5 need attention · 4 projects" on
     /// All, "2 need attention" on a project's tab, and "All caught up" in
-    /// place of the count when nothing needs attention.
-    public static func tabSummary(attention: Int, projects: Int, tab: MenuTab) -> String {
+    /// place of the count when nothing needs attention. Before the tab is
+    /// loaded nothing is known to be caught up, so with no count the line
+    /// names only how many projects All holds, and is empty on a project's tab.
+    public static func tabSummary(attention: Int, projects: Int, isLoaded: Bool, tab: MenuTab) -> String {
+        let projectCount = "\(projects) \(projects == 1 ? "project" : "projects")"
+        guard attention > 0 || isLoaded else { return tab == .all ? projectCount : "" }
         let count = attention == 0 ? "All caught up" : attentionCount(attention)
         guard tab == .all else { return count }
-        return "\(count) · \(projects) \(projects == 1 ? "project" : "projects")"
+        return "\(count) · \(projectCount)"
     }
 
     /// The button next to that line: All marks every project seen, a
@@ -289,6 +293,14 @@ public enum PanelText {
     /// check` repeat it.
     public static func configIssue(_ issue: ConfigurationIssue) -> String {
         ConfigurationCheck.banner(ConfigurationCheck.Issue(issue), in: ConfigurationStore.fileName)
+    }
+
+    /// The banner for theme files that don't read: each problem with its
+    /// file and line, "themes/Sunset.toml line 12: …", then that each theme
+    /// keeps its last good version; `nil` when there are none.
+    public static func themeIssues(_ issues: [ThemeIssue]) -> String? {
+        guard !issues.isEmpty else { return nil }
+        return (issues.map(\.description) + ["A theme keeps the version that last read until its file is fixed."]).joined(separator: "\n")
     }
 
     /// The quiet banner for settings the file has but shipyard ignores, each

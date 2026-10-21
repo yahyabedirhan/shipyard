@@ -1,14 +1,48 @@
-import AppKit
 import ShipyardConfig
 import ShipyardCore
 import SwiftUI
 
-enum Grid {
+/// The panel's sizes and type at one theme's font, density and shape knobs.
+/// It is resolved once where the theme is set (`EnvironmentValues.theme`),
+/// and views read it from the environment's `panelScale`, so a row reads
+/// its sizes and builds nothing. The Shipyard theme's knobs give the
+/// panel's long-standing grid, and the design lab's 6 and 8 pt corners.
+struct PanelScale: Equatable {
+    let knobs: ThemeKnobs
+    /// The frame's and the tabs layout's grid and type.
+    let grid: Grid
+    let type: TypeScale
+    /// The list layout's tighter grid and type.
+    let list: ListGrid
+    let listType: ListType
+
+    init(_ knobs: ThemeKnobs) {
+        self.knobs = knobs
+        grid = Grid(knobs)
+        type = TypeScale(knobs)
+        list = ListGrid(knobs)
+        listType = ListType(knobs)
+    }
+
+    /// The Shipyard theme's scale, for views with no theme set above them.
+    static let shipyard = PanelScale(BuiltInThemes.shipyard.knobs)
+
+    /// A shared row piece's sizes and type, in the layout `style` draws.
+    func rowHeight(_ style: PanelStyle) -> CGFloat { style == .list ? list.rowHeight : grid.rowHeight }
+    func meta(_ style: PanelStyle) -> Font { style == .list ? listType.meta : type.meta }
+    func eyebrow(_ style: PanelStyle) -> Font { style == .list ? listType.eyebrow : type.eyebrow }
+
+    /// How far a ping row's ✕ sits from the row's trailing edge: just
+    /// before the age, so the age stays readable.
+    func dismissTrailing(_ style: PanelStyle) -> CGFloat {
+        style == .list ? list.gutter + ListGrid.ageColumn + 2 : grid.gutter + Grid.ageColumn + 2
+    }
+}
+
+/// The frame's and the tabs layout's grid. The columns are fixed; the
+/// gutter, the heights and the radii follow the theme's density and shape.
+struct Grid: Equatable {
     static let panelWidth: CGFloat = 400
-    static let gutter: CGFloat = 12
-    static let titleBarHeight: CGFloat = 38
-    static let rowHeight: CGFloat = 24
-    static let headerHeight: CGFloat = 26
     static let dotColumn: CGFloat = 10
     static let iconColumn: CGFloat = 16
     static let numberColumn: CGFloat = 30
@@ -18,27 +52,166 @@ enum Grid {
     static let chipGap: CGFloat = 6
     static let inset: CGFloat = 4
     static let maxListHeight: CGFloat = 560
-    static let smallRadius: CGFloat = 5
-    static let radius: CGFloat = 7
     static let maxTabTitleWidth: CGFloat = 140
     static let tabFade: CGFloat = 24
     static let tabSlide: CGFloat = 40
+
+    /// The panel's side padding.
+    let gutter: CGFloat
+    /// The header's height.
+    let titleBarHeight: CGFloat
+    /// One item.
+    let rowHeight: CGFloat
+    /// A project's header.
+    let headerHeight: CGFloat
+    /// A two-line tabs row's padding above and below: 5 pt at the regular
+    /// row, half a point more or less for each point the row grows or shrinks.
+    let tabRowPadding: CGFloat
+    /// Rounded corners, each the theme's `[shape]` knob in points: small
+    /// controls, and cards and banners.
+    let smallRadius: CGFloat
+    let radius: CGFloat
+
+    init(_ knobs: ThemeKnobs) {
+        gutter = knobs.gutter
+        titleBarHeight = knobs.bar
+        rowHeight = knobs.row
+        headerHeight = knobs.header
+        tabRowPadding = max(1, 5 + (knobs.row - ThemeKnobs.standard.row) / 2)
+        smallRadius = knobs.small
+        radius = knobs.medium
+    }
 }
 
-enum TypeScale {
-    static let title = Font.system(size: 13, weight: .semibold)
-    static let display = Font.system(size: 14, weight: .semibold)
-    static let body = Font.system(size: 12)
-    static let bodyEmphasis = Font.system(size: 12, weight: .semibold)
-    static let button = Font.system(size: 12, weight: .medium)
-    static let meta = Font.system(size: 11).monospacedDigit()
-    static let section = Font.system(size: 11, weight: .semibold)
-    static let eyebrow = Font.system(size: 10, weight: .semibold)
-    static let caption = Font.system(size: 10.5).monospacedDigit()
-    static let captionEmphasis = Font.system(size: 10.5, weight: .medium)
-    static let badge = Font.system(size: 10, weight: .bold).monospacedDigit()
-    static let code = Font.system(size: 12, weight: .medium, design: .monospaced)
-    static let branch = Font.system(size: 10.5, weight: .medium, design: .monospaced)
+/// The list layout's tighter scale, from the frame's: rows 2 pt shorter,
+/// project headers 4 pt shorter and narrower columns.
+struct ListGrid: Equatable {
+    static let dotColumn: CGFloat = 8
+    static let iconColumn: CGFloat = 14
+    static let numberColumn: CGFloat = 28
+    static let metaColumn: CGFloat = 68
+    static let agentMark: CGFloat = 12
+    static let ageColumn: CGFloat = 24
+    static let chipGap: CGFloat = 4
+
+    let gutter: CGFloat
+    let rowHeight: CGFloat
+    let headerHeight: CGFloat
+
+    init(_ knobs: ThemeKnobs) {
+        gutter = knobs.gutter
+        rowHeight = knobs.row - 2
+        headerHeight = knobs.header - 4
+    }
+}
+
+/// Builds fonts from the theme's font knob: the system text styles when the
+/// theme keeps the system families at 12 pt, and sized fonts of its family
+/// otherwise.
+enum FontKit {
+    static func usesSystemStyles(_ knobs: ThemeKnobs) -> Bool {
+        knobs.fontFamily == "system" && knobs.fontMono == "system" && knobs.fontSize == 12
+    }
+
+    /// The text style `style` at the default; otherwise the body size plus `offset`.
+    static func style(
+        _ knobs: ThemeKnobs,
+        _ style: Font.TextStyle,
+        offset: Double,
+        _ weight: Font.Weight? = nil,
+        mono: Bool = false
+    ) -> Font {
+        if usesSystemStyles(knobs) {
+            return Font.system(style, design: mono ? .monospaced : nil, weight: weight)
+        }
+        return sized(knobs, knobs.fontSize + offset, weight ?? .regular, mono: mono)
+    }
+
+    static func sized(_ knobs: ThemeKnobs, _ size: Double, _ weight: Font.Weight = .regular, mono: Bool = false) -> Font {
+        switch mono ? knobs.fontMono : knobs.fontFamily {
+        case "system": Font.system(size: size, weight: weight, design: mono ? .monospaced : .default)
+        case "rounded": Font.system(size: size, weight: weight, design: .rounded)
+        case "mono": Font.system(size: size, weight: weight, design: .monospaced)
+        case let family: Font.custom(family, size: size).weight(weight)
+        }
+    }
+}
+
+/// The frame's and the tabs layout's type: the system text styles under the
+/// Shipyard theme, sized from the theme's body size otherwise.
+struct TypeScale: Equatable {
+    /// The panel's heading, and a screen's title.
+    let title: Font
+    /// A larger heading, on the connect screen and the pickers.
+    let display: Font
+    /// Body text: a row's title, a screen's message.
+    let body: Font
+    let bodyEmphasis: Font
+    let button: Font
+    /// Numbers, authors, ages; banner text.
+    let meta: Font
+    /// A small header over a kind's rows.
+    let eyebrow: Font
+    /// The footer, and small print.
+    let caption: Font
+    let captionEmphasis: Font
+    /// A count in a capsule.
+    let badge: Font
+    /// A command to copy, and a run's branch.
+    let code: Font
+    let branch: Font
+
+    init(_ knobs: ThemeKnobs) {
+        title = FontKit.style(knobs, .headline, offset: 1, .semibold)
+        display = FontKit.style(knobs, .title3, offset: 3, .semibold)
+        body = FontKit.style(knobs, .callout, offset: 0)
+        bodyEmphasis = FontKit.style(knobs, .callout, offset: 0, .semibold)
+        button = FontKit.style(knobs, .callout, offset: 0, .medium)
+        meta = FontKit.style(knobs, .subheadline, offset: -1).monospacedDigit()
+        eyebrow = FontKit.style(knobs, .caption, offset: -2, .semibold)
+        caption = FontKit.style(knobs, .footnote, offset: -2).monospacedDigit()
+        captionEmphasis = FontKit.style(knobs, .footnote, offset: -2, .medium)
+        badge = FontKit.style(knobs, .caption, offset: -2, .bold).monospacedDigit()
+        code = FontKit.style(knobs, .callout, offset: 0, .medium, mono: true)
+        branch = FontKit.style(knobs, .footnote, offset: -2, .medium, mono: true)
+    }
+}
+
+/// The list layout's type: smaller steps from the theme's body size, with
+/// hierarchy by weight and by the text tiers.
+struct ListType: Equatable {
+    let body: Font
+    let bodyEmphasis: Font
+    let meta: Font
+    let section: Font
+    let eyebrow: Font
+    let caption: Font
+    let badge: Font
+    let branch: Font
+
+    init(_ knobs: ThemeKnobs) {
+        let base = knobs.fontSize
+        body = FontKit.sized(knobs, base)
+        bodyEmphasis = FontKit.sized(knobs, base, .semibold)
+        meta = FontKit.sized(knobs, base - 1.5).monospacedDigit()
+        section = FontKit.sized(knobs, base - 0.5, .semibold)
+        eyebrow = FontKit.sized(knobs, base - 2.5, .semibold)
+        caption = FontKit.sized(knobs, base - 2).monospacedDigit()
+        badge = FontKit.sized(knobs, base - 2, .medium).monospacedDigit()
+        branch = FontKit.sized(knobs, base - 2, mono: true)
+    }
+}
+
+private struct PanelScaleKey: EnvironmentKey {
+    static let defaultValue = PanelScale.shipyard
+}
+
+extension EnvironmentValues {
+    /// The sizes and type of the environment's theme. Setting the theme sets it.
+    var panelScale: PanelScale {
+        get { self[PanelScaleKey.self] }
+        set { self[PanelScaleKey.self] = newValue }
+    }
 }
 
 enum Motion {
@@ -52,77 +225,20 @@ enum Motion {
     static let tab = Animation.spring(response: 0.36, dampingFraction: 0.86)
 }
 
-enum Palette {
-
-    static let green = dynamic(light: 0x1A7F37, dark: 0x3FB950)
-    static let gray = dynamic(light: 0x59636E, dark: 0x9198A1)
-    static let purple = dynamic(light: 0x8250DF, dark: 0xAB7DF8)
-    static let red = dynamic(light: 0xD1242F, dark: 0xF85149)
-    static let amber = dynamic(light: 0x9A6700, dark: 0xD29922)
-    static let accent = dynamic(light: 0x006BED, dark: 0x4A94FF)
-    static let lease = Color(nsColor: .systemYellow)
-
-    static let header = dynamic(light: 0xF6F6F8, dark: 0x2A2A2D)
-    static let panel = dynamic(light: 0xFBFBFC, dark: 0x252528)
-    static let chrome = dynamic(light: 0xF3F3F5, dark: 0x202023, alpha: 0.6)
-    static let separator = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.065, darkAlpha: 0.07)
-    static let border = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.1, darkAlpha: 0.12)
-    static let hover = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.045, darkAlpha: 0.075)
-    static let pressed = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.08, darkAlpha: 0.12)
-    static let fill = dynamic(light: 0x000000, dark: 0xFFFFFF, lightAlpha: 0.045, darkAlpha: 0.06)
-    static let track = dynamic(light: 0xE8E8EB, dark: 0x18181A)
-    static let raised = dynamic(light: 0xFFFFFF, dark: 0x3F3F44)
-    static let raisedShadow = dynamic(light: 0x000000, dark: 0x000000, lightAlpha: 0.08, darkAlpha: 0.35)
-
-    static func color(_ state: ItemState, kind: ItemKind) -> Color {
-        if kind == .ping || kind == .note { return gray }
-        return switch state {
-        case .open, .succeeded: green
-        case .draft: gray
-        case .merged: purple
-        case .closed: kind == .issue ? purple : red
-        case .running: amber
-        case .failed: red
-        }
-    }
-
-    static func color(_ checks: ChecksState) -> Color? {
-        switch checks {
-        case .none: nil
-        case .pending: amber
-        case .passed: green
-        case .failed: red
-        }
-    }
-
-    static func color(_ level: RateLevel) -> Color {
-        switch level {
-        case .normal: .secondary
-        case .low: amber
-        case .exhausted: red
-        }
-    }
-
-    static func bar(_ level: RateLevel) -> Color {
-        switch level {
-        case .normal: green.opacity(0.65)
-        case .low: amber
-        case .exhausted: red
-        }
-    }
-
-    static func symbol(_ state: ItemState, kind: ItemKind) -> String {
+/// The SF Symbol for what a row shows: its kind and state, a ping's icon.
+enum ItemSymbol {
+    static func name(_ state: ItemState, kind: ItemKind) -> String {
         switch (kind, state) {
         case (.pullRequest, .merged): "arrow.triangle.merge"
         case (.issue, .closed): "checkmark.circle"
         case (.workflowRun, .running): "arrow.triangle.2.circlepath.circle.fill"
         case (.workflowRun, .failed): "xmark.circle.fill"
         case (.workflowRun, _): "checkmark.circle.fill"
-        default: symbol(kind)
+        default: name(kind)
         }
     }
 
-    static func symbol(_ kind: ItemKind) -> String {
+    static func name(_ kind: ItemKind) -> String {
         switch kind {
         case .pullRequest: "arrow.triangle.pull"
         case .issue: "smallcircle.filled.circle"
@@ -132,32 +248,12 @@ enum Palette {
         }
     }
 
-    static func symbol(_ icon: PingIcon) -> String {
+    static func name(_ icon: PingIcon) -> String {
         switch icon {
         case .link: "link"
         case .app: "macwindow"
         case .terminal: "terminal"
         case .noAction: "bell.fill"
         }
-    }
-
-    private static func dynamic(light: UInt32, dark: UInt32, alpha: CGFloat = 1) -> Color {
-        dynamic(light: light, dark: dark, lightAlpha: alpha, darkAlpha: alpha)
-    }
-
-    private static func dynamic(light: UInt32, dark: UInt32, lightAlpha: CGFloat, darkAlpha: CGFloat) -> Color {
-        Color(nsColor: NSColor(name: nil) { appearance in
-            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            return rgb(isDark ? dark : light, alpha: isDark ? darkAlpha : lightAlpha)
-        })
-    }
-
-    private static func rgb(_ hex: UInt32, alpha: CGFloat) -> NSColor {
-        NSColor(
-            srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
-            green: CGFloat((hex >> 8) & 0xFF) / 255,
-            blue: CGFloat(hex & 0xFF) / 255,
-            alpha: alpha
-        )
     }
 }

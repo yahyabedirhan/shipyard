@@ -9,36 +9,44 @@ struct Panel: View {
     var isSnapshot = false
 
     var body: some View {
+        // The theme is set below this view, so its own sizes come from the
+        // theme's knobs here; the views it builds read the environment's.
+        let scale = PanelScale(shipyard.theme.knobs)
         TimelineView(.periodic(from: .now, by: 30)) { context in
             VStack(alignment: .leading, spacing: 0) {
-                header
+                header(scale)
                 banners
                 Hairline()
-                content
+                content(scale)
                 Hairline()
-                footer(now: context.date)
+                footer(now: context.date, scale: scale)
             }
             .environment(\.panelNow, context.date)
             .hoverHelpHost()
         }
         .frame(width: Grid.panelWidth)
+        .background { PanelBackdrop() }
+        .background { if !isSnapshot { PanelWindowAnchor(isOpen: actions.panelState.isOpen) } }
+        .theme(shipyard.theme)
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
         .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
     }
 
-    private var header: some View {
+    private func header(_ scale: PanelScale) -> some View {
         let attention = shipyard.phase == .ready ? shipyard.menu.attention.total : 0
         return HStack(spacing: 8) {
             if let viewer = shipyard.viewer {
                 AccountButton(viewer: viewer, avatars: actions.avatars, action: actions.openProfile)
             } else {
-                Text(PanelText.title(for: nil)).font(TypeScale.title)
+                Text(PanelText.title(for: nil))
+                    .font(scale.type.title)
+                    .foregroundStyle(ThemeColor.textPrimary)
             }
             if let summary = PanelText.attentionSummary(attention) {
                 Text(summary)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .font(scale.type.caption)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .contentTransition(.numericText(value: Double(attention)))
                     .transition(.opacity)
             }
@@ -68,21 +76,13 @@ struct Panel: View {
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
             .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
-            Menu {
-                settingsItems
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .frame(width: 24, height: 22)
-            .hoverHelp(PanelText.settings)
+            SettingsMenuButton { settingsItems }
+                .hoverHelp(PanelText.settings)
             .accessibilityLabel(PanelText.settings)
         }
-        .padding(.leading, Grid.gutter)
+        .padding(.leading, scale.grid.gutter)
         .padding(.trailing, 8)
-        .frame(height: Grid.titleBarHeight)
+        .frame(height: scale.grid.titleBarHeight)
         .animation(Motion.count, value: attention)
     }
 
@@ -194,16 +194,16 @@ struct Panel: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(_ scale: PanelScale) -> some View {
         if let part = actions.panelState.openView {
             StatusView(part: part, actions: actions) { actions.panelState.openView = nil }
         } else {
-            phaseContent
+            phaseContent(scale)
         }
     }
 
     @ViewBuilder
-    private var phaseContent: some View {
+    private func phaseContent(_ scale: PanelScale) -> some View {
         switch shipyard.phase {
         case .signedOut, .connecting:
             ConnectView(shipyard: shipyard)
@@ -214,11 +214,11 @@ struct Panel: View {
                 PresetPicker(shipyard: shipyard)
             }
             SkillInstallCard(installation: actions.skillInstallation)
-                .padding(.horizontal, Grid.gutter)
+                .padding(.horizontal, scale.grid.gutter)
                 .padding(.bottom, 8)
             CLILinkCard(link: actions.cliLink)
-                .padding(.horizontal, Grid.gutter)
-                .padding(.bottom, Grid.gutter)
+                .padding(.horizontal, scale.grid.gutter)
+                .padding(.bottom, scale.grid.gutter)
         case .ready:
             layout
         }
@@ -234,21 +234,21 @@ struct Panel: View {
         }
     }
 
-    private func footer(now: Date) -> some View {
+    private func footer(now: Date, scale: PanelScale) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 if shipyard.isRefreshing {
                     ProgressView().controlSize(.mini)
                     Text("Refreshing…")
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
+                        .font(scale.type.caption)
+                        .foregroundStyle(ThemeColor.textSecondary)
                 } else if let updated = PanelText.lastUpdated(shipyard.menu.lastUpdated, now: now) {
                     Image(systemName: "clock")
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ThemeColor.textTertiary)
                     Text(updated)
-                        .font(TypeScale.caption)
-                        .foregroundStyle(.secondary)
+                        .font(scale.type.caption)
+                        .foregroundStyle(ThemeColor.textSecondary)
                 }
                 Spacer()
                 if shipyard.phase == .ready, shipyard.menu.attention.total > 0 {
@@ -262,10 +262,10 @@ struct Panel: View {
                 Button(action: actions.quit) {
                     HStack(spacing: 4) {
                         Text("Quit")
-                        Text("⌘Q").foregroundStyle(.tertiary)
+                        Text("⌘Q").foregroundStyle(ThemeColor.textTertiary)
                     }
                 }
-                .buttonStyle(TextButtonStyle(tint: .primary, font: TypeScale.caption))
+                .buttonStyle(TextButtonStyle(tint: ThemeColor.textPrimary, font: \.caption))
                 .keyboardShortcut("q")
             }
             if shipyard.phase == .ready, let indicator = shipyard.menu.rateIndicator {
@@ -274,11 +274,71 @@ struct Panel: View {
                 }
             }
         }
-        .padding(.leading, Grid.gutter)
-        .padding(.trailing, Grid.gutter - 6)
+        .padding(.leading, scale.grid.gutter)
+        .padding(.trailing, scale.grid.gutter - 6)
         .padding(.vertical, 8)
-        .background(Palette.chrome)
+        .background(ThemeColor.chrome)
         .animation(.spring(duration: 0.5), value: shipyard.menu.rateIndicator)
+    }
+}
+
+/// The header's gear: the settings menu, drawn like the header's icon
+/// buttons. The system draws a borderless menu's own icon in the label
+/// colour, darker than the icons beside it, whatever style it's given; so
+/// the gear is an image already tinted with the theme's colour, secondary at
+/// rest and primary under the pointer, on the icon buttons' hover fill.
+private struct SettingsMenuButton<Items: View>: View {
+    @ViewBuilder let items: Items
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
+    @State private var hover = false
+
+    var body: some View {
+        let tint = hover ? ThemeColor.textPrimary : ThemeColor.textSecondary
+        Menu {
+            items
+        } label: {
+            Image(nsImage: SymbolImage.tinted("gearshape", NSColor(tint.color(in: theme, ThemeAppearance(scheme)))))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(width: 24, height: 22)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(ThemeColor.rowHover.opacity(hover ? 1 : 0))
+        )
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .animation(Motion.hover, value: hover)
+    }
+}
+
+/// An SF Symbol drawn in one colour into an image that isn't a template, so
+/// AppKit draws it as it is rather than tinting it with the label colour.
+enum SymbolImage {
+    static func tinted(_ name: String, _ color: NSColor, pointSize: CGFloat = 12, weight: NSFont.Weight = .medium) -> NSImage {
+        let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+        guard let symbol = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration)
+        else { return NSImage() }
+        // The ink is painted opaque over the glyph, then the glyph is drawn at
+        // the colour's alpha. Painting a translucent colour over the black
+        // glyph would leave it near black: a `label` at 70% read as `label`.
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        let solid = rgb.withAlphaComponent(1)
+        let glyph = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            solid.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        let image = NSImage(size: symbol.size, flipped: false) { rect in
+            glyph.draw(in: rect, from: .zero, operation: .sourceOver, fraction: rgb.alphaComponent)
+            return true
+        }
+        image.isTemplate = false
+        return image
     }
 }
 
@@ -288,6 +348,7 @@ private struct AccountButton: View {
     let action: () -> Void
     @State private var avatar: NSImage?
     @State private var hover = false
+    @Environment(\.panelScale) private var scale
 
     private static let avatarSize: CGFloat = 20
 
@@ -296,7 +357,8 @@ private struct AccountButton: View {
             HStack(spacing: 6) {
                 avatarView
                 Text(PanelText.title(for: viewer))
-                    .font(TypeScale.title)
+                    .font(scale.type.title)
+                    .foregroundStyle(ThemeColor.textPrimary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -304,7 +366,7 @@ private struct AccountButton: View {
             .frame(height: 26)
             .background(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(hover ? Palette.hover : .clear)
+                    .fill(ThemeColor.rowHover.opacity(hover ? 1 : 0))
             )
             .contentShape(Rectangle())
         }
@@ -337,17 +399,17 @@ private struct AccountButton: View {
                     .aspectRatio(contentMode: .fill)
             } else {
                 Circle()
-                    .fill(Color.primary.opacity(0.08))
+                    .fill(ThemeColor.field)
                     .overlay(
                         Image(systemName: "person.fill")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(ThemeColor.textTertiary)
                     )
             }
         }
         .frame(width: Self.avatarSize, height: Self.avatarSize)
         .clipShape(Circle())
-        .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .overlay(Circle().strokeBorder(ThemeColor.border, lineWidth: 0.5))
         .accessibilityHidden(true)
     }
 
@@ -376,12 +438,12 @@ extension PanelBanner {
         }
     }
 
-    fileprivate var tint: Color {
+    fileprivate var tint: ThemeColor {
         switch kind {
-        case .configError, .paused: Palette.red
-        case .delay, .fetch: Palette.amber
-        case .lease: Palette.lease
-        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: Palette.gray
+        case .configError, .paused: ThemeColor.failure
+        case .delay, .fetch: ThemeColor.pending
+        case .lease: ThemeColor.lease
+        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: ThemeColor.neutral
         }
     }
 }
@@ -397,6 +459,7 @@ extension MenuLayout {
 
 private struct RateLine: View {
     let usage: RateUsage
+    @Environment(\.panelScale) private var scale
 
     private var fraction: Double {
         Double(max(0, usage.remaining)) / Double(max(1, usage.limit))
@@ -405,14 +468,14 @@ private struct RateLine: View {
     var body: some View {
         HStack(spacing: 6) {
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.08))
-                Capsule().fill(Palette.bar(usage.level)).frame(width: 26 * fraction)
+                Capsule().fill(ThemeColor.track)
+                Capsule().fill(ThemeColor.rateBar(usage.level)).frame(width: 26 * fraction)
             }
             .frame(width: 26, height: 4)
             .accessibilityHidden(true)
             Text(PanelText.rateUsage(usage))
-                .font(TypeScale.caption)
-                .foregroundStyle(usage.level == .normal ? AnyShapeStyle(.tertiary) : AnyShapeStyle(Palette.color(usage.level)))
+                .font(scale.type.caption)
+                .foregroundStyle(ThemeColor.rate(usage.level))
         }
     }
 }

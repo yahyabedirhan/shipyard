@@ -21,7 +21,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
     }
 
     /// The banner key: `lease`, `stopped-<holder key>`, `config`,
-    /// `config-warnings`, `delay`, `paused`, `fetch`, `machine-<machine>`,
+    /// `config-warnings`, `themes`, `delay`, `paused`, `fetch`, `machine-<machine>`,
     /// `notes` or `notifications`. A snooze is kept by it, so words that change
     /// (2 min, then 4 min) keep the banner hidden.
     public var id: String
@@ -79,7 +79,8 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
 
     /// Every banner whose condition holds, in the panel's order: the
     /// lease's banner and each stopped holder's quiet line, in every phase;
-    /// then the configuration error, its warnings, then once `ready` the refresh
+    /// then the configuration error, its warnings, the theme files' problems
+    /// (a configuration banner too), then once `ready` the refresh
     /// delay (or pause), the fetch error and one quiet line per remote
     /// machine, and the notes banner; then notifications off, which the app knows
     /// (`notificationsOff`).
@@ -87,6 +88,7 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         lease: Lease = Lease(),
         configError: ConfigurationError?,
         configWarnings: [ConfigurationIssue],
+        themeIssues: [ThemeIssue] = [],
         ready: Bool,
         menu: MenuModel,
         notes: NotesNotice? = nil,
@@ -104,6 +106,9 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         }
         if let text = PanelText.configWarnings(configWarnings) {
             banners.append(PanelBanner(id: "config-warnings", kind: .configWarnings, text: text))
+        }
+        if let text = PanelText.themeIssues(themeIssues) {
+            banners.append(PanelBanner(id: "themes", kind: .configError, text: text))
         }
         if ready {
             if let text = PanelText.refreshDelay(menu.refreshDelay) {

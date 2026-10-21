@@ -12,6 +12,12 @@
       "enum": [1],
       "default": 1
     },
+    "theme": {
+      "description": "The theme the panel draws with, by name, ignoring case: a built-in theme (Shipyard, Native, Graphite, Paper, Midnight or Harbor) or the name of a theme file in the themes folder beside config.toml. An unknown name is an error; a theme whose text has too little contrast on its panel reads with a warning.",
+      "type": "string",
+      "examples": ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"],
+      "default": "Shipyard"
+    },
     "refresh-interval": {
       "description": "How often to refresh: a whole number and one unit, s, m, h or d, such as \"2m\", at least 30 seconds. A floor: shipyard stretches it when a refresh at this interval would spend more than max-share-percent of a GitHub rate limit.",
       "type": "string",

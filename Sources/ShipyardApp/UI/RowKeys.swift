@@ -81,6 +81,11 @@ extension View {
         environment(\.rowList, AnyHashable(list))
     }
 
+    /// Tags the rows below as `list`'s, or as no list's when it's `nil`.
+    func rowsTagged(_ list: AnyHashable?) -> some View {
+        environment(\.rowList, list)
+    }
+
     func clearsRowHighlight(_ highlight: Binding<RowHighlight>) -> some View {
         onHover { inside in
             if inside { highlight.wrappedValue.pointerLeftRows() }

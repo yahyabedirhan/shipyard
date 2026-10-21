@@ -16,7 +16,7 @@ The design of the `shipyard` command line: who calls it, its command tree, its i
 2. Tell the user about progress with a notice that isn't kept, and take it away.
 3. Open, quit and ask about the Mac's app, steer its panel and capture it, without clicking.
 4. Take turns on the app with other agents, through the lease.
-5. Check `config.toml`, `cli.toml` and the notes workspace after an edit.
+5. Check `config.toml`, the theme files beside it, `cli.toml` and the notes workspace after an edit.
 6. Let Herdr's hooks ping when an agent is blocked.
 
 **Roles**
@@ -159,8 +159,20 @@ shipyard --version
 | `panel *` | one line | — | the app isn't running; no such project, kind, tab or view, naming those that exist |
 | `lease take` / `release` | `you hold shipyard until <HH:mm:ss>` / one line | — | another agent holds it |
 | `notes check` | one line per project, then each problem | — | an error in the layout; the app isn't running |
-| `config check` | each file's verdict, problems and warnings | each file's result by name | a file has a problem |
+| `config check` | each file's verdict, problems and warnings: `config.toml`, each theme file in file-name order, `cli.toml` | each file's result by name: `config.toml`, `themes/<file>`, `cli.toml` | a file has a problem |
 | `help` | the top help, or a group's help | every command and every old name | — |
+
+**`config check`'s files.** The Mac's `shipyard` checks `config.toml`, then each `*.toml` theme file in the `themes` folder beside it, in file-name order, then `cli.toml`; the Linux `shipyard` checks `cli.toml` alone (ADR 0014).
+Each file prints its absolute path and `accepted` or `rejected`, then one indented `problem:` or `warning:` line per issue in the panel banner's words; a theme file's problems read `themes/<file> line N: …`, and a theme file has no warnings.
+
+```text
+/Users/me/.config/shipyard/config.toml: accepted
+/Users/me/.config/shipyard/themes/Sunset.toml: rejected
+  problem: themes/Sunset.toml line 22: unknown token `any.accent.acent`; did you mean `accent`?
+/Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
+```
+
+`--json` prints one object with a key per file, `config.toml`, `themes/<file>` and `cli.toml`, each in `config-status.json`'s fields: `config` is the file's path and `configModified` its modification time.
 
 **Exit codes**, the same on every command: 0 success; 1 failed or refused, with one line on why; 2 wrong usage, with one line and the help to read.
 

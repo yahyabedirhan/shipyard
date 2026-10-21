@@ -5,6 +5,7 @@ struct TabsLayout: View {
     let model: MenuModel
     let panel: PanelState
     let actions: LayoutActions
+    @Environment(\.panelScale) private var scale
 
     @State private var highlight = RowHighlight()
 
@@ -15,7 +16,7 @@ struct TabsLayout: View {
         let content = model.tabContent(for: tab)
         VStack(spacing: 0) {
             TabStrip(model: model, selection: tab, select: select)
-                .padding(.horizontal, Grid.gutter)
+                .padding(.horizontal, scale.grid.gutter)
                 .padding(.top, 8)
             summary(content)
             Hairline()
@@ -36,15 +37,20 @@ struct TabsLayout: View {
 
     private func summary(_ content: MenuTabContent) -> some View {
         HStack(spacing: 4) {
-            if content.attentionCount == 0 {
+            if content.isCaughtUp {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Palette.green)
+                    .foregroundStyle(ThemeColor.success)
                     .transition(.scale.combined(with: .opacity))
             }
-            Text(PanelText.tabSummary(attention: content.attentionCount, projects: content.projectCount, tab: tab))
+            Text(PanelText.tabSummary(
+                attention: content.attentionCount,
+                projects: content.projectCount,
+                isLoaded: content.isLoaded,
+                tab: tab
+            ))
                 .monospacedDigit()
                 .contentTransition(.numericText(value: Double(content.attentionCount)))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .lineLimit(1)
             Spacer(minLength: 8)
             if content.attentionCount > 0 {
@@ -57,9 +63,9 @@ struct TabsLayout: View {
                 NewNoteIcon(project: section.title, state: newNote) { actions.startNote(section) }
             }
         }
-        .font(TypeScale.meta)
+        .font(scale.type.meta)
         .frame(height: 22)
-        .padding(.horizontal, Grid.gutter)
+        .padding(.horizontal, scale.grid.gutter)
         .padding(.vertical, 4)
         .animation(Motion.count, value: content.attentionCount)
     }
@@ -81,9 +87,10 @@ struct TabsLayout: View {
                             TabList(content: content, actions: actions, highlight: $highlight)
                                 .rowList(tab)
                                 .id(tab)
+                                // The old tab's rows go at once, so the two lists never draw over each other.
                                 .transition(.asymmetric(
                                     insertion: .offset(x: forward ? Grid.tabSlide : -Grid.tabSlide).combined(with: .opacity),
-                                    removal: .offset(x: forward ? -Grid.tabSlide : Grid.tabSlide).combined(with: .opacity)
+                                    removal: .identity
                                 ))
                         }
                         .frame(maxWidth: .infinity, alignment: .top)
@@ -153,10 +160,10 @@ private struct TabStrip: View {
     let selection: MenuTab
     let select: (MenuTab) -> Void
 
-    @Namespace private var pill
     @State private var height: CGFloat = 0
     @State private var content: CGRect = .zero
     @State private var visibleWidth: CGFloat = 0
+    @State private var tabFrames: [MenuTab: CGRect] = [:]
 
     private var hidesLeading: Bool { content.minX < -0.5 }
     private var hidesTrailing: Bool { content.maxX > visibleWidth + 0.5 }
@@ -169,13 +176,16 @@ private struct TabStrip: View {
                         TabPill(
                             title: model.tabTitle(tab),
                             count: model.attentionCount(for: tab),
-                            isOn: tab == selection,
-                            namespace: pill
+                            isOn: tab == selection
                         ) { select(tab) }
                         .id(tab)
+                        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("tab-row")) } action: {
+                            tabFrames[tab] = $0
+                        }
                     }
                 }
                 .padding(3)
+                .coordinateSpace(.named("tab-row"))
                 .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("tab-strip")) } action: {
                     height = $0.height
                     content = $0
@@ -186,11 +196,16 @@ private struct TabStrip: View {
             .coordinateSpace(.named("tab-strip"))
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { visibleWidth = $0 }
             .mask(edgeFade)
-            .background(Palette.track, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .onChange(of: selection) {
-                withAnimation(Motion.tab) { proxy.scrollTo(selection, anchor: .center) }
-            }
+            .background(ThemeColor.track, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .onChange(of: selection) { reveal(selection, with: proxy) }
         }
+    }
+
+    private func reveal(_ tab: MenuTab, with proxy: ScrollViewProxy) {
+        guard let frame = tabFrames[tab] else { return }
+        let shown = frame.offsetBy(dx: content.minX, dy: 0)
+        guard let anchor = TabStripScroll.anchor(revealing: shown.minX...shown.maxX, in: visibleWidth, fade: Grid.tabFade) else { return }
+        withAnimation(Motion.tab) { proxy.scrollTo(tab, anchor: anchor) }
     }
 
     private var edgeFade: some View {
@@ -210,22 +225,22 @@ private struct TabPill: View {
     let title: String
     let count: Int
     let isOn: Bool
-    let namespace: Namespace.ID
     let action: () -> Void
     @State private var isHovered = false
     @State private var isTruncated = false
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Text(title)
-                    .font(TypeScale.button)
+                    .font(scale.type.button)
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: Grid.maxTabTitleWidth)
                     .background {
                         Text(title)
-                            .font(TypeScale.button)
+                            .font(scale.type.button)
                             .fixedSize()
                             .hidden()
                             .onGeometryChange(for: Bool.self) { $0.size.width > Grid.maxTabTitleWidth } action: { isTruncated = $0 }
@@ -235,19 +250,22 @@ private struct TabPill: View {
                         .transition(.scale(scale: 0.5).combined(with: .opacity))
                 }
             }
-            .foregroundStyle(isOn ? .primary : .secondary)
+            .foregroundStyle(isOn ? ThemeColor.textPrimary : ThemeColor.textSecondary)
             .fixedSize()
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
+            // The pill stays under its title: it fades onto the picked tab, never sliding across the others.
             .background {
                 if isOn {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Palette.raised)
-                        .shadow(color: Palette.raisedShadow, radius: 1.5, y: 1)
-                        .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Palette.separator, lineWidth: 0.5))
-                        .matchedGeometryEffect(id: "pill", in: namespace)
+                        .fill(ThemeColor.raised)
+                        .shadow(color: .black.opacity(0.14), radius: 1, y: 0.5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .strokeBorder(ThemeColor.textPrimary.opacity(0.06), lineWidth: 0.5)
+                        )
                 } else if isHovered {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Palette.hover)
+                    RoundedRectangle(cornerRadius: 6, style: .continuous).fill(ThemeColor.rowHover)
                 }
             }
             .contentShape(Rectangle())
@@ -303,6 +321,7 @@ private struct TabRow: View {
     let row: MenuRow
     let showsRepository: Bool
     @Environment(\.panelNow) private var now
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         HStack(spacing: 0) {
@@ -311,15 +330,15 @@ private struct TabRow: View {
             StateSymbol(row: row)
                 .frame(width: 22, height: 22)
                 .background(
-                    RoundedRectangle(cornerRadius: Grid.smallRadius + 1, style: .continuous)
-                        .fill(Palette.color(row.state, kind: row.kind).opacity(0.14))
+                    RoundedRectangle(cornerRadius: scale.grid.smallRadius + 1, style: .continuous)
+                        .fill(ThemeColor.state(row.state, kind: row.kind).opacity(0.14))
                 )
                 .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
                 .padding(.trailing, 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .font(row.needsAttention ? TypeScale.bodyEmphasis : TypeScale.body)
-                    .foregroundStyle(row.state.isActive || row.needsAttention ? .primary : .secondary)
+                    .font(row.needsAttention ? scale.type.bodyEmphasis : scale.type.body)
+                    .foregroundStyle(row.state.isActive || row.needsAttention ? ThemeColor.textPrimary : ThemeColor.textSeen)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 HStack(spacing: 5) {
@@ -327,21 +346,21 @@ private struct TabRow: View {
                         AgentMarkView(agent: agent, size: Grid.agentMark)
                     }
                     Text(PanelText.rowDetail(row, showingRepository: showsRepository))
-                        .font(TypeScale.meta)
-                        .foregroundStyle(row.actionError == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Palette.red))
+                        .font(scale.type.meta)
+                        .foregroundStyle(row.actionError == nil ? ThemeColor.textSecondary : ThemeColor.failure)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(PanelText.age(row.age(at: now)))
-                .font(TypeScale.meta)
-                .foregroundStyle(row.needsAttention ? .secondary : .tertiary)
+                .font(scale.type.meta)
+                .foregroundStyle(row.needsAttention ? ThemeColor.textSecondary : ThemeColor.textTertiary)
                 .padding(.leading, 8)
         }
-        .padding(.leading, Grid.gutter - 4)
-        .padding(.trailing, Grid.gutter)
-        .padding(.vertical, 5)
+        .padding(.leading, scale.grid.gutter - 4)
+        .padding(.trailing, scale.grid.gutter)
+        .padding(.vertical, scale.grid.tabRowPadding)
         .contentShape(Rectangle())
     }
 }
@@ -349,18 +368,35 @@ private struct TabRow: View {
 private struct EmptyTab: View {
     let text: String
     let isLoaded: Bool
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: isLoaded ? "checkmark.seal.fill" : "clock")
                 .font(.system(size: 26))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isLoaded ? AnyShapeStyle(Palette.green) : AnyShapeStyle(.tertiary))
+                .foregroundStyle(isLoaded ? ThemeColor.success : ThemeColor.textTertiary)
             Text(text)
-                .font(TypeScale.button)
-                .foregroundStyle(.secondary)
+                .font(scale.type.button)
+                .foregroundStyle(ThemeColor.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
+    }
+}
+
+enum TabStripScroll {
+    static func anchor(revealing tab: ClosedRange<CGFloat>, in width: CGFloat, fade: CGFloat) -> UnitPoint? {
+        let tolerance: CGFloat = 0.5
+        let cutLeading = tab.lowerBound < fade - tolerance
+        let cutTrailing = tab.upperBound > width - fade + tolerance
+        guard cutLeading || cutTrailing else { return nil }
+        // `scrollTo` lines up the point at `x` of the tab with the point at `x` of the visible
+        // width, so the tab's leading edge lands at `x * (width - its width)`; the scroll view
+        // clamps the result to the strip's ends.
+        let room = width - (tab.upperBound - tab.lowerBound)
+        guard room > 2 * fade else { return .leading }
+        let x = cutLeading ? fade / room : 1 - fade / room
+        return UnitPoint(x: x, y: 0.5)
     }
 }

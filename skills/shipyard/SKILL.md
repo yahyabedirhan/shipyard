@@ -1,6 +1,6 @@
 ---
 name: shipyard
-description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. Use `shipyard notice send` from any of my machines to post a status notice (tests running, done) that needs nothing from me. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app` and `panel`, on my data or a demo's. And use for my notes, kept in Notion per shipyard project: to take a note I dictate, find one by its number, or list, tidy or archive them."
+description: "Edit shipyard's config.toml, the macOS menu bar app listing pull requests, issues and workflow runs. Use when asked to change my shipyard or the shipyard app (its layout, theme, projects, notifications, what it shows): watch or group repositories, show or hide issues, runs, drafts or someone's items, switch the menu between a list and tabs, pick or write a theme, change when it notifies, show pings from my other machines, or fix its configuration file. Also use to ping me through shipyard with the `shipyard ping` command, from my Mac or another machine running Herdr: when a PR is ready, when you need my input, or to bring me back to this pane. Use `shipyard notice send` from any of my machines to post a status notice (tests running, done) that needs nothing from me. And use to open, quit, steer or screenshot the shipyard app on my Mac with `shipyard app` and `panel`, on my data or a demo's. And use for my notes, kept in Notion per shipyard project: to take a note I dictate, find one by its number, or list, tidy or archive them."
 ---
 
 # shipyard configuration
@@ -12,6 +12,9 @@ Agents also send the user **pings** through shipyard with the `shipyard ping` co
 On the Mac, agents can also open, steer and screenshot the running app with `shipyard app` and `panel`, on the user's data or a demo's, one agent at a time. See Driving the app, at the end.
 
 The user's own **notes** live in Notion, one numbered list per project, and the menu lists the open ones. Before you take a note the user dictates, look one up by its number, or list, tidy or archive notes, read [references/notes.md](references/notes.md): it holds where notes live, the rules every agent follows, each operation through the Notion connector or `ntn`, and `shipyard notes check`, which shows whether the app can read them.
+
+The panel's look is its **theme**: the top-level `theme` key picks a built-in theme or one of the user's theme files.
+Before you pick a theme, write or fix a theme file, or answer why the panel draws Shipyard, read [references/themes.md](references/themes.md): it holds the built-in themes, the theme file format with every token and knob, the contrast check and how `shipyard config check` reports theme files.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 
@@ -44,7 +47,7 @@ Start from a preset when the user names one, or asks to set shipyard up (or star
    - A new project is a `[[projects]]` block **appended at the end** of the file.
    - A project's overrides (`pull-requests`, `issues`, `workflow-runs`, `pings`, `notes`, `notifications`) go **inside its own block** as inline tables, so each block stays self-contained.
    - An inline table `{ … }` stays on one line; an array `[ … ]` may span lines.
-   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show` and `seen-window`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
+   - A file the app created starts with a header showing the common settings as commented-out TOML at their defaults: `theme`, `[defaults.pull-requests] authors`, `[menu] layout`, `[menu-bar] count`, `[defaults] group-by`, `sort-by` and `show-first`, `[defaults.issues]` `show` and `states`, `[defaults.workflow-runs]` `show`, `[defaults.pings]` `show` and `seen-window`, a `[[defaults.notifications]]` rule and `[rate-limit] max-share-percent`. To set one, uncomment its lines (the table line with its keys) and change the value rather than adding a second copy. The header puts top-level keys above its tables, so any of them can be uncommented; in a file edited since, check that no top-level key sits below the table line you uncomment, which would pull that key into the table.
 3. The app creates the file with that header whenever it starts, or its Refresh button is clicked, without one. When it still doesn't exist, create it (and its directory) starting with:
 
    ```toml
@@ -61,6 +64,7 @@ Top level:
 | Key | Default | Allowed |
 |---|---|---|
 | `version` | `1` | only `1` |
+| `theme` | `"Shipyard"` | the panel's theme, by name, ignoring case: `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight`, `Harbor`, or the `name` of a theme file in `themes/*.toml` beside `config.toml`; an unknown name is an error. Theme files: [references/themes.md](references/themes.md) |
 | `refresh-interval` | `"2m"` | a window (below), at least `"30s"`: how often the app refreshes; a floor it stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
 
@@ -236,7 +240,9 @@ shipyard config check; echo "config check exit status: $?"
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 
-Exit status 0 means every file is accepted: fix each `warning` line anyway, usually a misspelled key. Exit status 1 means a file has a `problem`: fix each one at its line and run the command again. `shipyard config check --json` prints each file's result under its name (`config.toml`, `cli.toml`) in the same fields as the app's record below, so you can compare them. It checks the files on disk, not what the app runs on: the app's record says whether the app took your save.
+Each theme file in the `themes` folder gets its own verdict, between `config.toml`'s and `cli.toml`'s, with its problems as `themes/<file> line N: …`.
+
+Exit status 0 means every file is accepted: fix each `warning` line anyway, usually a misspelled key. Exit status 1 means a file has a `problem`: fix each one at its line and run the command again. `shipyard config check --json` prints each file's result under its name (`config.toml`, `themes/<file>`, `cli.toml`) in the same fields as the app's record below, so you can compare them. It checks the files on disk, not what the app runs on: the app's record says whether the app took your save.
 
 **The schema.** Run [Taplo](https://taplo.tamasfe.dev) on the file and print its exit status; it finds the schema through the `#:schema` line:
 
@@ -424,6 +430,13 @@ Runs work the same way: `workflow-runs = { show = true, states = ["failed", "in-
 ```toml
 [menu]
 layout = "tabs"
+```
+
+**"Use the Midnight theme."** One top-level key, above the first table; uncomment the header's `# theme` line when it's there.
+For a theme of the user's own, such as "make it orange", write a theme file first, as [references/themes.md](references/themes.md) says, and put its `name` here.
+
+```toml
+theme = "Midnight"
 ```
 
 **"Show issues for this project."** Add an `issues` override inside the project's block:

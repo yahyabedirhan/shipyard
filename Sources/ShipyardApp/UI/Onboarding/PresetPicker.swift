@@ -8,6 +8,7 @@ struct PresetPicker: View {
     @State private var choice = PresetChoice()
     @State private var isWriting = false
     @State private var writeError: String?
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         switch choice.step {
@@ -28,10 +29,10 @@ struct PresetPicker: View {
     private var presets: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(PanelText.presetTitle).font(TypeScale.display)
+                Text(PanelText.presetTitle).font(scale.type.display)
                 Text(PanelText.presetIntro)
-                    .font(TypeScale.body)
-                    .foregroundStyle(.secondary)
+                    .font(scale.type.body)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .lineSpacing(1.5)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -50,11 +51,12 @@ struct PresetPicker: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .themedScreen()
     }
 
     private func label(_ preset: Preset) -> some View {
-        (Text(preset.title).font(TypeScale.bodyEmphasis)
-            + Text("\n" + preset.summary).font(TypeScale.meta).foregroundColor(.secondary))
+        (Text(preset.title).font(scale.type.bodyEmphasis)
+            + Text("\n" + preset.summary).font(scale.type.meta).foregroundStyle(ThemeColor.textSecondary))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.vertical, 2)
     }
@@ -69,8 +71,8 @@ struct PresetPicker: View {
             .labelsHidden()
             if choice.watchesOwned {
                 Text(PanelText.watchOwnedDetail)
-                    .font(TypeScale.meta)
-                    .foregroundStyle(.secondary)
+                    .font(scale.type.meta)
+                    .foregroundStyle(ThemeColor.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -90,8 +92,8 @@ struct PresetPicker: View {
             }
             if let writeError {
                 Text(writeError)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(Palette.red)
+                    .font(scale.type.caption)
+                    .foregroundStyle(ThemeColor.failure)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

@@ -11,6 +11,7 @@ struct ConnectView: View {
     @State private var showsGh = false
     @State private var showsInstallHint = false
     @State private var codeCopiedAt: Date?
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Group {
@@ -21,12 +22,13 @@ struct ConnectView: View {
             } else {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
-                    Text(PanelText.connecting).font(TypeScale.body).foregroundStyle(.secondary)
+                    Text(PanelText.connecting).font(scale.type.body).foregroundStyle(ThemeColor.textSecondary)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .themedScreen()
         .onChange(of: shipyard.signedOutReason, initial: true) { _, reason in
             if let reason { shown = reason }
         }
@@ -47,7 +49,7 @@ struct ConnectView: View {
                             .padding(.top, 8)
                     } label: {
                         markdown(PanelText.useGhInstead, size: 12)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ThemeColor.textSecondary)
                             .hoverHelp(markdown: PanelText.useGhInsteadHelp)
                     }
                     .padding(.top, 4)
@@ -57,7 +59,7 @@ struct ConnectView: View {
                 case .connectWithGh:
                     connectWithGh(prominent: true)
                     if let alternative = text.alternative {
-                        Divider()
+                        Hairline()
                             .padding(.vertical, 8)
                         line(alternative)
                             .padding(.bottom, 8)
@@ -72,7 +74,7 @@ struct ConnectView: View {
 
     private func line(_ text: String) -> some View {
         markdown(text, size: 12)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ThemeColor.textSecondary)
             .lineSpacing(1.5)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -114,7 +116,7 @@ struct ConnectView: View {
         .popover(isPresented: $showsInstallHint, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 8) {
                 markdown(PanelText.installGh, size: 12)
-                    .tint(Palette.accent)
+                    .tint(ThemeColor.accent)
                     .fixedSize(horizontal: false, vertical: true)
                 CommandBox(command: PanelText.brewInstallGh)
             }
@@ -144,20 +146,20 @@ struct ConnectView: View {
 
     private func note(_ text: String) -> some View {
         markdown(text, size: 10.5)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ThemeColor.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> Text {
-        Text(markdown: text, size: size, weight: weight)
+    private func markdown(_ text: String, size: CGFloat, weight: Font.Weight = .regular) -> some View {
+        MarkdownText(text, size: size, weight: weight)
     }
 
     private func codeScreen(_ text: PanelText.DeviceCodeScreen) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             heading(text.title)
             Text(text.message)
-                .font(TypeScale.body)
-                .foregroundStyle(.secondary)
+                .font(scale.type.body)
+                .foregroundStyle(ThemeColor.textSecondary)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 12)
@@ -166,8 +168,8 @@ struct ConnectView: View {
             HStack(spacing: 6) {
                 ProgressView().controlSize(.mini)
                 Text(text.waiting)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.secondary)
+                    .font(scale.type.caption)
+                    .foregroundStyle(ThemeColor.textSecondary)
             }
             HStack(spacing: 8) {
                 Spacer()
@@ -213,7 +215,7 @@ struct ConnectView: View {
     private func heading(_ title: String) -> some View {
         HStack(spacing: 10) {
             LogoBadge(side: 32)
-            Text(title).font(TypeScale.display)
+            Text(title).font(scale.type.display)
         }
         .padding(.bottom, 12)
     }

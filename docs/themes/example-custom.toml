@@ -1,0 +1,52 @@
+# An example of your own theme: save a file like this as
+#   ~/.config/shipyard/themes/<anything>.toml
+# then put  theme = "Sunset"  in config.toml. A save applies at once.
+#
+# Start from a built-in theme with `extends`, then change only what you want.
+# Every token you leave out comes from the theme you extend.
+name = "Sunset"
+version = 1
+extends = "Shipyard"
+description = "Shipyard with a coral accent and warmer text on dark."
+
+# Raw colors, named once. A token's value is one of these names,
+# a hex color (#rrggbb or #rrggbbaa), or "system" for the macOS color.
+[light.palette]
+coral = "#C2410C"
+[dark.palette]
+coral = "#FB923C"
+
+# Appearance-specific colors go under [light.*] and [dark.*];
+# [any.*] sets both at once.
+[any.accent]
+accent = "coral"
+
+[any.signal]
+attention = "coral"
+
+# Make the unread dot and the count badge text readable on the coral fill.
+[light.text]
+on-accent = "#ffffff"
+[dark.text]
+on-accent = "#1a0b02"
+
+# A few state colors changed from the quiet default:
+# open items are green, merged ones purple.
+[light.state]
+open = "#1A7F37"
+merged = "#8250DF"
+[dark.state]
+open = "#3FB950"
+merged = "#A371F7"
+
+# Knobs shared by both appearances.
+[density]
+preset = "compact"   # compact, regular or comfortable; or row, header, bar, gutter in points
+
+[shape]
+small = 6
+medium = 10
+large = 14           # accepted and checked, with no effect yet
+
+[material]
+style = "flat"       # flat paints surfaces with their colors; glass uses the system's material

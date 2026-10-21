@@ -93,6 +93,45 @@ struct ConfigurationCheckTests {
         #expect(cli["config"] as? String == CLISettingsFile.beside(config: harness.configURL).url.path)
     }
 
+    @Test("each theme file is checked by its name, its problems on their lines, in text and in --json; one with a problem exits 1")
+    func themeFiles() throws {
+        let harness = try Harness(stored: nil, config: projects)
+        let folder = ThemeFiles.folder(beside: harness.configURL)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let good = folder.appendingPathComponent("Calm.toml")
+        let bad = folder.appendingPathComponent("Typo.toml")
+        try Data("name = \"Calm\"\nversion = 1\nextends = \"Shipyard\"\n".utf8).write(to: good)
+        try Data("name = \"Typo\"\nversion = 1\n[any.text]\nprimray = \"#ff0000\"\n".utf8).write(to: bad)
+
+        let text = harness.cli("config", "check")
+        #expect(text.status == CommandResult.failedStatus)
+        #expect(text.output.contains("""
+            \(good.path): accepted
+            \(bad.path): rejected
+              problem: themes/Typo.toml line 4: unknown token `any.text.primray`; did you mean `primary`?
+
+            """))
+
+        let json = harness.cli("config", "check", "--json")
+        let checked = try #require(try JSONSerialization.jsonObject(with: Data(json.output.utf8)) as? [String: Any])
+        #expect((checked["config.toml"] as? [String: Any])?["accepted"] as? Bool == true)
+        #expect((checked["themes/Calm.toml"] as? [String: Any])?["accepted"] as? Bool == true)
+        let typo = try #require(checked["themes/Typo.toml"] as? [String: Any])
+        #expect(typo["accepted"] as? Bool == false)
+        #expect(typo["config"] as? String == bad.path)
+        let problems = try #require(typo["problems"] as? [[String: Any]])
+        #expect(problems.map { $0["banner"] as? String }
+            == ["themes/Typo.toml line 4: unknown token `any.text.primray`; did you mean `primary`?"])
+
+        try Data("name = \"Calm\"\nversion = 1\n".utf8).write(to: bad)
+        let twice = harness.cli("config", "check")
+        #expect(twice.status == CommandResult.failedStatus)
+        #expect(twice.output.contains("""
+            \(good.path): rejected
+              problem: themes/Calm.toml: theme `Calm` is also in themes/Typo.toml, which replaces this one
+            """))
+    }
+
     @Test("an unknown subcommand or flag is a usage error")
     func usage() throws {
         let harness = try Harness(stored: nil, config: nil)

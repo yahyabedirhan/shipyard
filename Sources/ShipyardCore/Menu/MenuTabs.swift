@@ -27,6 +27,10 @@ public struct MenuTabContent: Equatable, Sendable {
     /// Whether every one of its projects' rows was fetched: `false` before
     /// the first refresh succeeded, or for a project added since.
     public var isLoaded: Bool
+
+    /// Whether the tab is loaded and nothing in it needs attention: only
+    /// then does the line under the strip show its check.
+    public var isCaughtUp: Bool { isLoaded && attentionCount == 0 }
 }
 
 extension MenuModel {

@@ -1,13 +1,14 @@
 import Foundation
 
 /// `shipyard config check`: the verdict on each settings file the build
-/// reads, without the app. The executable hands it one check per file, in
-/// the order it prints them: on the Mac `config.toml` (read as the app
-/// reads it) and `cli.toml`, on a machine without the app `cli.toml` alone,
-/// so this module never links the reader of a file its build lacks.
+/// reads, without the app. The executable hands it checks in the order it
+/// prints them: on the Mac `config.toml` (read as the app reads it), each
+/// theme file in the `themes` folder beside it, and `cli.toml`; on a machine
+/// without the app `cli.toml` alone, so this module never links the reader
+/// of a file its build lacks.
 public enum ConfigurationCommands {
-    /// Reads one file at the time it's given.
-    public typealias Check = @Sendable (_ now: Date) -> ConfigurationCheck
+    /// Reads its files at the time it's given: one, or a folder's worth.
+    public typealias Check = @Sendable (_ now: Date) -> [ConfigurationCheck]
 
     public static func entries(checks: [Check]) -> [CommandTable.Entry] {
         [
@@ -30,7 +31,7 @@ public enum ConfigurationCommands {
             }
             json = true
         }
-        let results = checks.map { $0(now) }
+        let results = checks.flatMap { $0(now) }
         let status = results.allSatisfy(\.accepted) ? 0 : CommandResult.failedStatus
         guard json else {
             return CommandResult(output: results.map(text).joined(), status: status)
@@ -62,8 +63,9 @@ public enum ConfigurationCommands {
           shipyard config check --json
 
         Reads each settings file this shipyard uses, config.toml as the app
-        reads it, and prints whether it's accepted, with each problem and
-        warning and its line.
+        reads it and each theme file in the themes folder beside it, and
+        prints whether it's accepted, with each problem and warning and its
+        line.
 
         Options:
           --json  print each file's result by its name, in config-status.json's fields

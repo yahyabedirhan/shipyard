@@ -1,8 +1,10 @@
 import Foundation
 
 extension Configuration {
-    static func settingLayout(_ layout: MenuLayout, in text: String) throws(ConfigurationError) -> String {
-        let current = try decode(text).configuration
+    static func settingLayout(
+        _ layout: MenuLayout, in text: String, themes: ThemeLibrary = .builtIn
+    ) throws(ConfigurationError) -> String {
+        let current = try decode(text, themes: themes).configuration
         let map = TOMLSourceMap(text)
         var lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let value = tomlString(layout.rawValue)
@@ -26,7 +28,7 @@ extension Configuration {
         let edited = lines.joined(separator: "\n")
         var expected = current
         expected.menu.layout = layout
-        guard (try? decode(edited))?.configuration == expected else {
+        guard (try? decode(edited, themes: themes))?.configuration == expected else {
             throw cantSetLayout(layout, line: map.entries.first { $0.path.first == menu.first }?.line)
         }
         return edited

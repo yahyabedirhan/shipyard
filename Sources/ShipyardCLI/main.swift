@@ -24,8 +24,8 @@ table.add(PingCommands.entries(
 table.add(NoticeCommands.entries(route: ControlNoticeRoute(support: support)))
 table.add(ControlCommands.entries(support: support, launcher: WorkspaceLauncher()))
 table.add(ConfigurationCommands.entries(checks: [
-    { now in ConfigurationStore.check(configURL, at: now) },
-    { now in settings.check(at: now) },
+    { now in ConfigurationStore.checks(configURL, at: now) },
+    { now in [settings.check(at: now)] },
 ]))
 #else
 let settings = CLISettingsFile.withoutTheApp(environment: environment)
@@ -34,7 +34,7 @@ table.add(PingCommands.entries(
     store: PingStore(directory: PingStore.directoryWithoutTheApp(environment: environment))
 ))
 table.add(NoticeCommands.entries(route: RemoteNoticeRoute(settings: settings)))
-table.add(ConfigurationCommands.entries(checks: [{ now in settings.check(at: now) }]))
+table.add(ConfigurationCommands.entries(checks: [{ now in [settings.check(at: now)] }]))
 #endif
 let result = ShipyardCLI.run(
     Array(CommandLine.arguments.dropFirst()),

@@ -13,6 +13,9 @@ public struct Configuration: Equatable, Sendable {
     public static let supportedVersion = 1
 
     public var version: Int = Configuration.supportedVersion
+    /// `theme`: the name of the theme the panel draws with, as the theme
+    /// spells it; Shipyard when the key is missing.
+    public var theme: String = ThemeLibrary.defaultName
     /// `refresh-interval`: a floor in seconds (at least 30); the rate
     /// budget may stretch it.
     public var refreshInterval: TimeInterval = 120
@@ -784,6 +787,11 @@ extension Configuration {
         # How often shipyard refreshes, at least "30s": a floor it stretches
         # when a refresh would spend more than max-share-percent (below).
         # refresh-interval = "2m"
+
+        # The panel's look: "Shipyard", "Native", "Graphite", "Paper",
+        # "Midnight" or "Harbor", or the name of your own theme, a TOML file
+        # in the themes folder beside this file. A save applies at once.
+        # theme = "Shipyard"
 
         # How the menu draws your projects: "list" (every project in one
         # scrolling list) or "tabs" (one project at a time).
