@@ -697,7 +697,8 @@ A command shipyard won't run for you exits 1 with one of these lines:
 
 - **The user's files stay as they were.** Their `config.toml`, their state and their login item are left alone; the run writes only a small pointer file in shipyard's support folder, which the next plain `app open` removes.
 - **Plain `shipyard app open` brings the user's app back**: it quits the demo and launches the user's own. Always end a demo with it, so the user is left with their shipyard running.
-- **It reads GitHub as the signed-in user**, so name public repositories in a demo's configuration: what it shows ends up in screenshots. Signing out from a demo's panel would sign the user out too.
+- **Made-up items keep the user's work out of it.** With a `demo-items.json` in the folder, the run lists that file's pull requests, issues, workflow runs and notes, under the account the file names, and asks GitHub and Notion nothing. Use it for any screenshot others will see. Before you write one, read [references/demo-items.md](references/demo-items.md): it holds the format, every key and an example.
+- **Without that file, it reads GitHub as the signed-in user**, so name public repositories in a demo's configuration: what it shows ends up in screenshots. It lists no notes. Signing out from such a demo's panel would sign the user out too.
 - **Pings you send meanwhile go to the user's app**, not the demo, and show there once it's back.
 - **Put the folder in the user's home**, such as `~/shipyard-demo`, never in a shared folder like `/tmp`: another account on the Mac could create that folder first and answer your `app` and `panel` commands in the demo's place.
 - **Keep the folder's path short**: the run refuses one whose path is too long for its socket, saying `use a folder with a shorter path`.
@@ -798,3 +799,5 @@ shipyard app capture ~/shipyard-demo/panel.png
 shipyard app open
 shipyard lease release
 ```
+
+To show made-up items rather than the repository's real ones, write `~/shipyard-demo/demo-items.json` before `app open --demo`, as [references/demo-items.md](references/demo-items.md) says.
