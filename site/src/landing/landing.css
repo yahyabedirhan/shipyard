@@ -25,7 +25,7 @@
 .dx .vd-sea path{fill:none;stroke:var(--land-wave);stroke-width:1;vector-effect:non-scaling-stroke;animation:vd-swell 14s ease-in-out infinite alternate}
 @keyframes vd-swell{to{transform:translateY(var(--sp-7))}}
 .dx .vd-inner{position:relative;max-width:var(--land-col);margin:0 auto}
-.dx .vd-word img{width:.78em;height:.78em;border-radius:22%;flex:none}
+.dx .vd-word img{width:1.02em;height:1.02em;border-radius:22%;flex:none}
 .dx .vd-word{display:flex;align-items:center;gap:.22em;font:600 var(--type-wordmark-big)/1 var(--serif);letter-spacing:var(--tracking-title);color:var(--fg)}
 .dx .vd-line{margin:var(--sp-9) 0 0;max-width:var(--land-shot);font:500 var(--type-sub)/1.4 var(--sans);color:var(--text)}
 .dx .vd-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-10);margin-top:var(--sp-17)}

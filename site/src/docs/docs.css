@@ -43,6 +43,8 @@ body{margin:0;background:var(--bg)}
 .dx .wordmark{display:inline-flex;align-items:center;gap:.45em;font:600 var(--type-wordmark)/1 var(--serif);letter-spacing:var(--tracking-tight);color:var(--fg);text-decoration:none;transition:opacity var(--quick)}
 .dx .wordmark:hover{opacity:.82}
 .dx .wordmark img{width:1.4em;height:1.4em;border-radius:22%}
+.dx .nav .wordmark{margin-left:calc(-1 * var(--sp-13));gap:calc(var(--sp-13) - var(--nav-logo))}
+.dx .nav .wordmark img{width:var(--nav-logo);height:var(--nav-logo)}
 .dx .blinks-rows{display:grid;gap:var(--sp-2)}
 .dx .blinks{list-style:none;display:flex;flex-wrap:nowrap;white-space:nowrap;margin:0;padding:0;line-height:1}
 .dx .blinks li+li::before{content:'·';margin:0 var(--sp-2);color:var(--faint);font:400 var(--type-small)/1 var(--sans)}
