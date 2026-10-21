@@ -396,6 +396,7 @@
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
       "usedIn": [
+        "README.md",
         "site: landing first screen",
         "site: docs opening"
       ],
@@ -425,6 +426,7 @@
       "layout": "list",
       "size": "the panel as captured, at 2x",
       "usedIn": [
+        "README.md",
         "site: landing first screen",
         "site: docs opening"
       ],

@@ -14,12 +14,10 @@
 
 **Status:** under construction; this README describes 0.7.1.
 
-<!-- SHOT:readme-hero-light SHOT:readme-hero-dark -->
+<!-- SHOT:landing-tabs-dark SHOT:landing-list-light -->
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/themed-look/tabs-shipyard-dark.png">
-    <img src="assets/screenshots/themed-look/tabs-shipyard-light.png" width="420" alt="The shipyard panel in the Shipyard theme, in the tabs layout on its All tab: pull requests from two public repositories, each row with its number, repository and author">
-  </picture>
+  <img src="assets/screenshots/launch/landing-tabs-dark.png" width="320" alt="The shipyard panel in dark mode, in the tabs layout on one project's tab: pull requests, pings from agents, issues and runs">
+  <img src="assets/screenshots/launch/landing-list-light.png" width="320" alt="The shipyard panel in the Paper theme, in the list layout: four projects, each with its pull requests, pings, issues and runs">
 </p>
 
 ```sh
