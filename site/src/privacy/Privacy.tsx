@@ -11,7 +11,7 @@ function Plain({ children }: { children: React.ReactNode }) {
   return (
     <div className="dx">
       <div className="plain">
-        <a className="wordmark" href="/">{NAME}</a>
+        <a className="wordmark" href="/"><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
         <main id="top">{children}</main>
         <footer className="plain-foot"><a href="/docs">Docs</a><a href="/privacy">Privacy</a><a href="/llms.txt">llms.txt</a></footer>
       </div>

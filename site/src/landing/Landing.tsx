@@ -53,7 +53,7 @@ export function Landing() {
         ))}
       </svg>
       <div className="vd-inner">
-        <span className="vd-word">{NAME}</span>
+        <span className="vd-word"><img src="/logo.png" alt="" width="96" height="96" />{NAME}</span>
         <h1 className="vd-line">{LINE}</h1>
         <div className="vd-cols">
           <div><h2>What</h2><p>{WHAT}</p></div>

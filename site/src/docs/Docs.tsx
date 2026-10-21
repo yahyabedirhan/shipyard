@@ -206,9 +206,9 @@ function Section({ s, index }: { s: DocSection; index: number }) {
 
 /* ---------------------------------------------------------------- the page */
 
-function BrandLinks({ home }: { home: string }) {
+function BrandLinks() {
   const rows: [string, string, OutboundTarget | null][][] = [
-    [['home', home, null], ['GitHub', REPO, 'github'], ['releases', RELEASES, 'releases']],
+    [['GitHub', REPO, 'github'], ['releases', RELEASES, 'releases']],
     [['yahyapak.dev', PERSONAL_SITE, 'site']],
   ];
   return (
@@ -311,7 +311,7 @@ export function Docs({ home = '/' }: { home?: string }) {
   return (
     <div className="dx">
       <div className="mbar">
-        <a className="wordmark" href="#top">{NAME}</a>
+        <a className="wordmark" href={home}><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
         <select aria-label="Jump to section" value={current} onChange={(e) => document.getElementById(e.target.value)?.scrollIntoView()}>
           {SECTIONS.map((s, i) => <option key={s.id} value={s.id}>{pad(i)} {s.nav}</option>)}
         </select>
@@ -319,8 +319,8 @@ export function Docs({ home = '/' }: { home?: string }) {
       <div className="page">
         <nav className="nav" aria-label="Docs">
           <div className="brand">
-            <a className="wordmark" href="#top">{NAME}</a>
-            <BrandLinks home={home} />
+            <a className="wordmark" href={home}><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
+            <BrandLinks />
             {REF.version ? <span className="ver" title="The version these docs describe">{REF.version}</span> : null}
           </div>
           <div className="secs">
@@ -335,7 +335,7 @@ export function Docs({ home = '/' }: { home?: string }) {
           <a className="nav-foot" href="#install" data-id="install">Install shipyard</a>
         </nav>
         <main id="top" ref={main} onClick={onClick}>
-          <div className="head"><BrandLinks home={home} /></div>
+          <div className="head"><BrandLinks /></div>
           <h1 className="title">{OPENING.head}</h1>
           <p className="sub">{OPENING.sub}</p>
           <div className="hero-pair">
