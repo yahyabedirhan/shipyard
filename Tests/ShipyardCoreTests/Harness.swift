@@ -89,7 +89,8 @@ struct Harness {
             notesTimer: notesTimer,
             tailnet: tailnet,
             sleep: sleeper.sleep,
-            oauthClientID: clientID
+            oauthClientID: clientID,
+            demoItems: files.demoItems(at: Harness.now)
         )
     }
 

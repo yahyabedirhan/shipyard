@@ -24,6 +24,9 @@ import ShipyardPings
 /// opens (`refreshNotes()`), and listed with them too, once the user
 /// connected Notion (`connectNotion()`, ADR 0013): until then no `ntn`
 /// runs but the Notion view's check (`checkNotion()`).
+/// A demo run with example items (`demoItems`) lists them in place of
+/// GitHub's items and the notes, signed in as the file's account, and
+/// reads no token and sends no request.
 /// Observable, so the panel redraws when what it reads changes.
 @MainActor
 @Observable
@@ -202,8 +205,11 @@ public final class Shipyard {
     /// Whether the build has an OAuth App client ID, so the device flow can start.
     public let canSignInWithGitHub: Bool
     private let transport: any HTTPTransport
+    /// A demo run's example items, listed in place of GitHub's and
+    /// Notion's; `nil` outside a demo run with a `demo-items.json`.
+    private let demoItems: DemoItems?
 
-    private(set) var github: GitHubClient?
+    private(set) var github: (any GitHubReading)?
     @ObservationIgnored private var deviceFlowTask: Task<Void, Never>?
     @ObservationIgnored private var deviceFlowGeneration = 0
     @ObservationIgnored private var session = 0
@@ -234,7 +240,8 @@ public final class Shipyard {
         notesTimer: any RefreshTimer = TaskRefreshTimer(),
         tailnet: any TailnetIdentity = TailscaleCLI(),
         sleep: @escaping Sleep = systemSleep,
-        oauthClientID: String = OAuthApp.clientID
+        oauthClientID: String = OAuthApp.clientID,
+        demoItems: DemoItems? = nil
     ) {
         self.configStore = configStore
         self.appStateStore = appStateStore
@@ -257,6 +264,7 @@ public final class Shipyard {
         self.deviceFlow = DeviceFlow(clientID: oauthClientID, transport: transport, clock: clock, sleep: sleep)
         self.canSignInWithGitHub = OAuthApp.isSet(oauthClientID)
         self.transport = transport
+        self.demoItems = demoItems
     }
 
     /// Loads the app state and the configuration, registers or removes the
@@ -287,6 +295,10 @@ public final class Shipyard {
             armNotesTimer(after: 0)
         }
         if configError == nil { followLaunchAtLogin() }
+        if let demoItems {
+            await connect(to: demoItems, source: .demoItems)
+            return
+        }
         let provider = tokenProvider
         let found = await Task.detached { provider.current() }.value
         guard let found else {
@@ -305,7 +317,7 @@ public final class Shipyard {
     @discardableResult
     public func beginDeviceFlow() -> Task<Void, Never> {
         if let deviceFlowTask { return deviceFlowTask }
-        guard phase == .signedOut else { return Task {} }
+        guard phase == .signedOut, demoItems == nil else { return Task {} }
         signInError = nil
         deviceFlowGeneration += 1
         let generation = deviceFlowGeneration
@@ -354,10 +366,14 @@ public final class Shipyard {
     }
 
     private func connect(with found: FoundToken) async {
+        await connect(to: GitHubClient(token: found.value, transport: transport), source: found.source)
+    }
+
+    private func connect(to github: any GitHubReading, source: TokenSource) async {
         session += 1
         let current = session
-        github = GitHubClient(token: found.value, transport: transport)
-        tokenSource = found.source
+        self.github = github
+        tokenSource = source
         let viewer: Viewer?
         do {
             viewer = try await request { try await $0.viewer() }
@@ -373,7 +389,7 @@ public final class Shipyard {
         await refresh()
     }
 
-    func request<T>(_ body: (GitHubClient) async throws -> T) async throws -> T {
+    func request<T>(_ body: (any GitHubReading) async throws -> T) async throws -> T {
         guard let github else { throw GitHubError.unauthorized }
         let current = session
         do {
@@ -397,7 +413,7 @@ public final class Shipyard {
     public func signOut() -> SignOutResult {
         cancelDeviceFlow()
         let source = tokenSource
-        try? tokenStore.delete()
+        if demoItems == nil { try? tokenStore.delete() }
         signInError = nil
         endSession()
         let result: SignOutResult = source == .gh ? .ghStillSignedIn : .signedOut
@@ -1412,9 +1428,10 @@ public final class Shipyard {
         return await NotesCheck.run(projects: projects, client: NotionClient(transport: notionRoute))
     }
 
-    /// Whether the app reads the user's notes now: once Notion is
-    /// connected, never in a demo run (`AppFiles.notionRoute`).
-    public var readsNotes: Bool { canReadNotes && notionConnected }
+    /// Whether the app lists notes now: the user's, once Notion is
+    /// connected, never in a demo run (`AppFiles.notionRoute`); a demo
+    /// run's example notes, when it has example items (`demoItems`).
+    public var readsNotes: Bool { demoItems != nil || (canReadNotes && notionConnected) }
 
     /// Whether this run can read notes at all: always in the app, never in
     /// a demo run, which has no route to Notion.
@@ -1476,13 +1493,20 @@ public final class Shipyard {
     }
 
     private func readNotes() async {
-        guard readsNotes, let notionRoute else { return }
+        guard readsNotes else { return }
         let configuration = configStore.lastValid
         let shown = configuration.projects.filter { configuration.settings(for: $0).notes.show }
         let projects = shown.map(\.slug)
-        let reading = shown.isEmpty
-            ? NotesReading.read([:])
-            : await notesReader.read(projects: shown.map { ($0.slug, $0.title) }, client: NotionClient(transport: notionRoute))
+        let reading: NotesReading
+        if shown.isEmpty {
+            reading = .read([:])
+        } else if let demoItems {
+            reading = demoItems.notes(for: shown.map { ($0.slug, $0.title) })
+        } else if let notionRoute {
+            reading = await notesReader.read(projects: shown.map { ($0.slug, $0.title) }, client: NotionClient(transport: notionRoute))
+        } else {
+            return
+        }
         guard readsNotes else { return }
         var read: [String: [Note]] = [:]
         var errors: [String: String] = [:]

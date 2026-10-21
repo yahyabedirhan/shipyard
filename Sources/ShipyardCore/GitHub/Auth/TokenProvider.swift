@@ -1,10 +1,12 @@
 import Foundation
 import ShipyardCommand
 
-/// Where the token shipyard signed in with came from.
+/// Where the token shipyard signed in with came from; for a demo run with
+/// example items, that there is no token: the items come from its file.
 public enum TokenSource: Equatable, Sendable {
     case tokenStore
     case gh
+    case demoItems
 }
 
 /// A token and where it came from.

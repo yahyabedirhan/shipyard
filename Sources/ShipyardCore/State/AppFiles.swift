@@ -59,6 +59,14 @@ public struct AppFiles: Equatable, Sendable {
         demo == nil ? transport : nil
     }
 
+    /// A demo run's example items (`DemoItems`), from `demo-items.json`
+    /// in the demo folder, with their ages counted back from `now`; `nil`
+    /// outside a demo run, or in one without the file, which reads GitHub
+    /// as the signed-in user.
+    public func demoItems(at now: Date) -> DemoItems? {
+        demo.flatMap { DemoItems.read(in: $0, at: now) }
+    }
+
     private struct LeftAlone: LoginItem {
         func setEnabled(_ enabled: Bool) {}
     }
