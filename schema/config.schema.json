@@ -24,24 +24,10 @@
       "pattern": "^0*([3-9][0-9]|[1-9][0-9]{2,})s$|^0*[1-9][0-9]*[mhd]$",
       "default": "2m"
     },
-    "refresh-interval-seconds": {
-      "description": "Deprecated: write refresh-interval = \"<n>s\" instead. How often to refresh, in seconds; still read, with a warning.",
-      "deprecated": true,
-      "type": "integer",
-      "minimum": 30,
-      "default": 120
-    },
     "launch-at-login": {
       "description": "Start shipyard when you log in.",
       "type": "boolean",
       "default": true
-    },
-    "hide-authors": {
-      "description": "Deprecated: write authors = { hide = [...] } in [defaults.pull-requests], [defaults.issues] and [defaults.workflow-runs] instead. Logins (without @) whose items are hidden, e.g. \"dependabot[bot]\"; still read, as a hide in each kind's defaults, with a warning.",
-      "deprecated": true,
-      "type": "array",
-      "items": { "type": "string" },
-      "default": []
     },
     "menu-bar": {
       "description": "What the menu bar shows next to the icon.",
@@ -181,12 +167,6 @@
           "type": "string",
           "pattern": "^[1-9][0-9]*[smhd]$",
           "default": "1h"
-        },
-        "snooze": {
-          "description": "Deprecated: write snooze-duration instead. The same duration; still read, with a warning.",
-          "deprecated": true,
-          "type": "string",
-          "pattern": "^[1-9][0-9]*[smhd]$"
         }
       }
     },
@@ -276,12 +256,6 @@
           "type": "string",
           "pattern": "\\S"
         },
-        "name": {
-          "description": "Deprecated: write slug and title instead. The project's old name; still read, with a warning, as its title, with a slug made of it in lowercase, each run of other characters changed to one hyphen.",
-          "deprecated": true,
-          "type": "string",
-          "pattern": "[A-Za-z0-9]"
-        },
         "repositories": {
           "description": "The project's repository selectors, each listed once: \"owner/name\" (one repository, always listed, archived or not), \"owner/*\" (every repository a user or organization owns), or a repository group: \"owned\" (your own account's), \"organizations\" (reached through an organization you're a member of, teams included), \"collaborator\" (someone else's that added you), \"anywhere\" (open pull requests waiting on your review in any repository, from GitHub's search; the project must set pull-requests.review-requested = true and show no issues or runs). Groups and wildcards are looked up again at least hourly, so new repositories appear on their own; archived and forks decide what they bring in. Shipyard also rejects two spellings that differ only in case, which this check can't see.",
           "type": "array",
@@ -331,13 +305,6 @@
           "pattern": "^(0|[0-9]+[smhd])$",
           "default": "7d"
         },
-        "closed-window-days": {
-          "description": "Deprecated: write closed-window = \"<n>d\" instead. How many days closed and merged pull requests stay listed; still read, with a warning.",
-          "deprecated": true,
-          "type": "integer",
-          "minimum": 0,
-          "default": 7
-        },
         "drafts": {
           "description": "List draft pull requests (in gray).",
           "type": "boolean",
@@ -373,13 +340,6 @@
           "pattern": "^(0|[0-9]+[smhd])$",
           "default": "7d"
         },
-        "closed-window-days": {
-          "description": "Deprecated: write closed-window = \"<n>d\" instead. How many days closed issues stay listed; still read, with a warning.",
-          "deprecated": true,
-          "type": "integer",
-          "minimum": 0,
-          "default": 7
-        },
         "authors": { "$ref": "#/definitions/authors" }
       }
     },
@@ -404,13 +364,6 @@
           "type": "string",
           "pattern": "^(0|[0-9]+[smhd])$",
           "default": "3h"
-        },
-        "finished-window-hours": {
-          "description": "Deprecated: write finished-window = \"<n>h\" instead. How many hours finished runs stay listed; still read, with a warning.",
-          "deprecated": true,
-          "type": "integer",
-          "minimum": 0,
-          "default": 3
         },
         "branches": {
           "description": "Which branches' runs to list: the default branch and open pull request branches, or all branches.",
@@ -509,16 +462,8 @@
           ]
         },
         "authors": {
-          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping or a notice has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended. The old single string (any, me, others or bots) is deprecated but still read, with a warning.",
-          "anyOf": [
-            { "$ref": "#/definitions/author-selectors" },
-            {
-              "description": "Deprecated: write a list instead, e.g. [\"others\"]; \"any\" is [].",
-              "deprecated": true,
-              "type": "string",
-              "enum": ["any", "me", "others", "bots"]
-            }
-          ],
+          "description": "Whose items the rule covers, as author selectors (me, others, bots or an @login); empty is everyone. It only narrows what the project lists. A ping or a notice has no author, so a rule with authors never selects one, and authors are ignored on control.started and control.ended.",
+          "$ref": "#/definitions/author-selectors",
           "default": []
         }
       }

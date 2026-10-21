@@ -387,7 +387,7 @@ struct ConfigurationValidationTests {
 
     @Test("a rule without an event, and other unknown choices, are rejected")
     func otherChoices() {
-        #expect(rejection("[[defaults.notifications]]\nauthors = \"me\"\n")
+        #expect(rejection("[[defaults.notifications]]\nauthors = [\"me\"]\n")
             == [ConfigurationIssue(line: 1, message: "a notification rule needs an `event`")])
         #expect(rejection("[[defaults.notifications]]\nevent = \"pr.opened\"\nauthors = \"bot\"\n")
             == [ConfigurationIssue(line: 3, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
@@ -616,46 +616,6 @@ struct ConfigurationValidationTests {
         #expect(decoded("[[projects]]\nslug = \"a\"\ntitle = \"T\"\nrepositories = [\"o/a\"]\n[[projects]]\nslug = \"b\"\ntitle = \"T\"\nrepositories = [\"o/b\"]\n") != nil)
     }
 
-    @Test("an old name still reads, with a warning: its title is the name, its slug the name made into one")
-    func oldName() throws {
-        let result = try #require(decoded("""
-            version = 1
-            [[projects]]
-            name = "Review queue"
-            repositories = ["anywhere"]
-            pull-requests = { review-requested = true }
-
-            [[projects]]
-            name = "shop"
-            repositories = ["o/shop"]
-
-            [[projects]]
-            name = "  C++ & Rust: tools!  "
-            repositories = ["o/tools"]
-            """))
-        #expect(result.configuration.projects.map(\.slug) == ["review-queue", "shop", "c-rust-tools"])
-        #expect(result.configuration.projects.map(\.title) == ["Review queue", "shop", "  C++ & Rust: tools!  "])
-        #expect(result.warnings == [
-            ConfigurationIssue(line: 3, message: "`name` is the old form: it's read as `slug = \"review-queue\"` and `title = \"Review queue\"`; write those instead"),
-            ConfigurationIssue(line: 8, message: "`name` is the old form: it's read as `slug = \"shop\"`; write that instead"),
-            ConfigurationIssue(line: 12, message: "`name` is the old form: it's read as `slug = \"c-rust-tools\"` and `title = \"  C++ & Rust: tools!  \"`; write those instead"),
-        ])
-    }
-
-    @Test("an old name is rejected when it's empty, makes no slug, sits beside slug or title, or makes another project's slug")
-    func oldNameRejected() {
-        #expect(rejection("[[projects]]\nname = \" \"\nrepositories = [\"o/a\"]\n")
-            == [ConfigurationIssue(line: 2, message: "a project's `name` can't be empty")])
-        #expect(rejection("[[projects]]\nname = \"!!\"\nrepositories = [\"o/a\"]\n")
-            == [ConfigurationIssue(line: 2, message: "`name` \"!!\" has no letter or digit to make a `slug` of; write `slug` and `title` instead")])
-        for key in ["slug = \"a\"", "title = \"A\""] {
-            #expect(rejection("[[projects]]\nname = \"a\"\n\(key)\nrepositories = [\"o/a\"]\n")
-                == [ConfigurationIssue(line: 2, message: "`name` is the old form of `slug` and `title`, which this project sets too; delete `name`")], "\(key)")
-        }
-        #expect(rejection("[[projects]]\nslug = \"shop\"\nrepositories = [\"o/a\"]\n[[projects]]\nname = \"Shop\"\nrepositories = [\"o/b\"]\n")
-            == [ConfigurationIssue(line: 5, message: "project slug `shop` is used twice (first on line 2)")])
-    }
-
     @Test("review-requested must be true or false, and a project's overrides the default")
     func reviewRequested() throws {
         #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { review-requested = \"yes\" }\n")
@@ -706,20 +666,6 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 1, message: "`refresh-interval` must be a string: \(ConfigurationReader.windowForm)")])
     }
 
-    @Test("the old refresh-interval-seconds still reads, with a warning giving the new key; both together is an error")
-    func oldInterval() throws {
-        let result = try #require(decoded("version = 1\nrefresh-interval-seconds = 90\n"))
-        #expect(result.configuration.refreshInterval == 90)
-        #expect(result.warnings == [ConfigurationIssue(
-            line: 2, message: "`refresh-interval-seconds` is the old form: it's read as `refresh-interval = \"90s\"`; write that instead"
-        )])
-        #expect(rejection("refresh-interval-seconds = 29\n")
-            == [ConfigurationIssue(line: 1, message: "`refresh-interval-seconds` must be at least 30 (got 29)")])
-        #expect(rejection("refresh-interval = \"2m\"\nrefresh-interval-seconds = 120\n") == [ConfigurationIssue(
-            line: 2, message: "`refresh-interval-seconds` is the old form of `refresh-interval`, which this table sets too; delete `refresh-interval-seconds`"
-        )])
-    }
-
     @Test("a file that sets keys without version reads, with a warning; an empty one, or one of comments, has none")
     func missingVersion() throws {
         let result = try #require(decoded("[menu]\nlayout = \"tabs\"\n"))
@@ -748,10 +694,8 @@ struct ConfigurationValidationTests {
     func wrongTypes() {
         #expect(rejection("version = 1\nlaunch-at-login = \"yes\"\n")
             == [ConfigurationIssue(line: 2, message: "`launch-at-login` must be true or false")])
-        #expect(rejection("refresh-interval-seconds = 90.5\n")
-            == [ConfigurationIssue(line: 1, message: "`refresh-interval-seconds` must be a whole number")])
-        #expect(rejection("hide-authors = \"dependabot[bot]\"\n")
-            == [ConfigurationIssue(line: 1, message: "`hide-authors` must be a list of strings")])
+        #expect(rejection("version = 1.5\n")
+            == [ConfigurationIssue(line: 1, message: "`version` must be a whole number")])
         #expect(rejection("menu-bar = 3\n")
             == [ConfigurationIssue(line: 1, message: "`menu-bar` must be a table")])
     }

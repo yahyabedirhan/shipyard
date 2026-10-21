@@ -83,53 +83,6 @@ struct ConfigurationWindowsTests {
             == [ConfigurationIssue(line: 4, message: "`closed-window` must be \(allowed) (got \"7 days\"; did you mean \"7d\"?)")])
     }
 
-    @Test("the old closed-window-days and finished-window-hours still read, with a warning naming the new key")
-    func oldKeys() throws {
-        let result = try #require(decoded("""
-            version = 1
-            [defaults.pull-requests]
-            closed-window-days = 3
-
-            [defaults.workflow-runs]
-            finished-window-hours = 4
-
-            [[projects]]
-            slug = "a"
-            repositories = ["o/a"]
-            issues = { closed-window-days = 0 }
-            """))
-        let config = result.configuration
-        #expect(config.defaults.pullRequests.closedWindow == 3 * 86_400)
-        #expect(config.defaults.workflowRuns.finishedWindow == 4 * 3600)
-        #expect(config.settings(for: try #require(config.projects.first)).issues.closedWindow == 0)
-        #expect(result.warnings == [
-            ConfigurationIssue(line: 3, message: "`closed-window-days` is the old form: it's read as `closed-window = \"3d\"`; write that instead"),
-            ConfigurationIssue(line: 6, message: "`finished-window-hours` is the old form: it's read as `finished-window = \"4h\"`; write that instead"),
-            ConfigurationIssue(line: 11, message: "`closed-window-days` is the old form: it's read as `closed-window = \"0\"`; write that instead"),
-        ])
-    }
-
-    @Test("an old key that doesn't read is still rejected")
-    func badOldKey() {
-        #expect(rejection("[defaults.issues]\nclosed-window-days = -2\n")
-            == [ConfigurationIssue(line: 2, message: "`closed-window-days` can't be negative (got -2)")])
-        #expect(rejection("[defaults.workflow-runs]\nfinished-window-hours = \"3h\"\n")
-            == [ConfigurationIssue(line: 2, message: "`defaults.workflow-runs.finished-window-hours` must be a whole number")])
-    }
-
-    @Test("the old and the new key in one table is an error on the old key's line")
-    func bothKeys() {
-        #expect(rejection("[defaults.pull-requests]\nclosed-window = \"30m\"\nclosed-window-days = 1\n") == [ConfigurationIssue(
-            line: 3, message: "`closed-window-days` is the old form of `closed-window`, which this table sets too; delete `closed-window-days`"
-        )])
-        #expect(rejection("[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\nworkflow-runs = { finished-window-hours = 1, finished-window = \"1h\" }\n") == [ConfigurationIssue(
-            line: 4, message: "`finished-window-hours` is the old form of `finished-window`, which this table sets too; delete `finished-window-hours`"
-        )])
-        let result = decoded("[defaults.pull-requests]\nclosed-window-days = 1\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\npull-requests = { closed-window = \"30m\" }\n")
-        let config = result?.configuration
-        #expect(config.map { $0.settings(for: $0.projects[0]).pullRequests.closedWindow } == 1800)
-    }
-
     @Test("the schema's window pattern takes exactly what the reader takes")
     func schemaPattern() throws {
         let schema = try loadSchema()

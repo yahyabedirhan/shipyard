@@ -320,39 +320,6 @@ struct ListingTests {
         #expect(harness.numbers("open-only") == [1])
     }
 
-    @Test("an old hide-authors still hides, with a warning in the banner and the status record")
-    func oldHideAuthors() async throws {
-        let config = "version = 1\nhide-authors = [\"dependabot[bot]\"]\n\n" + shop()
-        let harness = try await Harness.started(config: config, graphQL: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3]))
-
-        #expect(harness.numbers("shop")?.sorted() == [1, 2, 4])
-        await harness.refresh(answering: shopAnswer(everyAuthor[0], everyAuthor[1], everyAuthor[2], everyAuthor[3], pr(5, author: "dependabot", type: "Bot")))
-        #expect(harness.headlines.isEmpty)
-
-        let warning = try #require(harness.shipyard.configWarnings.first)
-        #expect(harness.shipyard.configWarnings.count == 1)
-        #expect(warning.line == 2)
-        #expect(warning.message.hasPrefix("`hide-authors` is the old form"))
-        #expect(PanelText.configWarnings(harness.shipyard.configWarnings)?.contains("`hide-authors` is the old form") == true)
-        #expect(try recordedWarnings(harness) == [warning.message])
-    }
-
-    @Test("old notification author strings still select, with a warning")
-    func oldNotificationAuthors() async throws {
-        let config = """
-            version = 1
-            [[defaults.notifications]]
-            event = "pr.opened"
-            authors = "others"
-
-            """ + shop()
-        let harness = try await Harness.started(config: config, graphQL: shopAnswer(pr(1)))
-        await harness.refresh(answering: shopAnswer(pr(1), pr(2), pr(3, author: "octocat"), pr(4, author: "dependabot", type: "Bot")))
-        #expect(harness.headlines == ["shop · New PR #3"])
-        #expect(harness.shipyard.configWarnings.map(\.line) == [4])
-        #expect(try recordedWarnings(harness).count == 1)
-    }
-
     @Test("a bad author selector is rejected with its line, and the last valid configuration keeps running")
     func rejected() async throws {
         let harness = try await Harness.started(config: shop(), graphQL: shopAnswer(pr(1), pr(2, author: "octocat")))
@@ -360,13 +327,6 @@ struct ListingTests {
         let error = try #require(harness.shipyard.configError)
         #expect(error.issues == [ConfigurationIssue(line: 4, message: "unknown author `bot` (did you mean `bots` or `@bot`?)")])
         #expect(harness.numbers("shop")?.sorted() == [1, 2])
-    }
-
-    private func recordedWarnings(_ harness: Harness) throws -> [String] {
-        let data = try Data(contentsOf: harness.stateDirectory.appendingPathComponent(ConfigStatusStore.fileName))
-        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let warnings = try #require(json["warnings"] as? [[String: Any]])
-        return warnings.compactMap { $0["message"] as? String }
     }
 }
 

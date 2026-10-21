@@ -142,7 +142,7 @@ struct ConfigurationStoreAppendTests {
         let url = temporaryConfigURL()
         let existing = """
             # hand-written, keep me
-            refresh-interval-seconds = 60   # quick
+            refresh-interval = "60s"   # quick
 
             [[projects]]
             slug = "a"   # the first one
@@ -208,7 +208,7 @@ struct ConfigurationStoreLayoutTests {
     func replacesValue() throws {
         let before = """
             # mine
-            refresh-interval-seconds = 60
+            refresh-interval = "60s"
 
             [menu]   # how it looks
             layout = "list"   # or tabs
@@ -256,7 +256,7 @@ struct ConfigurationStoreLayoutTests {
         let before = """
             # [menu]
             # layout = "list"
-            refresh-interval-seconds = 60
+            refresh-interval = "60s"
 
             # my projects
             [[projects]]
@@ -268,7 +268,7 @@ struct ConfigurationStoreLayoutTests {
         #expect(after == """
             # [menu]
             # layout = "list"
-            refresh-interval-seconds = 60
+            refresh-interval = "60s"
 
             [menu]
             layout = "tabs"
@@ -288,7 +288,7 @@ struct ConfigurationStoreLayoutTests {
         let before = """
             #:schema \(Configuration.schemaURL)
             version = 1
-            hide-authors = ["dependabot[bot]"]
+            launch-at-login = false
 
             [menu-bar]
             count = "none"
@@ -301,7 +301,7 @@ struct ConfigurationStoreLayoutTests {
         #expect(after == """
             #:schema \(Configuration.schemaURL)
             version = 1
-            hide-authors = ["dependabot[bot]"]
+            launch-at-login = false
 
             [menu]
             layout = "tabs"
@@ -315,7 +315,7 @@ struct ConfigurationStoreLayoutTests {
             """)
         #expect(store.lastValid.menu.layout == .tabs)
         #expect(store.lastValid.menuBar.count == .none)
-        #expect(store.lastValid.defaults.pullRequests.authors.hide == [.login("dependabot[bot]")])
+        #expect(store.lastValid.launchAtLogin == false)
     }
 
     @Test("a file with no tables gets [menu] at the end")

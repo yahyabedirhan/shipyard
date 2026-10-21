@@ -31,8 +31,8 @@ extension Configuration {
     /// a project slug that isn't one or is used twice, negative windows, an
     /// interval under 30 s, a rate-limit share outside 1–50 and an
     /// unsupported `version`. Unknown keys are warnings, so a newer file
-    /// doesn't break an older app; so are old keys (read as their new
-    /// form) and a file that sets keys without `version`. `theme` must name
+    /// doesn't break an older app; so is a file that sets keys without
+    /// `version`. `theme` must name
     /// one of `themes`; the theme it names having too little contrast is a
     /// warning.
     public static func decode(_ text: String, themes: ThemeLibrary = .builtIn) throws(ConfigurationError) -> Decoded {
@@ -85,9 +85,9 @@ final class ConfigurationReader {
         let node = Node(table: root, path: [])
         var config = Configuration()
         warnUnknownKeys(in: node, known: [
-            "version", "theme", "refresh-interval", "launch-at-login", "hide-authors",
+            "version", "theme", "refresh-interval", "launch-at-login",
             "menu-bar", "menu", "rate-limit", "attention", "herdr", "remote", "notices", "banners", "defaults", "projects",
-        ], old: ["refresh-interval-seconds"])
+        ])
 
         if let version = int(node, "version") {
             if version == Configuration.supportedVersion {
@@ -98,20 +98,16 @@ final class ConfigurationReader {
         } else if !node.table.contains(key: "version"), !node.table.keys.isEmpty {
             warnings.append(ConfigurationIssue(line: nil, message: Self.missingVersionMessage))
         }
-        if let interval = duration(node, "refresh-interval", old: "refresh-interval-seconds", unit: "s") {
+        if let interval = duration(node, "refresh-interval") {
             if interval < Self.shortestRefreshInterval {
-                if let text = try? node.table.string(forKey: "refresh-interval") {
-                    error("`refresh-interval` must be at least \"30s\" (got \(Configuration.tomlString(text)))", at: node.path + [.key("refresh-interval")])
-                } else {
-                    error("`refresh-interval-seconds` must be at least 30 (got \(Int(interval)))", at: node.path + [.key("refresh-interval-seconds")])
-                }
+                let text = (try? node.table.string(forKey: "refresh-interval")) ?? ""
+                error("`refresh-interval` must be at least \"30s\" (got \(Configuration.tomlString(text)))", at: node.path + [.key("refresh-interval")])
             } else {
                 config.refreshInterval = interval
             }
         }
         if let value = bool(node, "launch-at-login") { config.launchAtLogin = value }
         if let name = string(node, "theme") { readTheme(name, into: &config) }
-        let hiddenAuthors = strings(node, "hide-authors")
 
         if let menuBar = table(node, "menu-bar") {
             warnUnknownKeys(in: menuBar, known: ["count"])
@@ -168,13 +164,12 @@ final class ConfigurationReader {
         }
 
         if let banners = table(node, "banners") {
-            warnUnknownKeys(in: banners, known: ["snooze-duration"], old: ["snooze"])
-            if let snooze = duration(banners, "snooze-duration", renamedFrom: "snooze") {
+            warnUnknownKeys(in: banners, known: ["snooze-duration"])
+            if let snooze = duration(banners, "snooze-duration") {
                 if snooze > 0 {
                     config.banners.snoozeDuration = snooze
                 } else {
-                    let key = banners.table.contains(key: "snooze-duration") ? "snooze-duration" : "snooze"
-                    error("`\(key)` must be longer than 0, such as \"1h\" or \"10s\"", at: banners.path + [.key(key)])
+                    error("`snooze-duration` must be longer than 0, such as \"1h\" or \"10s\"", at: banners.path + [.key("snooze-duration")])
                 }
             }
         }
@@ -199,13 +194,12 @@ final class ConfigurationReader {
             if let rules = notifications(defaults) { config.defaults.notifications = rules }
             config.defaults.arrangement = arrangement(defaults).applied(to: config.defaults.arrangement)
         }
-        if let hiddenAuthors { readHideAuthors(hiddenAuthors, into: &config.defaults, at: node.path + [.key("hide-authors")]) }
 
         if let projects = tables(node, "projects") {
             var firstLine: [String: Int?] = [:]
             for node in projects {
                 guard let project = project(node, defaults: config.defaults) else { continue }
-                let line = map.line(for: node.path + [.key(node.table.contains(key: "slug") ? "slug" : "name")])
+                let line = map.line(for: node.path + [.key("slug")])
                 if let first = firstLine[project.slug] {
                     let earlier = first.map { " (first on line \($0))" } ?? ""
                     errors.append(ConfigurationIssue(line: line, message: "project slug `\(project.slug)` is used twice\(earlier)"))
@@ -248,9 +242,9 @@ final class ConfigurationReader {
     private func project(_ node: Node, defaults: Configuration.Defaults) -> Configuration.Project? {
         warnUnknownKeys(in: node, known: [
             "slug", "title", "repositories", "pull-requests", "issues", "workflow-runs", "pings", "notes", "notifications", "archived", "forks",
-        ] + Self.arrangementKeys, old: ["name"])
+        ] + Self.arrangementKeys)
         let identity = projectIdentity(node)
-        let name = identity?.slug ?? (try? node.table.string(forKey: "slug")) ?? (try? node.table.string(forKey: "name"))
+        let name = identity?.slug ?? (try? node.table.string(forKey: "slug"))
         let repositories = strings(node, "repositories")
         if repositories == nil && !node.table.contains(key: "repositories") {
             error("project `\(name ?? "")` needs `repositories`, a list of repositories (`owner/name`, `owner/*` or a group such as `owned`)", at: node.path)
@@ -298,7 +292,6 @@ final class ConfigurationReader {
     }
 
     private func projectIdentity(_ node: Node) -> (slug: String, title: String)? {
-        if node.table.contains(key: "name") { return oldProjectName(node) }
         guard node.table.contains(key: "slug") else {
             error("a project needs a `slug`, its ID: lowercase letters and digits joined by single hyphens, such as \"e-commerce\"", at: node.path)
             return nil
@@ -320,29 +313,6 @@ final class ConfigurationReader {
             title = written
         }
         return validSlug ? (slug, title) : nil
-    }
-
-    private func oldProjectName(_ node: Node) -> (slug: String, title: String)? {
-        let path = node.path + [.key("name")]
-        if node.table.contains(key: "slug") || node.table.contains(key: "title") {
-            error("`name` is the old form of `slug` and `title`, which this project sets too; delete `name`", at: path)
-            return nil
-        }
-        guard let name = string(node, "name") else { return nil }
-        if name.trimmingCharacters(in: .whitespaces).isEmpty {
-            error("a project's `name` can't be empty", at: path)
-            return nil
-        }
-        let slug = Configuration.slug(from: name)
-        if slug.isEmpty {
-            error("`name` \(Configuration.tomlString(name)) has no letter or digit to make a `slug` of; write `slug` and `title` instead", at: path)
-            return nil
-        }
-        let written = name == slug
-            ? "`slug = \(Configuration.tomlString(slug))`; write that instead"
-            : "`slug = \(Configuration.tomlString(slug))` and `title = \(Configuration.tomlString(name))`; write those instead"
-        warnings.append(ConfigurationIssue(line: map.line(for: path), message: "`name` is the old form: it's read as \(written)"))
-        return (slug, name)
     }
 
     private static func allowsAnywhere(_ project: Configuration.Project, defaults: Configuration.Defaults) -> Bool {
@@ -367,11 +337,11 @@ final class ConfigurationReader {
 
     private func pullRequests(_ parent: Node) -> PullRequestOverrides {
         guard let node = table(parent, "pull-requests") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "closed-window-days", "drafts", "authors", "review-requested"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "drafts", "authors", "review-requested"])
         return PullRequestOverrides(
             show: bool(node, "show"),
             states: states(node, of: .pullRequest),
-            closedWindow: duration(node, "closed-window", old: "closed-window-days", unit: "d"),
+            closedWindow: duration(node, "closed-window"),
             drafts: bool(node, "drafts"),
             authors: authorFilter(node),
             reviewRequested: bool(node, "review-requested")
@@ -380,22 +350,22 @@ final class ConfigurationReader {
 
     private func issues(_ parent: Node) -> IssueOverrides {
         guard let node = table(parent, "issues") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "closed-window-days", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "closed-window", "authors"])
         return IssueOverrides(
             show: bool(node, "show"),
             states: states(node, of: .issue),
-            closedWindow: duration(node, "closed-window", old: "closed-window-days", unit: "d"),
+            closedWindow: duration(node, "closed-window"),
             authors: authorFilter(node)
         )
     }
 
     private func workflowRuns(_ parent: Node) -> WorkflowRunOverrides {
         guard let node = table(parent, "workflow-runs") else { return .init() }
-        warnUnknownKeys(in: node, known: ["show", "states", "finished-window", "finished-window-hours", "branches", "authors"])
+        warnUnknownKeys(in: node, known: ["show", "states", "finished-window", "branches", "authors"])
         return WorkflowRunOverrides(
             show: bool(node, "show"),
             states: states(node, of: .workflowRun),
-            finishedWindow: duration(node, "finished-window", old: "finished-window-hours", unit: "h"),
+            finishedWindow: duration(node, "finished-window"),
             branches: choice(node, "branches", WorkflowRunBranches.self),
             authors: authorFilter(node)
         )
@@ -474,19 +444,6 @@ final class ConfigurationReader {
         return AuthorFilterOverrides(show: authorSelectors(node, "show"), hide: authorSelectors(node, "hide"))
     }
 
-    private func readHideAuthors(_ logins: [String], into defaults: inout Configuration.Defaults, at path: ConfigurationPath) {
-        let selectors = logins.map { AuthorSelector.login($0.hasPrefix("@") ? String($0.dropFirst()) : $0) }
-        defaults.pullRequests.authors.hide += selectors
-        defaults.issues.authors.hide += selectors
-        defaults.workflowRuns.authors.hide += selectors
-        let written = selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ")
-        warnings.append(ConfigurationIssue(
-            line: map.line(for: path),
-            message: "`hide-authors` is the old form: it's read as `authors = { hide = [\(written)] }` "
-                + "in `[defaults.pull-requests]`, `[defaults.issues]` and `[defaults.workflow-runs]`; write that instead"
-        ))
-    }
-
     private func notifications(_ parent: Node, inProject: Bool = false) -> [NotificationRule]? {
         guard let rules = tables(parent, "notifications") else { return nil }
         return rules.compactMap { node in
@@ -518,25 +475,15 @@ final class ConfigurationReader {
     }
 
     private func ruleAuthors(_ node: Node) -> [AuthorSelector]? {
-        guard let old = try? node.table.string(forKey: "authors") else { return authorSelectors(node, "authors") }
+        guard let text = try? node.table.string(forKey: "authors") else { return authorSelectors(node, "authors") }
         let path = node.path + [.key("authors")]
-        guard NotificationRule.legacyAuthors.contains(old) else {
-            do throws(AuthorSelector.Rejection) {
-                let selector = try AuthorSelector(parsing: old)
-                error("`authors` is a list: write `authors = [\(Configuration.tomlString(selector.description))]`", at: path, value: old)
-            } catch {
-                self.error(error.message, at: path, value: old)
-            }
-            return nil
+        do throws(AuthorSelector.Rejection) {
+            let selector = try AuthorSelector(parsing: text)
+            error("`authors` is a list: write `authors = [\(Configuration.tomlString(selector.description))]`", at: path, value: text)
+        } catch {
+            self.error(error.message, at: path, value: text)
         }
-        let selectors = old == "any" ? [] : [try! AuthorSelector(parsing: old)]
-        let written = "[" + selectors.map { Configuration.tomlString($0.description) }.joined(separator: ", ") + "]"
-        let advice = old == "any" ? "write `authors = []`, or leave it out, for everyone" : "write `authors = \(written)`"
-        warnings.append(ConfigurationIssue(
-            line: map.line(for: path, value: old),
-            message: "`authors = \"\(old)\"` is the old form of a notification rule's authors; \(advice)"
-        ))
-        return selectors
+        return nil
     }
 
     private func authorSelectors(_ node: Node, _ key: String) -> [AuthorSelector]? {
@@ -552,38 +499,6 @@ final class ConfigurationReader {
             }
         }
         return valid ? selectors : nil
-    }
-
-    private func duration(_ node: Node, _ key: String, old: String, unit: Character) -> TimeInterval? {
-        guard node.table.contains(key: old) else { return duration(node, key) }
-        guard !setsBoth(node, key, old: old),
-              let count = self.window(node, old),
-              let seconds = ConfigurationDuration.units.first(where: { $0.unit == unit })?.seconds
-        else { return nil }
-        warnOldForm(node, old, readAs: key, value: count == 0 ? "0" : "\(count)\(unit)")
-        return TimeInterval(count) * TimeInterval(seconds)
-    }
-
-    private func duration(_ node: Node, _ key: String, renamedFrom old: String) -> TimeInterval? {
-        guard node.table.contains(key: old) else { return duration(node, key) }
-        guard !setsBoth(node, key, old: old), let value = duration(node, old),
-              let written = try? node.table.string(forKey: old)
-        else { return nil }
-        warnOldForm(node, old, readAs: key, value: written)
-        return value
-    }
-
-    private func setsBoth(_ node: Node, _ key: String, old: String) -> Bool {
-        guard node.table.contains(key: key) else { return false }
-        error("`\(old)` is the old form of `\(key)`, which this table sets too; delete `\(old)`", at: node.path + [.key(old)])
-        return true
-    }
-
-    private func warnOldForm(_ node: Node, _ old: String, readAs key: String, value: String) {
-        warnings.append(ConfigurationIssue(
-            line: map.line(for: node.path + [.key(old)]),
-            message: "`\(old)` is the old form: it's read as `\(key) = \(Configuration.tomlString(value))`; write that instead"
-        ))
     }
 
     private func duration(_ node: Node, _ key: String) -> TimeInterval? {
@@ -746,8 +661,8 @@ final class ConfigurationReader {
         }
     }
 
-    private func warnUnknownKeys(in node: Node, known: [String], old: [String] = []) {
-        for key in node.table.keys where !known.contains(key) && !old.contains(key) {
+    private func warnUnknownKeys(in node: Node, known: [String]) {
+        for key in node.table.keys where !known.contains(key) {
             let path = node.path + [.key(key)]
             let hint = Suggestion.nearest(to: key, in: known).map { "; did you mean `\($0)`?" } ?? ""
             warnings.append(ConfigurationIssue(line: map.line(for: path), message: "unknown setting `\(path.dotted)` (ignored\(hint))"))

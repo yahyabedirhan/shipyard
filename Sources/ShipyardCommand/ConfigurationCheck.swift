@@ -34,7 +34,7 @@ public struct ConfigurationCheck: Equatable, Sendable {
     public var modified: Date?
     /// Why the file was rejected; empty when it was accepted.
     public var problems: [Issue]
-    /// What an accepted file has that's ignored or read in an old form.
+    /// What an accepted file has that's ignored or questionable.
     public var warnings: [Issue]
 
     public init(name: String, checked: Date, file: URL, modified: Date?, problems: [Issue], warnings: [Issue]) {
