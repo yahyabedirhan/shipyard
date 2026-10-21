@@ -103,7 +103,7 @@ public enum ShipyardCLI {
     /// one line each, from the table.
     public static func usage(_ table: CommandTable) -> String {
         var lines = [
-            "shipyard: your pull requests, issues, runs and agents' pings, from the menu bar",
+            "shipyard: a macOS menu bar app for keeping up with your projects while your agents work",
             "",
             "Usage: shipyard <group> <command> [options]",
         ]
