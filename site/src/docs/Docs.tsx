@@ -139,7 +139,7 @@ function Presets() {
           <Html as="p" html={tidy(inlineMd(p.about))} />
           <dl className="pdl"><div><dt>For</dt><Html as="dd" html={inlineMd(p.for)} /></div><div><dt>Asks for</dt><Html as="dd" html={inlineMd(p.asks)} /></div></dl>
           <div className="shot-pair"><Shot id={`preset-${p.id}-dark`} /><Shot id={`preset-${p.id}-light`} /></div>
-          <details className="whole"><summary>The whole file</summary><CodeBlock code={p.file} lang="toml" target="config" /></details>
+          <details className="whole"><summary><code>{p.id}</code> <span aria-hidden="true">›</span> <code>config.toml</code></summary><CodeBlock code={p.file} lang="toml" target="config" /></details>
         </div>
       ))}
     </div>
