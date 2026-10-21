@@ -26,7 +26,7 @@ Its sections, in order:
 - **The command:** `shipyard`, in code font.
 - **Never:** "ShipYard", "Ship Yard", "the Shipyard app" in prose.
 - **Wordmark:** `shipyard` set in IBM Plex Serif SemiBold, on the site and the social cards.
-- **Body text:** the Apple system font on Apple devices, and Geist elsewhere and on the social cards.
+- **Body text:** Geist, on the site and the social cards.
 
 ## Category
 

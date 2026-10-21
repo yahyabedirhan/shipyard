@@ -45,7 +45,7 @@
   --land-wave:rgba(236,235,232,.16);
 
   /* typefaces */
-  --sans:-apple-system,BlinkMacSystemFont,Geist,system-ui,sans-serif;
+  --sans:Geist,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   --serif:'IBM Plex Serif',Georgia,serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 
