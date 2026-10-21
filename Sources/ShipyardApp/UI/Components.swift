@@ -365,18 +365,19 @@ struct CommandBox: View {
     @State private var copiedAt: Date?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .center, spacing: 6) {
             if prompt {
                 Text("$").font(scale.type.code).foregroundStyle(ThemeColor.textTertiary)
             }
+            // One line, scaled down when long: a wrapped command reads as two and crowds the box.
             Text(command)
                 .font(scale.type.code)
                 .foregroundStyle(ThemeColor.textPrimary)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
             CopyButton(text: command, copiedAt: $copiedAt)
-                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
         }
         .padding(.leading, 10)
         .padding(.trailing, 4)
