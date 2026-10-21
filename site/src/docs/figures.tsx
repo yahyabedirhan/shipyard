@@ -14,7 +14,7 @@ export const shotSrc = (id: string) => `/shots/${id}.png`;
  * A screenshot of the real app, by its id in shots.json. Until its status is done, it shows a placeholder frame
  * with what the picture must show, so a page never claims a picture it doesn't have.
  */
-export function Shot({ id, caption, className }: { id: string; caption?: string; className?: string }) {
+export function Shot({ id, caption, className, bare }: { id: string; caption?: string; className?: string; bare?: boolean }) {
   const s = BY_ID[id];
   if (!s) throw new Error(`no shot ${id} in shots.json`);
   return (
@@ -28,7 +28,7 @@ export function Shot({ id, caption, className }: { id: string; caption?: string;
             <code className="shot-id">{id}</code>
           </div>
         )}
-      {caption || s.status === 'done' ? <figcaption className="cap">{caption ?? s.shows}</figcaption> : null}
+      {!bare && (caption || s.status === 'done') ? <figcaption className="cap">{caption ?? s.shows}</figcaption> : null}
     </figure>
   );
 }

@@ -62,8 +62,12 @@ export function Landing() {
         </div>
         <div className="vd-row">
           <div className="vd-install"><Install /><Agent /><Paths /></div>
-          {/* SHOT:readme-hero-dark */}
-          <Shot id="readme-hero-dark" className="vd-shot" />
+          <div className="vd-shots">
+            {/* SHOT:landing-tabs-dark */}
+            <Shot id="landing-tabs-dark" className="vd-shot" bare />
+            {/* SHOT:landing-list-light */}
+            <Shot id="landing-list-light" className="vd-shot" bare />
+          </div>
         </div>
         <Facts className="l-facts row" />
       </div>

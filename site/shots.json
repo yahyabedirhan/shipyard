@@ -387,6 +387,61 @@
       ],
       "status": "done",
       "notes": "The capture is the template glyph alone, white on transparent for dark, with no attention count: the count is menu bar text outside the icon. Place it on a dark bar."
+    },
+    {
+      "id": "landing-tabs-dark",
+      "shows": "The tabs layout on the shipyard tab, Shipyard theme: pull requests, two pings from agents, issues and runs, three of each.",
+      "state": "Signed in, refreshed, the shipyard tab selected, two pings sent into the demo.",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\nshow-first = 3\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
+      "appearance": "dark",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: landing first screen"
+      ],
+      "path": "assets/screenshots/launch/landing-tabs-dark.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo/shipyard",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #308 is ready for review\" --body \"Drops the old config forms\" --from \"claude · config\" --project shipyard --open https://github.com/yahyabedirhan/shipyard/pull/308 --id hero-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Which serif for the wordmark?\" --body \"IBM Plex Serif or Fraunces\" --from \"codex · site\" --project shipyard --id hero-2",
+        "# wait for the first refresh to finish",
+        "shipyard panel show-tab shipyard",
+        "shipyard app capture assets/screenshots/launch/landing-tabs-dark.png --appearance dark",
+        "shipyard app open",
+        "shipyard lease release"
+      ],
+      "status": "done",
+      "notes": "Pings are sent into the demo with SHIPYARD_SUPPORT_DIR set to the demo's support folder. Notes never list in a demo run, so these shots leave them out."
+    },
+    {
+      "id": "landing-list-light",
+      "shows": "The list layout in the Paper theme: four projects, each with its pull requests, pings, issues and runs, two of each.",
+      "state": "Signed in, refreshed, nothing folded, two pings sent into the demo.",
+      "demo": "version = 1\ntheme = \"Paper\"\n[menu]\nlayout = \"list\"\n[defaults]\nshow-first = 2\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
+      "appearance": "light",
+      "layout": "list",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: landing first screen"
+      ],
+      "path": "assets/screenshots/launch/landing-list-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo/shipyard",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #308 is ready for review\" --body \"Drops the old config forms\" --from \"claude · config\" --project shipyard --open https://github.com/yahyabedirhan/shipyard/pull/308 --id hero-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Which serif for the wordmark?\" --body \"IBM Plex Serif or Fraunces\" --from \"codex · site\" --project shipyard --id hero-2",
+        "# wait for the first refresh to finish",
+        "shipyard app capture assets/screenshots/launch/landing-list-light.png --appearance light",
+        "shipyard app open",
+        "shipyard lease release"
+      ],
+      "status": "done",
+      "notes": "Pings are sent into the demo with SHIPYARD_SUPPORT_DIR set to the demo's support folder. Notes never list in a demo run, so these shots leave them out."
     }
   ]
 }

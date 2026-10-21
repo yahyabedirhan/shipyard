@@ -32,6 +32,7 @@
 .dx .vd-cols p{margin:0;font-size:var(--type-body);color:var(--text)}
 .dx .vd-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,var(--land-shot));gap:var(--sp-14);margin-top:var(--sp-17);align-items:start}
 .dx .vd-install{display:grid;gap:var(--sp-5)}
+.dx .vd-shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-5);align-items:start}
 .dx .vd-shot{background:radial-gradient(circle at 50% 30%,var(--land-glow),transparent 70%)}
 .dx .vd .l-facts.row{margin-top:var(--sp-14)}
 

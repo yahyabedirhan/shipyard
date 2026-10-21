@@ -14,7 +14,9 @@ describe('the landing page', () => {
   it('tells the whole story: the line, what, who and how, the panel, the install, the agent line and the way to the docs', () => {
     expect(html).toContain(esc(LINE));
     for (const s of [WHAT, WHO, HOW]) expect(text).toContain(esc(s));
-    expect(html).toContain('data-shot="readme-hero-dark"');
+    expect(html).toContain('data-shot="landing-tabs-dark"');
+    expect(html).toContain('data-shot="landing-list-light"');
+    expect(html).not.toContain('<figcaption');
     expect(text).toContain('make install');
     expect(text).toContain(INSTALL.skill);
     expect(text).toContain(ASK_AGENT);
