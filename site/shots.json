@@ -109,7 +109,7 @@
       "id": "preset-my-agents-dark",
       "shows": "The my-agents preset: one project per repository, pull requests then issues.",
       "state": "Signed in, refreshed, list layout.",
-      "demo": "version = 1\n[defaults]\ngroup-by = \"kind\"\n[defaults.issues]\nshow = true\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"ruff\"\nrepositories = [\"astral-sh/ruff\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[defaults]\ngroup-by = \"kind\"\n[defaults.issues]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -119,22 +119,23 @@
       "path": "assets/screenshots/launch/preset-my-agents-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-my-agents-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "preset-incoming-contributions-dark",
       "shows": "The incoming-contributions preset: other people's pull requests and issues, grouped by repository under subheaders, bots hidden.",
       "state": "Signed in, refreshed, list layout. The demo uses public repositories in place of the user's own; me is the signed-in account, so hiding me is left out of the demo.",
-      "demo": "version = 1\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\n[defaults.pull-requests]\nauthors = { hide = [\"bots\"] }\n[defaults.issues]\nshow = true\nauthors = { hide = [\"bots\"] }\n[[projects]]\nslug = \"incoming\"\ntitle = \"Incoming\"\nrepositories = [\"astral-sh/uv\", \"astral-sh/ruff\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\n[defaults.pull-requests]\nauthors = { hide = [\"me\", \"bots\"] }\n[defaults.issues]\nshow = true\nauthors = { hide = [\"me\", \"bots\"] }\n[[projects]]\nslug = \"incoming\"\ntitle = \"Incoming\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/havooch\", \"yahyabedirhan/topographic\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"review-requests\"\ntitle = \"Review requests\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\nissues = { show = false }\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -144,22 +145,23 @@
       "path": "assets/screenshots/launch/preset-incoming-contributions-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-incoming-contributions-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "preset-review-queue-dark",
       "shows": "The review-queue preset: the pull requests waiting on your review, grouped by repository.",
       "state": "Signed in, refreshed, list layout. anywhere lists the signed-in account's own review requests, so it needs an account whose requests may be shown.",
-      "demo": "version = 1\n[[projects]]\nslug = \"review-queue\"\ntitle = \"Review queue\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\ngroup-by = \"repository\"\nsubsections = true\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[[projects]]\nslug = \"review-queue\"\ntitle = \"Review queue\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\ngroup-by = \"repository\"\nsubsections = true\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -169,22 +171,23 @@
       "path": "assets/screenshots/launch/preset-review-queue-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-review-queue-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "panel-list-dark",
       "shows": "The list layout: every project in one scrolling list under pinned headers, grouped by repository with subheaders, four rows a group.",
       "state": "Signed in, refreshed, nothing folded.",
-      "demo": "version = 1\n[menu]\nlayout = \"list\"\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\nshow-first = 4\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[defaults]\nshow-first = 4\ngroup-by = \"repository\"\nsubsections = true\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -194,22 +197,23 @@
       "path": "assets/screenshots/launch/panel-list-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/panel-list-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "panel-tabs-dark",
       "shows": "The tabs layout on one project's tab, grouped by kind.",
       "state": "Signed in, refreshed, the uv tab selected.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -219,23 +223,24 @@
       "path": "assets/screenshots/launch/panel-tabs-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
-        "shipyard panel show-tab uv",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
+        "shipyard panel show-tab havooch",
         "shipyard app capture assets/screenshots/launch/panel-tabs-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "panel-pings-dark",
       "shows": "A project with two pings from agents above its pull requests: one with a link, one that focuses a Herdr pane.",
       "state": "Pings sent during a demo go to the user's own app, not the demo, so this one is captured on the user's app with test pings filed under a public repository's project, withdrawn afterwards.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[defaults]\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = false\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -245,23 +250,23 @@
       "path": "assets/screenshots/launch/panel-pings-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/panel-pings-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "Not a demo run: send two pings with --project <slug> and --id site-shot-1 / site-shot-2, capture, then shipyard ping withdraw both."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "panel-notes-dark",
       "shows": "A project's Notes group from Notion: numbered notes with labels, newest first.",
       "state": "Notion connected through ntn, the project's database holding three example notes about public work. Needs the user's connected workspace.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"list\"\n[defaults]\nshow-first = 2\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = false\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -271,17 +276,17 @@
       "path": "assets/screenshots/launch/panel-notes-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/panel-notes-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "Needs ntn logged in to a workspace whose notes may be shown."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "panel-remote-machine-dark",
@@ -313,7 +318,7 @@
       "id": "view-skill-dark",
       "shows": "The Set up /shipyard skill view, with the skill installed.",
       "state": "Signed in, skill installed.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -323,23 +328,24 @@
       "path": "assets/screenshots/launch/view-skill-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard panel show-view skill",
         "shipyard app capture assets/screenshots/launch/view-skill-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "view-cli-dark",
       "shows": "The Set up shipyard command view, with the command linked.",
       "state": "Signed in, command linked at ~/.local/bin/shipyard.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -349,17 +355,18 @@
       "path": "assets/screenshots/launch/view-cli-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard panel show-view cli",
         "shipyard app capture assets/screenshots/launch/view-cli-dark.png --appearance dark",
-        "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done"
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "menu-bar-icon-dark",
@@ -391,7 +398,7 @@
       "id": "landing-tabs-dark",
       "shows": "The tabs layout on the shipyard tab, Shipyard theme: pull requests, two pings from agents, issues and runs, three of each.",
       "state": "Signed in, refreshed, the shipyard tab selected, two pings sent into the demo.",
-      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\nshow-first = 3\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\nshow-first = 2\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = false\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -403,19 +410,18 @@
       "path": "assets/screenshots/launch/landing-tabs-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #308 is ready for review\" --body \"Drops the old config forms\" --from \"claude · config\" --project shipyard --open https://github.com/yahyabedirhan/shipyard/pull/308 --id hero-1",
-        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Which serif for the wordmark?\" --body \"IBM Plex Serif or Fraunces\" --from \"codex · site\" --project shipyard --id hero-2",
-        "# wait for the first refresh to finish",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard panel show-tab shipyard",
         "shipyard app capture assets/screenshots/launch/landing-tabs-dark.png --appearance dark",
         "shipyard app open",
         "shipyard lease release"
       ],
       "status": "done",
-      "notes": "Pings are sent into the demo with SHIPYARD_SUPPORT_DIR set to the demo's support folder. Notes never list in a demo run, so these shots leave them out."
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "landing-list-light",
@@ -433,24 +439,23 @@
       "path": "assets/screenshots/launch/landing-list-light.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #308 is ready for review\" --body \"Drops the old config forms\" --from \"claude · config\" --project shipyard --open https://github.com/yahyabedirhan/shipyard/pull/308 --id hero-1",
-        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Which serif for the wordmark?\" --body \"IBM Plex Serif or Fraunces\" --from \"codex · site\" --project shipyard --id hero-2",
-        "# wait for the first refresh to finish",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/landing-list-light.png --appearance light",
         "shipyard app open",
         "shipyard lease release"
       ],
       "status": "done",
-      "notes": "Pings are sent into the demo with SHIPYARD_SUPPORT_DIR set to the demo's support folder. Notes never list in a demo run, so these shots leave them out."
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "preset-my-agents-light",
       "shows": "The my-agents preset in the Paper theme: one project per repository, pull requests then issues.",
       "state": "Signed in, refreshed, list layout.",
-      "demo": "version = 1\ntheme = \"Paper\"\n[defaults]\ngroup-by = \"kind\"\n[defaults.issues]\nshow = true\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"ruff\"\nrepositories = [\"astral-sh/ruff\"]\n",
+      "demo": "version = 1\ntheme = \"Paper\"\n[menu]\nlayout = \"list\"\n[defaults]\ngroup-by = \"kind\"\n[defaults.issues]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "light",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -460,19 +465,23 @@
       "path": "assets/screenshots/launch/preset-my-agents-light.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-my-agents-light.png --appearance light",
+        "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "The light pair of the dark preset shot, on the same demo data."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "preset-incoming-contributions-light",
       "shows": "The incoming-contributions preset in the Paper theme: other people's pull requests and issues, grouped by repository under subheaders, bots hidden.",
       "state": "Signed in, refreshed, list layout. The demo uses public repositories in place of the user's own; me is the signed-in account, so hiding me is left out of the demo.",
-      "demo": "version = 1\ntheme = \"Paper\"\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\n[defaults.pull-requests]\nauthors = { hide = [\"bots\"] }\n[defaults.issues]\nshow = true\nauthors = { hide = [\"bots\"] }\n[[projects]]\nslug = \"incoming\"\ntitle = \"Incoming\"\nrepositories = [\"astral-sh/uv\", \"astral-sh/ruff\"]\n",
+      "demo": "version = 1\ntheme = \"Paper\"\n[menu]\nlayout = \"list\"\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\n[defaults.pull-requests]\nauthors = { hide = [\"me\", \"bots\"] }\n[defaults.issues]\nshow = true\nauthors = { hide = [\"me\", \"bots\"] }\n[[projects]]\nslug = \"incoming\"\ntitle = \"Incoming\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/havooch\", \"yahyabedirhan/topographic\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"review-requests\"\ntitle = \"Review requests\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\nissues = { show = false }\n",
       "appearance": "light",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -482,19 +491,23 @@
       "path": "assets/screenshots/launch/preset-incoming-contributions-light.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-incoming-contributions-light.png --appearance light",
+        "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "The light pair of the dark preset shot, on the same demo data."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "preset-review-queue-light",
       "shows": "The review-queue preset in the Paper theme: the pull requests waiting on your review, grouped by repository.",
       "state": "Signed in, refreshed, list layout. anywhere lists the signed-in account's own review requests, so it needs an account whose requests may be shown.",
-      "demo": "version = 1\ntheme = \"Paper\"\n[[projects]]\nslug = \"review-queue\"\ntitle = \"Review queue\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\ngroup-by = \"repository\"\nsubsections = true\n",
+      "demo": "version = 1\ntheme = \"Paper\"\n[menu]\nlayout = \"list\"\n[[projects]]\nslug = \"review-queue\"\ntitle = \"Review queue\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\ngroup-by = \"repository\"\nsubsections = true\n",
       "appearance": "light",
       "layout": "list",
       "size": "the panel as captured, at 2x",
@@ -504,19 +517,23 @@
       "path": "assets/screenshots/launch/preset-review-queue-light.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
         "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard app capture assets/screenshots/launch/preset-review-queue-light.png --appearance light",
+        "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "The light pair of the dark preset shot, on the same demo data."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "pings-tabs-light",
       "shows": "The tabs layout's Pings group on one project's tab, in light: a ping that opens a link and one that focuses a Herdr pane, each with its sender's agent logo.",
       "state": "Two pings sent into the demo with SHIPYARD_SUPPORT_DIR, the project's tab selected.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "light",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -526,14 +543,18 @@
       "path": "assets/screenshots/launch/pings-tabs-light.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
-        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #42 is ready for review\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
         "shipyard panel show-tab shipyard",
         "shipyard app capture assets/screenshots/launch/pings-tabs-light.png --appearance light",
+        "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "Pairs with panel-pings-dark."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "view-notion-dark",
@@ -560,7 +581,7 @@
       "id": "config-warning-dark",
       "shows": "The panel's quiet banner after an agent's edit left a misspelled key: the line and the nearest valid key.",
       "state": "A config.toml with one unknown key, accepted with a warning.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "demo": "colour = \"red\"\nversion = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\nshow-first = 2\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
       "appearance": "dark",
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
@@ -570,13 +591,18 @@
       "path": "assets/screenshots/launch/config-warning-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "# add `colour = \"red\"` to the demo config",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
         "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
+        "shipyard panel show-tab shipyard",
         "shipyard app capture assets/screenshots/launch/config-warning-dark.png --appearance dark",
+        "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "Pairs with view-skill-dark: the verdict the skill reads after each edit."
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
       "id": "remote-machine-tabs-light",
@@ -603,7 +629,7 @@
     {
       "id": "cli-help-dark",
       "shows": "A terminal showing shipyard --help: the command groups and their verbs.",
-      "state": "The installed shipyard command.",
+      "state": "The installed shipyard command's help, drawn as a dark terminal window by site/scripts/terminal.mjs.",
       "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
       "appearance": "dark",
       "layout": "list",
@@ -614,12 +640,11 @@
       "path": "assets/screenshots/launch/cli-help-dark.png",
       "capture": [
         "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "# run shipyard --help in a dark terminal and capture the window",
-        "shipyard app capture assets/screenshots/launch/cli-help-dark.png --appearance dark",
+        "# npm run terminal (from site/) runs shipyard --help and draws it; it stands in for shipyard app capture assets/screenshots/launch/cli-help-dark.png --appearance dark",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "A terminal capture, not a panel: the app capture line stands for the terminal screenshot."
+      "status": "done",
+      "notes": "Not a panel capture: retake with npm run terminal after the help changes."
     }
   ]
 }
