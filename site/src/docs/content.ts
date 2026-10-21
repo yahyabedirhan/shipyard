@@ -40,7 +40,7 @@ export const GROUPS: { name: string; ids: string[] }[] = [
 export const SECTIONS: DocSection[] = [
   {
     id: 'what', title: 'What it is', nav: 'What it is',
-    lede: 'Your pull requests, issues and workflow runs, in the menu bar, with one number for what needs you.',
+    lede: 'Your pull requests, issues, workflow runs, pings and notes, grouped by project in the menu bar, with one number for what needs you.',
     body: '<p>Coding agents open pull requests and issues and start workflow runs, often several at once across several repositories. shipyard lists them in the menu bar, from anyone, grouped into projects you name. The number beside its icon counts the items that need attention: new, changed since you last opened them, waiting on your review, or failing their checks.<sup class="fn"></sup></p>\n<p>It can notify you when something happens, and your agents can ping you when they need you. What it shows lives in one TOML file that you, or your agents, edit.<sup class="fn"></sup></p>',
     notes: [
       'Clicking an item opens it on GitHub and clears its attention until it changes again. Closed items never need attention.',

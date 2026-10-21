@@ -5,13 +5,13 @@
 export const NAME = 'shipyard';
 
 /** The category, as the messaging kit words it. */
-export const CATEGORY = 'A macOS menu bar app for pull requests.';
+export const CATEGORY = 'A macOS menu bar app.';
 
-/** The one line, positioning A of the messaging kit. */
-export const LINE = 'A macOS menu bar app for the pull requests your agents open.';
+/** The one line, as the messaging kit words it. */
+export const LINE = 'A macOS menu bar app for keeping up with your projects while your agents work.';
 
 /** One proof point after the line, for meta descriptions (the kit's "one line, then one proof point"). */
-export const PROOF = 'One number for what needs you, one file your agents edit, and pings from any machine.';
+export const PROOF = 'One number for what needs you, one file your agents edit, pings from any machine.';
 
 export const SITE_URL = 'https://shipyard.yahyapak.dev';
 export const REPO = 'https://github.com/yahyabedirhan/shipyard';

@@ -23,7 +23,7 @@ export interface PageMeta {
 export const PAGES: PageMeta[] = [
   {
     id: 'home', path: '/', file: 'index.html',
-    title: `${NAME}: a menu bar app for the pull requests your agents open`,
+    title: `${NAME}: keep up with your projects while your agents work`,
     description: `${LINE} ${PROOF}`,
     image: 'og/home.png', imageAlt: `${NAME}: ${LINE}`, card: 'For macOS 14 and later. Open source.', listed: true,
   },

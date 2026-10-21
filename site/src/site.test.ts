@@ -52,8 +52,8 @@ describe('page heads', () => {
     expect(routeOf('/elsewhere')).toBe('not-found');
   });
 
-  it('use the one line from the messaging kit, positioning A', () => {
-    expect(LINE).toBe('A macOS menu bar app for the pull requests your agents open.');
+  it('use the one line from the messaging kit', () => {
+    expect(LINE).toBe('A macOS menu bar app for keeping up with your projects while your agents work.');
     expect(LINE.length).toBeLessThan(80);
   });
 });
