@@ -25,30 +25,37 @@ Its sections, in order:
 - **The app's bundle:** `Shipyard.app`, as macOS shows it in Finder and in notifications. Use it only where a path or a window title names the bundle.
 - **The command:** `shipyard`, in code font.
 - **Never:** "ShipYard", "Ship Yard", "the Shipyard app" in prose.
+- **Wordmark:** `shipyard` set in IBM Plex Serif SemiBold, on the site and the social cards. Body text is Inter.
 
 ## Category
 
-A macOS menu bar app for pull requests.
+A macOS menu bar app.
 
 ## One line
 
-The one line is `positioning/A`:
+> A macOS menu bar app for keeping up with your projects while your agents work.
 
-> A macOS menu bar app for the pull requests your agents open.
-
-It is 60 characters, under the 80 the channels allow.
+It is 79 characters, under the 80 the channels allow.
+It names the job, keeping up with your projects, and leaves the kinds of item to the next sentence, so it stays true as shipyard lists more of them.
 Every surface uses it.
 The README and `AGENTS.md` open with it.
 
-Considered and not chosen: `positioning/B`, "See, review and triage what your coding agents ship, from the menu bar", and `positioning/C`, "Your agents' pull requests, issues and runs, one click away in the menu bar".
-The maintainer chose A.
+The next sentence, where a surface has room, names what it lists: pull requests, issues, workflow runs, pings from your agents and your notes, grouped by project, one click away.
+
+Considered and not chosen:
+
+- "A macOS menu bar app for the pull requests your agents open": only pull requests.
+- "A macOS menu bar app for everything in your projects that needs your attention."
+- "What needs your attention across your projects, in the macOS menu bar."
+- "A macOS menu bar app that shows what your projects and agents need from you."
+- "Your projects' pull requests, issues, runs and notes, one click away in the macOS menu bar."
 
 ## Uses
 
 Two uses, as equals.
 Every surface names both or neither.
 
-- **Your agents' work:** the pull requests, issues and workflow runs that you and your agents open.
+- **Your agents' work:** the pull requests, issues and workflow runs that you and your agents open, and your agents' pings.
 - **Other people's work:** what other people open on your repositories, and the pull requests waiting on your review anywhere.
 
 ## Reach
@@ -75,7 +82,7 @@ What shipyard does not do yet.
 Each one is stated once, plainly, in the docs' Limits section, and never in marketing copy.
 
 - It runs on macOS 14 or later only. The `shipyard` command also runs on Linux, without the app.
-- It reads github.com only. GitHub Enterprise Server is not supported.
+- It reads github.com only. GitHub Enterprise Server, Linear and other issue trackers are not supported.
 - The download is not notarized yet: macOS asks you to clear the quarantine flag before the first launch. PLACEHOLDER: remove this line when the notarized build ships.
 - There is no Homebrew cask and no automatic update yet. PLACEHOLDER: remove this line when the cask ships.
 - Its settings live in `config.toml`. The app's settings menu shows the setup of GitHub, Notion, the skill and the command, the layout button switches between list and tabs, and the rest is edited in the file, by you or your agents.

@@ -2,7 +2,7 @@
 
 <h1 align="center">shipyard</h1>
 
-<p align="center">A macOS menu bar app for the pull requests your agents open.</p>
+<p align="center">A macOS menu bar app for keeping up with your projects while your agents work.</p>
 
 <p align="center">
   <a href="https://shipyard.yahyapak.dev">Site</a> ·
