@@ -50,6 +50,7 @@ Each one is true of the code today.
 - **Pings from agents:** `shipyard ping send` lists a message under the project the agent works in, with a notification, and its click opens a link, an app or the agent's Herdr pane.
 - **Pings from other machines:** the `shipyard` command runs on Linux too, and the Mac collects pings from the machines named in `[remote] machines`, which run Herdr with the herdr-shipyard plugin.
 - **Three presets:** `my-agents`, `incoming-contributions` and `review-queue`, offered on first launch.
+- **Themes:** six built-in themes, picked by name with the `theme` key, and theme files of your own that extend one and change only what you name.
 - **Notes in Notion:** optional, one database per project, listed beside the pull requests.
 - **Native and open:** a Swift app with no Dock icon, open source under Apache 2.0.
 
@@ -78,6 +79,8 @@ Use only these words on public surfaces.
 | attention count | The number in the menu bar | badge, unread count |
 | preset | A ready-made configuration for one use | template, profile |
 | layout | `list` or `tabs` | view, mode |
+| theme | A named set of colours and settings that decides how the panel looks: Shipyard, the default, or one of the five other built-in themes | skin, style, colour scheme |
+| theme file | Your own theme: one TOML file in the `themes` folder beside `config.toml` | custom config, theme config |
 | ping | An agent's message to you, listed until you have seen it and its `seen-window` passes | notification, alert |
 | notice | An agent's disposable status message, such as "tests running" | ping, toast |
 | notification | The macOS banner shipyard posts when a rule matches | ping, alert |

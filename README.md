@@ -17,8 +17,8 @@
 <!-- SHOT:readme-hero-light SHOT:readme-hero-dark -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/showcase/tabs-all-dark.png">
-    <img src="assets/screenshots/showcase/tabs-all-light.png" width="420" alt="The shipyard panel open below the menu bar, in the tabs layout on its All tab: pull requests, issues and workflow runs from several public repositories, each row with its number, repository and author">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/screenshots/themed-look/tabs-shipyard-dark.png">
+    <img src="assets/screenshots/themed-look/tabs-shipyard-light.png" width="420" alt="The shipyard panel in the Shipyard theme, in the tabs layout on its All tab: pull requests from two public repositories, each row with its number, repository and author">
   </picture>
 </p>
 
