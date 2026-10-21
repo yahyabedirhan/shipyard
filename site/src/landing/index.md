@@ -15,8 +15,9 @@ This folder is the landing page at `/` of `shipyard.yahyapak.dev`. The docs are 
 
 ## The panel image
 
-The panel is the `readme-hero-dark` screenshot, marked in `Landing.tsx` with a shot comment and listed in `site/shots.json`.
-Until it is captured, the `Shot` component shows a placeholder frame.
+The panels are two screenshots side by side, `landing-tabs-dark` and `landing-list-light`, marked in `Landing.tsx` with shot comments and listed in `site/shots.json`.
+The docs page opens with the same pair.
+Until a screenshot is captured, the `Shot` component shows a placeholder frame.
 `npm run placeholders` lists the screenshots still to take.
 
 ## Running it

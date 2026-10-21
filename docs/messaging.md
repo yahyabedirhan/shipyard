@@ -25,7 +25,8 @@ Its sections, in order:
 - **The app's bundle:** `Shipyard.app`, as macOS shows it in Finder and in notifications. Use it only where a path or a window title names the bundle.
 - **The command:** `shipyard`, in code font.
 - **Never:** "ShipYard", "Ship Yard", "the Shipyard app" in prose.
-- **Wordmark:** `shipyard` set in IBM Plex Serif SemiBold, on the site and the social cards. Body text is Inter.
+- **Wordmark:** `shipyard` set in IBM Plex Serif SemiBold, on the site and the social cards.
+- **Body text:** the Apple system font on Apple devices, and Geist elsewhere and on the social cards.
 
 ## Category
 

@@ -55,7 +55,7 @@ body{margin:0;background:var(--bg)}
 .dx .sub{margin:var(--sp-5) 0 0;font:400 var(--type-sub)/1.45 var(--sans);letter-spacing:var(--tracking-tight);color:var(--text)}
 .dx main p{margin:0 0 var(--sp-6);color:var(--text)}
 .dx .intro{margin-top:var(--sp-11)}
-.dx .shot.hero{margin-top:var(--sp-9)}
+.dx .hero-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-5);align-items:start;margin-top:var(--sp-9)}
 
 /* sections */
 .dx .sec{position:relative;padding-top:var(--sp-17)}

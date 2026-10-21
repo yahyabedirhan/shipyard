@@ -338,8 +338,12 @@ export function Docs({ home = '/' }: { home?: string }) {
           <div className="head"><BrandLinks home={home} /></div>
           <h1 className="title">{OPENING.head}</h1>
           <p className="sub">{OPENING.sub}</p>
-          {/* SHOT:readme-hero-dark */}
-          <Shot id="readme-hero-dark" className="hero" caption="The tabs layout on its All tab, on public repositories." />
+          <div className="hero-pair">
+            {/* SHOT:landing-tabs-dark */}
+            <Shot id="landing-tabs-dark" bare />
+            {/* SHOT:landing-list-light */}
+            <Shot id="landing-list-light" bare />
+          </div>
           <div className="intro">
             <Html as="p" html={tidy(OPENING.open1)} />
             <Html as="p" html={tidy(OPENING.open2)} />

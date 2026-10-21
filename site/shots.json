@@ -36,8 +36,7 @@
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
       "usedIn": [
-        "README.md",
-        "site: docs opening"
+        "README.md"
       ],
       "path": "assets/screenshots/launch/readme-hero-dark.png",
       "capture": [
@@ -397,7 +396,8 @@
       "layout": "tabs",
       "size": "the panel as captured, at 2x",
       "usedIn": [
-        "site: landing first screen"
+        "site: landing first screen",
+        "site: docs opening"
       ],
       "path": "assets/screenshots/launch/landing-tabs-dark.png",
       "capture": [
@@ -425,7 +425,8 @@
       "layout": "list",
       "size": "the panel as captured, at 2x",
       "usedIn": [
-        "site: landing first screen"
+        "site: landing first screen",
+        "site: docs opening"
       ],
       "path": "assets/screenshots/launch/landing-list-light.png",
       "capture": [
