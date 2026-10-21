@@ -282,7 +282,7 @@ Three levels, each made from the same table.
 `shipyard --help` and `shipyard help` print the top help, grouped by job:
 
 ```text
-shipyard: your pull requests, issues, runs and agents' pings, from the menu bar
+shipyard: a macOS menu bar app for keeping up with your projects while your agents work
 
 Usage: shipyard <group> <command> [options]
 
