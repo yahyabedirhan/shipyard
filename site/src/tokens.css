@@ -46,7 +46,7 @@
 
   /* typefaces */
   --sans:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
-  --serif:Literata,Georgia,serif;
+  --serif:'IBM Plex Serif',Georgia,serif;
   --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 
   /* type sizes */

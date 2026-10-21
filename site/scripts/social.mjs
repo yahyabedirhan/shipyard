@@ -8,7 +8,7 @@ const read = async (rel) => (await import('node:fs/promises')).readFile(join(SIT
 const str = (src, name) => src.match(new RegExp(`export const ${name} = '([^']+)'`))?.[1] ?? src.match(new RegExp(`export const ${name} = "([^"]+)"`))?.[1];
 
 const messaging = await read('src/messaging.ts');
-const LINE = messaging.match(/A: '([^']+)'/)[1];
+const LINE = str(messaging, 'LINE');
 const SITE_URL = str(messaging, 'SITE_URL');
 const pages = [...(await read('src/pages.ts')).matchAll(/id: '([\w-]+)'[\s\S]*?image: '([^']+)'[\s\S]*?card: '([^']*)'/g)]
   .map((m) => ({ id: m[1], image: m[2], card: m[3] }))
@@ -28,7 +28,7 @@ function card({ w, h, logo, line, sub }) {
   <rect width="${w}" height="${h}" fill="${C.bg}"/>
   ${swell(h * 0.36, 0.1)}${swell(h * 0.26, 0.18)}${swell(h * 0.16, 0.3)}
   <image href="${logo}" x="${pad}" y="${pad}" width="${Math.round(h * 0.14)}" height="${Math.round(h * 0.14)}"/>
-  <text x="${pad + h * 0.17}" y="${pad + h * 0.093}" font-family="Literata 72pt" font-weight="600" font-size="${Math.round(h * 0.06)}" fill="${C.fg}">shipyard</text>
+  <text x="${pad + h * 0.17}" y="${pad + h * 0.093}" font-family="IBM Plex Serif SemiBold" font-weight="600" font-size="${Math.round(h * 0.06)}" fill="${C.fg}">shipyard</text>
   ${lines.map((l, i) => `<text x="${pad}" y="${top + i * size * 1.12}" font-family="Inter" font-weight="600" font-size="${size}" letter-spacing="-1" fill="${C.fg}">${esc(l)}</text>`).join('\n  ')}
   ${sub ? `<text x="${pad}" y="${top + lines.length * size * 1.12 + size * 0.35}" font-family="Inter" font-weight="400" font-size="${Math.round(size * 0.48)}" fill="${C.text}">${esc(sub)}</text>` : ''}
   <line x1="${pad}" y1="${h - pad - h * 0.06}" x2="${pad + h * 0.08}" y2="${h - pad - h * 0.06}" stroke="${C.line}" stroke-width="2"/>

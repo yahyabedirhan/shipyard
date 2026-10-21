@@ -1,6 +1,6 @@
 /* The docs page, after the topographic docs: a nav with the wordmark, one narrow column, and a margin for notes.
    Everything is scoped to .dx and reads its values from tokens.css; this file holds no colour, size or spacing of
-   its own. Literata is only for the wordmark and section titles; everything else is Inter. */
+   its own. IBM Plex Serif is only for the wordmark and section titles; everything else is Inter. */
 .dx{min-height:100vh;background:var(--bg);color:var(--text);font:400 var(--type-body)/var(--leading) var(--sans);font-feature-settings:'cv11','ss01';-webkit-text-size-adjust:100%;color-scheme:dark}
 html:has(.dx){background:var(--bg);scroll-padding-top:var(--scroll-pad)}
 body{margin:0;background:var(--bg)}
