@@ -52,7 +52,7 @@
   /* type sizes */
   --type-display:64px;
   --type-display-phone:40px;
-  --type-wordmark-big:120px;
+  --type-wordmark-big:64px;
   --type-wordmark-big-phone:64px;
   --type-title:31px;
   --type-title-phone:26px;
@@ -148,6 +148,9 @@
 
   --land-col:1120px;
   --land-shot:560px;
+  --land-logo:128px;
+  --land-logo-bleed:-12px;
+  --land-logo-gap:calc(.22em + 12px);
   --btn-h:40px;
 
   /* motion */
