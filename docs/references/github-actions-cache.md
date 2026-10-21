@@ -1,10 +1,17 @@
 # GitHub Actions cache
 
-Checked 2026-10-02 against [Dependency caching reference](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching), [Workflow syntax: `on.push`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore) and the [`actions/cache` README at v6.1.0](https://github.com/actions/cache/blob/v6.1.0/README.md).
+How GitHub Actions matches, restores, keeps and evicts caches, and which pushes trigger a workflow.
+The `ci` workflow's `.build` cache depends on it.
 
-The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with `actions/cache/restore@v6` and `actions/cache/save@v6`. Its key is `<github.workflow>-<github.job>-<runner.os>-<runner.arch>-swift-<toolchain hash>-<hash of Package.resolved>-<commit>`, and its one restore key is the same without the commit. The toolchain hash is of `swift --version` on Linux, and of `swift --version`, `xcodebuild -version` and `xcrun --show-sdk-version` together on macOS, so an Xcode or SDK point release with the same Swift starts a fresh cache.
+## Sources
 
-## Matching a key
+Checked 2026-10-02 against:
+
+- [Dependency caching reference](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)
+- [Workflow syntax: `on.push`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushbranchestagsbranches-ignoretags-ignore)
+- The [`actions/cache` README at v6.1.0](https://github.com/actions/cache/blob/v6.1.0/README.md)
+
+## Key matching
 
 - The action "first searches for cache hits for `key` and the cache version in the branch containing the workflow run. If there is no hit, it searches for prefix-matches for `key`, and if there is still no hit, it searches for `restore-keys` and the version. If there are still no hits in the current branch, the `cache` action retries the same steps on the default branch."
 - `restore-keys` are tried in order; "if there are multiple partial matches for a restore key, the action returns the most recently created cache."
@@ -15,9 +22,10 @@ The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with
 
 ## Immutability
 
-- "You cannot change the contents of an existing cache. Instead, you can create a new cache with a new key." A key that names only the dependencies would keep restoring the first build forever; the commit in the key makes every push's build a new cache, and the restore key finds the newest one.
+- "You cannot change the contents of an existing cache. Instead, you can create a new cache with a new key."
+- A key that names only the dependencies would keep restoring the first build forever; the commit in the key makes every push's build a new cache, and the restore key finds the newest one.
 
-## Which runs can restore which caches
+## Restore scope
 
 - "Workflow runs can restore caches created in either the current branch or the default branch (usually `main`)." A pull request run can also restore caches of its base branch.
 - "Workflow runs cannot restore caches created for child branches or sibling branches", nor caches of a different tag name.
@@ -32,16 +40,29 @@ The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with
 - A repository holds 10 GB of caches by default (raisable, with billing). Past the limit "GitHub will save the new cache but will begin evicting caches" in order of last access, oldest first, which can thrash.
 - At most 200 uploads per minute and 1500 downloads per minute per repository.
 
-## Containers
+## Container jobs
 
-- Inside a container job, "a POSIX-compliant `tar` needs to be included and accessible from the execution path." `swift:6.2-noble` has GNU tar but no `zstd`, so the action packs with gzip there (seen in the save step's `tar ... -z`); saving the Linux cache takes about 10–15 s.
+- Inside a container job, "a POSIX-compliant `tar` needs to be included and accessible from the execution path."
+- `swift:6.2-noble` has GNU tar but no `zstd`, so the action packs with gzip there (seen in the save step's `tar ... -z`); saving the Linux cache takes about 10–15 s.
 - `actions/cache` v5 and later run on Node.js 24 and need runner version 2.327.1 or newer (GitHub-hosted runners have it).
 
-## Triggers
+## Push triggers
 
 - "If you define neither `tags`/`tags-ignore` or `branches`/`branches-ignore`, the workflow will run for events affecting either branches or tags." `ci.yml` gives a bare `push:`, so it runs on every branch push and every tag push; defining only `branches` would stop tag pushes.
-- A push to a branch with an open pull request fires both `push` and `pull_request` for the same commit. `ci.yml` keeps the `push` run, the only one that saves a cache, and skips its jobs on a `pull_request` whose `github.event.pull_request.head.repo.full_name` is this repository; a fork's pull request still runs, since its pushes don't trigger this repository's workflows. The pull request shows the push run's checks, because checks belong to the head commit, plus the skipped `pull_request` jobs. A skipped job counts as passing for a required status check, so if `main` ever requires checks, require the `push` ones by name. The cost is that a same-repository pull request is tested at its head commit, not at its merge with the base.
+- A push to a branch with an open pull request fires both `push` and `pull_request` for the same commit.
+- `ci.yml` keeps the `push` run, the only one that saves a cache, and skips its jobs on a `pull_request` whose `github.event.pull_request.head.repo.full_name` is this repository. A fork's pull request still runs, since its pushes don't trigger this repository's workflows.
+- The pull request shows the push run's checks, because checks belong to the head commit, plus the skipped `pull_request` jobs.
+- A skipped job counts as passing for a required status check, so if `main` ever requires checks, require the `push` ones by name.
+- The cost is that a same-repository pull request is tested at its head commit, not at its merge with the base.
 
 ## Security
 
-- "Anyone who can open a pull request against your repository can read the contents of caches in the base branch." Never put secrets in a cached path; `.build` holds only build products and the Linux job's list of source hashes.
+- "Anyone who can open a pull request against your repository can read the contents of caches in the base branch."
+- Never put secrets in a cached path; `.build` holds only build products and the Linux job's list of source hashes.
+
+## Shipyard's use
+
+- The `ci` workflow (`.github/workflows/ci.yml`) caches `.build` in both jobs with `actions/cache/restore@v6` and `actions/cache/save@v6`.
+- Its key is `<github.workflow>-<github.job>-<runner.os>-<runner.arch>-swift-<toolchain hash>-<hash of Package.resolved>-<commit>`.
+- Its one restore key is the same without the commit.
+- The toolchain hash is of `swift --version` on Linux, and of `swift --version`, `xcodebuild -version` and `xcrun --show-sdk-version` together on macOS, so an Xcode or SDK point release with the same Swift starts a fresh cache.

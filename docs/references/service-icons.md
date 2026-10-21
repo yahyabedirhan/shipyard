@@ -1,8 +1,25 @@
 # Service icons
 
-> **Decision (#249, 2026-10-07): the GitHub and Notion status views show their makers' marks, in look A.** The maintainer picked look A of three prototyped looks: each mark on a tile of `LogoBadge`'s squircle in its maker's colours, GitHub's white Invertocat on `#24292F` and Notion's black cube on white (as Notion's own app icon), both fixed in light and dark mode. The Shipyard Skill and Shipyard CLI views keep the sailboat (`LogoBadge`), and the signed-out GitHub view (`ConnectView`) keeps its logo. Each SVG is kept as published in `assets/images/service-logos/` and converted, unaltered, to the PDF the app bundles (`make service-logos`); `SetupBadge` draws it. The bundled files' sources and notices are in `THIRD-PARTY-NOTICES.md`.
+Where GitHub's and Notion's marks for their status views come from, under what licence and brand terms, and the look the maintainer chose (#249).
+`SetupBadge` and the bundled `ServiceLogos` depend on it.
+
+## Sources
 
 Checked 2026-10-07, with the method of [agent-icons.md](agent-icons.md): copyright in the drawing and trademark in the mark are separate questions, and showing a mark only to say which service a view sets up is nominative use, when the mark isn't altered and implies no endorsement.
+
+- [primer/octicons](https://github.com/primer/octicons) at `923a31b34542702800cb90a0fd390e2e60dd92ac`, and [simple-icons/simple-icons](https://github.com/simple-icons/simple-icons) at `1089fb7d2bf0e323f834c205ab76265005a6d5e8`: the same commits [agent-icons.md](agent-icons.md) already cites.
+- [github.com/logos](https://github.com/logos) and GitHub's brand kit: checked 2026-10-07.
+- [Notion Trademark Usage Guidelines](https://notion.notion.site/Notion-Trademark-Usage-Guidelines-9826313c686a4f6e9d8a48347162714b) and [Notion's brand usage guidelines](https://notion.notion.site/Notion-s-brand-usage-guidelines-How-to-use-Notion-s-brand-in-your-marketing-30a5510bc5644475a28844e427008bee): checked 2026-10-07.
+- Each other file checked, with its address and fetch date, is in [Candidate files](#candidate-files).
+
+## Decision
+
+**Decision (#249, 2026-10-07): the GitHub and Notion status views show their makers' marks, in look A.**
+
+- The maintainer picked look A of three prototyped looks: each mark on a tile of `LogoBadge`'s squircle in its maker's colours, GitHub's white Invertocat on `#24292F` and Notion's black cube on white (as Notion's own app icon), both fixed in light and dark mode.
+- The Shipyard Skill and Shipyard CLI views keep the sailboat (`LogoBadge`), and the signed-out GitHub view (`ConnectView`) keeps its logo.
+- Each SVG is kept as published in `assets/images/service-logos/` and converted, unaltered, to the PDF the app bundles (`make service-logos`); `SetupBadge` draws it.
+- The bundled files' sources and notices are in `THIRD-PARTY-NOTICES.md`.
 
 ## Bundled logos
 
@@ -11,11 +28,27 @@ Checked 2026-10-07, with the method of [agent-icons.md](agent-icons.md): copyrig
 | GitHub | `github.svg` | [primer/octicons](https://github.com/primer/octicons) at `923a31b34542702800cb90a0fd390e2e60dd92ac` (the last commit touching it; HEAD `f04253eb4088fb9869418771effb391fa13a2744` has it unchanged), `icons/mark-github-24.svg` | MIT, "Copyright (c) 2026 GitHub Inc."; GitHub's logo terms allow showing an integration, white or black only |
 | Notion | `notion.svg` | [simple-icons/simple-icons](https://github.com/simple-icons/simple-icons) at `1089fb7d2bf0e323f834c205ab76265005a6d5e8` (the last commit touching it), `icons/notion.svg` | project CC0, the Notion entry has no licence field; Notion's trademark terms allow describing an integration |
 
-Both are one path on a 24-unit box with no fill, so the view draws them as template images in the tile's mark colour: GitHub's white, Notion's black. The mark's box takes 66 % (GitHub) and 64 % (Notion) of the tile's side, centred, so each mark looks the size of the sailboat. A 0.5 pt hairline inside the edge (white at 10 % on GitHub's tile, black at 12 % on Notion's) keeps each tile's shape against the panel in both modes.
+### Drawing
 
-Notion's file comes from simple-icons because Notion publishes no clean vector file: its brand page (`notion.com/brand`) answers 401, its media kit's "SVG" wraps a 2019 PNG, and the only first-party vector, the cube inline in notion.com's header, takes its black fill from a CSS variable, which the conversion drops unless that fill is edited. The simple-icons path is the same cube, converts cleanly, and on a white tile matches Notion's own app icon (`https://www.notion.com/front-static/logo-ios.png`).
+- Both are one path on a 24-unit box with no fill, so the view draws them as template images in the tile's mark colour: GitHub's white, Notion's black.
+- The mark's box takes 66 % (GitHub) and 64 % (Notion) of the tile's side, centred, so each mark looks the size of the sailboat.
+- A 0.5 pt hairline inside the edge (white at 10 % on GitHub's tile, black at 12 % on Notion's) keeps each tile's shape against the panel in both modes.
 
-## Sources checked
+### Tile colour
+
+- The tile colour `#24292F` is the old Primer dark.
+- GitHub's current brand palette lists Gray 6 `#101411` ("Process Black") and Gray 5 `#232925`; the site favicon uses `#24292E`.
+- GitHub publishes no app-icon tile colour, and the maintainer kept `#24292F`.
+
+### Notion's file
+
+- Notion's file comes from simple-icons because Notion publishes no clean vector file:
+  - its brand page (`notion.com/brand`) answers 401,
+  - its media kit's "SVG" wraps a 2019 PNG,
+  - and the only first-party vector, the cube inline in notion.com's header, takes its black fill from a CSS variable, which the conversion drops unless that fill is edited.
+- The simple-icons path is the same cube, converts cleanly, and on a white tile matches Notion's own app icon (`https://www.notion.com/front-static/logo-ios.png`).
+
+## Candidate files
 
 | Candidate | Source | Copyright | Verdict |
 |---|---|---|---|
@@ -38,6 +71,7 @@ Notion's file comes from simple-icons because Notion publishes no clean vector f
 - Don't: "Modify the logo: Do not modify the permitted GitHub logos, including changing the color, dimensions, or combining with other words or design elements."
 - Colour: "The Invertocat and our wordmark should only appear in white, black, or in few cases grey or green."
 - Legal: "No adaptation or use of any kind … is allowed without the express written permission of GitHub, Inc." The "Show integration" Do is the carve-out that covers a view that sets up shipyard's GitHub connection.
+- GitHub's brand guidelines prefer the Invertocat "in GitHub-owned environments or where the brand is already clearly established", and ask for written permission for any use; "Show integration" is the exception that applies.
 
 Verdict: bundled with the MIT notice, drawn white, unaltered, as the integration case GitHub lists.
 
@@ -52,10 +86,7 @@ Verdict: bundled with the MIT notice, drawn white, unaltered, as the integration
 - Attribution, where permission is granted: "Notion and the Notion logo are trademarks of Notion Labs, Inc., and are used here with permission."
 - "Notion can modify or revoke at any time … any permission or license we grant you to use our trademarks." Questions: team@makenotion.com.
 
-Verdict: the same standing as the agents' logos in #137. The terms name describing an integration as permitted, in words; the cube is shown unaltered only to identify the view that connects shipyard's notes to Notion, with no endorsement implied, and `THIRD-PARTY-NOTICES.md` carries the trademark line. Notion may revoke the permission, so the cube may have to go back to the sailboat.
-
-## Surprises
-
-- The tile colour `#24292F` is the old Primer dark. GitHub's current brand palette lists Gray 6 `#101411` ("Process Black") and Gray 5 `#232925`; the site favicon uses `#24292E`. GitHub publishes no app-icon tile colour, and the maintainer kept `#24292F`.
-- GitHub's brand guidelines prefer the Invertocat "in GitHub-owned environments or where the brand is already clearly established", and ask for written permission for any use; "Show integration" is the exception that applies.
-- The octicon and simple-icons commits are the ones [agent-icons.md](agent-icons.md) already cites.
+Verdict: the same standing as the agents' logos in #137.
+The terms name describing an integration as permitted, in words.
+The cube is shown unaltered only to identify the view that connects shipyard's notes to Notion, with no endorsement implied, and `THIRD-PARTY-NOTICES.md` carries the trademark line.
+Notion may revoke the permission, so the cube may have to go back to the sailboat.
