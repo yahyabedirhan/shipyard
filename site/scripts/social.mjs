@@ -27,7 +27,7 @@ function card({ w, h, logo, line, sub }) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect width="${w}" height="${h}" fill="${C.bg}"/>
   ${swell(h * 0.36, 0.1)}${swell(h * 0.26, 0.18)}${swell(h * 0.16, 0.3)}
-  <image href="${logo}" x="${pad}" y="${pad}" width="${Math.round(h * 0.14)}" height="${Math.round(h * 0.14)}"/>
+  <image href="${logo}" x="${pad + h * 0.014}" y="${pad + h * 0.014}" width="${Math.round(h * 0.113)}" height="${Math.round(h * 0.113)}"/>
   <text x="${pad + h * 0.17}" y="${pad + h * 0.093}" font-family="IBM Plex Serif SemiBold" font-weight="600" font-size="${Math.round(h * 0.06)}" fill="${C.fg}">shipyard</text>
   ${lines.map((l, i) => `<text x="${pad}" y="${top + i * size * 1.12}" font-family="Geist" font-weight="600" font-size="${size}" letter-spacing="-1" fill="${C.fg}">${esc(l)}</text>`).join('\n  ')}
   ${sub ? `<text x="${pad}" y="${top + lines.length * size * 1.12 + size * 0.35}" font-family="Geist" font-weight="400" font-size="${Math.round(size * 0.48)}" fill="${C.text}">${esc(sub)}</text>` : ''}

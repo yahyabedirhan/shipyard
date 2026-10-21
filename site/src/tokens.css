@@ -129,7 +129,7 @@
   --bar-h:52px;
   --ring-w:34px;
   --ring-h:24px;
-  --nav-logo:32px;
+  --nav-logo:26px;
   --copy:28px;
   --copy-icon:14px;
   --icon:18px;
@@ -148,8 +148,7 @@
 
   --land-col:1120px;
   --land-shot:560px;
-  --land-logo:128px;
-  --land-logo-bleed:-12px;
+  --land-logo:104px;
   --land-logo-gap:calc(.22em + 12px);
   --btn-h:40px;
 
