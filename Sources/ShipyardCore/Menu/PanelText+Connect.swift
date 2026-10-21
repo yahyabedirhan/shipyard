@@ -94,7 +94,7 @@ extension PanelText {
         switch reason {
         case .noToken: "The `gh` command still isn't signed in."
         case .rejected(.gh): "GitHub still rejects the `gh` command's sign-in."
-        case .rejected(.tokenStore): "GitHub still rejects the sign-in."
+        case .rejected(.tokenStore), .rejected(.demoItems): "GitHub still rejects the sign-in."
         case .userSignedOut: "Still not connected."
         }
     }
@@ -127,7 +127,7 @@ extension PanelText {
                 showsInstallHint: false,
                 alternative: canSignIn ? "Alternatively, sign in with GitHub, if you'd rather:" : nil
             )
-        case .rejected(.tokenStore):
+        case .rejected(.tokenStore), .rejected(.demoItems):
             return Connect(
                 title: "Welcome back",
                 message: "Your GitHub sign-in expired or was revoked. Sign in again to pick up where you left off.",

@@ -16,7 +16,8 @@ import FoundationNetworking
 /// empty body) stores nothing and returns the kept avatar while it is for
 /// the same URL, else `nil`, so the header shows the handle alone; the
 /// next ask tries again. The request carries no token: avatars are
-/// public, served from `avatars.githubusercontent.com`.
+/// public, served from `avatars.githubusercontent.com`. A file URL (a
+/// demo run's made-up account, `DemoItems`) is read from disk instead.
 public actor AvatarCache {
     /// The size asked for, in pixels (`s=`): the header's 20 pt at 3×.
     public static let pixelSize = 60
@@ -43,6 +44,7 @@ public actor AvatarCache {
 
     /// The URL downloaded for `avatarURL`: the same, asking for `pixelSize`.
     public static func downloadURL(for avatarURL: URL) -> URL {
+        guard !avatarURL.isFileURL else { return avatarURL }
         guard var components = URLComponents(url: avatarURL, resolvingAgainstBaseURL: false) else { return avatarURL }
         var items = (components.queryItems ?? []).filter { $0.name != "s" }
         items.append(URLQueryItem(name: "s", value: String(pixelSize)))
@@ -98,6 +100,10 @@ public actor AvatarCache {
     }
 
     private static func download(_ url: URL, transport: any HTTPTransport) async -> Data? {
+        if url.isFileURL {
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else { return nil }
+            return data
+        }
         let request = URLRequest(url: downloadURL(for: url))
         guard let (data, response) = try? await transport.send(request),
               response.statusCode == 200, !data.isEmpty else { return nil }

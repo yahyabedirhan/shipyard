@@ -30,6 +30,8 @@ extension PanelText {
         case .tokenStore:
             page.detail = "Connected with Sign in with GitHub."
             page.alternatives = [signOut]
+        case .demoItems:
+            page.detail = "A demo run: it lists the example items in its `\(DemoItems.fileName)` and asks GitHub nothing."
         }
         return page
     }
