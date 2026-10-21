@@ -164,41 +164,28 @@ The menu follows the reload `writePreset` returns, as after the picker: with pro
 These are **warnings**, not errors:
 
 - **Unknown keys**, so a file written for a newer shipyard still loads in an older one.
-- **The old forms** the reader still accepts and turns into the new ones (see [Old forms](#old-forms)).
 - **A file that sets any key without `version`.** It reads, and from version 2 it will be an error.
-- **Rules that mean nothing for app control's events**, `control.started` and `control.ended` (since 0.2.0, #182): one in a project's own list (only the top-level rules decide them), and one with `authors` (no item's author sends one).
+- **Rules that mean nothing for app control's events**, `control.started` and `control.ended` (#182): one in a project's own list (only the top-level rules decide them), and one with `authors` (no item's author sends one).
   Each is read and ignored.
 
 `ConfigurationStore.warnings` holds them.
 The panel shows them in its quiet banner and `config-status.json` records them, but a misspelled key otherwise silently does nothing.
 The schema is the check that catches it, which is why the skill tells agents to run `taplo check`.
 
-### Old forms
+### Project slugs
 
-Each old form reads with a warning that says what to write instead.
-
-| Old form | New form |
-|---|---|
-| a top-level `hide-authors` | a `hide` of those logins in each kind's `[defaults.*]` |
-| a notification rule's `authors` written as one string: `authors = "others"` | `["others"]` (`"any"` is `[]`) |
-| a kind's `closed-window-days` (a whole number of days): `closed-window-days = 3` | `closed-window = "3d"` |
-| a kind's `finished-window-hours` (a whole number of hours): `finished-window-hours = 4` | `finished-window = "4h"` |
-| `refresh-interval-seconds` (a whole number of seconds): `refresh-interval-seconds = 90` | `refresh-interval = "90s"` |
-| `[banners] snooze` | `snooze-duration` |
-| a project's `name` (since 0.6.0, #255) | its `title`, with a `slug` made of it |
-
-- **Old beside new.** An old key beside its new one in one table is an error instead, as is `name` beside `slug` or `title`.
-- **The slug.** `Configuration.slug(from:)` makes it: lowercased, each run of characters other than `a`–`z` and `0`–`9` one hyphen, none at either end.
-- **Old project names.** `--project` (`shipyard ping`, `shipyard notice send`) finds a project by its slug, then by its title (`Configuration.project(named:)`), so an older `shipyard` that sends a project's old name still files under it.
-  The app names each filed ping's projects by slug the same way (`ProjectFiling.named`), so pings filed before the rename stay listed.
-- **The schema.** It keeps the old forms too, marked `"deprecated": true`, so `taplo check` passes every file the app reads.
-  `ConfigSchemaTests` checks that the deprecated keys are exactly the ones `everyKey` leaves out.
+- **The rule.** A project needs a `slug`: lowercase letters and digits joined by single hyphens, such as `e-commerce`.
+  A block without one is rejected, "a project needs a `slug`".
+- **Making one.** `Configuration.slug(from:)` makes a slug from any text: lowercased, each run of characters other than `a`–`z` and `0`–`9` one hyphen, none at either end.
+  It suggests the nearest slug for an invalid one, and makes a picked project's slug from its title.
+- **Finding a project.** `--project` (`shipyard ping`, `shipyard notice send`) finds a project by its slug, then by its title (`Configuration.project(named:)`), so an older `shipyard` that sends a project's title still files under it.
+  The app names each filed ping's projects by slug the same way (`ProjectFiling.named`), so pings filed by a title stay listed.
 
 ### Cross-key rules
 
 The reader enforces these, and the schema can't express them:
 
-- Project slugs are unique: the second one is rejected on its line, `slug` or the old `name` it was made from.
+- Project slugs are unique: the second one is rejected on its `slug` line.
 - A repository is listed once per project, ignoring case.
 - A project using `anywhere` lists pull requests with `review-requested = true` and no issues or runs, once its defaults are merged; otherwise it's rejected on the `anywhere` entry's line.
 
@@ -485,7 +472,7 @@ Do every step in the same change; the tests fail on most of the ones you miss.
    Add the key to its table's `warnUnknownKeys` known list, otherwise it's reported as unknown.
 3. **The schema.** Add the key to `schema/config.schema.json` with its `description`, `type`, `default` and any `enum`, `minimum` or `maximum`, under the right table or definition.
    A project-overridable key goes in the shared definition both `defaults` and `project` reference.
-   A key or spelling the reader still accepts as an old form stays in the schema, marked `"deprecated": true` (an old spelling of a value sits beside the new one in an `anyOf`).
+   A renamed key is dropped outright, from the reader and the schema alike: the reader doesn't keep the old key as an old form, so a file that still has it gets an unknown-setting warning.
 4. **The new-file header.** When users should discover the setting from a fresh file, show it commented out at its default in `Configuration.header`, in the `# [table]` / `# key = value` form the header already uses.
    Put it under a one-line comment with no ` = ` in it (the header test takes such lines for settings).
    A top-level key goes above the first commented table, a table among the others.

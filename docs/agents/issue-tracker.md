@@ -67,7 +67,7 @@ An **effort** is one spec issue and the tickets that build it.
 
 - A bug found while building or checking the app gets a ticket, labelled `bug`, in the effort it belongs to, and blocks that effort's verification ticket. If an open ticket already owns the behaviour, update that ticket instead.
 - Attach a screenshot when it shows the bug:
-  - `gh` can't upload images to an issue, so screenshots are committed to the repository under `assets/screenshots/<topic>/` (for example `assets/screenshots/bugs/`, or the effort's folder such as `assets/screenshots/shipyard-0.0.2/`) on the working branch, and pushed.
+  - `gh` can't upload images to an issue, so screenshots are committed to the repository under `assets/screenshots/<topic>/` (for example `assets/screenshots/bugs/`, or the effort's folder such as `assets/screenshots/agent-lease/`) on the working branch, and pushed.
   - Embed the raw URL pinned to the commit that added the file, not a branch name: `![what it shows](https://raw.githubusercontent.com/yahyabedirhan/shipyard/<commit>/assets/screenshots/<topic>/<name>.png)`.
   - Check it loads (`curl -s -o /dev/null -w "%{http_code}" <url>` prints `200`) before posting.
   - Pull requests here merge with merge commits, so the pinned commit stays reachable from `main` after the merge; don't squash or rebase a branch whose commits are embedded.

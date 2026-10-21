@@ -94,6 +94,8 @@ When a ticket that changes what the maintainer sees or does is built, close it a
 
 `docs/cli-design.md` is the `shipyard` command line's design: its groups, verbs, help and exit codes. A new command or flag follows it.
 
+The docs, the skill and the schema describe shipyard as it is now. They name no release version ("since 0.2.0", "(0.0.5)"). Until the public launch, a renamed setting or command is replaced outright, with no old form kept beside it. History belongs in `CHANGELOG.md`, the ADRs and the pull requests.
+
 ## Testing
 
 Verify changes with automated tests (`make test`) that exercise the code and the menu model without driving the Mac.

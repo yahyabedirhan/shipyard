@@ -110,7 +110,7 @@ A ping or notice is filed by the working folder's repository unless `--repo` or 
 
 ### Previous command forms
 
-Shipyard 0.6.0 had nine top-level commands in a flat list, each module writing its own help lines.
+Before this design, shipyard had nine top-level commands in a flat list, each module writing its own help lines.
 The last column names the item in Verification that each finding fails.
 
 | Finding | Evidence | Verification item |
@@ -120,13 +120,13 @@ The last column names the item in Verification that each finding fails.
 | `screenshot` was a top-level verb about the app, beside `app`; GLOSSARY.md says *capture* is the act. | GLOSSARY.md "Screenshot" | 3, 4 |
 | `panel tab <name>` and `panel view <name>` used nouns as verbs. | `PanelCommand.swift` | 2 |
 | The top help was written by hand, twice per command, and had drifted: it left `--for` out of `control take`, and cut `notify`'s flags to `…`. | `ControlCommands.swift` `controlHelp` | 9 |
-| `help ping` printed the top help and ignored `ping`; `ping list --help` printed `ping`'s help. | run the 0.6.0 binary | 1 |
+| `help ping` printed the top help and ignored `ping`; `ping list --help` printed `ping`'s help. | run the binary from before this design | 1 |
 | A mistyped command printed the whole top help, 40 lines, after one line of error; so did every argument error in `app`, `panel`, `control` and `screenshot`. | `ShipyardCLI.run`, each `misread` | 7 |
 | `ping list` refused to run without `--json`. | `PingCommand.list` | 6 |
 | `herdr-event` was listed among the everyday commands, though only hooks run it, and `herdr-event --help` exited 2. | `PingCommands.swift` | 4 |
 | No machine-readable listing of the commands for agents. | — | 9 |
 
-What held from 0.6.0:
+What held from the previous forms:
 
 - Exit codes 0, 1 and 2 on every command.
 - Data on standard output and messages on standard error.
