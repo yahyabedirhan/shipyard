@@ -8,7 +8,7 @@ A ping's agent logo (`KnownAgent`, `AgentMarkView`) and the bundled `AgentLogos`
 - Checked 2026-10-03.
 - Each agent's repository, commit, brand page and terms are linked in its own section under [Per agent](#per-agent).
 - The aggregator icon sets' commits are in [Aggregator icon sets](#aggregator-icon-sets), and Herdr's in [Herdr's agents](#herdrs-agents).
-- Shipyard had no `LICENSE` file when this was checked (`f167e7b`); it is MIT-licensed now, and bundled files' notices go in `THIRD-PARTY-NOTICES.md`.
+- Shipyard had no `LICENSE` file when this was checked (`f167e7b`); it is Apache 2.0 licensed now (#281), and bundled files' notices go in `THIRD-PARTY-NOTICES.md`.
 
 ## Decision
 
@@ -18,7 +18,7 @@ A ping's agent logo (`KnownAgent`, `AgentMarkView`) and the bundled `AgentLogos`
 - The earlier choice, a monogram on a coloured circle of shipyard's own, didn't let them recognise the agents.
 - Each SVG is kept as published in `assets/images/agent-logos/` and converted, unaltered, to the PDF the app bundles (`make agent-logos`).
 - The view fits it to a square with app-icon corners, tints Copilot's one-colour glyph like text, and switches OpenCode to its maker's dark-mode file.
-- Shipyard is MIT-licensed (`LICENSE`), and the bundled logos' sources and MIT notices are in `THIRD-PARTY-NOTICES.md`, which the app bundle carries beside `LICENSE`.
+- Shipyard is Apache 2.0 licensed (`LICENSE`, #281), and the bundled logos' sources and MIT notices are in `THIRD-PARTY-NOTICES.md`, which the app bundle carries beside `LICENSE`.
 
 ## Bundled logos
 

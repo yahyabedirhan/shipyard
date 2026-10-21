@@ -15,7 +15,7 @@ The connect screen's Sign in with GitHub depends on it.
 4. The device and user codes expire after 900 seconds (15 minutes). After that, start over with a new request.
 
 The device flow has to be enabled in the OAuth App's settings.
-ghbar (`~/Developer/open-source/ghbar/Sources/GHBar/DeviceFlowAuth.swift`) is a working Swift implementation to learn from.
+ghbar ([cobanov/ghbar](https://github.com/cobanov/ghbar) at `9ae1632`, `Sources/GHBar/DeviceFlowAuth.swift`) is a working Swift implementation to learn from.
 
 ## Per-app limits
 
