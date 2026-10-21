@@ -32,8 +32,6 @@ export const INSTALL = {
     'xattr -dr com.apple.quarantine /Applications/Shipyard.app',
     'open /Applications/Shipyard.app',
   ].join('\n'),
-  // PLACEHOLDER: Homebrew cask. There is no cask yet; replace this line when `brew install --cask shipyard` works.
-  homebrew: 'brew install --cask shipyard',
   skill: 'npx skills add yahyabedirhan/shipyard -g -y',
   plugin: 'herdr plugin install yahyabedirhan/herdr-shipyard',
 } as const;

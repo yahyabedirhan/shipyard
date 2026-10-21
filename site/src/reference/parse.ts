@@ -10,7 +10,6 @@ export interface SchemaNode {
   type?: string;
   enum?: Json[];
   default?: Json;
-  deprecated?: boolean;
   minimum?: number;
   maximum?: number;
   minItems?: number;
@@ -33,7 +32,6 @@ export interface KeyRow {
   allowed: string;
   default: string;
   description: string;
-  deprecated: boolean;
   required: boolean;
   /** When the key holds a table described elsewhere in the reference, that table's owner. */
   table?: string;
@@ -98,8 +96,7 @@ function describeType(n: SchemaNode, defs: Record<string, SchemaNode>): { type: 
     return describeType(d ?? {}, defs);
   }
   if (n.anyOf) {
-    const first = n.anyOf.find((a) => !a.deprecated) ?? n.anyOf[0];
-    return describeType(first, defs);
+    return describeType(n.anyOf[0], defs);
   }
   if (n.type === 'array') {
     const items = n.items?.$ref ? defs[refName(n.items.$ref)] ?? {} : n.items ?? {};
@@ -137,7 +134,6 @@ function rowsOf(owner: string, node: SchemaNode, defs: Record<string, SchemaNode
       allowed: t.allowed,
       default: defaultOf(n, defs),
       description,
-      deprecated: Boolean(n.deprecated),
       required: Boolean(node.required?.includes(key)),
       ...(t.table ? { table: t.table } : {}),
     };

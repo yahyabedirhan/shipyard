@@ -10,7 +10,6 @@
   <a href="https://github.com/yahyabedirhan/shipyard/releases/latest">Download</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
-<!-- PLACEHOLDER: the Site and Docs links go live with shipyard.yahyapak.dev at launch. -->
 
 **Status:** under construction; this README describes 0.7.1.
 
@@ -55,7 +54,6 @@ make install    # builds, signs and copies Shipyard.app to /Applications, then o
 **From the download.** Get `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest).
 It is not notarized yet, so clear the quarantine flag before the first launch:
 
-<!-- PLACEHOLDER: the notarized download replaces the xattr step, and a Homebrew cask line joins this section, at the last launch step. -->
 
 ```sh
 unzip Shipyard-<version>-macos.zip

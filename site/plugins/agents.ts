@@ -11,7 +11,7 @@ const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const fence = (lang: string, code: string) => `\`\`\`${lang === 'text' ? '' : lang}\n${code.trim()}\n\`\`\``;
 
 function keyTable(g: KeyGroup): string {
-  const rows = g.rows.map((r) => `| \`${r.key}\`${r.required ? ' (required)' : ''}${r.deprecated ? ' (deprecated)' : ''} | ${r.default ? `\`${cell(r.default)}\`` : 'unset'} | ${cell([r.type, r.allowed].filter(Boolean).join(': '))} | ${cell(r.description)} |`);
+  const rows = g.rows.map((r) => `| \`${r.key}\`${r.required ? ' (required)' : ''} | ${r.default ? `\`${cell(r.default)}\`` : 'unset'} | ${cell([r.type, r.allowed].filter(Boolean).join(': '))} | ${cell(r.description)} |`);
   return [`### \`${g.heading}\`${g.also ? ` (also ${g.also})` : ''}`, '', g.description, '', '| Key | Default | Type | What it does |', '|---|---|---|---|', ...rows].join('\n');
 }
 

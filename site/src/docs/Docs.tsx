@@ -49,8 +49,8 @@ function KeyTable({ g, prefix = 'keys' }: { g: KeyGroup; prefix?: string }) {
           <thead><tr><th>Key</th><th>Default</th><th>What it takes</th></tr></thead>
           <tbody>
             {g.rows.map((r) => (
-              <tr key={r.id} data-key={r.id} id={`key-${r.id}`} className={r.deprecated ? 'old' : undefined}>
-                <td><code>{r.key}</code>{r.required ? <span className="req">required</span> : null}{r.deprecated ? <span className="req">deprecated</span> : null}</td>
+              <tr key={r.id} data-key={r.id} id={`key-${r.id}`}>
+                <td><code>{r.key}</code>{r.required ? <span className="req">required</span> : null}</td>
                 <td className="num">{r.default ? <code>{r.default}</code> : <span className="none">unset</span>}</td>
                 <td>
                   <span className="ty">{r.type}{r.allowed ? <>: <Html html={inlineMd(r.allowed)} /></> : null}</span>

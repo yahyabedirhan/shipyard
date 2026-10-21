@@ -127,7 +127,7 @@ export const SECTIONS: DocSection[] = [
       { label: 'ntn', lang: 'sh', code: 'curl -fsSL https://ntn.dev | bash\nntn login\nntn doctor' },
       { label: 'Hide one project\'s', lang: 'toml', code: '[[projects]]\nslug = "shop"\nrepositories = ["my-org/shop"]\nnotes = { show = false }' },
     ],
-    shots: ['panel-notes-dark', 'view-notion-dark'],
+    shots: ['panel-notes-dark', 'notes-tabs-light'],
   },
   {
     id: 'skill', title: 'The agent skill', nav: 'The agent skill',
@@ -157,7 +157,6 @@ export const SECTIONS: DocSection[] = [
       { label: 'On the machine', lang: 'sh', code: INSTALL.plugin },
       { label: 'config.toml', lang: 'toml', code: '[remote]\nmachines = ["build-box"]' },
     ],
-    shots: ['panel-remote-machine-dark', 'remote-machine-tabs-light'],
   },
   {
     id: 'configuration', title: 'Configuration reference', nav: 'Configuration',
@@ -165,7 +164,7 @@ export const SECTIONS: DocSection[] = [
     body: '<p>The file is <code>~/.config/shipyard/config.toml</code>, or <code>$XDG_CONFIG_HOME/shipyard/config.toml</code> when that is set. <b>Open configuration file</b> in the gear menu opens it. Every key is optional and each save applies at once. A broken edit keeps the last good configuration and shows the error in the panel.<sup class="fn"></sup></p>\n<p>A project\'s tables merge key by key onto <code>[defaults]</code>, so <code>issues = { show = true }</code> keeps the default <code>closed-window</code>. A project\'s <code>notifications</code> replaces the default list instead. A <b>window</b> is a whole number and one unit, <code>s</code>, <code>m</code>, <code>h</code> or <code>d</code>, such as <code>"30m"</code> or <code>"7d"</code><sup class="fn"></sup></p>',
     notes: [
       `The file's first line, <code>#:schema</code>, names ${ext(SCHEMA_URL, 'the JSON schema')} this table is made from, so editors that read it complete and check every key.`,
-      'Unknown keys are ignored with a warning, and deprecated keys still read, with a warning that names the new one.',
+      'Unknown keys are ignored with a warning that names the nearest key shipyard reads.',
     ],
     code: [{ lang: 'toml', code: `#:schema ${SCHEMA_URL}\nversion = 1\n\n[[projects]]\nslug = "shipyard"\nrepositories = ["yahyabedirhan/shipyard"]` }],
     extra: 'config',
@@ -210,9 +209,7 @@ export const byId: Record<string, DocSection> = Object.fromEntries(SECTIONS.map(
 export const LIMITS: [string, string][] = [
   ['macOS only', 'The app runs on macOS 14 or later. The <code>shipyard</code> command also runs on Linux, without the app.'],
   ['github.com only', 'It reads github.com. GitHub Enterprise Server is not supported.'],
-  // PLACEHOLDER: notarized download. Remove this limit when the notarized build ships.
   ['Not notarized', 'macOS asks you to clear the quarantine flag before the first launch of the download.'],
-  // PLACEHOLDER: Homebrew cask and automatic updates. Remove this limit when the cask ships.
   ['No Homebrew or updates', 'There is no Homebrew cask and no automatic update yet.'],
   ['Settings in a file', 'The gear menu shows the setup of GitHub, Notion, the skill and the command, and the layout button switches layouts. Everything else is edited in <code>config.toml</code>, by you or your agents.'],
   ['Herdr windows', 'With Herdr 0.9.3, clicking another machine\'s ping focuses its pane on that machine, but the Mac\'s Herdr window moves there only when it already shows that machine.'],
@@ -235,6 +232,4 @@ export const QUESTIONS: [string, string][] = [
 export const INSTALL_WAYS = [
   { id: 'download', label: 'Download', lang: 'sh' as const, code: INSTALL.download, hint: `Get the zip from the ${ext(RELEASES, 'latest release')}.` },
   { id: 'source', label: 'From source', lang: 'sh' as const, code: INSTALL.source, hint: 'Builds, signs and installs the app, then opens it.' },
-  // PLACEHOLDER: Homebrew. No cask exists yet, so the tab says so instead of showing a command that fails.
-  { id: 'homebrew', label: 'Homebrew', lang: 'text' as const, code: 'Not available yet. Use the download or build from source.', hint: 'There is no cask yet.' },
 ];

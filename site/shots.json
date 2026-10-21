@@ -289,32 +289,6 @@
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
-      "id": "panel-remote-machine-dark",
-      "shows": "A section named after another machine, listing pings its agents sent through Herdr.",
-      "state": "A saved Herdr machine with the herdr-shipyard plugin, listed in [remote] machines, holding one or two test pings. Needs the user's machines; use a neutral label.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n[remote]\nmachines = [\"<a saved Herdr machine>\"]\n",
-      "appearance": "dark",
-      "layout": "list",
-      "size": "the panel as captured, at 2x",
-      "usedIn": [
-        "site: docs #machines"
-      ],
-      "path": "assets/screenshots/launch/panel-remote-machine-dark.png",
-      "capture": [
-        "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "mkdir -p ~/shipyard-demo/shipyard",
-        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
-        "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel open",
-        "shipyard app capture assets/screenshots/launch/panel-remote-machine-dark.png --appearance dark",
-        "shipyard panel close",
-        "shipyard app open",
-        "shipyard lease release"
-      ],
-      "status": "placeholder",
-      "notes": "Remote pings are read from the machine, so this is captured on the user's own setup. Crop or blur a private machine label."
-    },
-    {
       "id": "view-skill-dark",
       "shows": "The Set up /shipyard skill view, with the skill installed.",
       "state": "Signed in, skill installed.",
@@ -557,27 +531,6 @@
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
-      "id": "view-notion-dark",
-      "shows": "The Set up Notion view: ntn installed and logged in, its workspace, and Connect with ntn done.",
-      "state": "Notion connected through ntn.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
-      "appearance": "dark",
-      "layout": "tabs",
-      "size": "the panel as captured, at 2x",
-      "usedIn": [
-        "site: docs #notes"
-      ],
-      "path": "assets/screenshots/launch/view-notion-dark.png",
-      "capture": [
-        "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "shipyard panel show-view notion",
-        "shipyard app capture assets/screenshots/launch/view-notion-dark.png --appearance dark",
-        "shipyard lease release"
-      ],
-      "status": "placeholder",
-      "notes": "Captured on the maintainer's app: the view shows only ntn's status and the workspace name."
-    },
-    {
       "id": "config-warning-dark",
       "shows": "The panel's quiet banner after an agent's edit left a misspelled key: the line and the nearest valid key.",
       "state": "A config.toml with one unknown key, accepted with a warning.",
@@ -605,28 +558,6 @@
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
-      "id": "remote-machine-tabs-light",
-      "shows": "The tabs layout with a tab named after another machine, listing pings its agents sent through Herdr, in light.",
-      "state": "A machine named in [remote] machines, with two pings.",
-      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n[remote]\nmachines = [\"<a saved Herdr machine>\"]\n",
-      "appearance": "light",
-      "layout": "tabs",
-      "size": "the panel as captured, at 2x",
-      "usedIn": [
-        "site: docs #remote"
-      ],
-      "path": "assets/screenshots/launch/remote-machine-tabs-light.png",
-      "capture": [
-        "shipyard lease take --wait 120 --for \"site screenshots\"",
-        "shipyard app open --demo ~/shipyard-demo",
-        "shipyard panel show-tab <machine>",
-        "shipyard app capture assets/screenshots/launch/remote-machine-tabs-light.png --appearance light",
-        "shipyard lease release"
-      ],
-      "status": "placeholder",
-      "notes": "The machine's label shows in the shot: use a generic label, never a real one."
-    },
-    {
       "id": "cli-help-dark",
       "shows": "A terminal showing shipyard --help: the command groups and their verbs.",
       "state": "The installed shipyard command's help, drawn as a dark terminal window by site/scripts/terminal.mjs.",
@@ -645,6 +576,33 @@
       ],
       "status": "done",
       "notes": "Not a panel capture: retake with npm run terminal after the help changes."
+    },
+    {
+      "id": "notes-tabs-light",
+      "shows": "The tabs layout on the shipyard tab, in light: its Notes group from Notion under its pull requests, pings and issues, each note with its number and label.",
+      "state": "Signed in to the made-up account, the shipyard tab selected, the made-up notes listed.",
+      "demo": "version = 1\ntheme = \"Shipyard\"\n[menu]\nlayout = \"tabs\"\n[defaults]\nshow-first = 2\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = false\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\"]\n[[projects]]\nslug = \"havooch\"\nrepositories = [\"yahyabedirhan/havooch\"]\n[[projects]]\nslug = \"topographic\"\nrepositories = [\"yahyabedirhan/topographic\"]\n[[projects]]\nslug = \"skills\"\nrepositories = [\"yahyabedirhan/skills\"]\n",
+      "appearance": "light",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #notes"
+      ],
+      "path": "assets/screenshots/launch/notes-tabs-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "mkdir -p ~/shipyard-demo && cp -R assets/demo/ ~/shipyard-demo/",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #318 is ready for review\" --body \"Focus mode, one hour mute\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard --id site-1",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"Mute for an hour or until tomorrow?\" --body \"Both fit the menu\" --from \"codex · focus\" --project shipyard --id site-2",
+        "shipyard panel show-tab shipyard",
+        "shipyard app capture assets/screenshots/launch/notes-tabs-light.png --appearance light",
+        "shipyard app open",
+        "shipyard lease release"
+      ],
+      "status": "done",
+      "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     }
   ]
 }

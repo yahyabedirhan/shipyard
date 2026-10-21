@@ -131,7 +131,6 @@ body{margin:0;background:var(--bg)}
 .dx main .tbl .kd{margin:var(--sp-1) 0 0;font-size:var(--type-table)}
 .dx .tbl .req{display:block;margin-top:var(--sp-1);font:500 var(--type-label)/1 var(--sans);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--faint)}
 .dx .tbl .none{color:var(--faint);font-size:var(--type-small)}
-.dx .tbl tr.old td{opacity:.7}
 
 /* install */
 .dx .inst{display:grid;gap:var(--sp-8);margin-top:var(--sp-9)}

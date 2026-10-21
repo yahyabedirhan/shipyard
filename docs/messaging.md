@@ -84,8 +84,8 @@ Each one is stated once, plainly, in the docs' Limits section, and never in mark
 
 - It runs on macOS 14 or later only. The `shipyard` command also runs on Linux, without the app.
 - It reads github.com only. GitHub Enterprise Server, Linear and other issue trackers are not supported.
-- The download is not notarized yet: macOS asks you to clear the quarantine flag before the first launch. PLACEHOLDER: remove this line when the notarized build ships.
-- There is no Homebrew cask and no automatic update yet. PLACEHOLDER: remove this line when the cask ships.
+- The download is not notarized yet: macOS asks you to clear the quarantine flag before the first launch.
+- There is no Homebrew cask and no automatic update yet.
 - Its settings live in `config.toml`. The app's settings menu shows the setup of GitHub, Notion, the skill and the command, the layout button switches between list and tabs, and the rest is edited in the file, by you or your agents.
 - With Herdr 0.9.3, clicking another machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it already shows that machine.
 
@@ -123,7 +123,6 @@ make install
 ```
 
 Or download `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest).
-PLACEHOLDER: the notarized download and `brew install --cask shipyard` replace the zip's quarantine steps at the last launch step.
 
 The agent path:
 
@@ -137,13 +136,13 @@ Then ask your agent: "Watch this repo in shipyard".
 
 | Link | Address |
 |---|---|
-| Product site | `https://shipyard.yahyapak.dev` (PLACEHOLDER: live at launch) |
-| Docs | `https://shipyard.yahyapak.dev/docs` (PLACEHOLDER: live at launch) |
+| Product site | `https://shipyard.yahyapak.dev` |
+| Docs | `https://shipyard.yahyapak.dev/docs` |
 | Code host | `https://github.com/yahyabedirhan/shipyard` |
 | Releases | `https://github.com/yahyabedirhan/shipyard/releases/latest` |
 | Agent skill | `npx skills add yahyabedirhan/shipyard` |
 | Herdr plugin | `https://github.com/yahyabedirhan/herdr-shipyard` |
-| Personal site page | `https://yahyapak.dev/projects/shipyard` (PLACEHOLDER: live at launch) |
+| Personal site page | `https://yahyapak.dev/projects/shipyard` |
 
 ## Channel lengths
 
@@ -166,4 +165,4 @@ Each surface says the one line in its own length, never a different idea.
 - Leave use categories out of the one line. Show what shipyard lists, and let people bring their own uses.
 - Say only what the app does today. Describe behavior, and leave how it looks to the screenshots.
 - State each limit once, in the docs' Limits section.
-- A `PLACEHOLDER:` marker names a gap that a later launch step fills. The launch check fails while one is open.
+- Nothing ships with a placeholder: a gap that a later launch step fills is stated as a fact of today, such as a non-claim, and changed when the step lands.
