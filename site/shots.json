@@ -102,8 +102,8 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "placeholder",
-      "notes": "Shows the signed-in login. Run show-view projects after the capture."
+      "status": "done",
+      "notes": "Captured on the maintainer's app: the view shows only the signed-in login and how it connected."
     },
     {
       "id": "preset-my-agents-dark",
@@ -445,6 +445,181 @@
       ],
       "status": "done",
       "notes": "Pings are sent into the demo with SHIPYARD_SUPPORT_DIR set to the demo's support folder. Notes never list in a demo run, so these shots leave them out."
+    },
+    {
+      "id": "preset-my-agents-light",
+      "shows": "The my-agents preset in the Paper theme: one project per repository, pull requests then issues.",
+      "state": "Signed in, refreshed, list layout.",
+      "demo": "version = 1\ntheme = \"Paper\"\n[defaults]\ngroup-by = \"kind\"\n[defaults.issues]\nshow = true\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"ruff\"\nrepositories = [\"astral-sh/ruff\"]\n",
+      "appearance": "light",
+      "layout": "list",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #preset-my-agents"
+      ],
+      "path": "assets/screenshots/launch/preset-my-agents-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "shipyard app capture assets/screenshots/launch/preset-my-agents-light.png --appearance light",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "The light pair of the dark preset shot, on the same demo data."
+    },
+    {
+      "id": "preset-incoming-contributions-light",
+      "shows": "The incoming-contributions preset in the Paper theme: other people's pull requests and issues, grouped by repository under subheaders, bots hidden.",
+      "state": "Signed in, refreshed, list layout. The demo uses public repositories in place of the user's own; me is the signed-in account, so hiding me is left out of the demo.",
+      "demo": "version = 1\ntheme = \"Paper\"\n[defaults]\ngroup-by = \"repository\"\nsubsections = true\n[defaults.pull-requests]\nauthors = { hide = [\"bots\"] }\n[defaults.issues]\nshow = true\nauthors = { hide = [\"bots\"] }\n[[projects]]\nslug = \"incoming\"\ntitle = \"Incoming\"\nrepositories = [\"astral-sh/uv\", \"astral-sh/ruff\"]\n",
+      "appearance": "light",
+      "layout": "list",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #preset-incoming-contributions"
+      ],
+      "path": "assets/screenshots/launch/preset-incoming-contributions-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "shipyard app capture assets/screenshots/launch/preset-incoming-contributions-light.png --appearance light",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "The light pair of the dark preset shot, on the same demo data."
+    },
+    {
+      "id": "preset-review-queue-light",
+      "shows": "The review-queue preset in the Paper theme: the pull requests waiting on your review, grouped by repository.",
+      "state": "Signed in, refreshed, list layout. anywhere lists the signed-in account's own review requests, so it needs an account whose requests may be shown.",
+      "demo": "version = 1\ntheme = \"Paper\"\n[[projects]]\nslug = \"review-queue\"\ntitle = \"Review queue\"\nrepositories = [\"anywhere\"]\npull-requests = { review-requested = true }\ngroup-by = \"repository\"\nsubsections = true\n",
+      "appearance": "light",
+      "layout": "list",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #preset-review-queue"
+      ],
+      "path": "assets/screenshots/launch/preset-review-queue-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "# write the demo config below to ~/shipyard-demo/shipyard/config.toml",
+        "shipyard app open --demo ~/shipyard-demo",
+        "shipyard app capture assets/screenshots/launch/preset-review-queue-light.png --appearance light",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "The light pair of the dark preset shot, on the same demo data."
+    },
+    {
+      "id": "pings-tabs-light",
+      "shows": "The tabs layout's Pings group on one project's tab, in light: a ping that opens a link and one that focuses a Herdr pane, each with its sender's agent logo.",
+      "state": "Two pings sent into the demo with SHIPYARD_SUPPORT_DIR, the project's tab selected.",
+      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "appearance": "light",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #pings"
+      ],
+      "path": "assets/screenshots/launch/pings-tabs-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "shipyard app open --demo ~/shipyard-demo",
+        "SHIPYARD_SUPPORT_DIR=~/shipyard-demo/support shipyard ping send \"PR #42 is ready for review\" --from \"claude · focus\" --project shipyard --open https://github.com/yahyabedirhan/shipyard",
+        "shipyard panel show-tab shipyard",
+        "shipyard app capture assets/screenshots/launch/pings-tabs-light.png --appearance light",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "Pairs with panel-pings-dark."
+    },
+    {
+      "id": "view-notion-dark",
+      "shows": "The Set up Notion view: ntn installed and logged in, its workspace, and Connect with ntn done.",
+      "state": "Notion connected through ntn.",
+      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "appearance": "dark",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #notes"
+      ],
+      "path": "assets/screenshots/launch/view-notion-dark.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "shipyard panel show-view notion",
+        "shipyard app capture assets/screenshots/launch/view-notion-dark.png --appearance dark",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "Captured on the maintainer's app: the view shows only ntn's status and the workspace name."
+    },
+    {
+      "id": "config-warning-dark",
+      "shows": "The panel's quiet banner after an agent's edit left a misspelled key: the line and the nearest valid key.",
+      "state": "A config.toml with one unknown key, accepted with a warning.",
+      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "appearance": "dark",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #skill"
+      ],
+      "path": "assets/screenshots/launch/config-warning-dark.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "# add `colour = \"red\"` to the demo config",
+        "shipyard app open --demo ~/shipyard-demo",
+        "shipyard app capture assets/screenshots/launch/config-warning-dark.png --appearance dark",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "Pairs with view-skill-dark: the verdict the skill reads after each edit."
+    },
+    {
+      "id": "remote-machine-tabs-light",
+      "shows": "The tabs layout with a tab named after another machine, listing pings its agents sent through Herdr, in light.",
+      "state": "A machine named in [remote] machines, with two pings.",
+      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n[remote]\nmachines = [\"<a saved Herdr machine>\"]\n",
+      "appearance": "light",
+      "layout": "tabs",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #remote"
+      ],
+      "path": "assets/screenshots/launch/remote-machine-tabs-light.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "shipyard app open --demo ~/shipyard-demo",
+        "shipyard panel show-tab <machine>",
+        "shipyard app capture assets/screenshots/launch/remote-machine-tabs-light.png --appearance light",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "The machine's label shows in the shot: use a generic label, never a real one."
+    },
+    {
+      "id": "cli-help-dark",
+      "shows": "A terminal showing shipyard --help: the command groups and their verbs.",
+      "state": "The installed shipyard command.",
+      "demo": "version = 1\n[menu]\nlayout = \"tabs\"\n[defaults.issues]\nshow = true\n[defaults.workflow-runs]\nshow = true\n[[projects]]\nslug = \"shipyard\"\nrepositories = [\"yahyabedirhan/shipyard\", \"yahyabedirhan/skills\"]\n[[projects]]\nslug = \"uv\"\nrepositories = [\"astral-sh/uv\"]\n[[projects]]\nslug = \"deno\"\nrepositories = [\"denoland/deno\"]\n",
+      "appearance": "dark",
+      "layout": "list",
+      "size": "the panel as captured, at 2x",
+      "usedIn": [
+        "site: docs #command"
+      ],
+      "path": "assets/screenshots/launch/cli-help-dark.png",
+      "capture": [
+        "shipyard lease take --wait 120 --for \"site screenshots\"",
+        "# run shipyard --help in a dark terminal and capture the window",
+        "shipyard app capture assets/screenshots/launch/cli-help-dark.png --appearance dark",
+        "shipyard lease release"
+      ],
+      "status": "placeholder",
+      "notes": "A terminal capture, not a panel: the app capture line stands for the terminal screenshot."
     }
   ]
 }

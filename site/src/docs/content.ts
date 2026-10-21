@@ -109,7 +109,7 @@ export const SECTIONS: DocSection[] = [
       { lang: 'sh', code: 'shipyard ping send "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57\nshipyard ping send "Waiting for your input" --herdr --id shop-question\nshipyard ping withdraw shop-question\nshipyard notice send "Tests running" --from "claude · checkout" --id checkout-tests' },
     ],
     extra: 'pings',
-    shots: ['panel-pings-dark'],
+    shots: ['panel-pings-dark', 'pings-tabs-light'],
     after: '<p>If your <code>config.toml</code> lists its own notification rules, add <code>{ event = "ping.sent" }</code> to hear about pings, and <code>{ event = "agent.notice" }</code> to let notices through: a project whose rules leave <code>agent.notice</code> out refuses notices, and the agent is told.</p>',
   },
   {
@@ -124,7 +124,7 @@ export const SECTIONS: DocSection[] = [
       { label: 'ntn', lang: 'sh', code: 'curl -fsSL https://ntn.dev | bash\nntn login\nntn doctor' },
       { label: 'Hide one project\'s', lang: 'toml', code: '[[projects]]\nslug = "shop"\nrepositories = ["my-org/shop"]\nnotes = { show = false }' },
     ],
-    shots: ['panel-notes-dark'],
+    shots: ['panel-notes-dark', 'view-notion-dark'],
   },
   {
     id: 'skill', title: 'The agent skill', nav: 'The agent skill',
@@ -138,7 +138,7 @@ export const SECTIONS: DocSection[] = [
       { label: 'Install', lang: 'sh', code: INSTALL.skill },
       { label: 'Check an edit', lang: 'sh', code: 'shipyard config check\ntaplo check ~/.config/shipyard/config.toml' },
     ],
-    shots: ['view-skill-dark'],
+    shots: ['view-skill-dark', 'config-warning-dark'],
   },
   {
     id: 'machines', title: 'Other machines', nav: 'Other machines',
@@ -152,7 +152,7 @@ export const SECTIONS: DocSection[] = [
       { label: 'On the machine', lang: 'sh', code: INSTALL.plugin },
       { label: 'config.toml', lang: 'toml', code: '[remote]\nmachines = ["build-box"]' },
     ],
-    shots: ['panel-remote-machine-dark'],
+    shots: ['panel-remote-machine-dark', 'remote-machine-tabs-light'],
   },
   {
     id: 'configuration', title: 'Configuration reference', nav: 'Configuration',
@@ -174,7 +174,7 @@ export const SECTIONS: DocSection[] = [
       'The <code>app</code>, <code>panel</code> and <code>lease</code> groups drive the app on the Mac, one agent at a time. The holder shows as a yellow dot on the menu bar icon and a banner on the panel.',
     ],
     extra: 'commands',
-    shots: ['view-cli-dark'],
+    shots: ['view-cli-dark', 'cli-help-dark'],
   },
   {
     id: 'limits', title: 'Limits', nav: 'Limits',

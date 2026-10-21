@@ -10,6 +10,7 @@ body{margin:0;background:var(--bg)}
 .dx b,.dx strong{color:var(--fg);font-weight:500}
 .dx code{font:400 .86em/1.4 var(--mono);color:var(--fg);background:var(--tint);padding:var(--hair) var(--radius-xs);border-radius:var(--radius-xs);white-space:nowrap}
 .dx code,.dx pre{font-variant-ligatures:none}
+.dx :not(pre)>code{white-space:normal;overflow-wrap:anywhere}
 .dx pre code{background:none;padding:0;border-radius:0;white-space:pre;color:var(--text)}
 .dx :focus-visible{outline:var(--focus) solid var(--fg);outline-offset:var(--focus-offset);border-radius:var(--sp-1)}
 .dx img{display:block;max-width:100%;height:auto}
@@ -58,7 +59,9 @@ body{margin:0;background:var(--bg)}
 .dx .sub{margin:var(--sp-5) 0 0;font:400 var(--type-sub)/1.45 var(--sans);letter-spacing:var(--tracking-tight);color:var(--text)}
 .dx main p{margin:0 0 var(--sp-6);color:var(--text)}
 .dx .intro{margin-top:var(--sp-11)}
-.dx .hero-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-5);align-items:start;margin-top:var(--sp-9)}
+.dx .shot-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-5);align-items:start}
+.dx .shot-pair .shot{margin:0}
+.dx .hero-pair{margin-top:var(--sp-9)}
 
 /* sections */
 .dx .sec{position:relative;padding-top:var(--sp-17)}
@@ -78,7 +81,6 @@ body{margin:0;background:var(--bg)}
 .dx .sn .k{position:absolute;left:0;top:var(--hair);font-size:var(--type-label);color:var(--faint)}
 .dx .sn code{font-size:var(--type-micro)}
 .dx .sn.flash{color:var(--fg);transition:color .6s}
-.dx main :not(pre)>code{white-space:nowrap}
 
 /* figures and screenshots */
 .dx .fig{position:relative;margin:0}
@@ -110,12 +112,13 @@ body{margin:0;background:var(--bg)}
 .dx .tk-k{color:var(--tk-k)}.dx .tk-s{color:var(--tk-s)}.dx .tk-n{color:var(--tk-n)}.dx .tk-t{color:var(--tk-t)}.dx .tk-a{color:var(--tk-a)}.dx .tk-c{color:var(--tk-c);font-style:italic}
 
 /* tables */
-.dx .tbl{width:100%;border-collapse:collapse;font-size:var(--type-table);line-height:1.5}
+.dx .tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--type-table);line-height:1.5}
 .dx .tbl th{font:500 var(--type-th)/1.3 var(--sans);color:var(--mut);text-align:left;padding:0 var(--sp-5) var(--sp-3) 0;border-bottom:var(--hair) solid var(--line-2);white-space:nowrap}
 .dx .tbl td{padding:var(--sp-4) var(--sp-5) var(--sp-4) 0;border-bottom:var(--hair) solid var(--line);vertical-align:top;color:var(--text)}
 .dx .tbl td:first-child{color:var(--fg)}
-.dx .tbl td code{font-size:var(--type-small)}
-.dx .tbl .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dx .tbl td code{font-size:var(--type-small);white-space:normal;overflow-wrap:anywhere}
+.dx .tbl th:nth-child(1){width:28%}.dx .tbl th:nth-child(2){width:24%}
+.dx .tbl .num{font-variant-numeric:tabular-nums}
 .dx .tbl-wrap{overflow-x:auto;margin:0 calc(-1 * var(--sp-0));padding:0 var(--sp-0)}
 
 /* the generated reference */

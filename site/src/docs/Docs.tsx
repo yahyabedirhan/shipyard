@@ -138,7 +138,7 @@ function Presets() {
           <h3 className="keys-h"><code>{p.id}</code></h3>
           <Html as="p" html={tidy(inlineMd(p.about))} />
           <dl className="pdl"><div><dt>For</dt><Html as="dd" html={inlineMd(p.for)} /></div><div><dt>Asks for</dt><Html as="dd" html={inlineMd(p.asks)} /></div></dl>
-          <Shot id={`preset-${p.id}-dark`} />
+          <div className="shot-pair"><Shot id={`preset-${p.id}-dark`} /><Shot id={`preset-${p.id}-light`} /></div>
           <details className="whole"><summary>The whole file</summary><CodeBlock code={p.file} lang="toml" target="config" /></details>
         </div>
       ))}
@@ -189,7 +189,7 @@ function Section({ s, index }: { s: DocSection; index: number }) {
       {s.body ? <Html as="div" className="body" html={tidyParagraphs(withMarkers(s.body, numbers))} /> : null}
       {s.extra === 'install' ? <Extras s={s} /> : null}
       {s.code && !s.codeLast ? <CodeTabs code={s.code} target={(i) => (s.code![i].lang === 'toml' ? 'config' : 'command')} /> : null}
-      {s.shots?.map((id) => <Shot key={id} id={id} />)}
+      {s.shots ? <div className="shot-pair">{s.shots.map((id) => <Shot key={id} id={id} />)}</div> : null}
       {s.extra && s.extra !== 'install' ? <Extras s={s} /> : null}
       {s.after ? <Html as="div" className="body after" html={tidyParagraphs(s.after)} /> : null}
       {s.code && s.codeLast ? <CodeTabs code={s.code} target={() => 'command'} /> : null}
@@ -338,7 +338,7 @@ export function Docs({ home = '/' }: { home?: string }) {
           <div className="head"><BrandLinks /></div>
           <h1 className="title">{OPENING.head}</h1>
           <p className="sub">{OPENING.sub}</p>
-          <div className="hero-pair">
+          <div className="shot-pair hero-pair">
             {/* SHOT:landing-tabs-dark */}
             <Shot id="landing-tabs-dark" bare />
             {/* SHOT:landing-list-light */}

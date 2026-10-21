@@ -113,7 +113,7 @@ describe('screenshots', () => {
   it('cover every id the pages use', () => {
     const used = [
       ...SECTIONS.flatMap((s) => s.shots ?? []),
-      ...referenceData().presets.map((p) => `preset-${p.id}-dark`),
+      ...referenceData().presets.flatMap((p) => [`preset-${p.id}-dark`, `preset-${p.id}-light`]),
       ...walk(site('src')).flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/SHOT:([a-z0-9-]+)|<Shot id="([a-z0-9-]+)"/g)].map((m) => m[1] ?? m[2])),
     ];
     expect(used.length).toBeGreaterThan(10);
