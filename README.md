@@ -39,7 +39,8 @@ and ask in your own words: "Watch this repo in shipyard".
 Coding agents open pull requests and issues and start workflow runs, often several at once across several repositories.
 shipyard lists them in the menu bar, with what other people open, and shows one number: how many items need attention, because they are new, changed since you last opened them, waiting on your review, or failing their checks.
 It notifies you when something happens, and your agents can ping you when they need you.
-What it shows lives in one TOML file that you, or your agents, edit.
+Its settings live in one configuration file, `~/.config/shipyard/config.toml`.
+Your agents edit it for you with the shipyard skill, so you customize shipyard by asking them, or by editing the file yourself.
 
 ## Install
 
