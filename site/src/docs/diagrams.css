@@ -1,0 +1,38 @@
+/* The docs' diagrams (diagrams.tsx). Every value is a token from tokens.css: the --dg- colours are the Graphite
+   look's palette, and the --dg-type- sizes are in the diagram's own units, so they scale with it. */
+.dg .dg-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.dg .dg-svg{display:block;width:100%;height:auto;min-width:var(--dg-min);overflow:visible}
+
+.dg-stop-tile-top{stop-color:var(--dg-tile-top)}
+.dg-stop-tile-bottom{stop-color:var(--dg-tile-bottom)}
+.dg-stop-rim-top{stop-color:var(--dg-rim-top)}
+.dg-stop-rim-bottom{stop-color:var(--dg-rim-bottom)}
+.dg-stop-rim-in-top{stop-color:var(--dg-rim-in-top)}
+.dg-stop-rim-in-bottom{stop-color:var(--dg-rim-in-bottom)}
+
+.dg-node{fill:var(--dg-node);stroke:var(--dg-line);stroke-width:1}
+.dg-zone{fill:var(--dg-zone);stroke:var(--dg-zone-line);stroke-width:1;stroke-dasharray:var(--dg-zone-dash)}
+.dg-fold{fill:var(--dg-fold)}
+.dg-fold-ear{fill:var(--dg-shade)}
+.dg-chip{fill:var(--dg-fold-chip);stroke:var(--dg-fold-line);stroke-width:1}
+
+.dg-arrow{fill:none;stroke:var(--dg-muted);stroke-width:1}
+.dg-arrow.folded{stroke:var(--dg-fold)}
+.dg-arrow.dashed{stroke-dasharray:var(--dg-dash)}
+.dg-head{fill:var(--dg-muted)}
+.dg-head-fold{fill:var(--dg-fold)}
+.dg-head-shade{fill:var(--dg-shade)}
+
+.dg-tag-box{fill:none;stroke:var(--dg-line);stroke-width:1}
+.dg-tag-box.on-fold{stroke:var(--dg-fold-line)}
+.dg-tag{font:400 var(--dg-type-tag) var(--mono);letter-spacing:var(--dg-tracking-tag);fill:var(--dg-muted)}
+.dg-tag.on-fold{fill:var(--dg-fold-muted)}
+.dg-name{font:600 var(--dg-type-name) var(--sans);fill:var(--dg-ink);text-anchor:middle}
+.dg-name.on-fold{fill:var(--dg-on-fold)}
+.dg-sub{font:400 var(--dg-type-sub) var(--mono);fill:var(--dg-muted);text-anchor:middle}
+.dg-sub.on-fold{fill:var(--dg-fold-muted)}
+.dg-chip-n{font:400 var(--dg-type-sub) var(--mono);fill:var(--dg-fold-muted);text-anchor:middle}
+.dg-chip-t{font:500 var(--dg-type-chip) var(--sans);fill:var(--dg-on-fold);text-anchor:middle}
+.dg-eyebrow{font:400 var(--dg-type-label) var(--mono);letter-spacing:var(--dg-tracking-label);fill:var(--dg-soft)}
+.dg-label{font:400 var(--dg-type-label) var(--mono);letter-spacing:var(--dg-tracking-label);fill:var(--dg-muted)}
+.dg-callout{font:400 var(--dg-type-callout) var(--sans);fill:var(--dg-muted)}

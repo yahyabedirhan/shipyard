@@ -20,6 +20,8 @@ export interface DocSection {
   notes: string[];
   /** Code shown under the prose, one block or a tab per snippet. */
   code?: Snippet[];
+  /** An explanatory diagram from diagrams.tsx, shown under the prose. */
+  diagram?: 'how-it-works' | 'config-loop' | 'pings';
   /** Screenshot ids from shots.json, shown under the code. */
   shots?: string[];
   extra?: 'install' | 'presets' | 'layouts' | 'explorer' | 'pings' | 'config' | 'commands' | 'limits' | 'troubleshooting' | 'changelog';
@@ -46,6 +48,7 @@ export const SECTIONS: DocSection[] = [
       'Clicking an item opens it on GitHub and clears its attention until it changes again. Closed items never need attention.',
       'There is no settings window. The file is the whole interface for settings, and each save applies at once.',
     ],
+    diagram: 'how-it-works',
   },
   {
     id: 'install', title: 'Install', nav: 'Install',
@@ -134,6 +137,7 @@ export const SECTIONS: DocSection[] = [
       'The Set up /shipyard skill view shows whether the skill is installed, and its <b>Update</b> runs the same command for the newest version.',
       'After each save the app writes its verdict to <code>~/Library/Application Support/Shipyard/config-status.json</code>, so the agent knows whether the app took the edit.',
     ],
+    diagram: 'config-loop',
     code: [
       { label: 'Install', lang: 'sh', code: INSTALL.skill },
       { label: 'Check an edit', lang: 'sh', code: 'shipyard config check\ntaplo check ~/.config/shipyard/config.toml' },
@@ -148,6 +152,7 @@ export const SECTIONS: DocSection[] = [
       'shipyard reaches another machine only through Herdr\'s connection to it, never over SSH of its own, and the file names a label, never a host or an address.',
       'A machine that doesn\'t answer shows a quiet line in the menu and keeps its last pings until it answers again.',
     ],
+    diagram: 'pings',
     code: [
       { label: 'On the machine', lang: 'sh', code: INSTALL.plugin },
       { label: 'config.toml', lang: 'toml', code: '[remote]\nmachines = ["build-box"]' },

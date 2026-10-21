@@ -158,3 +158,40 @@
   --quick:.15s;
 }
 @media (max-width:1180px){:root{--mar:200px;--g1:48px;--nav:160px;--col:520px}}
+
+/* the docs' diagrams, in the Graphite look: folded white paper on a dark granite tile, as the logo is drawn */
+:root{
+  --dg-tile-top:#222529;
+  --dg-tile-bottom:#131417;
+  --dg-node:#222529;
+  --dg-ink:#e4e6e9;
+  --dg-muted:#8b9097;
+  --dg-soft:#6b7078;
+  --dg-line:rgba(255,255,255,.16);
+  --dg-zone:rgba(255,255,255,.03);
+  --dg-zone-line:rgba(255,255,255,.12);
+  --dg-fold:#ffffff;
+  --dg-shade:#b9bec4;
+  --dg-on-fold:#131417;
+  --dg-fold-muted:#4f545b;
+  --dg-fold-chip:#f1f2f4;
+  --dg-fold-line:rgba(19,20,23,.16);
+  --dg-rim-top:rgba(255,255,255,.32);
+  --dg-rim-bottom:rgba(255,255,255,.08);
+  --dg-rim-in-top:rgba(255,255,255,.14);
+  --dg-rim-in-bottom:rgba(255,255,255,.03);
+
+  /* sizes in the diagram's own units, which scale with it */
+  --dg-type-name:14px;
+  --dg-type-sub:10.5px;
+  --dg-type-tag:8.5px;
+  --dg-type-label:9px;
+  --dg-type-chip:12px;
+  --dg-type-callout:12px;
+  --dg-tracking-tag:.1em;
+  --dg-tracking-label:.08em;
+  --dg-dash:4 3;
+  --dg-zone-dash:3 4;
+  /* the narrowest a diagram draws before it scrolls inside its box */
+  --dg-min:480px;
+}

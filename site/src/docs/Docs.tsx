@@ -5,6 +5,7 @@ import { ASK_AGENT, CHANGELOG, HERDR_PLUGIN, INSTALL, LICENSE, LINE, NAME, PERSO
 import { inlineMd, type KeyGroup } from '../reference/parse';
 import { CodeBlock, CodeTabs } from './CodeBlocks';
 import { GROUPS, INSTALL_WAYS, LIMITS, QUESTIONS, SECTIONS, byId, type DocSection } from './content';
+import { DIAGRAMS } from './diagrams';
 import { ConfigExplorer, SAILBOAT, Shot } from './figures';
 import { tidy, tidyParagraphs, withMarkers } from './text';
 import './docs.css';
@@ -182,11 +183,13 @@ function Extras({ s }: { s: DocSection }) {
 
 function Section({ s, index }: { s: DocSection; index: number }) {
   const numbers = NOTE_NUMBERS[s.id];
+  const Figure = s.diagram ? DIAGRAMS[s.diagram] : null;
   return (
     <section className="sec" id={s.id} aria-labelledby={`h-${s.id}`}>
       <h2 className="sec-h" id={`h-${s.id}`}><a href={`#${s.id}`}>{s.title}</a><span className="n">{pad(index)}</span></h2>
       <Html as="p" className="lede" html={tidy(s.lede)} />
       {s.body ? <Html as="div" className="body" html={tidyParagraphs(withMarkers(s.body, numbers))} /> : null}
+      {Figure ? <Figure /> : null}
       {s.extra === 'install' ? <Extras s={s} /> : null}
       {s.code && !s.codeLast ? <CodeTabs code={s.code} target={(i) => (s.code![i].lang === 'toml' ? 'config' : 'command')} /> : null}
       {s.shots ? <div className="shot-pair">{s.shots.map((id) => <Shot key={id} id={id} />)}</div> : null}
