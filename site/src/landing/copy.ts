@@ -6,7 +6,7 @@ export const WHAT = 'Your pull requests, issues, workflow runs, pings from your 
 /** The two uses, as equals, as the messaging kit asks. */
 export const WHO = 'For people whose coding agents work on their projects, and for maintainers who review what other people open.';
 
-export const HOW = 'Click any item to open it. To change what you see, just ask your agent. Your agents can also message you when they need your input.';
+export const HOW = 'shipyard signs in to GitHub through the GitHub CLI, `gh`, or Sign in with GitHub, and reads your notes from Notion through its CLI, `ntn`. Your agents talk to you through the `shipyard` command, and change what you see when you ask them. Click any item to open it.';
 
 export const FACTS: [string, string][] = [
   ['Runs on', 'macOS 14 or later'],

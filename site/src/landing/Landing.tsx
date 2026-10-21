@@ -58,7 +58,7 @@ export function Landing() {
         <div className="vd-cols">
           <div><h2>What</h2><p>{WHAT}</p></div>
           <div><h2>Who</h2><p>{WHO}</p></div>
-          <div><h2>How</h2><p>{HOW}</p></div>
+          <div><h2>How</h2><p dangerouslySetInnerHTML={{ __html: inlineMd(HOW) }} /></div>
         </div>
         <div className="vd-row">
           <div className="vd-install"><Install /><Agent /><Paths /></div>
