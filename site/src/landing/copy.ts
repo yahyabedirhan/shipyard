@@ -11,7 +11,7 @@ export const HOW = 'Click a row to open it on GitHub. Tell your agent what to sh
 export const FACTS: [string, string][] = [
   ['Runs on', 'macOS 14 or later'],
   ['Works with', 'GitHub, signed in as you'],
-  ['Configuration', 'one TOML file'],
+  ['Configuration', 'Agent-first customization'],
   ['Command', '`shipyard`, also on Linux'],
   ['License', 'Apache 2.0'],
 ];
