@@ -2563,22 +2563,195 @@ Outside a `.app` bundle (`make run`) it only logs.
 
 ### MenuModel — `ShipyardCore/Menu/MenuModel.swift`
 
-Pure: `build(listings:snapshot:configuration:state:expanded:now:) -> MenuModel`: sections per project in configuration order, built from the projects' listings, the snapshot giving only the error rows and when it was fetched (without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`); so does a project the snapshot has no entry for, one added to the configuration since it was fetched), the items `Listing` lists (kind shown, states, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), drafts, `authors`), each section's `groups: [RowGroup]` as `Arrangement` groups, sorts and caps them (the defaults, `group-by = "kind"` and `sort-by = "updated"`, give the old order: pull requests, then issues, then runs, open or running first; `expanded` holds the groups Show more revealed past their cap), each row with its number, title (a run: its workflow's name), author, URL, semantic state (open, draft, merged, closed, running, succeeded, failed; the app's `ThemeColor.state(_:kind:)` colours it by kind: an issue's closed takes `state.merged`, a pull request's `state.closed`), `branch` (runs only), check dot (open and draft PRs only), `since` for its age (opened or started, or closed or finished), its `needsAttention` flag and the `item` it shows (marking it seen records that version); an error row per repository with a failed source of a kind the project shows (one row per repository, so a runs failure isn't shown where runs are off); each section's `showsRepository` (true only when its project has more than one repository, so a row's second line names the repository only there); `lastUpdated` and `fetchError` for the banner, and `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused (the pause banner already says why); `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget; plus, from attention, each section's `attentionCount` (what Mark all seen covers and a project's tab counts), its `headerCounts: [HeaderCount]` (#210: the list header's chips, one per kind `[menu] header-counts` lists (#211; all five by default) that this section has a row of (hidden and folded rows too; a kind at 0 has no chip, whatever other sections hold), always in `headerCountOrder` (pull requests, issues, workflow runs, pings, notes) whatever the file's order (`headerCountKinds`), each with `kind`, `count` (every row of that kind: shown, behind Show more, in folded subsections, closed ones in their window) and `needsAttention` (any of its rows needs attention; never notes), so the view counts nothing) and `isCollapsed` (a collapsed section keeps its rows and still counts), the model's `attention: AttentionCounts` and the `layout` (`list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel), the `menuBarLabel` (`total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0; `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count). After the projects come the remote machines' own sections (`machineSections`, 0.0.6): one per machine in `[remote] machines` whose listing has rows, named after its label, arranged with the defaults, with `machine` set to the label (`nil` on a project's section). A row's `machine` names the machine a remote ping came from; `PanelText.rowDetail` puts it first on a ping's second line after its number ("#2 · beta-vps · claude · …") and `PanelText.pingMeta` gives the list layout's meta column the same. The menu bar count, each header's chips and the tabs' counts are of listed items only. `applyAttention(_:configuration:)` recomputes just those, and each subsection's fold from `collapsedGroups`, so a click, a collapse or a fold updates the model without a refresh; `applyExpansions(_:configuration:)` re-caps the groups for Show more and Show less, and `foldsToKeep(_:)` drops the folds of groups or projects that are gone. All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+The pure model the panel draws.
+All of R3–R6's display rules live here, where tests can reach them without SwiftUI.
+
+#### Operations
+
+- `build(listings:snapshot:configuration:state:expanded:now:) -> MenuModel` is pure.
+  It gives one section per project in configuration order, built from the projects' listings.
+  The snapshot gives only the error rows and when it was fetched.
+- `applyAttention(_:configuration:)` recomputes just the attention counts (the menu bar count, each header's chips and the tabs' counts), and each subsection's fold from `collapsedGroups`.
+  So a click, a collapse or a fold updates the model without a refresh.
+- `applyExpansions(_:configuration:)` re-caps the groups for Show more and Show less.
+- `foldsToKeep(_:)` drops the folds of groups or projects that are gone.
+
+#### State
+
+Each project's section holds:
+
+- The items `Listing` lists: kind shown, states, the kind's own closed window counted back from `now` with 0 hiding closed items (runs: finished ones within `finished-window-hours`, running ones always), drafts and `authors`.
+- `groups: [RowGroup]`, as `Arrangement` groups, sorts and caps them.
+  The defaults, `group-by = "kind"` and `sort-by = "updated"`, give the old order: pull requests, then issues, then runs, open or running first.
+  `expanded` holds the groups Show more revealed past their cap.
+- An error row per repository with a failed source of a kind the project shows.
+  There is one row per repository, so a runs failure isn't shown where runs are off.
+- `showsRepository`, true only when its project has more than one repository, so a row's second line names the repository only there.
+- `attentionCount`, from attention: what Mark all seen covers and a project's tab counts.
+- `headerCounts: [HeaderCount]` (#210): the list header's chips, so the view counts nothing.
+  - One chip per kind `[menu] header-counts` lists (#211; all five by default) that this section has a row of, hidden and folded rows too.
+    A kind at 0 has no chip, whatever other sections hold.
+  - Always in `headerCountOrder` (pull requests, issues, workflow runs, pings, notes), whatever the file's order (`headerCountKinds`).
+  - Each with `kind`, `count` (every row of that kind: shown, behind Show more, in folded subsections, closed ones in their window) and `needsAttention` (any of its rows needs attention; never notes).
+- `isCollapsed`: a collapsed section keeps its rows and still counts.
+
+Without a snapshot, before any refresh succeeded, every project still gets a section, with no rows and `isLoaded` false, which the panel shows as "Not loaded yet" (`PanelText.emptySection`).
+So does a project the snapshot has no entry for, one added to the configuration since it was fetched.
+
+Each row holds:
+
+- Its number, title (a run: its workflow's name), author and URL.
+- Its semantic state: open, draft, merged, closed, running, succeeded, failed.
+  The app's `ThemeColor.state(_:kind:)` colours it by kind: an issue's closed takes `state.merged`, a pull request's `state.closed`.
+- `branch` (runs only) and the check dot (open and draft PRs only).
+- `since` for its age: opened or started, or closed or finished.
+- Its `needsAttention` flag and the `item` it shows; marking it seen records that version.
+- `machine`, which names the machine a remote ping came from.
+  `PanelText.rowDetail` puts it first on a ping's second line after its number ("#2 · beta-vps · claude · …"), and `PanelText.pingMeta` gives the list layout's meta column the same.
+
+The model as a whole holds:
+
+- `lastUpdated` and `fetchError` for the banner.
+- `bannerFetchError`, which leaves out a rate-limit error while refreshing is paused, since the pause banner already says why.
+- `refreshDelay` (configured, stretched, backed off or paused, with the API and why), `rateIndicator` and `canRefreshNow`, which `Shipyard` fills in from the rate budget.
+- `attention: AttentionCounts`.
+- `layout`: `list` or `tabs`, per `[menu] layout`, rebuilt with the model so a configuration change switches the open panel.
+- `menuBarLabel`: `total(n)`, `perKind(counts)` or `hidden`, per `[menu-bar] count`, with its text, e.g. "3" or "2 PRs · 1 run", `nil` at 0.
+  `Shipyard` hides it outside `ready`, so a menu without projects or signed out shows no count.
+- `machineSections` (0.0.6), after the projects: one per machine in `[remote] machines` whose listing has rows, named after its label, arranged with the defaults, with `machine` set to the label (`nil` on a project's section).
+
+#### Rules
+
+- The menu bar count, each header's chips and the tabs' counts are of listed items only.
 
 ### PanelBanner and BannerSnoozes — `ShipyardCore/Menu/PanelBanner.swift`, `BannerSnoozes.swift` (#220)
 
-`PanelBanner` is one banner above the projects: `id` (its banner key, which names the condition, never its words), `kind` (the panel picks the symbol and tint by it) and `text` (`PanelText`'s words). `PanelBanner.list(lease:configError:configWarnings:ready:menu:notes:notificationsOff:)` gives every banner whose condition holds, in the panel's order: the configuration error, its warnings, then once ready the refresh delay (`delay` while backed off, or `paused` while refreshing can't run; none for an interval only stretched to stay within the share, #224), the fetch error, one `machine-<machine>` line per `MenuModel.machineNotices` and the `notes` banner when a `NotesNotice` is given (NT10, ADR 0011); then `notifications`. Before them all, in every phase, come the lease's banners from `PanelBanner.Lease`, which the app hands over: `lease` while an agent holds it (its words the headline; the panel draws it from the lease, with its countdown and Stop) and a `stopped-<holder key>` quiet line per stopped holder still barred (kind `stoppedHolder(key:)`, for its Allow). Every banner is dismissable. `opens` (#242) names the status view (`SetupPart`) a banner's **Open…** (`PanelText.openBannerView`) opens: `.notion` for the `notes` banner; nil, no Open…, for every other banner, the `fetch` banner included for every error (#247). A rejected token (`.unauthorized`) signs out at once (`Shipyard.request`), which leaves the `ready` phase and shows the signed-out onboarding view with the GitHub steps, so its banner has no Open… of its own. The panel's Open… sets `PanelState.openView`, as the settings menu's items do.
+The banners above the projects, and the snoozes that hide them for a while.
 
-`BannerSnoozes` is pure, given the time on each call: `ends`, by banner key, when each snooze ends. `snooze(key, at:, for:)` hides a key for the given length (`[banners] snooze-duration`, one hour by default); `shown(banners, at:)` leaves out those snoozed at that time; `endsAfter(now)` lists the ends still to come, soonest first; `follow(current:at:)` drops the snooze of each key not current (its condition stopped) and each that ended; `clear(key)` drops one, for a lease handed straight to the next holder. Since #221 it's kept in `AppState.bannerSnoozes` and saved in `state.json` under `bannerSnoozes`, as each banner key with when its snooze ends; optional when read (an older file loads with none, no version bump), and a snooze that can't be read is skipped. `dismissBanner` and `followBannerConditions()` change it through `changeBannerSnoozes(_:)`, which sets `Shipyard`'s observed copy (the store isn't observed, so this is what redraws the panel on a dismissal) and saves it through `AppStateStore.update`, so a dismissal saves it and a snooze that ended or whose condition stopped leaves the file.
+#### State
 
-After a restart, a loaded snooze waits until this launch has looked at its condition before a missing condition clears it (`restoredSnoozes`, `bannerConditionIsKnown`): `delay`, `paused` and `fetch` once a refresh has ended, `machine-<machine>` once that machine's poll answered or failed, `notifications` once the notifier set `notificationsAreOff`, and every other key once `start()` has read the configuration: `lease` and `stopped-<holder key>` among them, since a relaunch keeps no stopped holder and a lease it was handed over shows its banner again (a new `lease` value clears the `lease` snooze). Without it the sign-in's phase change, before the first refresh, would clear a valid snooze. A snooze whose hour ended is cleared at once. A machine no longer configured is never looked at, so its snooze lasts out its hour.
+- `PanelBanner` is one banner above the projects:
+  - `id`: its banner key, which names the condition, never its words.
+  - `kind`: the panel picks the symbol and tint by it.
+  - `text`: `PanelText`'s words.
+  - `opens` (#242): the status view (`SetupPart`) a banner's **Open…** (`PanelText.openBannerView`) opens.
+    It is `.notion` for the `notes` banner, and nil, with no Open…, for every other banner, the `fetch` banner included for every error (#247).
+- `BannerSnoozes` is pure, given the time on each call: `ends`, by banner key, when each snooze ends.
+  - Since #221 it's kept in `AppState.bannerSnoozes` and saved in `state.json` under `bannerSnoozes`, as each banner key with when its snooze ends.
+  - It's optional when read: an older file loads with none, with no version bump.
+  - A snooze that can't be read is skipped.
 
-The flow: a refresh, a poll, a reload, the notifier or the lease indicator changes a condition → `Shipyard.followBannerConditions()` clears the snoozes of conditions that stopped → the panel draws `Shipyard.banners(at:)` inside a `TimelineView` over `bannerSnoozeEnds`, so a banner whose snooze ends while the panel is open slides back in then, without a refresh; it draws for now, not for the schedule's first date, which SwiftUI hands a draw before any entry is due (`Panel.bannerDate`, #227) → its ✕ calls `dismissBanner(key)` and the banner slides out. Owner test: `BannerSnoozeTests` (`Harness`, manual clock).
+#### Operations
+
+`PanelBanner.list(lease:configError:configWarnings:ready:menu:notes:notificationsOff:)` gives every banner whose condition holds, in the panel's order:
+
+1. The configuration error.
+2. Its warnings.
+3. Once ready:
+   - the refresh delay: `delay` while backed off, or `paused` while refreshing can't run; none for an interval only stretched to stay within the share (#224);
+   - the fetch error;
+   - one `machine-<machine>` line per `MenuModel.machineNotices`;
+   - the `notes` banner when a `NotesNotice` is given (NT10, ADR 0011).
+4. Then `notifications`.
+
+Before them all, in every phase, come the lease's banners from `PanelBanner.Lease`, which the app hands over:
+
+- `lease` while an agent holds it.
+  Its words are the headline; the panel draws it from the lease, with its countdown and Stop.
+- A `stopped-<holder key>` quiet line per stopped holder still barred, of kind `stoppedHolder(key:)`, for its Allow.
+
+`BannerSnoozes` operations:
+
+- `snooze(key, at:, for:)` hides a key for the given length: `[banners] snooze-duration`, one hour by default.
+- `shown(banners, at:)` leaves out those snoozed at that time.
+- `endsAfter(now)` lists the ends still to come, soonest first.
+- `follow(current:at:)` drops the snooze of each key not current (its condition stopped) and each that ended.
+- `clear(key)` drops one, for a lease handed straight to the next holder.
+- `dismissBanner` and `followBannerConditions()` change it through `changeBannerSnoozes(_:)`.
+  That sets `Shipyard`'s observed copy, which is what redraws the panel on a dismissal, since the store isn't observed.
+  It also saves it through `AppStateStore.update`, so a dismissal saves it and a snooze that ended or whose condition stopped leaves the file.
+
+#### Rules
+
+- Every banner is dismissable.
+- A rejected token (`.unauthorized`) signs out at once (`Shipyard.request`).
+  That leaves the `ready` phase and shows the signed-out onboarding view with the GitHub steps, so its banner has no Open… of its own.
+- The panel's Open… sets `PanelState.openView`, as the settings menu's items do.
+- After a restart, a loaded snooze waits until this launch has looked at its condition before a missing condition clears it (`restoredSnoozes`, `bannerConditionIsKnown`):
+  - `delay`, `paused` and `fetch` once a refresh has ended;
+  - `machine-<machine>` once that machine's poll answered or failed;
+  - `notifications` once the notifier set `notificationsAreOff`;
+  - every other key once `start()` has read the configuration: `lease` and `stopped-<holder key>` among them, since a relaunch keeps no stopped holder and a lease it was handed over shows its banner again (a new `lease` value clears the `lease` snooze).
+- Without that wait, the sign-in's phase change, before the first refresh, would clear a valid snooze.
+- A snooze whose hour ended is cleared at once.
+- A machine no longer configured is never looked at, so its snooze lasts out its hour.
+
+#### Flow
+
+1. A refresh, a poll, a reload, the notifier or the lease indicator changes a condition.
+2. `Shipyard.followBannerConditions()` clears the snoozes of conditions that stopped.
+3. The panel draws `Shipyard.banners(at:)` inside a `TimelineView` over `bannerSnoozeEnds`, so a banner whose snooze ends while the panel is open slides back in then, without a refresh.
+   It draws for now, not for the schedule's first date, which SwiftUI hands a draw before any entry is due (`Panel.bannerDate`, #227).
+4. Its ✕ calls `dismissBanner(key)` and the banner slides out.
+
+#### Tests
+
+- Owner test: `BannerSnoozeTests` (`Harness`, manual clock).
 
 ### Arrangement — `ShipyardCore/Menu/Arrangement.swift` (0.0.2)
 
-Pure: `groups(items, project, settings: ArrangementSettings, layout, folded: Set<GroupID>, expanded: Set<GroupID>, now, calendar) -> [RowGroup]` groups by `group-by` (one untitled group for `none`, with no header), sorts each group (open first, then `sort-by`, then the order given), marks folds, and caps unexpanded groups at `show-first` (`RowGroup.capped(at:expanded:)`, which `MenuModel.applyExpansions` also calls to re-cap in place). `RowGroup`: `id` (project + key), `title` ("Pull requests", "owner/name", "Today", "@login"), `rows` (the ones drawn), `hiddenRows` (the ones past the cap, still the group's: `allRows` is both, and `MenuSection.rows`, which the counts, Mark all seen and the All tab read, is every group's `allRows`), `attentionCount` (of every row, capped or not), `showsHeader` (`subsections`, or the layout's own when unset: dividers in the list, subheaders in a tab), `isFolded`, `hiddenCount`, `isExpanded` (past a cap it has), `hasShowMore` (a cap to toggle: drawn as a `ShowMoreRow` after the rows unless folded). Group order: kinds in today's order; repositories and authors A to Z (ignoring case); dates newest first. A group's key is a `GroupKey` (`kind`, `repository`, `date(DateBucket)`, `author`, `sender` (a ping's `--from` under `group-by = "author"`, titled as written, after the authors, #100), `ungrouped`); `GroupID` is the project's name and that key. The date buckets count calendar days back from `now` (Today, Yesterday, the week so far, the month so far, Older) by `sort-by`'s date: `createdAt` for `created`, else `updatedAt` (a closed item's `closedAt`). The rows come without attention flags, which `applyAttention` sets on each group's rows along with its `attentionCount`; an internal variant arranges rows that already carry them. `applyAttention` also sets each subsection's `isFolded` from `collapsedGroups`, so a fold needs no refresh, and keeps them as the model's `foldedGroups`, which the All tab (its groups' project is empty) is arranged with. `MenuTabs` uses the section's groups for a project's tab; the All tab arranges its rows with fixed settings (kind, updated, subheaders, no cap). The layouts draw a group with `showsHeader` under a `GroupHeader` (a chevron, its title, a kind or a date in capitals, and its row count, folded or not; a click folds or unfolds it, and a folded group draws its subheader alone), and any other group but the first after a `GroupDivider` line (`Components+Groups.swift`). `RowHighlight`'s places gain `groupHeader(GroupID)` and `showMore(GroupID)`, so ↑ and ↓ stop there, ← and → fold a subsection, Return on a subheader folds or unfolds it, and Return toggles Show more (`MenuListTarget.showMore`, `MenuTabContent.showMoreGroup(at:)`); ← on a Show more row goes to its subheader, or its project's header after a divider. Group titles, date bucket names and "Show 3 more" / "Show less" are in `PanelText+Groups.swift`.
+Groups, sorts, folds and caps a section's rows.
+
+#### Operations
+
+- `groups(items, project, settings: ArrangementSettings, layout, folded: Set<GroupID>, expanded: Set<GroupID>, now, calendar) -> [RowGroup]` is pure.
+  - It groups by `group-by`: one untitled group for `none`, with no header.
+  - It sorts each group: open first, then `sort-by`, then the order given.
+  - It marks folds.
+  - It caps unexpanded groups at `show-first` (`RowGroup.capped(at:expanded:)`, which `MenuModel.applyExpansions` also calls to re-cap in place).
+- The rows come without attention flags, which `applyAttention` sets on each group's rows along with its `attentionCount`; an internal variant arranges rows that already carry them.
+- `applyAttention` also sets each subsection's `isFolded` from `collapsedGroups`, so a fold needs no refresh.
+  It keeps them as the model's `foldedGroups`, which the All tab (its groups' project is empty) is arranged with.
+
+#### State
+
+`RowGroup` holds:
+
+- `id`: project + key.
+- `title`: "Pull requests", "owner/name", "Today", "@login".
+- `rows`: the ones drawn.
+- `hiddenRows`: the ones past the cap, still the group's.
+  `allRows` is both, and `MenuSection.rows`, which the counts, Mark all seen and the All tab read, is every group's `allRows`.
+- `attentionCount`: of every row, capped or not.
+- `showsHeader`: `subsections`, or the layout's own when unset: dividers in the list, subheaders in a tab.
+- `isFolded`, `hiddenCount`, and `isExpanded` (past a cap it has).
+- `hasShowMore`: a cap to toggle, drawn as a `ShowMoreRow` after the rows unless folded.
+
+A group's key is a `GroupKey`: `kind`, `repository`, `date(DateBucket)`, `author`, `sender` (a ping's `--from` under `group-by = "author"`, titled as written, after the authors, #100) or `ungrouped`.
+`GroupID` is the project's name and that key.
+
+#### Rules
+
+- Group order: kinds in today's order; repositories and authors A to Z (ignoring case); dates newest first.
+- The date buckets count calendar days back from `now` (Today, Yesterday, the week so far, the month so far, Older) by `sort-by`'s date: `createdAt` for `created`, else `updatedAt` (a closed item's `closedAt`).
+- `MenuTabs` uses the section's groups for a project's tab.
+  The All tab arranges its rows with fixed settings: kind, updated, subheaders, no cap.
+
+#### Drawing and keys
+
+- The layouts draw a group with `showsHeader` under a `GroupHeader`: a chevron, its title, a kind or a date in capitals, and its row count, folded or not.
+  A click folds or unfolds it, and a folded group draws its subheader alone.
+- They draw any other group but the first after a `GroupDivider` line (`Components+Groups.swift`).
+- `RowHighlight`'s places gain `groupHeader(GroupID)` and `showMore(GroupID)`, so ↑ and ↓ stop there.
+  ← and → fold a subsection, Return on a subheader folds or unfolds it, and Return toggles Show more (`MenuListTarget.showMore`, `MenuTabContent.showMoreGroup(at:)`).
+  ← on a Show more row goes to its subheader, or its project's header after a divider.
+- Group titles, date bucket names and "Show 3 more" / "Show less" are in `PanelText+Groups.swift`.
+
 ### UI — `ShipyardApp/UI/`
+
+The SwiftUI views of the panel.
+
+#### Panel tree
 
 SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
 
@@ -2678,31 +2851,355 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               (amber low, red exhausted)
 ```
 
-The frame and the layouts share the theme's colours through `ThemeColor` (see Themes), `Design.swift`'s spacing `Grid` and `TypeScale`, both resolved from the theme into `\.panelScale`, `ItemSymbol`'s SF Symbol names and `Motion`, and `Components.swift`'s pieces (`MeasuredScrollView`, whose height `MeasuredHeight` (`ShipyardCore/Menu/`, pure, #94) decides: the content's measured height capped at `maxHeight`, written only when it moves by half a point or more, since a lazy stack's height estimate depends on the viewport and writing each one looped the panel's layout; `Banner`, `CountBadge`, `CommandBox` and its `CopyButton`, with `Clipboard`; a row's `StateSymbol`, `CheckDot`, `AttentionDot` and `ErrorRow`; `itemRow(…)`, which makes a layout's item row a button that opens it on click and marks it seen on ⌥-click (or the VoiceOver action), with the hover card from `PanelText.rowCard` and the row highlight, and on a ping's row a ✕ (`DismissButton`, 8 pt in the compact 16×16 icon button) while it's highlighted, which dismisses it: in the list layout just before the age column, so the age stays readable, in the tabs layout at the row's end; `MarkSeenButton`, a project's or tab's Mark all seen; the row, press, icon, pill and text button styles, the row style also pressing a subheader and Show more; the row highlight's shape, `rowHighlight(_:in:)`, and `HighlightLayer`, which tags every row inside it with its list so a composed row is lit whether or not it was tagged), so the two layouts look like one app. The list layout is tighter: `Design.swift`'s `ListGrid` (rows 2 pt and project headers 4 pt shorter than the theme's, 22 pt under Shipyard, narrower columns) and `ListType` (smaller type steps from the theme's body size, 12 pt under Shipyard), and it sets the `panelStyle` environment value to `.list`, which the shared row pieces read to pick the list's sizes; the tabs layout keeps the default, `.tabs`. The plumbing behind the highlight and the keys (`highlightable`, `clearsRowHighlight`, `rowKeys`, `RowFrames`, the focus on each open) is in `RowKeys.swift`. A layout is a view `(model: MenuModel, actions: LayoutActions)`; `LayoutActions` (`open`, `markSeen`, `dismiss`, `markAllSeen`, `toggleCollapsed`, `openRepository`, `openPage`) comes from `AppServices`, and a layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
+#### Shared pieces
 
-Each layout highlights at most one row, and keeps which one in a `RowHighlight` (`ShipyardCore/Menu/RowHighlight.swift`, pure, #44, #45). A row is known by its `MenuRowPlace`: its project in the list layout (where one item can be listed under two projects) and its row id, or, for a project's header in the list layout, `.header(project)` (no row id): headers are rows the pointer and the keys highlight like items. Rows and headers feed the pointer's enter and exit to it (`highlightable(_:_:drawsOwnHighlight:)`): an exit from a row the highlight already left changes nothing, leaving the rows clears it even if the last exit never arrived, and `keep(in:)` clears it once its row stops being listed (collapsed, refreshed away, another tab). The rows a highlight can rest on, top to bottom, are `MenuModel.listRowPlaces` (each project's header, then, while it's expanded, its groups' places) and `MenuTabContent.rowPlaces` (its groups' places); error and placeholder rows aren't among them. Since 0.0.2 a place is a `MenuRowPlace.Kind`: an item, a project's header (`.header(project)`), or a subsection's subheader (`.groupHeader(GroupID, in: section)`, the section `nil` in a tab), which the highlight rests on like a row; `RowGroup.places(in:)` gives a group's places (its subheader, then, unless folded, its rows and its Show more row, `.showMore(GroupID, in: section)`), the one seam a new stop extends. The layout draws the highlight once, behind its rows (`rowHighlight(_:in:)`): one shape placed at the highlighted row's bounds (read from anchor preferences) that glides to the next row, rather than a shape matched between rows, which a lazy stack's recycled rows made jump. Tabs list a row at the same place, and while the list slides from one tab to the next both tabs are on screen, so a tab's rows are marked with `rowList(tab)` and what they report (bounds and spans) is keyed by `RowSlot` (the tab and the place); the tabs layout draws the highlight outside the sliding lists, for the selected tab's slots only, so the outgoing tab isn't lit and the shape fades in on the new tab. A project header pins over the rows, so it draws its own highlight on its background instead. Error rows and placeholders call `pointerLeftRows()` when the pointer enters them (`clearsRowHighlight(_:)`), so a row whose exit was lost doesn't stay lit.
+The frame and the layouts share these, so the two layouts look like one app:
 
-The keys drive the same highlight (#45), so the pointer and the keys can't disagree; every rule is in `RowHighlight` and `RowScroll` and tested there. `rowKeys(_:places:in:pinnedHeader:scroll:left:right:dismiss:activate:)` (`RowKeys.swift`) goes on each layout's scrolling list. ↑ and ↓ call `moveUp(in:)` / `moveDown(in:)` with the layout's row places (the list's, or the selected tab's), which step to the previous or next place (from none: the first or the last) and wrap at the ends, like `NSMenu`. In the list layout, ← and → are `moveLeft(in:)` / `moveRight(in:)`, as in an outline: ← goes from an item to its subheader (or, in a group without one, its project's header), folds an open subheader, goes from a folded one to its project's header, and collapses an expanded header; → expands a collapsed header and goes from an expanded one to what's first under it, unfolds a folded subheader and goes from an open one to its first item; they return the `MenuFold` (collapse or expand a project, fold or unfold a group) the layout passes to `toggleCollapsed` or `toggleGroup`. In the tabs layout, ← and → on a subheader fold and unfold it (`moveLeft(in:)` / `moveRight(in:)` with the tab's content; → on an open one goes to its first item); anywhere else they switch to the previous or next tab (`MenuModel.tab(beside:by:)`, wrapping; provisional) and `moveToFirst(in:)` puts the highlight on the new tab's first place. Return acts on `MenuModel.listTarget(at:)` (an item, a header's project, a subheader's group, or a Show more row's group) or `MenuTabContent.row(at:)` / `subsection(at:)` / `showMoreGroup(at:)`: an item opens and is marked seen, ⌥Return only marks it seen, like a click and an ⌥-click; a header opens its project's `repositoryURL` (the first configured repository) through `openRepository`; a subheader folds or unfolds, as a click on it does; a Show more row shows the rest of its group, or as Show less caps it again; ⌥Return on a header, a subheader or a Show more row does nothing. ⌫ on a ping's row dismisses it (`dismiss`); on any other place it does nothing. An item in a folded subsection is no target. After a key the highlight stops following the pointer (`followsPointer`), so rows scrolling under a resting pointer don't take it back; it still records which row is under the pointer, and when the pointer really moves (a new location from `onContinuousHover`) `pointerMoved()` hands the highlight to that row, or to none.
+- The theme's colours through `ThemeColor` (see Themes).
+- `Design.swift`'s spacing `Grid` and `TypeScale`, both resolved from the theme into `\.panelScale`.
+- `ItemSymbol`'s SF Symbol names and `Motion`.
+- `Components.swift`'s pieces:
+  - `MeasuredScrollView`, whose height `MeasuredHeight` (`ShipyardCore/Menu/`, pure, #94) decides: the content's measured height capped at `maxHeight`, written only when it moves by half a point or more.
+    A lazy stack's height estimate depends on the viewport, and writing each one looped the panel's layout.
+  - `Banner`, `CountBadge`, `CommandBox` and its `CopyButton`, with `Clipboard`.
+  - A row's `StateSymbol`, `CheckDot`, `AttentionDot` and `ErrorRow`.
+  - `itemRow(…)`, which makes a layout's item row a button that opens it on click and marks it seen on ⌥-click (or the VoiceOver action), with the hover card from `PanelText.rowCard` and the row highlight.
+    On a ping's row it adds a ✕ (`DismissButton`, 8 pt in the compact 16×16 icon button) while it's highlighted, which dismisses it.
+    In the list layout the ✕ sits just before the age column, so the age stays readable; in the tabs layout, at the row's end.
+  - `MarkSeenButton`, a project's or tab's Mark all seen.
+  - The row, press, icon, pill and text button styles, the row style also pressing a subheader and Show more.
+  - The row highlight's shape, `rowHighlight(_:in:)`, and `HighlightLayer`, which tags every row inside it with its list so a composed row is lit whether or not it was tagged.
 
-Scrolling with the keys: the list layout is one lazy stack whose every line (a project's placeholders, error rows and item rows, each with the hairline where the kind changes) is its own child, under `Section`s whose headers pin, and each row and header carries its place as its `.id`, so `ScrollViewReader` can reach a row the lazy stack hasn't laid out. Each laid-out row reports its span in the list's visible area to a `RowFrames` (a reference in the environment, kept out of view state), under its `RowSlot` and a token for the row view, so a row view that disappears (dropped by the lazy stack, or the outgoing tab's) forgets only the span it reported itself; and `RowScroll.reveal` decides: a row in full view doesn't scroll; one past the bottom scrolls to sit on it; one above the top, or under the pinned header, scrolls to sit just below the header (a unit anchor worked out from the list's and the row's heights); one not laid out scrolls towards the way the highlight moved (up: to the top), except a header's first item after the header, which is under the header pinned at the top: just below the header. A wrap (↓ from the last row to the first, ↑ from the first to the last) scrolls straight to the list's far end in the same key press, laid out or not: to `RowListTop` or `RowListBottom`, zero-height views the layout puts above and below its rows, outside the lazy stack. The lazy stack guesses the height of rows it hasn't laid out, so the first scroll to the bottom can stop short of the last row; a `RowWrapLanding` (pure, in `RowScroll.swift`) follows the wrap: each time rows report new spans (`RowFrames.rowsMoved`), once the update is laid out, it checks the wrapped-to row and scrolls to the same end again until the row is in full view, at most four times; any key or pointer move ends it. A row the lazy stack kept but hid reports its last span again when it reappears (a wrap back to the end it came from leaves it where it was, so its geometry doesn't change and it wouldn't report otherwise). The scroll isn't animated, so a held key repeats at the system's rate and the list keeps up; only the highlight shape glides. `onKeyPress` calls the handler it had at the key-down for every repeat of that key, with that handler's copy of the modifier (its rows, and a highlight from before the first step), so the key handlers act through a reference to the modifier as last drawn (`LatestRowKeys`), along with the highlight a key set that the view hasn't been updated with yet; ↑/↓ take `.down` and `.repeat`, and ←, → and Return act once per press. A highlighted item row gets the rounded, inset shape; a highlighted project header fills its whole band, square and full width. A tab switch scrolls to the list's top (`RowListTop`, a zero-height view above the sliding lists), where the new tab's first row is: not to the row itself, which isn't laid out yet and whose id the outgoing tab's row shares.
+The list layout is tighter:
 
-Hover help (#72): the panel doesn't use macOS's native tooltips (`.help`), which come late, look dated, are cut off at the panel's edge and linger over the rows. A view with help says so with `hoverHelp(_:context:leadingInset:)` (`HoverHelp.swift`), which also gives the text to VoiceOver as the view's hint, as `.help` did; `nil` shows nothing. The panel draws the help once, with `hoverHelpHost()` on its frame: the hovered view reports its bounds and text through an anchor preference (like the row highlight's), and a card on the system's regular material, with the panel's hairline, sits under the view, or over it when there's no room below, lined up with a row's title or centred under a button, kept inside the panel. `HoverHelpPlacement` (`ShipyardCore/Menu/`, pure, tested) decides the frame, so the card never covers the view the pointer is on and the panel's edge never cuts it off; drawn at the frame, it reaches past the scroll view's clip. The context sets the timing (`HoverHelp.timing`). On the header's buttons, the account and the tabs (`toolbar`), the card shows after the pointer rests 0.5 s, at once while it's warm (just shown, or hidden less than 0.6 s ago), and glides to the next button with the highlight's spring. A row's card (`hoverHelp(_ card: RowCard, leadingInset:)`) shows the author's avatar (20 pt, SwiftUI's `AsyncImage`, at `AvatarCache`'s size; for a ping from a known agent, `RowCard.agent`, that agent's logo, `AgentMarkView`, #137) centred beside the full title as its header; under the title, a review request (amber) and failed checks (red) as tinted tags, from the row's attention reasons (new and changed get no tag; the row's attention dot says as much), then `RowCard.facts`, a line of them at a time, each an SF Symbol and a short value, coloured only where it says how things stand (added green, removed red, the review and checks by state, a running run amber). An issue with no comments has no facts line. On the item rows (`row`), which the pointer crosses on its way elsewhere, it shows after a 1 s rest, closes as the pointer leaves the row, and every row waits again, so it never follows the pointer down the list. Either way it fades when the pointer leaves and never takes the pointer. SwiftUI's own popover was the runner-up (`docs/references/macos-hover-help.md`); built as a second style and never tried, it was removed (#84). Where hover help isn't worth it there's none: a subheader's or a list section's chevron, the skill card's close button, the command box's Copy (its icon turns into a checkmark), the picker's lock; each keeps its VoiceOver label or hint. A note row and an error row wrap instead of truncating, a pull request's check dot has its words in the row's card, and a tab shows its title as help only while the title is cut off.
+- `Design.swift`'s `ListGrid`: rows 2 pt and project headers 4 pt shorter than the theme's, 22 pt under Shipyard, and narrower columns.
+- `ListType`: smaller type steps from the theme's body size, 12 pt under Shipyard.
+- It sets the `panelStyle` environment value to `.list`, which the shared row pieces read to pick the list's sizes; the tabs layout keeps the default, `.tabs`.
 
-Focus: the list takes the keyboard focus when it appears and again each time its window becomes key (`NSWindow.didBecomeKeyNotification` for the window it's in, through a zero-size `NSViewRepresentable`), because the `MenuBarExtra`'s view outlives a closed menu and focus set before the window is key is lost; so the arrows work as soon as the menu opens. The panel's window is key while the menu is open, which is what lets the list receive keys (as ⌘R and the picker's text field already do); closed, it's off screen and takes no keys, and nothing here changes when the window becomes key or the app's activation.
+The plumbing behind the highlight and the keys (`highlightable`, `clearsRowHighlight`, `rowKeys`, `RowFrames`, the focus on each open) is in `RowKeys.swift`.
 
-`ConnectView` draws `PanelText.connect(signedOutReason, canSignIn: canSignInWithGitHub)` in one shape for every state (#78): the logo (`LogoBadge`, the app icon's squircle and sailboat, #80) and a greeting ("Welcome to Shipyard" with no token or after a sign-out that left nothing signed in, "Welcome back" otherwise), a line or two on what happened, then the ways in as full-width buttons stacked in the order its `lead` gives, the main one prominent. `signIn` (no token, signed out with nothing left signed in, or the Keychain token rejected): **Sign in with GitHub** (`beginDeviceFlow()`), then a collapsed native disclosure, "Use the GitHub CLI `gh` instead", holding the `gh auth login` box (`CommandBox`) with an ⓘ beside it, whose popover gives a cli.github.com link and a copyable `brew install gh`, over **Connect with `gh`**. `ghCommand` (`gh`'s token rejected): the `gh auth login` box over Connect with `gh`, prominent, then Sign in with GitHub. `connectWithGh` (signed out while `gh` is still signed in): two blocks with a native divider between them: "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:" over Connect with `gh`, prominent, then the `alternative`, "Alternatively, sign in with GitHub, if you'd rather:", over Sign in with GitHub; no `gh auth logout`, and without a client ID no second block. With the placeholder client ID, `gh` leads (`ghCommand`, with the ⓘ when there's no token, or `connectWithGh` alone) and Sign in with GitHub is disabled with `PanelText.signInUnavailable`. Under Sign in with GitHub, `PanelText.signInFailed(signInError)` after a flow that ended without a token. Connect with `gh` (`start()`) says why (`PanelText.stillSignedOut`) under it when it leaves shipyard signed out, and isn't the default action, so Return can't undo a sign-out. Every `gh` in the words is in backticks, and the panel draws code spans monospaced on a faint chip (`CodeText`, `ShipyardApp/UI/Components.swift`, tested in `Tests/ShipyardAppTests`): SF Mono's "g" and "h" are drawn almost like SF Pro's, so the monospaced font alone left `gh` looking like the words around it. Hover help takes Markdown too (`hoverHelp(markdown:)`). In `connecting(code)` it draws `PanelText.deviceCode(code)`: the user code, large, which a click on it or on its copy icon (`CopyButton`, the command box's, here with its word "Copy" beside it) puts on the clipboard, turning the icon into a checkmark and rolling the word to "Copied" with the counts' `numericText` transition and `Motion.count` spring (the only feedback: the code has no hover help; VoiceOver hears "Copy code", then "Copied"; ten seconds after the last copy, through the button's cancellable `.task(id:)`, it turns back with the same animations, as the command box's does; a new code resets it at once), when it expires, Cancel (`cancelDeviceFlow()`) and Copy code and open GitHub, which puts the code on the clipboard before `openVerificationPage()` (the browser taking focus may close the menu; the flow goes on in `Shipyard`). While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Connect with `gh`. The header's gear menu has Sign out once signed in (not while `start()` is still connecting). `ProjectPicker` loads `suggestedRepositories()` when it appears (a failure says why, with Retry, and typing still works), checks a typed `owner/name` or link with `checkRepository(_:)` (a rejection shows its `message`), and keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure): the repositories offered (typed ones first, so one just added is in sight, then the suggestions), the chosen ones in order, and each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident). Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name. `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty. While `shipyard.presets` isn't empty (the file holds nothing but `version`), the panel shows `PresetPicker` first: a native radio group of `presets`, each with its title and summary, and for `incoming-contributions` a second one, "All my repositories (`owned`)" (the default) or "Pick repositories". Its state is a `PresetChoice` (`ShipyardCore/Onboarding/`, pure): the chosen preset, `watchesOwned`, and whether the picker comes next (`needsRepositories`). The button says so (`PanelText.presetContinue`): "Choose repositories" shows the `ProjectPicker` with a back button, whose Add calls `choosePreset(preset, projects:)` with the picked projects; "Start with …" calls it at once with none. A refusal empties `presets`, so the panel shows the plain picker. Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27). `SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation` (owned by `AppServices`, so an install goes on while the panel is closed): the offer with the command and Install, Cancel while running, then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again. `CLILinkCard`, shaped like it, draws `PanelText.cliLink(state, command:)` for the app's one `CLILink` (owned by `AppServices`, its CLI `Contents/Helpers/shipyard` in `Bundle.main`, its home the user's): it calls `check()` each time it appears, since the user may have linked it by hand, then the offer with the command and Link, linked (with the PATH reminder), something in the way or a failure (each with the command, a Copy button and Try again), or no CLI to link.
+A layout is a view `(model: MenuModel, actions: LayoutActions)`.
+`LayoutActions` (`open`, `markSeen`, `dismiss`, `markAllSeen`, `toggleCollapsed`, `openRepository`, `openPage`) comes from `AppServices`.
+A layout reads the time for ages from the `panelNow` environment value the panel's 30 s timeline sets.
 
-`StatusView` (#238) draws a part's status view from one model, `PanelText.StatusPage`, in `ConnectView`'s shape: the ‹ Back row (`PanelText.back`), then the part's badge (`SetupBadge`, #249) and its title, the lead line on what the part is for, the status line with its tone's icon (set up, something to fix, or neither), a line on what to do, what a command printed (the skill install's output), each command in a `CommandBox` with its copy button, the primary full-width button, and the page's `alternatives` in order, each under its own divider (a line, its commands, an optional button). A button names a `StatusPage.Action`, which `StatusView` runs (`linkCLI`: `CLILink.makeLink`; `installSkill` and `cancelSkillInstall`: `SkillInstallation.start` and `cancel`, Cancel with the running install's spinner beside it; `checkNotion`, `connectNotion`, which also shows the projects again, and `disconnectNotion`: the `Shipyard` operations, #241; `signOut`: `Shipyard.signOut()`, the settings menu's Sign out, #240); each part's page and its look-again on appearing (`CLILink.check`, `SkillDetector.check`; `Shipyard.checkNotion()`, the one ntn run before Connect with ntn) are picked there, so a later part adds a page function, its actions and a `SetupStatus` field. The settings menu marks a part from `SetupStatus`, which `Panel` fills (the CLI from `CLILink.state`, the skill from `SkillDetector.isInstalled`, each looked at again each time the panel opens, and the skill again when an install ends, from the view or onboarding's card; Notion from `Shipyard.notionIsSetUp`; GitHub from `Shipyard.gitHubConnection`, #240). The GitHub view (#240) draws `PanelText.gitHubStatus(gitHubConnection)` while signed in: three segments, as the Notion view's: the account and how it connected; under a divider, what signing out stops and a **Sign out** button (`signOut`, the menu's Sign out, which stays in the menu too); and, for a `gh` token only, under another divider, that signing out leaves `gh` signed in, with `gh auth logout` in a command box and no button. After Sign out there's no connection, so the view shows `ConnectView`; signed out (no connection: signed out, the device flow's code, or `start()` still asking), it draws `ConnectView` under ‹ Back in place of a page, so the signed-out view's words and ways in live in one place. `SetupBadge(part:side:)` (#249) draws the Shipyard Skill's and the Shipyard CLI's badge as `LogoBadge`, and GitHub's and Notion's as the maker's mark on a tile of the same squircle (`LogoShape.squircle`, the clip and fill both, so the corners match), 32 pt square in every view: GitHub's white Invertocat on `#24292F`, Notion's black cube on white, the mark's 24-unit box at 66 % and 64 % of the side, centred, and a 0.5 pt hairline inside the edge (white at 10 % on GitHub's, black at 12 % on Notion's) so each tile holds its shape on the panel in both modes. The colours are fixed in light and dark, as `LogoBadge`'s are. `SetupBadge.mark(for:)` loads the mark from `Resources/ServiceLogos/` (`make service-logos`) as a template image, cached, through `AgentLogoImage.resources`; nil for the skill and the CLI. The signed-out GitHub view keeps `ConnectView`'s own `LogoBadge`. Sources and terms: `docs/references/service-icons.md`. Tests: `ServiceLogoTests` (`Tests/ShipyardAppTests/`), both marks loading from the app's resources.
+#### Row highlight
 
-The words the panel shows (a row's age and second line ("#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name; the repository after the number only when the project has more than one, named without its owner by `repositoryName`), a row's hover card in either layout (`PanelText.rowCard`, only what the row doesn't show: the author's avatar and full title; a pull request's branches, size, review and checks; comments and when it last changed; a run's title, what started it, who and how long it ran; a review request and failed checks, from `Attention.reasons`; each fact in words for VoiceOver through `PanelText.fact`), the header buttons' hover help, a list section's VoiceOver hint, a state's word and the state icon's VoiceOver label, the header (the account's "@handle", its hover text and VoiceOver label, "Shipyard" until the account is known, "3 need attention"), the Mark all seen buttons, "Last updated 5 min ago", the configuration error and warnings, fetch error, refresh-delay and notifications-off banners, the rate-limit lines, the connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card, the CLI link card) come from `PanelText` in `ShipyardCore/Menu/` (one file for the menu, one per onboarding screen, the skill card and the CLI link card), so they're tested with the menu model. The app wires the core in `AppServices` (`ShipyardApp.swift`): `ConfigurationWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`, opening the panel only rereads the notification permission (it doesn't refresh), ⌘R is the header's Refresh button (`refreshNow()`, which also creates a missing configuration file), and `layoutActions` hands the layouts their `LayoutActions`. `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation` and the `CLILink`. `AppServices` also holds the `AvatarCache` (in `Application Support/Shipyard/Avatar/`) the header's account draws from. Opening something elsewhere (a row's `open`, a notification's item, the header's account through `openProfile()`, "Open configuration file") then calls `closeMenu()`, which closes the menu the way a click on its icon does, through the status item (SwiftUI has no dismiss for a `.window` `MenuBarExtra`); ⌥-click, collapse, tab switches and Mark all seen leave it open (#39).
+Each layout highlights at most one row, and keeps which one in a `RowHighlight` (`ShipyardCore/Menu/RowHighlight.swift`, pure, #44, #45).
 
-`TabsLayout` (`UI/Layouts/`, `[menu] layout = "tabs"`) is the ready state's body built from the `MenuModel` and `LayoutActions`: a pill strip with All and one tab per project, each with its attention count (All's is the model's attention count, so a row listed in two projects counts once); under it "5 need attention · 4 projects" (a project's tab leaves out the project count; before the tab is loaded, with nothing counted, it never says All caught up nor shows the check, #292) with Mark all seen, or Mark seen for one project; then the tab's error rows and its rows grouped under Pull requests, Issues and Runs (All: every project's rows in project order, each row once, naming the repository once there's more than one project), each with its age on the right. The rules live in `MenuTabs.swift` (`tabs`, `attentionCount(for:)`, `resolved(_:)`, `tabContent(for:)`) and the words in `PanelText`. The selected tab is `PanelState`'s since #167 (a click and `shipyard panel show-tab` set the same value), kept while the menu closes and opens, and falls back to All when its project leaves the configuration. More tabs than fit scroll sideways, and an end fades while tabs are hidden past it. Choosing a tab leaves the strip where it is while the tab is clear of the faded ends; one cut off is scrolled in only as far as it takes to clear the fade (`TabStripScroll`, #297), so the other tabs stay under the pointer. The selected pill fades onto the chosen tab rather than sliding across the others, and the old tab's rows leave at once while the new tab's slide in, so the two lists never draw over each other. The strip and the list are measured and fixed in height, like the list layout (#27, `MeasuredScrollView`). A tab's rows are a `LazyVStack`, as the list layout's are, so only the rows in view are made, laid out and tracked; and the row highlight is drawn by a layer of its own (`HighlightLayer`, in `Components.swift`, which the list layout uses too, with a small view around each project header that reads whether it's highlighted), the only part of the layout that reads it, so a hover redraws that layer and the rows, not the layout, which would work out the tab's content again.
+- A row is known by its `MenuRowPlace`: its project in the list layout (where one item can be listed under two projects) and its row id.
+  For a project's header in the list layout it is `.header(project)` (no row id): headers are rows the pointer and the keys highlight like items.
+- Since 0.0.2 a place is a `MenuRowPlace.Kind`: an item, a project's header (`.header(project)`), or a subsection's subheader (`.groupHeader(GroupID, in: section)`, the section `nil` in a tab), which the highlight rests on like a row.
+- `RowGroup.places(in:)` gives a group's places: its subheader, then, unless folded, its rows and its Show more row (`.showMore(GroupID, in: section)`).
+  It is the one seam a new stop extends.
+- The rows a highlight can rest on, top to bottom, are `MenuModel.listRowPlaces` (each project's header, then, while it's expanded, its groups' places) and `MenuTabContent.rowPlaces` (its groups' places).
+  Error and placeholder rows aren't among them.
+- Rows and headers feed the pointer's enter and exit to it (`highlightable(_:_:drawsOwnHighlight:)`).
+  An exit from a row the highlight already left changes nothing.
+  Leaving the rows clears it even if the last exit never arrived.
+  `keep(in:)` clears it once its row stops being listed: collapsed, refreshed away, another tab.
+- Error rows and placeholders call `pointerLeftRows()` when the pointer enters them (`clearsRowHighlight(_:)`), so a row whose exit was lost doesn't stay lit.
+
+Drawing:
+
+- The layout draws the highlight once, behind its rows (`rowHighlight(_:in:)`): one shape placed at the highlighted row's bounds (read from anchor preferences) that glides to the next row.
+  A shape matched between rows was not used, because a lazy stack's recycled rows made it jump.
+- Tabs list a row at the same place, and while the list slides from one tab to the next both tabs are on screen.
+  So a tab's rows are marked with `rowList(tab)`, and what they report (bounds and spans) is keyed by `RowSlot` (the tab and the place).
+  The tabs layout draws the highlight outside the sliding lists, for the selected tab's slots only, so the outgoing tab isn't lit and the shape fades in on the new tab.
+- A project header pins over the rows, so it draws its own highlight on its background instead.
+
+#### Keys
+
+The keys drive the same highlight (#45), so the pointer and the keys can't disagree.
+Every rule is in `RowHighlight` and `RowScroll` and tested there.
+`rowKeys(_:places:in:pinnedHeader:scroll:left:right:dismiss:activate:)` (`RowKeys.swift`) goes on each layout's scrolling list.
+
+- ↑ and ↓ call `moveUp(in:)` / `moveDown(in:)` with the layout's row places (the list's, or the selected tab's).
+  They step to the previous or next place (from none: the first or the last) and wrap at the ends, like `NSMenu`.
+- In the list layout, ← and → are `moveLeft(in:)` / `moveRight(in:)`, as in an outline:
+  - ← goes from an item to its subheader (or, in a group without one, its project's header), folds an open subheader, goes from a folded one to its project's header, and collapses an expanded header.
+  - → expands a collapsed header and goes from an expanded one to what's first under it, unfolds a folded subheader and goes from an open one to its first item.
+  - They return the `MenuFold` (collapse or expand a project, fold or unfold a group) the layout passes to `toggleCollapsed` or `toggleGroup`.
+- In the tabs layout, ← and → on a subheader fold and unfold it (`moveLeft(in:)` / `moveRight(in:)` with the tab's content; → on an open one goes to its first item).
+  Anywhere else they switch to the previous or next tab (`MenuModel.tab(beside:by:)`, wrapping; provisional), and `moveToFirst(in:)` puts the highlight on the new tab's first place.
+- Return acts on `MenuModel.listTarget(at:)` (an item, a header's project, a subheader's group, or a Show more row's group) or `MenuTabContent.row(at:)` / `subsection(at:)` / `showMoreGroup(at:)`:
+  - an item opens and is marked seen, and ⌥Return only marks it seen, like a click and an ⌥-click;
+  - a header opens its project's `repositoryURL` (the first configured repository) through `openRepository`;
+  - a subheader folds or unfolds, as a click on it does;
+  - a Show more row shows the rest of its group, or as Show less caps it again;
+  - ⌥Return on a header, a subheader or a Show more row does nothing.
+- ⌫ on a ping's row dismisses it (`dismiss`); on any other place it does nothing.
+- An item in a folded subsection is no target.
+- After a key the highlight stops following the pointer (`followsPointer`), so rows scrolling under a resting pointer don't take it back.
+  It still records which row is under the pointer, and when the pointer really moves (a new location from `onContinuousHover`) `pointerMoved()` hands the highlight to that row, or to none.
+
+#### Scrolling
+
+Scrolling with the keys:
+
+- The list layout is one lazy stack whose every line (a project's placeholders, error rows and item rows, each with the hairline where the kind changes) is its own child, under `Section`s whose headers pin.
+  Each row and header carries its place as its `.id`, so `ScrollViewReader` can reach a row the lazy stack hasn't laid out.
+- Each laid-out row reports its span in the list's visible area to a `RowFrames` (a reference in the environment, kept out of view state), under its `RowSlot` and a token for the row view.
+  So a row view that disappears (dropped by the lazy stack, or the outgoing tab's) forgets only the span it reported itself.
+- `RowScroll.reveal` decides:
+  - a row in full view doesn't scroll;
+  - one past the bottom scrolls to sit on it;
+  - one above the top, or under the pinned header, scrolls to sit just below the header (a unit anchor worked out from the list's and the row's heights);
+  - one not laid out scrolls towards the way the highlight moved (up: to the top), except a header's first item after the header, which is under the header pinned at the top: just below the header.
+- A wrap (↓ from the last row to the first, ↑ from the first to the last) scrolls straight to the list's far end in the same key press, laid out or not.
+  It goes to `RowListTop` or `RowListBottom`, zero-height views the layout puts above and below its rows, outside the lazy stack.
+- The lazy stack guesses the height of rows it hasn't laid out, so the first scroll to the bottom can stop short of the last row.
+  A `RowWrapLanding` (pure, in `RowScroll.swift`) follows the wrap: each time rows report new spans (`RowFrames.rowsMoved`), once the update is laid out, it checks the wrapped-to row and scrolls to the same end again until the row is in full view, at most four times.
+  Any key or pointer move ends it.
+- A row the lazy stack kept but hid reports its last span again when it reappears.
+  A wrap back to the end it came from leaves it where it was, so its geometry doesn't change and it wouldn't report otherwise.
+- The scroll isn't animated, so a held key repeats at the system's rate and the list keeps up; only the highlight shape glides.
+- `onKeyPress` calls the handler it had at the key-down for every repeat of that key, with that handler's copy of the modifier (its rows, and a highlight from before the first step).
+  So the key handlers act through a reference to the modifier as last drawn (`LatestRowKeys`), along with the highlight a key set that the view hasn't been updated with yet.
+  ↑/↓ take `.down` and `.repeat`, and ←, → and Return act once per press.
+- A highlighted item row gets the rounded, inset shape; a highlighted project header fills its whole band, square and full width.
+- A tab switch scrolls to the list's top (`RowListTop`, a zero-height view above the sliding lists), where the new tab's first row is.
+  It doesn't scroll to the row itself, which isn't laid out yet and whose id the outgoing tab's row shares.
+
+#### Hover help
+
+Hover help (#72): the panel doesn't use macOS's native tooltips (`.help`), which come late, look dated, are cut off at the panel's edge and linger over the rows.
+
+- A view with help says so with `hoverHelp(_:context:leadingInset:)` (`HoverHelp.swift`), which also gives the text to VoiceOver as the view's hint, as `.help` did; `nil` shows nothing.
+- The panel draws the help once, with `hoverHelpHost()` on its frame.
+  The hovered view reports its bounds and text through an anchor preference (like the row highlight's).
+  A card on the system's regular material, with the panel's hairline, sits under the view, or over it when there's no room below, lined up with a row's title or centred under a button, kept inside the panel.
+- `HoverHelpPlacement` (`ShipyardCore/Menu/`, pure, tested) decides the frame, so the card never covers the view the pointer is on and the panel's edge never cuts it off.
+  Drawn at the frame, it reaches past the scroll view's clip.
+- The context sets the timing (`HoverHelp.timing`):
+  - On the header's buttons, the account and the tabs (`toolbar`), the card shows after the pointer rests 0.5 s, at once while it's warm (just shown, or hidden less than 0.6 s ago), and glides to the next button with the highlight's spring.
+  - On the item rows (`row`), which the pointer crosses on its way elsewhere, it shows after a 1 s rest, closes as the pointer leaves the row, and every row waits again, so it never follows the pointer down the list.
+  - Either way it fades when the pointer leaves and never takes the pointer.
+- A row's card (`hoverHelp(_ card: RowCard, leadingInset:)`) shows:
+  - the author's avatar (20 pt, SwiftUI's `AsyncImage`, at `AvatarCache`'s size; for a ping from a known agent, `RowCard.agent`, that agent's logo, `AgentMarkView`, #137) centred beside the full title as its header;
+  - under the title, a review request (amber) and failed checks (red) as tinted tags, from the row's attention reasons (new and changed get no tag; the row's attention dot says as much);
+  - then `RowCard.facts`, a line of them at a time, each an SF Symbol and a short value, coloured only where it says how things stand (added green, removed red, the review and checks by state, a running run amber).
+  An issue with no comments has no facts line.
+- SwiftUI's own popover was the runner-up (`docs/references/macos-hover-help.md`); built as a second style and never tried, it was removed (#84).
+- Where hover help isn't worth it there's none: a subheader's or a list section's chevron, the skill card's close button, the command box's Copy (its icon turns into a checkmark), the picker's lock.
+  Each keeps its VoiceOver label or hint.
+- A note row and an error row wrap instead of truncating, a pull request's check dot has its words in the row's card, and a tab shows its title as help only while the title is cut off.
+
+#### Focus
+
+- The list takes the keyboard focus when it appears and again each time its window becomes key (`NSWindow.didBecomeKeyNotification` for the window it's in, through a zero-size `NSViewRepresentable`).
+  The `MenuBarExtra`'s view outlives a closed menu, and focus set before the window is key is lost; so the arrows work as soon as the menu opens.
+- The panel's window is key while the menu is open, which is what lets the list receive keys (as ⌘R and the picker's text field already do).
+- Closed, it's off screen and takes no keys, and nothing here changes when the window becomes key or the app's activation.
+
+#### ConnectView
+
+`ConnectView` draws `PanelText.connect(signedOutReason, canSignIn: canSignInWithGitHub)` in one shape for every state (#78):
+
+- the logo (`LogoBadge`, the app icon's squircle and sailboat, #80);
+- a greeting: "Welcome to Shipyard" with no token or after a sign-out that left nothing signed in, "Welcome back" otherwise;
+- a line or two on what happened;
+- then the ways in as full-width buttons stacked in the order its `lead` gives, the main one prominent.
+
+The leads:
+
+- `signIn` (no token, signed out with nothing left signed in, or the Keychain token rejected): **Sign in with GitHub** (`beginDeviceFlow()`).
+  Then a collapsed native disclosure, "Use the GitHub CLI `gh` instead", holds the `gh auth login` box (`CommandBox`) with an ⓘ beside it, over **Connect with `gh`**.
+  The ⓘ's popover gives a cli.github.com link and a copyable `brew install gh`.
+- `ghCommand` (`gh`'s token rejected): the `gh auth login` box over Connect with `gh`, prominent, then Sign in with GitHub.
+- `connectWithGh` (signed out while `gh` is still signed in): two blocks with a native divider between them.
+  The first is "The GitHub CLI `gh` is already signed in on this computer, so connecting takes one click:" over Connect with `gh`, prominent.
+  The second is the `alternative`, "Alternatively, sign in with GitHub, if you'd rather:", over Sign in with GitHub.
+  There is no `gh auth logout`, and without a client ID no second block.
+- With the placeholder client ID, `gh` leads (`ghCommand`, with the ⓘ when there's no token, or `connectWithGh` alone), and Sign in with GitHub is disabled with `PanelText.signInUnavailable`.
+
+Rules:
+
+- Under Sign in with GitHub, `PanelText.signInFailed(signInError)` shows after a flow that ended without a token.
+- Connect with `gh` (`start()`) says why (`PanelText.stillSignedOut`) under it when it leaves shipyard signed out.
+  It isn't the default action, so Return can't undo a sign-out.
+- Every `gh` in the words is in backticks, and the panel draws code spans monospaced on a faint chip (`CodeText`, `ShipyardApp/UI/Components.swift`, tested in `Tests/ShipyardAppTests`).
+  SF Mono's "g" and "h" are drawn almost like SF Pro's, so the monospaced font alone left `gh` looking like the words around it.
+- Hover help takes Markdown too (`hoverHelp(markdown:)`).
+- While `start()` looks for a token (no reason yet) it shows "Connecting to GitHub…", keeping the last reason on screen during Connect with `gh`.
+- The header's gear menu has Sign out once signed in (not while `start()` is still connecting).
+
+In `connecting(code)` it draws `PanelText.deviceCode(code)`:
+
+- The user code, large, which a click on it or on its copy icon (`CopyButton`, the command box's, here with its word "Copy" beside it) puts on the clipboard.
+  The icon turns into a checkmark and the word rolls to "Copied" with the counts' `numericText` transition and `Motion.count` spring.
+  That is the only feedback: the code has no hover help; VoiceOver hears "Copy code", then "Copied".
+  Ten seconds after the last copy, through the button's cancellable `.task(id:)`, it turns back with the same animations, as the command box's does; a new code resets it at once.
+- When it expires.
+- Cancel (`cancelDeviceFlow()`).
+- Copy code and open GitHub, which puts the code on the clipboard before `openVerificationPage()`.
+  The browser taking focus may close the menu; the flow goes on in `Shipyard`.
+
+#### Onboarding views
+
+`ProjectPicker`:
+
+- It loads `suggestedRepositories()` when it appears; a failure says why, with Retry, and typing still works.
+- It checks a typed `owner/name` or link with `checkRepository(_:)`; a rejection shows its `message`.
+- It keeps what the user picked in a `ProjectChoices` (`ShipyardCore/Onboarding/`, pure):
+  - the repositories offered: typed ones first, so one just added is in sight, then the suggestions;
+  - the chosen ones in order;
+  - each one's project name, which starts as the repository's name (`owner/name` when a project already has that name, so choosing never groups by accident).
+- Naming and grouping are one field: chosen repositories with the same trimmed name make one project, and "Group with" copies another project's name.
+- `projects` is what Add passes to `addProjects(_:)`; `hasUnnamedProject` blocks Add while a name is empty.
+
+`PresetPicker`:
+
+- While `shipyard.presets` isn't empty (the file holds nothing but `version`), the panel shows `PresetPicker` first.
+- It is a native radio group of `presets`, each with its title and summary.
+  For `incoming-contributions` a second one offers "All my repositories (`owned`)" (the default) or "Pick repositories".
+- Its state is a `PresetChoice` (`ShipyardCore/Onboarding/`, pure): the chosen preset, `watchesOwned`, and whether the picker comes next (`needsRepositories`).
+- The button says so (`PanelText.presetContinue`):
+  - "Choose repositories" shows the `ProjectPicker` with a back button, whose Add calls `choosePreset(preset, projects:)` with the picked projects;
+  - "Start with …" calls it at once with none.
+- A refusal empties `presets`, so the panel shows the plain picker.
+
+Adding moves the phase to `ready`, so the panel shows the list without a restart; the list scrolls inside a measured fixed height, like the sections (#27).
+
+`SkillInstallCard` draws `PanelText.skillInstall(state)` for the app's one `SkillInstallation`, owned by `AppServices`, so an install goes on while the panel is closed:
+
+- the offer with the command and Install;
+- Cancel while running;
+- then installed with its output, the failure's output, npx not found, or timed out, each but the success with the command and a Copy button and Try again.
+
+`CLILinkCard`, shaped like it, draws `PanelText.cliLink(state, command:)` for the app's one `CLILink`, owned by `AppServices`, its CLI `Contents/Helpers/shipyard` in `Bundle.main`, its home the user's:
+
+- It calls `check()` each time it appears, since the user may have linked it by hand.
+- Then it shows the offer with the command and Link, linked (with the PATH reminder), something in the way or a failure (each with the command, a Copy button and Try again), or no CLI to link.
+
+#### StatusView
+
+`StatusView` (#238) draws a part's status view from one model, `PanelText.StatusPage`, in `ConnectView`'s shape:
+
+1. The ‹ Back row (`PanelText.back`).
+2. The part's badge (`SetupBadge`, #249) and its title.
+3. The lead line on what the part is for.
+4. The status line with its tone's icon: set up, something to fix, or neither.
+5. A line on what to do.
+6. What a command printed (the skill install's output).
+7. Each command in a `CommandBox` with its copy button.
+8. The primary full-width button.
+9. The page's `alternatives` in order, each under its own divider: a line, its commands, an optional button.
+
+Actions:
+
+- A button names a `StatusPage.Action`, which `StatusView` runs:
+  - `linkCLI`: `CLILink.makeLink`;
+  - `installSkill` and `cancelSkillInstall`: `SkillInstallation.start` and `cancel`, Cancel with the running install's spinner beside it;
+  - `checkNotion`, `connectNotion`, which also shows the projects again, and `disconnectNotion`: the `Shipyard` operations (#241);
+  - `signOut`: `Shipyard.signOut()`, the settings menu's Sign out (#240).
+- Each part's page and its look-again on appearing are picked there (`CLILink.check`, `SkillDetector.check`; `Shipyard.checkNotion()`, the one ntn run before Connect with ntn).
+  So a later part adds a page function, its actions and a `SetupStatus` field.
+
+The settings menu marks a part from `SetupStatus`, which `Panel` fills:
+
+- the CLI from `CLILink.state`, and the skill from `SkillDetector.isInstalled`, each looked at again each time the panel opens, and the skill again when an install ends, from the view or onboarding's card;
+- Notion from `Shipyard.notionIsSetUp`;
+- GitHub from `Shipyard.gitHubConnection` (#240).
+
+The GitHub view (#240) draws `PanelText.gitHubStatus(gitHubConnection)` while signed in, in three segments, as the Notion view's:
+
+1. The account and how it connected.
+2. Under a divider, what signing out stops and a **Sign out** button (`signOut`, the menu's Sign out, which stays in the menu too).
+3. For a `gh` token only, under another divider, that signing out leaves `gh` signed in, with `gh auth logout` in a command box and no button.
+
+After Sign out there's no connection, so the view shows `ConnectView`.
+Signed out (no connection: signed out, the device flow's code, or `start()` still asking), it draws `ConnectView` under ‹ Back in place of a page, so the signed-out view's words and ways in live in one place.
+
+`SetupBadge(part:side:)` (#249):
+
+- It draws the Shipyard Skill's and the Shipyard CLI's badge as `LogoBadge`.
+- It draws GitHub's and Notion's as the maker's mark on a tile of the same squircle (`LogoShape.squircle`, the clip and fill both, so the corners match), 32 pt square in every view:
+  - GitHub's white Invertocat on `#24292F`, Notion's black cube on white;
+  - the mark's 24-unit box at 66 % and 64 % of the side, centred;
+  - a 0.5 pt hairline inside the edge (white at 10 % on GitHub's, black at 12 % on Notion's), so each tile holds its shape on the panel in both modes.
+- The colours are fixed in light and dark, as `LogoBadge`'s are.
+- `SetupBadge.mark(for:)` loads the mark from `Resources/ServiceLogos/` (`make service-logos`) as a template image, cached, through `AgentLogoImage.resources`; nil for the skill and the CLI.
+- The signed-out GitHub view keeps `ConnectView`'s own `LogoBadge`.
+- Sources and terms: `docs/references/service-icons.md`.
+
+#### Panel words
+
+The words the panel shows come from `PanelText` in `ShipyardCore/Menu/` (one file for the menu, one per onboarding screen, the skill card and the CLI link card), so they're tested with the menu model:
+
+- A row's age and second line: "#21 · yahyabedirhan · 37m" for a pull request or an issue; "#41 · main · failed · 12m" for a run, whose first line is its workflow's name.
+  The repository comes after the number only when the project has more than one, named without its owner by `repositoryName`.
+- A row's hover card in either layout (`PanelText.rowCard`), only what the row doesn't show:
+  - the author's avatar and full title;
+  - a pull request's branches, size, review and checks;
+  - comments and when it last changed;
+  - a run's title, what started it, who and how long it ran;
+  - a review request and failed checks, from `Attention.reasons`;
+  - each fact in words for VoiceOver through `PanelText.fact`.
+- The header buttons' hover help, a list section's VoiceOver hint, a state's word and the state icon's VoiceOver label.
+- The header: the account's "@handle", its hover text and VoiceOver label, "Shipyard" until the account is known, "3 need attention".
+- The Mark all seen buttons and "Last updated 5 min ago".
+- The configuration error and warnings, fetch error, refresh-delay and notifications-off banners, and the rate-limit lines.
+- The connect screen, the picker's Add button ("Add 2 projects") and its summary line, the skill install card and the CLI link card.
+
+#### App wiring
+
+The app wires the core in `AppServices` (`ShipyardApp.swift`):
+
+- `ConfigurationWatcher` and `WakeObserver` call `reloadConfiguration()` and `refresh()`.
+- Opening the panel only rereads the notification permission; it doesn't refresh.
+- ⌘R is the header's Refresh button (`refreshNow()`, which also creates a missing configuration file).
+- `layoutActions` hands the layouts their `LayoutActions`.
+- `AppServices` owns the `Notifier`, routes its clicks to `openNotification(_:)`, tells the panel whether notifications are off, and holds the `SkillInstallation` and the `CLILink`.
+- `AppServices` also holds the `AvatarCache` (in `Application Support/Shipyard/Avatar/`) the header's account draws from.
+- Opening something elsewhere (a row's `open`, a notification's item, the header's account through `openProfile()`, "Open configuration file") then calls `closeMenu()`.
+  That closes the menu the way a click on its icon does, through the status item, since SwiftUI has no dismiss for a `.window` `MenuBarExtra`.
+- ⌥-click, collapse, tab switches and Mark all seen leave it open (#39).
+
+#### TabsLayout
+
+`TabsLayout` (`UI/Layouts/`, `[menu] layout = "tabs"`) is the ready state's body built from the `MenuModel` and `LayoutActions`:
+
+- A pill strip with All and one tab per project, each with its attention count.
+  All's is the model's attention count, so a row listed in two projects counts once.
+- Under it "5 need attention · 4 projects", with Mark all seen, or Mark seen for one project.
+  A project's tab leaves out the project count; before the tab is loaded, with nothing counted, it never says All caught up nor shows the check (#292).
+- Then the tab's error rows and its rows grouped under Pull requests, Issues and Runs, each with its age on the right.
+  All shows every project's rows in project order, each row once, naming the repository once there's more than one project.
+
+Rules:
+
+- The rules live in `MenuTabs.swift` (`tabs`, `attentionCount(for:)`, `resolved(_:)`, `tabContent(for:)`) and the words in `PanelText`.
+- The selected tab is `PanelState`'s since #167 (a click and `shipyard panel show-tab` set the same value).
+  It is kept while the menu closes and opens, and falls back to All when its project leaves the configuration.
+- More tabs than fit scroll sideways, and an end fades while tabs are hidden past it.
+- Choosing a tab leaves the strip where it is while the tab is clear of the faded ends.
+  One cut off is scrolled in only as far as it takes to clear the fade (`TabStripScroll`, #297), so the other tabs stay under the pointer.
+- The selected pill fades onto the chosen tab rather than sliding across the others.
+  The old tab's rows leave at once while the new tab's slide in, so the two lists never draw over each other.
+- The strip and the list are measured and fixed in height, like the list layout (#27, `MeasuredScrollView`).
+- A tab's rows are a `LazyVStack`, as the list layout's are, so only the rows in view are made, laid out and tracked.
+- The row highlight is drawn by a layer of its own (`HighlightLayer`, in `Components.swift`, which the list layout uses too, with a small view around each project header that reads whether it's highlighted).
+  It is the only part of the layout that reads it, so a hover redraws that layer and the rows, not the layout, which would work out the tab's content again.
+
+#### Tests
+
+- `ServiceLogoTests` (`Tests/ShipyardAppTests/`): both marks loading from the app's resources.
 
 ### RateBudget — `ShipyardCore/GitHub/RateBudget.swift`
 
-Pure value, so the arithmetic is tested without a network. It's the answer to "can we afford the configured interval?".
+Pure value, so the arithmetic is tested without a network.
+It's the answer to "can we afford the configured interval?".
 
-State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the last 5 refreshes per API (averaged), and a `RatePause` (until, reason: `exhausted(api)` or `secondaryLimit`). Every question takes `now`, so it stays pure.
+#### State
+
+- The last `RateLimit` per API (`RateAPI`: `graphql`, `rest`).
+- The costs of the last 5 refreshes per API, averaged.
+- A `RatePause`: until, and reason: `exhausted(api)` or `secondaryLimit`.
+
+Every question takes `now`, so it stays pure.
+
+#### Operations
 
 | Operation | Returns |
 |---|---|
@@ -2712,15 +3209,45 @@ State: last `RateLimit` per API (`RateAPI`: `graphql`, `rest`), the costs of the
 | `canRefresh(at:) -> Bool` | false only while paused (⌘R uses this) |
 | `indicator(show, in: apis, at:) -> RateIndicator?` | what the footer draws: per API in use (`Shipyard` passes REST only while some project shows workflow runs, so a REST line doesn't linger stale once runs are off) remaining / limit, reset time and level (`normal`, `low` under 25% (ghbar's threshold), `exhausted` at 0; a window that has reset counts as normal), and the worst level for the colour; `nil` for `never`, for `when-low` while all are normal, or before any limit is known |
 
-After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it (`paused` arms for the configured interval, or the time left until the pause ends when that's sooner: each such firing sends nothing and only lists again from the last snapshot, so a closed item leaves within an interval of its window passing even while paused), so a busy hour slows shipyard down on its own instead of running the limit dry. Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
+#### Rules
+
+- After every refresh `Shipyard` asks `nextDelay`, publishes it and the indicator in the menu model, and arms the refresh timer with it.
+  So a busy hour slows shipyard down on its own instead of running the limit dry.
+- `paused` arms for the configured interval, or the time left until the pause ends when that's sooner.
+  Each such firing sends nothing and only lists again from the last snapshot, so a closed item leaves within an interval of its window passing even while paused.
+- Workflow runs (REST) only have to report `rateLimits.rest` with the counted requests as `cost`.
 
 ### PingStore — `ShipyardPings/PingStore.swift` (0.0.5; over `RecordStore` since 0.1.0, #164)
 
-The pings agents send, one JSON file per ping (`<id>.json`, a `RecordStore<Ping>`) in `~/Library/Application Support/Shipyard/Pings/` (`PingStore.appDirectory`, in `SupportFolder.app`; tests pass a temporary one), apart from `state.json`: app state is what shipyard remembers from use, pings are data agents send. The format is private (ADR 0004); `Ping` is `Codable`, and a field added later is optional, so an older record still reads. The CLI and the running app write to it at the same time: each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet. A plain `struct`, not tied to the main actor, since the CLI uses it too.
+The pings agents send.
 
-On a machine without the app (0.0.6, #110), the CLI keeps its pings in `$XDG_DATA_HOME/shipyard/pings` (`~/.local/share/shipyard/pings` when it's unset or not absolute), in the same format: `PingStore.directoryWithoutTheApp(environment:home:)`, in `SupportFolder.withoutTheApp`. There a ping carries `expires` (a day after its sending or its last replace, `PingCommand.lifetimeWithoutTheApp`, which `Unfiled.expiry` gives), since no one sees it there; on the Mac it's `nil` and the ping stays until seen. `PingList` leaves it out.
+#### State
 
-A ping past its `expires` is gone (M4): every read (`all()`, `ping(id:)`, and so the writes that read first) leaves it out and removes its file through `RecordStore.removeIfUnchanged`; a file that can't be removed stays, and every read still leaves it out. The store reads expiry against its `now`, the real time unless it's built with another clock; `at(date)` is the store reading as at `date`, which each command run gets, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. Nothing on the Mac expires, so there it changes nothing.
+- One JSON file per ping (`<id>.json`, a `RecordStore<Ping>`) in `~/Library/Application Support/Shipyard/Pings/` (`PingStore.appDirectory`, in `SupportFolder.app`; tests pass a temporary one).
+- It is apart from `state.json`: app state is what shipyard remembers from use, pings are data agents send.
+- The format is private (ADR 0004).
+  `Ping` is `Codable`, and a field added later is optional, so an older record still reads.
+- The CLI and the running app write to it at the same time.
+  Each write replaces one ping's file atomically, so a reader sees a whole ping or none, and two pings' writes never meet.
+- A plain `struct`, not tied to the main actor, since the CLI uses it too.
+
+On a machine without the app (0.0.6, #110):
+
+- The CLI keeps its pings in `$XDG_DATA_HOME/shipyard/pings` (`~/.local/share/shipyard/pings` when it's unset or not absolute), in the same format: `PingStore.directoryWithoutTheApp(environment:home:)`, in `SupportFolder.withoutTheApp`.
+- There a ping carries `expires`, a day after its sending or its last replace (`PingCommand.lifetimeWithoutTheApp`, which `Unfiled.expiry` gives), since no one sees it there.
+- On the Mac it's `nil` and the ping stays until seen.
+- `PingList` leaves it out.
+
+#### Rules
+
+- A ping past its `expires` is gone (M4).
+  Every read (`all()`, `ping(id:)`, and so the writes that read first) leaves it out and removes its file through `RecordStore.removeIfUnchanged`.
+  A file that can't be removed stays, and every read still leaves it out.
+- The store reads expiry against its `now`, the real time unless it's built with another clock.
+  `at(date)` is the store reading as at `date`, which each command run gets, so an expired ping can't be listed or withdrawn and its id sent again is a new ping.
+- Nothing on the Mac expires, so there it changes nothing.
+
+#### Operations
 
 | Operation | Returns / rejects |
 |---|---|
@@ -2733,11 +3260,26 @@ A ping past its `expires` is gone (M4): every read (`all()`, `ping(id:)`, and so
 | `removeIfUnchanged(ping) throws -> Bool` | removes the ping only while the store holds it exactly as `ping` (read again just before), for a seen ping past its window: one replaced, sent anew or seen again since stays; whether it's gone |
 | `remove(id:) throws` | deletes the ping's file, its failure with it; an unknown id changes nothing (#103) |
 
-The app watches `PingStore.watchedDirectory` with `ConfigurationWatcher(folder:)` and calls `Shipyard.reloadPings()`: the directory alone, whose entries change with every ping sent, replaced or withdrawn, so a save to `state.json` in its parent doesn't reload pings (#128). The app creates the directory before the watch opens (and `Shipyard.start()` again, demo runs included), so the watch is never on the support folder; should the directory be removed later, the watch falls back to its nearest existing ancestor, so creating it again is seen. The watch reopens after each change.
+#### Watching
+
+- The app watches `PingStore.watchedDirectory` with `ConfigurationWatcher(folder:)` and calls `Shipyard.reloadPings()`.
+- It watches the directory alone, whose entries change with every ping sent, replaced or withdrawn, so a save to `state.json` in its parent doesn't reload pings (#128).
+- The app creates the directory before the watch opens (and `Shipyard.start()` again, demo runs included), so the watch is never on the support folder.
+- Should the directory be removed later, the watch falls back to its nearest existing ancestor, so creating it again is seen.
+- The watch reopens after each change.
 
 ### PingList — `ShipyardPings/PingList.swift` (0.0.6)
 
-The remote ping list: the JSON `shipyard ping list --json` prints on a machine and the Mac's shipyard reads from it through Herdr (#109). Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"0.0.6","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds. `version` is the contract's major version (`PingList.currentVersion`, 1): a field a reader can ignore keeps it, anything else bumps it. Each ping carries what it's sent with (id, instance, title, body, sender, repository, projects, action, sent); `seen` and `failure` stay on the machine that recorded them. Which pings to list (the machine's live ones) is the caller's choice.
+The remote ping list: the JSON `shipyard ping list --json` prints on a machine and the Mac's shipyard reads from it through Herdr (#109).
+
+#### State
+
+- Unlike the store's files, it's part of the CLI's public contract (ADR 0004): `{"pings":[…],"shipyardVersion":"0.0.6","truncated":false,"version":1}`, compact, keys sorted, dates ISO 8601 in whole seconds.
+- `version` is the contract's major version (`PingList.currentVersion`, 1): a field a reader can ignore keeps it, anything else bumps it.
+- Each ping carries what it's sent with (id, instance, title, body, sender, repository, projects, action, sent); `seen` and `failure` stay on the machine that recorded them.
+- Which pings to list (the machine's live ones) is the caller's choice.
+
+#### Operations
 
 | Operation | Returns / rejects |
 |---|---|
@@ -2746,37 +3288,175 @@ The remote ping list: the JSON `shipyard ping list --json` prints on a machine a
 
 ### HerdrCommand — `ShipyardCommand/HerdrCommand.swift` (0.0.6, #111)
 
-Runs `herdr` for the app, directly (no shell) behind `ShellRunning`: `locate(home:pathEnvironment:isExecutable:)` finds it (`~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`), and `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`. `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`. `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say. Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
+Runs `herdr` for the app, directly (no shell) behind `ShellRunning`.
+
+#### Operations
+
+- `locate(home:pathEnvironment:isExecutable:)` finds it: `~/.local/bin`, Homebrew, `/usr/local/bin`, then `PATH`, since an `.app` starts with an almost empty `PATH`.
+- `run(arguments, on: machine?)` prefixes `--machine <label>` when given and races its `timeout`, giving `notFound`, `couldNotRun`, `timedOut` or `finished(output)`.
+- `answer(output)` reads Herdr's one JSON object: its `result`, or its error's `code` and `message`.
+- `HerdrFocus` and `RemotePingReader` both run through it, and `HerdrEvent` finds `herdr` with `locate` when Herdr doesn't say.
+- Its `Outcome`, `run`, `answer` and `refusal` are `package`, for Core.
 
 ### HerdrFocus on a machine — `ShipyardCore/Pings/HerdrFocus.swift` (0.0.6, #117)
 
-`focus(id, on: machine)` focuses a remote ping's tab or pane through `herdr --machine <label>`, each run racing `machineTimeout` (`defaultMachineTimeout`, 15 s, since Herdr may first connect to the machine). A pane is focused by its agent, `agent focus <pane>`; when Herdr answers `agent_not_found` (no agent occupies it, or the pane is gone), it falls back to `pane get <pane>` and `tab focus <tab>`, as on the Mac. A tab is focused at once. Reasons: "Herdr pane <id> is gone on <label>" (also tab, and "Herdr isn't running on <label>"), "<label> didn't answer in time", and, when the run gave no JSON error, the reason `HerdrCommand.refusal` reads from Herdr's `error: ` line, as the poll does ("Herdr has no saved machine named <label>", "<label> is disabled in Herdr"; #119), else "Couldn't reach <label> through Herdr" (the connection failed).
+#### Operations
 
-**Known limit:** a focus through `--machine` moves the Mac's Herdr window only when it already shows that machine. When it shows another, the machine's workspace turns red in Herdr's sidebar, and opening it lands on the agent: one extra click, which Herdr's API doesn't let shipyard take.
+- `focus(id, on: machine)` focuses a remote ping's tab or pane through `herdr --machine <label>`.
+  Each run races `machineTimeout` (`defaultMachineTimeout`, 15 s, since Herdr may first connect to the machine).
+- A pane is focused by its agent, `agent focus <pane>`.
+  When Herdr answers `agent_not_found` (no agent occupies it, or the pane is gone), it falls back to `pane get <pane>` and `tab focus <tab>`, as on the Mac.
+- A tab is focused at once.
+
+#### Errors
+
+- "Herdr pane <id> is gone on <label>" (also tab), and "Herdr isn't running on <label>".
+- "<label> didn't answer in time".
+- When the run gave no JSON error, the reason `HerdrCommand.refusal` reads from Herdr's `error: ` line, as the poll does: "Herdr has no saved machine named <label>", "<label> is disabled in Herdr" (#119).
+- Else "Couldn't reach <label> through Herdr": the connection failed.
+
+**Known limit:** a focus through `--machine` moves the Mac's Herdr window only when it already shows that machine.
+When it shows another, the machine's workspace turns red in Herdr's sidebar, and opening it lands on the agent: one extra click, which Herdr's API doesn't let shipyard take.
 
 ### RemotePingReader — `ShipyardCore/Pings/RemotePingReader.swift` (0.0.6, #111)
 
-`list(machine: label) async -> Result<PingList, Failure>`: asks one machine for its pings through the Mac's Herdr (ADR 0005). `herdr --machine <label> plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` answers `plugin_action_invoked` with the started record's `log.log_id`; then `herdr --machine <label> plugin log list --plugin … --limit 10` lists the plugin's 10 newest records (`logLimit`; Herdr keeps at least 32 and lists 50 by default, each with up to 48 KiB of `stdout`, too much to ask for every 0.25 s; `handle_plugin_log_list` at Herdr commit 65e35a3 takes the newest), and the one with that `log_id`, just started holds the list on `stdout` once `status` is `succeeded`. While it's `running` the reader waits `waitInterval` (0.25 s) and asks again, up to `waitAttempts` (20). Its pings come back with `machine` set to the label. The whole read races `timeout` (15 s). `Failure.reason` is a short line: "Couldn't find herdr", "<label> didn't answer in time", "Couldn't reach <label> through Herdr: <Herdr's message>", "shipyard on <label> couldn't list its pings" (a `failed` record), "Herdr lost <label>'s ping list" (no record with that id), or `PingList.DecodeError.message(machine:)` (another contract version, or a list that doesn't read).
+#### Operations
+
+`list(machine: label) async -> Result<PingList, Failure>` asks one machine for its pings through the Mac's Herdr (ADR 0005):
+
+1. `herdr --machine <label> plugin action invoke list --plugin yahyabedirhan.herdr-shipyard` answers `plugin_action_invoked` with the started record's `log.log_id`.
+2. `herdr --machine <label> plugin log list --plugin … --limit 10` lists the plugin's 10 newest records (`logLimit`).
+   Herdr keeps at least 32 and lists 50 by default, each with up to 48 KiB of `stdout`, too much to ask for every 0.25 s; `handle_plugin_log_list` at Herdr commit 65e35a3 takes the newest.
+3. The one with that `log_id`, just started, holds the list on `stdout` once `status` is `succeeded`.
+   While it's `running` the reader waits `waitInterval` (0.25 s) and asks again, up to `waitAttempts` (20).
+
+Its pings come back with `machine` set to the label.
+The whole read races `timeout` (15 s).
+
+#### Errors
+
+`Failure.reason` is a short line:
+
+- "Couldn't find herdr";
+- "<label> didn't answer in time";
+- "Couldn't reach <label> through Herdr: <Herdr's message>";
+- "shipyard on <label> couldn't list its pings" (a `failed` record);
+- "Herdr lost <label>'s ping list" (no record with that id);
+- or `PingList.DecodeError.message(machine:)` (another contract version, or a list that doesn't read).
 
 ### RemoteMachines — `ShipyardCore/Pings/RemoteMachines.swift` (0.0.6, #111)
 
-Pure state, kept by `Shipyard` as `remote`: one `Machine` per label in configuration order (`label`, `pings` from the last good poll, `truncated`, `failure` from the latest poll, `answered`). `follow(labels)` keeps known machines, adds new ones empty and drops removed ones with their pings; `record(result, for: label, at:)` replaces a machine's pings on success (clearing `failure`) and only sets `failure` on a failure, so a machine that stops answering keeps its last pings; `pings` is every machine's, in order, each with why its action last failed (#117): `recordFailure(ping, reason:)` and `clearFailure(ping)` keep it in memory by the ping's URL for one sending only (`Ping.isSameSending`), so a ping replaced on its machine or sent anew under its id starts without it, as a local one does; a sending no machine lists gets none, and a good poll or `follow` forgets those of sendings no machine lists any more. Seen and dismissed are the app state's (`RemotePingMarks`). A remote ping's `Ping.machine` isn't encoded, so it never reaches a store or a list.
+#### State
+
+Pure state, kept by `Shipyard` as `remote`: one `Machine` per label in configuration order, with:
+
+- `label`;
+- `pings` from the last good poll, and `truncated`;
+- `failure` from the latest poll;
+- `answered`.
+
+#### Operations
+
+- `follow(labels)` keeps known machines, adds new ones empty and drops removed ones with their pings.
+- `record(result, for: label, at:)` replaces a machine's pings on success (clearing `failure`) and only sets `failure` on a failure, so a machine that stops answering keeps its last pings.
+- `pings` is every machine's, in order, each with why its action last failed (#117).
+- `recordFailure(ping, reason:)` and `clearFailure(ping)` keep that failure in memory by the ping's URL for one sending only (`Ping.isSameSending`).
+  So a ping replaced on its machine or sent anew under its id starts without it, as a local one does.
+  A sending no machine lists gets none, and a good poll or `follow` forgets those of sendings no machine lists any more.
+
+#### Rules
+
+- Seen and dismissed are the app state's (`RemotePingMarks`).
+- A remote ping's `Ping.machine` isn't encoded, so it never reaches a store or a list.
 
 ### RemotePingMarks — `ShipyardCore/Pings/RemotePingMarks.swift` (0.0.6, #118)
 
-Pure state in `AppState.remotePings`, saved in `state.json` under `remotePings`: what the user did to remote pings, since nothing is written back to a machine. One `Mark` per remote ping URL: the `instance` it was made for, `seen` with `seenSending` (the ping as listed when seen) and `dismissed`. `markSeen(ping, at:)` keeps a first seen time for the same sending; `dismiss(ping)`; `apply(to: pings)` leaves out the dismissed and sets `seen` on a ping that is still the sending seen (so a replace, same instance with new content, needs attention again, as a local replace does); a mark for another instance under the URL isn't applied. `prune(listed:, keeping:)` drops marks whose URL and instance aren't listed, except for the machines in `keeping`.
+#### State
+
+- Pure state in `AppState.remotePings`, saved in `state.json` under `remotePings`: what the user did to remote pings, since nothing is written back to a machine.
+- One `Mark` per remote ping URL: the `instance` it was made for, `seen` with `seenSending` (the ping as listed when seen) and `dismissed`.
+
+#### Operations
+
+- `markSeen(ping, at:)` keeps a first seen time for the same sending.
+- `dismiss(ping)`.
+- `apply(to: pings)` leaves out the dismissed and sets `seen` on a ping that is still the sending seen.
+  So a replace, same instance with new content, needs attention again, as a local replace does.
+  A mark for another instance under the URL isn't applied.
+- `prune(listed:, keeping:)` drops marks whose URL and instance aren't listed, except for the machines in `keeping`.
 
 ### PingNumbers — `ShipyardCore/Pings/PingNumbers.swift` (0.0.7, #153)
 
-Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`: the numbers the Mac gives pings (0.0.7's N14). One `Sequence` per section (a project's slug, or a machine's label for its own section): `last`, the last number it gave, and `pings`, each listed ping's number by its URL. `number(filed, mayRetire:)` first retires the numbers of pings a section no longer holds, unless `mayRetire(url)` says the absence doesn't count yet, then gives each ping new to its section the next number, the new ones of one call oldest `sent` first (then by URL); `last` stays, so a number never comes back. `number(of: url, in: section)` reads one. `nil` in `AppState` until the first numbering, which `Shipyard.numberPings` holds back until every configured machine has answered or failed, so the pings already there are numbered together in `sent` order. It's written as its sections by name (`AppState` encodes and decodes them; `PingNumbers` itself isn't `Codable`). A section that can't be read is dropped alone, its pings numbered again from 1 there, and a `pingNumbers` that can't be read at all is dropped as a whole.
+#### State
 
-`Shipyard.numberPings` runs inside `listings(for:in:configuration:)`, the one place `Shipyard` lists pings (a refresh, `rebuildMenu`, `notifyNewPings`), over `filedPings` without those that have left (`hasLeft`), sectioned by `Listing.sections`. A remote ping's absence counts as `RemotePingMarks.prune` and `forgetLeftPings` count it: once its machine has answered since the app started and its list didn't stop before it, or once its machine is no longer configured (after a configuration read from the file). Nothing is numbered under the defaults standing in for a file broken since launch. Every poll rebuilds the menu while no numbers are kept yet, so machines that only failed still let the first numbering run.
+- Pure state in `AppState.pingNumbers`, saved in `state.json` under `pingNumbers`: the numbers the Mac gives pings (0.0.7's N14).
+- One `Sequence` per section (a project's slug, or a machine's label for its own section):
+  - `last`, the last number it gave;
+  - `pings`, each listed ping's number by its URL.
+- `nil` in `AppState` until the first numbering.
+- It's written as its sections by name: `AppState` encodes and decodes them; `PingNumbers` itself isn't `Codable`.
 
-`MachineNotice` (`ShipyardCore/Menu/MachineNotice.swift`, #119) is the panel's one quiet line per machine: `unreachable(reason, answered:)` while its latest poll failed (`answered` when a poll before it succeeded), else `truncated(listed:)` while its list stopped early; none once a poll is good and whole. `MenuModel.machineNotices` holds them in configuration order, `PanelText.machineNotice` words them ("beta-vps is disabled in Herdr. Its last pings stay listed.", without the second sentence for a machine that never answered), and the panel draws each as a gray banner, as it does the configuration warnings. Every reason names its machine. `HerdrCommand.refusal`, which the reader and `HerdrFocus` share, reads the plain line Herdr prints, exit status 2, when it refuses a label before asking (`cli/target.rs`, `resolve_machine`, at Herdr commit 65e35a3): `` error: unknown machine '<label>'; use `herdr machine list` ``, `error: machine '<label>' is disabled`, `error: machine label '<label>' is ambiguous; use its profile ID`. A machine Herdr can't connect to ends with Rust's Debug form of the error, which isn't read: "Couldn't reach <label> through Herdr".
+#### Operations
+
+- `number(filed, mayRetire:)` first retires the numbers of pings a section no longer holds, unless `mayRetire(url)` says the absence doesn't count yet.
+  Then it gives each ping new to its section the next number, the new ones of one call oldest `sent` first (then by URL).
+  `last` stays, so a number never comes back.
+- `number(of: url, in: section)` reads one.
+- `Shipyard.numberPings` runs inside `listings(for:in:configuration:)`, the one place `Shipyard` lists pings (a refresh, `rebuildMenu`, `notifyNewPings`).
+  It runs over `filedPings` without those that have left (`hasLeft`), sectioned by `Listing.sections`.
+
+#### Rules
+
+- `Shipyard.numberPings` holds the first numbering back until every configured machine has answered or failed, so the pings already there are numbered together in `sent` order.
+- A remote ping's absence counts as `RemotePingMarks.prune` and `forgetLeftPings` count it: once its machine has answered since the app started and its list didn't stop before it, or once its machine is no longer configured (after a configuration read from the file).
+- Nothing is numbered under the defaults standing in for a file broken since launch.
+- Every poll rebuilds the menu while no numbers are kept yet, so machines that only failed still let the first numbering run.
+
+#### Errors
+
+- A section that can't be read is dropped alone, its pings numbered again from 1 there.
+- A `pingNumbers` that can't be read at all is dropped as a whole.
+
+#### MachineNotice
+
+`MachineNotice` (`ShipyardCore/Menu/MachineNotice.swift`, #119) is the panel's one quiet line per machine:
+
+- `unreachable(reason, answered:)` while its latest poll failed (`answered` when a poll before it succeeded);
+- else `truncated(listed:)` while its list stopped early;
+- none once a poll is good and whole.
+
+`MenuModel.machineNotices` holds them in configuration order.
+`PanelText.machineNotice` words them ("beta-vps is disabled in Herdr. Its last pings stay listed.", without the second sentence for a machine that never answered).
+The panel draws each as a gray banner, as it does the configuration warnings.
+Every reason names its machine.
+
+`HerdrCommand.refusal`, which the reader and `HerdrFocus` share, reads the plain line Herdr prints, exit status 2, when it refuses a label before asking (`cli/target.rs`, `resolve_machine`, at Herdr commit 65e35a3):
+
+- `` error: unknown machine '<label>'; use `herdr machine list` ``
+- `error: machine '<label>' is disabled`
+- `error: machine label '<label>' is ambiguous; use its profile ID`
+
+A machine Herdr can't connect to ends with Rust's Debug form of the error, which isn't read: "Couldn't reach <label> through Herdr".
 
 ### ResolvedRepositoriesStore — `ShipyardConfig/ResolvedRepositoriesStore.swift` (0.0.5)
 
-Each project's repositories as the app last resolved them (`ResolvedRepositories.repositories`, by project slug), in `repositories.json` beside `state.json` (`SupportFolder.app`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.appDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one), so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub. The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it. Private format (ADR 0004): `{ "version": 1, "projects": { "<slug>": ["owner/name", …] } }`. A plain `struct`, like `PingStore`, since the CLI uses it too. It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists, so a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again. It's left as it is on sign-out; the next account's first resolve replaces it.
+Each project's repositories as the app last resolved them, so the CLI can file a ping by a repository a group or `owner/*` brought in without calling GitHub.
+
+#### State
+
+- `ResolvedRepositories.repositories`, by project slug, in `repositories.json` beside `state.json`.
+- The folder is `SupportFolder.app`, `~/Library/Application Support/Shipyard/`, the one definition of that folder: the app's stores and `PingStore.appDirectory` are built on it, so the CLI and the app can't disagree; tests pass a temporary one.
+- Private format (ADR 0004): `{ "version": 1, "projects": { "<slug>": ["owner/name", …] } }`.
+- A plain `struct`, like `PingStore`, since the CLI uses it too.
+
+#### Rules
+
+- The app writes it after every resolve in a refresh (a write that fails is ignored) and never reads it; the CLI only reads it.
+- It fails safe: a missing file, one that doesn't read or a newer `version` reads as no lists.
+  So a ping still matches the configuration's `owner/name` selectors, and the next resolve writes it again.
+- It's left as it is on sign-out; the next account's first resolve replaces it.
+
+#### Operations
 
 | Operation | Returns / rejects |
 |---|---|
@@ -2785,27 +3465,66 @@ Each project's repositories as the app last resolved them (`ResolvedRepositories
 
 ### PingCommand and ShipyardCLI — `ShipyardPings/PingCommand.swift`, `ShipyardPings/PingCommands.swift`, `ShipyardCommand/CommandTable.swift`, `ShipyardCommand/GitRemote.swift` (0.0.5; split by module in 0.1.0, #164)
 
-`ShipyardCLI.run(arguments, table, environment, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and the commands of the build's `CommandTable` ([CommandTable](#commandtable-and-recordstore--shipyardcommand-010-164)). `PingCommands.entries(filing:store:)` gives `ping`, which answers its own `--help`, sends `withdraw` and `list` on without filing, and runs `PingCommand.run` with the filing; and `herdr-event`, which takes no arguments. On the Mac the filing (`ProjectFiling`) reads `config.toml` as the app does (a missing file is no projects; one that doesn't read fails with its first problem, since the CLI has no last valid configuration to fall back on) and the lists the app resolved (a `ResolvedRepositoriesStore`), only when a ping is filed. `CommandResult` is the output, the error text and the exit status: 0 done, 1 refused (`failedStatus`), 2 arguments that don't read (`usageStatus`). `CommandEnvironment` is the working folder, the environment variables (`HERDR_PANE_ID`, which `--herdr` without an id takes; `TERM_PROGRAM` and `__CFBundleIdentifier`, which name its terminal; `HERDR_SESSION`, which names its Herdr session) and `git`, a `GitRemoteLookup` port: `origin(in: folder) -> String?`, the remote's URL or `nil` when the folder isn't in a git repository or has no `origin`. `GitCLI` runs `git -C <folder> remote get-url origin` (through `/usr/bin/env`, so the agent's `PATH` finds git), so worktrees and `insteadOf` read as git reads them; tests pass `FakeGitRemote`, a fake working folder. `GitRemote.repository(fromURL:)` reads `https://`, `ssh://`, `git://` and scp-like `git@host:` URLs whose path is exactly `owner/name` (`.git` and a trailing `/` dropped); a local path, `file://` or a deeper path is no repository.
+#### Operations
+
+- `ShipyardCLI.run(arguments, table, environment, now) -> CommandResult` is the whole `shipyard` executable: `--help`, `--version`, and the commands of the build's `CommandTable` ([CommandTable](#commandtable-and-recordstore--shipyardcommand-010-164)).
+- `PingCommands.entries(filing:store:)` gives two entries:
+  - `ping`, which answers its own `--help`, sends `withdraw` and `list` on without filing, and runs `PingCommand.run` with the filing;
+  - `herdr-event`, which takes no arguments.
+- On the Mac the filing (`ProjectFiling`) reads `config.toml` as the app does, and the lists the app resolved (a `ResolvedRepositoriesStore`), only when a ping is filed.
+  A missing file is no projects; one that doesn't read fails with its first problem, since the CLI has no last valid configuration to fall back on.
 
 | Operation | Returns / rejects |
 |---|---|
 | `PingCommand.run(arguments, environment, filing, store, now, newID) -> CommandResult` (the refusals for projects are `ProjectFiling`'s) | `<title>` with `--repo <owner/name>` or `--project <name>` or neither, `--body`, `--from`, and one action flag at most (`actionFlags`: `--open <url>`, `--app <bundle id or name>`, `--herdr [<tab or pane id>]`), in any order; `--herdr` takes the next argument when `isHerdrID` (`<workspace>:t<n>` or `:p<n>`), else `HERDR_PANE_ID` (#101); the body, sender and action are saved with the ping (#100). `--project`: filed under that project, with no repository. Otherwise the repository is `--repo`'s, else the working folder's `origin`, and it's filed under every project (in configuration order) whose `owner/name` selectors or `resolved` list include it, ignoring case; the ping keeps the repository as the first such project spells it (GitHub's spelling once resolved), which `Ping.item` fills. Saves `Ping(id, title, projects, sent: now, repository)` and prints `<id>`. The id is `newID()` (`Ping.newID`: six letters and digits without `0 o 1 l i`), drawn again while the store has it, since ids are global | no title, two titles, an unknown option, a flag without its value, `--repo` that isn't `owner/name`, `--repo` with `--project`, two action flags, `--open` without a scheme, an empty `--app`, or `--herdr` without an id outside Herdr: exit 2; a project the configuration doesn't name: exit 1, listing them (or saying there are none); no `origin`, or one that isn't `owner/name`: exit 1, saying so, with `--repo`/`--project` as the way out and the projects listed; a repository no project watches: exit 1, listing the projects; every project it would be filed under hides pings (`pings.show = false`): exit 1, naming them and the projects that show pings, or saying none does (#127); a store that can't be written: exit 1 |
-
 | `PingCommand.run`, `--id <id>` (#102) | names the ping; `isID` (`\A[a-z0-9][a-z0-9_-]{0,63}\z`, anchored so a trailing newline isn't accepted, which generated ids also match, and which keeps it a safe file name and URL path on a case-insensitive disk). A stored id is replaced: the new title, body, sender, action, projects and repository, `sent` now (its age starts again, #150), the stored `instance` kept, `seen` and `failure` cleared. A new ping gets a new `instance` (a UUID). Without it, `newID()` as above | an id that isn't one: exit 2 |
 | `PingCommand.withdraw(arguments, store) -> CommandResult` (#102) | `shipyard ping withdraw <id>`: `store.remove(id:)`, prints the id. The `ping` entry sends `ping withdraw …` here without filing, so a broken `config.toml` doesn't stop it | no id, two, or one that isn't an id: exit 2; an id no ping has: exit 1 ("no ping has the id …"); a store that can't be written: exit 1 |
 | `PingCommand.list(arguments, store, now) -> CommandResult` (0.0.6, #110) | `shipyard ping list --json`: the store's live pings at `now` (`Ping.isLive`) as `PingList.encode` gives them, newest first and capped, plus a newline. Reads no `config.toml`. Works on macOS too, where every stored ping is live | anything but exactly `--json`: exit 2 |
 
-`PingCommand.Request.parse` reads the arguments after the `ping` entry has checked for `withdraw` or `list` as the first one. `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`), `list` or a word starting with `--`, and `--help` after it isn't help.
+- `PingCommand.Request.parse` reads the arguments after the `ping` entry has checked for `withdraw` or `list` as the first one.
+  `--` ends the flags: everything after it is the title, even `withdraw` (`shipyard ping -- withdraw`), `list` or a word starting with `--`, and `--help` after it isn't help.
+- `PingCommand.send(request, terminal, folder, git, filing, store, now, newID, whenNoProject)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path ([the pseudocode](#pingcommandsend-through-a-filing-010-164)).
+  `folder` is where the repository is looked up (`nil`: nowhere).
+  `whenNoProject: .keepUnfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
 
-`PingCommand.send(request, terminal, folder, git, filing, store, now, newID, whenNoProject)` is everything `run` does once the arguments read (filing, the id, a replace, the save), so `HerdrEvent` sends through the same path ([the pseudocode](#pingcommandsend-through-a-filing-010-164)). `folder` is where the repository is looked up (`nil`: nowhere); `whenNoProject: .keepUnfiled` saves a ping no project takes under none, with the repository it named, instead of refusing it.
+#### Command environment
 
-**On a machine without the app (0.0.6, #110; the filing since 0.1.0, #164).** The build's filing decides: on Linux, `Unfiled`. There's no app to file a ping for, and the Linux build doesn't link the code that reads `config.toml` or `repositories.json`, so `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it. `run` gives a ping without an action the agent's pane (`HERDR_PANE_ID`) as `.herdr(pane)`, so a click can focus it; an action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win. The ping gets `expires`, a day from its sending or its replace, and `PingStore` drops expired pings as it reads, so an expired ping can't be listed or withdrawn and its id sent again is a new ping. With the Mac's filing nothing changes from 0.0.5.
+- `CommandResult` is the output, the error text and the exit status: 0 done, 1 refused (`failedStatus`), 2 arguments that don't read (`usageStatus`).
+- `CommandEnvironment` is:
+  - the working folder;
+  - the environment variables: `HERDR_PANE_ID`, which `--herdr` without an id takes; `TERM_PROGRAM` and `__CFBundleIdentifier`, which name its terminal; `HERDR_SESSION`, which names its Herdr session;
+  - `git`, a `GitRemoteLookup` port: `origin(in: folder) -> String?`, the remote's URL or `nil` when the folder isn't in a git repository or has no `origin`.
+- `GitCLI` runs `git -C <folder> remote get-url origin` (through `/usr/bin/env`, so the agent's `PATH` finds git), so worktrees and `insteadOf` read as git reads them.
+  Tests pass `FakeGitRemote`, a fake working folder.
+- `GitRemote.repository(fromURL:)` reads `https://`, `ssh://`, `git://` and scp-like `git@host:` URLs whose path is exactly `owner/name` (`.git` and a trailing `/` dropped).
+  A local path, `file://` or a deeper path is no repository.
 
-Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPlatform`), and `ShipyardCLI` removed expired pings before `ping` and `herdr-event` on Linux. #164 replaced both with the filing and the store's rule ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)), with the same behaviour.
+#### Without the app
+
+On a machine without the app (0.0.6, #110; the filing since 0.1.0, #164), the build's filing decides: on Linux, `Unfiled`.
+
+- There's no app to file a ping for, and the Linux build doesn't link the code that reads `config.toml` or `repositories.json`.
+  So `send` saves the ping as given: `--project`'s name (any name, with no repository), else the repository of `--repo` or the folder's `origin`, else none, always exit 0; the Mac files it.
+- `run` gives a ping without an action the agent's pane (`HERDR_PANE_ID`) as `.herdr(pane)`, so a click can focus it.
+  An action the agent gives, and `herdr-event`'s event pane (a hook's `HERDR_PANE_ID` is the focused pane), win.
+- The ping gets `expires`, a day from its sending or its replace, and `PingStore` drops expired pings as it reads.
+  So an expired ping can't be listed or withdrawn, and its id sent again is a new ping.
+- With the Mac's filing nothing changes from 0.0.5.
+
+Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPlatform`), and `ShipyardCLI` removed expired pings before `ping` and `herdr-event` on Linux.
+#164 replaced both with the filing and the store's rule ([PingFiling](#pingfiling-unfiled-and-projectfiling--shipyardpingspingfilingswift-shipyardconfigprojectfilingswift-010-164-165)), with the same behaviour.
 
 ### HerdrEvent — `ShipyardPings/HerdrEvent.swift` (0.0.6, #112)
 
-`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to. The `herdr-event` entry runs `HerdrEvent.run(environment, filing, store, now)`; the filing is asked only for a blocked agent's ping, so on the Mac a `config.toml` that doesn't read never stops a withdraw. It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too). The ping's id is `herdr-<pane id>`, lowercased (Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone), each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
+`shipyard herdr-event`, which the herdr-shipyard plugin's event hooks run, so a blocked agent pings without remembering to.
+
+#### Operations
+
+- The `herdr-event` entry runs `HerdrEvent.run(environment, filing, store, now)`.
+  The filing is asked only for a blocked agent's ping, so on the Mac a `config.toml` that doesn't read never stops a withdraw.
+- It reads `HERDR_PLUGIN_EVENT` and `HERDR_PLUGIN_EVENT_JSON`, whose fields (`pane_id`, `workspace_id`, `agent_status`, `agent`, optionally `display_agent`) Herdr puts under `data` (read from the top level too).
+- The ping's id is `herdr-<pane id>`, lowercased, each character still outside the id alphabet a `-` (`wA:p3` → `herdr-wa-p3`), cut to 64.
+  Herdr writes its id numbers in digits and uppercase letters, so its ids never differ by case alone.
 
 | Event | Does |
 |---|---|
@@ -2814,13 +3533,24 @@ Until 0.1.0 the platform decided this (`CommandEnvironment.platform`, `CommandPl
 | `tab.closed`, `workspace.closed` (#112, found in #120) | Herdr 0.9.3 sends no `pane.closed` for the panes a closed tab or workspace takes with it, and these payloads name only the tab or workspace. So, when the store holds any ping this command sent (`herdr-<pane>` whose action is `.herdr(pane)`; a ping an agent sent with `--herdr` is never touched), it runs `herdr pane list` once and removes each one whose pane isn't listed, printing their ids. No such ping: nothing, exit 0, and `herdr` isn't run. When `herdr pane list` can't be run or doesn't read (no server, no `herdr`), nothing is removed, exit 1: the CLI sees only an exit status, so a pane Herdr doesn't know and a Herdr that didn't answer would read the same through `pane get` |
 | any other event or status | nothing, exit 0 |
 
-Errors: no `HERDR_PLUGIN_EVENT`, or any argument: exit 2; a payload missing, not a JSON object, without `pane_id`, or (for a status change) without `agent_status`: exit 1, one line naming the event; a `config.toml` that doesn't read (blocked only), a store that can't be written, or (for a closed tab or workspace) a `herdr pane list` that didn't answer: exit 1. `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
+#### Errors
+
+- No `HERDR_PLUGIN_EVENT`, or any argument: exit 2.
+- A payload missing, not a JSON object, without `pane_id`, or (for a status change) without `agent_status`: exit 1, one line naming the event.
+- A `config.toml` that doesn't read (blocked only), a store that can't be written, or (for a closed tab or workspace) a `herdr pane list` that didn't answer: exit 1.
+- `herdr` isn't run with a timeout: the hook runs apart from Herdr's own work, and Herdr answers at once when it's well.
 
 ### The `shipyard` CLI target — `Sources/ShipyardCLI/main.swift` (0.0.5)
 
-A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status. Its product is `shipyard-cli` (on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file), and `make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it. It builds on Linux too, like the core.
+A thin executable target: it assembles the build's `CommandTable`, gathers the arguments, the working folder and the environment (with `GitCLI`), calls `ShipyardCLI.run`, prints what it returns and exits with its status.
+Its product is `shipyard-cli`, since on a case-insensitive disk `shipyard` and the app's `Shipyard` would be one file.
+`make bundle` copies it to `Shipyard.app/Contents/Helpers/shipyard`, signed before the bundle so the bundle's signature seals it.
+It builds on Linux too, like the core.
 
-Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else. As built by #126, #166 and #168 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
+#### Command table
+
+Since 0.1.0 (#164, #165, #166) it assembles the build's `CommandTable` and nothing else.
+As built by #126, #166 and #168 (the macOS branch imports ShipyardConfig and ShipyardControl, never ShipyardCore):
 
 ```swift
 var table = CommandTable()
@@ -2846,11 +3576,14 @@ table.add(ConfigurationCommands.entries(checks: [{ now in settings.check(at: now
 let result = ShipyardCLI.run(arguments, table: table, environment: commandEnvironment, now: Date())
 ```
 
-The `#if` is compile time and decides which modules are linked; nothing after it asks the platform. `settings` is where this build's `cli.toml` is; the commands that need a setting take it with their entries, as the ping entries take a filing, and `notify`'s route on Linux, `RemoteNoticeRoute`, is the first (#194).
+- The `#if` is compile time and decides which modules are linked; nothing after it asks the platform.
+- `settings` is where this build's `cli.toml` is.
+  The commands that need a setting take it with their entries, as the ping entries take a filing, and `notify`'s route on Linux, `RemoteNoticeRoute`, is the first (#194).
 
 ### CLISettings and CLISettingsFile — `ShipyardCLISettings/` (#189)
 
-The command's own settings file, `cli.toml` (ADR 0008). The app never reads it; `config.toml` stays the app's, and no setting is in both.
+The command's own settings file, `cli.toml` (ADR 0008).
+The app never reads it; `config.toml` stays the app's, and no setting is in both.
 
 | | |
 |---|---|
@@ -2859,29 +3592,114 @@ The command's own settings file, `cli.toml` (ADR 0008). The app never reads it; 
 | `CLISettings.decode(text) throws(CLISettingsError)` | the parse, every issue collected (`CLISettingsIssue`: an optional line and a message, "line 3: …") |
 | `CLISettings` | `notices: NoticeSettings`, `[notices]` (#194): `app-machine` (the app machine's MagicDNS name, a bare host name: no scheme, port or space; none by default), `app-scheme` (`http` or `https`, `http` by default) and `app-port` (1–65535, `NoticePort.default` 47420 by default; not `port`, which is `config.toml`'s). A new setting is a property on `NoticeSettings`, its key in `Reader.noticesKeys` and its read in `Reader.notify(_:)` |
 
-Tests: `CLISettingsTests` (`Tests/ShipyardCoreTests/CLISettings/`), the owner test of the file's contract: both places (the XDG cases, and the Mac's beside a recorded `config.toml`), a missing, empty or comment-only file and an empty `[notices]` as the defaults, and a table of files that don't read (invalid TOML, an unknown key in `[notices]`, an unknown table, `notify` not a table, not UTF-8), each exit 1 with the path and the problem. The commands that read it test their own behaviour with a file missing, set or malformed.
+#### Tests
+
+- `CLISettingsTests` (`Tests/ShipyardCoreTests/CLISettings/`) is the owner test of the file's contract:
+  - both places: the XDG cases, and the Mac's beside a recorded `config.toml`;
+  - a missing, empty or comment-only file and an empty `[notices]` as the defaults;
+  - a table of files that don't read (invalid TOML, an unknown key in `[notices]`, an unknown table, `notify` not a table, not UTF-8), each exit 1 with the path and the problem.
+- The commands that read it test their own behaviour with a file missing, set or malformed.
 
 ### CLILink — `ShipyardCore/CLI/CLILink.swift` (0.0.5)
 
-Puts the CLI on the user's PATH (N10), through onboarding's card and the Shipyard CLI view (N16, `PanelText.cliStatus`). `CLILink(cli:home:fileSystem:)` is `@MainActor @Observable` and holds `state`: `unlinked`, `linked`, `occupied(destination:)` (a link elsewhere, or `nil` for a file or folder), `failed(reason)` (the system's words), `missingCLI`, or `translocated`: the CLI's path is under `/AppTranslocation/` (`isTranslocated`), macOS running a downloaded copy from a temporary path, so it links nothing and the card says to move Shipyard to Applications first, with no command or button. A link whose destination is gone (an older copy moved or deleted) isn't this app's, so it reads as `occupied`, with the command that replaces it. It looks through the `LinkFileSystem` port: `fileExists(at:)` (following links, for the app's CLI), `entry(at:)` (`none`, `link(destination:)` as written, or `other`, without following the link), `createDirectory(at:)` and `createSymbolicLink(at:to:)`. `FileManagerLinkFileSystem` is the real one; it's Foundation alone, so it lives in the core and the tests run it in a temporary folder (a wrapper that refuses the link stands for no permission). A link counts as this app's when its destination, resolved against `~/.local/bin` when relative, is `cli`'s path. `check()` looks again; `makeLink()` makes the folder and the link only when the state is `unlinked`, otherwise it just says what's there, and after a failure it looks once more so something that appeared meanwhile reads as occupied rather than a failure. `command` is what the card offers to copy: `mkdir -p ~/.local/bin && ln -sf <cli> ~/.local/bin/shipyard`, the CLI's path single-quoted when it isn't plain, which replaces whatever is there, since running it is the user's choice. `CLILink.bundledCLI(in:)` is `Contents/Helpers/shipyard` in a bundle. Linking is instant, so there's no running state, timeout or cancel, unlike the skill install.
+Puts the CLI on the user's PATH (N10), through onboarding's card and the Shipyard CLI view (N16, `PanelText.cliStatus`).
+Linking is instant, so there's no running state, timeout or cancel, unlike the skill install.
+
+#### State
+
+`CLILink(cli:home:fileSystem:)` is `@MainActor @Observable` and holds `state`:
+
+- `unlinked`;
+- `linked`;
+- `occupied(destination:)`: a link elsewhere, or `nil` for a file or folder;
+- `failed(reason)`: the system's words;
+- `missingCLI`;
+- `translocated`: the CLI's path is under `/AppTranslocation/` (`isTranslocated`), macOS running a downloaded copy from a temporary path.
+  It links nothing, and the card says to move Shipyard to Applications first, with no command or button.
+
+#### Operations
+
+- `check()` looks again.
+- `makeLink()` makes the folder and the link only when the state is `unlinked`; otherwise it just says what's there.
+  After a failure it looks once more, so something that appeared meanwhile reads as occupied rather than a failure.
+- `command` is what the card offers to copy: `mkdir -p ~/.local/bin && ln -sf <cli> ~/.local/bin/shipyard`, the CLI's path single-quoted when it isn't plain.
+  It replaces whatever is there, since running it is the user's choice.
+- `CLILink.bundledCLI(in:)` is `Contents/Helpers/shipyard` in a bundle.
+
+#### Rules
+
+- A link counts as this app's when its destination, resolved against `~/.local/bin` when relative, is `cli`'s path.
+- A link whose destination is gone (an older copy moved or deleted) isn't this app's, so it reads as `occupied`, with the command that replaces it.
+
+#### Ports
+
+- It looks through the `LinkFileSystem` port:
+  - `fileExists(at:)`, following links, for the app's CLI;
+  - `entry(at:)`: `none`, `link(destination:)` as written, or `other`, without following the link;
+  - `createDirectory(at:)` and `createSymbolicLink(at:to:)`.
+- `FileManagerLinkFileSystem` is the real one.
+  It's Foundation alone, so it lives in the core and the tests run it in a temporary folder; a wrapper that refuses the link stands for no permission.
 
 ### SkillDetector — `ShipyardCore/Skill/SkillDetector.swift`
 
-Whether the shipyard skill is installed, for the Shipyard Skill view and the settings menu's mark (N16, #239). The skills CLI records each skill `npx skills add … -g` installs in `~/.agents/.skill-lock.json` (`skills.<name>.source`, the repository) and copies it to `~/.agents/skills/<name>/`. The skill is installed when the lock file's `shipyard` entry comes from `yahyabedirhan/shipyard`, or, with no such entry (no lock file, one that isn't JSON, or one without it), when `~/.agents/skills/shipyard/SKILL.md` exists. An entry from another source is some other skill named shipyard, so its folder doesn't count. `SkillDetector(home:)` is `@MainActor @Observable`, holds `isInstalled` and looks again on `check()`; the rule itself is `nonisolated static isInstalled(home:)`, Foundation alone, so `SkillDetectorTests` run it against temporary home folders. `AppServices` keeps one for the user's home.
+Whether the shipyard skill is installed, for the Shipyard Skill view and the settings menu's mark (N16, #239).
+
+#### Rules
+
+- The skills CLI records each skill `npx skills add … -g` installs in `~/.agents/.skill-lock.json` (`skills.<name>.source`, the repository) and copies it to `~/.agents/skills/<name>/`.
+- The skill is installed when the lock file's `shipyard` entry comes from `yahyabedirhan/shipyard`.
+- With no such entry (no lock file, one that isn't JSON, or one without it), it is installed when `~/.agents/skills/shipyard/SKILL.md` exists.
+- An entry from another source is some other skill named shipyard, so its folder doesn't count.
+
+#### State
+
+- `SkillDetector(home:)` is `@MainActor @Observable`, holds `isInstalled` and looks again on `check()`.
+- `AppServices` keeps one for the user's home.
+
+#### Tests
+
+- The rule itself is `nonisolated static isInstalled(home:)`, Foundation alone, so `SkillDetectorTests` run it against temporary home folders.
 
 ### SkillInstaller — `ShipyardCore/Skill/SkillInstaller.swift`
 
-Runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path) so nvm/asdf/Homebrew `PATH` setups are loaded. Spawning sits behind the `ShellRunning` port (ShipyardCommand's `Shell.swift` since 0.1.0; `ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together), so tests use a fake shell. Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`): an interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open. The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state (`idle`, `running`, `finished(result)`, `timedOut(seconds)`); `start()` races the install against a 180 s timeout (the sleep is injected, so tests don't wait), `cancel()` goes back to `idle` at once and stops the shell (a result that arrives after is dropped, so Install can start again straight away), and a timeout stops the shell and says so.
+Installs the shipyard skill.
+
+#### Operations
+
+- It runs the user's login shell as an interactive one (`$SHELL -l -i -c 'npx -y skills add yahyabedirhan/shipyard -g -y'`, `/bin/zsh` when `$SHELL` isn't an absolute path), so nvm/asdf/Homebrew `PATH` setups are loaded.
+- Spawning sits behind the `ShellRunning` port (ShipyardCommand's `Shell.swift` since 0.1.0), so tests use a fake shell.
+  `ProcessShellRunner` runs it with `Process`, standard input empty, output and errors read together.
+- Cancelling `ProcessShellRunner`'s task returns `nil` at once and sends SIGTERM, then SIGKILL a second later, to the shell and every process under it (found with `ps`).
+  An interactive shell ignores SIGTERM and runs the command as a job in its own process group, which would outlive it and hold the output pipe open.
 
 | Operation | Returns |
 |---|---|
 | `install() async -> SkillInstallResult` | `installed(output)` on status 0; `npxNotFound(command)` on status 127 (the shell couldn't find `npx`), with `SkillInstaller.command` for the Copy button; `failed(output)` otherwise: what it printed, colour codes stripped, or "exited with status N" when it printed nothing, or "couldn't start <shell>" |
 
-The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` looks for a repository's skills (`skills/<name>/SKILL.md`, with `name` and `description` frontmatter). It documents the configuration file for agents; `SkillDocumentTests` read its frontmatter as strict YAML (the CLI skips a skill whose frontmatter isn't valid YAML, such as a value with an unquoted `: `), decode each of its TOML examples with `Configuration.decode`, check them against the schema, and check that it names every key (each nested one beside its table), default, event and author filter the code has, and that its worked requests configure what they say. How configuration works in the code, and the checklist for adding a setting, is `docs/configuration.md`; `ConfigurationDocumentTests` keep that checklist naming every place a setting lives.
+#### State
+
+The panel doesn't call `install()` itself: `SkillInstallation` (`Skill/SkillInstallation.swift`, `@MainActor @Observable`) runs one install at a time and holds its state: `idle`, `running`, `finished(result)`, `timedOut(seconds)`.
+
+- `start()` races the install against a 180 s timeout; the sleep is injected, so tests don't wait.
+- `cancel()` goes back to `idle` at once and stops the shell.
+  A result that arrives after is dropped, so Install can start again straight away.
+- A timeout stops the shell and says so.
+
+#### Tests
+
+- The skill it installs is `skills/shipyard/SKILL.md`, where `npx skills add` looks for a repository's skills (`skills/<name>/SKILL.md`, with `name` and `description` frontmatter).
+  It documents the configuration file for agents.
+- `SkillDocumentTests`:
+  - read its frontmatter as strict YAML, since the CLI skips a skill whose frontmatter isn't valid YAML, such as a value with an unquoted `: `;
+  - decode each of its TOML examples with `Configuration.decode` and check them against the schema;
+  - check that it names every key (each nested one beside its table), default, event and author filter the code has;
+  - check that its worked requests configure what they say.
+- How configuration works in the code, and the checklist for adding a setting, is `docs/configuration.md`; `ConfigurationDocumentTests` keep that checklist naming every place a setting lives.
 
 ### Folder tree
 
-The layout since 0.1.0 (ADR 0006). `(0.1.0)` marks a file 0.1.0 added and `(moved)` one it moved to another module; #164–#169 built them.
+The layout since 0.1.0 (ADR 0006).
+`(0.1.0)` marks a file 0.1.0 added and `(moved)` one it moved to another module; #164–#169 built them.
 
 ```text
 shipyard/
@@ -3134,7 +3952,19 @@ shipyard/
 └── Tests/ShipyardAppTests/           # macOS only: the app's pure helpers, such as CodeText (a code span monospaced on a chip), and that the menu bar item, badge and icon share the sailboat path, and the badge and the committed icon the logo's colours; the control server's dispatch with a fake panel control and screenshotter, its real socket in a temporary folder, and the screenshot's rendering and PNG writing (0.1.0); NoticeListenerTests, the tailnet listener on a real 127.0.0.1 socket (#194); AgentLogoTests and ServiceLogoTests (#249), the bundled logos loading from the app's resources
 ```
 
-Shipyard is a macOS app and only ships for macOS. Linux is a development environment, where agents build and test every library, and a platform only for the `shipyard` command: since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005). Since 0.1.0 the package follows concerns (ADR 0006): the libraries on the agent's side (Command, Pings, CLISettings, Notices, Config, Control) and `ShipyardCore` build on Linux, importing only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder (CLISettings' and Config's), with AppKit only behind `#if canImport(AppKit)` in Control's launcher. Each build links what it uses (the table in [Modules and what each build links](#modules-and-what-each-build-links)). `ShipyardCore` holds the app's rules: the GitHub client, attention, events, notification rules, the rate budget, the menu model and the orchestrator itself. It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them (its module isn't called `Shipyard`, which is the core's orchestrator class): the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, the control server, the screenshotter and the SwiftUI views. Tests target the libraries, so they run on the VPS. The app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`, and the control server's dispatch.
+#### Platforms and builds
+
+- Shipyard is a macOS app and only ships for macOS.
+- Linux is a development environment, where agents build and test every library, and a platform only for the `shipyard` command.
+  Since 0.0.6 it runs on Linux machines too, where agents ping the Mac through Herdr (ADR 0005).
+- Since 0.1.0 the package follows concerns (ADR 0006).
+  The libraries on the agent's side (Command, Pings, CLISettings, Notices, Config, Control) and `ShipyardCore` build on Linux, importing only Foundation, FoundationNetworking (on Linux), Observation and TOMLDecoder (CLISettings' and Config's), with AppKit only behind `#if canImport(AppKit)` in Control's launcher.
+- Each build links what it uses (the table in [Modules and what each build links](#modules-and-what-each-build-links)).
+- `ShipyardCore` holds the app's rules: the GitHub client, attention, events, notification rules, the rate budget, the menu model and the orchestrator itself.
+- It reaches Apple-only services through a few small protocols in `Ports.swift`, and the `ShipyardApp` target supplies them: the Keychain, notifications, file watching (`DispatchSource` file-system sources are Darwin-only), wake, login item, the control server, the screenshotter and the SwiftUI views.
+  Its module isn't called `Shipyard`, which is the core's orchestrator class.
+- Tests target the libraries, so they run on the VPS.
+- The app target is built and checked on macOS, where `ShipyardAppTests` (declared only on macOS, like the app) also tests the few pure helpers that need SwiftUI types, such as `CodeText`, and the control server's dispatch.
 
 ---
 
