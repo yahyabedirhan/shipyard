@@ -67,7 +67,7 @@ extension BuiltInThemes {
     success = "mint"
     failure = "coral"
     pending = "sun"
-    running = "sun"
+    running = "mint"
     neutral = "quiet"
 
     [any.signal]

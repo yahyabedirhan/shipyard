@@ -69,7 +69,7 @@ extension BuiltInThemes {
     success = "green"
     failure = "brick"
     pending = "amber"
-    running = "amber"
+    running = "green"
     neutral = "quiet"
 
     [any.signal]

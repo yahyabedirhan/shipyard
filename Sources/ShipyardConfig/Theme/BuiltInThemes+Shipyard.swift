@@ -63,6 +63,7 @@ extension BuiltInThemes {
     selected = "system"
 
     # Open, merged and closed each take their own hue; a draft stays quiet.
+    # A running run is active, as an open item is, so it takes open's hue.
     [any.state]
     open = "green"
     draft = "quiet"
@@ -71,7 +72,7 @@ extension BuiltInThemes {
     success = "ok"
     failure = "bad"
     pending = "warn"
-    running = "warn"
+    running = "green"
     neutral = "quiet"
 
     [any.signal]

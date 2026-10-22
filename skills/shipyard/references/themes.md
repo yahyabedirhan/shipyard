@@ -101,14 +101,14 @@ A token that no theme in the `extends` chain sets is `system`.
 | `row` | `hover` | A hovered row or button, and the keyboard-highlighted row. |
 | | `pressed` | A pressed row or button. |
 | | `selected` | Reserved: accepted and checked, with no effect. The keyboard-highlighted row draws with `row.hover`. |
-| `state` | `open` | An open pull request or issue, a succeeded run. |
+| `state` | `open` | An open pull request or issue. |
 | | `draft` | A draft pull request. |
-| | `merged` | A merged pull request, a closed issue. |
-| | `closed` | A closed pull request. |
+| | `merged` | A merged pull request, a closed issue, a succeeded run: done. |
+| | `closed` | A closed pull request, a failed run. |
 | | `success` | A passing check, an approval. |
 | | `failure` | A failing check, an error, an exhausted rate limit. |
 | | `pending` | A pending check, a low rate limit. |
-| | `running` | A workflow run in progress. |
+| | `running` | A workflow run in progress. The built-in themes give it `open`'s hue, since both are active. |
 | | `neutral` | A ping, a note, any state without its own colour. |
 | `signal` | `attention` | A row that needs attention. |
 | | `lease` | The banner while an agent drives the app. |

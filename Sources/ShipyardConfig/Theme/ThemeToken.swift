@@ -67,11 +67,11 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
         case .separator, .border: SystemShade(.separator)
         case .rowPressed: SystemShade(.tertiaryFill)
         case .rowSelected: SystemShade(.accent, alpha: 0.2)
-        case .open, .success: SystemShade(.green)
+        case .open, .running, .success: SystemShade(.green)
         case .draft, .neutral: SystemShade(.secondaryLabel)
         case .merged: SystemShade(.purple)
         case .closed, .failure: SystemShade(.red)
-        case .pending, .running: SystemShade(.orange)
+        case .pending: SystemShade(.orange)
         case .lease: SystemShade(.yellow)
         }
     }

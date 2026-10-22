@@ -252,7 +252,7 @@ struct ThemeReaderTests {
         #expect(theme.knobs == .standard)
     }
 
-    @Test("each built-in theme reads with no problem, passes the contrast check and tells open, draft, merged and closed apart by colour in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
+    @Test("each built-in theme reads with no problem, passes the contrast check and tells open, draft, merged and closed apart by colour, and draws a running run as open, in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
     func builtIn(_ name: String) throws {
         #expect(BuiltInThemes.issues.isEmpty, "\(BuiltInThemes.issues)")
         let theme = try #require(BuiltInThemes.named(name))
@@ -260,6 +260,7 @@ struct ThemeReaderTests {
         for appearance in theme.appearances {
             let states = [ThemeToken.open, .draft, .merged, .closed].map { theme.rgba($0, appearance) }
             #expect(Set(states).count == states.count, "\(appearance): \(states)")
+            #expect(theme.rgba(.running, appearance) == theme.rgba(.open, appearance), "\(appearance)")
         }
         // Paper fills light and Midnight dark; each draws its one in both appearances.
         let fills: [ThemeAppearance] = switch name {
