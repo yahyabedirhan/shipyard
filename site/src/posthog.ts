@@ -1,4 +1,10 @@
-/** The PostHog client, in its own chunk. Imported only by `analytics.ts` in a build with a key. */
+/**
+ * The PostHog client, in its own chunk. Imported only by `analytics.ts` in a build with a key.
+ *
+ * Copied: yahyabedirhan/topographic keeps the same module in apps/playground/src, and yahyabedirhan/personal-website
+ * keeps the same behaviour in src/privacy.js, src/analytics.js and src/errors.js. Change all three together;
+ * docs/low-level-design.md > 'Copied modules' lists them.
+ */
 // The slim build has capture, pageview and pageleave, without replay, surveys or the toolbar.
 import posthog from 'posthog-js/dist/module.slim';
 import type { SuperProperties } from './analytics';

@@ -1,6 +1,10 @@
 /**
  * Error reporting for the site. It is built in only when `VITE_SENTRY_DSN` is set; without it every call here does
  * nothing and @sentry/browser is not part of the build. At most `MAX_EVENTS` reports leave one page.
+ *
+ * Copied: yahyabedirhan/topographic keeps the same module in apps/playground/src, and yahyabedirhan/personal-website
+ * keeps the same behaviour in src/privacy.js, src/analytics.js and src/errors.js. Change all three together;
+ * docs/low-level-design.md > 'Copied modules' lists them.
  */
 import { consent } from './consent';
 
