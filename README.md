@@ -37,16 +37,16 @@ npx skills add yahyabedirhan/shipyard -g -y
 ## What it does
 
 Your agents open pull requests and issues and start workflow runs, often several at once across several repositories.
-shipyard keeps them in one place.
+shipyard lists them in the macOS menu bar.
 
 | | |
 |---|---|
-| **One menu** | Pull requests, issues and workflow runs, from you, your agents and other people, grouped by project. |
-| **One number** | How many items need attention: new, changed since you last opened them, waiting on your review, or failing their checks. |
+| **Menu bar** | Pull requests, issues and workflow runs, from you, your agents and other people, grouped by project. |
+| **Attention number** | How many items need attention: new, changed since you last opened them, waiting on your review, or failing their checks. |
 | **Notifications** | When something happens, by the rules you choose. |
 | **Pings** | Your agents tell you when they need you, from this Mac or your other machines. |
 | **Notes** | Your own notes, kept in Notion, listed beside each project. |
-| **One file** | All settings live in `~/.config/shipyard/config.toml`, edited by you or by your agents. |
+| **Configuration file** | All settings live in `~/.config/shipyard/config.toml`, edited by you or by your agents. |
 
 ## Install
 
