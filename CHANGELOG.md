@@ -4,9 +4,10 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 ## 0.8.1 (2026-10-22)
 
-The default theme's state icons are in colour again, and the README and the site's docs are easier to scan. It gathers [#324](https://github.com/yahyabedirhan/shipyard/pull/324), [#325](https://github.com/yahyabedirhan/shipyard/pull/325) and [#328](https://github.com/yahyabedirhan/shipyard/pull/328).
+The default theme's state icons are in colour again, ntn runs on Linux no longer hold each other's pipes, and the README and the site's docs are easier to scan. It gathers [#324](https://github.com/yahyabedirhan/shipyard/pull/324), [#325](https://github.com/yahyabedirhan/shipyard/pull/325), [#328](https://github.com/yahyabedirhan/shipyard/pull/328), [#329](https://github.com/yahyabedirhan/shipyard/pull/329) and [#330](https://github.com/yahyabedirhan/shipyard/pull/330).
 
 - **State icons in colour again.** The Shipyard theme draws an open pull request or issue green, a merged pull request or a closed issue purple and a closed pull request red, in light and dark, as before 0.8.0; a draft stays grey. Graphite does the same in its own green, violet and red, and Harbor follows Shipyard. Every built-in theme now tells open, merged and closed apart: [#326](https://github.com/yahyabedirhan/shipyard/issues/326) "Bug: Built-in themes show open, merged and closed states in one grey".
+- **ntn runs no longer hold each other's pipes.** On Linux, a pipe from one ntn run could leak into a program another run started at the same moment, so a run sometimes waited until its timeout and failed. The pipes are now close-on-exec, and a stopped run stops the programs it started: [#322](https://github.com/yahyabedirhan/shipyard/issues/322) "Bug: The empty standard input test of ntn runs is flaky on Linux".
 
 ## 0.8.0 (2026-10-22)
 
