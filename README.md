@@ -249,7 +249,7 @@ Clicking it takes you where the agent means:
 A ping:
 
 - needs attention until you click it
-- leaves a day after you have seen it (`seen-window`), or when you dismiss it with its ✕
+- leaves a day after you have seen it (`seen-window`), or when you mark it done with the ✓ that takes its age's place on hover
 - never reaches GitHub
 
 With the skill installed, ask "ping me when the PR is ready" and the agent knows the rest.
