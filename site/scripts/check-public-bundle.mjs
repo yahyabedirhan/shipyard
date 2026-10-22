@@ -3,6 +3,7 @@
 // off. Run after `astro build`, from site/. It prints the JavaScript each page loads up front and in all.
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
+import { loadEnv } from 'vite';
 
 const dist = new URL('../dist/', import.meta.url).pathname;
 // Each vendor's words must appear only in that vendor's own code. posthog-js mentions Sentry, so the Sentry words
@@ -73,7 +74,9 @@ for (const [page, words] of Object.entries(pages)) {
   console.log(`${page}: JavaScript ${kb(await size(onLoad))} on load, ${kb(await size(hydrate))} more for its islands, ${kb(await size(later))} more only when analytics load`);
 }
 
-const allowed = { posthog: Boolean(process.env.VITE_POSTHOG_KEY), sentry: Boolean(process.env.VITE_SENTRY_DSN) };
+// The keys the build saw: the shell's, else site/.env.local and the other .env files, as Astro's build reads them.
+const env = { ...loadEnv('production', new URL('..', import.meta.url).pathname, 'VITE_'), ...process.env };
+const allowed = { posthog: Boolean(env.VITE_POSTHOG_KEY), sentry: Boolean(env.VITE_SENTRY_DSN) };
 for (const path of scripts) {
   for (const [name, words] of Object.entries(vendors)) {
     if (!words.some((w) => text[path].includes(w))) continue;
