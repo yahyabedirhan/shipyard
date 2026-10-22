@@ -11,7 +11,7 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-This README describes 0.7.1.
+This README describes 0.8.0.
 
 <p align="center">
   <img src="assets/screenshots/launch/landing-tabs-dark.png" width="320" alt="The shipyard panel in dark mode, in the tabs layout on one project's tab: pull requests, pings from agents, issues and runs">
