@@ -24,7 +24,7 @@ type(scope): what changed
 ```
 
 - Types: `feat` (new capability, MINOR bump) and `fix` (a patched bug, PATCH bump); `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, and `chore` for maintenance. Nothing else, and no bare subjects.
-- Scope is optional and names the area: the app's (`menu`, `panel`, `sign-in`, `onboarding`, `config`, `arrangement`, `runs`, `icon`) or the repo's (`release`, `skill`, `agents`, `handoff`, `readme`, `design`, `adr`, `references`, `assets`). Moves and path rewrites are `refactor`, tickets and ledgers are `chore`, handoffs and reports are `docs`.
+- Scope is optional and names the area: the app's (`menu`, `panel`, `sign-in`, `onboarding`, `config`, `arrangement`, `runs`, `icon`) or the repo's (`release`, `skill`, `agents`, `readme`, `design`, `adr`, `references`, `assets`). Moves and path rewrites are `refactor`, tickets and ledgers are `chore`, reports are `docs`.
 - Keep the whole message lowercase, including company and product names. The `Co-Authored-By` trailer keeps its standard spelling.
 - Never add a `Claude-Session:` trailer or any other session link to a commit message. The `Co-Authored-By` line from the session's attribution rule is the only trailer.
 
@@ -59,14 +59,16 @@ A machine Herdr can't reach (`herdr machine status`) is reported with the rest a
 ## Folder Layout
 
 ```text
-.handoff/<date>-<topic>.md     tracked   handoffs between sessions
 assets/images/<topic>/         tracked   images the project uses, such as the logo and the app icon's drafts
 assets/screenshots/<topic>/    tracked   screenshots worth keeping, linked from issues, pull requests and docs
 .scratch/                      ignored   notes, logs, temp files, raw captures and pull request description sources
+.handoff/                      ignored   handoffs between sessions, when the session's handoff folder is the repository's
 .claude/worktrees/             ignored   sub-agent worktrees
 ```
 
 `.scratch/` is throwaway: anything that must outlive the session moves to a tracked home, or into the issue or pull request it belongs to.
+
+Handoffs stay private: they go to the handoff folder outside the repository, and never into git.
 
 Only the repository's root has a `README.md`. A folder's own index, which says what the folder holds and how its files are shaped, is `index.md`, as in `docs/references/index.md`.
 
