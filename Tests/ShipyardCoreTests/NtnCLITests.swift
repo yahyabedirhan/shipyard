@@ -121,8 +121,9 @@ struct NtnCLITests {
         while kill(child, 0) == 0, Date() < deadline {
             try await Task.sleep(for: .milliseconds(50))
         }
-        #expect(kill(child, 0) != 0)
-        kill(child, SIGKILL)
+        let outlived = kill(child, 0) == 0
+        #expect(!outlived)
+        if outlived { kill(child, SIGKILL) }
         _ = await run.value
     }
 
