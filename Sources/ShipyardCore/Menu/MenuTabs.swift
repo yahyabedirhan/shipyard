@@ -14,9 +14,11 @@ public struct MenuTabContent: Equatable, Sendable {
     /// the list; All's by kind (pull requests, then pings, then issues, then runs) under
     /// subheaders, newest first. A group with no rows is left out.
     public var groups: [RowGroup]
-    /// One per repository of the tab's projects that couldn't be fetched.
+    /// One per repository of the tab's projects that couldn't be fetched,
+    /// an error several projects share once.
     public var errors: [MenuErrorRow]
-    /// Its projects' notes, such as the review search's limit.
+    /// Its projects' notes, such as the review search's limit, a note
+    /// several projects share once.
     public var notes: [String]
     /// Rows in the tab needing attention.
     public var attentionCount: Int
@@ -96,11 +98,12 @@ extension MenuModel {
         case .project:
             groups = visible.flatMap(\.groups)
         }
-        let errors = visible.flatMap(\.errors)
+        var seenErrors = Set<String>()
+        var seenNotes = Set<String>()
         return MenuTabContent(
             groups: groups,
-            errors: errors,
-            notes: visible.flatMap(\.notes),
+            errors: visible.flatMap(\.errors).filter { seenErrors.insert($0.id).inserted },
+            notes: visible.flatMap(\.notes).filter { seenNotes.insert($0).inserted },
             attentionCount: attentionCount(for: tab),
             projectCount: visible.count,
             showsRepository: tab == .all ? visible.count > 1 || visible.contains(where: \.showsRepository)

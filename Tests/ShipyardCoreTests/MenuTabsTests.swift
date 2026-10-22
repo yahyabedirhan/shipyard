@@ -149,6 +149,22 @@ struct MenuTabsTests {
         #expect(menu.tabContent(for: .project("other")).errors.isEmpty)
     }
 
+    @Test("All lists an error or a note that several projects share once, so each line it lists has an id of its own")
+    func sharedErrorsOnce() {
+        let unreachable = MenuErrorRow(.notes("can't reach Notion"))
+        var first = section("shipyard", [])
+        first.errors = [unreachable]
+        first.notes = ["Showing 50 of 80"]
+        var second = section("skills", [])
+        second.errors = [unreachable, MenuErrorRow(.notes("ntn isn't logged in"))]
+        second.notes = ["Showing 50 of 80"]
+        let all = model([first, second]).tabContent(for: .all)
+
+        #expect(all.errors.map(\.message) == ["notes: can't reach Notion", "notes: ntn isn't logged in"])
+        #expect(Set(all.errors.map(\.id)).count == all.errors.count)
+        #expect(all.notes == ["Showing 50 of 80"])
+    }
+
     @Test("an empty tab says nothing is open, or not loaded yet while any of its projects isn't")
     func empty() {
         let menu = model([section("shipyard", []), section("new", [], isLoaded: false), section("busy", [row(.issue, 1)])])

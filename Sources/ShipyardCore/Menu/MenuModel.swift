@@ -629,7 +629,9 @@ public struct MenuErrorRow: Equatable, Sendable, Identifiable {
     /// For example "yahyabedirhan/gone: not found, or no access".
     public var message: String
 
-    public var id: String { repository }
+    /// Its repository and message, so two projects' notes errors with
+    /// different messages never share an id in the All tab.
+    public var id: String { "\(repository)\n\(message)" }
 
     public init(_ error: RepositoryError) {
         repository = error.repository
