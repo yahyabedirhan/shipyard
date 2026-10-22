@@ -39,7 +39,7 @@ struct TabsLayout: View {
         HStack(spacing: 4) {
             if content.isCaughtUp {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(ThemeColor.done)
+                    .foregroundStyle(ThemeColor.accent)
                     .transition(.scale.combined(with: .opacity))
             }
             Text(PanelText.tabSummary(
@@ -379,7 +379,7 @@ private struct EmptyTab: View {
             Image(systemName: isLoaded ? "checkmark.seal.fill" : "clock")
                 .font(.system(size: 26))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isLoaded ? ThemeColor.done : ThemeColor.textTertiary)
+                .foregroundStyle(isLoaded ? ThemeColor.accent : ThemeColor.textTertiary)
             Text(text)
                 .font(scale.type.button)
                 .foregroundStyle(ThemeColor.textSecondary)

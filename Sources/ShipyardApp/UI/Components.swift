@@ -773,7 +773,7 @@ struct ToneIcon: View {
         Group {
             switch tone {
             case .success:
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(ThemeColor.done)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(ThemeColor.accent)
             case .warning:
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(ThemeColor.failed)
             case .neutral:

@@ -187,11 +187,11 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let lease = ThemeColor(.lease)
 
     /// The theme's phase colours, for what isn't one kind's state but is
-    /// in a phase: an error is `failed`, a tick for something finished
-    /// `done`, a hint that something is under way `active`, a note that
-    /// asks for nothing `quiet`.
+    /// in a phase: an error is `failed`, a diff's additions `active`, a
+    /// note that asks for nothing `quiet`. A status mark, such as a
+    /// caught-up tick or a connected status, is the accent, not `done`,
+    /// so it never reads as a merged pull request.
     static let active = ThemeColor(.phase(.active), opacity: 1)
-    static let done = ThemeColor(.phase(.done), opacity: 1)
     static let failed = ThemeColor(.phase(.failed), opacity: 1)
     static let quiet = ThemeColor(.phase(.quiet), opacity: 1)
 
