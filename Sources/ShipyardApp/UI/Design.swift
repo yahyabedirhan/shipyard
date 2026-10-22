@@ -32,10 +32,12 @@ struct PanelScale: Equatable {
     func meta(_ style: PanelStyle) -> Font { style == .list ? listType.meta : type.meta }
     func eyebrow(_ style: PanelStyle) -> Font { style == .list ? listType.eyebrow : type.eyebrow }
 
-    /// How far a ping row's ✕ sits from the row's trailing edge: just
-    /// before the age, so the age stays readable.
-    func dismissTrailing(_ style: PanelStyle) -> CGFloat {
-        style == .list ? list.gutter + ListGrid.ageColumn + 2 : grid.gutter + Grid.ageColumn + 2
+    /// Where a ping row's done button sits: in the age's slot, as far from
+    /// the row's trailing edge as the age, as wide as its column and the
+    /// row's icon button high.
+    func pingDoneTrailing(_ style: PanelStyle) -> CGFloat { style == .list ? list.gutter : grid.gutter }
+    func pingDoneSize(_ style: PanelStyle) -> CGSize {
+        style == .list ? CGSize(width: ListGrid.ageColumn, height: 16) : CGSize(width: Grid.ageColumn, height: 22)
     }
 }
 
