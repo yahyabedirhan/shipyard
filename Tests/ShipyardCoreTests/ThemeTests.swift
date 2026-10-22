@@ -125,7 +125,7 @@ struct ThemeTests {
         #expect(harness.shipyard.themeIssues.map(\.description)
             == ["""
                 themes/Tide.toml line 11: `extends` names "Shipyard", which isn't a theme (expected one of `Brass`, `Harbor`, `Heather`, \
-                `Ocean`, `Paper Dark`, `Paper Light`, `Shipyard Dark`, `Shipyard Light`, `Sunset`, `System`, `Tide`)
+                `Ocean`, `Paper Dark`, `Paper Light`, `Shipyard Dark`, `Shipyard Light`, `Sunset`, `System`)
                 """])
     }
 

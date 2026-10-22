@@ -397,7 +397,7 @@ struct ThemeReaderTests {
             extends = "Nowhere"
             """, issues: ["""
                 Theme.toml line 3: `extends` names "Nowhere", which isn't a theme (expected one of `Brass`, `Harbor`, `Heather`, \
-                `Ocean`, `Orphan`, `Paper Dark`, `Paper Light`, `Shipyard Dark`, `Shipyard Light`, `Sunset`, `System`)
+                `Ocean`, `Paper Dark`, `Paper Light`, `Shipyard Dark`, `Shipyard Light`, `Sunset`, `System`)
                 """]),
         Invalid(name: "extends goes back to the theme itself", text: """
             name = "Loop"

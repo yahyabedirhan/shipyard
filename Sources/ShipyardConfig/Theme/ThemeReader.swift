@@ -178,7 +178,10 @@ public enum ThemeReader {
         var chain: [ThemeDefinition] = [definition]
         while let parent = chain[0].extends {
             guard let found = library[parent.lowercased()] else {
-                let names = library.values.map(\.name).sorted { $0.lowercased() < $1.lowercased() }.map { "`\($0)`" }
+                // The themes it could extend: every one but those in its own chain.
+                let own = Set(chain.map { $0.name.lowercased() })
+                let names = library.values.map(\.name).filter { !own.contains($0.lowercased()) }
+                    .sorted { $0.lowercased() < $1.lowercased() }.map { "`\($0)`" }
                 return .failure(Failure(issues: [extendsIssue(
                     chain[0], "`extends` names \"\(parent)\", which isn't a theme (expected one of \(names.joined(separator: ", ")))"
                 )]))
