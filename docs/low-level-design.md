@@ -25,7 +25,7 @@ The closing sections:
 ### Sources
 
 - The design was agreed 2026-09-25.
-- The decisions on filters, repository selectors and arrangement, with the reasons, are in `.handoff/2026-09-26-shipyard-0.0.2-decisions.md`; the lasting ones are ADRs 0002 and 0003.
+- The lasting decisions on filters, repository selectors and arrangement, with the reasons, are ADRs 0002 and 0003.
 - Terms are the ones in `GLOSSARY.md`.
 - The configuration decision is `docs/adr/0001-configuration-is-a-toml-file-agents-edit.md`.
 - Facts about GitHub's API are in `docs/references/`.
