@@ -67,6 +67,8 @@ struct ThemeColor: ShapeStyle, Hashable {
     /// What the colour is looked up by.
     enum Source: Hashable {
         case token(ThemeToken)
+        /// A phase, as the theme's `[phase]` table names it.
+        case phase(ThemePhase)
         /// A kind's state, as its `[states.<kind>]` table names it.
         case state(ThemeKind, String)
     }
@@ -98,6 +100,8 @@ struct ThemeColor: ShapeStyle, Hashable {
             case .color(let rgba): Self.color(rgba)
             case .system: SystemColors.color(token.system(appearance), appearance)
             }
+        case .phase(let phase):
+            Self.color(theme.color(phase, appearance), appearance)
         case .state(let kind, let state):
             // A state the kind doesn't have draws the quiet phase.
             Self.color(theme.color(kind, state, appearance) ?? theme.color(.quiet, appearance), appearance)
@@ -132,46 +136,67 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let border = ThemeColor(.border)
     static let rowHover = ThemeColor(.rowHover)
     static let rowPressed = ThemeColor(.rowPressed)
-    static let success = ThemeColor(.success)
-    static let failure = ThemeColor(.failure)
-    static let pending = ThemeColor(.pending)
-    static let neutral = ThemeColor(.neutral)
     static let attention = ThemeColor(.attention)
     static let lease = ThemeColor(.lease)
 
-    /// A row's state icon: the theme's colour for the kind in that state,
-    /// its `[states.<kind>]` value. A ping or a note is neutral.
+    /// The theme's phase colours, for what isn't one kind's state but is
+    /// in a phase: an error is `failed`, a tick for something finished
+    /// `done`, a hint that something is under way `active`, a note that
+    /// asks for nothing `quiet`.
+    static let active = ThemeColor(.phase(.active), opacity: 1)
+    static let done = ThemeColor(.phase(.done), opacity: 1)
+    static let failed = ThemeColor(.phase(.failed), opacity: 1)
+    static let quiet = ThemeColor(.phase(.quiet), opacity: 1)
+
+    /// The theme's colour for `kind` in `state`, its `[states.<kind>]` value.
+    static func state(_ kind: ThemeKind, _ state: String) -> ThemeColor {
+        ThemeColor(.state(kind, state), opacity: 1)
+    }
+
+    /// A row's state icon. A ping or a note has one state, `open`.
     static func state(_ state: ItemState, kind: ItemKind) -> ThemeColor {
-        guard let kind = ThemeKind(kind) else { return neutral }
-        return ThemeColor(.state(kind, state.rawValue), opacity: 1)
+        switch kind {
+        case .ping, .note: Self.state(ThemeKind(kind), "open")
+        case .pullRequest, .issue, .workflowRun: Self.state(ThemeKind(kind), state.rawValue)
+        }
     }
 
     /// A pull request's check dot; none when it has no checks.
     static func checks(_ checks: ChecksState) -> ThemeColor? {
-        switch checks {
-        case .none: nil
-        case .pending: pending
-        case .passed: success
-        case .failed: failure
-        }
+        checks == .none ? nil : state(.check, checks.rawValue)
     }
 
-    /// The rate-limit text: the tertiary text while normal, then pending, then failure.
+    /// A review decision, as the hover card shows it.
+    static func review(_ decision: ReviewDecision) -> ThemeColor {
+        let name = switch decision {
+        case .approved: "approved"
+        case .changesRequested: "changes-requested"
+        case .reviewRequired: "review-required"
+        }
+        return state(.review, name)
+    }
+
+    /// The rate limit's colour at `level`.
     static func rate(_ level: RateLevel) -> ThemeColor {
-        switch level {
-        case .normal: textTertiary
-        case .low: pending
-        case .exhausted: failure
+        let name = switch level {
+        case .normal: "normal"
+        case .low: "low"
+        case .exhausted: "exhausted"
         }
+        return state(.rate, name)
     }
 
-    /// The rate-limit bar.
+    /// The rate-limit text: the tertiary text while normal, so a limit with
+    /// room doesn't draw the eye; the theme's `low` or `exhausted` colour
+    /// once it runs short.
+    static func rateText(_ level: RateLevel) -> ThemeColor {
+        level == .normal ? textTertiary : rate(level)
+    }
+
+    /// The rate-limit bar: the theme's colour for the level, lighter while
+    /// normal.
     static func rateBar(_ level: RateLevel) -> ThemeColor {
-        switch level {
-        case .normal: success.opacity(0.65)
-        case .low: pending
-        case .exhausted: failure
-        }
+        level == .normal ? rate(level).opacity(0.65) : rate(level)
     }
 }
 

@@ -78,7 +78,8 @@ public struct Theme: Identifiable, Hashable, Sendable {
     }
 
     /// A theme with its phase and state colours; one left out takes its
-    /// default: a state its phase, a phase its macOS colour.
+    /// default: a state its phase (a state with no phase the macOS orange),
+    /// a phase its macOS colour.
     init(
         name: String,
         summary: String,
@@ -113,8 +114,9 @@ public struct Theme: Identifiable, Hashable, Sendable {
     /// The colour of `kind` in `state`, in `appearance`: the one lookup the
     /// app colours a state with. `nil` when the kind has no such state.
     public func color(_ kind: ThemeKind, _ state: String, _ appearance: ThemeAppearance) -> ThemeStateColor? {
-        guard let phase = kind.phase(of: state) else { return nil }
-        return states[appearance]?[ThemeStateKey(kind: kind, state: state)] ?? color(phase, appearance)
+        guard kind.has(state) else { return nil }
+        if let set = states[appearance]?[ThemeStateKey(kind: kind, state: state)] { return set }
+        return kind.phase(of: state).map { color($0, appearance) } ?? .system(ThemeKind.warning)
     }
 }
 

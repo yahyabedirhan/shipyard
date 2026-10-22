@@ -440,10 +440,12 @@ extension PanelBanner {
 
     fileprivate var tint: ThemeColor {
         switch kind {
-        case .configError, .paused: ThemeColor.failure
-        case .delay, .fetch: ThemeColor.pending
+        // A delay is the rate limit running low, a pause the limit spent.
+        case .delay: ThemeColor.rate(.low)
+        case .paused: ThemeColor.rate(.exhausted)
+        case .configError, .fetch: ThemeColor.failed
         case .lease: ThemeColor.lease
-        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: ThemeColor.neutral
+        case .stoppedHolder, .configWarnings, .machine, .notes, .notificationsOff: ThemeColor.quiet
         }
     }
 }
@@ -475,7 +477,7 @@ private struct RateLine: View {
             .accessibilityHidden(true)
             Text(PanelText.rateUsage(usage))
                 .font(scale.type.caption)
-                .foregroundStyle(ThemeColor.rate(usage.level))
+                .foregroundStyle(ThemeColor.rateText(usage.level))
         }
     }
 }

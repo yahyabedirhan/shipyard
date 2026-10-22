@@ -1785,12 +1785,13 @@ The theme file format is in `skills/shipyard/references/themes.md`, and what to 
 
 It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without AppKit.
 
-- `ThemeToken` lists the 25 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`).
+- `ThemeToken` lists the 21 tokens in six sections (`surface`, `text`, `accent`, `line`, `row`, `signal`).
   `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
-  The `state` section holds `success`, `failure`, `pending` and `neutral`; the colours of pull requests, issues and runs are state colours, not tokens (ADR 0015).
+  Every state's colour is a state colour, not a token (ADR 0015): `[state]` has no tokens left.
 - A `ThemeValue` is a colour (`RGBA`) or `system`.
 - `ThemePhase` lists the four phases, `active`, `done`, `failed` and `quiet`, and `ThemePhase.system` names each one's macOS colour: green, purple, red and the secondary label grey.
-- `ThemeKind` lists the kinds a theme colours by state, `pull-request`, `issue` and `run`, each with its states and the phase each state takes by default (`ThemeKind.states`); `ThemeKind(_:)` maps an `ItemKind` to one, and a ping or a note has none.
+- `ThemeKind` lists the kinds a theme colours by state, `pull-request`, `issue`, `run`, `check`, `review`, `rate`, `ping` and `note`, each with its states and the phase each state takes by default (`ThemeKind.states`); the rate limit's `low` has no phase and draws `ThemeKind.warning`, the macOS orange.
+  `ThemeKind(_:)` maps an `ItemKind` to one.
 - A `ThemeStateColor` is a resolved state or phase colour: a fixed `RGBA`, or a `SystemShade` the app draws live.
 - `ThemeKnobs` holds what both appearances share: the font (`family`, `mono`, `size`), the density (a preset and the `row`, `header`, `bar` and `gutter` heights it sets), the corner radii (`small`, `medium`, `large`) and the material (`glass` or flat).
 - `Theme` holds every token, phase and state colour resolved for light and dark, its knobs, the `appearances` it fills itself, and its `source`, built in or a file; `Theme.drawn(_:)` gives the appearance it draws in while the system is in another.
@@ -1846,7 +1847,8 @@ A `[phase]` value is a palette name, a hex colour or `system`; one that names a 
 A `[states.<kind>]` value is a phase name, a palette name, a hex colour or `system`.
 A phase's name always means the phase, even where a palette entry has that name, so the built-in themes call their grey `grey`.
 A state no theme in the chain sets takes its phase, and a phase no theme sets is its macOS colour; `system` in a state is its own phase's macOS colour.
-A `state.*` token that `[states.*]` replaced, such as `state.merged`, is a problem on its line that names the keys that replace it, in the same layer.
+A state with no phase, the rate limit's `low`, takes the macOS orange, for `system` too.
+A removed `state.*` token, such as `state.merged` or `state.success`, is a problem on its line that names the keys that replace it, in the same layer; any other key in `[state]` is a problem too.
 
 **Files that don't read.**
 A file with a problem keeps the theme it last read, by file URL.
@@ -1861,7 +1863,11 @@ Every built-in theme passes in both appearances.
 
 **The token layer.**
 `ShipyardApp/UI/ThemeColor.swift` brings a theme into the views.
-Views read `\.theme` from the environment, Shipyard by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves a token, or a kind's state, from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` and `checks(_:)` for a row's icon and check dot, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
+Views read `\.theme` from the environment, Shipyard by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves a token, or a kind's state, from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` and `checks(_:)` for a row's icon and check dot, `review(_:)` for a hover card's review, `rate(_:)`, `rateBar(_:)` and `rateText(_:)` for the rate limit, `state(_:_:)` for any kind's state, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
+The app keeps no mapping from a state to a colour: each of these names a `[states.<kind>]` state, and `Theme.color(_:_:_:)` resolves it.
+The rate-limit bar draws `normal` at 65% opacity, and its text stays `text.tertiary` until the limit is `low`.
+What shows a phase without being one kind's state draws the phase, `.active`, `.done`, `.failed` or `.quiet`: an error row, an action's error, onboarding's errors and the lease banner's Stop are `failed`, a caught-up tick and a finished status `done`, a diff's additions `active`, and an informational banner `quiet`.
+The slow-down and paused banners are the rate limit's `low` and `exhausted`.
 There is no global active theme: a view that sets `\.theme` changes only what's below it.
 `View.theme(_:)` sets it at the panel's root, from `Shipyard.theme`, and gives the views below the appearance the theme draws in, so a theme that fills one appearance draws it in both, its `system` values and the text and controls with no colour of their own included.
 
@@ -2623,7 +2629,7 @@ Each row holds:
 
 - Its number, title (a run: its workflow's name), author and URL.
 - Its semantic state: open, draft, merged, closed, running, succeeded, failed.
-  The app's `ThemeColor.state(_:kind:)` colours its icon with the theme's state colour, `Theme.color(_:_:_:)` for the kind and the state, in the list and the tabs layouts alike; the app keeps no mapping from a state to a colour of its own, and a ping or a note is `state.neutral`.
+  The app's `ThemeColor.state(_:kind:)` colours its icon with the theme's state colour, `Theme.color(_:_:_:)` for the kind and the state, in the list and the tabs layouts alike; the app keeps no mapping from a state to a colour of its own, and a ping or a note is its kind's `open` state.
 - `branch` (runs only) and the check dot (open and draft PRs only).
 - `since` for its age: opened or started, or closed or finished.
 - Its `needsAttention` flag and the `item` it shows; marking it seen records that version.
@@ -2822,8 +2828,8 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               Allow again at its right edge where Stop sits (AppServices.allowLeaseHolder, #181, #216) ·
                               config error (any phase) · config warnings (any phase, gray: unknown settings the
                               file ignores, "config.toml line 1: unknown setting `future-key` (ignored)", with a
-                              "did you mean" when one is close) · once ready: refresh delay (backed off: amber;
-                              paused: red; none when only stretched, #224) · fetch error · each remote machine's quiet line · the notes banner (gray,
+                              "did you mean" when one is close) · once ready: refresh delay (backed off: rate.low;
+                              paused: rate.exhausted; none when only stretched, #224) · fetch error · each remote machine's quiet line · the notes banner (gray,
                               `note.text`: no ntn, ntn logged out, or no Shipyard Notes page, NT10) · notifications off (with a button to
                               System Settings); the core's list (`Shipyard.banners(at:)`, #220), redrawn by a
                               TimelineView at each snooze's end, the lease's banner and quiet lines included (left out
@@ -2869,7 +2875,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               clicks, shows hover help and highlights as the list's does (itemRow)
       footer                  last updated (the native mini spinner and "Refreshing…" while a refresh runs) ·
                               global "Mark all seen" · Quit (⌘Q) · rate limit lines, each with a bar
-                              (amber low, red exhausted)
+                              (the theme's rate.low and rate.exhausted)
 ```
 
 #### Shared pieces
@@ -2998,8 +3004,8 @@ Hover help (#72): the panel doesn't use macOS's native tooltips (`.help`), which
   - Either way it fades when the pointer leaves and never takes the pointer.
 - A row's card (`hoverHelp(_ card: RowCard, leadingInset:)`) shows:
   - the author's avatar (20 pt, SwiftUI's `AsyncImage`, at `AvatarCache`'s size; for a ping from a known agent, `RowCard.agent`, that agent's logo, `AgentMarkView`, #137) centred beside the full title as its header;
-  - under the title, a review request (amber) and failed checks (red) as tinted tags, from the row's attention reasons (new and changed get no tag; the row's attention dot says as much);
-  - then `RowCard.facts`, a line of them at a time, each an SF Symbol and a short value, coloured only where it says how things stand (added green, removed red, the review and checks by state, a running run amber).
+  - under the title, a review request (`review.review-required`) and failed checks (`check.failed`) as tinted tags, from the row's attention reasons (new and changed get no tag; the row's attention dot says as much);
+  - then `RowCard.facts`, a line of them at a time, each an SF Symbol and a short value, coloured only where it says how things stand (added the `active` phase, removed `failed`, the review and checks by their state colours, a running run's duration `run.running`).
   An issue with no comments has no facts line.
 - SwiftUI's own popover was the runner-up (`docs/references/macos-hover-help.md`); built as a second style and never tried, it was removed (#84).
 - Where hover help isn't worth it there's none: a subheader's or a list section's chevron, the skill card's close button, the command box's Copy (its icon turns into a checkmark), the picker's lock.

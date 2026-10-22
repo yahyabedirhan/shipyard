@@ -16,7 +16,6 @@ extension BuiltInThemes {
     grey = "#6B6B72"
     green = "#1F883D"
     purple = "#8250DF"
-    ok = "#2E8B4Eb3"
     bad = "#D1242F"
     warn = "#9A6700"
     band = "#F8F8F9"
@@ -26,7 +25,6 @@ extension BuiltInThemes {
     grey = "#9A9AA2"
     green = "#4CB868"
     purple = "#A371F7"
-    ok = "#4CB868b3"
     bad = "#F2655F"
     warn = "#D9A02A"
     band = "#29292C"
@@ -86,12 +84,27 @@ extension BuiltInThemes {
     succeeded = "done"
     failed = "failed"
 
-    # Checks, approvals, the rate limit, pings and notes.
-    [state]
-    success = "ok"
-    failure = "bad"
-    pending = "warn"
-    neutral = "grey"
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "warn"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
 
     [signal]
     attention = "accent"

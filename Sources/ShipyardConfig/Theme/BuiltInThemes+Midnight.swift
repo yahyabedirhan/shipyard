@@ -83,12 +83,27 @@ extension BuiltInThemes {
     succeeded = "done"
     failed = "failed"
 
-    # Checks, approvals, the rate limit, pings and notes.
-    [state]
-    success = "mint"
-    failure = "coral"
-    pending = "sun"
-    neutral = "grey"
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "sun"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
 
     [signal]
     attention = "sky"

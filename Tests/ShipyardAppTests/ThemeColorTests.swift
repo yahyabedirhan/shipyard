@@ -37,19 +37,28 @@ struct ThemeColorTests {
         #expect(abs(drawn(.panel.opacity(0.5), theme: Self.theme, .light).opacity - 0.5) < 0.001)
     }
 
-    @Test("every state a theme colours is a state an item of that kind has, so a row's icon finds its colour")
+    @Test("the app looks up every state a theme colours, and only states the theme has: rows, check dots, reviews and the rate limit")
     func stateNames() {
-        let kinds: [ItemKind: ThemeKind] = [.pullRequest: .pullRequest, .issue: .issue, .workflowRun: .run]
-        for (itemKind, kind) in kinds {
-            #expect(ThemeKind(itemKind) == kind)
+        var named: Set<String> = []
+        func record(_ color: ThemeColor?) {
+            guard case .state(let kind, let state)? = color?.source else { return }
+            named.insert("\(kind.rawValue).\(state)")
+        }
+        for (itemKind, kind) in [(ItemKind.pullRequest, ThemeKind.pullRequest), (.issue, .issue), (.workflowRun, .run)] {
             for (state, _) in kind.states {
                 let item = ItemState(rawValue: state)
                 #expect(item != nil, "\(kind.rawValue).\(state)")
-                if let item { #expect(ThemeColor.state(item, kind: itemKind) != ThemeColor.neutral) }
+                if let item { record(ThemeColor.state(item, kind: itemKind)) }
             }
         }
-        #expect(ThemeKind(.ping) == nil)
-        #expect(ThemeKind(.note) == nil)
+        record(ThemeColor.state(.open, kind: .ping))
+        record(ThemeColor.state(.open, kind: .note))
+        for checks in [ChecksState.pending, .passed, .failed] { record(ThemeColor.checks(checks)) }
+        #expect(ThemeColor.checks(.none) == nil)
+        for decision in [ReviewDecision.approved, .changesRequested, .reviewRequired] { record(ThemeColor.review(decision)) }
+        for level in [RateLevel.normal, .low, .exhausted] { record(ThemeColor.rate(level)) }
+        let themed = Set(ThemeKind.allCases.flatMap { kind in kind.states.map { "\(kind.rawValue).\($0.name)" } })
+        #expect(named == themed)
     }
 
     @Test("each built-in theme passes the contrast check with the live macOS colours, as with the reference ones the command uses")

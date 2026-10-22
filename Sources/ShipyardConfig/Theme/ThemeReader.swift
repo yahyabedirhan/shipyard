@@ -256,13 +256,13 @@ public enum ThemeReader {
             }
             // A phase's name is always the phase, even where a palette entry
             // has that name; `system` is the macOS colour of the state's own
-            // phase.
+            // phase, or the macOS orange for a state with no phase.
             for (state, written) in states[appearance] ?? [:] {
                 let text = written.entry.text
                 if let phase = ThemePhase(rawValue: text) {
                     stateColors[appearance, default: [:]][state] = phaseColors[appearance]?[phase] ?? .system(phase.system)
                 } else if let value = value(text, appearance) {
-                    stateColors[appearance, default: [:]][state] = stateColor(value, system: state.phase.system)
+                    stateColors[appearance, default: [:]][state] = stateColor(value, system: state.system)
                 } else {
                     problem(written, "which isn't a phase, a palette name, a color or `system`")
                 }
@@ -317,6 +317,10 @@ private struct Parser {
         for key in root.keys where !ThemeReader.topLevelKeys.contains(key) {
             if key == "any" {
                 anyPrefix(root)
+            } else if key == "state" {
+                // `[state]` has no tokens: reading the colour tables
+                // reports each of its keys as a problem.
+                continue
             } else {
                 unknown(key, at: [], known: ThemeReader.topLevelKeys)
             }
@@ -362,8 +366,19 @@ private struct Parser {
         _ body: TOMLTable, sections: [String], layer: ThemeDefinition.Layer,
         at path: ConfigurationPath, into definition: inout ThemeDefinition
     ) {
-        for section in body.keys where sections.contains(section) {
+        for section in body.keys where sections.contains(section) || section == "state" {
             let sectionPath = path + [.key(section)]
+            if section == "state" {
+                guard let removed = table(body, section, at: path) else { continue }
+                for key in removed.keys {
+                    if let moved = Self.movedStates[key] {
+                        self.removed(key, moved, at: path)
+                    } else {
+                        fail("`\((sectionPath + [.key(key)]).dotted)` isn't a theme key; a state takes its colour from `[phase]` and `[states.<kind>]`", at: sectionPath + [.key(key)])
+                    }
+                }
+                continue
+            }
             if section == "palette" {
                 guard let palette = table(body, section, at: path) else { continue }
                 definition.palette[layer, default: [:]].merge(self.palette(palette, at: sectionPath)) { $1 }
@@ -390,7 +405,7 @@ private struct Parser {
                     let kindPath = sectionPath + [.key(key)]
                     guard let states = table(kinds, key, at: sectionPath) else { continue }
                     for state in states.keys {
-                        guard kind.phase(of: state) != nil else {
+                        guard kind.has(state) else {
                             unknown(state, at: kindPath, known: kind.states.map(\.name), noun: "state")
                             continue
                         }
@@ -408,10 +423,6 @@ private struct Parser {
             guard let tokens = table(body, section, at: path) else { continue }
             for key in tokens.keys {
                 guard let token = ThemeToken(rawValue: "\(section).\(key)") else {
-                    if section == "state", let moved = Self.movedStates[key] {
-                        removed(key, moved, at: path)
-                        continue
-                    }
                     let known = ThemeToken.allCases.filter { $0.rawValue.hasPrefix(section + ".") }.map { String($0.rawValue.dropFirst(section.count + 1)) }
                     unknown(key, at: sectionPath, known: known, noun: "token")
                     continue
@@ -421,18 +432,23 @@ private struct Parser {
         }
     }
 
-    /// Where a key `[state]` doesn't take now went: the phase it was, and
-    /// the `[states.*]` keys that set it per kind.
+    /// Where a removed `[state]` token went: the phase it was, and the
+    /// `[states.*]` keys that set what it coloured, per kind.
     private typealias Moved = (phase: ThemePhase, keys: [(kind: ThemeKind, state: String)])
 
-    /// The keys of `[state]` for pull requests, issues and runs, which
-    /// `[phase]` and `[states.*]` set instead.
+    /// The removed `state.*` tokens, which `[phase]` and `[states.*]` set
+    /// instead. A token that coloured a state with no phase, as `pending`
+    /// coloured the rate limit's `low`, names that state's key too.
     private static let movedStates: [String: Moved] = [
         "open": (.active, [(.pullRequest, "open"), (.issue, "open")]),
         "draft": (.quiet, [(.pullRequest, "draft")]),
         "merged": (.done, [(.pullRequest, "merged"), (.issue, "closed"), (.run, "succeeded")]),
         "closed": (.failed, [(.pullRequest, "closed"), (.run, "failed")]),
         "running": (.active, [(.run, "running")]),
+        "success": (.done, [(.check, "passed"), (.review, "approved")]),
+        "failure": (.failed, [(.check, "failed"), (.review, "changes-requested"), (.rate, "exhausted")]),
+        "pending": (.active, [(.check, "pending"), (.review, "review-required"), (.rate, "low")]),
+        "neutral": (.quiet, [(.ping, "open"), (.note, "open")]),
     ]
 
     /// A removed `state.*` token is an error on its line that names the
@@ -440,9 +456,16 @@ private struct Parser {
     private mutating func removed(_ key: String, _ moved: Moved, at path: ConfigurationPath) {
         let keyPath = path + [.key("state"), .key(key)]
         let prefix = path.isEmpty ? "" : "\(path.dotted)."
-        let keys = moved.keys.map { "`[\(prefix)states.\($0.kind.rawValue)] \($0.state)`" }
-        let list = keys.count == 1 ? keys[0] : keys.dropLast().joined(separator: ", ") + " and " + keys.last!
-        fail("`\(keyPath.dotted)` was removed; write `[\(prefix)phase] \(moved.phase.rawValue)` for every \(moved.phase.rawValue) state, or \(list)", at: keyPath)
+        func written(_ key: (kind: ThemeKind, state: String)) -> String { "`[\(prefix)states.\(key.kind.rawValue)] \(key.state)`" }
+        func list(_ keys: [String]) -> String {
+            keys.count == 1 ? keys[0] : keys.dropLast().joined(separator: ", ") + " and " + keys.last!
+        }
+        // A state in no phase, such as the rate limit's `low`, isn't set by
+        // the phase: it is named apart.
+        let inPhase = moved.keys.filter { $0.kind.phase(of: $0.state) != nil }.map(written)
+        let apart = moved.keys.filter { $0.kind.phase(of: $0.state) == nil }.map(written)
+        let warning = apart.isEmpty ? "" : "; \(list(apart)) is in no phase, so write it too"
+        fail("`\(keyPath.dotted)` was removed; write `[\(prefix)phase] \(moved.phase.rawValue)` for every \(moved.phase.rawValue) state, or \(list(inPhase))\(warning)", at: keyPath)
     }
 
     /// A colour as written: a quoted string, with a hex colour checked here

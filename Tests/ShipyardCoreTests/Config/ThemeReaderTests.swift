@@ -107,7 +107,7 @@ struct ThemeReaderTests {
             #expect(theme.knobs.medium == parent.knobs.medium)
             #expect(theme.knobs.glass)
         },
-        Valid(name: "a state with no colour of its own takes its phase; one left out of [phase] is its macOS colour", text: """
+        Valid(name: "a state with no colour of its own takes its phase, the rate limit's low the macOS orange; one left out of [phase] is its macOS colour", text: """
             name = "Phases"
             version = 1
             [palette]
@@ -123,8 +123,20 @@ struct ThemeReaderTests {
                 #expect(theme.color(.issue, "closed", appearance) == .color(RGBA(r: 0, g: 0, b: 1)))
                 #expect(theme.color(.run, "failed", appearance) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
                 #expect(theme.color(.pullRequest, "draft", appearance) == .system(SystemShade(.secondaryLabel)))
+                #expect(theme.color(.check, "pending", appearance) == .color(RGBA(r: 1, g: 0, b: 0)))
+                #expect(theme.color(.review, "review-required", appearance) == .color(RGBA(r: 1, g: 0, b: 0)))
+                #expect(theme.color(.rate, "normal", appearance) == .color(RGBA(r: 1, g: 0, b: 0)))
+                #expect(theme.color(.check, "passed", appearance) == .color(RGBA(r: 0, g: 0, b: 1)))
+                #expect(theme.color(.review, "approved", appearance) == .color(RGBA(r: 0, g: 0, b: 1)))
+                #expect(theme.color(.check, "failed", appearance) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
+                #expect(theme.color(.review, "changes-requested", appearance) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
+                #expect(theme.color(.rate, "exhausted", appearance) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
+                #expect(theme.color(.rate, "low", appearance) == .system(SystemShade(.orange)))
+                #expect(theme.color(.ping, "open", appearance) == .system(SystemShade(.secondaryLabel)))
+                #expect(theme.color(.note, "open", appearance) == .system(SystemShade(.secondaryLabel)))
             }
             #expect(theme.color(.issue, "draft", .light) == nil)
+            #expect(theme.color(.rate, "high", .light) == nil)
         },
         Valid(name: "a state names a phase, a palette name, a hex colour or system, which is its phase's macOS colour", text: """
             name = "States"
@@ -144,6 +156,11 @@ struct ThemeReaderTests {
             closed = "quiet"
             [states.run]
             failed = "system"
+            [states.rate]
+            low = "system"
+            exhausted = "active"
+            [states.note]
+            open = "ink"
             """) { theme in
             #expect(theme.color(.pullRequest, "open", .dark) == .color(RGBA(r: 1, g: 0, b: 0)))
             #expect(theme.color(.pullRequest, "draft", .dark) == .color(RGBA(r: 0, g: 0, b: 1)))
@@ -154,6 +171,11 @@ struct ThemeReaderTests {
             #expect(theme.color(.run, "failed", .light) == .system(SystemShade(.red)))
             // Another kind's state in that phase keeps the phase's colour.
             #expect(theme.color(.issue, "open", .light) == .system(SystemShade(.green)))
+            // `system` for a state with no phase is the macOS orange.
+            #expect(theme.color(.rate, "low", .dark) == .system(SystemShade(.orange)))
+            #expect(theme.color(.rate, "exhausted", .dark) == .system(SystemShade(.green)))
+            #expect(theme.color(.note, "open", .light) == .color(RGBA(r: 0, g: 0, b: 1)))
+            #expect(theme.color(.ping, "open", .light) == .system(SystemShade(.secondaryLabel)))
         },
         Valid(name: "a [light.*] or [dark.*] phase or state wins over the table without a prefix", text: """
             name = "Split states"
@@ -288,6 +310,8 @@ struct ThemeReaderTests {
             version = 1
             [states.pull-requests]
             open = "active"
+            [states.review]
+            aproved = "done"
             [phase]
             activ = "#ff0000"
             done = "#12345"
@@ -295,9 +319,10 @@ struct ThemeReaderTests {
             passed = "done"
             """, issues: [
                 "Theme.toml line 3: unknown kind `states.pull-requests`; did you mean `pull-request`?",
-                "Theme.toml line 6: unknown phase `phase.activ`; did you mean `active`?",
-                "Theme.toml line 7: `phase.done` is \"#12345\", which isn't a color; write #rrggbb or #rrggbbaa",
-                "Theme.toml line 9: unknown state `dark.states.run.passed`",
+                "Theme.toml line 6: unknown state `states.review.aproved`; did you mean `approved`?",
+                "Theme.toml line 8: unknown phase `phase.activ`; did you mean `active`?",
+                "Theme.toml line 9: `phase.done` is \"#12345\", which isn't a color; write #rrggbb or #rrggbbaa",
+                "Theme.toml line 11: unknown state `dark.states.run.passed`",
             ]),
         Invalid(name: "a state or phase value that's no phase, palette name, color or system", text: """
             name = "Wrong"
@@ -329,11 +354,20 @@ struct ThemeReaderTests {
             [state]
             merged = "#ff0000"
             success = "#00ff00"
+            failure = "#ff0000"
+            neutral = "#888888"
+            hover = "#000000"
             [dark.state]
             running = "#0000ff"
+            pending = "#ffaa00"
             """, issues: [
                 "Theme.toml line 4: `state.merged` was removed; write `[phase] done` for every done state, or `[states.pull-request] merged`, `[states.issue] closed` and `[states.run] succeeded`",
-                "Theme.toml line 7: `dark.state.running` was removed; write `[dark.phase] active` for every active state, or `[dark.states.run] running`",
+                "Theme.toml line 5: `state.success` was removed; write `[phase] done` for every done state, or `[states.check] passed` and `[states.review] approved`",
+                "Theme.toml line 6: `state.failure` was removed; write `[phase] failed` for every failed state, or `[states.check] failed`, `[states.review] changes-requested` and `[states.rate] exhausted`",
+                "Theme.toml line 7: `state.neutral` was removed; write `[phase] quiet` for every quiet state, or `[states.ping] open` and `[states.note] open`",
+                "Theme.toml line 8: `state.hover` isn't a theme key; a state takes its colour from `[phase]` and `[states.<kind>]`",
+                "Theme.toml line 10: `dark.state.running` was removed; write `[dark.phase] active` for every active state, or `[dark.states.run] running`",
+                "Theme.toml line 11: `dark.state.pending` was removed; write `[dark.phase] active` for every active state, or `[dark.states.check] pending` and `[dark.states.review] review-required`; `[dark.states.rate] low` is in no phase, so write it too",
             ]),
         Invalid(name: "a value that isn't a string, and a knob out of range", text: """
             name = "Wrong"
@@ -422,7 +456,8 @@ struct ThemeReaderTests {
             var byPhase: [ThemePhase: Set<ThemeStateColor>] = [:]
             for kind in ThemeKind.allCases {
                 for (state, phase) in kind.states {
-                    byPhase[phase, default: []].insert(try #require(theme.color(kind, state, appearance)))
+                    let color = try #require(theme.color(kind, state, appearance))
+                    if let phase { byPhase[phase, default: []].insert(color) }
                 }
             }
             for (phase, colors) in byPhase {

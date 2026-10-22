@@ -3,7 +3,7 @@
 A **theme** decides how the panel looks: its colours, its font, its density, its corner radii and its material.
 Every theme draws the same panel, with the same rows and the same layout.
 A theme is a set of **tokens**, each one colour named by what it means, such as `surface.panel` or `text.secondary`, never by hue.
-It also sets the **state colours** of pull requests, issues and runs, one for each state of each kind, which may share one colour per **phase**.
+It also sets the **state colours** of pull requests, issues, runs, checks, reviews, the rate limit, pings and notes, one for each state of each kind, which may share one colour per **phase**.
 
 Shipyard has six **built-in themes**, part of the app: Shipyard, the default, then Native, Graphite, Paper, Midnight and Harbor.
 A **theme file** is the user's own theme: one TOML file in the `themes` folder beside `config.toml`, so `~/.config/shipyard/themes/<anything>.toml`, or under `$XDG_CONFIG_HOME` when it is set.
@@ -104,16 +104,13 @@ A token that no theme in the `extends` chain sets is `system`.
 | `row` | `hover` | A hovered row or button, and the keyboard-highlighted row. |
 | | `pressed` | A pressed row or button. |
 | | `selected` | Reserved: accepted and checked, with no effect. The keyboard-highlighted row draws with `row.hover`. |
-| `state` | `success` | A passing check, an approval. |
-| | `failure` | A failing check, an error, an exhausted rate limit. |
-| | `pending` | A pending check, a low rate limit. |
-| | `neutral` | A ping, a note. |
 | `signal` | `attention` | A row that needs attention. |
 | | `lease` | The banner while an agent drives the app. |
 
 ### State colours
 
-A row's state icon takes the colour its theme gives that kind in that state.
+A row's state icon, a pull request's check dot, the hover card's review and checks, the rate-limit bar and text, and a ping's or a note's icon take the colour the theme gives that kind in that state.
+The rest of the panel that shows a phase draws the phase's colour: an error, a failed action or the lease banner's Stop is `failed`, a finished tick is `done`, an informational banner is `quiet`.
 Two tables set them, without a prefix for light and dark or under `[light.*]` and `[dark.*]` for one appearance:
 
 - `[phase]` names one colour per phase, for every state in it to share.
@@ -124,20 +121,27 @@ Two tables set them, without a prefix for light and dark or under `[light.*]` an
 
 | Phase | Its states | Its default |
 |---|---|---|
-| `active` | `pull-request.open`, `issue.open`, `run.running` | The macOS green. |
-| `done` | `pull-request.merged`, `issue.closed`, `run.succeeded` | The macOS purple. |
-| `failed` | `pull-request.closed`, `run.failed` | The macOS red. |
-| `quiet` | `pull-request.draft` | The macOS secondary label grey. |
+| `active` | `pull-request.open`, `issue.open`, `run.running`, `check.pending`, `review.review-required`, `rate.normal` | The macOS green. |
+| `done` | `pull-request.merged`, `issue.closed`, `run.succeeded`, `check.passed`, `review.approved` | The macOS purple. |
+| `failed` | `pull-request.closed`, `run.failed`, `check.failed`, `review.changes-requested`, `rate.exhausted` | The macOS red. |
+| `quiet` | `pull-request.draft`, `ping.open`, `note.open` | The macOS secondary label grey. |
 
-| Table | States |
-|---|---|
-| `[states.pull-request]` | `open`, `draft`, `merged`, `closed` |
-| `[states.issue]` | `open`, `closed` |
-| `[states.run]` | `running`, `succeeded`, `failed` |
+`rate.low` is a warning, not a phase: its default is the macOS orange.
+
+| Table | States | What it colours |
+|---|---|---|
+| `[states.pull-request]` | `open`, `draft`, `merged`, `closed` | A pull request's icon. |
+| `[states.issue]` | `open`, `closed` | An issue's icon. |
+| `[states.run]` | `running`, `succeeded`, `failed` | A workflow run's icon, and a running run's duration on its hover card. |
+| `[states.check]` | `pending`, `passed`, `failed` | A pull request's check dot, its checks on the hover card, and the "checks failed" reason. |
+| `[states.review]` | `review-required`, `approved`, `changes-requested` | The review on a pull request's hover card, and the "review requested" reason. |
+| `[states.rate]` | `normal`, `low`, `exhausted` | The rate-limit bar, lighter while `normal`; its text once `low` or `exhausted`, and the slow-down and paused banners. |
+| `[states.ping]` | `open` | A ping's icon. |
+| `[states.note]` | `open` | A note's icon. |
 
 - A state colour comes from the appearance's table, then the table without a prefix, then the `extends` chain.
 - A state no theme in the chain sets takes its phase, and a phase no theme sets is its macOS colour.
-- `system` in a state is the macOS colour of its own phase.
+- `system` in a state is the macOS colour of its own phase, and the macOS orange for `rate.low`.
 - Every built-in theme follows one rule: active is green, done is purple, failed is red and quiet is grey.
 
 ```toml
@@ -151,8 +155,8 @@ running = "#F59E0B"
 closed = "#A78BFA"
 ```
 
-`[state]` has no `open`, `draft`, `merged`, `closed` or `running` token.
-A theme file that writes one has a problem on its line that names the keys to write instead, such as `[phase] done` for `state.merged`.
+`[state]` has no tokens: every state's colour is in `[phase]` and `[states.<kind>]`.
+A theme file that writes a key in `[state]`, such as `open`, `merged`, `success` or `neutral`, has a problem on its line that names the keys to write instead, such as `[phase] done` or `[states.check] passed` for `state.success`.
 
 ### Knobs
 

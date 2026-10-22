@@ -73,7 +73,7 @@ struct ProjectPicker: View {
             if let rejection {
                 Text(LocalizedStringKey(rejection))
                     .font(scale.type.caption)
-                    .foregroundStyle(ThemeColor.failure)
+                    .foregroundStyle(ThemeColor.failed)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -133,7 +133,7 @@ struct ProjectPicker: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(message)
                 .font(scale.type.caption)
-                .foregroundStyle(ThemeColor.pending)
+                .foregroundStyle(ThemeColor.failed)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Retry") { Task { await loadSuggestions() } }
                 .buttonStyle(TextButtonStyle())
@@ -228,7 +228,7 @@ struct ProjectPicker: View {
             }
             HStack(spacing: 8) {
                 if choices.hasUnnamedProject {
-                    Text(PanelText.unnamedProject).font(scale.type.caption).foregroundStyle(ThemeColor.failure)
+                    Text(PanelText.unnamedProject).font(scale.type.caption).foregroundStyle(ThemeColor.failed)
                 }
                 Spacer()
                 if isAdding {
@@ -242,7 +242,7 @@ struct ProjectPicker: View {
             if let addError {
                 Text(addError)
                     .font(scale.type.caption)
-                    .foregroundStyle(ThemeColor.failure)
+                    .foregroundStyle(ThemeColor.failed)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

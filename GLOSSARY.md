@@ -182,7 +182,7 @@ One colour of a theme, named by what it means rather than its hue, such as the p
 _Avoid_: Colour (for the named slot), variable, palette entry
 
 **Phase**:
-Where a pull request, an issue or a run is in its life: active (open, running), done (merged, a closed issue, succeeded), failed (a closed pull request, a failed run) or quiet (a draft). A theme may name one colour per phase in `[phase]`, for every state in it to share.
+Where a state is in its life: active (open, running, pending checks, a required review, a rate limit with room), done (merged, a closed issue, succeeded, passed checks, an approval), failed (a closed pull request, a failed run, failed checks, changes requested, a spent rate limit) or quiet (a draft, a ping, a note). The rate limit's low is a warning, in no phase. A theme may name one colour per phase in `[phase]`, for every state in it to share.
 _Avoid_: Status, lifecycle stage
 
 **State colour**:

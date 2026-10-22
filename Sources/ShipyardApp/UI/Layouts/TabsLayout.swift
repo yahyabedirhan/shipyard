@@ -39,7 +39,7 @@ struct TabsLayout: View {
         HStack(spacing: 4) {
             if content.isCaughtUp {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(ThemeColor.success)
+                    .foregroundStyle(ThemeColor.done)
                     .transition(.scale.combined(with: .opacity))
             }
             Text(PanelText.tabSummary(
@@ -347,7 +347,7 @@ private struct TabRow: View {
                     }
                     Text(PanelText.rowDetail(row, showingRepository: showsRepository))
                         .font(scale.type.meta)
-                        .foregroundStyle(row.actionError == nil ? ThemeColor.textSecondary : ThemeColor.failure)
+                        .foregroundStyle(row.actionError == nil ? ThemeColor.textSecondary : ThemeColor.failed)
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -375,7 +375,7 @@ private struct EmptyTab: View {
             Image(systemName: isLoaded ? "checkmark.seal.fill" : "clock")
                 .font(.system(size: 26))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(isLoaded ? ThemeColor.success : ThemeColor.textTertiary)
+                .foregroundStyle(isLoaded ? ThemeColor.done : ThemeColor.textTertiary)
             Text(text)
                 .font(scale.type.button)
                 .foregroundStyle(ThemeColor.textSecondary)

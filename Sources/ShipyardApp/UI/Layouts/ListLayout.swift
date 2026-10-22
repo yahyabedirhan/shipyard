@@ -416,7 +416,7 @@ private struct ListRow: View {
                     }
                     Text(meta)
                         .font(scale.listType.meta)
-                        .foregroundStyle(row.actionError == nil ? ThemeColor.textTertiary : ThemeColor.failure)
+                        .foregroundStyle(row.actionError == nil ? ThemeColor.textTertiary : ThemeColor.failed)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
