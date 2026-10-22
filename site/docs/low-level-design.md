@@ -48,9 +48,7 @@ Without them the build has no analytics and no error reporting, and the bundle c
 
 The `site` workflow (`.github/workflows/site.yml`) runs `npm ci`, `npm test` and `npm run build` when `site/` or a repository file the site is made from changes.
 It doesn't deploy.
-
-- Gap: who deploys, from where and when.
-  The repository has only the manual `npm run deploy` (`site/wrangler.jsonc`, `site/package.json`).
+The maintainer, or an agent on their Mac, deploys by hand with `npm run deploy` from a `main` checkout, after a change to the site or a release, with the keys in `site/.env.local`.
 
 ### Where each page's code lives
 
