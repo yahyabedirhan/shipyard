@@ -829,7 +829,7 @@ Each one is an entity, a value, a port or a field on another entity.
   - 4 (logged out, no workspace, a token Notion stopped taking): a 401.
   - 5: the status, code and message in ntn's line "error: Public API request failed (404 Not Found object_not_found): …".
   - Anything else: a 599 that `NotionClient` reads as `NotionError.network`, with ntn's error line (the one starting "error:", past any warning).
-- **The timeout:** a run past `NtnCLI.timeout` (30 seconds) is stopped (SIGTERM, then SIGKILL a second later) and ends as such a failure, "didn't answer within 30 seconds", so a stuck ntn can't hold the notes read for good.
+- **The timeout:** a run past `NtnCLI.timeout` (30 seconds) is stopped (SIGTERM, then SIGKILL a second later, to its process group, so a program ntn started stops too) and ends as such a failure, "didn't answer within 30 seconds", so a stuck ntn can't hold the notes read for good.
   A cancelled task stops its run, before or after the launch.
 - **Tests** run it with a fake `run` (`NtnCLITests`), and the orchestrator with `FakeNtnRoute` (missing, logged out, logged in over the Notion stub).
 
