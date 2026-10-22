@@ -13,11 +13,8 @@
     "check": "astro check",
     "preview": "astro preview",
     "test": "vitest run",
-    "images": "node scripts/social.mjs && node scripts/shots.mjs",
-    "shots": "node scripts/shots.mjs",
     "social": "node scripts/social.mjs",
     "terminal": "node scripts/terminal.mjs",
-    "placeholders": "node scripts/placeholders.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

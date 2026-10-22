@@ -87,10 +87,6 @@ body{margin:0;background:var(--bg)}
 .dx .fig{position:relative;margin:0}
 .dx .cap{display:block;margin-top:var(--sp-4);font:400 var(--type-caption)/1.5 var(--sans);color:var(--mut)}
 .dx .shot img{border-radius:var(--radius-lg);box-shadow:inset 0 0 0 var(--hair) var(--line)}
-.dx .shot-ph{position:relative;display:grid;align-content:center;justify-items:start;gap:var(--sp-3);min-height:var(--shot-h);box-sizing:border-box;padding:var(--sp-10);border-radius:var(--radius-lg);box-shadow:inset 0 0 0 var(--hair) var(--line-2);background:repeating-linear-gradient(135deg,transparent 0 var(--sp-2),var(--stripe) var(--sp-2) var(--sp-3)),var(--card)}
-.dx .shot-tag{font:600 var(--type-label)/1 var(--sans);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--mut)}
-.dx .shot-what{font:500 var(--type-lede)/1.45 var(--sans);color:var(--fg);max-width:44ch}
-.dx .shot-id{font-size:var(--type-micro)}
 
 /* code */
 .dx .code{position:relative;margin:0;border-radius:var(--radius-md);background:var(--code);box-shadow:inset 0 0 0 var(--hair) var(--line);overflow:hidden}
@@ -221,7 +217,6 @@ body{margin:0;background:var(--bg)}
 }
 @media (max-width:560px){
   .dx .title{font-size:var(--type-title-phone)}.dx .sub{font-size:var(--type-sub-phone)}
-  .dx .shot-ph{min-height:var(--shot-h-phone)}
   .dx .limits>div{grid-template-columns:1fr;gap:var(--sp-1)}
   .dx .foot{grid-template-columns:1fr;gap:var(--sp-5)}
   .dx .tbl{font-size:var(--type-caption)}

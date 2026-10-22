@@ -33,10 +33,10 @@ export function generatedFiles(): Record<string, string> {
   return { ...buildAgentFiles(referenceData()), 'sitemap.xml': sitemap() };
 }
 
-/** The finished screenshots: a shot still marked placeholder shows its frame on the page, not its PNG. */
+/** The screenshots listed in shots.json, by file name. */
 function shotFiles(): string[] {
-  const done = new Set((JSON.parse(readFileSync(`${SITE_DIR}shots.json`, 'utf8')).shots as { id: string; status: string }[]).filter((s) => s.status === 'done').map((s) => `${s.id}.png`));
-  return existsSync(SHOTS_DIR) ? readdirSync(SHOTS_DIR).filter((f) => done.has(f)) : [];
+  const listed = new Set((JSON.parse(readFileSync(`${SITE_DIR}shots.json`, 'utf8')).shots as { id: string }[]).map((s) => `${s.id}.png`));
+  return existsSync(SHOTS_DIR) ? readdirSync(SHOTS_DIR).filter((f) => listed.has(f)) : [];
 }
 
 /** The virtual modules: the generated reference and site/PRIVACY.md as HTML. */

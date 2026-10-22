@@ -47,5 +47,3 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      # Lists what is still open before a launch; it doesn't fail the run.
-      - run: npm run placeholders
