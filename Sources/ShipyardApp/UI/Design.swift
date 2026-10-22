@@ -6,7 +6,7 @@ import SwiftUI
 /// It is resolved once where the theme is set (`EnvironmentValues.theme`),
 /// and views read it from the environment's `panelScale`, so a row reads
 /// its sizes and builds nothing. The Shipyard theme's knobs give the
-/// panel's long-standing grid, and the design lab's 6 and 8 pt corners.
+/// panel's long-standing grid, with 6 and 8 pt corners.
 struct PanelScale: Equatable {
     let knobs: ThemeKnobs
     /// The frame's and the tabs layout's grid and type.

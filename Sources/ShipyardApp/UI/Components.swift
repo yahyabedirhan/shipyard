@@ -609,7 +609,7 @@ struct RowHighlightShape: View {
     @Environment(\.panelStyle) private var style
 
     var body: some View {
-        // Fixed, as the design lab draws it, under every theme's shape.
+        // Fixed under every theme's shape, so a hovered row keeps one corner.
         RoundedRectangle(cornerRadius: style == .list ? 5 : 6, style: .continuous).fill(ThemeColor.rowHover)
     }
 }
