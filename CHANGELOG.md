@@ -2,7 +2,9 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
-## Unreleased
+## 0.8.1 (2026-10-22)
+
+The default theme's state icons are in colour again, and the README and the site's docs are easier to scan. It gathers [#324](https://github.com/yahyabedirhan/shipyard/pull/324), [#325](https://github.com/yahyabedirhan/shipyard/pull/325) and [#328](https://github.com/yahyabedirhan/shipyard/pull/328).
 
 - **State icons in colour again.** The Shipyard theme draws an open pull request or issue green, a merged pull request or a closed issue purple and a closed pull request red, in light and dark, as before 0.8.0; a draft stays grey. Graphite does the same in its own green, violet and red, and Harbor follows Shipyard. Every built-in theme now tells open, merged and closed apart: [#326](https://github.com/yahyabedirhan/shipyard/issues/326) "Bug: Built-in themes show open, merged and closed states in one grey".
 
