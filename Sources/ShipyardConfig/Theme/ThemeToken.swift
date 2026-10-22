@@ -32,6 +32,9 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
     case rowPressed = "row.pressed"
     case rowSelected = "row.selected"
     case attention = "signal.attention"
+    /// The attention dot while a pull request's checks fail. A theme that
+    /// leaves it out takes its `failed` phase colour.
+    case attentionFailed = "signal.attention-failed"
     case lease = "signal.lease"
 
     /// The sections a theme file writes as tables: without a prefix, such
@@ -62,6 +65,7 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
         case .separator, .border: SystemShade(.separator)
         case .rowPressed: SystemShade(.tertiaryFill)
         case .rowSelected: SystemShade(.accent, alpha: 0.2)
+        case .attentionFailed: SystemShade(.red)
         case .lease: SystemShade(.yellow)
         }
     }

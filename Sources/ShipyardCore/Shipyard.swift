@@ -68,7 +68,9 @@ public final class Shipyard {
     /// The theme the panel draws with: the one `theme` in the configuration
     /// names, kept from the last valid configuration while an edit is
     /// rejected, and following the theme files on every reload.
-    public private(set) var theme = BuiltInThemes.shipyard
+    public private(set) var theme = BuiltInThemes.system
+    /// The gear menu's Theme submenu, as the latest reload read the themes.
+    public private(set) var themeMenu = ThemeMenu(.builtIn, current: BuiltInThemes.system)
     private(set) var expandedGroups: Set<GroupID> = []
     private(set) var snapshot: Snapshot?
     /// The pings in the ping store, as last read: at start and whenever the
@@ -474,6 +476,8 @@ public final class Shipyard {
         configWarnings = configStore.warnings
         let theme = configStore.theme
         if self.theme != theme { self.theme = theme }
+        let themeMenu = ThemeMenu(configStore.themes, current: theme)
+        if self.themeMenu != themeMenu { self.themeMenu = themeMenu }
         let themeIssues = configStore.themeIssues
         if self.themeIssues != themeIssues { self.themeIssues = themeIssues }
         presets = configStore.acceptsPreset ? Preset.all : []
@@ -569,6 +573,22 @@ public final class Shipyard {
             configError = error
         } catch {
             configError = ConfigurationError([ConfigurationIssue(line: nil, message: "can't switch the layout: \(error.localizedDescription)")])
+        }
+    }
+
+    /// The gear menu's Theme submenu: writes `name` to the top-level `theme`
+    /// in the configuration file and follows the reload, so the panel draws
+    /// the theme as it does for a hand edit. When the file can't be written
+    /// (it doesn't read, `theme` is in a form the writer doesn't edit, the
+    /// name is no theme, or the file system refuses), nothing changes and
+    /// `configError` says why until the next reload.
+    public func switchTheme(to name: String) async {
+        do {
+            await follow(try configStore.setTheme(name))
+        } catch let error as ConfigurationError {
+            configError = error
+        } catch {
+            configError = ConfigurationError([ConfigurationIssue(line: nil, message: "can't switch the theme: \(error.localizedDescription)")])
         }
     }
 

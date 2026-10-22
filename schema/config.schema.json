@@ -13,10 +13,10 @@
       "default": 1
     },
     "theme": {
-      "description": "The theme the panel draws with, by name, ignoring case: a built-in theme (Shipyard, Native, Graphite, Paper, Midnight or Harbor) or the name of a theme file in the themes folder beside config.toml. An unknown name is an error; a theme whose text has too little contrast on its panel reads with a warning.",
+      "description": "The theme the panel draws with, by name, ignoring case: a built-in theme (System, which follows the macOS appearance and accent, Shipyard Light, Shipyard Dark, Paper Light, Paper Dark, Harbor, Heather, Brass, Ocean or Sunset) or the name of a theme file in the themes folder beside config.toml. The gear menu's Theme submenu sets it too. An unknown name is an error that lists every theme's; a theme whose text has too little contrast on its panel, or whose attention colours are too close to tell apart, reads with a warning.",
       "type": "string",
-      "examples": ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"],
-      "default": "Shipyard"
+      "examples": ["System", "Shipyard Light", "Shipyard Dark", "Paper Light", "Paper Dark", "Harbor", "Heather", "Brass", "Ocean", "Sunset"],
+      "default": "System"
     },
     "refresh-interval": {
       "description": "How often to refresh: a whole number and one unit, s, m, h or d, such as \"2m\", at least 30 seconds. A floor: shipyard stretches it when a refresh at this interval would spend more than max-share-percent of a GitHub rate limit.",

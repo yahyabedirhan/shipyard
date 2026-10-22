@@ -73,7 +73,7 @@ extension Configuration {
         return out
     }
 
-    private static func isComment(_ line: String) -> Bool {
+    static func isComment(_ line: String) -> Bool {
         line.trimmingCharacters(in: .whitespaces).hasPrefix("#")
     }
 
@@ -81,11 +81,11 @@ extension Configuration {
         line.firstMatch(of: /^[ \t]*#[ \t]*\[/) != nil
     }
 
-    private static func uncommented(_ line: String) -> String {
+    static func uncommented(_ line: String) -> String {
         line.replacing(/^([ \t]*)#[ \t]?/, with: { $0.output.1 })
     }
 
-    private static func replacingValue(of line: String, with value: String) -> String? {
+    static func replacingValue(of line: String, with value: String) -> String? {
         guard let match = line.firstMatch(of: /^([^=]*=[ \t]*)("(?:[^"\\]|\\.)*"|'[^']*')(.*)$/) else { return nil }
         return match.output.1 + value + match.output.3
     }

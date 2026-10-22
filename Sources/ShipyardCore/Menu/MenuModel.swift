@@ -6,7 +6,7 @@ import ShipyardConfig
 /// the attention count and menu bar label, and when the list was last
 /// brought up to date. It's built from the projects' listings (`Listing`
 /// decides which items a project has); every display rule (order, state and
-/// check dot, which rows need attention, what the menu bar says) lives here,
+/// attention dot, which rows need attention, what the menu bar says) lives here,
 /// so tests reach them without SwiftUI.
 public struct MenuModel: Equatable, Sendable {
     public var sections: [MenuSection]
@@ -220,6 +220,7 @@ public struct MenuModel: Equatable, Sendable {
         for row in rows.indices {
             rows[row].attentionReasons = attention.reasons(rows[row].item, toggles: toggles)
             rows[row].needsAttention = !rows[row].attentionReasons.isEmpty
+            rows[row].attentionLevel = attention.level(rows[row].item, toggles: toggles)
         }
     }
 
@@ -527,7 +528,8 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     /// A workflow run's branch; `nil` for pull requests and issues. (Its
     /// `title` is the workflow's name.)
     public var branch: String?
-    /// The check dot, for open (and draft) pull requests; `nil` otherwise.
+    /// The checks of an open (or draft) pull request, which its attention
+    /// dot and hover card show; `nil` otherwise.
     public var checks: ChecksState?
     /// What the age counts from: when it was opened (a run: started), or
     /// for a closed item (a finished run) when it was closed (finished).
@@ -537,6 +539,9 @@ public struct MenuRow: Equatable, Sendable, Identifiable {
     public var needsAttention: Bool
     /// Why it needs attention; empty when it doesn't.
     public var attentionReasons: [Attention.Reason] = []
+    /// How its attention dot speaks: red while a pull request's checks
+    /// fail, seen or not, breathing while they're pending.
+    public var attentionLevel: AttentionLevel = .none
     /// The item as fetched: marking the row seen records this version.
     public var item: Item
 

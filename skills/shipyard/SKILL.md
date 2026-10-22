@@ -64,7 +64,7 @@ Top level:
 | Key | Default | Allowed |
 |---|---|---|
 | `version` | `1` | only `1` |
-| `theme` | `"Shipyard"` | the panel's theme, by name, ignoring case: `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight`, `Harbor`, or the `name` of a theme file in `themes/*.toml` beside `config.toml`; an unknown name is an error. Theme files: [references/themes.md](references/themes.md) |
+| `theme` | `"System"` | the panel's theme, by name, ignoring case: `System` (follows the macOS appearance and accent), `Shipyard Light`, `Shipyard Dark`, `Paper Light`, `Paper Dark`, `Harbor`, `Heather`, `Brass`, `Ocean`, `Sunset`, or the `name` of a theme file in `themes/*.toml` beside `config.toml`; an unknown name is an error that lists every theme's. The gear menu's Theme submenu sets it too. Theme files: [references/themes.md](references/themes.md) |
 | `refresh-interval` | `"2m"` | a window (below), at least `"30s"`: how often the app refreshes; a floor it stretches to stay within its rate-limit share |
 | `launch-at-login` | `true` | boolean |
 
@@ -80,7 +80,7 @@ Tables:
 | `[attention] unseen` | `true` | an item not clicked yet needs attention |
 | `[attention] changed` | `true` | an item that changed since it was clicked needs attention |
 | `[attention] review-requested` | `true` | a PR requesting the user's review (or a team's they're in) needs attention |
-| `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention |
+| `[attention] checks-failed` | `true` | a PR (or run) whose checks failed needs attention, and a PR's attention dot stays red in `signal.attention-failed` until its checks pass, even once seen |
 | `[herdr] terminal` | unset | the terminal app Herdr runs in, by name (`"Ghostty"`) or bundle id (`"com.mitchellh.ghostty"`): clicking a ping sent with `--herdr` focuses its Herdr tab, then brings this app forward. Unset, it brings forward the terminal the ping was sent from, when that was known; otherwise only the tab is focused |
 | `[remote] machines` | `[]` | your other machines, by the labels your Herdr knows them by as saved machines (`["beta-vps"]`), never a host or an address: shipyard asks each one for its agents' pings through Herdr and lists them in a section named after the machine, after the projects. A label can't be empty, start with `-`, hold a control character, be listed twice, or be a project's slug or title |
 | `[notices] listen` | `false` | whether the app takes notices (`shipyard notice send`) from agents on your other machines straight over your tailnet. Nothing listens unless it's `true`; then the app listens on 127.0.0.1 only, and takes only notices sent from this Mac's own Tailscale login. Setting it up: [references/notices.md](references/notices.md) |
@@ -420,11 +420,11 @@ Runs work the same way: `workflow-runs = { show = true, states = ["failed", "in-
 layout = "tabs"
 ```
 
-**"Use the Midnight theme."** One top-level key, above the first table; uncomment the header's `# theme` line when it's there.
+**"Use the Ocean theme."** One top-level key, above the first table; uncomment the header's `# theme` line when it's there. The Theme submenu in the menu's gear makes the same edit with one click.
 For a theme of the user's own, such as "make it orange", write a theme file first, as [references/themes.md](references/themes.md) says, and put its `name` here.
 
 ```toml
-theme = "Midnight"
+theme = "Ocean"
 ```
 
 **"Show issues for this project."** Add an `issues` override inside the project's block:

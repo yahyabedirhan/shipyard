@@ -100,7 +100,7 @@ struct ConfigurationCheckTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let good = folder.appendingPathComponent("Calm.toml")
         let bad = folder.appendingPathComponent("Typo.toml")
-        try Data("name = \"Calm\"\nversion = 1\nextends = \"Shipyard\"\n".utf8).write(to: good)
+        try Data("name = \"Calm\"\nversion = 1\nextends = \"Shipyard Light\"\n".utf8).write(to: good)
         try Data("name = \"Typo\"\nversion = 1\n[any.text]\nprimary = \"#ff0000\"\n[states.check]\npassd = \"done\"\n".utf8).write(to: bad)
 
         let text = harness.cli("config", "check")

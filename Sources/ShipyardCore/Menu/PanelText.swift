@@ -154,13 +154,23 @@ public enum PanelText {
     public static let dismissPing = "Dismiss"
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
+
+    /// What the attention dot says to VoiceOver at `level`; `nil` with no dot.
+    public static func attentionDot(_ level: AttentionLevel) -> String? {
+        switch level {
+        case .none: nil
+        case .regular: needsAttention
+        case .pending(let needs): needs ? "\(needsAttention), checks running" : "Checks running"
+        case .error: "Checks failed"
+        }
+    }
     /// The copy icon's VoiceOver label (and its word, where it has one)
     /// before a copy, and after it.
     public static let copy = "Copy"
     public static let copied = "Copied"
 
-    /// What a pull request's check dot means, for VoiceOver and the row's
-    /// hover help; `nil` with no checks.
+    /// What a pull request's checks mean, for the row's hover card; `nil`
+    /// with no checks.
     public static func checks(_ checks: ChecksState) -> String? {
         switch checks {
         case .none: nil

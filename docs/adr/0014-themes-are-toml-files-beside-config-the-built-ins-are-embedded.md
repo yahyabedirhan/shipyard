@@ -33,3 +33,14 @@ So a broken theme file never rejects `config.toml`, as a broken `config.toml` ne
 - The theme reader is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without the app; the Linux `shipyard` never links ShipyardConfig, so it reads neither theme files nor `theme` (ADR 0006).
 - A theme's text must reach 4.5:1 on its panel, 3:1 for the tertiary tier; a shortfall is a warning on the `theme` line and never stops the theme.
 - The app watches the `themes` folder and each file in it, as it watches `config.toml`.
+
+## Amendment, 2026-10-22: one appearance per built-in theme, System, and the Theme submenu
+
+The built-in themes are now ten, each of one appearance except System (#342): System, the default, follows the macOS appearance and accent colour; Shipyard Light, Shipyard Dark, Paper Light, Paper Dark, Harbor, Heather, Brass, Ocean and Sunset each draw their one appearance whatever the system's.
+They replace Shipyard, Native, Graphite, Paper and Midnight outright, with no aliases: a `theme` that names a removed theme is an error that lists every theme's name.
+A theme that extends another keeps the appearances it has, and adds the one whose `[light.*]` or `[dark.*]` tables it writes, so a theme that extends Shipyard Dark is dark too.
+Two themes of one appearance each look different from each other, where one theme of two appearances made light and dark look alike.
+
+The gear menu's Theme submenu now picks a theme (#327): it sets the one `theme` key, a fourth targeted edit (ADR 0001).
+The considered option "a theme picker in the settings menu" is chosen for picking alone; making a theme stays a theme file.
+A theme whose `signal.attention` and `signal.attention-failed` are closer than ΔE 25 reads with a warning on the `theme` line, as a contrast shortfall does (#343).

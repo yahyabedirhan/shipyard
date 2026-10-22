@@ -5,7 +5,7 @@ import SwiftUI
 /// The panel's sizes and type at one theme's font, density and shape knobs.
 /// It is resolved once where the theme is set (`EnvironmentValues.theme`),
 /// and views read it from the environment's `panelScale`, so a row reads
-/// its sizes and builds nothing. The Shipyard theme's knobs give the
+/// its sizes and builds nothing. System's knobs, and the Shipyard themes', give the
 /// panel's long-standing grid, with 6 and 8 pt corners.
 struct PanelScale: Equatable {
     let knobs: ThemeKnobs
@@ -24,8 +24,8 @@ struct PanelScale: Equatable {
         listType = ListType(knobs)
     }
 
-    /// The Shipyard theme's scale, for views with no theme set above them.
-    static let shipyard = PanelScale(BuiltInThemes.shipyard.knobs)
+    /// The default theme's scale, System's, for views with no theme set above them.
+    static let shipyard = PanelScale(BuiltInThemes.system.knobs)
 
     /// A shared row piece's sizes and type, in the layout `style` draws.
     func rowHeight(_ style: PanelStyle) -> CGFloat { style == .list ? list.rowHeight : grid.rowHeight }
@@ -138,7 +138,7 @@ enum FontKit {
 }
 
 /// The frame's and the tabs layout's type: the system text styles under the
-/// Shipyard theme, sized from the theme's body size otherwise.
+/// default theme's knobs, sized from the theme's body size otherwise.
 struct TypeScale: Equatable {
     /// The panel's heading, and a screen's title.
     let title: Font
@@ -223,6 +223,14 @@ enum Motion {
     static let hover = Animation.easeOut(duration: 0.12)
     static let highlight = Animation.spring(duration: 0.25, bounce: 0.1)
     static let tab = Animation.spring(response: 0.36, dampingFraction: 0.86)
+    /// The breath of what is still going on: a running run's state icon and
+    /// the attention dot while a pull request's checks are pending. One
+    /// symbol pulse for both, run by the render server rather than a timer
+    /// per row, slowed to a cycle of about two seconds so it reads as alive,
+    /// not as an alert.
+    static let breathe: SymbolEffectOptions = .repeating.speed(0.5)
+    /// What a breathing dot or icon holds still at under Reduce Motion.
+    static let breatheStill: Double = 0.6
 }
 
 /// The SF Symbol for what a row shows: its kind and state, a ping's icon.

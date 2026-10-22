@@ -56,6 +56,54 @@ public enum ThemeContrast {
     }
 }
 
+/// The attention check: the attention dot's two colours, `signal.attention`
+/// for a new or changed row and `signal.attention-failed` while a pull
+/// request's checks fail, must stand apart enough to tell which is which.
+/// Too close is a warning, not a failure.
+public enum ThemeSignals {
+    /// The CIE76 colour difference the two need, at least.
+    public static let minimumDistance: Double = 25
+
+    /// The two signal colours too close in one appearance.
+    public struct Clash: Hashable, Sendable, CustomStringConvertible {
+        public var appearance: ThemeAppearance
+        public var distance: Double
+
+        /// "dark `signal.attention` and `signal.attention-failed` are ΔE 12 apart; they need 25".
+        public var description: String {
+            "\(appearance.rawValue) `\(ThemeToken.attention.rawValue)` and `\(ThemeToken.attentionFailed.rawValue)` are ΔE \(Int(distance.rounded(.down))) apart; they need \(Int(ThemeSignals.minimumDistance))"
+        }
+    }
+
+    /// Each appearance the theme fills where its two signal colours are
+    /// closer than `minimumDistance`, laid over its panel. `system` values
+    /// are `system`'s colours, by default the reference values.
+    public static func clashes(
+        _ theme: Theme,
+        system: (SystemShade, ThemeAppearance) -> RGBA = { $0.reference($1) }
+    ) -> [Clash] {
+        theme.appearances.compactMap { appearance in
+            let base = appearance == .dark ? RGBA(r: 0, g: 0, b: 0) : RGBA(r: 1, g: 1, b: 1)
+            let panel = theme.rgba(.panel, appearance, system: system).over(base)
+            let attention = theme.rgba(.attention, appearance, system: system).over(panel)
+            let failed = theme.rgba(.attentionFailed, appearance, system: system).over(panel)
+            let distance = attention.distance(to: failed)
+            return distance < minimumDistance ? Clash(appearance: appearance, distance: distance) : nil
+        }
+    }
+
+    /// The deeper red the error dot takes when the accent it follows is
+    /// the macOS accent and the user picked a red one, close to `failed`.
+    public static let deeperRed = RGBA(hex: "#8E1622")!
+
+    /// `failed`, or `deeperRed` when it is closer to `attention` than
+    /// `minimumDistance`: what the error dot draws while the accent follows
+    /// the user's choice, which no theme check can see.
+    public static func failed(_ failed: RGBA, apartFrom attention: RGBA) -> RGBA {
+        failed.distance(to: attention) < minimumDistance ? deeperRed : failed
+    }
+}
+
 extension Theme {
     /// The appearance the theme draws in while the system is in
     /// `appearance`: that one when the theme fills it, else the one it fills.
@@ -120,6 +168,29 @@ extension RGBA {
             value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
         }
         return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+    }
+
+    /// The CIE76 colour difference of two colours, taken as opaque: the
+    /// distance between them in CIE L*a*b* under D65.
+    public func distance(to other: RGBA) -> Double {
+        let (a, b) = (lab, other.lab)
+        return ((a.l - b.l) * (a.l - b.l) + (a.a - b.a) * (a.a - b.a) + (a.b - b.b) * (a.b - b.b)).squareRoot()
+    }
+
+    /// The colour in CIE L*a*b*, under D65.
+    private var lab: (l: Double, a: Double, b: Double) {
+        func linear(_ value: Double) -> Double {
+            value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+        }
+        let (lr, lg, lb) = (linear(r), linear(g), linear(b))
+        let x = (0.4124 * lr + 0.3576 * lg + 0.1805 * lb) / 0.95047
+        let y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb
+        let z = (0.0193 * lr + 0.1192 * lg + 0.9505 * lb) / 1.08883
+        func f(_ t: Double) -> Double {
+            t > 216.0 / 24389 ? cbrt(t) : (24389.0 / 27 * t + 16) / 116
+        }
+        let (fx, fy, fz) = (f(x), f(y), f(z))
+        return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
     }
 
     /// The WCAG contrast ratio of two opaque colours, from 1 to 21.

@@ -65,6 +65,20 @@ public struct Attention: Equatable, Sendable {
         return reasons
     }
 
+    /// How loudly `item`'s attention dot speaks under `toggles`. A pull
+    /// request whose checks failed is `error` while `checks-failed` is on,
+    /// whether or not it was seen since: the dot stays red until the checks
+    /// pass, and wins over the other levels. One whose checks are pending
+    /// breathes, `pending`. Otherwise the dot is `regular` while the item
+    /// needs attention, and `none` when it doesn't.
+    public func level(_ item: Item, toggles: Configuration.AttentionToggles) -> AttentionLevel {
+        let needs = needsAttention(item, toggles: toggles)
+        guard item.kind == .pullRequest, Self.canNeedAttention(item) else { return needs ? .regular : .none }
+        if toggles.checksFailed, item.checks == .failed { return .error }
+        if item.checks == .pending { return .pending(needsAttention: needs) }
+        return needs ? .regular : .none
+    }
+
     /// One of the reasons an item needs attention, as `[attention]` names them.
     public enum Reason: Equatable, Hashable, Sendable {
         case unseen
@@ -116,6 +130,21 @@ public struct Attention: Equatable, Sendable {
         seen = seen.filter { $0.value.present >= cutoff }
         return changed || seen.count != before
     }
+}
+
+/// How loudly a row's attention dot speaks (`Attention.level(_:toggles:)`).
+public enum AttentionLevel: Equatable, Hashable, Sendable {
+    /// No dot: nothing new, failing or pending.
+    case none
+    /// New or changed: a still dot in `signal.attention`.
+    case regular
+    /// A pull request's checks are pending: the dot breathes, in
+    /// `signal.attention` when the row needs attention, in the quiet colour
+    /// when it doesn't.
+    case pending(needsAttention: Bool)
+    /// A pull request's checks failed: a still dot in
+    /// `signal.attention-failed`, which stays after the row is marked seen.
+    case error
 }
 
 /// Items needing attention, per kind, and in total.

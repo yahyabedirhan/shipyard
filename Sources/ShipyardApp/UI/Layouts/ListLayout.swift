@@ -336,21 +336,6 @@ private enum PageLinkMenu {
     }
 }
 
-private final class ActionMenuItem: NSMenuItem {
-    private let run: () -> Void
-
-    init(title: String, run: @escaping () -> Void) {
-        self.run = run
-        super.init(title: title, action: #selector(choose), keyEquivalent: "")
-        target = self
-    }
-
-    @available(*, unavailable)
-    required init(coder: NSCoder) { fatalError("not decoded") }
-
-    @objc private func choose() { run() }
-}
-
 private struct ChipButtonStyle: ButtonStyle {
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
         ChipButtonBody(configuration: configuration)
@@ -381,7 +366,7 @@ private struct ListRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            AttentionDot(isOn: row.needsAttention)
+            AttentionDot(level: row.attentionLevel)
                 .frame(width: ListGrid.dotColumn, alignment: .leading)
             stateIcon
             ZStack(alignment: numberAlignment) {
@@ -441,7 +426,6 @@ private struct ListRow: View {
     private var stateIcon: some View {
         StateSymbol(row: row)
             .frame(width: ListGrid.iconColumn, alignment: .center)
-            .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
     }
 
     private var meta: String? {

@@ -4,7 +4,8 @@ import ShipyardConfig
 extension ConfigurationStore {
     /// Writes `preset`'s whole file, with `projects` as its picked
     /// repositories, for onboarding's first step: only when the file is
-    /// missing or its only live key is `version`. Creates the directory when
+    /// missing or its only live keys are `version` and `theme`, which the
+    /// preset keeps. Creates the directory when
     /// it's missing. Throws a `ConfigurationError` (and writes nothing) when the
     /// file holds anything else or doesn't read, when a project is invalid
     /// (as for `append(projects:)`), or when the preset's file wouldn't read
@@ -13,12 +14,17 @@ extension ConfigurationStore {
     @discardableResult
     public func writePreset(_ preset: Preset, projects: [NewProject] = []) throws -> ReloadResult {
         try validate(projects, against: [])
-        let text = preset.text(projects: projects)
+        var text = preset.text(projects: projects)
         _ = try Configuration.decode(text)
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: url.path) {
-            guard let current = String(data: try read(), encoding: .utf8), Configuration.acceptsPreset(current) else {
+            guard let current = String(data: try read(), encoding: .utf8), Configuration.acceptsPreset(current, themes: themes) else {
                 throw Configuration.presetRefused
+            }
+            // A theme picked before the preset stays.
+            if current.firstMatch(of: /(?m)^[ \t]*theme[ \t]*=/) != nil {
+                let theme = try Configuration.decode(current, themes: themes).configuration.theme
+                text = try Configuration.settingTheme(theme, in: text, themes: themes)
             }
             let handle = try FileHandle(forWritingTo: url)
             defer { try? handle.close() }

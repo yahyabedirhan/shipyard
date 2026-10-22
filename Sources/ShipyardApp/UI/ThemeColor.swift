@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import os
 import ShipyardConfig
 import ShipyardCore
@@ -10,7 +11,7 @@ import SwiftUI
 // each with its own sizes and type.
 
 private struct ThemeKey: EnvironmentKey {
-    static let defaultValue = BuiltInThemes.shipyard
+    static let defaultValue = BuiltInThemes.system
 }
 
 extension EnvironmentValues {
@@ -45,6 +46,42 @@ extension View {
     /// with no colour of their own) draws for its surfaces too.
     func theme(_ theme: Theme) -> some View {
         modifier(ThemeScope(theme: theme))
+    }
+}
+
+private struct SystemColorsGenerationKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    /// Counts the system's colour changes (a new accent, more contrast), so
+    /// a `system` value draws again when it changes. The panel sets it from
+    /// `SystemColorsWatch`.
+    var systemColorsGeneration: Int {
+        get { self[SystemColorsGenerationKey.self] }
+        set { self[SystemColorsGenerationKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Draws the views below again when the system's colours change:
+    /// `NSColor.systemColorsDidChangeNotification`, which a new accent in
+    /// System Settings > Appearance posts.
+    func followsSystemColors() -> some View {
+        modifier(SystemColorsWatch())
+    }
+}
+
+private struct SystemColorsWatch: ViewModifier {
+    @State private var generation = 0
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.systemColorsGeneration, generation)
+            .onReceive(NotificationCenter.default.publisher(for: NSColor.systemColorsDidChangeNotification).receive(on: RunLoop.main)) { _ in
+                SystemColors.forget()
+                generation += 1
+            }
     }
 }
 
@@ -89,12 +126,21 @@ struct ThemeColor: ShapeStyle, Hashable {
     func opacity(_ value: Double) -> ThemeColor { ThemeColor(source, opacity: opacity * value) }
 
     func resolve(in environment: EnvironmentValues) -> Color {
-        color(in: environment.theme, ThemeAppearance(environment.colorScheme))
+        // Read so a change of the system's colours draws again.
+        _ = environment.systemColorsGeneration
+        return color(in: environment.theme, ThemeAppearance(environment.colorScheme))
     }
 
     /// The colour in `theme` and `appearance`, for code with no environment.
     func color(in theme: Theme, _ appearance: ThemeAppearance) -> Color {
         let base: Color = switch source {
+        case .token(.attentionFailed) where theme.value(.attention, appearance) == .system:
+            // The attention dot follows the user's accent, which no theme
+            // check sees: a red accent pushes failed's dot to a deeper red.
+            Self.color(ThemeSignals.failed(
+                theme.rgba(.attentionFailed, appearance, system: SystemColors.rgba),
+                apartFrom: theme.rgba(.attention, appearance, system: SystemColors.rgba)
+            ))
         case .token(let token):
             switch theme.value(token, appearance) {
             case .color(let rgba): Self.color(rgba)
@@ -137,6 +183,7 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let rowHover = ThemeColor(.rowHover)
     static let rowPressed = ThemeColor(.rowPressed)
     static let attention = ThemeColor(.attention)
+    static let attentionFailed = ThemeColor(.attentionFailed)
     static let lease = ThemeColor(.lease)
 
     /// The theme's phase colours, for what isn't one kind's state but is
@@ -161,7 +208,7 @@ struct ThemeColor: ShapeStyle, Hashable {
         }
     }
 
-    /// A pull request's check dot; none when it has no checks.
+    /// A pull request's checks on its hover card; none when it has none.
     static func checks(_ checks: ChecksState) -> ThemeColor? {
         checks == .none ? nil : state(.check, checks.rawValue)
     }
@@ -210,10 +257,29 @@ enum SystemColors {
     }
 
     private static let cache = OSAllocatedUnfairLock(initialState: [Key: Color]())
+    private static let values = OSAllocatedUnfairLock(initialState: [Key: RGBA]())
     nonisolated(unsafe) private static let observer: any NSObjectProtocol = NotificationCenter.default.addObserver(
         forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: nil
     ) { _ in
+        forget()
+    }
+
+    /// The shade as an sRGB colour, read under `appearance`, for code that
+    /// works on colours' values: the theme circles, the error dot's red.
+    static func rgba(_ shade: SystemShade, _ appearance: ThemeAppearance) -> RGBA {
+        _ = observer
+        let key = Key(shade: shade, appearance: appearance)
+        if let rgba = values.withLock({ $0[key] }) { return rgba }
+        let color = resolved(shade, appearance)
+        let rgba = RGBA(r: color.redComponent, g: color.greenComponent, b: color.blueComponent, a: color.alphaComponent)
+        values.withLock { $0[key] = rgba }
+        return rgba
+    }
+
+    /// Drops the colours read so far, so the next draw reads them again.
+    static func forget() {
         cache.withLock { $0.removeAll() }
+        values.withLock { $0.removeAll() }
     }
 
     static func color(_ shade: SystemShade, _ appearance: ThemeAppearance) -> Color {

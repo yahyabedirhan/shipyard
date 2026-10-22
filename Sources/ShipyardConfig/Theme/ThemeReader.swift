@@ -48,7 +48,7 @@ public struct ThemeDefinition: Sendable {
     /// draws in both; `nil` when it fills both or extends another. It fills
     /// one when it writes `[light.*]` or `[dark.*]` tables for that one
     /// alone, and its colours without a prefix, if any, read that
-    /// appearance's own palette: Paper's `[surface]` and `[text]` tokens name
+    /// appearance's own palette: Paper Light's `[surface]` and `[text]` tokens name
     /// `[light.palette]` colours, so it fills light, where tokens without a
     /// prefix and a `[dark.*]` override still set both appearances.
     var single: ThemeAppearance? {
@@ -178,7 +178,13 @@ public enum ThemeReader {
         var chain: [ThemeDefinition] = [definition]
         while let parent = chain[0].extends {
             guard let found = library[parent.lowercased()] else {
-                return .failure(Failure(issues: [extendsIssue(chain[0], "`extends` names \"\(parent)\", which isn't a theme")]))
+                // The themes it could extend: every one but those in its own chain.
+                let own = Set(chain.map { $0.name.lowercased() })
+                let names = library.values.map(\.name).filter { !own.contains($0.lowercased()) }
+                    .sorted { $0.lowercased() < $1.lowercased() }.map { "`\($0)`" }
+                return .failure(Failure(issues: [extendsIssue(
+                    chain[0], "`extends` names \"\(parent)\", which isn't a theme (expected one of \(names.joined(separator: ", ")))"
+                )]))
             }
             if chain.contains(where: { $0.name.lowercased() == found.name.lowercased() }) {
                 let loop = ([found] + chain).map(\.name).joined(separator: " → ")
@@ -270,11 +276,23 @@ public enum ThemeReader {
         }
         guard issues.isEmpty else { return .failure(Failure(issues: issues.sorted { ($0.line ?? 0) < ($1.line ?? 0) })) }
 
+        // `signal.attention-failed`, when no theme in the chain sets it, is
+        // the `failed` phase's colour: `system` stands for the macOS red,
+        // as the phase's does.
+        for appearance in ThemeAppearance.allCases where values[appearance]?[.attentionFailed] == nil {
+            if case .color(let color) = phaseColors[appearance]?[.failed] {
+                values[appearance, default: [:]][.attentionFailed] = .color(color)
+            }
+        }
+
+        // A theme that extends another keeps the appearances its parent
+        // fills, and adds the one whose `[light.*]` or `[dark.*]` tables it
+        // writes: a theme that extends Shipyard Dark is dark too.
         var filled = Set<ThemeAppearance>()
         for link in chain {
             if let single = link.single {
                 filled = [single]
-            } else if link.extends == nil || link.fillsBoth {
+            } else if link.extends == nil {
                 filled = Set(ThemeAppearance.allCases)
             } else {
                 if link.fillsLight { filled.insert(.light) }

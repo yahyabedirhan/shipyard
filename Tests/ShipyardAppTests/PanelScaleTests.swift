@@ -7,7 +7,7 @@ import Testing
 struct PanelScaleTests {
     @Test("the Shipyard theme gives the panel's long-standing grid and list grid, its 6 and 8 pt corners, and the system text styles")
     func shipyard() {
-        let scale = PanelScale(BuiltInThemes.shipyard.knobs)
+        let scale = PanelScale(BuiltInThemes.system.knobs)
         let grid = scale.grid
         #expect([grid.gutter, grid.titleBarHeight, grid.rowHeight, grid.headerHeight, grid.tabRowPadding] == [12, 38, 24, 26, 5])
         #expect([grid.smallRadius, grid.radius] == [6, 8])
@@ -36,7 +36,7 @@ struct PanelScaleTests {
     @Test("setting a theme in the environment sets its scale; with none set, the scale is Shipyard's")
     func environment() {
         var environment = EnvironmentValues()
-        #expect(environment.panelScale == PanelScale(BuiltInThemes.shipyard.knobs))
+        #expect(environment.panelScale == PanelScale(BuiltInThemes.system.knobs))
         var knobs = ThemeKnobs.standard
         knobs.row = 22
         environment.theme = Theme(name: "Compact", knobs: knobs) { _, _ in .system }

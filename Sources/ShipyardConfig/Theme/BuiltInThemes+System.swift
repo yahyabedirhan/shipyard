@@ -1,13 +1,14 @@
-// The Native theme's file, embedded so the app and the command read it
+// The System theme's file, embedded so the app and the command read it
 // with no file on disk.
 
 extension BuiltInThemes {
-    static let nativeSource = #"""
-    # Native: every token is the matching macOS semantic color.
-    # It follows the system accent and the system light or dark setting.
-    name = "Native"
+    static let systemSource = #"""
+    # System: the default theme. Every token is the matching macOS colour,
+    # so it follows the macOS appearance, light or dark, and the accent
+    # colour picked in System Settings > Appearance.
+    name = "System"
     version = 1
-    description = "The system's own colors: semantic fills, labels and the user's accent."
+    description = "The default: the macOS appearance, its semantic colours and your accent colour."
 
     [surface]
     window = "system"
@@ -84,8 +85,11 @@ extension BuiltInThemes {
     [states.note]
     open = "quiet"
 
+    # The attention dot: the macOS accent for a new or changed row, the
+    # macOS red while a pull request's checks fail.
     [signal]
     attention = "system"
+    attention-failed = "system"
     lease = "system"
 
     [font]

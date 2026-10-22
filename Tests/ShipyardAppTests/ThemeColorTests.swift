@@ -24,8 +24,8 @@ struct ThemeColorTests {
         let dark = drawn(.panel, theme: Self.theme, .dark)
         #expect((light.red, light.green, light.blue) == (1, 0, 0))
         #expect((dark.red, dark.green, dark.blue) == (0, 0, 1))
-        // Another part of the window, with no theme set, keeps drawing Shipyard.
-        #expect(drawn(.panel, theme: nil, .dark) == drawn(.panel, theme: BuiltInThemes.shipyard, .dark))
+        // Another part of the window, with no theme set, keeps drawing System.
+        #expect(drawn(.panel, theme: nil, .dark) == drawn(.panel, theme: BuiltInThemes.system, .dark))
         #expect(drawn(.panel, theme: nil, .dark) != dark)
     }
 
@@ -61,7 +61,7 @@ struct ThemeColorTests {
         #expect(named == themed)
     }
 
-    @Test("each built-in theme passes the contrast check with the live macOS colours, as with the reference ones the command uses")
+    @Test("each built-in theme passes the contrast and attention checks with the live macOS colours, as with the reference ones the command uses")
     func liveContrast() {
         let live: (SystemShade, ThemeAppearance) -> RGBA = { shade, appearance in
             var environment = EnvironmentValues()
@@ -71,6 +71,26 @@ struct ThemeColorTests {
         }
         for theme in BuiltInThemes.themes {
             #expect(ThemeContrast.shortfalls(theme, system: live).isEmpty, "\(theme.name): \(ThemeContrast.shortfalls(theme, system: live))")
+            // System's accent is this Mac's choice, which the error dot's own rule handles.
+            if theme.value(.attention, .light) != .system {
+                #expect(ThemeSignals.clashes(theme, system: SystemColors.rgba).isEmpty, "\(theme.name)")
+            }
+        }
+    }
+
+    @Test("the error dot draws attention-failed, and a deeper red when it is close to an attention that follows the macOS accent")
+    func errorDot() {
+        let accent = SystemColors.rgba(SystemShade(.accent), .light)
+        let following = Theme(name: "Following") { token, _ in token == .attentionFailed ? .color(accent) : .system }
+        let fixed = Theme(name: "Fixed") { token, _ in token == .attentionFailed || token == .attention ? .color(accent) : .system }
+        let deeper = ThemeColor.attentionFailed.color(in: following, .light)
+        #expect(deeper == Color(.sRGB, red: ThemeSignals.deeperRed.r, green: ThemeSignals.deeperRed.g, blue: ThemeSignals.deeperRed.b, opacity: 1))
+        #expect(ThemeColor.attentionFailed.color(in: fixed, .light)
+            == Color(.sRGB, red: accent.r, green: accent.g, blue: accent.b, opacity: accent.a))
+        // System's own red stays while the accent is apart from it, as with the default blue.
+        let red = SystemColors.rgba(SystemShade(.red), .light)
+        if red.distance(to: accent) >= ThemeSignals.minimumDistance {
+            #expect(ThemeColor.attentionFailed.color(in: BuiltInThemes.system, .light) == Color(.sRGB, red: red.r, green: red.g, blue: red.b, opacity: red.a))
         }
     }
 }

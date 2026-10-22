@@ -368,6 +368,148 @@ struct ConfigurationStoreLayoutTests {
     }
 }
 
+@Suite("Configuration store: setting the theme")
+struct ConfigurationStoreThemeTests {
+    /// One write of the Theme submenu: the file before, the name picked, the file after.
+    struct Case: CustomTestStringConvertible, Sendable {
+        var name: String
+        var before: String
+        var pick: String
+        var after: String
+        var testDescription: String { name }
+    }
+
+    static let projects = "\n[[projects]]\nslug = \"a\"\nrepositories = [\"o/a\"]\n"
+
+    static let cases: [Case] = [
+        Case(name: "an existing theme's value is replaced, keeping its comment, the theme's spelling and every other line", before: """
+            # mine
+            version = 1
+            theme = "Ocean"   # the dark one
+            refresh-interval = "60s"
+
+            [menu]
+            layout = "list"
+            \(projects)
+            """, pick: "paper light", after: """
+            # mine
+            version = 1
+            theme = "Paper Light"   # the dark one
+            refresh-interval = "60s"
+
+            [menu]
+            layout = "list"
+            \(projects)
+            """),
+        Case(name: "the new-file header's commented example is uncommented in place", before: Configuration.header + projects, pick: "Harbor",
+             after: Configuration.header.replacingOccurrences(of: "# theme = \"System\"\n", with: "theme = \"Harbor\"\n") + projects),
+        Case(name: "a file without the key gets it after version, above every table", before: """
+            #:schema \(Configuration.schemaURL)
+            version = 1
+            launch-at-login = false
+
+            [menu]
+            layout = "tabs"
+            """, pick: "Sunset", after: """
+            #:schema \(Configuration.schemaURL)
+            version = 1
+            theme = "Sunset"
+            launch-at-login = false
+
+            [menu]
+            layout = "tabs"
+            """),
+        Case(name: "a file without version gets it above its first table and that table's comment", before: """
+            refresh-interval = "60s"
+
+            # my projects
+            [[projects]]
+            slug = "a"
+            repositories = ["o/a"]
+            """, pick: "System", after: """
+            refresh-interval = "60s"
+
+            theme = "System"
+
+            # my projects
+            [[projects]]
+            slug = "a"
+            repositories = ["o/a"]
+            """),
+        Case(name: "an empty file gets the key alone", before: "", pick: "Brass", after: "theme = \"Brass\"\n"),
+    ]
+
+    @Test("the Theme submenu's write changes only the top-level theme, keeping comments and order", arguments: cases)
+    func setsTheme(_ example: Case) throws {
+        let url = temporaryConfigURL()
+        try write(example.before, to: url)
+        let store = ConfigurationStore(url: url)
+        store.reload()
+        let before = store.lastValid
+        try store.setTheme(example.pick)
+        #expect(try contents(of: url) == example.after)
+        var expected = before
+        expected.theme = try #require(store.themes.theme(named: example.pick)).name
+        #expect(store.error == nil)
+        #expect(store.lastValid == expected)
+        #expect(store.theme.name == expected.theme)
+    }
+
+    @Test("a missing file is created with its header, whose example is uncommented")
+    func missingFile() throws {
+        let url = temporaryConfigURL()
+        let store = ConfigurationStore(url: url)
+        try store.setTheme("Shipyard Dark")
+        #expect(try contents(of: url) == Configuration.header
+            .replacingOccurrences(of: "# theme = \"System\"\n", with: "theme = \"Shipyard Dark\"\n"))
+        #expect(store.theme.name == "Shipyard Dark")
+    }
+
+    @Test("a file that doesn't read, a name that's no theme and a theme written in a form shipyard doesn't edit leave the file as it was, with the reason")
+    func refused() throws {
+        let url = temporaryConfigURL()
+        let broken = "version = 1\ntheme = \"Ocean\"\n\n[[projects]]\nslug = \"a\"\nrepositories = [\"nope\"]\n"
+        try write(broken, to: url)
+        let store = ConfigurationStore(url: url)
+        #expect(throws: ConfigurationError([ConfigurationIssue(line: 6, message: "unknown repository group `nope` (did you mean `nope/*`, or a repository as `nope/name`?)")])) {
+            try store.setTheme("Brass")
+        }
+        #expect(try contents(of: url) == broken)
+
+        let valid = "version = 1\ntheme = \"Ocean\"\n"
+        try write(valid, to: url)
+        store.reload()
+        #expect(throws: ConfigurationError.self) { try store.setTheme("Midnight") }
+        #expect(try contents(of: url) == valid)
+
+        let multiline = "version = 1\ntheme = \"\"\"Ocean\"\"\"\n"
+        try write(multiline, to: url)
+        store.reload()
+        #expect(throws: ConfigurationError([ConfigurationIssue(
+            line: 2,
+            message: "can't switch the theme: `theme` is written in a form shipyard doesn't edit; set `theme = \"Brass\"` at the top of the file by hand"
+        )])) {
+            try store.setTheme("Brass")
+        }
+        #expect(try contents(of: url) == multiline)
+        #expect(store.theme.name == "Ocean")
+    }
+
+    @Test("a theme picked before onboarding's preset stays in the preset's file")
+    func presetKeepsTheme() throws {
+        let url = temporaryConfigURL()
+        let store = ConfigurationStore(url: url)
+        try store.createIfMissing()
+        try store.setTheme("Heather")
+        #expect(store.acceptsPreset)
+        try store.writePreset(.reviewQueue)
+        #expect(store.error == nil)
+        #expect(store.theme.name == "Heather")
+        #expect(store.lastValid.theme == "Heather")
+        #expect(try contents(of: url).contains("theme = \"Heather\""))
+    }
+}
+
 @Suite("Configuration store: location")
 struct ConfigurationStoreLocationTests {
     let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)

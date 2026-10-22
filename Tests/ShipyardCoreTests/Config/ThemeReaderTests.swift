@@ -92,14 +92,14 @@ struct ThemeReaderTests {
         Valid(name: "extends fills every token and knob the file leaves out, and its palette names carry over", text: """
             name = "Harbor at night"
             version = 1
-            extends = "shipyard"
+            extends = "shipyard dark"
             [surface]
             panel = "accent"
             [shape]
             small = 2
             """) { theme in
-            let parent = BuiltInThemes.shipyard
-            #expect(theme.value(.panel, .light) == parent.value(.accent, .light))
+            let parent = BuiltInThemes.named("Shipyard Dark")!
+            #expect(theme.appearances == [.dark], "it keeps its parent's one appearance")
             #expect(theme.value(.panel, .dark) == parent.value(.accent, .dark))
             #expect(theme.value(.textOnAccent, .dark) == white)
             #expect(theme.value(.header, .dark) == parent.value(.header, .dark))
@@ -196,15 +196,15 @@ struct ThemeReaderTests {
             #expect(theme.appearances == [.light, .dark])
         },
         Valid(name: "extends fills the phases and states a file leaves out, and a state follows the phase the file changes", text: """
-            name = "Shipyard red"
+            name = "System red"
             version = 1
-            extends = "Shipyard"
+            extends = "System"
             [phase]
             done = "#ff0000"
             [dark.states.run]
             running = "#0000ff"
             """) { theme in
-            let parent = BuiltInThemes.shipyard
+            let parent = BuiltInThemes.system
             #expect(theme.color(.pullRequest, "merged", .light) == .color(RGBA(r: 1, g: 0, b: 0)))
             #expect(theme.color(.run, "succeeded", .dark) == .color(RGBA(r: 1, g: 0, b: 0)))
             #expect(theme.color(.run, "running", .dark) == .color(RGBA(r: 0, g: 0, b: 1)))
@@ -395,7 +395,10 @@ struct ThemeReaderTests {
             name = "Orphan"
             version = 1
             extends = "Nowhere"
-            """, issues: ["Theme.toml line 3: `extends` names \"Nowhere\", which isn't a theme"]),
+            """, issues: ["""
+                Theme.toml line 3: `extends` names "Nowhere", which isn't a theme (expected one of `Brass`, `Harbor`, `Heather`, \
+                `Ocean`, `Paper Dark`, `Paper Light`, `Shipyard Dark`, `Shipyard Light`, `Sunset`, `System`)
+                """]),
         Invalid(name: "extends goes back to the theme itself", text: """
             name = "Loop"
             version = 1
@@ -422,7 +425,7 @@ struct ThemeReaderTests {
     @Test("of two themes with one name, the later wins, so a user file replaces a built-in theme")
     func laterWins() throws {
         let user = try #require(ThemeReader.definition("""
-            name = "shipyard"
+            name = "ocean"
             version = 1
             [accent]
             accent = "#ff0000"
@@ -430,29 +433,45 @@ struct ThemeReaderTests {
         let (themes, issues) = ThemeReader.resolve(BuiltInThemes.definitions + [user])
         #expect(issues.isEmpty)
         #expect(themes.count == BuiltInThemes.themes.count)
-        let shipyard = try #require(themes.first { $0.name.lowercased() == "shipyard" })
+        let shipyard = try #require(themes.first { $0.name.lowercased() == "ocean" })
         #expect(shipyard.value(.accent, .light) == Self.red)
         #expect(shipyard.source == .file(URL(fileURLWithPath: "/themes/Mine.toml")))
     }
 
-    @Test("the Shipyard theme is built in, reads with no problem, and draws white text on the accent in dark")
-    func shipyard() {
+    @Test("the built-in themes are the lineup, in its order: System, which follows the macOS appearance, then one theme of each appearance")
+    func lineup() {
         #expect(BuiltInThemes.issues.isEmpty, "\(BuiltInThemes.issues)")
-        let theme = BuiltInThemes.shipyard
-        #expect(theme.name == "Shipyard")
-        #expect(BuiltInThemes.named("SHIPYARD") == theme)
-        #expect(theme.value(.textOnAccent, .dark) == Self.white)
-        #expect(theme.value(.accent, .dark) == .color(RGBA(hex: "#6D9CFF")!))
-        #expect(theme.value(.panel, .light) == .system)
-        #expect(theme.knobs == .standard)
+        #expect(BuiltInThemes.themes.map(\.name) == [
+            "System", "Shipyard Light", "Shipyard Dark", "Paper Light", "Paper Dark", "Harbor", "Heather", "Brass", "Ocean", "Sunset",
+        ])
+        #expect(ThemeLibrary.builtIn.names == BuiltInThemes.themes.map(\.name))
+        #expect(BuiltInThemes.system.name == "System")
+        #expect(BuiltInThemes.named("SYSTEM") == BuiltInThemes.system)
+        #expect(ThemeLibrary.defaultName == "System")
+        let accents = [
+            "Shipyard Light": "#2F6BDE", "Shipyard Dark": "#6D9CFF", "Paper Light": "#B4491E", "Paper Dark": "#E3CFA8",
+            "Harbor": "#0E7C86", "Heather": "#6A4FB0", "Brass": "#8A6100", "Ocean": "#4FC3F7", "Sunset": "#FB923C",
+        ]
+        for (name, accent) in accents {
+            let theme = BuiltInThemes.named(name)
+            #expect(theme?.value(.accent, theme?.appearances.first ?? .light) == .color(RGBA(hex: accent)!), "\(name)")
+        }
+        // System is the macOS colours throughout, the accent included.
+        for token in ThemeToken.allCases {
+            #expect(BuiltInThemes.system.value(token, .light) == .system, "\(token)")
+        }
+        #expect(BuiltInThemes.named("Paper Light")?.color(.failed, .light) == .color(RGBA(hex: "#A3203C")!))
+        #expect(BuiltInThemes.named("Sunset")?.color(.failed, .dark) == .color(RGBA(hex: "#F0506E")!))
+        #expect(BuiltInThemes.named("Sunset")?.value(.attentionFailed, .dark) == .color(RGBA(hex: "#F0506E")!))
     }
 
-    @Test("each built-in theme reads with no problem, passes the contrast check, gives active, done and failed their own colours and every state of one phase one colour, in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
+    @Test("each built-in theme reads with no problem, passes the contrast and attention checks, gives active, done and failed their own colours and every state of one phase one colour, and fills its one appearance (System both)", arguments: BuiltInThemes.themes.map(\.name))
     func builtIn(_ name: String) throws {
         #expect(BuiltInThemes.issues.isEmpty, "\(BuiltInThemes.issues)")
         let theme = try #require(BuiltInThemes.named(name))
         #expect(ThemeContrast.shortfalls(theme).isEmpty, "\(ThemeContrast.shortfalls(theme))")
-        for appearance in ThemeAppearance.allCases {
+        #expect(ThemeSignals.clashes(theme).isEmpty, "\(ThemeSignals.clashes(theme))")
+        for appearance in theme.appearances {
             var byPhase: [ThemePhase: Set<ThemeStateColor>] = [:]
             for kind in ThemeKind.allCases {
                 for (state, phase) in kind.states {
@@ -466,15 +485,42 @@ struct ThemeReaderTests {
             let lifecycle = [ThemePhase.active, .done, .failed].compactMap { byPhase[$0]?.first }
             #expect(Set(lifecycle).count == 3, "\(appearance): \(lifecycle)")
         }
-        // Paper fills light and Midnight dark; each draws its one in both appearances.
         let fills: [ThemeAppearance] = switch name {
-        case "Paper": [.light]
-        case "Midnight": [.dark]
-        default: [.light, .dark]
+        case "System": [.light, .dark]
+        case "Shipyard Dark", "Paper Dark", "Ocean", "Sunset": [.dark]
+        default: [.light]
         }
         #expect(theme.appearances == fills)
         for appearance in ThemeAppearance.allCases {
             #expect(fills.contains(theme.drawn(appearance)))
+        }
+    }
+
+    @Test("a theme's circle in the Theme submenu is its panel and its accent in the appearance it draws: a one-appearance theme's own in both, System's the macOS colours of the appearance")
+    func swatches() throws {
+        let white = RGBA(r: 1, g: 1, b: 1)
+        let system = BuiltInThemes.system
+        #expect(system.swatch(.light) == ThemeSwatch(panel: SystemColor.windowBackground.reference(.light).over(white), accent: SystemColor.accent.reference(.light)))
+        #expect(system.swatch(.dark).panel == SystemColor.windowBackground.reference(.dark))
+        #expect(system.swatch(.light) != system.swatch(.dark))
+        // System follows the live colours the app passes, such as a purple accent.
+        let purple = RGBA(hex: "#953D96")!
+        #expect(system.swatch(.light) { shade, appearance in shade.color == .accent ? purple : shade.reference(appearance) }.accent == purple)
+
+        let expected: [String: (panel: String?, accent: String)] = [
+            "Shipyard Light": (nil, "#2F6BDE"), "Shipyard Dark": (nil, "#6D9CFF"),
+            "Paper Light": ("#FAF6EE", "#B4491E"), "Paper Dark": ("#221C1D", "#E3CFA8"),
+            "Harbor": (nil, "#0E7C86"), "Heather": ("#FAF9FC", "#6A4FB0"), "Brass": ("#FBF9F3", "#8A6100"),
+            "Ocean": ("#0F1830", "#4FC3F7"), "Sunset": (nil, "#FB923C"),
+        ]
+        for (name, colours) in expected {
+            let theme = try #require(BuiltInThemes.named(name))
+            let own = try #require(theme.appearances.first)
+            #expect(theme.swatch(.light) == theme.swatch(.dark), "\(name) draws one appearance")
+            let swatch = theme.swatch(.light)
+            #expect(swatch.accent == RGBA(hex: colours.accent)!, "\(name)")
+            let panel = colours.panel.flatMap { RGBA(hex: $0) } ?? SystemColor.windowBackground.reference(own)
+            #expect(swatch.panel == panel, "\(name)")
         }
     }
 

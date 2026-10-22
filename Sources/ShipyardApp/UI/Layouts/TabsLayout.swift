@@ -325,7 +325,7 @@ private struct TabRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            AttentionDot(isOn: row.needsAttention)
+            AttentionDot(level: row.attentionLevel)
                 .frame(width: Grid.dotColumn, alignment: .leading)
             StateSymbol(row: row)
                 .frame(width: 22, height: 22)
@@ -333,7 +333,6 @@ private struct TabRow: View {
                     RoundedRectangle(cornerRadius: scale.grid.smallRadius + 1, style: .continuous)
                         .fill(ThemeColor.state(row.state, kind: row.kind).opacity(0.14))
                 )
-                .overlay(alignment: .bottomTrailing) { CheckDot(checks: row.checks).offset(x: 2, y: 2) }
                 .padding(.trailing, 10)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)

@@ -1,12 +1,12 @@
-// The Midnight theme's file, embedded so the app and the command read it
+// The Ocean theme's file, embedded so the app and the command read it
 // with no file on disk.
 
 extension BuiltInThemes {
-    static let midnightSource = #"""
-    # Midnight: deep blue, dark only. Light mode repeats the dark colors.
-    name = "Midnight"
+    static let oceanSource = #"""
+    # Ocean: deep navy surfaces with a sky-cyan accent, dark.
+    name = "Ocean"
     version = 1
-    description = "Deep blue dark theme with a bright blue accent; dark only."
+    description = "Deep navy with a sky-cyan accent; dark."
 
     [dark.palette]
     deep = "#0A1124"
@@ -21,9 +21,9 @@ extension BuiltInThemes {
     line-strong = "#8fa8e03d"
     wash = "#8fa8e014"
     press = "#8fa8e026"
-    sky = "#5B9BFF"
-    sky-soft = "#5B9BFF33"
-    on-sky = "#06122B"
+    sky = "#4FC3F7"
+    sky-soft = "#4FC3F733"
+    on-sky = "#04182A"
     mint = "#6FCF97"
     violet = "#B794F6"
     coral = "#FF7A85"
@@ -105,6 +105,8 @@ extension BuiltInThemes {
     [states.note]
     open = "quiet"
 
+    # The attention dot: the accent for a new or changed row; while a pull
+    # request's checks fail, attention-failed, which is failed's colour unless set.
     [signal]
     attention = "sky"
     lease = "sun"

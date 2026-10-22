@@ -1,13 +1,13 @@
-// The Paper theme's file, embedded so the app and the command read it
+// The Paper Light theme's file, embedded so the app and the command read it
 // with no file on disk.
 
 extension BuiltInThemes {
-    static let paperSource = #"""
-    # Paper: warm cream surfaces and brown ink, a terracotta accent.
-    # It fills the light appearance; dark mode repeats it.
-    name = "Paper"
+    static let paperLightSource = #"""
+    # Paper Light: warm cream surfaces and brown ink, a terracotta accent.
+    # Failed is a crimson, so the attention dot's two colours read apart.
+    name = "Paper Light"
     version = 1
-    description = "Warm light paper with brown ink and a terracotta accent; light only."
+    description = "Warm paper with brown ink and a terracotta accent; light."
 
     [light.palette]
     cream = "#FAF6EE"
@@ -26,8 +26,7 @@ extension BuiltInThemes {
     terracotta-soft = "#B4491E26"
     green = "#3F7D4E"
     plum = "#7B4FA0"
-    brick = "#B3322A"
-    brick-dim = "#B3322Ab3"
+    crimson = "#A3203C"
     amber = "#8F5A00"
     gold = "#C99A00"
     grey = "#7A6D5B"
@@ -66,7 +65,7 @@ extension BuiltInThemes {
     [phase]
     active = "green"
     done = "plum"
-    failed = "brick"
+    failed = "crimson"
     quiet = "grey"
 
     # Each kind's states, by phase. A state can name its own colour instead.
@@ -107,6 +106,8 @@ extension BuiltInThemes {
     [states.note]
     open = "quiet"
 
+    # The attention dot: the accent for a new or changed row; while a pull
+    # request's checks fail, attention-failed, which is failed's colour unless set.
     [signal]
     attention = "terracotta"
     lease = "gold"
