@@ -106,6 +106,19 @@ struct NtnCLITests {
         await #expect(throws: NotionError.network("ntn: error: didn't answer within 0 seconds")) { try await client.me() }
     }
 
+    @Test("a run past its timeout also stops a program it started, so that program can't outlive it")
+    func timeoutStopsChildren() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("ntn-child-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: file) }
+        _ = await NtnCLI.processRunner(timeout: 0.5)("/bin/sh", ["-c", "sleep 30 & echo $! > '\(file.path)'; wait"])
+        let child = try #require(pid_t(String(decoding: try Data(contentsOf: file), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)))
+        let deadline = Date().addingTimeInterval(3)
+        while kill(child, 0) == 0, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(kill(child, 0) != 0)
+    }
+
     @Test("a task cancelled before the run starts never launches it")
     func cancelledFirst() async {
         let task = Task {

@@ -155,7 +155,8 @@ public struct NtnCLI: HTTPTransport {
     /// without waiting for its outputs to close, which a program it started
     /// may hold open. Cancelling the task stops the run, before or after
     /// its launch, and it ends with `nil`. A stopped run gets SIGTERM, then
-    /// SIGKILL a second later.
+    /// SIGKILL a second later, sent to its process group when it leads one,
+    /// so a program it started stops with it.
     static func processRunner(timeout: TimeInterval) -> Run {
         { executable, arguments in
             let run = NtnRun(executable: executable, arguments: arguments)
@@ -217,6 +218,14 @@ private final class NtnRun: @unchecked Sendable {
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = output
         process.standardError = error
+        // Linux's Foundation closes a child's other descriptors only up to
+        // the highest one open when it starts the launch, so a pipe made
+        // meanwhile would leak into a program another run launches.
+        for pipe in [output, error] {
+            for handle in [pipe.fileHandleForReading, pipe.fileHandleForWriting] {
+                _ = fcntl(handle.fileDescriptor, F_SETFD, FD_CLOEXEC)
+            }
+        }
     }
 
     func toEnd() -> NtnCLI.Output? {
@@ -259,9 +268,10 @@ private final class NtnRun: @unchecked Sendable {
         }
         guard let pid else { return false }
         if let pid {
-            kill(pid, SIGTERM)
+            let target = getpgid(pid) == pid ? -pid : pid
+            kill(target, SIGTERM)
             DispatchQueue.global().asyncAfter(deadline: .now() + Self.killDelay) {
-                kill(pid, SIGKILL)
+                kill(target, SIGKILL)
             }
         }
         return true
