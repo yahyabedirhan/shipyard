@@ -1,5 +1,5 @@
-# Vite gives every file in assets/ a content hash, so it never changes.
-/assets/*
+# Astro gives every file in _astro/ a content hash, so it never changes.
+/_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
 # HTML and files without a hash must be checked on every visit.

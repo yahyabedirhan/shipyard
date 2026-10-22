@@ -1,0 +1,51 @@
+---
+// One numbered docs section: its title, lede and body, its diagram, code, screenshots and extras, and its notes in
+// the margin. Everything is HTML at build time; the code blocks, the install tabs and the config explorer hydrate as
+// islands once they scroll into view.
+import { ASK_AGENT, INSTALL } from '../messaging';
+import { REF } from '../reference/data';
+import { CodeBlock, CodeTabs } from './CodeBlocks';
+import { INSTALL_WAYS, type DocSection } from './content';
+import { DIAGRAMS } from './diagrams';
+import { ConfigExplorer } from './ConfigExplorer';
+import { Shot } from './figures';
+import { Install } from './Install';
+import { Changelog, CommandReference, ConfigReference, Html, Limits, NOTE_NUMBERS, PresetHead, Pings, Questions, pad } from './parts';
+import { tidy, tidyParagraphs, withMarkers } from './text';
+
+interface Props { s: DocSection; index: number }
+const { s, index } = Astro.props;
+const numbers = NOTE_NUMBERS[s.id];
+const Figure = s.diagram ? DIAGRAMS[s.diagram] : null;
+const codeTargets = (s.code ?? []).map((c) => (s.codeLast ? 'command' : c.lang === 'toml' ? 'config' : 'command'));
+---
+<section class="sec" id={s.id} aria-labelledby={`h-${s.id}`}>
+  <h2 class="sec-h" id={`h-${s.id}`}><a href={`#${s.id}`}>{s.title}</a><span class="n">{pad(index)}</span></h2>
+  <Html as="p" className="lede" html={tidy(s.lede)} />
+  {s.body ? <Html as="div" className="body" html={tidyParagraphs(withMarkers(s.body, numbers))} /> : null}
+  {Figure ? <Figure /> : null}
+  {s.extra === 'install' ? <Install client:visible ways={INSTALL_WAYS} skill={INSTALL.skill} ask={ASK_AGENT} /> : null}
+  {s.code && !s.codeLast ? <CodeTabs client:visible code={s.code} targets={codeTargets} /> : null}
+  {s.shots ? <div class="shot-pair">{s.shots.map((id) => <Shot id={id} />)}</div> : null}
+  {s.extra === 'presets' ? (
+    <div class="presets">
+      {REF.presets.map((p) => (
+        <div class="preset" id={`preset-${p.id}`}>
+          <PresetHead p={p} />
+          <div class="shot-pair"><Shot id={`preset-${p.id}-dark`} /><Shot id={`preset-${p.id}-light`} /></div>
+          <details class="whole"><summary><code>{p.id}</code> <span aria-hidden="true">›</span> <code>config.toml</code></summary><CodeBlock client:visible code={p.file} lang="toml" target="config" /></details>
+        </div>
+      ))}
+    </div>
+  ) : null}
+  {s.extra === 'explorer' ? <ConfigExplorer client:visible /> : null}
+  {s.extra === 'pings' ? <Pings /> : null}
+  {s.extra === 'config' ? <ConfigReference /> : null}
+  {s.extra === 'commands' ? <CommandReference /> : null}
+  {s.extra === 'limits' ? <Limits /> : null}
+  {s.extra === 'troubleshooting' ? <Questions /> : null}
+  {s.extra === 'changelog' ? <Changelog /> : null}
+  {s.after ? <Html as="div" className="body after" html={tidyParagraphs(s.after)} /> : null}
+  {s.code && s.codeLast ? <CodeTabs client:visible code={s.code} targets={codeTargets} /> : null}
+  <aside class="mar">{s.notes.map((n, j) => <p class="sn" id={`fn-${numbers[j]}`} data-ref={`fnref-${numbers[j]}`}><span class="k">{numbers[j]}</span><Html html={tidy(n)} /></p>)}</aside>
+</section>

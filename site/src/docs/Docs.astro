@@ -1,0 +1,55 @@
+---
+// The docs page: one column of numbered sections, the nav on the left and notes in the margin. It is HTML at build
+// time. The nav's section mark and the phone bar's menu hydrate as islands, each only at the width that shows it, and
+// notes.ts lines the margin notes up with their markers.
+import { NAME } from '../messaging';
+import { REF } from '../reference/data';
+import { GROUPS, SECTIONS, byId } from './content';
+import { JumpMenu, NavSections } from './DocsNav';
+import { Shot } from './figures';
+import { BrandLinks, Footer, Html, OPENING } from './parts';
+import Section from './Section.astro';
+import { tidy } from './text';
+import './docs.css';
+
+const home = '/';
+const groups = GROUPS.map((g) => g.ids.map((id) => ({ id, nav: byId[id].nav })));
+const sections = SECTIONS.map((s) => ({ id: s.id, nav: s.nav }));
+---
+<div class="dx">
+  <div class="mbar">
+    <a class="wordmark" href={home} data-astro-prefetch><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
+    <JumpMenu client:media="(max-width: 1040px)" sections={sections} />
+  </div>
+  <div class="page">
+    <nav class="nav" aria-label="Docs">
+      <div class="brand">
+        <a class="wordmark" href={home} data-astro-prefetch><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
+        <BrandLinks />
+        {REF.version ? <span class="ver" title="The version these docs describe">{REF.version}</span> : null}
+      </div>
+      <NavSections client:media="(min-width: 1041px)" groups={groups} order={sections.map((s) => s.id)} />
+      <a class="nav-foot" href="#install" data-id="install">Install shipyard</a>
+    </nav>
+    <main id="top">
+      <div class="head"><BrandLinks /></div>
+      <h1 class="title">{OPENING.head}</h1>
+      <p class="sub">{OPENING.sub}</p>
+      <div class="shot-pair hero-pair">
+        {/* SHOT:landing-tabs-dark */}
+        <Shot id="landing-tabs-dark" bare />
+        {/* SHOT:landing-list-light */}
+        <Shot id="landing-list-light" bare />
+      </div>
+      <div class="intro">
+        <Html as="p" html={tidy(OPENING.open1)} />
+        <Html as="p" html={tidy(OPENING.open2)} />
+      </div>
+      {SECTIONS.map((s, i) => <Section s={s} index={i} />)}
+      <Footer />
+    </main>
+  </div>
+</div>
+<script>
+  import './notes';
+</script>

@@ -1,15 +1,15 @@
-// @vitest-environment happy-dom
-import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { ASK_AGENT, INSTALL, LINE } from '../messaging';
+import { renderPage } from '../test/render';
 import { FACTS, HOW, WHAT, WHO } from './copy';
-import { Landing } from './Landing';
+import Landing from './Landing.astro';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-describe('the landing page', () => {
-  const html = renderToStaticMarkup(<Landing />);
-  const text = html.replace(/<[^>]+>/g, '');
+describe('the landing page', async () => {
+  const html = await renderPage(Landing);
+  // The text a reader sees: no tags, and no island props, which repeat the code blocks' text.
+  const text = html.replace(/<astro-island\b[^>]*>/g, '').replace(/<[^>]+>/g, '');
 
   it('tells the whole story: the line, what, who and how, the panel, the install, the agent line and the way to the docs', () => {
     expect(html).toContain(esc(LINE));
@@ -29,8 +29,8 @@ describe('the landing page', () => {
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
   });
 
-  it('has no prototype switcher and ignores ?variant=', () => {
+  it('has no prototype switcher and ignores ?variant=', async () => {
     expect(html).not.toContain('switcher');
-    expect(renderToStaticMarkup(<Landing />)).toBe(html);
+    expect(await renderPage(Landing)).toBe(html);
   });
 });
