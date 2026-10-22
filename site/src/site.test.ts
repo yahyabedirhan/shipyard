@@ -96,7 +96,6 @@ describe('screenshots', () => {
   it('each say what they show, how to capture them, and where they go', () => {
     for (const s of shots) {
       expect(s.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*-(light|dark)$/);
-      expect(['placeholder', 'done']).toContain(s.status);
       expect(['light', 'dark']).toContain(s.appearance);
       expect(s.path).toBe(`assets/screenshots/launch/${s.id}.png`);
       expect(existsSync(join(REPO_DIR, s.path)), s.path).toBe(true);
@@ -119,7 +118,7 @@ describe('screenshots', () => {
     const used = [
       ...SECTIONS.flatMap((s) => s.shots ?? []),
       ...referenceData().presets.flatMap((p) => [`preset-${p.id}-dark`, `preset-${p.id}-light`]),
-      ...walk(site('src')).flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/SHOT:([a-z0-9-]+)|<Shot id="([a-z0-9-]+)"/g)].map((m) => m[1] ?? m[2])),
+      ...walk(site('src')).flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/<Shot id="([a-z0-9-]+)"/g)].map((m) => m[1])),
     ];
     expect(used.length).toBeGreaterThan(10);
     for (const id of used) expect(ids, id).toContain(id);

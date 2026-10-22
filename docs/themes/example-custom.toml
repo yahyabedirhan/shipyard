@@ -46,7 +46,7 @@ preset = "compact"   # compact, regular or comfortable; or row, header, bar, gut
 [shape]
 small = 6
 medium = 10
-large = 14           # accepted and checked, with no effect yet
+large = 14           # accepted and checked, with no effect
 
 [material]
 style = "flat"       # flat paints surfaces with their colors; glass uses the system's material

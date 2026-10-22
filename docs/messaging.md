@@ -79,13 +79,13 @@ Each one is true of the code today.
 
 ## Non-claims
 
-What shipyard does not do yet.
+What shipyard does not do.
 Each one is stated once, plainly, in the docs' Limits section, and never in marketing copy.
 
 - It runs on macOS 14 or later only. The `shipyard` command also runs on Linux, without the app.
 - It reads github.com only. GitHub Enterprise Server, Linear and other issue trackers are not supported.
-- The download is not notarized yet: macOS asks you to clear the quarantine flag before the first launch.
-- There is no Homebrew cask and no automatic update yet.
+- The download is not notarized: macOS asks you to clear the quarantine flag before the first launch.
+- There is no Homebrew cask and no automatic update.
 - Its settings live in `config.toml`. The app's settings menu shows the setup of GitHub, Notion, the skill and the command, the layout button switches between list and tabs, and the rest is edited in the file, by you or your agents.
 - With Herdr 0.9.3, clicking another machine's ping focuses its pane on that machine, but the Mac's Herdr window moves there only when it already shows that machine.
 
@@ -165,4 +165,5 @@ Each surface says the one line in its own length, never a different idea.
 - Leave use categories out of the one line. Show what shipyard lists, and let people bring their own uses.
 - Say only what the app does today. Describe behavior, and leave how it looks to the screenshots.
 - State each limit once, in the docs' Limits section.
-- Nothing ships with a placeholder: a gap that a later launch step fills is stated as a fact of today, such as a non-claim, and changed when the step lands.
+- Public copy states what is. No status markers, placeholders, TODOs or "coming soon": a limit is stated as a fact of today, such as a non-claim, and changed when the app changes.
+- Planned work lives in the maintainer's notes, not in the repository.

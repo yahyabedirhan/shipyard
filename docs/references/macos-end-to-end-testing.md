@@ -58,16 +58,16 @@ What the AX test needs from the app first, so it doesn't touch the maintainer's 
 
 ### Data scenarios
 
-Not yet.
+The recommendation leaves data scenarios out of the end-to-end tests.
 
 - Data scenarios end to end (a fixture PR appearing, the count rising, a notification firing) need a fixture HTTP mode inside the shipped app, which is test-only machinery in the product.
 - They would re-check rules the core harness already covers through `Shipyard` with stubbed HTTP, an injectable clock and a recording notifier.
-- Revisit if a bug slips through between the model and the SwiftUI views; at that point render-for-review attachments (see [Snapshot testing](#snapshot-testing)) are the cheaper next step.
+- When a bug slips through between the model and the SwiftUI views, render-for-review attachments (see [Snapshot testing](#snapshot-testing)) are the cheaper step.
 
 ### CI
 
 - Add the release-zip check to the macOS job now.
-- The AX smoke test should work on GitHub's hosted macOS runners (their image pre-grants Accessibility to the runner agent, see [Hosted runner permissions](#hosted-runner-permissions)), but that's inferred from the image scripts, not yet run: try it in a separate, non-required job first.
+- The AX smoke test should work on GitHub's hosted macOS runners (their image pre-grants Accessibility to the runner agent, see [Hosted runner permissions](#hosted-runner-permissions)), but that's inferred from the image scripts and hasn't been run: try it in a separate, non-required job first.
 
 ## Comparison
 

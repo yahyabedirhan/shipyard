@@ -1,5 +1,5 @@
 {
-  "about": "Every screenshot the site and the README use, by id. A source marks where one goes with SHOT:<id>, and site/src/docs/figures.tsx shows its placeholder frame until status is done. To finish one: run its capture steps on the Mac (the shipyard skill's Driving the app), check the picture, and set status to done. npm run shots redraws the placeholder PNG of each shot still marked placeholder; npm run placeholders lists what is open. Run the capture steps from the repository root. GitHub answers a refresh of several large repositories with HTTP 502 or 504 now and then, and the panel then shows Not loaded yet: capture again until the panel holds data.",
+  "about": "Every screenshot the site and the README use, by id: what it shows, the state and demo configuration it is taken in, the capture steps and the path it is saved at. To take one again: run its capture steps on the Mac from the repository root (the shipyard skill's Driving the app) and check the picture. GitHub answers a refresh of several large repositories with HTTP 502 or 504 now and then, and the panel then shows Not loaded yet: capture again until the panel holds data.",
   "shots": [
     {
       "id": "readme-hero-light",
@@ -24,8 +24,7 @@
         "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
-      ],
-      "status": "done"
+      ]
     },
     {
       "id": "readme-hero-dark",
@@ -50,8 +49,7 @@
         "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
-      ],
-      "status": "done"
+      ]
     },
     {
       "id": "onboarding-presets-dark",
@@ -75,8 +73,7 @@
         "shipyard panel close",
         "shipyard app open",
         "shipyard lease release"
-      ],
-      "status": "done"
+      ]
     },
     {
       "id": "view-github-dark",
@@ -102,7 +99,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Captured on the maintainer's app: the view shows only the signed-in login and how it connected."
     },
     {
@@ -128,7 +124,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -154,7 +149,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -180,7 +174,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -206,7 +199,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -233,7 +225,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -259,7 +250,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -285,7 +275,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -312,7 +301,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -339,7 +327,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -365,7 +352,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "The capture is the template glyph alone, white on transparent for dark, with no attention count: the count is menu bar text outside the icon. Place it on a dark bar."
     },
     {
@@ -394,7 +380,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -422,7 +407,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -448,7 +432,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -474,7 +457,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -500,7 +482,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -527,7 +508,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -554,7 +534,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     },
     {
@@ -574,7 +553,6 @@
         "# npm run terminal (from site/) runs shipyard --help and draws it; it stands in for shipyard app capture assets/screenshots/launch/cli-help-dark.png --appearance dark",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Not a panel capture: retake with npm run terminal after the help changes."
     },
     {
@@ -601,7 +579,6 @@
         "shipyard app open",
         "shipyard lease release"
       ],
-      "status": "done",
       "notes": "Made-up focus-mode items from assets/demo/demo-items.json (#309); nothing from the maintainer's account."
     }
   ]

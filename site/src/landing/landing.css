@@ -2,7 +2,6 @@
    reading every value from tokens.css. */
 .dx .land{box-sizing:border-box;min-height:100vh;padding:var(--sp-14) var(--gutter) var(--sp-20)}
 .dx .land q{color:var(--fg);quotes:'“' '”'}
-.dx .land .shot-ph{min-height:var(--shot-h)}
 .dx .l-agent p{margin:var(--sp-3) 0 0;font-size:var(--type-caption);color:var(--mut)}
 .dx .l-agent .code{margin-top:var(--sp-4)}
 .dx .l-paths{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-5);margin-top:var(--sp-11)}
@@ -45,5 +44,4 @@
 @media (max-width:560px){
   .dx .land{padding-left:var(--gutter-phone);padding-right:var(--gutter-phone)}
   .dx .vd-word{font-size:var(--type-wordmark-big-phone)}
-  .dx .land .shot-ph{min-height:var(--shot-h-phone)}
 }

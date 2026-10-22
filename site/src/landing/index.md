@@ -18,10 +18,9 @@ Only the install tabs and the copy buttons hydrate, as React islands from `src/d
 
 ## The panel image
 
-The panels are two screenshots side by side, `landing-tabs-dark` and `landing-list-light`, marked in `Landing.astro` with shot comments and listed in `site/shots.json`.
+The panels are two screenshots side by side, `landing-tabs-dark` and `landing-list-light`, shown in `Landing.astro` with the `Shot` component and listed in `site/shots.json`.
 The docs page opens with the same pair.
-Until a screenshot is captured, the `Shot` component shows a placeholder frame.
-`npm run placeholders` lists the screenshots still to take.
+Each entry in `site/shots.json` holds the steps that capture its screenshot again.
 
 ## Running it
 

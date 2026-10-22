@@ -193,7 +193,7 @@ icon-alternates: $(ICON_TOOL)
 	done
 	@rm -rf $(ICONSET)
 
-# The minimal sailboat options, not yet the app's icon: a 512 pt PNG of each and
+# The minimal sailboat options, alternatives to the app's icon: a 512 pt PNG of each and
 # a comparison sheet (with the menu bar item and the badge) in the exploration folder.
 icon-exploration: $(ICON_TOOL)
 	$(ICON_TOOL) --exploration assets/images/app-icon/exploration
