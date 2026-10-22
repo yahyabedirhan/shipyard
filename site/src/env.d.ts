@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+/// <reference types="astro/client" />
 
 interface ImportMetaEnv {
   /** PostHog project key. Unset means no analytics and no PostHog code in the build. */

@@ -8,7 +8,7 @@
  * This is the website's analytics only. The shipyard app sends nothing of the kind.
  */
 
-import { superProperties } from './device';
+import { pageOf, superProperties } from './device';
 import { consent, safeStore, setConsent, type Consent } from './consent';
 import { visitorId } from './visitor';
 import { loadAgent, readAgentParams, resolveActor, safeSession, saveAgent, type ActorProps } from './actor';
@@ -91,7 +91,8 @@ function doNotTrack(): boolean {
 const KEY = import.meta.env.VITE_POSTHOG_KEY || undefined;
 const HOST = import.meta.env.VITE_POSTHOG_HOST || DEFAULT_HOST;
 
-let posthogLoaded = false;
+/** The PostHog module once it has loaded, so a page change can reach it at once. */
+let posthog: typeof import('./posthog') | null = null;
 
 // `?analytics_agent=<name>&analytics_purpose=<purpose>` on the first load: saved for this tab when valid, and always removed from the address bar.
 if (typeof window !== 'undefined') {
@@ -115,11 +116,13 @@ function actorProps(): ActorProps {
 // With `?analytics_optout=all` saved, the client is never loaded.
 const tracker = createTracker(consent() === 'none' ? undefined : KEY, HOST, async (key, host) => {
   if (doNotTrack()) return null;
-  const { startPostHog } = await import('./posthog');
-  posthogLoaded = true;
+  // The key is replaced at build time, so a build without one drops this import and posthog-js with it.
+  if (!import.meta.env.VITE_POSTHOG_KEY) return null;
+  const mod = await import('./posthog');
+  posthog = mod;
   const props: SuperProperties = superProperties();
   if (consent() === 'all') Object.assign(props, actorProps());
-  return startPostHog(key, host, props);
+  return mod.startPostHog(key, host, props);
 });
 
 /** Sends one event. Does nothing in a build without a key. */
@@ -143,7 +146,7 @@ export function optOut(to: 'pageviews' | 'none' = 'none'): void {
     if (to === 'none') tracker.stop();
   } else if (KEY && to === 'none') tracker.stop();
   setConsent(to);
-  if (posthogLoaded && to === 'pageviews') import('./posthog').then((m) => m.dropVisitorId()).catch(() => {});
+  if (posthog && to === 'pageviews') posthog.dropVisitorId();
 }
 
 /** Clears the saved choice. Analytics start again on the next page load. */
@@ -157,4 +160,16 @@ export function startAnalytics(): void {
   const later = () => (idle ? idle(go, { timeout: 4000 }) : window.setTimeout(go, 1500));
   if (document.readyState === 'complete') later();
   else window.addEventListener('load', later, { once: true });
+}
+
+/**
+ * The client router moves between pages without a full load, so PostHog sees no new page of its own.
+ * Call `pageLeft` before the router swaps the page, while the address is still the old page's, and `pageShown` after.
+ */
+export function pageLeft(): void {
+  if (posthog && consent() !== 'none') posthog.capturePageLeave();
+}
+
+export function pageShown(): void {
+  if (posthog && consent() !== 'none') posthog.capturePageView(pageOf());
 }

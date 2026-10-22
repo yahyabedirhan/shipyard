@@ -1,5 +1,5 @@
 // The generated reference: the configuration's keys from schema/config.schema.json and cli.schema.json, and the
-// `shipyard` command's groups from the Swift sources that define them. Everything here is pure: the Vite plugin
+// `shipyard` command's groups from the Swift sources that define them. Everything here is pure: the site's integration
 // reads the files (plugins/repo.ts) and hands their text in, so the page, its Markdown and the tests share one parse.
 
 /* ---------------------------------------------------------------- the configuration */

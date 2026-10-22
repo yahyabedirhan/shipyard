@@ -1,6 +1,6 @@
 // Draws the social cards from the one line and the logo: a 1200x630 Open Graph image per page into site/public/og/,
 // the 1280x640 GitHub social preview into assets/images/social/github-preview.png, and the favicons.
-// Run from site/: `npm run social`. The words come from src/messaging.ts and src/pages.ts.
+// Run from site/: `npm run social`. The words come from src/messaging.ts and src/meta.ts.
 import { join } from 'node:path';
 import { REPO, SITE, esc, fonts, logoDataUri, png, wrap, write } from './render.mjs';
 
@@ -10,7 +10,7 @@ const str = (src, name) => src.match(new RegExp(`export const ${name} = '([^']+)
 const messaging = await read('src/messaging.ts');
 const LINE = str(messaging, 'LINE');
 const SITE_URL = str(messaging, 'SITE_URL');
-const pages = [...(await read('src/pages.ts')).matchAll(/id: '([\w-]+)'[\s\S]*?image: '([^']+)'[\s\S]*?card: '([^']*)'/g)]
+const pages = [...(await read('src/meta.ts')).matchAll(/id: '([\w-]+)'[\s\S]*?image: '([^']+)'[\s\S]*?card: '([^']*)'/g)]
   .map((m) => ({ id: m[1], image: m[2], card: m[3] }))
   .filter((p, i, all) => p.card && all.findIndex((q) => q.image === p.image) === i);
 

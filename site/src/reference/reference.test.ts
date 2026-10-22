@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { referenceData, readRepo } from '../../plugins/repo';
 import { buildAgentFiles } from '../../plugins/agents';
-import { Docs } from '../docs/Docs';
+import Docs from '../docs/Docs.astro';
+import { renderPage } from '../test/render';
 import { schemaKeyIds, skillKeys, type SchemaNode } from './parse';
 
 const ref = referenceData();
-const page = renderToStaticMarkup(<Docs />);
+const page = await renderPage(Docs);
 const files = buildAgentFiles(ref);
 const schema = JSON.parse(readRepo('schema/config.schema.json')) as SchemaNode;
 

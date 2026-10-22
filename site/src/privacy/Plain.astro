@@ -1,0 +1,14 @@
+---
+// A plain page in the docs' style: the wordmark, one column of text, and the way back. The privacy page and the
+// 404 page use it.
+import { NAME } from '../messaging';
+import '../docs/docs.css';
+import './privacy.css';
+---
+<div class="dx">
+  <div class="plain">
+    <a class="wordmark" href="/" data-astro-prefetch><img src="/logo.png" alt="" width="24" height="24" />{NAME}</a>
+    <main id="top"><slot /></main>
+    <footer class="plain-foot"><a href="/docs" data-astro-prefetch>Docs</a><a href="/privacy">Privacy</a><a href="/llms.txt" data-astro-reload>llms.txt</a></footer>
+  </div>
+</div>

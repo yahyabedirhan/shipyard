@@ -1,0 +1,15 @@
+---
+// The privacy page, from site/PRIVACY.md, with the opt-out buttons.
+import PRIVACY_HTML from 'virtual:shipyard-privacy';
+import Base from '../layouts/Base.astro';
+import { pageById } from '../meta';
+import { OptOut } from '../privacy/OptOut';
+import Plain from '../privacy/Plain.astro';
+---
+<Base page={pageById('privacy')}>
+  <Plain>
+    <h1 class="title">Privacy</h1>
+    <div class="prose" set:html={PRIVACY_HTML} />
+    <OptOut client:visible />
+  </Plain>
+</Base>

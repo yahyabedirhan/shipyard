@@ -1,0 +1,49 @@
+---
+// Every page's document: the head from src/pages.ts (title, description, canonical address and social card), the
+// fonts, the client router that moves between pages without a full load, and the analytics start-up.
+import { ClientRouter } from 'astro:transitions';
+import { headOf, type PageMeta } from '../meta';
+import '../tokens.css';
+
+interface Props { page: PageMeta }
+const h = headOf(Astro.props.page);
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="robots" content={h.robots} />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Serif:wght@600&display=swap" rel="stylesheet" />
+    <title>{h.title}</title>
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="Docs for AI agents" />
+    <meta name="description" content={h.description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="shipyard" />
+    <meta property="og:title" content={h.title} />
+    <meta property="og:description" content={h.description} />
+    <link rel="canonical" href={h.url} />
+    <meta property="og:url" content={h.url} />
+    <meta property="og:image" content={h.image} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={h.imageAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={h.title} />
+    <meta name="twitter:description" content={h.description} />
+    <meta name="twitter:image" content={h.image} />
+    <meta name="twitter:image:alt" content={h.imageAlt} />
+    <ClientRouter />
+  </head>
+  <body>
+    <slot />
+    <script>
+      import '../boot';
+    </script>
+  </body>
+</html>

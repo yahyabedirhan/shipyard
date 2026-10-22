@@ -1,5 +1,5 @@
 // Cloudflare Worker that serves the built site as static assets, at shipyard.yahyapak.dev.
-// Files come from site/dist, and site/public/_headers (copied into dist) sets their headers.
+// Files come from site/dist, Astro's static build, and site/public/_headers (copied into dist) sets their headers.
 // /docs and /privacy are served from docs.html and privacy.html. A request that matches no file
 // reaches worker/index.js, which answers with a 404: the 404 page for a browser, plain text otherwise.
 // Deploy from site/: `npm run deploy`. The analytics keys come from the build environment, never this file.

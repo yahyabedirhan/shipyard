@@ -1,5 +1,5 @@
-// Each page's head: its title, description, address and social card. The Vite plugin writes them into each page's
-// HTML, scripts/social.mjs draws each card, and the sitemap lists the pages. Titles stay near 60 characters and
+// Each page's head: its title, description, address and social card. src/layouts/Base.astro writes them into each
+// page's HTML, scripts/social.mjs draws each card, and the sitemap lists the pages. Titles stay near 60 characters and
 // descriptions near 155, as the messaging kit's channel lengths ask.
 import { LINE, NAME, PROOF, SITE_URL } from './messaging';
 
@@ -49,3 +49,15 @@ export const PAGES: PageMeta[] = [
 
 export const pageById = (id: PageMeta['id']) => PAGES.find((p) => p.id === id)!;
 export const absolute = (path: string) => `${SITE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+
+/** The values a page's head carries: its canonical address, its social card's address and whether search lists it. */
+export function headOf(page: PageMeta) {
+  return {
+    title: page.title,
+    description: page.description,
+    url: absolute(page.path),
+    image: absolute(page.image),
+    imageAlt: page.imageAlt,
+    robots: page.listed ? 'index, follow' : 'noindex',
+  };
+}

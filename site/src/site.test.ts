@@ -4,11 +4,15 @@ import { describe, expect, it } from 'vitest';
 import SHOTS from '../shots.json';
 import { buildAgentFiles, pagePath } from '../plugins/agents';
 import { REPO_DIR, SITE_DIR, referenceData } from '../plugins/repo';
-import { headFor, pageForPath, sitemap } from '../plugins/site';
+import { sitemap } from '../plugins/site';
 import { SECTIONS } from './docs/content';
 import { LINE } from './messaging';
-import { PAGES } from './pages';
-import { routeOf } from './route';
+import { PAGES, type PageMeta } from './meta';
+import { renderPage } from './test/render';
+import Home from './pages/index.astro';
+import DocsPage from './pages/docs.astro';
+import PrivacyPage from './pages/privacy.astro';
+import NotFoundPage from './pages/404.astro';
 
 const site = (...p: string[]) => join(SITE_DIR, ...p);
 
@@ -16,8 +20,9 @@ function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => (n === 'node_modules' || n === 'dist' || n.startsWith('.') ? [] : statSync(join(dir, n)).isDirectory() ? walk(join(dir, n)) : [join(dir, n)]));
 }
 
-describe('page heads', () => {
-  const html = readFileSync(site('index.html'), 'utf8');
+describe('page heads', async () => {
+  const ROUTES: Record<PageMeta['id'], Parameters<typeof renderPage>[0]> = { home: Home, docs: DocsPage, privacy: PrivacyPage, 'not-found': NotFoundPage };
+  const html = Object.fromEntries(await Promise.all(PAGES.map(async (p) => [p.id, await renderPage(ROUTES[p.id])] as const)));
 
   it('keep titles near 60 characters and descriptions near 155', () => {
     for (const p of PAGES) {
@@ -30,9 +35,11 @@ describe('page heads', () => {
 
   it('fill every meta tag, with a social card of 1200 by 630 that exists', () => {
     for (const p of PAGES) {
-      const head = headFor(html, p);
+      const head = html[p.id].slice(0, html[p.id].indexOf('</head>'));
       expect(head, p.id).not.toMatch(/content=""|href=""/);
-      expect(head).toContain(`<title>${p.title.replace(/'/g, "'")}</title>`);
+      expect(head).toContain(`<title>${p.title.replace(/'/g, '&#39;')}</title>`);
+      expect(head).toContain(`<link rel="canonical" href="https://shipyard.yahyapak.dev${p.path}">`);
+      expect(head).toContain(`<meta property="og:image" content="https://shipyard.yahyapak.dev/${p.image}">`);
       const png = readFileSync(site('public', p.image));
       expect(png.readUInt32BE(16), p.image).toBe(1200);
       expect(png.readUInt32BE(20), p.image).toBe(630);
@@ -40,16 +47,14 @@ describe('page heads', () => {
   });
 
   it('keep the 404 page out of search', () => {
-    expect(headFor(html, pageForPath('/nope'))).toContain('content="noindex"');
+    expect(html['not-found']).toContain('<meta name="robots" content="noindex">');
+    expect(html.home).toContain('<meta name="robots" content="index, follow">');
     expect(sitemap()).not.toContain('/404');
     expect(sitemap()).toContain('https://shipyard.yahyapak.dev/docs');
   });
 
-  it('route each path to its page', () => {
-    expect(routeOf('/')).toBe('home');
-    expect(routeOf('/docs/')).toBe('docs');
-    expect(routeOf('/privacy')).toBe('privacy');
-    expect(routeOf('/elsewhere')).toBe('not-found');
+  it('build each page into the file the host serves its path from', () => {
+    for (const p of PAGES) expect(existsSync(site('src/pages', p.file.replace(/\.html$/, '.astro'))), p.file).toBe(true);
   });
 
   it('use the one line from the messaging kit', () => {
@@ -122,7 +127,7 @@ describe('screenshots', () => {
 });
 
 describe('what the site never holds', () => {
-  const files = [...walk(site('src')), ...walk(site('plugins')), ...walk(site('scripts')), ...walk(site('public')).filter((f) => !f.endsWith('.png')), site('shots.json'), site('PRIVACY.md'), site('index.html'), site('wrangler.jsonc'), site('worker/index.js')];
+  const files = [...walk(site('src')), ...walk(site('plugins')), ...walk(site('scripts')), ...walk(site('public')).filter((f) => !f.endsWith('.png')), site('shots.json'), site('PRIVACY.md'), site('astro.config.ts'), site('wrangler.jsonc'), site('worker/index.js')];
 
   it('has no private paths, machine labels or the lab', () => {
     const banned = [/\/Users\/[a-z]/i, /\/home\/user/, /hetzner/i, /netcup/i, /\blab\//, /LAB_CLI/, /Swift Lab/i, /Developer\/open-source/];
@@ -134,7 +139,7 @@ describe('what the site never holds', () => {
   });
 
   it('has no em dashes in its prose', () => {
-    for (const f of [site('src/docs/content.ts'), site('src/messaging.ts'), site('src/pages.ts'), site('PRIVACY.md'), site('shots.json')]) {
+    for (const f of [site('src/docs/content.ts'), site('src/messaging.ts'), site('src/meta.ts'), site('PRIVACY.md'), site('shots.json')]) {
       expect(readFileSync(f, 'utf8').includes('—'), f).toBe(false);
     }
   });

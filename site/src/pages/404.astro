@@ -1,0 +1,12 @@
+---
+// The page for an address that has none. The Worker serves it as 404.html with a 404 status.
+import Base from '../layouts/Base.astro';
+import { pageById } from '../meta';
+import Plain from '../privacy/Plain.astro';
+---
+<Base page={pageById('not-found')}>
+  <Plain>
+    <h1 class="title">No page here</h1>
+    <p class="sub">This address has no page. The <a href="/docs" data-astro-prefetch>docs</a> cover install, configuration and the <code>shipyard</code> command, and <a href="/llms.txt" data-astro-reload>llms.txt</a> has them as plain text.</p>
+  </Plain>
+</Base>

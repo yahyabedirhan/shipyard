@@ -1,9 +1,12 @@
-// The site's Vite plugin. It serves the generated reference to the page as a virtual module, writes each page's HTML
-// head, and emits what a static host needs beside the bundle: docs.html, privacy.html and 404.html, the agent files,
-// the sitemap and the finished screenshots. In development it serves the same files from memory.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import type { Plugin, ViteDevServer } from 'vite';
-import { PAGES, absolute, type PageMeta } from '../src/pages';
+// The site's Astro integration. It serves the generated reference to the pages as a virtual module, and emits what a
+// static host needs beside the pages: the agent files, the sitemap and the finished screenshots. In development it
+// serves the same files from memory. The pages themselves, and each page's head, are src/pages/ and src/layouts/.
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { AstroIntegration } from 'astro';
+import type { Plugin } from 'vite';
+import { PAGES, absolute } from '../src/meta';
 import { blockMd } from '../src/reference/markdown';
 import { buildAgentFiles } from './agents';
 import { SITE_DIR, referenceData, repoPath } from './repo';
@@ -18,38 +21,6 @@ export const SOURCES = [
   repoPath('skills/shipyard/presets.md'), repoPath('skills/shipyard/references/notices.md'), repoPath('CHANGELOG.md'),
   repoPath('Sources'), `${SITE_DIR}PRIVACY.md`,
 ];
-
-const attr = (text: string) => text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-
-/** The site's index.html with the head of `page`: title, description, canonical address and social card. */
-export function headFor(html: string, page: PageMeta): string {
-  const url = absolute(page.path === '/' ? '/' : page.path);
-  const image = absolute(page.image);
-  const meta = (key: 'name' | 'property', name: string, content: string) => (h: string) =>
-    h.replace(new RegExp(`(<meta ${key}="${name}" content=")[^"]*(")`), `$1${attr(content)}$2`);
-  const steps = [
-    (h: string) => h.replace(/<title>[^<]*<\/title>/, `<title>${attr(page.title)}</title>`),
-    meta('name', 'description', page.description),
-    meta('property', 'og:title', page.title),
-    meta('property', 'og:description', page.description),
-    meta('property', 'og:url', url),
-    meta('property', 'og:image', image),
-    meta('property', 'og:image:alt', page.imageAlt),
-    meta('name', 'twitter:title', page.title),
-    meta('name', 'twitter:description', page.description),
-    meta('name', 'twitter:image', image),
-    meta('name', 'twitter:image:alt', page.imageAlt),
-    (h: string) => h.replace(/(<link rel="canonical" href=")[^"]*(")/, `$1${url}$2`),
-    (h: string) => (page.listed ? h : h.replace('<meta name="robots" content="index, follow" />', '<meta name="robots" content="noindex" />')),
-  ];
-  return steps.reduce((h, step) => step(h), html);
-}
-
-/** The page a request path is, for the head in development. */
-export function pageForPath(path: string): PageMeta {
-  const p = path.replace(/\/+$/, '') || '/';
-  return PAGES.find((x) => x.path === p) ?? PAGES.find((x) => x.id === 'not-found')!;
-}
 
 export function sitemap(): string {
   const urls = PAGES.filter((p) => p.listed).map((p) => absolute(p.path));
@@ -68,11 +39,10 @@ function shotFiles(): string[] {
   return existsSync(SHOTS_DIR) ? readdirSync(SHOTS_DIR).filter((f) => done.has(f)) : [];
 }
 
-export function sitePlugin(): Plugin {
-  let server: ViteDevServer | undefined;
+/** The virtual modules: the generated reference and site/PRIVACY.md as HTML. */
+export function referenceModules(): Plugin {
   return {
-    name: 'shipyard-site',
-    enforce: 'post',
+    name: 'shipyard-reference',
     resolveId(id) {
       if (id === REFERENCE || id === PRIVACY) return `\0${id}`;
       return null;
@@ -85,50 +55,50 @@ export function sitePlugin(): Plugin {
       }
       return null;
     },
-    transformIndexHtml: {
-      order: 'post',
-      handler(html, ctx) {
-        if (!server) return html;
-        return headFor(html, pageForPath((ctx.originalUrl ?? ctx.path).split(/[?#]/)[0]));
+  };
+}
+
+export function siteIntegration(): AstroIntegration {
+  return {
+    name: 'shipyard-site',
+    hooks: {
+      'astro:config:setup': ({ updateConfig }) => {
+        updateConfig({ vite: { plugins: [referenceModules()] } });
       },
-    },
-    configureServer(dev) {
-      server = dev;
-      dev.watcher.add(SOURCES);
-      dev.watcher.on('change', (file) => {
-        if (!SOURCES.some((s) => file.startsWith(s))) return;
-        for (const id of [`\0${REFERENCE}`, `\0${PRIVACY}`]) {
-          const mod = dev.moduleGraph.getModuleById(id);
-          if (mod) dev.moduleGraph.invalidateModule(mod);
-        }
-        dev.ws.send({ type: 'full-reload' });
-      });
-      dev.middlewares.use((req, res, next) => {
-        const path = (req.url ?? '').split('?')[0].replace(/^\//, '');
-        if (path.startsWith('shots/') && existsSync(`${SHOTS_DIR}/${path.slice(6)}`)) {
-          res.setHeader('content-type', 'image/png');
-          res.end(readFileSync(`${SHOTS_DIR}/${path.slice(6)}`));
-          return;
-        }
-        // Without this, Vite would answer /docs with nothing and /privacy with a 404.
-        if (path === 'docs' || path === 'docs/' || path === 'privacy' || path === 'privacy/') { req.url = '/index.html'; next(); return; }
-        const body = generatedFiles()[path];
-        if (body === undefined) { next(); return; }
-        res.setHeader('content-type', `${path.endsWith('.md') ? 'text/markdown' : path.endsWith('.xml') ? 'application/xml' : 'text/plain'}; charset=utf-8`);
-        res.end(body);
-      });
-    },
-    generateBundle(_options, bundle) {
-      for (const [fileName, source] of Object.entries(generatedFiles())) this.emitFile({ type: 'asset', fileName, source });
-      const index = bundle['index.html'];
-      if (index?.type !== 'asset') throw new Error('shipyard-site: no index.html in the bundle to make the pages from');
-      const html = String(index.source);
-      for (const page of PAGES) {
-        const source = headFor(html, page);
-        if (page.file === 'index.html') index.source = source;
-        else this.emitFile({ type: 'asset', fileName: page.file, source });
-      }
-      for (const f of shotFiles()) this.emitFile({ type: 'asset', fileName: `shots/${f}`, source: readFileSync(`${SHOTS_DIR}/${f}`) });
+      'astro:server:setup': ({ server }) => {
+        server.watcher.add(SOURCES);
+        server.watcher.on('change', (file) => {
+          if (!SOURCES.some((s) => file.startsWith(s))) return;
+          for (const env of Object.values(server.environments)) {
+            for (const id of [`\0${REFERENCE}`, `\0${PRIVACY}`]) {
+              const mod = env.moduleGraph.getModuleById(id);
+              if (mod) env.moduleGraph.invalidateModule(mod);
+            }
+          }
+          server.ws.send({ type: 'full-reload' });
+        });
+        server.middlewares.use((req, res, next) => {
+          const path = (req.url ?? '').split('?')[0].replace(/^\//, '');
+          if (path.startsWith('shots/') && existsSync(`${SHOTS_DIR}/${path.slice(6)}`)) {
+            res.setHeader('content-type', 'image/png');
+            res.end(readFileSync(`${SHOTS_DIR}/${path.slice(6)}`));
+            return;
+          }
+          const body = generatedFiles()[path];
+          if (body === undefined) { next(); return; }
+          res.setHeader('content-type', `${path.endsWith('.md') ? 'text/markdown' : path.endsWith('.xml') ? 'application/xml' : 'text/plain'}; charset=utf-8`);
+          res.end(body);
+        });
+      },
+      'astro:build:done': ({ dir }) => {
+        const out = fileURLToPath(dir);
+        const write = (name: string, body: string | Buffer) => {
+          mkdirSync(dirname(join(out, name)), { recursive: true });
+          writeFileSync(join(out, name), body);
+        };
+        for (const [name, body] of Object.entries(generatedFiles())) write(name, body);
+        for (const f of shotFiles()) write(`shots/${f}`, readFileSync(`${SHOTS_DIR}/${f}`));
+      },
     },
   };
 }

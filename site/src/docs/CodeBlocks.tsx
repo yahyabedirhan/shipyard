@@ -1,3 +1,5 @@
+// The code blocks and their copy buttons. Each renders to HTML at build time and hydrates as an island, so its props
+// are plain data: the copied text and each tab's copy target, never a function.
 import { useEffect, useState } from 'react';
 import { track, type CopyTarget } from '../analytics';
 import { highlight } from './code';
@@ -7,7 +9,7 @@ const COPY = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWi
 const CHECK = <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3 3 7-7" /></svg>;
 
 /** A quiet copy button that turns into a check for a moment. */
-export function CopyButton({ text, target = 'code' }: { text: () => string; target?: CopyTarget }) {
+export function CopyButton({ text, target = 'code' }: { text: string; target?: CopyTarget }) {
   const [done, setDone] = useState(false);
   useEffect(() => {
     if (!done) return;
@@ -21,7 +23,7 @@ export function CopyButton({ text, target = 'code' }: { text: () => string; targ
       aria-label={done ? 'Copied' : 'Copy code'}
       title={done ? 'Copied' : 'Copy code'}
       onClick={async () => {
-        try { await navigator.clipboard.writeText(text()); } catch { /* clipboard may be blocked */ }
+        try { await navigator.clipboard.writeText(text); } catch { /* clipboard may be blocked */ }
         setDone(true);
         track('code_copied', { target });
       }}
@@ -38,15 +40,15 @@ export function CodeBlock({ code, lang, id, target }: { code: string; lang: Lang
   return (
     <figure className={`code${one ? ' one' : ''}`} id={id}>
       <pre><code dangerouslySetInnerHTML={{ __html: highlight(text, lang) }} /></pre>
-      {lang === 'text' ? null : <CopyButton text={() => text} target={target} />}
+      {lang === 'text' ? null : <CopyButton text={text} target={target} />}
     </figure>
   );
 }
 
-/** Several snippets, one tab each. One snippet is a plain block. */
-export function CodeTabs({ code, target, onPick }: { code: Snippet[]; target?: (i: number) => CopyTarget; onPick?: (i: number) => void }) {
+/** Several snippets, one tab each, with `targets[i]` the copy target of tab i. One snippet is a plain block. */
+export function CodeTabs({ code, targets, onPick }: { code: Snippet[]; targets?: CopyTarget[]; onPick?: (i: number) => void }) {
   const [shown, setShown] = useState(0);
-  if (code.length === 1) return <CodeBlock code={code[0].code} lang={code[0].lang} target={target?.(0)} />;
+  if (code.length === 1) return <CodeBlock code={code[0].code} lang={code[0].lang} target={targets?.[0]} />;
   const s = code[Math.min(shown, code.length - 1)];
   const text = s.code.trim();
   return (
@@ -57,7 +59,7 @@ export function CodeTabs({ code, target, onPick }: { code: Snippet[]; target?: (
             <button key={c.label ?? i} type="button" className="code-tab" role="tab" aria-selected={i === shown} onClick={() => { setShown(i); onPick?.(i); }}>{c.label ?? c.lang}</button>
           ))}
         </div>
-        {s.lang === 'text' ? null : <CopyButton text={() => text} target={target?.(shown)} />}
+        {s.lang === 'text' ? null : <CopyButton text={text} target={targets?.[shown]} />}
       </div>
       <pre role="tabpanel" data-lang={s.lang}><code dangerouslySetInnerHTML={{ __html: highlight(text, s.lang) }} /></pre>
     </figure>

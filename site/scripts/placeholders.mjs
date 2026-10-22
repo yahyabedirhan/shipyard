@@ -24,10 +24,10 @@ function walk(dir) {
 export function sources(site = SITE, repo = REPO) {
   return [
     ...walk(join(site, 'src')),
-    ...['index.html', 'PRIVACY.md', 'wrangler.jsonc', '.env.example'].map((f) => join(site, f)).filter(existsSync),
+    ...['astro.config.ts', 'PRIVACY.md', 'wrangler.jsonc', '.env.example'].map((f) => join(site, f)).filter(existsSync),
     join(repo, 'README.md'),
     ...walk(join(repo, 'docs')).filter((p) => p.endsWith('.md')),
-  ].filter((p) => /\.(tsx?|css|html|md|jsonc|example)$/.test(p) && !/\.test\.tsx?$/.test(p));
+  ].filter((p) => /\.(tsx?|astro|css|html|md|jsonc|example)$/.test(p) && !/\.test\.tsx?$/.test(p));
 }
 
 /** Keys set in the environment or in one of the site's env files. */
