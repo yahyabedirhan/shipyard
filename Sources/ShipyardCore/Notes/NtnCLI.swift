@@ -151,25 +151,47 @@ public struct NtnCLI: HTTPTransport {
     /// since `ntn api` reads a request body from any standard input it's
     /// given and would wait for it; both outputs read before waiting, so a
     /// full pipe can't block it. A run past `timeout` is stopped and ends
-    /// with exit `timedOut` and "error: didn't answer within …". Cancelling
-    /// the task stops the run, before or after its launch, and it ends with
-    /// `nil`. A stopped run gets SIGTERM, then SIGKILL a second later.
+    /// with exit `timedOut` and "error: didn't answer within …" at once,
+    /// without waiting for its outputs to close, which a program it started
+    /// may hold open. Cancelling the task stops the run, before or after
+    /// its launch, and it ends with `nil`. A stopped run gets SIGTERM, then
+    /// SIGKILL a second later.
     static func processRunner(timeout: TimeInterval) -> Run {
         { executable, arguments in
             let run = NtnRun(executable: executable, arguments: arguments)
             return await withTaskCancellationHandler {
                 await withCheckedContinuation { continuation in
+                    let answer = OneAnswer(continuation)
                     DispatchQueue.global(qos: .userInitiated).async {
-                        continuation.resume(returning: run.toEnd())
+                        answer.give(run.toEnd())
                     }
                     DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                        run.stop(.timedOut(after: timeout))
+                        guard run.stop(.timedOut(after: timeout)) else { return }
+                        answer.give(NtnRun.timedOutOutput(after: timeout))
                     }
                 }
             } onCancel: {
                 run.stop(.cancelled)
             }
         }
+    }
+}
+
+/// A continuation resumed by the first of the run's end and its timeout.
+private final class OneAnswer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<NtnCLI.Output?, Never>?
+
+    init(_ continuation: CheckedContinuation<NtnCLI.Output?, Never>) {
+        self.continuation = continuation
+    }
+
+    func give(_ output: NtnCLI.Output?) {
+        lock.lock()
+        let waiting = continuation
+        continuation = nil
+        lock.unlock()
+        waiting?.resume(returning: output)
     }
 }
 
@@ -187,6 +209,7 @@ private final class NtnRun: @unchecked Sendable {
     private let error = Pipe()
     private var stopped: Stop?
     private var errorData = Data()
+    private var ended = false
 
     init(executable: String, arguments: [String]) {
         process.executableURL = URL(fileURLWithPath: executable)
@@ -207,27 +230,41 @@ private final class NtnRun: @unchecked Sendable {
         let data = output.fileHandleForReading.readDataToEndOfFile()
         errorRead.wait()
         process.waitUntilExit()
-        switch locked({ stopped }) {
+        let stopped = locked {
+            ended = true
+            return self.stopped
+        }
+        switch stopped {
         case .cancelled:
             return nil
         case .timedOut(let seconds):
-            return NtnCLI.Output(status: NtnCLI.timedOut, standardOutput: Data(), standardError: "error: didn't answer within \(Int(seconds)) seconds")
+            return Self.timedOutOutput(after: seconds)
         case nil:
             return NtnCLI.Output(status: process.terminationStatus, standardOutput: data, standardError: String(decoding: errorData, as: UTF8.self))
         }
     }
 
-    func stop(_ reason: Stop) {
-        let pid: pid_t? = locked {
-            guard stopped == nil else { return nil }
+    static func timedOutOutput(after seconds: TimeInterval) -> NtnCLI.Output {
+        NtnCLI.Output(status: NtnCLI.timedOut, standardOutput: Data(), standardError: "error: didn't answer within \(Int(seconds)) seconds")
+    }
+
+    /// Stops the run for `reason`; false when it had already ended or
+    /// been stopped.
+    @discardableResult
+    func stop(_ reason: Stop) -> Bool {
+        let pid: pid_t?? = locked {
+            guard stopped == nil, !ended else { return nil }
             stopped = reason
-            return process.isRunning ? process.processIdentifier : nil
+            return .some(process.isRunning ? process.processIdentifier : nil)
         }
-        guard let pid else { return }
-        kill(pid, SIGTERM)
-        DispatchQueue.global().asyncAfter(deadline: .now() + Self.killDelay) {
-            kill(pid, SIGKILL)
+        guard let pid else { return false }
+        if let pid {
+            kill(pid, SIGTERM)
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.killDelay) {
+                kill(pid, SIGKILL)
+            }
         }
+        return true
     }
 
     private func launch() -> Bool {

@@ -93,10 +93,13 @@ struct NtnCLITests {
         #expect(output.standardOutput.isEmpty)
     }
 
-    @Test("a run past its timeout is stopped, and ends as a failed run saying so")
-    func timeout() async throws {
+    @Test("a run past its timeout is stopped, and ends as a failed run saying so, even when a program it started still holds its output open", arguments: [
+        ("/bin/sleep", ["10"]),
+        ("/bin/sh", ["-c", "sleep 10 & wait"]),
+    ])
+    func timeout(executable: String, arguments: [String]) async throws {
         let started = Date()
-        let output = try #require(await NtnCLI.processRunner(timeout: 0.2)("/bin/sleep", ["10"]))
+        let output = try #require(await NtnCLI.processRunner(timeout: 0.2)(executable, arguments))
         #expect(Date().timeIntervalSince(started) < 5)
         #expect(output.status == NtnCLI.timedOut)
         let client = NotionClient(transport: NtnCLI(home: "/none", isExecutable: { $0 == "/bin/ntn" }, pathEnvironment: "/bin", run: { _, _ in output }))
