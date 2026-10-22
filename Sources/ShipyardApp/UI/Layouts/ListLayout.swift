@@ -363,6 +363,7 @@ private struct ListRow: View {
     let widestNumber: String
     @Environment(\.panelNow) private var now
     @Environment(\.panelScale) private var scale
+    @Environment(\.showsPingDone) private var showsPingDone
 
     var body: some View {
         HStack(spacing: 0) {
@@ -412,6 +413,7 @@ private struct ListRow: View {
                 .font(scale.listType.meta)
                 .foregroundStyle(ThemeColor.textSecondary)
                 .frame(width: ListGrid.ageColumn, alignment: .trailing)
+                .opacity(showsPingDone ? 0 : 1)
         }
         .padding(.leading, scale.list.gutter - 4)
         .padding(.trailing, scale.list.gutter)

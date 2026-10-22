@@ -322,6 +322,7 @@ private struct TabRow: View {
     let showsRepository: Bool
     @Environment(\.panelNow) private var now
     @Environment(\.panelScale) private var scale
+    @Environment(\.showsPingDone) private var showsPingDone
 
     var body: some View {
         HStack(spacing: 0) {
@@ -355,6 +356,10 @@ private struct TabRow: View {
             Text(PanelText.age(row.age(at: now)))
                 .font(scale.type.meta)
                 .foregroundStyle(row.needsAttention ? ThemeColor.textSecondary : ThemeColor.textTertiary)
+                .opacity(showsPingDone ? 0 : 1)
+                // A ping's age keeps its done button's width, so the title
+                // doesn't move when the button takes the slot.
+                .frame(minWidth: row.item.ping == nil ? nil : Grid.ageColumn, alignment: .trailing)
                 .padding(.leading, 8)
         }
         .padding(.leading, scale.grid.gutter - 4)

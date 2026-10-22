@@ -150,8 +150,20 @@ public enum PanelText {
     public static let markAllSeen = "Mark all seen"
     /// A row's action for ⌥-click's keyboard and VoiceOver equivalent.
     public static let markRowSeen = "Mark seen"
-    /// A ping row's ✕, and its VoiceOver action: removes the ping now.
-    public static let dismissPing = "Dismiss"
+    /// A ping row's done button, which takes the age's place while the row
+    /// is highlighted: removes the ping now, as ⌫ does.
+    public static let pingDone = "Done"
+
+    /// The done button's hover help, which VoiceOver reads as its hint:
+    /// what it does to this ping, and its key. A ping from another machine
+    /// is only hidden, until that machine stops listing it.
+    public static func pingDoneHelp(_ row: MenuRow) -> String {
+        if let machine = row.machine {
+            return "\(pingDone): hide this ping until \(machine) stops listing it (⌫)"
+        }
+        return "\(pingDone): remove this ping and its notification (⌫)"
+    }
+
     /// What the attention dot says to VoiceOver.
     public static let needsAttention = "Needs attention"
 

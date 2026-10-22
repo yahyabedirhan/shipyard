@@ -81,7 +81,7 @@ struct RemotePingsTests {
         #expect(harness.section("shop")?.rows.map(\.kind) == [.pullRequest])
     }
 
-    @Test("a remote ping's row names its machine, after its number")
+    @Test("a remote ping's row names its machine, after its number, and its done button says it only hides the ping")
     func rowNamesMachine() async throws {
         let harness = try await Harness.withMachines(beta: [remotePing("q1", "Deploy?", sender: "claude"), remotePing("q2", "Merge it?", minutes: 9)])
         await harness.poll()
@@ -89,6 +89,7 @@ struct RemotePingsTests {
         #expect(rows.map(\.machine) == ["beta-vps", "beta-vps"])
         #expect(rows.map { PanelText.rowDetail($0, showingRepository: false) } == ["#2 · beta-vps · claude", "#1 · beta-vps"])
         #expect(rows.map(PanelText.pingMeta) == ["beta-vps · claude", "beta-vps"])
+        #expect(PanelText.pingDoneHelp(rows[0]) == "Done: hide this ping until beta-vps stops listing it (⌫)")
     }
 
     @Test("a remote ping is known as shipyard://ping/<machine>/<id>, so the same id on two machines, and here, stays apart")

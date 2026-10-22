@@ -106,7 +106,7 @@ export const SECTIONS: DocSection[] = [
     lede: 'Your agents tell you when they need you, and when there\'s news.',
     body: '<p>A <b>ping</b> is a short message an agent sends with <code>shipyard ping send</code>: a title, an optional body and sender, and at most one action. It\'s listed under the projects that watch the repository of the agent\'s working folder, needs attention until you click it, and posts a notification. Clicking it opens a link, brings an app forward, or focuses the agent\'s Herdr tab.<sup class="fn"></sup></p>\n<p>A <b>notice</b>, from <code>shipyard notice send</code>, is a status update that needs nothing from you, such as "tests running": a notification only, never listed, counted or kept. When in doubt, agents send a notice.</p>',
     notes: [
-      'A ping leaves a day after you\'ve seen it (<code>seen-window</code>), or when you dismiss it. Pings never reach GitHub.',
+      'A ping leaves a day after you\'ve seen it (<code>seen-window</code>), or when you mark it done with the ✓ that takes its age\'s place on hover. Pings never reach GitHub.',
     ],
     code: [
       { lang: 'sh', code: 'shipyard ping send "PR #57 is ready for review" --from claude --open https://github.com/my-org/shop/pull/57\nshipyard ping send "Waiting for your input" --herdr --id shop-question\nshipyard ping withdraw shop-question\nshipyard notice send "Tests running" --from "claude · checkout" --id checkout-tests' },

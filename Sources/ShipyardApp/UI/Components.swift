@@ -21,6 +21,10 @@ private struct PanelStyleKey: EnvironmentKey {
     static let defaultValue = PanelStyle.tabs
 }
 
+private struct ShowsPingDoneKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 
 extension EnvironmentValues {
     var panelNow: Date {
@@ -31,6 +35,13 @@ extension EnvironmentValues {
     var panelStyle: PanelStyle {
         get { self[PanelStyleKey.self] }
         set { self[PanelStyleKey.self] = newValue }
+    }
+
+    /// Whether a ping row's done button has its age's slot, so the row
+    /// hides its age (`itemRow` sets it while a ping's row is highlighted).
+    var showsPingDone: Bool {
+        get { self[ShowsPingDoneKey.self] }
+        set { self[ShowsPingDoneKey.self] = newValue }
     }
 }
 
@@ -258,13 +269,13 @@ private struct ItemRow: ViewModifier {
     @Environment(\.panelScale) private var scale
 
     func body(content: Content) -> some View {
-        let isHighlighted = highlight.isHighlighted(place)
-        Button(action: click) { content }
+        let showsDone = row.item.ping != nil && highlight.isHighlighted(place)
+        Button(action: click) { content.environment(\.showsPingDone, showsDone) }
             .buttonStyle(RowButtonStyle())
             .overlay(alignment: .trailing) {
-                if row.item.ping != nil, isHighlighted {
-                    DismissButton { withAnimation(Motion.seen) { actions.dismiss(row) } }
-                        .padding(.trailing, scale.dismissTrailing(style))
+                if showsDone {
+                    PingDoneButton(row: row) { withAnimation(Motion.seen) { actions.dismiss(row) } }
+                        .padding(.trailing, scale.pingDoneTrailing(style))
                 }
             }
             .accessibilityAction(named: PanelText.markRowSeen) { actions.markSeen(row) }
@@ -281,22 +292,22 @@ private struct ItemRow: ViewModifier {
     }
 }
 
-private struct DismissButton: View {
+/// A highlighted ping row's ✓, in the slot its hidden age leaves, at the
+/// age's width, so nothing overlaps and nothing moves.
+private struct PingDoneButton: View {
+    let row: MenuRow
     let action: () -> Void
+    @Environment(\.panelStyle) private var style
+    @Environment(\.panelScale) private var scale
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.system(size: 8, weight: .semibold))
+            Image(systemName: "checkmark")
+                .font(.system(size: style == .list ? 10 : 11.5, weight: .semibold))
         }
-        .buttonStyle(IconButtonStyle(compact: true))
-        .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(ThemeColor.panel)
-                .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(ThemeColor.rowHover))
-        )
-        .hoverHelp(PanelText.dismissPing)
-        .accessibilityLabel(PanelText.dismissPing)
+        .buttonStyle(IconButtonStyle(compact: true, size: scale.pingDoneSize(style)))
+        .hoverHelp(PanelText.pingDoneHelp(row))
+        .accessibilityLabel(PanelText.pingDone)
     }
 }
 
@@ -478,9 +489,11 @@ struct OutputBox: View {
 struct IconButtonStyle: ButtonStyle {
     var labeled = false
     var compact = false
+    /// A size of its own, in place of the style's square.
+    var size: CGSize?
 
     func makeBody(configuration: ButtonStyleConfiguration) -> some View {
-        IconButtonBody(configuration: configuration, labeled: labeled, compact: compact)
+        IconButtonBody(configuration: configuration, labeled: labeled, compact: compact, size: size)
     }
 }
 
@@ -488,6 +501,7 @@ private struct IconButtonBody: View {
     let configuration: ButtonStyleConfiguration
     let labeled: Bool
     let compact: Bool
+    let size: CGSize?
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.panelStyle) private var style
     @State private var hover = false
@@ -501,7 +515,10 @@ private struct IconButtonBody: View {
             .foregroundStyle(hover && isEnabled ? ThemeColor.textPrimary : ThemeColor.textSecondary)
             .opacity(isEnabled ? 1 : 0.4)
             .padding(.horizontal, labeled ? 6 : 0)
-            .frame(width: labeled ? nil : compact ? (list ? 14 : 16) : (list ? 22 : 24), height: compact ? (list ? 14 : 16) : (list ? 20 : 22))
+            .frame(
+                width: size?.width ?? (labeled ? nil : compact ? (list ? 14 : 16) : (list ? 22 : 24)),
+                height: size?.height ?? (compact ? (list ? 14 : 16) : (list ? 20 : 22))
+            )
             .background(
                 RoundedRectangle(cornerRadius: compact ? 4 : list ? 5 : 6, style: .continuous)
                     .fill(configuration.isPressed ? ThemeColor.rowPressed : ThemeColor.rowHover.opacity(hover && isEnabled ? 1 : 0))
