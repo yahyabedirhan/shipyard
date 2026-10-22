@@ -11,7 +11,7 @@ The shipyard skill (`skills/shipyard/SKILL.md`), its description included, is fo
 ## Git, Commits, And Pull Requests
 
 - Opening a pull request, or changing an existing one's description, goes through the **to-pr** skill, which owns the description's shape and where it is saved. Invoke it as part of the work, without waiting to be asked.
-- Never wait for CI checks before the next step. After opening a pull request, go on to its follow-ups, such as the QA ticket, the report or asking for the merge. After a merge, go on to installing, carrying the change to the machines, closing tickets and cleaning up. Assume CI passes, and act when a run actually fails: fix it, or tell the maintainer what failed.
+- Never wait for CI checks before the next step. After opening a pull request, go on to its follow-ups, such as the QA ticket, the report or asking for the merge. After a merge, go on to installing, carrying the change to the machines, closing tickets and cleaning up. Expect CI to pass by default: the tests already ran on the local machine before the push, so waiting for CI runs them twice. Act when a run actually fails: fix it, or tell the maintainer what failed.
 - Issue and pull request numbers belong in commit messages, pull requests and docs. Code, comments and test names say what they mean in words, so they read without the tracker.
 
 Use lowercase multi-line commit messages with a Conventional Commits type on the subject line:
