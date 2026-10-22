@@ -48,7 +48,9 @@ Without them the build has no analytics and no error reporting, and the bundle c
 
 The `site` workflow (`.github/workflows/site.yml`) runs `npm ci`, `npm test` and `npm run build` when `site/` or a repository file the site is made from changes.
 It doesn't deploy.
-The maintainer, or an agent on their Mac, deploys by hand with `npm run deploy` from a `main` checkout, after a change to the site or a release, with the keys in `site/.env.local`.
+Cloudflare Workers Builds deploys the site: on every push to `main` it runs `npm run build` and `npx wrangler deploy` in `site/`, with the three keys as the trigger's build variables.
+It picks Node from `engines` in `site/package.json`.
+`npm run deploy` from a `main` checkout still deploys by hand, with the keys in `site/.env.local`.
 
 ### Where each page's code lives
 
@@ -572,12 +574,14 @@ GET /nope.json  (curl, an agent)
 ### A deploy
 
 ```text
-npm run deploy                                                  site/package.json
-├── npm run build                                               the build above; keys from the shell or .env.local
-└── wrangler deploy                                             site/wrangler.jsonc
-    ├── upload dist/ as static assets (binding ASSETS)
-    ├── upload worker/index.js as the Worker's main
-    └── route shipyard.yahyapak.dev as a custom domain          Cloudflare makes the DNS record and certificate
+push to main
+└── Workers Builds, trigger "Deploy production", root site/      keys from the trigger's build variables
+    ├── npm ci, Node from engines in site/package.json
+    ├── npm run build                                           the build above
+    └── npx wrangler deploy                                     site/wrangler.jsonc
+        ├── upload dist/ as static assets (binding ASSETS)
+        ├── upload worker/index.js as the Worker's main
+        └── route shipyard.yahyapak.dev as a custom domain      Cloudflare makes the DNS record and certificate
 ```
 
 ### A rejected build
