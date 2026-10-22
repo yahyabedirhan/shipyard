@@ -11,9 +11,8 @@
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-**Status:** under construction; this README describes 0.7.1.
+This README describes 0.7.1.
 
-<!-- SHOT:landing-tabs-dark SHOT:landing-list-light -->
 <p align="center">
   <img src="assets/screenshots/launch/landing-tabs-dark.png" width="320" alt="The shipyard panel in dark mode, in the tabs layout on one project's tab: pull requests, pings from agents, issues and runs">
   <img src="assets/screenshots/launch/landing-list-light.png" width="320" alt="The shipyard panel in the Paper theme, in the list layout: four projects, each with its pull requests, pings, issues and runs">
@@ -52,7 +51,7 @@ make install    # builds, signs and copies Shipyard.app to /Applications, then o
 ```
 
 **From the download.** Get `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest).
-It is not notarized yet, so clear the quarantine flag before the first launch:
+It is not notarized, so clear the quarantine flag before the first launch:
 
 
 ```sh
@@ -269,7 +268,7 @@ version = 1
 
 - shipyard runs on macOS 14 or later. The `shipyard` command also runs on Linux, without the app.
 - It reads github.com only, not GitHub Enterprise Server.
-- The download is not notarized yet, and there is no Homebrew cask or automatic update yet.
+- The download is not notarized, and there is no Homebrew cask or automatic update.
 - Most settings live in `config.toml`, edited by you or your agents. The app itself writes the file only for the preset and repositories chosen during onboarding, and for the layout button in the panel's header.
 - With Herdr 0.9.3, clicking another machine's ping focuses its pane on that machine, but your Mac's Herdr window moves there only when it already shows that machine. Otherwise nothing visible happens and the ping is marked seen; switch Herdr to that machine yourself. Herdr has no command yet that switches an open window to a saved machine.
 
