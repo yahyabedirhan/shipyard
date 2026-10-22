@@ -14,7 +14,7 @@ This folder is the landing page at `/` of `shipyard.yahyapak.dev`. The docs are 
 - `landing.test.ts` checks that the page tells the whole story.
 
 The page is HTML at build time and reads with JavaScript off.
-Only the install tabs and the copy buttons hydrate, as React islands from `src/docs/CodeBlocks.tsx`.
+Only the install tabs and the copy buttons hydrate, as React islands from `src/guide/CodeBlocks.tsx`.
 
 ## The panel image
 

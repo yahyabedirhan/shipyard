@@ -1,6 +1,6 @@
 // The site's plain-text surfaces for AI agents, made from the same content as the docs page: llms.txt, llms-full.txt
 // and one Markdown page per docs section under /docs/, the configuration and command references included.
-import { INSTALL_WAYS, LIMITS, QUESTIONS, SECTIONS, type DocSection } from '../src/docs/content';
+import { INSTALL_WAYS, LIMITS, QUESTIONS, SECTIONS, type DocSection } from '../src/guide/content';
 import { ASK_AGENT, CATEGORY, CHANGELOG, HERDR_PLUGIN, INSTALL, LINE, NAME, PROOF, RELEASES, REPO, SITE_URL } from '../src/messaging';
 import { htmlToMd } from '../src/reference/markdown';
 import type { KeyGroup } from '../src/reference/parse';

@@ -5,7 +5,7 @@ import SHOTS from '../shots.json';
 import { buildAgentFiles, pagePath } from '../plugins/agents';
 import { REPO_DIR, SITE_DIR, referenceData } from '../plugins/repo';
 import { sitemap } from '../plugins/site';
-import { SECTIONS } from './docs/content';
+import { SECTIONS } from './guide/content';
 import { LINE } from './messaging';
 import { PAGES, type PageMeta } from './meta';
 import { renderPage } from './test/render';
@@ -138,7 +138,7 @@ describe('what the site never holds', () => {
   });
 
   it('has no em dashes in its prose', () => {
-    for (const f of [site('src/docs/content.ts'), site('src/messaging.ts'), site('src/meta.ts'), site('PRIVACY.md'), site('shots.json')]) {
+    for (const f of [site('src/guide/content.ts'), site('src/messaging.ts'), site('src/meta.ts'), site('PRIVACY.md'), site('shots.json')]) {
       expect(readFileSync(f, 'utf8').includes('—'), f).toBe(false);
     }
   });

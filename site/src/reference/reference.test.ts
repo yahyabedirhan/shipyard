@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { referenceData, readRepo } from '../../plugins/repo';
 import { buildAgentFiles } from '../../plugins/agents';
-import Docs from '../docs/Docs.astro';
+import Guide from '../guide/Guide.astro';
 import { renderPage } from '../test/render';
 import { schemaKeyIds, skillKeys, type SchemaNode } from './parse';
 
 const ref = referenceData();
-const page = await renderPage(Docs);
+const page = await renderPage(Guide);
 const files = buildAgentFiles(ref);
 const schema = JSON.parse(readRepo('schema/config.schema.json')) as SchemaNode;
 

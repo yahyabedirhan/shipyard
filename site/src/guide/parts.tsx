@@ -1,6 +1,6 @@
 // The docs page's parts that never move: the generated reference tables, the section extras made of text, the brand
-// links and the footer. They render to HTML at build time and send no JavaScript. src/docs/Docs.astro puts them
-// together with the islands, and src/docs/Section.astro lays out one section.
+// links and the footer. They render to HTML at build time and send no JavaScript. src/guide/Guide.astro puts them
+// together with the islands, and src/guide/Section.astro lays out one section.
 import type { ReactNode } from 'react';
 import { REF } from '../reference/data';
 import type { OutboundTarget } from '../analytics';
