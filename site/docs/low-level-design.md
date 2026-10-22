@@ -413,18 +413,18 @@ It owns the mock's rules, kept to what the documentation states.
 
 ### Copied modules
 
-The privacy, analytics and error modules are copied, not shared, across three sites.
+The privacy, analytics and error modules are kept as copies in three sites, not shared as a package.
 Each project is small, so a shared package would cost more in publishing and versioning than the copies cost to keep in step.
 A change to consent, the visitor id, the agent identity, PostHog or Sentry is made in all three copies:
 
 | Site | Where the copies live | Storage key prefix | Consent levels |
 | --- | --- | --- | --- |
-| shipyard.yahyapak.dev | `site/src/consent.ts`, `actor.ts`, `visitor.ts`, `analytics.ts`, `posthog.ts`, `sentry.ts`, `errors.ts` | `shipyard:` | `all`, `pageviews`, `none` |
-| topographic.yahyapak.dev | `apps/playground/src/` in yahyabedirhan/topographic, with the same file names | `topographic:` | `all`, `pageviews`, `none` |
-| yahyapak.dev | `src/privacy.js`, `src/analytics.js`, `src/errors.js` in yahyabedirhan/personal-website | none | `full`, `pageviews`, `off` |
+| shipyard.yahyapak.dev | `src/consent.ts`, `src/actor.ts`, `src/visitor.ts`, `src/analytics.ts`, `src/posthog.ts`, `src/sentry.ts`, `src/errors.ts` in `site/` | `shipyard:` | `all`, `pageviews`, `none` |
+| topographic.yahyapak.dev | `apps/playground/src/` in `yahyabedirhan/topographic`, with the same file names | `topographic:` | `all`, `pageviews`, `none` |
+| yahyapak.dev | `src/privacy.js`, `src/analytics.js`, `src/errors.js` in `yahyabedirhan/personal-website` | none | `full`, `pageviews`, `off` |
 
-Each copy's header comment points here.
-The three sites send to one PostHog project and tell their events apart with the `site` super property; each has its own Sentry project.
+Each copy carries a header comment that names the other two.
+The three sites send to one PostHog project and tell their events apart with the `site` super property, which this site sets in `src/device.ts`.
 
 ### Observations
 

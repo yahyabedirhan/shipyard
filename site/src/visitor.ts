@@ -4,9 +4,9 @@
  * PostHog stays cookieless: its own distinct id is still the server's daily hash.
  * Any opt out deletes the id.
  *
- * Copied: yahyabedirhan/topographic keeps the same module in apps/playground/src, and yahyabedirhan/personal-website
- * keeps the same behaviour in src/privacy.js, src/analytics.js and src/errors.js. Change all three together;
- * docs/low-level-design.md > 'Copied modules' lists them.
+ * Copied: `yahyabedirhan/topographic` keeps the same module in `apps/playground/src`, and
+ * `yahyabedirhan/personal-website` keeps an equivalent in `src/privacy.js`, `src/analytics.js` and `src/errors.js`.
+ * Change all three together. `site/docs/low-level-design.md` > 'Copied modules' lists them.
  */
 
 export const VISITOR_KEY = 'shipyard:visitor';
