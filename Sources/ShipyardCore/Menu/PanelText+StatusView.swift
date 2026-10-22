@@ -7,6 +7,8 @@ extension PanelText {
     public struct SettingsItem: Equatable, Sendable {
         public enum Action: Equatable, Sendable {
             case openConfiguration
+            /// The Theme submenu (`ThemeMenu`).
+            case theme
             case open(SetupPart)
             case signOut
         }
@@ -17,14 +19,20 @@ extension PanelText {
         public var isChecked = false
     }
 
+    /// The settings menu's item that opens the Theme submenu.
+    public static let themeMenuTitle = "Theme"
+
     /// The mark on the right of a part's item when the part is set up.
     public static let setUpMark = "✓"
 
-    /// The settings menu: Open configuration file, then each part's Set up
-    /// item (a check mark when it's set up, no mark otherwise), then Sign
-    /// out when `canSignOut`.
+    /// The settings menu: Open configuration file and the Theme submenu,
+    /// then each part's Set up item (a check mark when it's set up, no mark
+    /// otherwise), then Sign out when `canSignOut`.
     public static func settingsMenu(_ status: SetupStatus, canSignOut: Bool) -> [SettingsItem] {
-        var items = [SettingsItem(title: "Open configuration file", action: .openConfiguration)]
+        var items = [
+            SettingsItem(title: "Open configuration file", action: .openConfiguration),
+            SettingsItem(title: themeMenuTitle, action: .theme),
+        ]
         items += SetupPart.allCases.map { part in
             SettingsItem(title: settingsTitle(part), action: .open(part), isChecked: status.isSetUp(part))
         }

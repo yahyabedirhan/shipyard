@@ -28,6 +28,7 @@ struct Panel: View {
         .background { PanelBackdrop() }
         .background { if !isSnapshot { PanelWindowAnchor(isOpen: actions.panelState.isOpen) } }
         .theme(shipyard.theme)
+        .followsSystemColors()
         .onAppear { if !isSnapshot { actions.panelOpened() } }
         .onDisappear { if !isSnapshot { actions.panelClosed() } }
         .onChange(of: actions.skillInstallation.state) { actions.skillDetector.check() }
@@ -76,7 +77,7 @@ struct Panel: View {
             .disabled(!shipyard.menu.canRefreshNow || shipyard.phase != .ready)
             .hoverHelp(PanelText.refreshHelp)
             .accessibilityLabel("Refresh")
-            SettingsMenuButton { settingsItems }
+            SettingsMenuButton(menu: settingsMenu)
                 .hoverHelp(PanelText.settings)
             .accessibilityLabel(PanelText.settings)
         }
@@ -86,8 +87,8 @@ struct Panel: View {
         .animation(Motion.count, value: attention)
     }
 
-    @ViewBuilder
-    private var settingsItems: some View {
+    /// The settings menu as it is now, built at each click.
+    private func settingsMenu(_ appearance: ThemeAppearance) -> NSMenu {
         let canSignOut = shipyard.phase != .signedOut && shipyard.tokenSource != nil
         let status = SetupStatus(
             cli: actions.cliLink.state,
@@ -95,18 +96,17 @@ struct Panel: View {
             notion: shipyard.notionIsSetUp,
             skill: actions.skillDetector.isInstalled
         )
-        ForEach(PanelText.settingsMenu(status, canSignOut: canSignOut), id: \.title) { item in
-            switch item.action {
-            case .openConfiguration:
-                Button(item.title, action: actions.openConfigurationFile)
-            case .open(let part):
-                Button(item.title) { actions.panelState.show(part) }
-                    .badge(item.isChecked ? Text(PanelText.setUpMark) : nil)
-            case .signOut:
-                Divider()
-                Button(item.title) { shipyard.signOut() }
-            }
-        }
+        return SettingsMenu.make(
+            PanelText.settingsMenu(status, canSignOut: canSignOut),
+            themes: shipyard.themeMenu,
+            appearance: appearance,
+            actions: SettingsMenu.Actions(
+                openConfiguration: actions.openConfigurationFile,
+                show: { actions.panelState.show($0) },
+                signOut: { shipyard.signOut() },
+                pickTheme: { name in Task { await shipyard.switchTheme(to: name) } }
+            )
+        )
     }
 
     private var banners: some View {
@@ -287,30 +287,59 @@ struct Panel: View {
 /// colour, darker than the icons beside it, whatever style it's given; so
 /// the gear is an image already tinted with the theme's colour, secondary at
 /// rest and primary under the pointer, on the icon buttons' hover fill.
-private struct SettingsMenuButton<Items: View>: View {
-    @ViewBuilder let items: Items
+private struct SettingsMenuButton: View {
+    /// The menu to show, for the appearance the menu draws in.
+    let menu: (ThemeAppearance) -> NSMenu
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var scheme
     @State private var hover = false
+    @State private var anchor = MenuAnchor()
 
     var body: some View {
         let tint = hover ? ThemeColor.textPrimary : ThemeColor.textSecondary
-        Menu {
-            items
+        Button {
+            anchor.pop(menu)
         } label: {
             Image(nsImage: SymbolImage.tinted("gearshape", NSColor(tint.color(in: theme, ThemeAppearance(scheme)))))
+                .frame(width: 24, height: 22)
+                .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .frame(width: 24, height: 22)
+        .buttonStyle(.plain)
+        .background(MenuAnchorView(anchor: anchor))
         .background(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
                 .fill(ThemeColor.rowHover.opacity(hover ? 1 : 0))
         )
-        .contentShape(Rectangle())
         .onHover { hover = $0 }
         .animation(Motion.hover, value: hover)
+    }
+}
+
+/// Where the settings menu pops up from: the gear's own view, below it.
+@MainActor
+private final class MenuAnchor {
+    weak var view: NSView?
+
+    func pop(_ make: (ThemeAppearance) -> NSMenu) {
+        guard let view else { return }
+        let dark = view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let menu = make(dark ? .dark : .light)
+        let below = NSPoint(x: 0, y: view.isFlipped ? view.bounds.maxY + 4 : -4)
+        menu.popUp(positioning: nil, at: below, in: view)
+    }
+}
+
+private struct MenuAnchorView: NSViewRepresentable {
+    let anchor: MenuAnchor
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        anchor.view = view
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        anchor.view = view
     }
 }
 

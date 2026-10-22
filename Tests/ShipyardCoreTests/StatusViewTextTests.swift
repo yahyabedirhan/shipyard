@@ -6,14 +6,14 @@ import Testing
 struct StatusViewTextTests {
     private let command = "mkdir -p ~/.local/bin && ln -sf /Applications/Shipyard.app/Contents/Helpers/shipyard ~/.local/bin/shipyard"
 
-    @Test("the settings menu lists the configuration file, the four parts' Set up items, then Sign out once signed in")
+    @Test("the settings menu lists the configuration file, the Theme submenu, the four parts' Set up items, then Sign out once signed in")
     func settingsMenuOrder() {
         let signedIn = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: true)
         #expect(signedIn.map(\.title) == [
-            "Open configuration file", "Set up GitHub", "Set up Notion", "Set up /shipyard skill", "Set up shipyard command", "Sign out",
+            "Open configuration file", "Theme", "Set up GitHub", "Set up Notion", "Set up /shipyard skill", "Set up shipyard command", "Sign out",
         ])
         #expect(signedIn.map(\.action) == [
-            .openConfiguration, .open(.github), .open(.notion), .open(.skill), .open(.cli), .signOut,
+            .openConfiguration, .theme, .open(.github), .open(.notion), .open(.skill), .open(.cli), .signOut,
         ])
         let signedOut = PanelText.settingsMenu(SetupStatus(cli: .unlinked), canSignOut: false)
         #expect(signedOut.map(\.title).last == "Set up shipyard command")

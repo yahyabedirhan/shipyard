@@ -9,9 +9,10 @@ import ShipyardCommand
 /// directory and the `themes` folder and call `reload()`; tests call it directly. A broken file
 /// never replaces the last valid configuration. The store never rewrites the
 /// file as a whole: `append(projects:)` only adds `[[projects]]` blocks at
-/// the end, `setLayout(_:)` changes or adds only `[menu] layout`, and the
-/// core's `writePreset(_:projects:)` writes a whole file only over one that
-/// holds nothing but `version`.
+/// the end, `setLayout(_:)` changes or adds only `[menu] layout`,
+/// `setTheme(_:)` only the top-level `theme`, and the core's
+/// `writePreset(_:projects:)` writes a whole file only over one that holds
+/// nothing but `version` and `theme`.
 public final class ConfigurationStore: @unchecked Sendable {
     /// What a reload found.
     public enum ReloadResult: Equatable, Sendable {
@@ -28,7 +29,7 @@ public final class ConfigurationStore: @unchecked Sendable {
 
     private let lock = NSLock()
     private var _lastValid = Configuration()
-    private var _theme = BuiltInThemes.shipyard
+    private var _theme = BuiltInThemes.system
     private var _themes = ThemeLibrary.builtIn
     private var _themeFiles: [ThemeFiles.File] = []
     /// The theme each file last read, kept while the file has a problem.
@@ -65,7 +66,7 @@ public final class ConfigurationStore: @unchecked Sendable {
     public var lastValid: Configuration { synchronized { _lastValid } }
 
     /// The theme `lastValid` picks, from the themes as the latest reload
-    /// read them: Shipyard before any file read cleanly, and while the
+    /// read them: System before any file read cleanly, and while the
     /// theme it names isn't one.
     public var theme: Theme { synchronized { _theme } }
 
@@ -92,7 +93,7 @@ public final class ConfigurationStore: @unchecked Sendable {
 
     /// Whether the latest reload found a file onboarding may write a preset
     /// over: missing, or holding no live key but `version` (the header the
-    /// app creates). `writePreset` checks the file again before writing.
+    /// app creates) and `theme`. `writePreset` checks the file again before writing.
     public var acceptsPreset: Bool { synchronized { _acceptsPreset } }
 
     /// Reads the theme files and the file again. A missing or empty file is
@@ -110,7 +111,7 @@ public final class ConfigurationStore: @unchecked Sendable {
         do throws(ConfigurationError) {
             let data = try read()
             outcome = .success(try Configuration.decode(data, themes: themes))
-            acceptsPreset = String(data: data, encoding: .utf8).map(Configuration.acceptsPreset) ?? false
+            acceptsPreset = String(data: data, encoding: .utf8).map { Configuration.acceptsPreset($0, themes: themes) } ?? false
         } catch {
             outcome = .failure(error)
         }
@@ -215,6 +216,29 @@ public final class ConfigurationStore: @unchecked Sendable {
         return reload()
     }
 
+    /// Sets the top-level `theme` in the file to `name`, for the gear menu's
+    /// Theme submenu: replaces the key's value, or uncomments the new-file
+    /// header's `# theme = …` example, or adds the key above the first
+    /// table, leaving every other line and comment as it was
+    /// (`Configuration.settingTheme`). Creates the file with its header when
+    /// it's missing. Throws the file's `ConfigurationError` when it doesn't
+    /// read, one saying why when `name` isn't a theme or the edit can't be
+    /// made, or the file system's error, and then writes nothing. Returns
+    /// the reload that follows.
+    @discardableResult
+    public func setTheme(_ name: String) throws -> ReloadResult {
+        try createIfMissing()
+        guard let text = String(data: try read(), encoding: .utf8) else {
+            throw ConfigurationError([ConfigurationIssue(line: nil, message: "the file isn't UTF-8 text")])
+        }
+        let edited = try Configuration.settingTheme(name, in: text, themes: themes)
+        let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+        try handle.truncate(atOffset: 0)
+        try handle.write(contentsOf: Data(edited.utf8))
+        return reload()
+    }
+
     package func validate(_ projects: [NewProject], against existing: [String]) throws(ConfigurationError) {
         var issues: [ConfigurationIssue] = []
         var slugs = Set(existing)
@@ -258,9 +282,11 @@ public final class ConfigurationStore: @unchecked Sendable {
 }
 
 extension Configuration {
-    package static func acceptsPreset(_ text: String) -> Bool {
-        guard (try? decode(text)) != nil else { return false }
-        return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && $0.path == [.key("version")] }
+    package static func acceptsPreset(_ text: String, themes: ThemeLibrary = .builtIn) -> Bool {
+        guard (try? decode(text, themes: themes)) != nil else { return false }
+        // `theme` may be set already: the gear menu's Theme submenu works
+        // before onboarding, and the preset keeps it.
+        return TOMLSourceMap(text).entries.allSatisfy { !$0.isHeader && ($0.path == [.key("version")] || $0.path == [.key("theme")]) }
     }
 }
 
