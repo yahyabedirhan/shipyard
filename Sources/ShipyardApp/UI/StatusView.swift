@@ -26,7 +26,6 @@ struct StatusView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .themedScreen()
-        .onChange(of: part, initial: true) { lookAgain() }
     }
 
     private var page: PanelText.StatusPage? {
@@ -42,21 +41,12 @@ struct StatusView: View {
         }
     }
 
-    private func lookAgain() {
-        switch part {
-        case .cli: actions.cliLink.check()
-        case .skill: actions.skillDetector.check()
-        case .notion: checkNotion()
-        case .github: break
-        }
-    }
-
     private func run(_ action: PanelText.StatusPage.Action) {
         switch action {
         case .linkCLI: actions.cliLink.makeLink()
         case .installSkill: actions.skillInstallation.start()
         case .cancelSkillInstall: actions.skillInstallation.cancel()
-        case .checkNotion: checkNotion()
+        case .checkNotion: actions.lookAt(.notion)
         case .connectNotion:
             back()
             let shipyard = actions.shipyard
@@ -64,11 +54,6 @@ struct StatusView: View {
         case .disconnectNotion: actions.shipyard.disconnectNotion()
         case .signOut: actions.shipyard.signOut()
         }
-    }
-
-    private func checkNotion() {
-        let shipyard = actions.shipyard
-        Task { await shipyard.checkNotion() }
     }
 
     private func page(_ text: PanelText.StatusPage) -> some View {

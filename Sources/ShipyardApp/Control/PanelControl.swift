@@ -102,7 +102,7 @@ final class PanelControl: PanelControlling {
 
     func showView(_ name: String) throws(PanelRefusal) -> String {
         let part = try SetupPart.named(name)
-        state.openView = part
+        state.show(part)
         return part.map(PanelText.statusTitle) ?? SetupPart.projectsName
     }
 }
