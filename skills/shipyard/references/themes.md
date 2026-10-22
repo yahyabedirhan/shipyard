@@ -111,7 +111,7 @@ A token that no theme in the `extends` chain sets is `system`.
 | | `tertiary` | Ages, last updated, hints. |
 | | `seen` | The title of a row already seen. |
 | | `on-accent` | Text on an accent fill. |
-| `accent` | `accent` | The one accent: a prominent button, the active count. |
+| `accent` | `accent` | The one accent: a prominent button, the active count, a caught-up or connected tick. |
 | | `soft` | Reserved: accepted and checked, with no effect. |
 | `line` | `separator` | Hairlines between parts. |
 | | `border` | Around cards and secondary buttons. |
@@ -125,8 +125,9 @@ A token that no theme in the `extends` chain sets is `system`.
 ### State colours
 
 A row's state icon, the hover card's review and checks, the rate-limit bar and text, and a ping's or a note's icon take the colour the theme gives that kind in that state.
-The rest of the panel that shows a phase draws the phase's colour: an error, a failed action or the lease banner's Stop is `failed`, a finished tick is `done`, an informational banner is `quiet`.
-Two tables set them, without a prefix for light and dark or under `[light.*]` and `[dark.*]` for one appearance:
+The rest of the panel that shows a phase draws the phase's colour: an error, a failed action or the lease banner's Stop is `failed`, an informational banner is `quiet`.
+A tick that says all is well, such as the one before "All caught up", draws the accent, not `done`.
+Two tables set the state and phase colours, without a prefix for light and dark or under `[light.*]` and `[dark.*]` for one appearance:
 
 - `[phase]` names one colour per phase, for every state in it to share.
   A phase's value is a palette name, a hex colour or `system`, never a phase's name.
