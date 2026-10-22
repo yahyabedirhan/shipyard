@@ -57,7 +57,7 @@ A caller should be able to:
 
 - No interactive prompts or pickers.
 - No colour.
-- No shell completions yet.
+- No shell completions.
 - No Windows build.
 - No command that changes `config.toml`: agents edit the file (ADR 0001).
 
@@ -421,7 +421,6 @@ Nothing is sent to the app.
 | A new group, such as `notes list` growing into `note` | one `Entry` in its module and `main.swift`'s `add`; `macOnly` when it needs the app |
 | A new flag | the parser and the group's `usageText`; additive, no rename |
 | A rename | the parser, the table's `Command`, the skill, the docs, and every caller in the same release |
-| A `--json` on `notes check` | the app's `notes.check` reply and the command: the reply is text today |
 
 ### Contract rules
 
@@ -440,7 +439,7 @@ Nothing is sent to the app.
 | 3 | Every noun is the glossary's | yes |
 | 4 | Two levels at most; everyday commands at the top | yes; `herdr-event` is listed apart as plumbing |
 | 5 | The same flag means the same thing everywhere | yes |
-| 6 | `--json` on every command that prints data | `ping list`, `app status`, `config check`, `help`; not yet `notes check` (see Evolution) |
+| 6 | `--json` on every command that prints data | `ping list`, `app status`, `config check`, `help`; `notes check` prints text only |
 | 7 | Every error says what to do next; every exit code documented | yes |
 | 8 | Nothing prompts or hangs | yes: no prompts; every wait bounded |
 | 9 | Every list in the help is made from the table | the top help and `help --json`; each group's detailed help is written beside its parser and tested against the table |

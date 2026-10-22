@@ -527,7 +527,7 @@ Added in effort `notes-and-notify` (spec #187); Trace 14 follows a read, Trace 1
 
 #### Notes banner, check and opt-in
 
-The notes' Projects page and their checks (ADR 0011; no issue numbers yet; Traces 14 and 16 follow the layout, Trace 17 the check).
+The notes' Projects page and their checks (ADR 0011; Traces 14 and 16 follow the layout, Trace 17 the check).
 
 - **NT10.** The **notes banner** (kind `notes`, banner key `notes`, gray, dismissable like the others).
   - **When it shows:** once ready, while notes are read, a project shows notes, and the last read could list none (`Shipyard.notesBlocked`, a `NotesNotice`; #234).
@@ -674,17 +674,17 @@ Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 
 | Excluded | Why |
 |---|---|
-| Reviewing inside the app (diff, comments), merge/close actions | Agreed: click-through to GitHub for now. |
+| Reviewing inside the app (diff, comments), merge/close actions | Agreed: rows click through to GitHub. |
 | A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's settings menu opens the file ("Open configuration file"); its status views (N16) show and set up the parts shipyard uses, never a setting. The `shipyard` CLI sends pings (ADR 0004) and, controls the app, but never edits the configuration. |
 | GitLab, GitHub Enterprise, several accounts | Nobody asked; the GraphQL host is one constant if GHE comes up. |
 | Telling agent PRs from hand-written ones | Agreed: not reliable today (see Extensibility). |
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
-| Developer ID signing, notarization | Agreed: ad-hoc signed zips and the `xattr` line for now. |
+| Developer ID signing, notarization | Agreed: ad-hoc signed zips and the `xattr` line. |
 | Push updates (webhooks) | Needs a server; polling is enough at this scale. |
-| Deployments waiting for the user's approval | Deferred: a later `workflow-runs` filter |
-| `assigned` and `mentioned` filters | Nobody needs them yet; each is a field and one check in `Listing` later |
-| Oldest first, a sort direction, nested grouping | Not asked for; each is one more choice later |
-| Folding busy projects automatically (ghbar folds repositories with more than three items) | Deferred: the maintainer doesn't need it yet |
+| Deployments waiting for the user's approval | Not asked for; it would be a `workflow-runs` filter |
+| `assigned` and `mentioned` filters | Not asked for; each would be a field and one check in `Listing` |
+| Oldest first, a sort direction, nested grouping | Not asked for; each would be one more choice |
+| Folding busy projects automatically (ghbar folds repositories with more than three items) | Not asked for |
 | The picker offering repository groups other than a preset's `owned` | Groups come through the skill |
 | More than 100 review requests at once | The search returns the first 100; the section says so when there are more |
 | More than one action per ping, buttons on its notification, or a shell command as an action | Spec #96: one clear action, and nothing a ping runs beyond opening, activating or focusing |
@@ -1785,7 +1785,7 @@ The theme file format is in `skills/shipyard/references/themes.md`, and what to 
 It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without AppKit.
 
 - `ThemeToken` lists the 30 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`).
-  `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view yet, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
+  `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
 - A `ThemeValue` is a colour (`RGBA`) or `system`.
 - `ThemeKnobs` holds what both appearances share: the font (`family`, `mono`, `size`), the density (a preset and the `row`, `header`, `bar` and `gutter` heights it sets), the corner radii (`small`, `medium`, `large`) and the material (`glass` or flat).
 - `Theme` holds every token resolved for light and dark, its knobs, the `appearances` it fills itself, and its `source`, built in or a file; `Theme.drawn(_:)` gives the appearance it draws in while the system is in another.
@@ -1862,7 +1862,7 @@ Another theme's `[font]` sizes the type from its body size and picks its family.
 Its `[density]` sets the row, header, title bar and gutter, and the tabs layout's two-line row moves half a point of padding per point of row.
 Its `[shape]` gives the radii in points: `Grid.smallRadius` and `radius` are its `small` and `medium`, so Shipyard draws 6 and 8 pt corners.
 
-`large` is read and checked but draws nothing yet, since the `MenuBarExtra` window draws the panel's own corner.
+`large` is read and checked but draws nothing, since the `MenuBarExtra` window draws the panel's own corner.
 The row highlight and the icon buttons keep the design lab's fixed radii.
 
 **What draws from tokens.**
@@ -4564,7 +4564,7 @@ Its sections, in order:
 
 - **Likely changes**: each change and what it touches.
 - **Future feature placement**: where each part of a new agent-facing feature goes, tested on a hypothetical handoff.
-- **Refused changes**: what the design doesn't make room for yet.
+- **Refused changes**: what the design doesn't make room for.
 
 ### Likely changes
 
@@ -4614,7 +4614,7 @@ A change that touched Pings, or made the Linux build link Config or Core, would 
 
 ### Refused changes
 
-Refused for now:
+Refused:
 
 - A plugin system for item kinds: one registration seam for a change that happens rarely.
 - A protocol over `GitHubClient` for other forges: one implementation.

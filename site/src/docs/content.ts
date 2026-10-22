@@ -53,10 +53,10 @@ export const SECTIONS: DocSection[] = [
   {
     id: 'install', title: 'Install', nav: 'Install',
     lede: 'Download the app, or build it from source. Then give your agents the skill.',
-    body: '<p>You need macOS 14 or later and a GitHub account. Building from source also needs the Command Line Tools with Swift 6, from <code>xcode-select --install</code><sup class="fn"></sup></p>\n<p>The download is <code>Shipyard-&lt;version&gt;-macos.zip</code> on the ' + ext(RELEASES, 'latest release') + '. It isn\'t notarized yet, so clear the quarantine flag before the first launch, as below.<sup class="fn"></sup></p>',
+    body: '<p>You need macOS 14 or later and a GitHub account. Building from source also needs the Command Line Tools with Swift 6, from <code>xcode-select --install</code><sup class="fn"></sup></p>\n<p>The download is <code>Shipyard-&lt;version&gt;-macos.zip</code> on the ' + ext(RELEASES, 'latest release') + '. It isn\'t notarized, so clear the quarantine flag before the first launch, as below.<sup class="fn"></sup></p>',
     notes: [
       '<code>make install</code> builds, signs and copies <code>Shipyard.app</code> to <code>/Applications</code>, then opens it. To update, run <code>git pull &amp;&amp; make install</code> again.',
-      'To update a download, replace the app with a newer zip. There is no automatic update yet.',
+      'To update a download, replace the app with a newer zip. There is no automatic update.',
     ],
     extra: 'install',
     after: '<p>To uninstall, choose <b>Sign out</b> in the gear menu if you signed in with GitHub, quit shipyard, and delete the app and its files. Remove the agent skill with <code>npx skills remove shipyard -g</code> if you installed it.</p>',
@@ -182,7 +182,7 @@ export const SECTIONS: DocSection[] = [
   },
   {
     id: 'limits', title: 'Limits', nav: 'Limits',
-    lede: 'What shipyard does not do yet.',
+    lede: 'What shipyard does not do.',
     body: '',
     notes: [],
     extra: 'limits',
@@ -205,12 +205,12 @@ export const SECTIONS: DocSection[] = [
 
 export const byId: Record<string, DocSection> = Object.fromEntries(SECTIONS.map((s) => [s.id, s]));
 
-/** What shipyard does not do yet, each stated once. It follows the messaging kit's non-claims. */
+/** What shipyard does not do, each stated once. It follows the messaging kit's non-claims. */
 export const LIMITS: [string, string][] = [
   ['macOS only', 'The app runs on macOS 14 or later. The <code>shipyard</code> command also runs on Linux, without the app.'],
   ['github.com only', 'It reads github.com. GitHub Enterprise Server is not supported.'],
   ['Not notarized', 'macOS asks you to clear the quarantine flag before the first launch of the download.'],
-  ['No Homebrew or updates', 'There is no Homebrew cask and no automatic update yet.'],
+  ['No Homebrew or updates', 'There is no Homebrew cask and no automatic update.'],
   ['Settings in a file', 'The gear menu shows the setup of GitHub, Notion, the skill and the command, and the layout button switches layouts. Everything else is edited in <code>config.toml</code>, by you or your agents.'],
   ['Herdr windows', 'With Herdr 0.9.3, clicking another machine\'s ping focuses its pane on that machine, but the Mac\'s Herdr window moves there only when it already shows that machine.'],
 ];
