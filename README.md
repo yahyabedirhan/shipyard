@@ -114,18 +114,18 @@ shipyard lives in the menu bar, with no Dock icon.
 2. **Choose a preset,** a ready-made configuration for one use.
 3. **Choose what to watch,** when the preset asks.
 
+</td>
+<td width="45%" valign="top">
+<img src="assets/screenshots/launch/onboarding-presets-dark.png" width="300" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
+</td>
+</tr>
+</table>
+
 | Preset | Shows | Asks for |
 |---|---|---|
 | `my-agents` | The pull requests and issues you and your agents open, one project per repository. | The repositories. |
 | `incoming-contributions` | What other people open on your repositories, bots left out, and the pull requests waiting on your review anywhere. | All your repositories, or the ones you pick. |
 | `review-queue` | Only the pull requests waiting on your review, in any repository. | Nothing. |
-
-</td>
-<td width="45%" valign="top">
-<img src="assets/screenshots/launch/onboarding-presets-dark.png" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
-</td>
-</tr>
-</table>
 
 ### Controls
 
@@ -164,7 +164,7 @@ The file sets:
 
 </td>
 <td width="45%" valign="top">
-<img src="assets/screenshots/launch/config-warning-dark.png" alt="The panel in the tabs layout with a banner at the top: config.toml line 1: unknown setting colour (ignored)">
+<img src="assets/screenshots/launch/config-warning-dark.png" width="300" alt="The panel in the tabs layout with a banner at the top: config.toml line 1: unknown setting colour (ignored)">
 </td>
 </tr>
 </table>
@@ -254,7 +254,7 @@ With the skill installed, ask "ping me when the PR is ready" and the agent knows
 
 </td>
 <td width="45%" valign="top">
-<img src="assets/screenshots/launch/panel-pings-dark.png" alt="The list layout in dark mode: the shipyard project holds two pings from Claude and Codex between its pull requests and its issues">
+<img src="assets/screenshots/launch/panel-pings-dark.png" width="300" alt="The list layout in dark mode: the shipyard project holds two pings from Claude and Codex between its pull requests and its issues">
 </td>
 </tr>
 </table>
@@ -324,7 +324,7 @@ shipyard keeps no Notion token of its own: it reads and writes through [`ntn`](h
 
 </td>
 <td width="45%" valign="top">
-<img src="assets/screenshots/launch/notes-tabs-light.png" alt="The shipyard project's tab in the Paper theme: a Notes group at the bottom with two notes, SHIP-14 labelled design and SHIP-12 labelled idea">
+<img src="assets/screenshots/launch/notes-tabs-light.png" width="300" alt="The shipyard project's tab in the Paper theme: a Notes group at the bottom with two notes, SHIP-14 labelled design and SHIP-12 labelled idea">
 </td>
 </tr>
 </table>
@@ -386,7 +386,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/repo-subsections-showfirst.png" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+<img src="assets/screenshots/0.1.0/repo-subsections-showfirst.png" width="360" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 </td>
 </tr>
 <tr>
@@ -412,7 +412,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/tabs.png" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
+<img src="assets/screenshots/0.1.0/tabs.png" width="360" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
 </td>
 </tr>
 <tr>
@@ -438,7 +438,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/date.png" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
+<img src="assets/screenshots/0.1.0/date.png" width="360" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
 </td>
 </tr>
 <tr>
@@ -453,7 +453,7 @@ version = 1
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/shipyard-0.0.2/presets.png" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
+<img src="assets/screenshots/shipyard-0.0.2/presets.png" width="360" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 </td>
 </tr>
 </table>
