@@ -112,6 +112,10 @@ _Avoid_: Unread, new, pending
 The number of items that need attention across all projects, shown in the menu bar.
 _Avoid_: Badge, unread count
 
+**Attention dot**:
+The dot before a row's icon. It shows in the accent while the item needs attention, red while a pull request's checks fail, even once seen, and breathing while they're pending. It is how a row shows its checks.
+_Avoid_: Check dot, unread dot
+
 ### Notifications
 
 **Notification**:
@@ -174,7 +178,7 @@ _Avoid_: Configuration, cache
 ### Themes
 
 **Theme**:
-A named set of colours and settings that decides how the panel looks: its tokens and state colours for light and dark, and its font, density, corner radii and material. Every theme draws the same panel; the configuration picks one by name, and Shipyard is the default.
+A named set of colours and settings that decides how the panel looks: its tokens and state colours for light and dark, and its font, density, corner radii and material. Every theme draws the same panel; the configuration picks one by name, and System is the default.
 _Avoid_: Skin, style, colour scheme, appearance (that is light or dark)
 
 **Token**:
@@ -190,11 +194,11 @@ The colour a theme gives one state of one kind, such as a merged pull request, i
 _Avoid_: State token
 
 **Built-in theme**:
-One of the six themes that come with the app: Shipyard, Native, Graphite, Paper, Midnight and Harbor.
-_Avoid_: Default theme (that is Shipyard alone), preset (a preset is a whole configuration)
+One of the ten themes that come with the app: System, which follows the macOS appearance and accent, then Shipyard Light, Shipyard Dark, Paper Light, Paper Dark, Harbor, Heather, Brass, Ocean and Sunset, each of one appearance.
+_Avoid_: Default theme (that is System alone), preset (a preset is a whole configuration)
 
 **Theme file**:
-A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme or replace one by taking its name. A colour table without a prefix, such as `[text]`, sets light and dark, and a `[light.*]` or `[dark.*]` table changes one appearance. A file that doesn't read keeps the theme it last read.
+A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme, and takes its appearance, or replace one by taking its name. A colour table without a prefix, such as `[text]`, sets every appearance the theme has, and a `[light.*]` or `[dark.*]` table changes one appearance. A file that doesn't read keeps the theme it last read.
 _Avoid_: Custom config, theme config
 
 ### Agents and the app

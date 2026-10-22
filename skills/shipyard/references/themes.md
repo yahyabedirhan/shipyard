@@ -5,7 +5,23 @@ Every theme draws the same panel, with the same rows and the same layout.
 A theme is a set of **tokens**, each one colour named by what it means, such as `surface.panel` or `text.secondary`, never by hue.
 It also sets the **state colours** of pull requests, issues, runs, checks, reviews, the rate limit, pings and notes, one for each state of each kind, which may share one colour per **phase**.
 
-Shipyard has six **built-in themes**, part of the app: Shipyard, the default, then Native, Graphite, Paper, Midnight and Harbor.
+Shipyard has ten **built-in themes**, part of the app.
+System, the default, follows the macOS appearance, light or dark, and the accent colour picked in System Settings > Appearance.
+Every other built-in theme has one appearance, which it draws whatever the system's appearance:
+
+| Theme | Appearance | Accent |
+|---|---|---|
+| `System` | follows macOS | the macOS accent colour |
+| `Shipyard Light` | light | blue `#2F6BDE` |
+| `Shipyard Dark` | dark | blue `#6D9CFF` |
+| `Paper Light` | light | terracotta `#B4491E` |
+| `Paper Dark` | dark | beige `#E3CFA8` |
+| `Harbor` | light | teal `#0E7C86` |
+| `Heather` | light | violet `#6A4FB0` |
+| `Brass` | light | ochre `#8A6100` |
+| `Ocean` | dark | sky cyan `#4FC3F7` |
+| `Sunset` | dark | orange `#FB923C` |
+
 A **theme file** is the user's own theme: one TOML file in the `themes` folder beside `config.toml`, so `~/.config/shipyard/themes/<anything>.toml`, or under `$XDG_CONFIG_HOME` when it is set.
 
 ## Picking a theme
@@ -14,44 +30,41 @@ Set the top-level `theme` key in `config.toml` to a theme's name, ignoring case,
 
 ```toml
 version = 1
-theme = "Midnight"
+theme = "Ocean"
 ```
 
 - The name is a built-in theme's or the `name` a theme file sets, not the file's name.
-- An unknown name is an error on its line that suggests the nearest name.
-- Without `theme`, the panel draws Shipyard.
+- An unknown name is an error on its line that suggests the nearest name and lists every theme's.
+- Without `theme`, the panel draws System.
 - A save applies at once, with no restart.
-- Paper fills only a light look and Midnight only a dark one: each draws its look whatever the system's appearance.
+- The panel's gear menu has a Theme submenu that sets `theme` too: the built-in themes, then the theme files after a separator, each with a circle of its panel and accent colours.
+  It changes that one key and keeps the rest of the file, its comments included.
 
 ## Writing a theme
 
 1. Make the `themes` folder beside `config.toml` when it is missing.
-2. Write the file, `themes/<Name>.toml`, starting from a built-in theme with `extends` and setting only what changes. The example below is a whole file.
+2. Write the file, `themes/<Name>.toml`, starting from a built-in theme with `extends` and setting only what changes. The theme takes the appearance of the theme it extends. The example below is a whole file.
 3. Set `theme` in `config.toml` to the file's `name`.
 4. Run `shipyard config check`. It is done when it exits 0 and prints no `warning` line for the `theme` line.
 
 ```toml
-# themes/Sunset.toml
-name = "Sunset"
+# themes/Tide.toml
+name = "Tide"
 version = 1
-extends = "Shipyard"
-description = "Shipyard with a coral accent."
+extends = "Shipyard Light"
+description = "Shipyard Light with a deep green accent."
 
-[light.palette]
-coral = "#C2410C"
-[dark.palette]
-coral = "#FB923C"
+[palette]
+green = "#2E7357"
 
 [accent]
-accent = "coral"
+accent = "green"
 
 [signal]
-attention = "coral"
+attention = "green"
 
-[light.text]
+[text]
 on-accent = "#ffffff"
-[dark.text]
-on-accent = "#1a0b02"
 
 [material]
 style = "flat"
@@ -73,13 +86,14 @@ A token that no theme in the `extends` chain sets is `system`.
 ### Colours per appearance
 
 - Tokens sit in tables named after their section, such as `[text]`.
-- A table without a prefix sets both the light and the dark look.
+- A table without a prefix sets every appearance the theme has.
   A `[light.*]` or `[dark.*]` table, such as `[dark.text]`, changes a token for that appearance only.
 - An `[any.*]` table is a problem on its line: remove the `any.` prefix.
 - A token's value is a palette name, a hex colour `#rrggbb` or `#rrggbbaa`, or `system`, the matching macOS colour.
 - `[palette]` names raw colours once.
   `[light.palette]` and `[dark.palette]` give one name a different colour per appearance, so one table without a prefix serves both.
-- A theme with no `extends` that fills only one appearance draws that one in both, as Paper and Midnight do.
+- A theme with no `extends` that fills only one appearance draws that one in both, as every built-in theme but System does.
+- A theme that extends another keeps the appearances it has, and adds the one whose `[light.*]` or `[dark.*]` tables it writes: a theme that extends Shipyard Dark is dark too.
 
 ### Tokens
 
@@ -97,19 +111,20 @@ A token that no theme in the `extends` chain sets is `system`.
 | | `tertiary` | Ages, last updated, hints. |
 | | `seen` | The title of a row already seen. |
 | | `on-accent` | Text on an accent fill. |
-| `accent` | `accent` | The one accent: the attention dot, a prominent button, the active count. |
+| `accent` | `accent` | The one accent: a prominent button, the active count. |
 | | `soft` | Reserved: accepted and checked, with no effect. |
 | `line` | `separator` | Hairlines between parts. |
 | | `border` | Around cards and secondary buttons. |
 | `row` | `hover` | A hovered row or button, and the keyboard-highlighted row. |
 | | `pressed` | A pressed row or button. |
 | | `selected` | Reserved: accepted and checked, with no effect. The keyboard-highlighted row draws with `row.hover`. |
-| `signal` | `attention` | A row that needs attention. |
+| `signal` | `attention` | The attention dot of a row that is new or changed, or whose pull request's checks are pending while it needs attention. |
+| | `attention-failed` | The attention dot while a pull request's checks fail. Without it, the `failed` phase's colour. |
 | | `lease` | The banner while an agent drives the app. |
 
 ### State colours
 
-A row's state icon, a pull request's check dot, the hover card's review and checks, the rate-limit bar and text, and a ping's or a note's icon take the colour the theme gives that kind in that state.
+A row's state icon, the hover card's review and checks, the rate-limit bar and text, and a ping's or a note's icon take the colour the theme gives that kind in that state.
 The rest of the panel that shows a phase draws the phase's colour: an error, a failed action or the lease banner's Stop is `failed`, a finished tick is `done`, an informational banner is `quiet`.
 Two tables set them, without a prefix for light and dark or under `[light.*]` and `[dark.*]` for one appearance:
 
@@ -133,7 +148,7 @@ Two tables set them, without a prefix for light and dark or under `[light.*]` an
 | `[states.pull-request]` | `open`, `draft`, `merged`, `closed` | A pull request's icon. |
 | `[states.issue]` | `open`, `closed` | An issue's icon. |
 | `[states.run]` | `running`, `succeeded`, `failed` | A workflow run's icon, and a running run's duration on its hover card. |
-| `[states.check]` | `pending`, `passed`, `failed` | A pull request's check dot, its checks on the hover card, and the "checks failed" reason. |
+| `[states.check]` | `pending`, `passed`, `failed` | A pull request's checks on the hover card, and the "checks failed" reason. The row shows its checks through the attention dot. |
 | `[states.review]` | `review-required`, `approved`, `changes-requested` | The review on a pull request's hover card, and the "review requested" reason. |
 | `[states.rate]` | `normal`, `low`, `exhausted` | The rate-limit bar, lighter while `normal`; its text once `low` or `exhausted`, and the slow-down and paused banners. |
 | `[states.ping]` | `open` | A ping's icon. |
@@ -179,22 +194,29 @@ The text must read on the panel, in each appearance the theme fills:
 A shortfall of the picked theme is a warning on `config.toml`'s `theme` line.
 The theme still draws: raise the contrast until the warning is gone.
 
+### Attention
+
+The attention dot has two colours that must read apart: `signal.attention` for a new or changed row, and `signal.attention-failed` while a pull request's checks fail.
+When they are closer than ΔE 25 (CIE76) in an appearance the theme fills, `config.toml`'s `theme` line has a warning.
+Move `signal.attention-failed`, or `[phase] failed`, away from the accent until the warning is gone.
+System follows the user's accent colour: with a red accent, its failed dot draws a deeper red.
+
 ## Checking a theme file
 
 `shipyard config check` prints a verdict for each theme file, after `config.toml`'s and before `cli.toml`'s:
 
 ```text
 /Users/me/.config/shipyard/config.toml: accepted
-  warning: config.toml line 2: theme `Sunset` isn't one shipyard has read, and `themes/Sunset.toml` has a problem; the panel draws Shipyard until it reads
-/Users/me/.config/shipyard/themes/Sunset.toml: rejected
-  problem: themes/Sunset.toml line 22: unknown token `accent.acent`; did you mean `accent`?
+  warning: config.toml line 2: theme `Tide` isn't one shipyard has read, and `themes/Tide.toml` has a problem; the panel draws System until it reads
+/Users/me/.config/shipyard/themes/Tide.toml: rejected
+  problem: themes/Tide.toml line 11: unknown token `accent.acent`; did you mean `accent`?
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 
 - Every problem in a theme file stops it: an unknown key, section, token, phase, kind or state, an `[any.*]` table, a removed `state.*` token, a value that isn't a palette name, a colour or `system`, a state value that isn't one of those or a phase, a phase that names another phase, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
 - A theme file has problems and no warnings.
 - A file with a problem keeps the theme it last read, and the panel shows a banner with the file, the line and the problem until it is fixed.
-  A file that has never read leaves `theme` drawing Shipyard.
+  A file that has never read leaves `theme` drawing System.
 - `--json` prints each theme file's result under `themes/<file>`, beside `config.toml` and `cli.toml`.
 - The app's record, `config-status.json`, holds `config.toml`'s verdict alone: check theme files with `shipyard config check`.
 - Theme files are read on the Mac only: the `shipyard` command on another machine checks `cli.toml` alone.

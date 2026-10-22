@@ -61,7 +61,7 @@ ShipyardNotices   agent side: Notice, NoticeRequest, NoticeVerdict, NoticeRoute,
                   the other machine's routes: RemoteNoticeRoute (the choice), TailnetNoticeRoute + NoticeHTTP, PluginNoticeRoute
 ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, ConfigurationDuration, LayoutSetting, ConfigurationStore,
                   ResolvedRepositoriesStore, ProjectFiling (implements PingFiling),
-                  Theme/: the theme model (ThemeToken, ThemeValue, ThemePhase, ThemeKind, ThemeStateColor, Theme, ThemeKnobs), ThemeReader, BuiltInThemes, ThemeLibrary, ThemeContrast
+                  Theme/: the theme model (ThemeToken, ThemeValue, ThemePhase, ThemeKind, ThemeStateColor, Theme, ThemeKnobs), ThemeReader, BuiltInThemes, ThemeLibrary, ThemeContrast, ThemeSignals, ThemeSwatch
 ShipyardControl   ControlRequest, ControlReply, ControlCommand and PanelCommand (argument parsing), ControlClient (socket), AppLauncher,
                   ControlLease (the lease's rules), Holder (who sends a request), LeaseBanner (the banner's words),
                   ControlNoticeRoute (a notice over the socket)
@@ -617,7 +617,7 @@ Added in effort `notes-and-notify` (spec #187); Trace 15 follows a notice, and i
 Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 
 - **N16.** The header's settings menu and its status views.
-  - **The menu:** Open configuration file, **Set up GitHub**, **Set up Notion**, **Set up /shipyard skill**, **Set up shipyard command** and, once signed in, Sign out (`PanelText.settingsMenu`).
+  - **The menu:** Open configuration file, the **Theme** submenu (#327: the built-in themes, then the theme files after a separator, a check mark on the current one, each theme's circle of its panel and accent at the row's trailing edge; a click writes `theme`), **Set up GitHub**, **Set up Notion**, **Set up /shipyard skill**, **Set up shipyard command** and, once signed in, Sign out (`PanelText.settingsMenu`).
   - **The marks:** a part's item (`SetupPart`) has a check mark on its right, the menu item's badge, only when the part is set up (`SetupStatus`); no other mark shows.
     GitHub's item is marked while signed in; Sign out stays in the menu and works as before.
   - **The views:** each item opens the part's status view (`StatusView`) in place of the panel's content, the header, the banners and the footer kept, in the signed-out onboarding view's style.
@@ -635,10 +635,11 @@ Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 
 ### Rules and completion
 
-- The app writes the configuration in three targeted ways only (ADR 0001):
+- The app writes the configuration in four targeted ways only (ADR 0001):
   - the project picker appends projects (R13);
   - the layout button sets `[menu] layout`;
-  - onboarding writes a preset (P2), only to a file whose only live key is `version` (the app's own commented header).
+  - the gear menu's Theme submenu sets the top-level `theme` (#327);
+  - onboarding writes a preset (P2), only to a file whose only live keys are `version` (the app's own commented header) and `theme`, which the preset keeps.
 
   Every other change comes from the user or their agents editing the file.
 - Resolved repository lists are app memory, not app state: they're resolved again at launch.
@@ -676,7 +677,7 @@ Added in effort `setup-views` (spec #237); the Notion opt-in is NT14.
 | Excluded | Why |
 |---|---|
 | Reviewing inside the app (diff, comments), merge/close actions | Agreed: rows click through to GitHub. |
-| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's settings menu opens the file ("Open configuration file"); its status views (N16) show and set up the parts shipyard uses, never a setting. The `shipyard` CLI sends pings (ADR 0004) and, controls the app, but never edits the configuration. |
+| A CLI for the configuration, or a settings window | ADR 0001: the file is the interface. The panel's settings menu opens the file ("Open configuration file") and picks a theme (its Theme submenu, the one setting it writes); its status views (N16) show and set up the parts shipyard uses, never a setting. The `shipyard` CLI sends pings (ADR 0004) and, controls the app, but never edits the configuration. |
 | GitLab, GitHub Enterprise, several accounts | Nobody asked; the GraphQL host is one constant if GHE comes up. |
 | Telling agent PRs from hand-written ones | Agreed: not reliable today (see Extensibility). |
 | Mac App Store build | The sandbox forbids running `gh`/`npx` and reading `~/.config`. |
@@ -919,7 +920,7 @@ Onboarding -> Shipyard            suggestedRepositories(), checkRepository(text)
 Panel    -> Shipyard               switchToNextLayout() (the header's layout button)
 Panel    -> Shipyard               toggleGroup(group), showMore(group), showLess(group), panelClosed()
 Onboarding -> Shipyard            presets, choosePreset(preset, projects), beginDeviceFlow()
-Shipyard -> ConfigurationStore            append(projects:), setLayout(layout) and writePreset(preset, projects) (the three writers), then follows the reload
+Shipyard -> ConfigurationStore            append(projects:), setLayout(layout), setTheme(name) and writePreset(preset, projects) (the four writers), then follows the reload
 Snapshot  has  [Project -> [Item]], reviewRequested: Set<ItemID>, the search's PRs, errors per source and per selector
 Configuration has [Project], Defaults, [NotificationRule]
 ```
@@ -1527,6 +1528,7 @@ loginItem: LoginItem               (port; told launch-at-login at start and on e
 | `suggestedRepositories()` | the picker's list: `GitHubClient.recentRepositories` through `request` | throws `GitHubError`; a 401 signs out; a spent limit is recorded in the budget (the same limit refreshes use) |
 | `checkRepository(text) -> RepositoryCheck` | a typed `owner/name` (trimmed; a `github.com/owner/name` link, `.git` and a trailing slash are taken apart too) is looked up with `GitHubClient.repository`; `accepted(RepoSummary)` carries GitHub's spelling, which is what the picker writes | `rejected` with a reason and its `message`: `notASlug` (no request sent), `notFound` (404: missing, or the token can't see it), `forbidden` (403, e.g. SSO), `couldNotCheck` (network, rate limit, 401, which also signs out) |
 | `addProjects([NewProject])` | `configStore.append(projects:)` then follows the reload like `reloadConfiguration()`: with projects, `needsProjects → ready` and the first refresh, no restart | throws `ConfigurationError` (empty or used name, no repositories, bad slug) before writing anything |
+| `switchTheme(to:)` | the gear menu's Theme submenu: `configStore.setTheme(name)` then follows the reload like `reloadConfiguration()`, so the panel draws the theme as for a hand edit | a file that doesn't read, a `theme` the writer doesn't edit, a name that's no theme or a failed write changes nothing: `configError` says why (the banner) until the next reload |
 | `switchToNextLayout()` | the header's layout button: `configStore.setLayout(lastValid.menu.layout.next)` then follows the reload like `reloadConfiguration()`, so the menu switches as for a hand edit (rows kept, then a refresh) | a file that doesn't read, a `[menu]` the writer doesn't edit or a failed write changes nothing: `configError` says why (the banner) until the next reload |
 | `toggleGroup(group)` | flips the group's fold in `collapsedGroups` (app state, saved) and re-applies the folds to the menu (`applyAttention`) without a refresh; the subheader keeps its count | only a subsection folds (`MenuModel.subsection(_:)`, in a project or the All tab); a group without a subheader, or one no longer listed, changes nothing |
 | `showMore(group)` / `showLess(group)` | adds the group to, or removes it from, `expandedGroups` (memory) and re-caps the menu's groups in place (`MenuModel.applyExpansions`), without a refresh or a save; a refresh while the menu is open keeps the expansion | Show more on a group that isn't capped (or isn't listed) changes nothing |
@@ -1692,6 +1694,7 @@ Per-project overrides are written as inline tables so each `[[projects]]` block 
 | `static decode(Data) throws(ConfigurationError) -> Decoded` | the configuration plus warnings; rejects, each with a line and a message (every problem is listed, not only the first): invalid TOML, a value of the wrong type, an unknown choice (event, author filter, count style…) with the nearest valid one suggested, bad repo slug (`owner/name`), a project without a slug or repositories, a slug that isn't lowercase letters and digits joined by single hyphens (the nearest one suggested), an empty title, a repository listed twice in one project (ignoring case), two projects with one slug (on the second one's line), a window that isn't a whole number and one unit (`s`, `m`, `h`, `d`) with the nearest spelling suggested, an interval under 30 seconds, share outside 1–50, a `version` other than 1; a file that sets keys without `version` reads, with a warning |
 | `settings(for: Project) -> ProjectSettings` | defaults merged with the project's overrides (objects merge by field; `notifications` replaces) |
 | `appendText(projects:) -> String` | the `[[projects]]` blocks the picker appends; the app never rewrites the file as a whole |
+| `settingTheme(name, in: text, themes:) throws(ConfigurationError) -> String` (`ThemeSetting.swift`) | the file's text with the top-level `theme` set to the theme's spelling and every other line kept: replaces an existing single-line value (keeping its comment), uncomments the header's `# theme = …` example, adds the key after a top-level `version`, else above the first table and its comments (or at the end); rejects a file that doesn't read, a name that's no theme, and any result that wouldn't read back as the same configuration with only the theme changed |
 | `settingLayout(layout, in: text) throws(ConfigurationError) -> String` (`LayoutSetting.swift`) | the file's text with `[menu] layout` set and every other line kept: replaces an existing value (keeping its comment), adds the key under an existing `[menu]`, uncomments the header's `# [menu]` example when no live key follows it before the next table, else adds `[menu]` before the first table (or at the end); rejects a file that doesn't read (its own error), a `[menu]` in another form (inline table, dotted keys, `[menu.x]`) and any result that wouldn't read back as the same configuration with only the layout changed |
 | `MenuLayout.next` | the layout after this one; the enum's case order is the cycle (list → tabs → list), so a new layout joins it by being added |
 
@@ -1753,6 +1756,8 @@ Top-level keys sit above every table, so any example, or all of them, can be unc
   `Shipyard.start()` and `refreshNow()` (the Refresh button) call it, and so does the gear menu's "Open configuration file".
 - `append(projects:)`: appends `[[projects]]` blocks to the end, creating the file with a commented header and the `#:schema` line when missing.
   It never rewrites, so comments survive; it rejects bad slugs, a repository listed twice in one project and names already used before writing.
+- `setTheme(name)`: the Theme submenu's writer, `Configuration.settingTheme` (`ThemeSetting.swift`) written in place.
+  It replaces the top-level `theme`'s value, uncomments the header's `# theme = …` example, or adds the key after `version`, above the first table; it refuses a `theme` it doesn't edit, a name that's no theme of `themes`, and any edit that doesn't read back as the same configuration with only the theme changed, and then writes nothing.
 - `setLayout(layout)`: the layout button's writer.
   It creates the file when missing, writes `Configuration.settingLayout` in place so a symlink stays one, and returns the reload; it throws and writes nothing when the edit is refused or the file system fails.
 - `writePreset(preset, projects)`: the third writer (see Presets below).
@@ -1776,8 +1781,8 @@ While the folder is missing it watches its nearest existing ancestor, where it c
 
 A theme is a named set of tokens and knobs that decides how the panel looks; every theme draws the same panel.
 A token is one colour named by what it means, never by hue, written `section.name` as a theme file writes it (`surface.panel`, `text.on-accent`).
-The six built-in themes are embedded in the app; a theme file is a user's theme, one `*.toml` file in the `themes` folder beside `config.toml`.
-`config.toml`'s top-level `theme = "<name>"` picks one, ignoring case, and Shipyard is the default.
+The ten built-in themes are embedded in the app; a theme file is a user's theme, one `*.toml` file in the `themes` folder beside `config.toml`.
+`config.toml`'s top-level `theme = "<name>"` picks one, ignoring case, and System is the default; the gear menu's Theme submenu writes it too.
 
 The theme file format is in `skills/shipyard/references/themes.md`, and what to touch when a token, a knob or a built-in theme is added is in `docs/configuration.md` > 'Themes'.
 
@@ -1785,7 +1790,7 @@ The theme file format is in `skills/shipyard/references/themes.md`, and what to 
 
 It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without AppKit.
 
-- `ThemeToken` lists the 21 tokens in six sections (`surface`, `text`, `accent`, `line`, `row`, `signal`).
+- `ThemeToken` lists the 22 tokens in six sections (`surface`, `text`, `accent`, `line`, `row`, `signal`).
   `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
   Every state's colour is a state colour, not a token (ADR 0015): `[state]` has no tokens left.
 - A `ThemeValue` is a colour (`RGBA`) or `system`.
@@ -1806,19 +1811,25 @@ An `[any.*]` table is an issue on its line that tells the author to remove the `
 `ThemeReader.resolve(_:extending:)` resolves definitions against each other and against a base it looks up but never resolves, the built-ins for the user's files.
 
 **The built-in themes.**
-`BuiltInThemes` embeds each built-in file as text, one `BuiltInThemes+<Name>.swift` each, listed in `sources`, and reads them once: Shipyard, Native, Graphite, Paper, Midnight and Harbor.
-`BuiltInThemes.shipyard` is the default; were its text broken, every token would be `system`.
+`BuiltInThemes` embeds each built-in file as text, in `BuiltInThemes+<Group>.swift` files, listed in `sources`, and reads them once, in the lineup's order (#342): System, Shipyard Light, Shipyard Dark, Paper Light, Paper Dark, Harbor, Heather, Brass, Ocean and Sunset.
+System is every macOS colour and follows the appearance and the accent; every other built-in theme fills one appearance, Harbor extending Shipyard Light and Sunset Shipyard Dark.
+`BuiltInThemes.system` is the default; were its text broken, every token would still be `system`.
 
 **The theme files.**
 `ThemeFiles.read(_:)` reads every `*.toml` in the folder `ThemeFiles.folder(beside:)` names, in file-name order, each named `themes/<file>` in its issues, and resolves them against the built-ins and each other.
-`ThemeLibrary` is the set of themes `theme` can pick, by name, ignoring case; `ThemeLibrary.builtIn` is the six built-ins.
+`ThemeLibrary` is the set of themes `theme` can pick, by name, ignoring case; `ThemeLibrary.builtIn` is the ten built-ins.
 `ThemeLibrary.with(_:keeping:)` puts the files' themes after the built-ins, so a file with a built-in's name replaces it.
 `ThemeLibrary.beside(config:)` reads the files as they are now, for ping filing, which decodes `config.toml` too.
 
 **Picking and reloading.**
 `Configuration.decode(_:themes:)` checks `theme` against a library, and `Configuration.theme` keeps the name as the theme spells it.
 `ConfigurationStore.reload()` reads the theme files before `config.toml`, keeps the last good theme per file (`themes`, `themeFiles`, `themeIssues`), and resolves `theme` for its last valid configuration on every reload, `unchanged` ones included, so a saved theme file applies while `config.toml` stays the same.
-`setLayout` checks its edit against the same library.
+`setLayout` and `setTheme` check their edits against the same library.
+An unknown `theme`, a removed built-in's name included, is an error that lists every theme's name, after the nearest when there is one; an `extends` that names no theme lists them too.
+
+**The Theme submenu.**
+`ThemeMenu` (`ShipyardCore/Menu/`) is the submenu's model: the built-in themes in their order, a theme file with a built-in's name in its place, then the other files' themes, and which one the panel draws; `Shipyard.themeMenu` publishes it after every reload.
+`Theme.swatch(_:system:)` (`ThemeSwatch`) gives a theme's circle: the panel and the accent of the appearance it draws in, opaque, so System's follows the appearance and every other theme shows its own.
 
 `Shipyard.theme` publishes the theme after every reload and keeps it while an edit is rejected.
 `Shipyard.themeIssues` publishes the files' problems, which `PanelBanner` shows as a configuration banner (`themes`, kind `configError`): each problem in its file's words, then "A theme keeps the version that last read until its file is fixed.".
@@ -1838,8 +1849,10 @@ Each link of the chain lays its `light` or `dark` layer over its `both` layer, f
 So a state colour comes from the appearance's table, then the table without a prefix, then the `extends` chain, then the default.
 Palette names are looked up per appearance once the whole chain is known, and a token no theme in the chain sets is `system`.
 Of two definitions with one name the later wins.
-A root theme that fills one appearance alone, writing `[light.*]` or `[dark.*]` for that one only, draws it in both: Paper fills light, Midnight fills dark.
-Its tables without a prefix keep it to that one when their tokens name a palette entry only that appearance's palette holds, as Paper's name `[light.palette]` colours.
+A root theme that fills one appearance alone, writing `[light.*]` or `[dark.*]` for that one only, draws it in both: every built-in theme but System does.
+Its tables without a prefix keep it to that one when their tokens name a palette entry only that appearance's palette holds, as Paper Light's name `[light.palette]` colours.
+A theme that extends another keeps the appearances it has, and adds the one whose `[light.*]` or `[dark.*]` tables it writes, so Sunset, which extends Shipyard Dark, is dark.
+`signal.attention-failed`, when no theme in the chain sets it, is the `failed` phase's colour in each appearance.
 
 **State colours.**
 `Theme.color(_:_:_:)` is the one lookup for a state: a `ThemeKind`, a state's name and an appearance in, a `ThemeStateColor` out, or `nil` for a state the kind doesn't have.
@@ -1852,7 +1865,7 @@ A removed `state.*` token, such as `state.merged` or `state.success`, is a probl
 
 **Files that don't read.**
 A file with a problem keeps the theme it last read, by file URL.
-A file that has never read is in `unread`, and while any is, a `theme` the library doesn't know is a warning on its line rather than an error, and the panel draws Shipyard until the file reads.
+A file that has never read is in `unread`, and while any is, a `theme` the library doesn't know is a warning on its line rather than an error, and the panel draws System until the file reads.
 So a broken theme file never rejects `config.toml`.
 
 **The contrast check.**
@@ -1861,9 +1874,13 @@ The configuration reader turns each shortfall of the picked theme into a warning
 `system` values are measured with `SystemColor.reference(_:)`, fixed sRGB values of macOS 26 with the default accent, so the check runs without AppKit.
 Every built-in theme passes in both appearances.
 
+**The attention check.**
+`ThemeSignals.clashes(_:system:)` measures the CIE76 difference of `signal.attention` and `signal.attention-failed`, laid over the panel, in each appearance the theme fills; under ΔE 25 the configuration reader adds a warning on the `theme` line (#343).
+`ThemeSignals.failed(_:apartFrom:)` is the error dot's colour where no check can see the accent: when the theme's `signal.attention` is `system`, the user's accent, and lies within ΔE 25 of the failed colour, the dot draws `ThemeSignals.deeperRed`.
+
 **The token layer.**
 `ShipyardApp/UI/ThemeColor.swift` brings a theme into the views.
-Views read `\.theme` from the environment, Shipyard by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves a token, or a kind's state, from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` and `checks(_:)` for a row's icon and check dot, `review(_:)` for a hover card's review, `rate(_:)`, `rateBar(_:)` and `rateText(_:)` for the rate limit, `state(_:_:)` for any kind's state, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
+Views read `\.theme` from the environment, System by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves a token, or a kind's state, from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` for a row's icon, `checks(_:)` for the hover card's checks, `.attention` and `.attentionFailed` for the attention dot, `review(_:)` for a hover card's review, `rate(_:)`, `rateBar(_:)` and `rateText(_:)` for the rate limit, `state(_:_:)` for any kind's state, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
 The app keeps no mapping from a state to a colour: each of these names a `[states.<kind>]` state, and `Theme.color(_:_:_:)` resolves it.
 The rate-limit bar draws `normal` at 65% opacity, and its text stays `text.tertiary` until the limit is `low`.
 What shows a phase without being one kind's state draws the phase, `.active`, `.done`, `.failed` or `.quiet`: an error row, an action's error, onboarding's errors and the lease banner's Stop are `failed`, a caught-up tick and a finished status `done`, a diff's additions `active`, and an informational banner `quiet`.
@@ -1872,6 +1889,7 @@ There is no global active theme: a view that sets `\.theme` changes only what's 
 `View.theme(_:)` sets it at the panel's root, from `Shipyard.theme`, and gives the views below the appearance the theme draws in, so a theme that fills one appearance draws it in both, its `system` values and the text and controls with no colour of their own included.
 
 `SystemColors` reads a `system` value's live `NSColor` for an appearance once and keeps it until `NSColor.systemColorsDidChangeNotification`.
+`followsSystemColors()` at the panel's root counts that notification into `\.systemColorsGeneration`, which every `ThemeColor` reads, so a new accent in System Settings draws at once.
 `PanelBackdrop` is the panel's one surface: the popover material under a veil of `surface.panel` when the material is `glass`, `surface.panel` alone when it's `flat`.
 `themedScreen()` gives the onboarding screens and the status views their text colour, `text.primary`, and their tint, `accent.accent`.
 `MarkdownText` resolves its code chips from the environment's theme, since an `AttributedString` takes a `Color`.
@@ -1881,10 +1899,10 @@ Setting `\.theme` also sets `\.panelScale`, a `PanelScale` from `Design.swift`, 
 It holds the frame's and the tabs layout's `Grid` and `TypeScale`, and the list layout's `ListGrid` and `ListType`, so a row reads its sizes from the environment and builds nothing.
 `Panel` sits above its own theme, so it resolves one scale from `Shipyard.theme` once per body pass.
 
-Under the Shipyard theme the type is the system text styles and the grid is the panel's long-standing one.
+Under System and the Shipyard themes the type is the system text styles and the grid is the panel's long-standing one.
 Another theme's `[font]` sizes the type from its body size and picks its family.
 Its `[density]` sets the row, header, title bar and gutter, and the tabs layout's two-line row moves half a point of padding per point of row.
-Its `[shape]` gives the radii in points: `Grid.smallRadius` and `radius` are its `small` and `medium`, so Shipyard draws 6 and 8 pt corners.
+Its `[shape]` gives the radii in points: `Grid.smallRadius` and `radius` are its `small` and `medium`, so System draws 6 and 8 pt corners.
 
 `large` is read and checked but draws nothing, since the `MenuBarExtra` window draws the panel's own corner.
 The row highlight and the icon buttons keep the design lab's fixed radii.
@@ -1894,7 +1912,7 @@ Every view the app draws takes its colours from tokens: the panel surface, heade
 A prominent pill button is `text.on-accent` on `accent.accent`.
 `Design.swift`'s `ItemSymbol` names the SF Symbols for states, kinds and ping icons.
 
-The system draws the rest: the settings menu and the other menus, radio buttons, check boxes, text fields, the disclosure triangle, the spinners, the install hint's popover, and the menu bar item, a template image with the lease's yellow dot and no theme colour.
+The system draws the rest: the settings menu (an `NSMenu`, `SettingsMenu.swift`, so the Theme submenu can draw each theme's circle at the row's trailing edge: an attachment after a right tab stop) and the other menus, radio buttons, check boxes, text fields, the disclosure triangle, the spinners, the install hint's popover, and the menu bar item, a template image with the lease's yellow dot and no theme colour.
 The settings menu tints a template icon with the label colour, so the header's gear is a `SymbolImage.tinted` image in the theme's secondary text, primary under the pointer.
 Materials are only on the panel surface, the hover card and the system menus; no row draws a material, a blur or a shadow.
 In the list layout `IconButtonStyle` is a size smaller, 14 pt compact and 22 by 20 on a 5 pt radius otherwise, from `\.panelStyle`.
@@ -2188,6 +2206,7 @@ It's keyed on the generic `Item`, so issues and runs reuse it.
 |---|---|
 | `reasons(item, toggles) -> [Reason]` | why it needs attention, in order: `unseen` or `changed`, then `reviewRequested`, `checksFailed`; empty when it doesn't (the rule below); the row carries them as `attentionReasons` for its hover card |
 | `needsAttention(item, toggles) -> Bool` | `reasons` isn't empty: false if closed, merged, running or succeeded (a failed run can, its `checks` failed so `checks-failed` covers it); true if unseen, or `seen[id] != fingerprint`, or review requested, or checks failed, each gated by its toggle, and **all cleared by a click until the fingerprint changes** |
+| `level(item, toggles) -> AttentionLevel` | the attention dot's level (#343): `error` for an open pull request whose checks failed while `checks-failed` is on, whether or not it was seen, so the dot stays red until the checks pass; `pending(needsAttention:)` while its checks are pending; else `regular` while it needs attention and `none`; `MenuModel` carries it on each row as `attentionLevel`; it never changes the counts |
 | `markSeen(item, at:)` | stores the current fingerprint |
 | `counts(items, toggles) -> AttentionCounts` | per kind (`pullRequests`, `issues`, `workflowRuns`) and `total`; an item listed in two projects counts once |
 | `prune(present: items, at:) -> Bool` | bumps `present` for listed items, drops records for items gone for 30 days; says whether to save |
@@ -2630,9 +2649,9 @@ Each row holds:
 - Its number, title (a run: its workflow's name), author and URL.
 - Its semantic state: open, draft, merged, closed, running, succeeded, failed.
   The app's `ThemeColor.state(_:kind:)` colours its icon with the theme's state colour, `Theme.color(_:_:_:)` for the kind and the state, in the list and the tabs layouts alike; the app keeps no mapping from a state to a colour of its own, and a ping or a note is its kind's `open` state.
-- `branch` (runs only) and the check dot (open and draft PRs only).
+- `branch` (runs only) and its `checks` (open and draft PRs only), which the attention dot and the hover card show.
 - `since` for its age: opened or started, or closed or finished.
-- Its `needsAttention` flag and the `item` it shows; marking it seen records that version.
+- Its `needsAttention` flag, its `attentionLevel` for the dot (`Attention.level`), and the `item` it shows; marking it seen records that version.
 - `machine`, which names the machine a remote ping came from.
   `PanelText.rowDetail` puts it first on a ping's second line after its number ("#2 · beta-vps · claude · …"), and `PanelText.pingMeta` gives the list layout's meta column the same.
 
@@ -2863,7 +2882,7 @@ SwiftUI `MenuBarExtra` in `.window` style (a panel, not an `NSMenu`):
                               then the new-note icon only on a header that has it (#210; `square.and.pencil` in the
                               compact 16×16 icon button since ADR 0011's change, like the check and the open icon);
                               highlighted like a row (drawn on its own background); ← collapses, → expands or goes to its first item, Return opens the project's first repository
-          row ×N              one line in columns: attention dot, state icon (check dot on it; a running run pulses),
+          row ×N              one line in columns: attention dot (its level: red while a PR's checks fail, breathing while pending), state icon (a running run breathes),
                               number, title (semibold when it needs attention; a run: workflow name and its branch
                               as a chip), author (the repository in multi-repository projects), age; a line where
                               the kind changes; the hover help holds the state, the full "#21 · …" detail and the checks;
@@ -2889,7 +2908,9 @@ The frame and the layouts share these, so the two layouts look like one app:
   - `MeasuredScrollView`, whose height `MeasuredHeight` (`ShipyardCore/Menu/`, pure, #94) decides: the content's measured height capped at `maxHeight`, written only when it moves by half a point or more.
     A lazy stack's height estimate depends on the viewport, and writing each one looped the panel's layout.
   - `Banner`, `CountBadge`, `CommandBox` and its `CopyButton`, with `Clipboard`.
-  - A row's `StateSymbol`, `CheckDot`, `AttentionDot` and `ErrorRow`.
+  - A row's `StateSymbol`, `AttentionDot` and `ErrorRow`.
+    `AttentionDot` draws the row's `AttentionLevel` (`Attention.level`, Core): `regular` in `signal.attention`, `error` in `signal.attention-failed` while a pull request's checks fail and `[attention] checks-failed` is on, seen or not, winning over the others; `pending` breathes, in the accent when the row needs attention and `phase.quiet` when it doesn't.
+    The pending dot and a running run's icon share `Motion.breathe`, a symbol pulse at half speed, about two seconds a cycle, and hold still at `Motion.breatheStill` (60%) under Reduce Motion.
   - `itemRow(…)`, which makes a layout's item row a button that opens it on click and marks it seen on ⌥-click (or the VoiceOver action), with the hover card from `PanelText.rowCard` and the row highlight.
     On a ping's row it adds a ✕ (`DismissButton`, 8 pt in the compact 16×16 icon button) while it's highlighted, which dismisses it.
     In the list layout the ✕ sits just before the age column, so the age stays readable; in the tabs layout, at the row's end.
@@ -3010,7 +3031,7 @@ Hover help (#72): the panel doesn't use macOS's native tooltips (`.help`), which
 - SwiftUI's own popover was the runner-up (`docs/references/macos-hover-help.md`); built as a second style and never tried, it was removed (#84).
 - Where hover help isn't worth it there's none: a subheader's or a list section's chevron, the skill card's close button, the command box's Copy (its icon turns into a checkmark), the picker's lock.
   Each keeps its VoiceOver label or hint.
-- A note row and an error row wrap instead of truncating, a pull request's check dot has its words in the row's card, and a tab shows its title as help only while the title is cut off.
+- A note row and an error row wrap instead of truncating, a pull request's checks have their words in the row's card, and a tab shows its title as help only while the title is cut off.
 
 #### Focus
 
@@ -3783,7 +3804,8 @@ shipyard/
 │   ├── Selectors.swift               # (moved) AuthorSelector, AuthorFilter, RepositorySelector: parse, the hints (ADR 0002); matching items is Core's
 │   ├── ConfigurationDuration.swift   # (moved) closed-window and finished-window: a whole number and one unit (s, m, h, d) to seconds and back, and the nearest spelling for a near miss
 │   ├── LayoutSetting.swift           # (moved) the layout button's edit: set [menu] layout in the text, every other line kept
-│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout; check(at:), the verdict, and checks(_:at:), config.toml's and each theme file's (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
+│   ├── ThemeSetting.swift            # the Theme submenu's edit: set the top-level theme in the text, every other line kept (#327)
+│   ├── ConfigurationStore.swift      # (moved) path, reload, last-valid fallback, append projects, set the layout, set the theme; check(at:), the verdict, and checks(_:at:), config.toml's and each theme file's (#256); Configuration.acceptsPreset (moved from PresetSetting.swift)
 │   ├── ConfigurationLocation.swift   # (#126) the config.toml path the app recorded, which the CLI reads
 │   ├── ResolvedRepositoriesStore.swift # (moved) repositories.json: each project's repositories as last resolved, written by the app, read by the CLI; fails safe
 │   ├── ProjectFiling.swift           # PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
@@ -3792,11 +3814,12 @@ shipyard/
 │       ├── ThemeState.swift          # ThemePhase (the four phases and their macOS colours), ThemeKind (each kind's states and their default phases), ThemeStateKey, ThemeStateColor
 │       ├── Theme.swift               # Theme (every token, phase and state colour for light and dark; the one state lookup), ThemeKnobs (font, density, shape, material), ThemeSource, ThemeIssue
 │       ├── ThemeReader.swift         # a file's text → ThemeDefinition (with lines), definitions → Themes (extends, palette names, phases, states)
-│       ├── BuiltInThemes.swift       # the embedded themes, read once; BuiltInThemes.shipyard, the default
-│       ├── BuiltInThemes+<Name>.swift # one per built-in theme (Shipyard, Native, Graphite, Paper, Midnight, Harbor): its file, as text
+│       ├── BuiltInThemes.swift       # the embedded themes, read once, in the lineup's order; BuiltInThemes.system, the default
+│       ├── BuiltInThemes+<Group>.swift # the built-in themes' files, as text: System, Shipyard (Light and Dark), Paper (Light), Flat (Paper Dark, Heather, Brass), Ocean, Extending (Harbor, Sunset)
 │       ├── ThemeLibrary.swift        # the themes `theme` can pick, by name; the default name
 │       ├── ThemeFiles.swift          # the themes folder beside config.toml, its files in file-name order, each file's verdict; ThemeLibrary.with(_:keeping:), beside(config:)
-│       └── ThemeContrast.swift       # the contrast check of the text tiers on surface.panel
+│       ├── ThemeSwatch.swift         # a theme's circle in the Theme submenu: its panel and accent in the appearance it draws
+│       └── ThemeContrast.swift       # the contrast check of the text tiers on surface.panel; ThemeSignals, the attention check and the error dot's deeper red; RGBA's CIE76 distance
 ├── Sources/ShipyardControl/          # the client side of app control; Command and Notices (AppKit only for the real launcher)
 │   ├── ControlRequest.swift          # the requests (app.status, app.quit, panel.*, screenshot), which need the lease, and notify (#190), which doesn't; ControlMessage: a request with its holder, versioned JSON (2); ControlProtocolError
 │   ├── ControlReply.swift            # { ok, output, error }
@@ -3876,6 +3899,7 @@ shipyard/
 │   ├── Menu/
 │   │   ├── PanelText+Notes.swift     # (#192) a notes error row's words; the new-note icon's help and error (#196); the notes banner's words (ADR 0011; ntn's three cases since #234)
 │   │   ├── NotesMenuState.swift      # (#196) what the menu shows about notes besides rows: errors, connected, starting, each project's database (ADR 0011); NewNoteButton; NotesNotice, why the notes banner shows
+│   │   ├── ThemeMenu.swift           # pure: the gear menu's Theme submenu, the built-in themes then the theme files, the current one checked (#327)
 │   │   ├── MenuModel.swift           # pure: sections of groups, from listings; semantic state colours, label
 │   │   ├── MachineNotice.swift       # pure: one quiet line per remote machine that failed or sent a truncated list
 │   │   ├── PanelBanner.swift         # (#220) pure: the panel's banners whose conditions hold, the lease's included, by banner key, in order
@@ -3899,7 +3923,7 @@ shipyard/
 │   │   ├── PanelText+CLILink.swift   # pure: the CLI link card
 │   │   ├── PanelText+GitHubView.swift  # (#240) pure: the GitHub view's words while signed in: the login, the source, gh auth logout for a gh token
 │   │   ├── PanelText+NotionView.swift  # (#241) pure: the Notion view's page for each NotionStatus, connected or not; the notes check's refusal
-│   │   └── PanelText+StatusView.swift  # (#238) pure: the settings menu's items and marks; a status view's page (StatusPage): the CLI's
+│   │   └── PanelText+StatusView.swift  # (#238) pure: the settings menu's items (the Theme submenu among them) and marks; a status view's page (StatusPage): the CLI's
 │   ├── Onboarding/
 │   │   ├── ProjectChoices.swift      # pure: the picker's offered and chosen repositories, names and grouping → [NewProject]
 │   │   └── PresetChoice.swift        # pure: the chosen preset and what it still needs before Add
@@ -3934,9 +3958,10 @@ shipyard/
 │   ├── Resources/AgentLogos/         # the known agents' logos as vector PDFs (`make agent-logos`, committed), a SwiftPM resource (#137)
 │   ├── Resources/ServiceLogos/       # GitHub's and Notion's marks as vector PDFs (`make service-logos`, committed), a SwiftPM resource (#249)
 │   └── UI/
-│       ├── Panel.swift               # the shared frame: header (the account button, #49), banners, phase switch, layout switch, footer
+│       ├── Panel.swift               # the shared frame: header (the account button, #49, the gear), banners, phase switch, layout switch, footer
+│       ├── SettingsMenu.swift        # the gear's settings menu as an NSMenu, the Theme submenu with each theme's circle (#327); ActionMenuItem
 │       ├── Design.swift              # PanelScale: the grid, type scale, the list's ListGrid and ListType from the theme's knobs; ItemSymbol; motion
-│       ├── ThemeColor.swift          # the token layer: the theme in the environment (\.theme), ThemeColor (a token, a phase or a kind's state), SystemColors (what `system` draws), PanelBackdrop (the panel's surface)
+│       ├── ThemeColor.swift          # the token layer: the theme in the environment (\.theme), ThemeColor (a token, a phase or a kind's state), SystemColors (what `system` draws), followsSystemColors (draws again on a new accent), PanelBackdrop (the panel's surface)
 │       ├── AgentLogoImage.swift      # loads a known agent's logo from the app's resource bundle (Contents/Resources in the app, beside the build otherwise), for light or dark, as a template where it's one glyph
 │       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, a known agent's logo (AgentMarkView), an item row's click, hover help and highlight (itemRow), the new-note icon (#196), Mark seen button, button styles, the row highlight's shape (rowHighlight), a tone's icon (ToneIcon, #238)
 │       ├── HoverHelp.swift           # hoverHelp(_:) in place of .help: the card the panel draws (hoverHelpHost), its timing and style, VoiceOver's hint
@@ -4227,8 +4252,8 @@ An agent opens e-commerce-backend#57.
 | 4 | `NotificationRules.shouldNotify` (Items/) | default rule `pr.opened any` → true |
 | 5 | `AppStateStore.update` (saved before posting) | `notified` has #57's `pr.opened`; `known` has #57 (checks pending) |
 | 6 | `Notifier.post` | macOS notification "e-commerce · New PR #57" / "Add order export" |
-| 7 | `MenuModel.build` → `MenuBarLabel` | #57 unseen → count **1**, green row, gray check dot |
-| 8 | 2 min later CI fails; refresh | fingerprint changed; event `pr.checks_failed` (no rule → silent); still unseen → count 1, red check dot |
+| 7 | `MenuModel.build` → `MenuBarLabel` | #57 unseen → count **1**, green row, a breathing attention dot (checks pending) |
+| 8 | 2 min later CI fails; refresh | fingerprint changed; event `pr.checks_failed` (no rule → silent); still unseen → count 1, a red attention dot, which stays after #57 is seen until its checks pass |
 | 9 | user clicks #57 → `Shipyard.open` → `Attention.markSeen` | `seen[#57] = fingerprint`; count **0**; browser opens |
 | 10 | agent pushes a fix; refresh | `updatedAt` changed → fingerprint changed → count **1** again |
 

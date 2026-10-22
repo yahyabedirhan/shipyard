@@ -13,7 +13,7 @@
 
 <p align="center">
   <img src="assets/screenshots/launch/landing-tabs-dark.png" width="320" alt="The shipyard panel in dark mode, in the tabs layout on one project's tab: pull requests, pings from agents, issues and runs">
-  <img src="assets/screenshots/launch/landing-list-light.png" width="320" alt="The shipyard panel in the Paper theme, in the list layout: four projects, each with its pull requests, pings, issues and runs">
+  <img src="assets/screenshots/launch/landing-list-light.png" width="320" alt="The shipyard panel in the Paper Light theme, in the list layout: four projects, each with its pull requests, pings, issues and runs">
 </p>
 
 ## Quick start
@@ -177,20 +177,22 @@ The file sets:
 
 ### Themes
 
-Pick a theme by name with the top-level `theme` key:
+Pick a theme in the gear menu's **Theme** submenu, or by name with the top-level `theme` key:
 
 ```toml
-theme = "Midnight"
+theme = "Ocean"
 ```
 
-Six come with the app: **Shipyard** (the default), **Native**, **Graphite**, **Paper**, **Midnight** and **Harbor**.
+Ten come with the app.
+**System**, the default, follows the macOS appearance and your accent colour.
+Each of the others has one look, light or dark: **Shipyard Light**, **Shipyard Dark**, **Paper Light**, **Paper Dark**, **Harbor**, **Heather**, **Brass**, **Ocean** and **Sunset**.
 
 <details>
 <summary><b>Custom themes</b></summary>
 
 - A theme file is one TOML file in `~/.config/shipyard/themes/`.
 - It names its colours by what they mean, such as `surface.panel` or `text.secondary`.
-- It can extend a built-in theme and change only a few of them.
+- It can extend a built-in theme and change only a few of them, and it is listed after the built-in themes in the Theme submenu.
 - [`docs/themes/example-custom.toml`](docs/themes/example-custom.toml) is a commented theme file to start from.
 - A theme file with a problem keeps the theme it last read, and the panel shows the file, the line and the problem.
 - `shipyard config check` checks each theme file too.
@@ -199,7 +201,7 @@ Six come with the app: **Shipyard** (the default), **Native**, **Graphite**, **P
 
 ### Gear menu
 
-It lists the parts shipyard uses, with a check mark beside each one that is set up:
+It opens the configuration file, switches the theme in its **Theme** submenu, and lists the parts shipyard uses, with a check mark beside each one that is set up:
 
 - **Set up GitHub**
 - **Set up Notion**
@@ -324,7 +326,7 @@ shipyard keeps no Notion token of its own: it reads and writes through [`ntn`](h
 
 </td>
 <td width="45%" valign="top">
-<img src="assets/screenshots/launch/notes-tabs-light.png" width="300" alt="The shipyard project's tab in the Paper theme: a Notes group at the bottom with two notes, SHIP-14 labelled design and SHIP-12 labelled idea">
+<img src="assets/screenshots/launch/notes-tabs-light.png" width="300" alt="The shipyard project's tab in the Paper Light theme: a Notes group at the bottom with two notes, SHIP-14 labelled design and SHIP-12 labelled idea">
 </td>
 </tr>
 </table>
