@@ -104,6 +104,7 @@ final class AppServices {
         )
         panelControl = PanelControl(shipyard: shipyard, state: panelState, demo: files.demo)
         let shipyard = shipyard
+        panelState.lookAt = { [weak self] part in self?.lookAt(part) }
         notifier.onOffChange = { shipyard.notificationsAreOff = $0 }
         leaseIndicator.onBannersChange = { if shipyard.lease != $0 { shipyard.lease = $0 } }
         notifier.onOpen = { [weak self] url in
@@ -259,11 +260,24 @@ final class AppServices {
         Task { await shipyard.panelOpened() }
     }
 
+    /// A status view's check, run as the view opens (`PanelState.show`)
+    /// and by its Check again.
+    func lookAt(_ part: SetupPart) {
+        switch part {
+        case .cli: cliLink.check()
+        case .skill: skillDetector.check()
+        case .notion:
+            let shipyard = shipyard
+            Task { await shipyard.checkNotion() }
+        case .github: break
+        }
+    }
+
     func panelClosed() {
         panelState.isOpen = false
         panelState.reopenGuard.panelClosed(byControl: panelState.closingByControl, at: Date())
         panelState.closingByControl = false
-        panelState.openView = nil
+        panelState.show(nil)
         shipyard.panelClosed()
     }
 

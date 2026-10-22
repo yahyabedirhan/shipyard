@@ -100,7 +100,7 @@ struct Panel: View {
             case .openConfiguration:
                 Button(item.title, action: actions.openConfigurationFile)
             case .open(let part):
-                Button(item.title) { actions.panelState.openView = part }
+                Button(item.title) { actions.panelState.show(part) }
                     .badge(item.isChecked ? Text(PanelText.setUpMark) : nil)
             case .signOut:
                 Divider()
@@ -174,7 +174,7 @@ struct Panel: View {
     private func action(of banner: PanelBanner) -> (title: String, run: () -> Void)? {
         if let part = banner.opens {
             let panelState = actions.panelState
-            return (PanelText.openBannerView, { panelState.openView = part })
+            return (PanelText.openBannerView, { panelState.show(part) })
         }
         guard banner.kind == .notificationsOff else { return nil }
         return (PanelText.openNotificationSettings, actions.openNotificationSettings)
@@ -196,7 +196,7 @@ struct Panel: View {
     @ViewBuilder
     private func content(_ scale: PanelScale) -> some View {
         if let part = actions.panelState.openView {
-            StatusView(part: part, actions: actions) { actions.panelState.openView = nil }
+            StatusView(part: part, actions: actions) { actions.panelState.show(nil) }
         } else {
             phaseContent(scale)
         }

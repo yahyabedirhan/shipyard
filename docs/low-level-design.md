@@ -553,7 +553,7 @@ The notes' Projects page and their checks (ADR 0011; no issue numbers yet; Trace
   - **Without it** the app runs no `ntn`: `start()`, the notes timer, opening the menu, a configuration change, the new-note icon and `shipyard notes check` ask nothing.
     No notes list, and there is no notes banner and no new-note icon (`Shipyard.readsNotes` is false).
   - **The Notion view** is the one place ntn runs before that.
-    Opening it, and its **Check again**, run `Shipyard.checkNotion()` through the notes' route: `GET /v1/users/me` for the name of ntn's default workspace (the bot's `workspace_name`), then search for "Shipyard Notes" (`NotionStatus`).
+    Opening it (`PanelState.show`, from the settings menu, a banner or `shipyard panel show-view`, the panel open or closed), and its **Check again**, run `Shipyard.checkNotion()` through the notes' route; drawing the view never does, so a screenshot's off-screen copy of the panel doesn't start the check over: `GET /v1/users/me` for the name of ntn's default workspace (the bot's `workspace_name`), then search for "Shipyard Notes" (`NotionStatus`).
   - **What the view shows**, in `PanelText.notionStatus`'s words:
     - no `ntn`: the install command (`curl -fsSL https://ntn.dev | bash`) and `ntn login`, each in a command box, and Check again;
     - ntn logged out: `ntn login` and Check again;
@@ -952,7 +952,7 @@ Screenshotter -> LeaseIndicator            hideForCapture() while it captures wi
 Panel, MenuBarLabelView -> LeaseIndicator  shown(at: now), shownEnd(at: now), isHiddenForCapture: the banner's countdown and the dot, read only (#180, #181); which lease banners show is the core's (#220)
 PanelControl -> Shipyard                   setCollapsed(project, collapsed) (toggleCollapsed when it differs), showMore(project, kind) (showMore(group)), menu.tab(named:)
 PanelControl -> MenuBarWindow              open(), close(): the status item, as a click on the icon
-PanelControl -> PanelState                 isOpen, openView (showView; the settings menu and ‹ Back set it too), selectedTab (the tabs layout reads and sets it)
+PanelControl -> PanelState                 isOpen, show(view) (showView; the settings menu, a banner and ‹ Back call it too; opening a view starts its check through lookAt), selectedTab (the tabs layout reads and sets it)
 ```
 
 ### Rule owners
