@@ -2,6 +2,10 @@
 
 What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHub releases with a download. 0.0.5 to 0.0.7 are plain tags on `main` that record the history between 0.0.3 and 0.1.0: no build was released for them, and the app and the `shipyard` command they build still report 0.0.3. There is no 0.0.4: its plan shipped in 0.0.5.
 
+## Unreleased
+
+- **No empty space under a shared error.** When several projects showed the same error, such as every project's "notes: can't reach Notion", the tabs layout's All tab listed it once but left an empty space for each other copy, which pushed the rows below it to the bottom of the panel. All now lists an error or a note that several projects share once, with no space left over.
+
 ## 0.8.1 (2026-10-22)
 
 The default theme's state icons are in colour again, ntn runs on Linux no longer hold each other's pipes, and the README and the site's docs are easier to scan. It gathers [#324](https://github.com/yahyabedirhan/shipyard/pull/324), [#325](https://github.com/yahyabedirhan/shipyard/pull/325), [#328](https://github.com/yahyabedirhan/shipyard/pull/328), [#329](https://github.com/yahyabedirhan/shipyard/pull/329) and [#330](https://github.com/yahyabedirhan/shipyard/pull/330).
