@@ -94,6 +94,8 @@ When a ticket that changes what the maintainer sees or does is built, close it a
 
 `docs/low-level-design.md` is the agreed module design: requirements, modules and their state, the folder tree, the refresh pipeline and traced flows. Read it before adding or moving a module, and update it in the same change when the design moves.
 
+`site/docs/low-level-design.md` is the website's module design: how to run, build, test and deploy it, where each page's code lives and the traced flows. Read it before changing `site/`, and update it in the same change when the site's design moves.
+
 `docs/cli-design.md` is the `shipyard` command line's design: its groups, verbs, help and exit codes. A new command or flag follows it.
 
 The docs, the skill and the schema describe shipyard as it is now. They name no release version ("since 0.2.0", "(0.0.5)"). Until the public launch, a renamed setting or command is replaced outright, with no old form kept beside it. History belongs in `CHANGELOG.md`, the ADRs and the pull requests.
