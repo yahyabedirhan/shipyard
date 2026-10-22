@@ -164,6 +164,48 @@ struct AttentionTests {
         #expect(harness.count == 1)
     }
 
+    @Test("the attention dot shows a pull request's checks: failed is an error that wins and survives mark seen until the checks pass, pending breathes, passed shows nothing once seen")
+    func dotLevels() async throws {
+        var failing = PR(1)
+        failing.checks = "FAILURE"
+        var pending = PR(2)
+        pending.checks = "PENDING"
+        var passed = PR(3)
+        passed.checks = "SUCCESS"
+        var none = PR(4)
+        none.checks = nil
+        let harness = try await Harness.started(config: shop, graphQL: answer(failing, pending, passed, none))
+
+        #expect(try harness.row(1).attentionLevel == .error)
+        #expect(try harness.row(2).attentionLevel == .pending(needsAttention: true))
+        #expect(try harness.row(3).attentionLevel == .regular)
+        #expect(try harness.row(4).attentionLevel == .regular)
+
+        for number in 1...4 { harness.shipyard.markSeen(try harness.row(number)) }
+        #expect(harness.count == 0)
+        #expect(try harness.row(1).attentionLevel == .error, "failed checks keep the dot red after mark seen")
+        #expect(try harness.row(2).attentionLevel == .pending(needsAttention: false))
+        #expect(try harness.row(3).attentionLevel == .none)
+        #expect(try harness.row(4).attentionLevel == .none)
+
+        failing.checks = "SUCCESS"
+        failing.updatedAt = "2026-09-25T11:00:00Z"
+        await harness.refresh(answering: answer(failing, pending, passed, none))
+        #expect(try harness.row(1).attentionLevel == .regular, "passing checks are a change: the dot is the regular one")
+        harness.shipyard.markSeen(try harness.row(1))
+        #expect(try harness.row(1).attentionLevel == .none)
+    }
+
+    @Test("with checks-failed off, failed checks don't turn the dot red")
+    func dotWithoutChecksFailed() async throws {
+        var failing = PR(1)
+        failing.checks = "FAILURE"
+        let harness = try await Harness.started(config: "[attention]\nchecks-failed = false\n\n" + shop, graphQL: answer(failing))
+        #expect(try harness.row(1).attentionLevel == .regular)
+        harness.shipyard.markSeen(try harness.row(1))
+        #expect(try harness.row(1).attentionLevel == .none)
+    }
+
     @Test("a row says why it needs attention: new, or changed since seen, and whatever still stands")
     func attentionReasons() {
         let toggles = Configuration.AttentionToggles()

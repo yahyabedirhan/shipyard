@@ -21,9 +21,6 @@ private struct PanelStyleKey: EnvironmentKey {
     static let defaultValue = PanelStyle.tabs
 }
 
-private struct RowBackdropKey: EnvironmentKey {
-    static let defaultValue: ThemeColor? = nil
-}
 
 extension EnvironmentValues {
     var panelNow: Date {
@@ -34,13 +31,6 @@ extension EnvironmentValues {
     var panelStyle: PanelStyle {
         get { self[PanelStyleKey.self] }
         set { self[PanelStyleKey.self] = newValue }
-    }
-
-    /// The fill under a row while it's highlighted, which a cut-out such as
-    /// the check dot must match; `nil` when the row isn't highlighted.
-    var rowBackdrop: ThemeColor? {
-        get { self[RowBackdropKey.self] }
-        set { self[RowBackdropKey.self] = newValue }
     }
 }
 
@@ -167,16 +157,21 @@ struct Banner: View {
     }
 }
 
+/// A row's state icon: its symbol in its state's colour, a running run
+/// breathing (`Motion.breathe`).
 struct StateSymbol: View {
     let row: MenuRow
     @Environment(\.panelStyle) private var style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let running = row.state == .running
         Image(systemName: row.pingIcon.map { ItemSymbol.name($0) } ?? ItemSymbol.name(row.state, kind: row.kind))
             .symbolRenderingMode(.hierarchical)
             .font(.system(size: style == .list ? 11 : 11.5, weight: style == .list ? .medium : .semibold))
             .foregroundStyle(ThemeColor.state(row.state, kind: row.kind))
-            .symbolEffect(.pulse, options: .repeating, isActive: row.state == .running)
+            .symbolEffect(.pulse, options: Motion.breathe, isActive: running && !reduceMotion)
+            .opacity(running && reduceMotion ? Motion.breatheStill : 1)
             .accessibilityLabel(PanelText.stateLabel(row))
     }
 }
@@ -204,40 +199,39 @@ struct AgentMarkView: View {
     }
 }
 
-struct CheckDot: View {
-    let checks: ChecksState?
-    @Environment(\.panelStyle) private var style
-    @Environment(\.rowBackdrop) private var backdrop
-
-    var body: some View {
-        if let checks, let color = ThemeColor.checks(checks) {
-            let cut: CGFloat = style == .list ? 7 : 8
-            let dot: CGFloat = style == .list ? 5 : 5.5
-            ZStack {
-                Circle().fill(ThemeColor.panel).frame(width: cut, height: cut)
-                if let backdrop {
-                    Circle().fill(backdrop).frame(width: cut, height: cut)
-                }
-                Circle().fill(color).frame(width: dot, height: dot)
-            }
-            .accessibilityLabel(PanelText.checks(checks) ?? "")
-        }
-    }
-}
-
+/// A row's attention dot: in `signal.attention` while the row is new or
+/// changed, in `signal.attention-failed` while a pull request's checks fail
+/// (seen or not), breathing while they're pending, in the accent when the
+/// row needs attention and the quiet colour when it doesn't; shrinking away
+/// when there's none of that. A pending dot shares the running run's
+/// breath, and holds still under Reduce Motion.
 struct AttentionDot: View {
-    let isOn: Bool
+    let level: AttentionLevel
     @Environment(\.panelStyle) private var style
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        let isOn = level != .none
+        let isPending = if case .pending = level { true } else { false }
         let size: CGFloat = style == .list ? 5 : 6
-        Circle()
-            .fill(ThemeColor.attention)
+        Image(systemName: "circle.fill")
+            .resizable()
             .frame(width: size, height: size)
-            .opacity(isOn ? 1 : 0)
+            .foregroundStyle(color)
+            .symbolEffect(.pulse, options: Motion.breathe, isActive: isPending && !reduceMotion)
+            .opacity(isOn ? (isPending && reduceMotion ? Motion.breatheStill : 1) : 0)
             .scaleEffect(isOn ? 1 : 0.2)
+            .animation(Motion.tint, value: level)
             .accessibilityHidden(!isOn)
-            .accessibilityLabel(PanelText.needsAttention)
+            .accessibilityLabel(PanelText.attentionDot(level) ?? "")
+    }
+
+    private var color: ThemeColor {
+        switch level {
+        case .error: ThemeColor.attentionFailed
+        case .pending(needsAttention: false): ThemeColor.quiet
+        case .none, .regular, .pending: ThemeColor.attention
+        }
     }
 }
 
@@ -265,7 +259,7 @@ private struct ItemRow: ViewModifier {
 
     func body(content: Content) -> some View {
         let isHighlighted = highlight.isHighlighted(place)
-        Button(action: click) { content.environment(\.rowBackdrop, isHighlighted ? ThemeColor.rowHover : nil) }
+        Button(action: click) { content }
             .buttonStyle(RowButtonStyle())
             .overlay(alignment: .trailing) {
                 if row.item.ping != nil, isHighlighted {
