@@ -37,21 +37,28 @@ struct ThemeColorTests {
         #expect(abs(drawn(.panel.opacity(0.5), theme: Self.theme, .light).opacity - 0.5) < 0.001)
     }
 
-    @Test("a state icon's colour says where it is in its life, whatever its kind: active, done or failed", arguments: [
-        (ItemState.open, ItemKind.pullRequest, ThemeToken.open),
-        (.open, .issue, .open),
-        (.running, .workflowRun, .running),
-        (.draft, .pullRequest, .draft),
-        (.merged, .pullRequest, .merged),
-        (.closed, .issue, .merged),
-        (.succeeded, .workflowRun, .merged),
-        (.closed, .pullRequest, .closed),
-        (.failed, .workflowRun, .closed),
-        (.open, .ping, .neutral),
-        (.open, .note, .neutral),
-    ])
-    func stateIcon(_ state: ItemState, _ kind: ItemKind, _ token: ThemeToken) {
-        #expect(ThemeColor.state(state, kind: kind) == ThemeColor(token))
+    @Test("the app looks up every state a theme colours, and only states the theme has: rows, check dots, reviews and the rate limit")
+    func stateNames() {
+        var named: Set<String> = []
+        func record(_ color: ThemeColor?) {
+            guard case .state(let kind, let state)? = color?.source else { return }
+            named.insert("\(kind.rawValue).\(state)")
+        }
+        for (itemKind, kind) in [(ItemKind.pullRequest, ThemeKind.pullRequest), (.issue, .issue), (.workflowRun, .run)] {
+            for (state, _) in kind.states {
+                let item = ItemState(rawValue: state)
+                #expect(item != nil, "\(kind.rawValue).\(state)")
+                if let item { record(ThemeColor.state(item, kind: itemKind)) }
+            }
+        }
+        record(ThemeColor.state(.open, kind: .ping))
+        record(ThemeColor.state(.open, kind: .note))
+        for checks in [ChecksState.pending, .passed, .failed] { record(ThemeColor.checks(checks)) }
+        #expect(ThemeColor.checks(.none) == nil)
+        for decision in [ReviewDecision.approved, .changesRequested, .reviewRequired] { record(ThemeColor.review(decision)) }
+        for level in [RateLevel.normal, .low, .exhausted] { record(ThemeColor.rate(level)) }
+        let themed = Set(ThemeKind.allCases.flatMap { kind in kind.states.map { "\(kind.rawValue).\($0.name)" } })
+        #expect(named == themed)
     }
 
     @Test("each built-in theme passes the contrast check with the live macOS colours, as with the reference ones the command uses")

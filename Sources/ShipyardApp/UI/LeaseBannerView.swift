@@ -35,7 +35,7 @@ struct LeaseBannerView: View {
                 .contentTransition(.numericText(countsDown: true))
                 .fixedSize()
             Button(LeaseBanner.stop, action: stop)
-                .buttonStyle(TextButtonStyle(tint: ThemeColor.failure))
+                .buttonStyle(TextButtonStyle(tint: ThemeColor.failed))
                 .fixedSize()
                 .layoutPriority(1)
             if let dismiss {

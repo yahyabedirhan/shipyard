@@ -242,7 +242,7 @@ A theme file's problems read `themes/<file> line N: …`, and a theme file has n
 ```text
 /Users/me/.config/shipyard/config.toml: accepted
 /Users/me/.config/shipyard/themes/Sunset.toml: rejected
-  problem: themes/Sunset.toml line 22: unknown token `any.accent.acent`; did you mean `accent`?
+  problem: themes/Sunset.toml line 22: unknown token `accent.acent`; did you mean `accent`?
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 

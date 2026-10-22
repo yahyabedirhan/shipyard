@@ -28,9 +28,9 @@ extension BuiltInThemes {
     violet = "#B794F6"
     coral = "#FF7A85"
     sun = "#F2C14E"
-    quiet = "#8392B8"
+    grey = "#8392B8"
 
-    [any.surface]
+    [surface]
     window = "deep"
     panel = "navy"
     header = "band"
@@ -39,38 +39,73 @@ extension BuiltInThemes {
     field = "wash"
     track = "deep"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "on-sky"
 
-    [any.accent]
+    [accent]
     accent = "sky"
     soft = "sky-soft"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "sky-soft"
 
-    [any.state]
-    open = "mint"
-    draft = "quiet"
-    merged = "violet"
-    closed = "coral"
-    success = "mint"
-    failure = "coral"
-    pending = "sun"
-    running = "mint"
-    neutral = "quiet"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "mint"
+    done = "violet"
+    failed = "coral"
+    quiet = "grey"
 
-    [any.signal]
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
+    draft = "quiet"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "sun"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
+
+    [signal]
     attention = "sky"
     lease = "sun"
 

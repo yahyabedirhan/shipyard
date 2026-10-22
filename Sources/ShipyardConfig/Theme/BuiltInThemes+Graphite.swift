@@ -25,7 +25,7 @@ extension BuiltInThemes {
     good = "#5FB27C"
     bad = "#F2655F"
     warn = "#D9A02A"
-    quiet = "#9A9AA2"
+    grey = "#9A9AA2"
     violet = "#A68BE0"
     [light.palette]
     ground = "#F2F2F3"
@@ -44,10 +44,10 @@ extension BuiltInThemes {
     good = "#2E7D4A"
     bad = "#C62828"
     warn = "#8A5A00"
-    quiet = "#62626A"
+    grey = "#62626A"
     violet = "#6E4FB0"
 
-    [any.surface]
+    [surface]
     window = "ground"
     panel = "ground"
     header = "band"
@@ -56,38 +56,73 @@ extension BuiltInThemes {
     field = "wash"
     track = "wash"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "on-accent"
 
-    [any.accent]
+    [accent]
     accent = "accent"
     soft = "press"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "press"
 
-    [any.state]
-    open = "good"
-    draft = "quiet"
-    merged = "violet"
-    closed = "bad"
-    success = "good"
-    failure = "bad"
-    pending = "warn"
-    running = "good"
-    neutral = "quiet"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "good"
+    done = "violet"
+    failed = "bad"
+    quiet = "grey"
 
-    [any.signal]
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
+    draft = "quiet"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "warn"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
+
+    [signal]
     attention = "accent"
     lease = "warn"
 

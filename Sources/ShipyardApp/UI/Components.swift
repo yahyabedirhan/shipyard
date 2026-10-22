@@ -340,7 +340,7 @@ struct ErrorRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .symbolRenderingMode(.palette)
-                .foregroundStyle(.white, ThemeColor.pending)
+                .foregroundStyle(.white, ThemeColor.failed)
                 .font(.system(size: 10.5))
                 .frame(width: style.iconColumn)
             Text(error.message)
@@ -762,9 +762,9 @@ struct ToneIcon: View {
         Group {
             switch tone {
             case .success:
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(ThemeColor.success)
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(ThemeColor.done)
             case .warning:
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(ThemeColor.pending)
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(ThemeColor.failed)
             case .neutral:
                 Image(systemName: neutral).foregroundStyle(neutralTint)
             }

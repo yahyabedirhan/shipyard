@@ -2,9 +2,8 @@ import Foundation
 import ShipyardConfig
 import ShipyardPings
 
-/// An item's semantic state. The app maps it to GitHub's colours: open
-/// green, draft gray, merged purple, closed red; a workflow run running
-/// amber, succeeded green, failed red.
+/// An item's semantic state. The theme colours it, by its kind's
+/// `[states.<kind>]` table.
 public enum ItemState: String, Codable, Equatable, Hashable, Sendable {
     case open
     case draft

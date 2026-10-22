@@ -97,7 +97,7 @@ struct ThemeTests {
         let banner = try #require(harness.shipyard.banners(at: harness.clock.now).first { $0.id == "themes" })
         #expect(banner.kind == .configError)
         #expect(banner.text == """
-            themes/Sunset.toml line 22: `any.accent.accent` is "corral", which isn't a palette name, a color or `system`
+            themes/Sunset.toml line 22: `accent.accent` is "corral", which isn't a palette name, a color or `system`
             A theme keeps the version that last read until its file is fixed.
             """)
 

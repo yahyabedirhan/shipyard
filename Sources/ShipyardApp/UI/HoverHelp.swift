@@ -325,8 +325,8 @@ private struct AttentionTag: View {
     private var tint: ThemeColor {
         switch reason {
         case .unseen, .changed: ThemeColor.accent
-        case .reviewRequested: ThemeColor.pending
-        case .checksFailed: ThemeColor.failure
+        case .reviewRequested: ThemeColor.review(.reviewRequired)
+        case .checksFailed: ThemeColor.state(.check, "failed")
         }
     }
 }
@@ -360,8 +360,8 @@ private struct FactView: View {
             .foregroundStyle(ThemeColor.textSecondary)
         case .size(let additions, let deletions):
             HStack(spacing: 4) {
-                Text("+\(additions)").foregroundStyle(ThemeColor.success)
-                Text("−\(deletions)").foregroundStyle(ThemeColor.failure)
+                Text("+\(additions)").foregroundStyle(ThemeColor.active)
+                Text("−\(deletions)").foregroundStyle(ThemeColor.failed)
             }
             .monospacedDigit()
         case .comments(let count), .reviews(let count):
@@ -408,9 +408,10 @@ private struct FactView: View {
 
     private var tint: ThemeColor? {
         switch fact {
-        case .review(.approved), .checks(.passed): ThemeColor.success
-        case .review(.changesRequested), .checks(.failed), .failure: ThemeColor.failure
-        case .review(.reviewRequired), .checks(.pending), .duration(_, running: true): ThemeColor.pending
+        case .review(let decision): ThemeColor.review(decision)
+        case .checks(let checks): ThemeColor.checks(checks)
+        case .duration(_, running: true): ThemeColor.state(.run, "running")
+        case .failure: ThemeColor.failed
         default: nil
         }
     }

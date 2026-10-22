@@ -6,8 +6,11 @@ public enum ThemeAppearance: String, CaseIterable, Hashable, Sendable {
 }
 
 /// A colour of a theme, named by what it means, never by hue. `rawValue` is
-/// `section.name`, the path a theme file writes it under: `[any.surface]`
-/// `panel = "..."` sets `surface.panel`.
+/// `section.name`, the path a theme file writes it under: `[surface]`
+/// `panel = "..."` sets `surface.panel`. The colours of states (pull
+/// requests, issues, runs, checks, reviews, the rate limit, pings and notes)
+/// aren't tokens: they are `[phase]` and `[states.*]` (`ThemePhase`,
+/// `ThemeKind`).
 public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
     case window = "surface.window"
     case panel = "surface.panel"
@@ -28,20 +31,12 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
     case rowHover = "row.hover"
     case rowPressed = "row.pressed"
     case rowSelected = "row.selected"
-    case open = "state.open"
-    case draft = "state.draft"
-    case merged = "state.merged"
-    case closed = "state.closed"
-    case success = "state.success"
-    case failure = "state.failure"
-    case pending = "state.pending"
-    case running = "state.running"
-    case neutral = "state.neutral"
     case attention = "signal.attention"
     case lease = "signal.lease"
 
-    /// The sections a theme file's `[any.*]`, `[light.*]` and `[dark.*]` tables hold.
-    public static let sections = ["surface", "text", "accent", "line", "row", "state", "signal"]
+    /// The sections a theme file writes as tables: without a prefix, such
+    /// as `[text]`, or under `[light.*]` and `[dark.*]`.
+    public static let sections = ["surface", "text", "accent", "line", "row", "signal"]
 
     /// The token's place in `allCases`: its index in a theme's table of values.
     var index: Int { Self.indices[self]! }
@@ -67,11 +62,6 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
         case .separator, .border: SystemShade(.separator)
         case .rowPressed: SystemShade(.tertiaryFill)
         case .rowSelected: SystemShade(.accent, alpha: 0.2)
-        case .open, .running, .success: SystemShade(.green)
-        case .draft, .neutral: SystemShade(.secondaryLabel)
-        case .merged: SystemShade(.purple)
-        case .closed, .failure: SystemShade(.red)
-        case .pending: SystemShade(.orange)
         case .lease: SystemShade(.yellow)
         }
     }

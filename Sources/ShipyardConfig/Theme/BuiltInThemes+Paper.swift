@@ -30,9 +30,9 @@ extension BuiltInThemes {
     brick-dim = "#B3322Ab3"
     amber = "#8F5A00"
     gold = "#C99A00"
-    quiet = "#7A6D5B"
+    grey = "#7A6D5B"
 
-    [any.surface]
+    [surface]
     window = "sand"
     panel = "cream"
     header = "band"
@@ -41,38 +41,73 @@ extension BuiltInThemes {
     field = "wash"
     track = "press"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "white"
 
-    [any.accent]
+    [accent]
     accent = "terracotta"
     soft = "terracotta-soft"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "terracotta-soft"
 
-    [any.state]
-    open = "green"
-    draft = "quiet"
-    merged = "plum"
-    closed = "brick"
-    success = "green"
-    failure = "brick"
-    pending = "amber"
-    running = "green"
-    neutral = "quiet"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "green"
+    done = "plum"
+    failed = "brick"
+    quiet = "grey"
 
-    [any.signal]
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
+    draft = "quiet"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "amber"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
+
+    [signal]
     attention = "terracotta"
     lease = "gold"
 

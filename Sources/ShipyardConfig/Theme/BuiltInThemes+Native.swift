@@ -9,7 +9,7 @@ extension BuiltInThemes {
     version = 1
     description = "The system's own colors: semantic fills, labels and the user's accent."
 
-    [any.surface]
+    [surface]
     window = "system"
     panel = "system"
     header = "system"
@@ -18,38 +18,73 @@ extension BuiltInThemes {
     field = "system"
     track = "system"
 
-    [any.text]
+    [text]
     primary = "system"
     secondary = "system"
     tertiary = "system"
     seen = "system"
     on-accent = "system"
 
-    [any.accent]
+    [accent]
     accent = "system"
     soft = "system"
 
-    [any.line]
+    [line]
     separator = "system"
     border = "system"
 
-    [any.row]
+    [row]
     hover = "system"
     pressed = "system"
     selected = "system"
 
-    [any.state]
-    open = "system"
-    draft = "system"
-    merged = "system"
-    closed = "system"
-    success = "system"
-    failure = "system"
-    pending = "system"
-    running = "system"
-    neutral = "system"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "system"
+    done = "system"
+    failed = "system"
+    quiet = "system"
 
-    [any.signal]
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
+    draft = "quiet"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    [states.check]
+    pending = "active"
+    passed = "done"
+    failed = "failed"
+
+    [states.review]
+    review-required = "active"
+    approved = "done"
+    changes-requested = "failed"
+
+    # The rate limit's low is a warning, not a phase.
+    [states.rate]
+    normal = "active"
+    low = "system"
+    exhausted = "failed"
+
+    [states.ping]
+    open = "quiet"
+
+    [states.note]
+    open = "quiet"
+
+    [signal]
     attention = "system"
     lease = "system"
 

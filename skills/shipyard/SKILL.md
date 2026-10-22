@@ -14,7 +14,7 @@ On the Mac, agents can also open, steer and screenshot the running app with `shi
 The user's own **notes** live in Notion, one numbered list per project, and the menu lists the open ones. Before you take a note the user dictates, look one up by its number, or list, tidy or archive notes, read [references/notes.md](references/notes.md): it holds where notes live, the rules every agent follows, each operation through the Notion connector or `ntn`, and `shipyard notes check`, which shows whether the app can read them.
 
 The panel's look is its **theme**: the top-level `theme` key picks a built-in theme or one of the user's theme files.
-Before you pick a theme, write or fix a theme file, or answer why the panel draws Shipyard, read [references/themes.md](references/themes.md): it holds the built-in themes, the theme file format with every token and knob, the contrast check and how `shipyard config check` reports theme files.
+Before you pick a theme, write or fix a theme file, or answer why the panel draws Shipyard, read [references/themes.md](references/themes.md): it holds the built-in themes, the theme file format with every token, state colour and knob, the contrast check and how `shipyard config check` reports theme files.
 
 A request to change the user's shipyard is a change to this file. When no key below does what's asked, say that shipyard has no such setting.
 

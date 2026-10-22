@@ -3,6 +3,7 @@
 A **theme** decides how the panel looks: its colours, its font, its density, its corner radii and its material.
 Every theme draws the same panel, with the same rows and the same layout.
 A theme is a set of **tokens**, each one colour named by what it means, such as `surface.panel` or `text.secondary`, never by hue.
+It also sets the **state colours** of pull requests, issues, runs, checks, reviews, the rate limit, pings and notes, one for each state of each kind, which may share one colour per **phase**.
 
 Shipyard has six **built-in themes**, part of the app: Shipyard, the default, then Native, Graphite, Paper, Midnight and Harbor.
 A **theme file** is the user's own theme: one TOML file in the `themes` folder beside `config.toml`, so `~/.config/shipyard/themes/<anything>.toml`, or under `$XDG_CONFIG_HOME` when it is set.
@@ -41,10 +42,10 @@ coral = "#C2410C"
 [dark.palette]
 coral = "#FB923C"
 
-[any.accent]
+[accent]
 accent = "coral"
 
-[any.signal]
+[signal]
 attention = "coral"
 
 [light.text]
@@ -64,18 +65,20 @@ The text on an accent fill, `text.on-accent`, follows the accent: change both to
 |---|---|
 | `name` | The name `theme` picks. Required. A file with a built-in theme's name replaces that theme. |
 | `version` | The format version, `1`. Required. |
-| `extends` | A theme, by name, that fills every token and knob this file leaves out, palette names included. A built-in theme or another file's. |
+| `extends` | A theme, by name, that fills every token, phase, state and knob this file leaves out, palette names included. A built-in theme or another file's. |
 | `description` | One line about the theme. Optional. |
 
 A token that no theme in the `extends` chain sets is `system`.
 
 ### Colours per appearance
 
-- Tokens sit in tables named `[<appearance>.<section>]`, such as `[dark.text]`.
-- `[any.*]` sets both the light and the dark look; `[light.*]` and `[dark.*]` override it for one.
+- Tokens sit in tables named after their section, such as `[text]`.
+- A table without a prefix sets both the light and the dark look.
+  A `[light.*]` or `[dark.*]` table, such as `[dark.text]`, changes a token for that appearance only.
+- An `[any.*]` table is a problem on its line: remove the `any.` prefix.
 - A token's value is a palette name, a hex colour `#rrggbb` or `#rrggbbaa`, or `system`, the matching macOS colour.
 - `[palette]` names raw colours once.
-  `[light.palette]` and `[dark.palette]` give one name a different colour per appearance, so one `[any.*]` table serves both.
+  `[light.palette]` and `[dark.palette]` give one name a different colour per appearance, so one table without a prefix serves both.
 - A theme with no `extends` that fills only one appearance draws that one in both, as Paper and Midnight do.
 
 ### Tokens
@@ -101,21 +104,63 @@ A token that no theme in the `extends` chain sets is `system`.
 | `row` | `hover` | A hovered row or button, and the keyboard-highlighted row. |
 | | `pressed` | A pressed row or button. |
 | | `selected` | Reserved: accepted and checked, with no effect. The keyboard-highlighted row draws with `row.hover`. |
-| `state` | `open` | An open pull request or issue. |
-| | `draft` | A draft pull request. |
-| | `merged` | A merged pull request, a closed issue, a succeeded run: done. |
-| | `closed` | A closed pull request, a failed run. |
-| | `success` | A passing check, an approval. |
-| | `failure` | A failing check, an error, an exhausted rate limit. |
-| | `pending` | A pending check, a low rate limit. |
-| | `running` | A workflow run in progress. The built-in themes give it `open`'s hue, since both are active. |
-| | `neutral` | A ping, a note, any state without its own colour. |
 | `signal` | `attention` | A row that needs attention. |
 | | `lease` | The banner while an agent drives the app. |
 
+### State colours
+
+A row's state icon, a pull request's check dot, the hover card's review and checks, the rate-limit bar and text, and a ping's or a note's icon take the colour the theme gives that kind in that state.
+The rest of the panel that shows a phase draws the phase's colour: an error, a failed action or the lease banner's Stop is `failed`, a finished tick is `done`, an informational banner is `quiet`.
+Two tables set them, without a prefix for light and dark or under `[light.*]` and `[dark.*]` for one appearance:
+
+- `[phase]` names one colour per phase, for every state in it to share.
+  A phase's value is a palette name, a hex colour or `system`, never a phase's name.
+- `[states.<kind>]` gives each state of one kind its colour.
+  A state's value is a phase name, a palette name, a hex colour or `system`.
+- A phase's name, such as `quiet`, always means the phase: give a palette entry another name.
+
+| Phase | Its states | Its default |
+|---|---|---|
+| `active` | `pull-request.open`, `issue.open`, `run.running`, `check.pending`, `review.review-required`, `rate.normal` | The macOS green. |
+| `done` | `pull-request.merged`, `issue.closed`, `run.succeeded`, `check.passed`, `review.approved` | The macOS purple. |
+| `failed` | `pull-request.closed`, `run.failed`, `check.failed`, `review.changes-requested`, `rate.exhausted` | The macOS red. |
+| `quiet` | `pull-request.draft`, `ping.open`, `note.open` | The macOS secondary label grey. |
+
+`rate.low` is a warning, not a phase: its default is the macOS orange.
+
+| Table | States | What it colours |
+|---|---|---|
+| `[states.pull-request]` | `open`, `draft`, `merged`, `closed` | A pull request's icon. |
+| `[states.issue]` | `open`, `closed` | An issue's icon. |
+| `[states.run]` | `running`, `succeeded`, `failed` | A workflow run's icon, and a running run's duration on its hover card. |
+| `[states.check]` | `pending`, `passed`, `failed` | A pull request's check dot, its checks on the hover card, and the "checks failed" reason. |
+| `[states.review]` | `review-required`, `approved`, `changes-requested` | The review on a pull request's hover card, and the "review requested" reason. |
+| `[states.rate]` | `normal`, `low`, `exhausted` | The rate-limit bar, lighter while `normal`; its text once `low` or `exhausted`, and the slow-down and paused banners. |
+| `[states.ping]` | `open` | A ping's icon. |
+| `[states.note]` | `open` | A note's icon. |
+
+- A state colour comes from the appearance's table, then the table without a prefix, then the `extends` chain.
+- A state no theme in the chain sets takes its phase, and a phase no theme sets is its macOS colour.
+- `system` in a state is the macOS colour of its own phase, and the macOS orange for `rate.low`.
+- Every built-in theme follows one rule: active is green, done is purple, failed is red and quiet is grey.
+
+```toml
+[phase]
+failed = "#DC2626"
+
+[states.run]
+running = "#F59E0B"
+
+[dark.states.issue]
+closed = "#A78BFA"
+```
+
+`[state]` has no tokens: every state's colour is in `[phase]` and `[states.<kind>]`.
+A theme file that writes a key in `[state]`, such as `open`, `merged`, `success` or `neutral`, has a problem on its line that names the keys to write instead, such as `[phase] done` or `[states.check] passed` for `state.success`.
+
 ### Knobs
 
-Knobs are shared by both appearances and sit in their own tables, with no `any`, `light` or `dark`.
+Knobs are shared by both appearances and sit in their own tables, with no `light` or `dark` prefix.
 
 | Table | Keys |
 |---|---|
@@ -142,11 +187,11 @@ The theme still draws: raise the contrast until the warning is gone.
 /Users/me/.config/shipyard/config.toml: accepted
   warning: config.toml line 2: theme `Sunset` isn't one shipyard has read, and `themes/Sunset.toml` has a problem; the panel draws Shipyard until it reads
 /Users/me/.config/shipyard/themes/Sunset.toml: rejected
-  problem: themes/Sunset.toml line 22: unknown token `any.accent.acent`; did you mean `accent`?
+  problem: themes/Sunset.toml line 22: unknown token `accent.acent`; did you mean `accent`?
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 
-- Every problem in a theme file stops it: an unknown key, section or token, a value that isn't a palette name, a colour or `system`, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
+- Every problem in a theme file stops it: an unknown key, section, token, phase, kind or state, an `[any.*]` table, a removed `state.*` token, a value that isn't a palette name, a colour or `system`, a state value that isn't one of those or a phase, a phase that names another phase, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
 - A theme file has problems and no warnings.
 - A file with a problem keeps the theme it last read, and the panel shows a banner with the file, the line and the problem until it is fixed.
   A file that has never read leaves `theme` drawing Shipyard.

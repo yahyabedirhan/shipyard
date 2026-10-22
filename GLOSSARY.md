@@ -174,19 +174,27 @@ _Avoid_: Configuration, cache
 ### Themes
 
 **Theme**:
-A named set of colours and settings that decides how the panel looks: its tokens for light and dark, and its font, density, corner radii and material. Every theme draws the same panel; the configuration picks one by name, and Shipyard is the default.
+A named set of colours and settings that decides how the panel looks: its tokens and state colours for light and dark, and its font, density, corner radii and material. Every theme draws the same panel; the configuration picks one by name, and Shipyard is the default.
 _Avoid_: Skin, style, colour scheme, appearance (that is light or dark)
 
 **Token**:
 One colour of a theme, named by what it means rather than its hue, such as the panel's surface or the secondary text.
 _Avoid_: Colour (for the named slot), variable, palette entry
 
+**Phase**:
+Where a state is in its life: active (open, running, pending checks, a required review, a rate limit with room), done (merged, a closed issue, succeeded, passed checks, an approval), failed (a closed pull request, a failed run, failed checks, changes requested, a spent rate limit) or quiet (a draft, a ping, a note). The rate limit's low is a warning, in no phase. A theme may name one colour per phase in `[phase]`, for every state in it to share.
+_Avoid_: Status, lifecycle stage
+
+**State colour**:
+The colour a theme gives one state of one kind, such as a merged pull request, in a `[states.<kind>]` table. It names a phase or a colour of its own; one a theme leaves out takes its phase.
+_Avoid_: State token
+
 **Built-in theme**:
 One of the six themes that come with the app: Shipyard, Native, Graphite, Paper, Midnight and Harbor.
 _Avoid_: Default theme (that is Shipyard alone), preset (a preset is a whole configuration)
 
 **Theme file**:
-A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme or replace one by taking its name. A file that doesn't read keeps the theme it last read.
+A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme or replace one by taking its name. A colour table without a prefix, such as `[text]`, sets light and dark, and a `[light.*]` or `[dark.*]` table changes one appearance. A file that doesn't read keeps the theme it last read.
 _Avoid_: Custom config, theme config
 
 ### Agents and the app

@@ -59,20 +59,34 @@ private struct ThemeScope: ViewModifier {
     }
 }
 
-/// A token of the theme in the environment, resolved when it's drawn for the
-/// environment's appearance. A `ShapeStyle`: use it where a colour goes in
-/// `foregroundStyle`, `fill`, `background`, `stroke` and `overlay`.
+/// A colour of the theme in the environment, a token or a state, resolved
+/// when it's drawn for the environment's appearance. A `ShapeStyle`: use it
+/// where a colour goes in `foregroundStyle`, `fill`, `background`, `stroke`
+/// and `overlay`.
 struct ThemeColor: ShapeStyle, Hashable {
-    let token: ThemeToken
+    /// What the colour is looked up by.
+    enum Source: Hashable {
+        case token(ThemeToken)
+        /// A phase, as the theme's `[phase]` table names it.
+        case phase(ThemePhase)
+        /// A kind's state, as its `[states.<kind>]` table names it.
+        case state(ThemeKind, String)
+    }
+
+    let source: Source
     var opacity: Double = 1
 
     init(_ token: ThemeToken, opacity: Double = 1) {
-        self.token = token
+        self.init(.token(token), opacity: opacity)
+    }
+
+    private init(_ source: Source, opacity: Double) {
+        self.source = source
         self.opacity = opacity
     }
 
-    /// The same token at a fraction of its alpha; `opacity(0)` draws nothing.
-    func opacity(_ value: Double) -> ThemeColor { ThemeColor(token, opacity: opacity * value) }
+    /// The same colour at a fraction of its alpha; `opacity(0)` draws nothing.
+    func opacity(_ value: Double) -> ThemeColor { ThemeColor(source, opacity: opacity * value) }
 
     func resolve(in environment: EnvironmentValues) -> Color {
         color(in: environment.theme, ThemeAppearance(environment.colorScheme))
@@ -80,11 +94,30 @@ struct ThemeColor: ShapeStyle, Hashable {
 
     /// The colour in `theme` and `appearance`, for code with no environment.
     func color(in theme: Theme, _ appearance: ThemeAppearance) -> Color {
-        let base = switch theme.value(token, appearance) {
-        case .color(let rgba): Color(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a)
-        case .system: SystemColors.color(token.system(appearance), appearance)
+        let base: Color = switch source {
+        case .token(let token):
+            switch theme.value(token, appearance) {
+            case .color(let rgba): Self.color(rgba)
+            case .system: SystemColors.color(token.system(appearance), appearance)
+            }
+        case .phase(let phase):
+            Self.color(theme.color(phase, appearance), appearance)
+        case .state(let kind, let state):
+            // A state the kind doesn't have draws the quiet phase.
+            Self.color(theme.color(kind, state, appearance) ?? theme.color(.quiet, appearance), appearance)
         }
         return opacity == 1 ? base : base.opacity(opacity)
+    }
+
+    private static func color(_ rgba: RGBA) -> Color {
+        Color(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a)
+    }
+
+    private static func color(_ value: ThemeStateColor, _ appearance: ThemeAppearance) -> Color {
+        switch value {
+        case .color(let rgba): color(rgba)
+        case .system(let shade): SystemColors.color(shade, appearance)
+        }
     }
 
     static let panel = ThemeColor(.panel)
@@ -103,55 +136,67 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let border = ThemeColor(.border)
     static let rowHover = ThemeColor(.rowHover)
     static let rowPressed = ThemeColor(.rowPressed)
-    static let success = ThemeColor(.success)
-    static let failure = ThemeColor(.failure)
-    static let pending = ThemeColor(.pending)
-    static let neutral = ThemeColor(.neutral)
     static let attention = ThemeColor(.attention)
     static let lease = ThemeColor(.lease)
 
-    /// A row's state icon, by where the item is in its life, whatever its
-    /// kind: active (open, running), done (merged, a closed issue, a
-    /// succeeded run) or failed (a closed pull request, a failed run). The
-    /// theme decides the hues; a ping or a note is neutral.
+    /// The theme's phase colours, for what isn't one kind's state but is
+    /// in a phase: an error is `failed`, a tick for something finished
+    /// `done`, a hint that something is under way `active`, a note that
+    /// asks for nothing `quiet`.
+    static let active = ThemeColor(.phase(.active), opacity: 1)
+    static let done = ThemeColor(.phase(.done), opacity: 1)
+    static let failed = ThemeColor(.phase(.failed), opacity: 1)
+    static let quiet = ThemeColor(.phase(.quiet), opacity: 1)
+
+    /// The theme's colour for `kind` in `state`, its `[states.<kind>]` value.
+    static func state(_ kind: ThemeKind, _ state: String) -> ThemeColor {
+        ThemeColor(.state(kind, state), opacity: 1)
+    }
+
+    /// A row's state icon. A ping or a note has one state, `open`.
     static func state(_ state: ItemState, kind: ItemKind) -> ThemeColor {
-        if kind == .ping || kind == .note { return neutral }
-        return switch state {
-        case .open: ThemeColor(.open)
-        case .running: ThemeColor(.running)
-        case .draft: ThemeColor(.draft)
-        case .merged, .succeeded: ThemeColor(.merged)
-        case .closed: kind == .issue ? ThemeColor(.merged) : ThemeColor(.closed)
-        case .failed: ThemeColor(.closed)
+        switch kind {
+        case .ping, .note: Self.state(ThemeKind(kind), "open")
+        case .pullRequest, .issue, .workflowRun: Self.state(ThemeKind(kind), state.rawValue)
         }
     }
 
     /// A pull request's check dot; none when it has no checks.
     static func checks(_ checks: ChecksState) -> ThemeColor? {
-        switch checks {
-        case .none: nil
-        case .pending: pending
-        case .passed: success
-        case .failed: failure
-        }
+        checks == .none ? nil : state(.check, checks.rawValue)
     }
 
-    /// The rate-limit text: the tertiary text while normal, then pending, then failure.
+    /// A review decision, as the hover card shows it.
+    static func review(_ decision: ReviewDecision) -> ThemeColor {
+        let name = switch decision {
+        case .approved: "approved"
+        case .changesRequested: "changes-requested"
+        case .reviewRequired: "review-required"
+        }
+        return state(.review, name)
+    }
+
+    /// The rate limit's colour at `level`.
     static func rate(_ level: RateLevel) -> ThemeColor {
-        switch level {
-        case .normal: textTertiary
-        case .low: pending
-        case .exhausted: failure
+        let name = switch level {
+        case .normal: "normal"
+        case .low: "low"
+        case .exhausted: "exhausted"
         }
+        return state(.rate, name)
     }
 
-    /// The rate-limit bar.
+    /// The rate-limit text: the tertiary text while normal, so a limit with
+    /// room doesn't draw the eye; the theme's `low` or `exhausted` colour
+    /// once it runs short.
+    static func rateText(_ level: RateLevel) -> ThemeColor {
+        level == .normal ? textTertiary : rate(level)
+    }
+
+    /// The rate-limit bar: the theme's colour for the level, lighter while
+    /// normal.
     static func rateBar(_ level: RateLevel) -> ThemeColor {
-        switch level {
-        case .normal: success.opacity(0.65)
-        case .low: pending
-        case .exhausted: failure
-        }
+        level == .normal ? rate(level).opacity(0.65) : rate(level)
     }
 }
 

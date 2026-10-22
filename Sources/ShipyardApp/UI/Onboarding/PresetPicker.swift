@@ -93,7 +93,7 @@ struct PresetPicker: View {
             if let writeError {
                 Text(writeError)
                     .font(scale.type.caption)
-                    .foregroundStyle(ThemeColor.failure)
+                    .foregroundStyle(ThemeColor.failed)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
             }

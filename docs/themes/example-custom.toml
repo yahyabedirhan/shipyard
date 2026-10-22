@@ -16,12 +16,12 @@ coral = "#C2410C"
 [dark.palette]
 coral = "#FB923C"
 
-# Appearance-specific colors go under [light.*] and [dark.*];
-# [any.*] sets both at once.
-[any.accent]
+# A table without a prefix, such as [accent], sets light and dark;
+# [light.*] and [dark.*] change a color for one appearance.
+[accent]
 accent = "coral"
 
-[any.signal]
+[signal]
 attention = "coral"
 
 # Make the unread dot and the count badge text readable on the coral fill.
@@ -30,14 +30,27 @@ on-accent = "#ffffff"
 [dark.text]
 on-accent = "#1a0b02"
 
-# A few state colors changed from the quiet default:
-# open items are green, merged ones purple.
-[light.state]
-open = "#1A7F37"
-merged = "#8250DF"
-[dark.state]
-open = "#3FB950"
-merged = "#A371F7"
+# The colours of states: pull requests, issues, runs, checks, reviews,
+# the rate limit, pings and notes. [phase] names one colour for each
+# phase of a state's life: active, done, failed and quiet.
+# A [states.<kind>] table gives one state its own colour: a phase name,
+# a palette name, a hex color or "system". Every state you leave out
+# takes its phase; the rate limit's low, a warning and not a phase, is
+# the macOS orange. Here every failed state is a deeper red, a draft pull
+# request and a ping are coral, and passed checks are green, not done's purple.
+[light.phase]
+failed = "#B91C1C"
+[dark.phase]
+failed = "#F87171"
+
+[states.pull-request]
+draft = "coral"
+
+[states.check]
+passed = "#16A34A"
+
+[states.ping]
+open = "coral"
 
 # Knobs shared by both appearances.
 [density]
