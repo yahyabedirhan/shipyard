@@ -110,18 +110,19 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let attention = ThemeColor(.attention)
     static let lease = ThemeColor(.lease)
 
-    /// A row's state icon, by kind: each state has its token, so the theme
-    /// decides whether open is green or quiet ink. A succeeded run takes the
-    /// open token and a closed issue the merged one; a ping or a note is neutral.
+    /// A row's state icon, by where the item is in its life, whatever its
+    /// kind: active (open, running), done (merged, a closed issue, a
+    /// succeeded run) or failed (a closed pull request, a failed run). The
+    /// theme decides the hues; a ping or a note is neutral.
     static func state(_ state: ItemState, kind: ItemKind) -> ThemeColor {
         if kind == .ping || kind == .note { return neutral }
         return switch state {
-        case .open, .succeeded: ThemeColor(.open)
-        case .draft: ThemeColor(.draft)
-        case .merged: ThemeColor(.merged)
-        case .closed: kind == .issue ? ThemeColor(.merged) : ThemeColor(.closed)
+        case .open: ThemeColor(.open)
         case .running: ThemeColor(.running)
-        case .failed: failure
+        case .draft: ThemeColor(.draft)
+        case .merged, .succeeded: ThemeColor(.merged)
+        case .closed: kind == .issue ? ThemeColor(.merged) : ThemeColor(.closed)
+        case .failed: ThemeColor(.closed)
         }
     }
 

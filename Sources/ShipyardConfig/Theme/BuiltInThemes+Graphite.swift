@@ -84,7 +84,7 @@ extension BuiltInThemes {
     success = "good"
     failure = "bad"
     pending = "warn"
-    running = "warn"
+    running = "good"
     neutral = "quiet"
 
     [any.signal]

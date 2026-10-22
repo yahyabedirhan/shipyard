@@ -2606,7 +2606,7 @@ Each row holds:
 
 - Its number, title (a run: its workflow's name), author and URL.
 - Its semantic state: open, draft, merged, closed, running, succeeded, failed.
-  The app's `ThemeColor.state(_:kind:)` colours it by kind: an issue's closed takes `state.merged`, a pull request's `state.closed`.
+  The app's `ThemeColor.state(_:kind:)` colours it by where it is in its life: active takes `state.open` (a run, `state.running`), done takes `state.merged` (a merged pull request, a closed issue, a succeeded run), and failed takes `state.closed` (a closed pull request, a failed run).
 - `branch` (runs only) and the check dot (open and draft PRs only).
 - `since` for its age: opened or started, or closed or finished.
 - Its `needsAttention` flag and the `item` it shows; marking it seen records that version.
