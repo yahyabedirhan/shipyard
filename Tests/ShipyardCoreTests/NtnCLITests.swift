@@ -5,6 +5,19 @@ import FoundationNetworking
 @testable import ShipyardCore
 import Testing
 
+/// Whether `pid` still runs. A stopped orphan stays a zombie where nothing
+/// reaps it, as in a container whose first process is `tail -f /dev/null`.
+private func running(_ pid: pid_t) -> Bool {
+    guard kill(pid, 0) == 0 else { return false }
+    #if os(Linux)
+    if let stat = try? String(contentsOfFile: "/proc/\(pid)/stat", encoding: .utf8),
+       let state = stat.split(separator: ")").last?.dropFirst().first {
+        return state != "Z"
+    }
+    #endif
+    return true
+}
+
 private final class FakeNtn: Sendable {
     private let calls = Locked<[(executable: String, arguments: [String])]>([])
     private let answer: NtnCLI.Output?
@@ -118,10 +131,10 @@ struct NtnCLITests {
         let child = try #require(pid_t(String(decoding: try Data(contentsOf: file), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)))
         run.cancel()
         let deadline = Date().addingTimeInterval(3)
-        while kill(child, 0) == 0, Date() < deadline {
+        while running(child), Date() < deadline {
             try await Task.sleep(for: .milliseconds(50))
         }
-        let outlived = kill(child, 0) == 0
+        let outlived = running(child)
         #expect(!outlived)
         if outlived { kill(child, SIGKILL) }
         _ = await run.value
