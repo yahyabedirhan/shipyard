@@ -32,7 +32,7 @@ extension BuiltInThemes {
     gold = "#C99A00"
     quiet = "#7A6D5B"
 
-    [any.surface]
+    [surface]
     window = "sand"
     panel = "cream"
     header = "band"
@@ -41,27 +41,27 @@ extension BuiltInThemes {
     field = "wash"
     track = "press"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "white"
 
-    [any.accent]
+    [accent]
     accent = "terracotta"
     soft = "terracotta-soft"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "terracotta-soft"
 
-    [any.state]
+    [state]
     open = "green"
     draft = "quiet"
     merged = "plum"
@@ -72,7 +72,7 @@ extension BuiltInThemes {
     running = "green"
     neutral = "quiet"
 
-    [any.signal]
+    [signal]
     attention = "terracotta"
     lease = "gold"
 

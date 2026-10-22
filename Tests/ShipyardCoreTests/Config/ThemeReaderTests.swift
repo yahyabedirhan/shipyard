@@ -17,11 +17,11 @@ struct ThemeReaderTests {
     }
 
     static let valid: [Valid] = [
-        Valid(name: "a token in [any.*] sets both appearances; one left out is system", text: """
+        Valid(name: "a token in a table without a prefix sets both appearances; one left out is system", text: """
             name = "Plain"
             version = 1
             description = "Red text."
-            [any.text]
+            [text]
             primary = "#ff0000"
             """) { theme in
             #expect(theme.name == "Plain")
@@ -32,16 +32,23 @@ struct ThemeReaderTests {
             #expect(theme.appearances == [.light, .dark])
             #expect(theme.knobs == .standard)
         },
-        Valid(name: "[light.*] and [dark.*] override [any.*] for one appearance", text: """
+        Valid(name: "[light.*] and [dark.*] override a table without a prefix for one appearance, whichever comes first", text: """
             name = "Split"
             version = 1
-            [any.accent]
+            [accent]
             accent = "#ff0000"
             [dark.accent]
             accent = "#0000ff"
+            [light.surface]
+            panel = "#0000ff"
+            [surface]
+            panel = "#ff0000"
             """) { theme in
             #expect(theme.value(.accent, .light) == red)
             #expect(theme.value(.accent, .dark) == blue)
+            #expect(theme.value(.panel, .light) == blue)
+            #expect(theme.value(.panel, .dark) == red)
+            #expect(theme.appearances == [.light, .dark])
         },
         Valid(name: "a palette name is looked up per appearance; system and #rrggbbaa are colors too", text: """
             name = "Named"
@@ -51,7 +58,7 @@ struct ThemeReaderTests {
             plain = "system"
             [dark.palette]
             ink = "#0000ff"
-            [any.text]
+            [text]
             primary = "ink"
             secondary = "plain"
             tertiary = "#ffffff80"
@@ -71,12 +78,12 @@ struct ThemeReaderTests {
             #expect(theme.value(.panel, .dark) == blue)
             #expect(theme.appearances == [.dark])
         },
-        Valid(name: "[any.*] tokens that read one appearance's own palette make a theme that fills that one", text: """
+        Valid(name: "tokens without a prefix that read one appearance's own palette make a theme that fills that one", text: """
             name = "Cream"
             version = 1
             [light.palette]
             ink = "#ff0000"
-            [any.text]
+            [text]
             primary = "ink"
             """) { theme in
             #expect(theme.appearances == [.light])
@@ -86,7 +93,7 @@ struct ThemeReaderTests {
             name = "Harbor at night"
             version = 1
             extends = "shipyard"
-            [any.surface]
+            [surface]
             panel = "accent"
             [shape]
             small = 2
@@ -144,9 +151,28 @@ struct ThemeReaderTests {
         Invalid(name: "an unknown token, with the nearest spelling", text: """
             name = "Typo"
             version = 1
-            [any.text]
+            [text]
             primray = "#ff0000"
-            """, issues: ["Theme.toml line 4: unknown token `any.text.primray`; did you mean `primary`?"]),
+            """, issues: ["Theme.toml line 4: unknown token `text.primray`; did you mean `primary`?"]),
+        Invalid(name: "an [any.*] table, each on its line, with the prefix to remove", text: """
+            name = "Old"
+            version = 1
+            [any.text]
+            primary = "#ff0000"
+            [surface]
+            panel = "#ffffff"
+            [any.accent]
+            accent = "#0000ff"
+            """, issues: [
+                "Theme.toml line 3: `[any.text]` has an `any.` prefix; remove it and write `[text]`, which sets light and dark",
+                "Theme.toml line 7: `[any.accent]` has an `any.` prefix; remove it and write `[accent]`, which sets light and dark",
+            ]),
+        Invalid(name: "an unknown table without a prefix, with the nearest section", text: """
+            name = "Typo"
+            version = 1
+            [surfaces]
+            panel = "#ffffff"
+            """, issues: ["Theme.toml line 3: unknown key `surfaces`; did you mean `surface`?"]),
         Invalid(name: "an unknown section and an unknown top-level key", text: """
             name = "Typo"
             version = 1
@@ -160,29 +186,29 @@ struct ThemeReaderTests {
         Invalid(name: "a value that's no palette name, color or system", text: """
             name = "Wrong"
             version = 1
-            [any.surface]
+            [surface]
             panel = "blue"
-            """, issues: ["Theme.toml line 4: `any.surface.panel` is \"blue\", which isn't a palette name, a color or `system`"]),
+            """, issues: ["Theme.toml line 4: `surface.panel` is \"blue\", which isn't a palette name, a color or `system`"]),
         Invalid(name: "a broken hex color, in a token and in the palette", text: """
             name = "Wrong"
             version = 1
             [palette]
             ink = "#12345"
-            [any.surface]
+            [surface]
             panel = "#zzzzzz"
             """, issues: [
                 "Theme.toml line 4: `palette.ink` is \"#12345\", which isn't a color; write #rrggbb, #rrggbbaa or system",
-                "Theme.toml line 6: `any.surface.panel` is \"#zzzzzz\", which isn't a color; write #rrggbb or #rrggbbaa",
+                "Theme.toml line 6: `surface.panel` is \"#zzzzzz\", which isn't a color; write #rrggbb or #rrggbbaa",
             ]),
         Invalid(name: "a value that isn't a string, and a knob out of range", text: """
             name = "Wrong"
             version = 1
-            [any.surface]
+            [surface]
             panel = 3
             [font]
             size = 40
             """, issues: [
-                "Theme.toml line 4: `any.surface.panel` must be a quoted string",
+                "Theme.toml line 4: `surface.panel` must be a quoted string",
                 "Theme.toml line 6: `font.size` must be a size in points from 9 to 20",
             ]),
         Invalid(name: "a wrong version", text: """
@@ -190,7 +216,7 @@ struct ThemeReaderTests {
             version = 2
             """, issues: ["Theme.toml line 2: `version` 2 isn't supported; this shipyard reads version 1"]),
         Invalid(name: "a missing name and version", text: """
-            [any.surface]
+            [surface]
             panel = "system"
             """, issues: [
                 "Theme.toml: `name` is missing; write name = \"My theme\"",
@@ -229,7 +255,7 @@ struct ThemeReaderTests {
         let user = try #require(ThemeReader.definition("""
             name = "shipyard"
             version = 1
-            [any.accent]
+            [accent]
             accent = "#ff0000"
             """, file: "Mine.toml", source: .file(URL(fileURLWithPath: "/themes/Mine.toml"))).definition)
         let (themes, issues) = ThemeReader.resolve(BuiltInThemes.definitions + [user])
@@ -279,9 +305,9 @@ struct ThemeReaderTests {
         let (theme, issues) = ThemeReader.theme("""
             name = "Faint"
             version = 1
-            [any.surface]
+            [surface]
             panel = "#ffffff"
-            [any.text]
+            [text]
             primary = "#000000"
             secondary = "#000000"
             seen = "#000000"

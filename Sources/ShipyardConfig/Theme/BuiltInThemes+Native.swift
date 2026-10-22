@@ -9,7 +9,7 @@ extension BuiltInThemes {
     version = 1
     description = "The system's own colors: semantic fills, labels and the user's accent."
 
-    [any.surface]
+    [surface]
     window = "system"
     panel = "system"
     header = "system"
@@ -18,27 +18,27 @@ extension BuiltInThemes {
     field = "system"
     track = "system"
 
-    [any.text]
+    [text]
     primary = "system"
     secondary = "system"
     tertiary = "system"
     seen = "system"
     on-accent = "system"
 
-    [any.accent]
+    [accent]
     accent = "system"
     soft = "system"
 
-    [any.line]
+    [line]
     separator = "system"
     border = "system"
 
-    [any.row]
+    [row]
     hover = "system"
     pressed = "system"
     selected = "system"
 
-    [any.state]
+    [state]
     open = "system"
     draft = "system"
     merged = "system"
@@ -49,7 +49,7 @@ extension BuiltInThemes {
     running = "system"
     neutral = "system"
 
-    [any.signal]
+    [signal]
     attention = "system"
     lease = "system"
 

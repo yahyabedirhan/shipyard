@@ -30,7 +30,7 @@ extension BuiltInThemes {
     sun = "#F2C14E"
     quiet = "#8392B8"
 
-    [any.surface]
+    [surface]
     window = "deep"
     panel = "navy"
     header = "band"
@@ -39,27 +39,27 @@ extension BuiltInThemes {
     field = "wash"
     track = "deep"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "on-sky"
 
-    [any.accent]
+    [accent]
     accent = "sky"
     soft = "sky-soft"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "sky-soft"
 
-    [any.state]
+    [state]
     open = "mint"
     draft = "quiet"
     merged = "violet"
@@ -70,7 +70,7 @@ extension BuiltInThemes {
     running = "mint"
     neutral = "quiet"
 
-    [any.signal]
+    [signal]
     attention = "sky"
     lease = "sun"
 

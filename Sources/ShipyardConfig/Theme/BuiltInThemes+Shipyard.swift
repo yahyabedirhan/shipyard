@@ -33,7 +33,7 @@ extension BuiltInThemes {
     # White text on the accent, in dark as in light.
     on-accent = "#ffffff"
 
-    [any.surface]
+    [surface]
     window = "system"
     panel = "system"
     header = "band"
@@ -42,29 +42,29 @@ extension BuiltInThemes {
     field = "system"
     track = "system"
 
-    [any.text]
+    [text]
     primary = "system"
     secondary = "system"
     tertiary = "system"
     seen = "system"
     on-accent = "on-accent"
 
-    [any.accent]
+    [accent]
     accent = "accent"
     soft = "system"
 
-    [any.line]
+    [line]
     separator = "system"
     border = "system"
 
-    [any.row]
+    [row]
     hover = "system"
     pressed = "system"
     selected = "system"
 
     # Open, merged and closed each take their own hue; a draft stays quiet.
     # A running run is active, as an open item is, so it takes open's hue.
-    [any.state]
+    [state]
     open = "green"
     draft = "quiet"
     merged = "purple"
@@ -75,7 +75,7 @@ extension BuiltInThemes {
     running = "green"
     neutral = "quiet"
 
-    [any.signal]
+    [signal]
     attention = "accent"
     lease = "system"
 

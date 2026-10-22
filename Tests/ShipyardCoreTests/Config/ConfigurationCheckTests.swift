@@ -101,14 +101,14 @@ struct ConfigurationCheckTests {
         let good = folder.appendingPathComponent("Calm.toml")
         let bad = folder.appendingPathComponent("Typo.toml")
         try Data("name = \"Calm\"\nversion = 1\nextends = \"Shipyard\"\n".utf8).write(to: good)
-        try Data("name = \"Typo\"\nversion = 1\n[any.text]\nprimray = \"#ff0000\"\n".utf8).write(to: bad)
+        try Data("name = \"Typo\"\nversion = 1\n[any.text]\nprimary = \"#ff0000\"\n".utf8).write(to: bad)
 
         let text = harness.cli("config", "check")
         #expect(text.status == CommandResult.failedStatus)
         #expect(text.output.contains("""
             \(good.path): accepted
             \(bad.path): rejected
-              problem: themes/Typo.toml line 4: unknown token `any.text.primray`; did you mean `primary`?
+              problem: themes/Typo.toml line 3: `[any.text]` has an `any.` prefix; remove it and write `[text]`, which sets light and dark
 
             """))
 
@@ -121,7 +121,7 @@ struct ConfigurationCheckTests {
         #expect(typo["config"] as? String == bad.path)
         let problems = try #require(typo["problems"] as? [[String: Any]])
         #expect(problems.map { $0["banner"] as? String }
-            == ["themes/Typo.toml line 4: unknown token `any.text.primray`; did you mean `primary`?"])
+            == ["themes/Typo.toml line 3: `[any.text]` has an `any.` prefix; remove it and write `[text]`, which sets light and dark"])
 
         try Data("name = \"Calm\"\nversion = 1\n".utf8).write(to: bad)
         let twice = harness.cli("config", "check")

@@ -41,10 +41,10 @@ coral = "#C2410C"
 [dark.palette]
 coral = "#FB923C"
 
-[any.accent]
+[accent]
 accent = "coral"
 
-[any.signal]
+[signal]
 attention = "coral"
 
 [light.text]
@@ -71,11 +71,13 @@ A token that no theme in the `extends` chain sets is `system`.
 
 ### Colours per appearance
 
-- Tokens sit in tables named `[<appearance>.<section>]`, such as `[dark.text]`.
-- `[any.*]` sets both the light and the dark look; `[light.*]` and `[dark.*]` override it for one.
+- Tokens sit in tables named after their section, such as `[text]`.
+- A table without a prefix sets both the light and the dark look.
+  A `[light.*]` or `[dark.*]` table, such as `[dark.text]`, changes a token for that appearance only.
+- An `[any.*]` table is a problem on its line: remove the `any.` prefix.
 - A token's value is a palette name, a hex colour `#rrggbb` or `#rrggbbaa`, or `system`, the matching macOS colour.
 - `[palette]` names raw colours once.
-  `[light.palette]` and `[dark.palette]` give one name a different colour per appearance, so one `[any.*]` table serves both.
+  `[light.palette]` and `[dark.palette]` give one name a different colour per appearance, so one table without a prefix serves both.
 - A theme with no `extends` that fills only one appearance draws that one in both, as Paper and Midnight do.
 
 ### Tokens
@@ -142,11 +144,11 @@ The theme still draws: raise the contrast until the warning is gone.
 /Users/me/.config/shipyard/config.toml: accepted
   warning: config.toml line 2: theme `Sunset` isn't one shipyard has read, and `themes/Sunset.toml` has a problem; the panel draws Shipyard until it reads
 /Users/me/.config/shipyard/themes/Sunset.toml: rejected
-  problem: themes/Sunset.toml line 22: unknown token `any.accent.acent`; did you mean `accent`?
+  problem: themes/Sunset.toml line 22: unknown token `accent.acent`; did you mean `accent`?
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 
-- Every problem in a theme file stops it: an unknown key, section or token, a value that isn't a palette name, a colour or `system`, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
+- Every problem in a theme file stops it: an unknown key, section or token, an `[any.*]` table, a value that isn't a palette name, a colour or `system`, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
 - A theme file has problems and no warnings.
 - A file with a problem keeps the theme it last read, and the panel shows a banner with the file, the line and the problem until it is fixed.
   A file that has never read leaves `theme` drawing Shipyard.

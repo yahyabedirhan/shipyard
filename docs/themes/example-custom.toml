@@ -16,12 +16,12 @@ coral = "#C2410C"
 [dark.palette]
 coral = "#FB923C"
 
-# Appearance-specific colors go under [light.*] and [dark.*];
-# [any.*] sets both at once.
-[any.accent]
+# A table without a prefix, such as [accent], sets light and dark;
+# [light.*] and [dark.*] change a color for one appearance.
+[accent]
 accent = "coral"
 
-[any.signal]
+[signal]
 attention = "coral"
 
 # Make the unread dot and the count badge text readable on the coral fill.

@@ -186,7 +186,7 @@ One of the six themes that come with the app: Shipyard, Native, Graphite, Paper,
 _Avoid_: Default theme (that is Shipyard alone), preset (a preset is a whole configuration)
 
 **Theme file**:
-A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme or replace one by taking its name. A file that doesn't read keeps the theme it last read.
+A user's own theme: one TOML file in the `themes` folder beside `config.toml`, which may extend a built-in theme or replace one by taking its name. A colour table without a prefix, such as `[text]`, sets light and dark, and a `[light.*]` or `[dark.*]` table changes one appearance. A file that doesn't read keeps the theme it last read.
 _Avoid_: Custom config, theme config
 
 ### Agents and the app

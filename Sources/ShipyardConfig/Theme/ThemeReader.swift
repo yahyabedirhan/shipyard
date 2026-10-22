@@ -9,9 +9,10 @@ public struct ThemeDefinition: Sendable {
     public var summary: String
     public var extends: String?
 
-    /// `any` sets both appearances; `light` and `dark` override it for one.
-    enum Layer: String, CaseIterable, Sendable {
-        case any, light, dark
+    /// `both`, the tables without a prefix, sets both appearances; `light`
+    /// and `dark`, the `[light.*]` and `[dark.*]` tables, override it for one.
+    enum Layer: CaseIterable, Sendable {
+        case both, light, dark
     }
 
     /// A token's value as written, with where it was written, so a value that
@@ -30,22 +31,22 @@ public struct ThemeDefinition: Sendable {
 
     var fillsLight: Bool { !(tokens[.light] ?? [:]).isEmpty || !(palette[.light] ?? [:]).isEmpty }
     var fillsDark: Bool { !(tokens[.dark] ?? [:]).isEmpty || !(palette[.dark] ?? [:]).isEmpty }
-    var fillsAny: Bool { !(tokens[.any] ?? [:]).isEmpty || !(palette[.any] ?? [:]).isEmpty }
+    var fillsBoth: Bool { !(tokens[.both] ?? [:]).isEmpty || !(palette[.both] ?? [:]).isEmpty }
 
     /// The one appearance a theme with no `extends` fills, which it then
     /// draws in both; `nil` when it fills both or extends another. It fills
     /// one when it writes `[light.*]` or `[dark.*]` tables for that one
-    /// alone, and its `[any.*]` tokens, if any, read that appearance's own
-    /// palette: Paper's `[any.*]` tokens name `[light.palette]` colours, so
-    /// it fills light, where `[any.*]` tokens with a `[dark.*]` override
-    /// still set both appearances.
+    /// alone, and its tokens without a prefix, if any, read that
+    /// appearance's own palette: Paper's `[surface]` and `[text]` tokens name
+    /// `[light.palette]` colours, so it fills light, where tokens without a
+    /// prefix and a `[dark.*]` override still set both appearances.
     var single: ThemeAppearance? {
         guard extends == nil, fillsLight != fillsDark else { return nil }
         let one: Layer = fillsLight ? .light : .dark
         let appearance: ThemeAppearance = fillsLight ? .light : .dark
-        let shared = tokens[.any] ?? [:]
+        let shared = tokens[.both] ?? [:]
         guard !shared.isEmpty else { return appearance }
-        let onlyThere = Set((palette[one] ?? [:]).keys).subtracting((palette[.any] ?? [:]).keys)
+        let onlyThere = Set((palette[one] ?? [:]).keys).subtracting((palette[.both] ?? [:]).keys)
         return shared.values.contains { onlyThere.contains($0.text) } ? appearance : nil
     }
 }
@@ -94,7 +95,8 @@ public enum ThemeReader {
 
     static let topLevelKeys = [
         "name", "version", "extends", "description", "palette",
-        "any", "light", "dark", "font", "density", "shape", "material",
+    ] + ThemeToken.sections + [
+        "light", "dark", "font", "density", "shape", "material",
     ]
 
     // MARK: Parsing
@@ -178,7 +180,7 @@ public enum ThemeReader {
             for appearance in ThemeAppearance.allCases {
                 // A root theme that fills one appearance draws it in both.
                 let layer: ThemeDefinition.Layer = (link.single ?? appearance) == .dark ? .dark : .light
-                for source in [ThemeDefinition.Layer.any, layer] {
+                for source in [ThemeDefinition.Layer.both, layer] {
                     palette[appearance, default: [:]].merge(link.palette[source] ?? [:]) { $1 }
                     for (token, entry) in link.tokens[source] ?? [:] {
                         tokens[appearance, default: [:]][token] = (entry, link.file)
@@ -213,7 +215,7 @@ public enum ThemeReader {
         for link in chain {
             if let single = link.single {
                 filled = [single]
-            } else if link.extends == nil || link.fillsAny {
+            } else if link.extends == nil || link.fillsBoth {
                 filled = Set(ThemeAppearance.allCases)
             } else {
                 if link.fillsLight { filled.insert(.light) }
@@ -252,7 +254,11 @@ private struct Parser {
 
     mutating func definition(from root: TOMLTable, source: ThemeSource) -> ThemeDefinition {
         for key in root.keys where !ThemeReader.topLevelKeys.contains(key) {
-            unknown(key, at: [], known: ThemeReader.topLevelKeys)
+            if key == "any" {
+                anyPrefix(root)
+            } else {
+                unknown(key, at: [], known: ThemeReader.topLevelKeys)
+            }
         }
 
         let name = string(root, "name", at: [])
@@ -278,43 +284,63 @@ private struct Parser {
         )
         if root.contains(key: "extends") { definition.extendsLine = map.line(for: [.key("extends")]) }
 
-        if let palette = table(root, "palette", at: []) {
-            definition.palette[.any] = self.palette(palette, at: [.key("palette")])
-        }
-        for layer in ThemeDefinition.Layer.allCases {
-            guard let body = table(root, layer.rawValue, at: []) else { continue }
-            let path: ConfigurationPath = [.key(layer.rawValue)]
-            for section in body.keys {
-                let sectionPath = path + [.key(section)]
-                if section == "palette" {
-                    guard let palette = table(body, section, at: path) else { continue }
-                    definition.palette[layer, default: [:]].merge(self.palette(palette, at: sectionPath)) { $1 }
-                    continue
-                }
-                guard ThemeToken.sections.contains(section) else {
-                    unknown(section, at: path, known: ThemeToken.sections + ["palette"])
-                    continue
-                }
-                guard let tokens = table(body, section, at: path) else { continue }
-                for key in tokens.keys {
-                    let keyPath = sectionPath + [.key(key)]
-                    guard let token = ThemeToken(rawValue: "\(section).\(key)") else {
-                        let known = ThemeToken.allCases.filter { $0.rawValue.hasPrefix(section + ".") }.map { String($0.rawValue.dropFirst(section.count + 1)) }
-                        unknown(key, at: sectionPath, known: known, noun: "token")
-                        continue
-                    }
-                    guard let text = string(tokens, key, at: sectionPath) else { continue }
-                    let value = text.trimmingCharacters(in: .whitespaces)
-                    if value.hasPrefix("#"), RGBA(hex: value) == nil {
-                        fail("`\(keyPath.dotted)` is \"\(value)\", which isn't a color; write #rrggbb or #rrggbbaa", at: keyPath)
-                        continue
-                    }
-                    definition.tokens[layer, default: [:]][token] = ThemeDefinition.Entry(text: value, path: keyPath.dotted, line: map.line(for: keyPath))
-                }
-            }
+        colours(root, sections: ThemeToken.sections + ["palette"], layer: .both, at: [], into: &definition)
+        for (layer, key) in [(ThemeDefinition.Layer.light, "light"), (.dark, "dark")] {
+            guard let body = table(root, key, at: []) else { continue }
+            colours(body, sections: body.keys, layer: layer, at: [.key(key)], into: &definition)
         }
         definition.knobs = knobs(root)
         return definition
+    }
+
+    /// Reads one layer's colour tables, the palette and each token section,
+    /// from `body`: the file itself for the tables without a prefix, or its
+    /// `light` or `dark` table.
+    private mutating func colours(
+        _ body: TOMLTable, sections: [String], layer: ThemeDefinition.Layer,
+        at path: ConfigurationPath, into definition: inout ThemeDefinition
+    ) {
+        for section in body.keys where sections.contains(section) {
+            let sectionPath = path + [.key(section)]
+            if section == "palette" {
+                guard let palette = table(body, section, at: path) else { continue }
+                definition.palette[layer, default: [:]].merge(self.palette(palette, at: sectionPath)) { $1 }
+                continue
+            }
+            guard ThemeToken.sections.contains(section) else {
+                unknown(section, at: path, known: ThemeToken.sections + ["palette"])
+                continue
+            }
+            guard let tokens = table(body, section, at: path) else { continue }
+            for key in tokens.keys {
+                let keyPath = sectionPath + [.key(key)]
+                guard let token = ThemeToken(rawValue: "\(section).\(key)") else {
+                    let known = ThemeToken.allCases.filter { $0.rawValue.hasPrefix(section + ".") }.map { String($0.rawValue.dropFirst(section.count + 1)) }
+                    unknown(key, at: sectionPath, known: known, noun: "token")
+                    continue
+                }
+                guard let text = string(tokens, key, at: sectionPath) else { continue }
+                let value = text.trimmingCharacters(in: .whitespaces)
+                if value.hasPrefix("#"), RGBA(hex: value) == nil {
+                    fail("`\(keyPath.dotted)` is \"\(value)\", which isn't a color; write #rrggbb or #rrggbbaa", at: keyPath)
+                    continue
+                }
+                definition.tokens[layer, default: [:]][token] = ThemeDefinition.Entry(text: value, path: keyPath.dotted, line: map.line(for: keyPath))
+            }
+        }
+    }
+
+    /// An `[any.<table>]` is an error on its own line that tells the author
+    /// to remove the prefix: a table without one sets both appearances.
+    private mutating func anyPrefix(_ root: TOMLTable) {
+        let path: ConfigurationPath = [.key("any")]
+        guard let body = try? root.table(forKey: "any"), !body.keys.isEmpty else {
+            fail("`any` isn't a theme key; remove the `any.` prefix: a table without a prefix, such as `[text]`, sets light and dark", at: path)
+            return
+        }
+        for section in body.keys {
+            fail("`[any.\(section)]` has an `any.` prefix; remove it and write `[\(section)]`, which sets light and dark", at: path + [.key(section)])
+        }
     }
 
     private mutating func palette(_ table: TOMLTable, at path: ConfigurationPath) -> [String: ThemeValue] {

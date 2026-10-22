@@ -6,6 +6,7 @@ What changed in each version of shipyard, newest first. 0.0.1 to 0.0.3 are GitHu
 
 - **No empty space under a shared error.** When several projects showed the same error, such as every project's "notes: can't reach Notion", the tabs layout's All tab listed it once but left an empty space for each other copy, which pushed the rows below it to the bottom of the panel. All now lists an error or a note that several projects share once, with no space left over.
 - **State colours say where an item is in its life.** Every kind now uses the same three colours: green for active (an open pull request or issue, a running run), purple for done (a merged pull request, a closed issue, a succeeded run) and red for failed (a closed pull request, a failed run). Before, a succeeded run was green like an open issue, and a running run was amber. Every built-in theme follows it.
+- **Theme tables without the `any.` prefix.** A theme file writes a colour table without a prefix, such as `[surface]` or `[text]`, for light and dark, and a `[light.*]` or `[dark.*]` table changes a value for one appearance. An `[any.*]` table is now a problem on its line, in the panel's banner and in `shipyard config check`, that tells you to remove the `any.` prefix. The built-in themes and the example theme file use the new tables, and the panel looks the same.
 
 ## 0.8.1 (2026-10-22)
 

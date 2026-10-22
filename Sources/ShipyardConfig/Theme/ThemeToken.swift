@@ -6,7 +6,7 @@ public enum ThemeAppearance: String, CaseIterable, Hashable, Sendable {
 }
 
 /// A colour of a theme, named by what it means, never by hue. `rawValue` is
-/// `section.name`, the path a theme file writes it under: `[any.surface]`
+/// `section.name`, the path a theme file writes it under: `[surface]`
 /// `panel = "..."` sets `surface.panel`.
 public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
     case window = "surface.window"
@@ -40,7 +40,8 @@ public enum ThemeToken: String, CaseIterable, Hashable, Sendable {
     case attention = "signal.attention"
     case lease = "signal.lease"
 
-    /// The sections a theme file's `[any.*]`, `[light.*]` and `[dark.*]` tables hold.
+    /// The sections a theme file writes as tables: without a prefix, such
+    /// as `[text]`, or under `[light.*]` and `[dark.*]`.
     public static let sections = ["surface", "text", "accent", "line", "row", "state", "signal"]
 
     /// The token's place in `allCases`: its index in a theme's table of values.

@@ -1796,6 +1796,8 @@ It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files
 
 **Reading a theme.**
 `ThemeReader.definition(_:file:source:)` reads one file's text with TOMLDecoder into a `ThemeDefinition`, or returns its issues, each placed on its line by `TOMLSourceMap`.
+A `ThemeDefinition` holds its palette and tokens per layer: `both`, the tables without a prefix (`[palette]`, `[surface]`, `[text]` …), and `light` and `dark`, the `[light.*]` and `[dark.*]` tables.
+An `[any.*]` table is an issue on its line that tells the author to remove the `any.` prefix.
 `ThemeReader.resolve(_:extending:)` resolves definitions against each other and against a base it looks up but never resolves, the built-ins for the user's files.
 
 **The built-in themes.**
@@ -1827,9 +1829,11 @@ The Linux `shipyard` never links ShipyardConfig, so it reads neither theme files
 
 **Resolving.**
 `extends` names a parent, ignoring case, that fills every token and knob the file leaves out.
+Each link of the chain lays its `light` or `dark` layer over its `both` layer, for the palette and the tokens alike.
 Palette names are looked up per appearance once the whole chain is known, and a token no theme in the chain sets is `system`.
 Of two definitions with one name the later wins.
 A root theme that fills one appearance alone, writing `[light.*]` or `[dark.*]` for that one only, draws it in both: Paper fills light, Midnight fills dark.
+Its tables without a prefix keep it to that one when their tokens name a palette entry only that appearance's palette holds, as Paper's name `[light.palette]` colours.
 
 **Files that don't read.**
 A file with a problem keeps the theme it last read, by file URL.

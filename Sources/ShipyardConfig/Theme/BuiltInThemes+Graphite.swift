@@ -47,7 +47,7 @@ extension BuiltInThemes {
     quiet = "#62626A"
     violet = "#6E4FB0"
 
-    [any.surface]
+    [surface]
     window = "ground"
     panel = "ground"
     header = "band"
@@ -56,27 +56,27 @@ extension BuiltInThemes {
     field = "wash"
     track = "wash"
 
-    [any.text]
+    [text]
     primary = "ink"
     secondary = "ink-2"
     tertiary = "ink-3"
     seen = "ink-seen"
     on-accent = "on-accent"
 
-    [any.accent]
+    [accent]
     accent = "accent"
     soft = "press"
 
-    [any.line]
+    [line]
     separator = "line"
     border = "line-strong"
 
-    [any.row]
+    [row]
     hover = "wash"
     pressed = "press"
     selected = "press"
 
-    [any.state]
+    [state]
     open = "good"
     draft = "quiet"
     merged = "violet"
@@ -87,7 +87,7 @@ extension BuiltInThemes {
     running = "good"
     neutral = "quiet"
 
-    [any.signal]
+    [signal]
     attention = "accent"
     lease = "warn"
 
