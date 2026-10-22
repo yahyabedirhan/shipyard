@@ -107,6 +107,89 @@ struct ThemeReaderTests {
             #expect(theme.knobs.medium == parent.knobs.medium)
             #expect(theme.knobs.glass)
         },
+        Valid(name: "a state with no colour of its own takes its phase; one left out of [phase] is its macOS colour", text: """
+            name = "Phases"
+            version = 1
+            [palette]
+            live = "#ff0000"
+            [phase]
+            active = "live"
+            done = "#0000ff"
+            failed = "#ffffff80"
+            """) { theme in
+            for appearance in ThemeAppearance.allCases {
+                #expect(theme.color(.pullRequest, "open", appearance) == .color(RGBA(r: 1, g: 0, b: 0)))
+                #expect(theme.color(.run, "running", appearance) == .color(RGBA(r: 1, g: 0, b: 0)))
+                #expect(theme.color(.issue, "closed", appearance) == .color(RGBA(r: 0, g: 0, b: 1)))
+                #expect(theme.color(.run, "failed", appearance) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
+                #expect(theme.color(.pullRequest, "draft", appearance) == .system(SystemShade(.secondaryLabel)))
+            }
+            #expect(theme.color(.issue, "draft", .light) == nil)
+        },
+        Valid(name: "a state names a phase, a palette name, a hex colour or system, which is its phase's macOS colour", text: """
+            name = "States"
+            version = 1
+            [palette]
+            ink = "#0000ff"
+            quiet = "#ffffff"
+            [phase]
+            failed = "#ff0000"
+            active = "system"
+            [states.pull-request]
+            open = "failed"
+            draft = "ink"
+            merged = "#ffffff80"
+            closed = "system"
+            [states.issue]
+            closed = "quiet"
+            [states.run]
+            failed = "system"
+            """) { theme in
+            #expect(theme.color(.pullRequest, "open", .dark) == .color(RGBA(r: 1, g: 0, b: 0)))
+            #expect(theme.color(.pullRequest, "draft", .dark) == .color(RGBA(r: 0, g: 0, b: 1)))
+            #expect(theme.color(.pullRequest, "merged", .light) == .color(RGBA(r: 1, g: 1, b: 1, a: 128.0 / 255)))
+            // A phase's name is the phase, though the palette has one too.
+            #expect(theme.color(.issue, "closed", .light) == .system(SystemShade(.secondaryLabel)))
+            #expect(theme.color(.pullRequest, "closed", .light) == .system(SystemShade(.red)))
+            #expect(theme.color(.run, "failed", .light) == .system(SystemShade(.red)))
+            // Another kind's state in that phase keeps the phase's colour.
+            #expect(theme.color(.issue, "open", .light) == .system(SystemShade(.green)))
+        },
+        Valid(name: "a [light.*] or [dark.*] phase or state wins over the table without a prefix", text: """
+            name = "Split states"
+            version = 1
+            [dark.states.issue]
+            closed = "#0000ff"
+            [states.issue]
+            closed = "#ff0000"
+            [phase]
+            active = "#ff0000"
+            [light.phase]
+            active = "#0000ff"
+            """) { theme in
+            #expect(theme.color(.issue, "closed", .light) == .color(RGBA(r: 1, g: 0, b: 0)))
+            #expect(theme.color(.issue, "closed", .dark) == .color(RGBA(r: 0, g: 0, b: 1)))
+            #expect(theme.color(.issue, "open", .light) == .color(RGBA(r: 0, g: 0, b: 1)))
+            #expect(theme.color(.issue, "open", .dark) == .color(RGBA(r: 1, g: 0, b: 0)))
+            #expect(theme.appearances == [.light, .dark])
+        },
+        Valid(name: "extends fills the phases and states a file leaves out, and a state follows the phase the file changes", text: """
+            name = "Shipyard red"
+            version = 1
+            extends = "Shipyard"
+            [phase]
+            done = "#ff0000"
+            [dark.states.run]
+            running = "#0000ff"
+            """) { theme in
+            let parent = BuiltInThemes.shipyard
+            #expect(theme.color(.pullRequest, "merged", .light) == .color(RGBA(r: 1, g: 0, b: 0)))
+            #expect(theme.color(.run, "succeeded", .dark) == .color(RGBA(r: 1, g: 0, b: 0)))
+            #expect(theme.color(.run, "running", .dark) == .color(RGBA(r: 0, g: 0, b: 1)))
+            #expect(theme.color(.run, "running", .light) == parent.color(.run, "running", .light))
+            #expect(theme.color(.pullRequest, "closed", .dark) == parent.color(.pullRequest, "closed", .dark))
+            #expect(theme.color(.pullRequest, "draft", .light) == parent.color(.quiet, .light))
+        },
         Valid(name: "the knobs: font, a density preset with an explicit size over it, shape and material", text: """
             name = "Roomy"
             version = 1
@@ -200,6 +283,58 @@ struct ThemeReaderTests {
                 "Theme.toml line 4: `palette.ink` is \"#12345\", which isn't a color; write #rrggbb, #rrggbbaa or system",
                 "Theme.toml line 6: `surface.panel` is \"#zzzzzz\", which isn't a color; write #rrggbb or #rrggbbaa",
             ]),
+        Invalid(name: "an unknown kind, state and phase, each with the nearest spelling, and a broken hex phase", text: """
+            name = "Typo"
+            version = 1
+            [states.pull-requests]
+            open = "active"
+            [phase]
+            activ = "#ff0000"
+            done = "#12345"
+            [dark.states.run]
+            passed = "done"
+            """, issues: [
+                "Theme.toml line 3: unknown kind `states.pull-requests`; did you mean `pull-request`?",
+                "Theme.toml line 6: unknown phase `phase.activ`; did you mean `active`?",
+                "Theme.toml line 7: `phase.done` is \"#12345\", which isn't a color; write #rrggbb or #rrggbbaa",
+                "Theme.toml line 9: unknown state `dark.states.run.passed`",
+            ]),
+        Invalid(name: "a state or phase value that's no phase, palette name, color or system", text: """
+            name = "Wrong"
+            version = 1
+            [phase]
+            done = "violet"
+            [states.issue]
+            open = "green"
+            """, issues: [
+                "Theme.toml line 4: `phase.done` is \"violet\", which isn't a palette name, a color or `system`",
+                "Theme.toml line 6: `states.issue.open` is \"green\", which isn't a phase, a palette name, a color or `system`",
+            ]),
+        Invalid(name: "a phase that names a phase, even one the palette has too", text: """
+            name = "Loop"
+            version = 1
+            [palette]
+            quiet = "#ffffff"
+            [phase]
+            failed = "done"
+            [dark.phase]
+            quiet = "quiet"
+            """, issues: [
+                "Theme.toml line 6: `phase.failed` is \"done\", which names a phase; a phase is a palette name, a color or `system`",
+                "Theme.toml line 8: `dark.phase.quiet` is \"quiet\", which names a phase; a phase is a palette name, a color or `system`",
+            ]),
+        Invalid(name: "a removed state token, each on its line, with the keys that replace it", text: """
+            name = "Old"
+            version = 1
+            [state]
+            merged = "#ff0000"
+            success = "#00ff00"
+            [dark.state]
+            running = "#0000ff"
+            """, issues: [
+                "Theme.toml line 4: `state.merged` was removed; write `[phase] done` for every done state, or `[states.pull-request] merged`, `[states.issue] closed` and `[states.run] succeeded`",
+                "Theme.toml line 7: `dark.state.running` was removed; write `[dark.phase] active` for every active state, or `[dark.states.run] running`",
+            ]),
         Invalid(name: "a value that isn't a string, and a knob out of range", text: """
             name = "Wrong"
             version = 1
@@ -278,15 +413,23 @@ struct ThemeReaderTests {
         #expect(theme.knobs == .standard)
     }
 
-    @Test("each built-in theme reads with no problem, passes the contrast check and tells open, draft, merged and closed apart by colour, and draws a running run as open, in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
+    @Test("each built-in theme reads with no problem, passes the contrast check, gives active, done and failed their own colours and every state of one phase one colour, in both appearances", arguments: ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"])
     func builtIn(_ name: String) throws {
         #expect(BuiltInThemes.issues.isEmpty, "\(BuiltInThemes.issues)")
         let theme = try #require(BuiltInThemes.named(name))
         #expect(ThemeContrast.shortfalls(theme).isEmpty, "\(ThemeContrast.shortfalls(theme))")
-        for appearance in theme.appearances {
-            let states = [ThemeToken.open, .draft, .merged, .closed].map { theme.rgba($0, appearance) }
-            #expect(Set(states).count == states.count, "\(appearance): \(states)")
-            #expect(theme.rgba(.running, appearance) == theme.rgba(.open, appearance), "\(appearance)")
+        for appearance in ThemeAppearance.allCases {
+            var byPhase: [ThemePhase: Set<ThemeStateColor>] = [:]
+            for kind in ThemeKind.allCases {
+                for (state, phase) in kind.states {
+                    byPhase[phase, default: []].insert(try #require(theme.color(kind, state, appearance)))
+                }
+            }
+            for (phase, colors) in byPhase {
+                #expect(colors.count == 1, "\(appearance) \(phase): \(colors)")
+            }
+            let lifecycle = [ThemePhase.active, .done, .failed].compactMap { byPhase[$0]?.first }
+            #expect(Set(lifecycle).count == 3, "\(appearance): \(lifecycle)")
         }
         // Paper fills light and Midnight dark; each draws its one in both appearances.
         let fills: [ThemeAppearance] = switch name {

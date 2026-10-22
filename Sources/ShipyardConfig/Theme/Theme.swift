@@ -48,7 +48,8 @@ public enum ThemeSource: Hashable, Sendable {
     case file(URL)
 }
 
-/// A theme ready to draw with: every token resolved for both appearances.
+/// A theme ready to draw with: every token, phase and state colour resolved
+/// for both appearances.
 public struct Theme: Identifiable, Hashable, Sendable {
     public var id: String { name }
     /// The name `config.toml` picks the theme by.
@@ -62,6 +63,8 @@ public struct Theme: Identifiable, Hashable, Sendable {
     public let knobs: ThemeKnobs
     private let light: [ThemeValue]
     private let dark: [ThemeValue]
+    private let phases: [ThemeAppearance: [ThemePhase: ThemeStateColor]]
+    private let states: [ThemeAppearance: [ThemeStateKey: ThemeStateColor]]
 
     public init(
         name: String,
@@ -71,6 +74,21 @@ public struct Theme: Identifiable, Hashable, Sendable {
         knobs: ThemeKnobs = .standard,
         value: (ThemeToken, ThemeAppearance) -> ThemeValue
     ) {
+        self.init(name: name, summary: summary, source: source, appearances: appearances, knobs: knobs, phases: [:], states: [:], value: value)
+    }
+
+    /// A theme with its phase and state colours; one left out takes its
+    /// default: a state its phase, a phase its macOS colour.
+    init(
+        name: String,
+        summary: String,
+        source: ThemeSource,
+        appearances: [ThemeAppearance],
+        knobs: ThemeKnobs,
+        phases: [ThemeAppearance: [ThemePhase: ThemeStateColor]],
+        states: [ThemeAppearance: [ThemeStateKey: ThemeStateColor]],
+        value: (ThemeToken, ThemeAppearance) -> ThemeValue
+    ) {
         self.name = name
         self.summary = summary
         self.source = source
@@ -78,11 +96,25 @@ public struct Theme: Identifiable, Hashable, Sendable {
         self.knobs = knobs
         light = ThemeToken.allCases.map { value($0, .light) }
         dark = ThemeToken.allCases.map { value($0, .dark) }
+        self.phases = phases
+        self.states = states
     }
 
     /// The token's value in `appearance`.
     public func value(_ token: ThemeToken, _ appearance: ThemeAppearance) -> ThemeValue {
         (appearance == .dark ? dark : light)[token.index]
+    }
+
+    /// The phase's colour in `appearance`.
+    public func color(_ phase: ThemePhase, _ appearance: ThemeAppearance) -> ThemeStateColor {
+        phases[appearance]?[phase] ?? .system(phase.system)
+    }
+
+    /// The colour of `kind` in `state`, in `appearance`: the one lookup the
+    /// app colours a state with. `nil` when the kind has no such state.
+    public func color(_ kind: ThemeKind, _ state: String, _ appearance: ThemeAppearance) -> ThemeStateColor? {
+        guard let phase = kind.phase(of: state) else { return nil }
+        return states[appearance]?[ThemeStateKey(kind: kind, state: state)] ?? color(phase, appearance)
     }
 }
 

@@ -459,6 +459,7 @@ The file format, for users and their agents, is `skills/shipyard/references/them
 - **A file with a problem.** It keeps the theme it last read, and its problems reach the panel's banner through `Shipyard.themeIssues`; it never rejects `config.toml`.
   A `theme` that names a file that never read is a warning on its line.
 - **A new token.** A case in `ThemeToken` with its `section.name` and its `system(_:)` shade, a value in each built-in theme where `system` won't do, its row in the skill's themes reference, a `ThemeColor` name in the app, and a case in `ThemeReaderTests`.
+- **A new kind or state colour.** A case in `ThemeKind`, or a state with its default phase in `ThemeKind.states`, its row in the skill's themes reference, its value in each built-in theme's `[states.*]`, and a case in `ThemeReaderTests`.
 - **A new knob.** A field in `ThemeKnobs` with the Shipyard theme's default, its read and range in `ThemeReader`, its row in the skill's themes reference, and a case in `ThemeReaderTests`.
 - **A new built-in theme.** One `BuiltInThemes+<Name>.swift` holding the file as text, one line in `BuiltInThemes.sources`, the name in the schema's `theme` description and the skill's `theme` row, and the name in `ThemeReaderTests`' list of built-ins, which reads each one and runs the contrast check on it in both appearances.
 

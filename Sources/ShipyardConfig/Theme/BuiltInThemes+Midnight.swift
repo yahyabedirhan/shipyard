@@ -28,7 +28,7 @@ extension BuiltInThemes {
     violet = "#B794F6"
     coral = "#FF7A85"
     sun = "#F2C14E"
-    quiet = "#8392B8"
+    grey = "#8392B8"
 
     [surface]
     window = "deep"
@@ -59,16 +59,36 @@ extension BuiltInThemes {
     pressed = "press"
     selected = "sky-soft"
 
-    [state]
-    open = "mint"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "mint"
+    done = "violet"
+    failed = "coral"
+    quiet = "grey"
+
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
     draft = "quiet"
-    merged = "violet"
-    closed = "coral"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    # Checks, approvals, the rate limit, pings and notes.
+    [state]
     success = "mint"
     failure = "coral"
     pending = "sun"
-    running = "mint"
-    neutral = "quiet"
+    neutral = "grey"
 
     [signal]
     attention = "sky"

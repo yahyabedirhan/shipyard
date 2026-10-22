@@ -27,16 +27,27 @@ public struct ThemeDefinition: Sendable {
     var extendsLine: Int?
     var palette: [Layer: [String: ThemeValue]] = [:]
     var tokens: [Layer: [ThemeToken: Entry]] = [:]
+    var phases: [Layer: [ThemePhase: Entry]] = [:]
+    var states: [Layer: [ThemeStateKey: Entry]] = [:]
     var knobs = KnobChanges()
 
-    var fillsLight: Bool { !(tokens[.light] ?? [:]).isEmpty || !(palette[.light] ?? [:]).isEmpty }
-    var fillsDark: Bool { !(tokens[.dark] ?? [:]).isEmpty || !(palette[.dark] ?? [:]).isEmpty }
-    var fillsBoth: Bool { !(tokens[.both] ?? [:]).isEmpty || !(palette[.both] ?? [:]).isEmpty }
+    var fillsLight: Bool { fills(.light) }
+    var fillsDark: Bool { fills(.dark) }
+    var fillsBoth: Bool { fills(.both) }
+
+    private func fills(_ layer: Layer) -> Bool {
+        !entries(layer).isEmpty || !(palette[layer] ?? [:]).isEmpty
+    }
+
+    /// Every colour the layer writes: its tokens, phases and states.
+    private func entries(_ layer: Layer) -> [Entry] {
+        Array((tokens[layer] ?? [:]).values) + Array((phases[layer] ?? [:]).values) + Array((states[layer] ?? [:]).values)
+    }
 
     /// The one appearance a theme with no `extends` fills, which it then
     /// draws in both; `nil` when it fills both or extends another. It fills
     /// one when it writes `[light.*]` or `[dark.*]` tables for that one
-    /// alone, and its tokens without a prefix, if any, read that
+    /// alone, and its colours without a prefix, if any, read that
     /// appearance's own palette: Paper's `[surface]` and `[text]` tokens name
     /// `[light.palette]` colours, so it fills light, where tokens without a
     /// prefix and a `[dark.*]` override still set both appearances.
@@ -44,10 +55,10 @@ public struct ThemeDefinition: Sendable {
         guard extends == nil, fillsLight != fillsDark else { return nil }
         let one: Layer = fillsLight ? .light : .dark
         let appearance: ThemeAppearance = fillsLight ? .light : .dark
-        let shared = tokens[.both] ?? [:]
+        let shared = entries(.both)
         guard !shared.isEmpty else { return appearance }
         let onlyThere = Set((palette[one] ?? [:]).keys).subtracting((palette[.both] ?? [:]).keys)
-        return shared.values.contains { onlyThere.contains($0.text) } ? appearance : nil
+        return shared.contains { onlyThere.contains($0.text) } ? appearance : nil
     }
 }
 
@@ -93,9 +104,13 @@ public enum ThemeReader {
     /// The theme file format this app reads.
     public static let formatVersion = 1
 
+    /// The colour tables a layer writes, without a prefix or under
+    /// `light` and `dark`.
+    static let colourSections = ["palette"] + ThemeToken.sections + ["phase", "states"]
+
     static let topLevelKeys = [
-        "name", "version", "extends", "description", "palette",
-    ] + ThemeToken.sections + [
+        "name", "version", "extends", "description",
+    ] + colourSections + [
         "light", "dark", "font", "density", "shape", "material",
     ]
 
@@ -174,7 +189,10 @@ public enum ThemeReader {
 
         var knobs = ThemeKnobs.standard
         var palette: [ThemeAppearance: [String: ThemeValue]] = [:]
-        var tokens: [ThemeAppearance: [ThemeToken: (entry: ThemeDefinition.Entry, file: String)]] = [:]
+        typealias Written = (entry: ThemeDefinition.Entry, file: String)
+        var tokens: [ThemeAppearance: [ThemeToken: Written]] = [:]
+        var phases: [ThemeAppearance: [ThemePhase: Written]] = [:]
+        var states: [ThemeAppearance: [ThemeStateKey: Written]] = [:]
         for link in chain {
             link.knobs.apply(to: &knobs)
             for appearance in ThemeAppearance.allCases {
@@ -185,27 +203,68 @@ public enum ThemeReader {
                     for (token, entry) in link.tokens[source] ?? [:] {
                         tokens[appearance, default: [:]][token] = (entry, link.file)
                     }
+                    for (phase, entry) in link.phases[source] ?? [:] {
+                        phases[appearance, default: [:]][phase] = (entry, link.file)
+                    }
+                    for (state, entry) in link.states[source] ?? [:] {
+                        states[appearance, default: [:]][state] = (entry, link.file)
+                    }
                 }
             }
         }
 
         var issues: [ThemeIssue] = []
+        func problem(_ written: Written, _ message: String) {
+            let found = ThemeIssue(file: written.file, line: written.entry.line, message: "`\(written.entry.path)` is \"\(written.entry.text)\", \(message)")
+            if !issues.contains(found) { issues.append(found) }
+        }
+        // A value that is `system`, a hex colour or a palette name; `nil`
+        // for any other text.
+        func value(_ text: String, _ appearance: ThemeAppearance) -> ThemeValue? {
+            if text == "system" { return .system }
+            if let color = RGBA(hex: text) { return .color(color) }
+            return palette[appearance]?[text]
+        }
+        func stateColor(_ value: ThemeValue, system shade: SystemShade) -> ThemeStateColor {
+            switch value {
+            case .system: .system(shade)
+            case .color(let color): .color(color)
+            }
+        }
+
         var values: [ThemeAppearance: [ThemeToken: ThemeValue]] = [:]
+        var phaseColors: [ThemeAppearance: [ThemePhase: ThemeStateColor]] = [:]
+        var stateColors: [ThemeAppearance: [ThemeStateKey: ThemeStateColor]] = [:]
         for appearance in ThemeAppearance.allCases {
             for (token, written) in tokens[appearance] ?? [:] {
-                let text = written.entry.text
-                if text == "system" {
-                    values[appearance, default: [:]][token] = .system
-                } else if let color = RGBA(hex: text) {
-                    values[appearance, default: [:]][token] = .color(color)
-                } else if let named = palette[appearance]?[text] {
-                    values[appearance, default: [:]][token] = named
+                if let value = value(written.entry.text, appearance) {
+                    values[appearance, default: [:]][token] = value
                 } else {
-                    let found = ThemeIssue(
-                        file: written.file, line: written.entry.line,
-                        message: "`\(written.entry.path)` is \"\(text)\", which isn't a palette name, a color or `system`"
-                    )
-                    if !issues.contains(found) { issues.append(found) }
+                    problem(written, "which isn't a palette name, a color or `system`")
+                }
+            }
+            // A phase is a colour of its own: a phase's name is always the
+            // phase, so naming one here is a problem.
+            for (phase, written) in phases[appearance] ?? [:] {
+                if ThemePhase(rawValue: written.entry.text) != nil {
+                    problem(written, "which names a phase; a phase is a palette name, a color or `system`")
+                } else if let value = value(written.entry.text, appearance) {
+                    phaseColors[appearance, default: [:]][phase] = stateColor(value, system: phase.system)
+                } else {
+                    problem(written, "which isn't a palette name, a color or `system`")
+                }
+            }
+            // A phase's name is always the phase, even where a palette entry
+            // has that name; `system` is the macOS colour of the state's own
+            // phase.
+            for (state, written) in states[appearance] ?? [:] {
+                let text = written.entry.text
+                if let phase = ThemePhase(rawValue: text) {
+                    stateColors[appearance, default: [:]][state] = phaseColors[appearance]?[phase] ?? .system(phase.system)
+                } else if let value = value(text, appearance) {
+                    stateColors[appearance, default: [:]][state] = stateColor(value, system: state.phase.system)
+                } else {
+                    problem(written, "which isn't a phase, a palette name, a color or `system`")
                 }
             }
         }
@@ -227,7 +286,9 @@ public enum ThemeReader {
             summary: definition.summary,
             source: definition.source,
             appearances: ThemeAppearance.allCases.filter(filled.contains),
-            knobs: knobs
+            knobs: knobs,
+            phases: phaseColors,
+            states: stateColors
         ) { token, appearance in
             values[appearance]?[token] ?? .system
         }
@@ -284,7 +345,7 @@ private struct Parser {
         )
         if root.contains(key: "extends") { definition.extendsLine = map.line(for: [.key("extends")]) }
 
-        colours(root, sections: ThemeToken.sections + ["palette"], layer: .both, at: [], into: &definition)
+        colours(root, sections: ThemeReader.colourSections, layer: .both, at: [], into: &definition)
         for (layer, key) in [(ThemeDefinition.Layer.light, "light"), (.dark, "dark")] {
             guard let body = table(root, key, at: []) else { continue }
             colours(body, sections: body.keys, layer: layer, at: [.key(key)], into: &definition)
@@ -293,7 +354,8 @@ private struct Parser {
         return definition
     }
 
-    /// Reads one layer's colour tables, the palette and each token section,
+    /// Reads one layer's colour tables, the palette, each token section,
+    /// `[phase]` and `[states.*]`,
     /// from `body`: the file itself for the tables without a prefix, or its
     /// `light` or `dark` table.
     private mutating func colours(
@@ -307,27 +369,93 @@ private struct Parser {
                 definition.palette[layer, default: [:]].merge(self.palette(palette, at: sectionPath)) { $1 }
                 continue
             }
+            if section == "phase" {
+                guard let phases = table(body, section, at: path) else { continue }
+                for key in phases.keys {
+                    guard let phase = ThemePhase(rawValue: key) else {
+                        unknown(key, at: sectionPath, known: ThemePhase.allCases.map(\.rawValue), noun: "phase")
+                        continue
+                    }
+                    if let entry = entry(phases, key, at: sectionPath) { definition.phases[layer, default: [:]][phase] = entry }
+                }
+                continue
+            }
+            if section == "states" {
+                guard let kinds = table(body, section, at: path) else { continue }
+                for key in kinds.keys {
+                    guard let kind = ThemeKind(rawValue: key) else {
+                        unknown(key, at: sectionPath, known: ThemeKind.allCases.map(\.rawValue), noun: "kind")
+                        continue
+                    }
+                    let kindPath = sectionPath + [.key(key)]
+                    guard let states = table(kinds, key, at: sectionPath) else { continue }
+                    for state in states.keys {
+                        guard kind.phase(of: state) != nil else {
+                            unknown(state, at: kindPath, known: kind.states.map(\.name), noun: "state")
+                            continue
+                        }
+                        if let entry = entry(states, state, at: kindPath) {
+                            definition.states[layer, default: [:]][ThemeStateKey(kind: kind, state: state)] = entry
+                        }
+                    }
+                }
+                continue
+            }
             guard ThemeToken.sections.contains(section) else {
-                unknown(section, at: path, known: ThemeToken.sections + ["palette"])
+                unknown(section, at: path, known: ThemeReader.colourSections)
                 continue
             }
             guard let tokens = table(body, section, at: path) else { continue }
             for key in tokens.keys {
-                let keyPath = sectionPath + [.key(key)]
                 guard let token = ThemeToken(rawValue: "\(section).\(key)") else {
+                    if section == "state", let moved = Self.movedStates[key] {
+                        removed(key, moved, at: path)
+                        continue
+                    }
                     let known = ThemeToken.allCases.filter { $0.rawValue.hasPrefix(section + ".") }.map { String($0.rawValue.dropFirst(section.count + 1)) }
                     unknown(key, at: sectionPath, known: known, noun: "token")
                     continue
                 }
-                guard let text = string(tokens, key, at: sectionPath) else { continue }
-                let value = text.trimmingCharacters(in: .whitespaces)
-                if value.hasPrefix("#"), RGBA(hex: value) == nil {
-                    fail("`\(keyPath.dotted)` is \"\(value)\", which isn't a color; write #rrggbb or #rrggbbaa", at: keyPath)
-                    continue
-                }
-                definition.tokens[layer, default: [:]][token] = ThemeDefinition.Entry(text: value, path: keyPath.dotted, line: map.line(for: keyPath))
+                if let entry = entry(tokens, key, at: sectionPath) { definition.tokens[layer, default: [:]][token] = entry }
             }
         }
+    }
+
+    /// Where a key `[state]` doesn't take now went: the phase it was, and
+    /// the `[states.*]` keys that set it per kind.
+    private typealias Moved = (phase: ThemePhase, keys: [(kind: ThemeKind, state: String)])
+
+    /// The keys of `[state]` for pull requests, issues and runs, which
+    /// `[phase]` and `[states.*]` set instead.
+    private static let movedStates: [String: Moved] = [
+        "open": (.active, [(.pullRequest, "open"), (.issue, "open")]),
+        "draft": (.quiet, [(.pullRequest, "draft")]),
+        "merged": (.done, [(.pullRequest, "merged"), (.issue, "closed"), (.run, "succeeded")]),
+        "closed": (.failed, [(.pullRequest, "closed"), (.run, "failed")]),
+        "running": (.active, [(.run, "running")]),
+    ]
+
+    /// A removed `state.*` token is an error on its line that names the
+    /// keys that replace it, in the same layer.
+    private mutating func removed(_ key: String, _ moved: Moved, at path: ConfigurationPath) {
+        let keyPath = path + [.key("state"), .key(key)]
+        let prefix = path.isEmpty ? "" : "\(path.dotted)."
+        let keys = moved.keys.map { "`[\(prefix)states.\($0.kind.rawValue)] \($0.state)`" }
+        let list = keys.count == 1 ? keys[0] : keys.dropLast().joined(separator: ", ") + " and " + keys.last!
+        fail("`\(keyPath.dotted)` was removed; write `[\(prefix)phase] \(moved.phase.rawValue)` for every \(moved.phase.rawValue) state, or \(list)", at: keyPath)
+    }
+
+    /// A colour as written: a quoted string, with a hex colour checked here
+    /// and a name looked up once `extends` is known.
+    private mutating func entry(_ table: TOMLTable, _ key: String, at path: ConfigurationPath) -> ThemeDefinition.Entry? {
+        let keyPath = path + [.key(key)]
+        guard let text = string(table, key, at: path) else { return nil }
+        let value = text.trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("#"), RGBA(hex: value) == nil {
+            fail("`\(keyPath.dotted)` is \"\(value)\", which isn't a color; write #rrggbb or #rrggbbaa", at: keyPath)
+            return nil
+        }
+        return ThemeDefinition.Entry(text: value, path: keyPath.dotted, line: map.line(for: keyPath))
     }
 
     /// An `[any.<table>]` is an error on its own line that tells the author

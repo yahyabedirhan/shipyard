@@ -59,20 +59,32 @@ private struct ThemeScope: ViewModifier {
     }
 }
 
-/// A token of the theme in the environment, resolved when it's drawn for the
-/// environment's appearance. A `ShapeStyle`: use it where a colour goes in
-/// `foregroundStyle`, `fill`, `background`, `stroke` and `overlay`.
+/// A colour of the theme in the environment, a token or a state, resolved
+/// when it's drawn for the environment's appearance. A `ShapeStyle`: use it
+/// where a colour goes in `foregroundStyle`, `fill`, `background`, `stroke`
+/// and `overlay`.
 struct ThemeColor: ShapeStyle, Hashable {
-    let token: ThemeToken
+    /// What the colour is looked up by.
+    enum Source: Hashable {
+        case token(ThemeToken)
+        /// A kind's state, as its `[states.<kind>]` table names it.
+        case state(ThemeKind, String)
+    }
+
+    let source: Source
     var opacity: Double = 1
 
     init(_ token: ThemeToken, opacity: Double = 1) {
-        self.token = token
+        self.init(.token(token), opacity: opacity)
+    }
+
+    private init(_ source: Source, opacity: Double) {
+        self.source = source
         self.opacity = opacity
     }
 
-    /// The same token at a fraction of its alpha; `opacity(0)` draws nothing.
-    func opacity(_ value: Double) -> ThemeColor { ThemeColor(token, opacity: opacity * value) }
+    /// The same colour at a fraction of its alpha; `opacity(0)` draws nothing.
+    func opacity(_ value: Double) -> ThemeColor { ThemeColor(source, opacity: opacity * value) }
 
     func resolve(in environment: EnvironmentValues) -> Color {
         color(in: environment.theme, ThemeAppearance(environment.colorScheme))
@@ -80,11 +92,28 @@ struct ThemeColor: ShapeStyle, Hashable {
 
     /// The colour in `theme` and `appearance`, for code with no environment.
     func color(in theme: Theme, _ appearance: ThemeAppearance) -> Color {
-        let base = switch theme.value(token, appearance) {
-        case .color(let rgba): Color(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a)
-        case .system: SystemColors.color(token.system(appearance), appearance)
+        let base: Color = switch source {
+        case .token(let token):
+            switch theme.value(token, appearance) {
+            case .color(let rgba): Self.color(rgba)
+            case .system: SystemColors.color(token.system(appearance), appearance)
+            }
+        case .state(let kind, let state):
+            // A state the kind doesn't have draws the quiet phase.
+            Self.color(theme.color(kind, state, appearance) ?? theme.color(.quiet, appearance), appearance)
         }
         return opacity == 1 ? base : base.opacity(opacity)
+    }
+
+    private static func color(_ rgba: RGBA) -> Color {
+        Color(.sRGB, red: rgba.r, green: rgba.g, blue: rgba.b, opacity: rgba.a)
+    }
+
+    private static func color(_ value: ThemeStateColor, _ appearance: ThemeAppearance) -> Color {
+        switch value {
+        case .color(let rgba): color(rgba)
+        case .system(let shade): SystemColors.color(shade, appearance)
+        }
     }
 
     static let panel = ThemeColor(.panel)
@@ -110,20 +139,11 @@ struct ThemeColor: ShapeStyle, Hashable {
     static let attention = ThemeColor(.attention)
     static let lease = ThemeColor(.lease)
 
-    /// A row's state icon, by where the item is in its life, whatever its
-    /// kind: active (open, running), done (merged, a closed issue, a
-    /// succeeded run) or failed (a closed pull request, a failed run). The
-    /// theme decides the hues; a ping or a note is neutral.
+    /// A row's state icon: the theme's colour for the kind in that state,
+    /// its `[states.<kind>]` value. A ping or a note is neutral.
     static func state(_ state: ItemState, kind: ItemKind) -> ThemeColor {
-        if kind == .ping || kind == .note { return neutral }
-        return switch state {
-        case .open: ThemeColor(.open)
-        case .running: ThemeColor(.running)
-        case .draft: ThemeColor(.draft)
-        case .merged, .succeeded: ThemeColor(.merged)
-        case .closed: kind == .issue ? ThemeColor(.merged) : ThemeColor(.closed)
-        case .failed: ThemeColor(.closed)
-        }
+        guard let kind = ThemeKind(kind) else { return neutral }
+        return ThemeColor(.state(kind, state.rawValue), opacity: 1)
     }
 
     /// A pull request's check dot; none when it has no checks.

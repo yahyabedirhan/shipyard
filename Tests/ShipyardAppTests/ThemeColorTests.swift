@@ -37,21 +37,19 @@ struct ThemeColorTests {
         #expect(abs(drawn(.panel.opacity(0.5), theme: Self.theme, .light).opacity - 0.5) < 0.001)
     }
 
-    @Test("a state icon's colour says where it is in its life, whatever its kind: active, done or failed", arguments: [
-        (ItemState.open, ItemKind.pullRequest, ThemeToken.open),
-        (.open, .issue, .open),
-        (.running, .workflowRun, .running),
-        (.draft, .pullRequest, .draft),
-        (.merged, .pullRequest, .merged),
-        (.closed, .issue, .merged),
-        (.succeeded, .workflowRun, .merged),
-        (.closed, .pullRequest, .closed),
-        (.failed, .workflowRun, .closed),
-        (.open, .ping, .neutral),
-        (.open, .note, .neutral),
-    ])
-    func stateIcon(_ state: ItemState, _ kind: ItemKind, _ token: ThemeToken) {
-        #expect(ThemeColor.state(state, kind: kind) == ThemeColor(token))
+    @Test("every state a theme colours is a state an item of that kind has, so a row's icon finds its colour")
+    func stateNames() {
+        let kinds: [ItemKind: ThemeKind] = [.pullRequest: .pullRequest, .issue: .issue, .workflowRun: .run]
+        for (itemKind, kind) in kinds {
+            #expect(ThemeKind(itemKind) == kind)
+            for (state, _) in kind.states {
+                let item = ItemState(rawValue: state)
+                #expect(item != nil, "\(kind.rawValue).\(state)")
+                if let item { #expect(ThemeColor.state(item, kind: itemKind) != ThemeColor.neutral) }
+            }
+        }
+        #expect(ThemeKind(.ping) == nil)
+        #expect(ThemeKind(.note) == nil)
     }
 
     @Test("each built-in theme passes the contrast check with the live macOS colours, as with the reference ones the command uses")

@@ -30,7 +30,7 @@ extension BuiltInThemes {
     brick-dim = "#B3322Ab3"
     amber = "#8F5A00"
     gold = "#C99A00"
-    quiet = "#7A6D5B"
+    grey = "#7A6D5B"
 
     [surface]
     window = "sand"
@@ -61,16 +61,36 @@ extension BuiltInThemes {
     pressed = "press"
     selected = "terracotta-soft"
 
-    [state]
-    open = "green"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "green"
+    done = "plum"
+    failed = "brick"
+    quiet = "grey"
+
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
     draft = "quiet"
-    merged = "plum"
-    closed = "brick"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    # Checks, approvals, the rate limit, pings and notes.
+    [state]
     success = "green"
     failure = "brick"
     pending = "amber"
-    running = "green"
-    neutral = "quiet"
+    neutral = "grey"
 
     [signal]
     attention = "terracotta"

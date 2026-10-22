@@ -30,14 +30,19 @@ on-accent = "#ffffff"
 [dark.text]
 on-accent = "#1a0b02"
 
-# A few state colors changed from the quiet default:
-# open items are green, merged ones purple.
-[light.state]
-open = "#1A7F37"
-merged = "#8250DF"
-[dark.state]
-open = "#3FB950"
-merged = "#A371F7"
+# The colours of pull requests, issues and runs. [phase] names one colour
+# for each phase of an item's life: active, done, failed and quiet.
+# A [states.<kind>] table gives one state its own colour: a phase name,
+# a palette name, a hex color or "system". Every state you leave out
+# takes its phase. Here every failed state is a deeper red, and a draft
+# pull request is coral.
+[light.phase]
+failed = "#B91C1C"
+[dark.phase]
+failed = "#F87171"
+
+[states.pull-request]
+draft = "coral"
 
 # Knobs shared by both appearances.
 [density]

@@ -13,7 +13,7 @@ extension BuiltInThemes {
     # Raw colors, named once. Tokens below refer to them by name.
     [light.palette]
     accent = "#2F6BDE"
-    quiet = "#6B6B72"
+    grey = "#6B6B72"
     green = "#1F883D"
     purple = "#8250DF"
     ok = "#2E8B4Eb3"
@@ -23,7 +23,7 @@ extension BuiltInThemes {
     on-accent = "#ffffff"
     [dark.palette]
     accent = "#6D9CFF"
-    quiet = "#9A9AA2"
+    grey = "#9A9AA2"
     green = "#4CB868"
     purple = "#A371F7"
     ok = "#4CB868b3"
@@ -62,18 +62,36 @@ extension BuiltInThemes {
     pressed = "system"
     selected = "system"
 
-    # Open, merged and closed each take their own hue; a draft stays quiet.
-    # A running run is active, as an open item is, so it takes open's hue.
-    [state]
-    open = "green"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "green"
+    done = "purple"
+    failed = "bad"
+    quiet = "grey"
+
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
     draft = "quiet"
-    merged = "purple"
-    closed = "bad"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    # Checks, approvals, the rate limit, pings and notes.
+    [state]
     success = "ok"
     failure = "bad"
     pending = "warn"
-    running = "green"
-    neutral = "quiet"
+    neutral = "grey"
 
     [signal]
     attention = "accent"

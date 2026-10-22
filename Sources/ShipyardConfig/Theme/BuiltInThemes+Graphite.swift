@@ -25,7 +25,7 @@ extension BuiltInThemes {
     good = "#5FB27C"
     bad = "#F2655F"
     warn = "#D9A02A"
-    quiet = "#9A9AA2"
+    grey = "#9A9AA2"
     violet = "#A68BE0"
     [light.palette]
     ground = "#F2F2F3"
@@ -44,7 +44,7 @@ extension BuiltInThemes {
     good = "#2E7D4A"
     bad = "#C62828"
     warn = "#8A5A00"
-    quiet = "#62626A"
+    grey = "#62626A"
     violet = "#6E4FB0"
 
     [surface]
@@ -76,16 +76,36 @@ extension BuiltInThemes {
     pressed = "press"
     selected = "press"
 
-    [state]
-    open = "good"
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "good"
+    done = "violet"
+    failed = "bad"
+    quiet = "grey"
+
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
     draft = "quiet"
-    merged = "violet"
-    closed = "bad"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    # Checks, approvals, the rate limit, pings and notes.
+    [state]
     success = "good"
     failure = "bad"
     pending = "warn"
-    running = "good"
-    neutral = "quiet"
+    neutral = "grey"
 
     [signal]
     attention = "accent"

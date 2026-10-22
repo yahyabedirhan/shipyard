@@ -61,7 +61,7 @@ ShipyardNotices   agent side: Notice, NoticeRequest, NoticeVerdict, NoticeRoute,
                   the other machine's routes: RemoteNoticeRoute (the choice), TailnetNoticeRoute + NoticeHTTP, PluginNoticeRoute
 ShipyardConfig    Configuration, ConfigurationReader, TOMLSourceMap, Selectors, ConfigurationDuration, LayoutSetting, ConfigurationStore,
                   ResolvedRepositoriesStore, ProjectFiling (implements PingFiling),
-                  Theme/: the theme model (ThemeToken, ThemeValue, Theme, ThemeKnobs), ThemeReader, BuiltInThemes, ThemeLibrary, ThemeContrast
+                  Theme/: the theme model (ThemeToken, ThemeValue, ThemePhase, ThemeKind, ThemeStateColor, Theme, ThemeKnobs), ThemeReader, BuiltInThemes, ThemeLibrary, ThemeContrast
 ShipyardControl   ControlRequest, ControlReply, ControlCommand and PanelCommand (argument parsing), ControlClient (socket), AppLauncher,
                   ControlLease (the lease's rules), Holder (who sends a request), LeaseBanner (the banner's words),
                   ControlNoticeRoute (a notice over the socket)
@@ -1785,18 +1785,22 @@ The theme file format is in `skills/shipyard/references/themes.md`, and what to 
 
 It is pure and lives in ShipyardConfig, so the Mac `shipyard` checks theme files without AppKit.
 
-- `ThemeToken` lists the 30 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`).
+- `ThemeToken` lists the 25 tokens in seven sections (`surface`, `text`, `accent`, `line`, `row`, `state`, `signal`).
   `surface.window`, `accent.soft` and `row.selected` are reserved, read and checked but drawn by no view, and `ThemeToken.system(_:)` names the macOS colour, a `SystemShade`, that the value `system` stands for.
+  The `state` section holds `success`, `failure`, `pending` and `neutral`; the colours of pull requests, issues and runs are state colours, not tokens (ADR 0015).
 - A `ThemeValue` is a colour (`RGBA`) or `system`.
+- `ThemePhase` lists the four phases, `active`, `done`, `failed` and `quiet`, and `ThemePhase.system` names each one's macOS colour: green, purple, red and the secondary label grey.
+- `ThemeKind` lists the kinds a theme colours by state, `pull-request`, `issue` and `run`, each with its states and the phase each state takes by default (`ThemeKind.states`); `ThemeKind(_:)` maps an `ItemKind` to one, and a ping or a note has none.
+- A `ThemeStateColor` is a resolved state or phase colour: a fixed `RGBA`, or a `SystemShade` the app draws live.
 - `ThemeKnobs` holds what both appearances share: the font (`family`, `mono`, `size`), the density (a preset and the `row`, `header`, `bar` and `gutter` heights it sets), the corner radii (`small`, `medium`, `large`) and the material (`glass` or flat).
-- `Theme` holds every token resolved for light and dark, its knobs, the `appearances` it fills itself, and its `source`, built in or a file; `Theme.drawn(_:)` gives the appearance it draws in while the system is in another.
+- `Theme` holds every token, phase and state colour resolved for light and dark, its knobs, the `appearances` it fills itself, and its `source`, built in or a file; `Theme.drawn(_:)` gives the appearance it draws in while the system is in another.
 - A `ThemeIssue` is a problem with its file and line, which reads in a banner as "themes/Sunset.toml line 22: …".
 
 #### Operations
 
 **Reading a theme.**
 `ThemeReader.definition(_:file:source:)` reads one file's text with TOMLDecoder into a `ThemeDefinition`, or returns its issues, each placed on its line by `TOMLSourceMap`.
-A `ThemeDefinition` holds its palette and tokens per layer: `both`, the tables without a prefix (`[palette]`, `[surface]`, `[text]` …), and `light` and `dark`, the `[light.*]` and `[dark.*]` tables.
+A `ThemeDefinition` holds its palette, tokens, phases and states per layer: `both`, the tables without a prefix (`[palette]`, `[surface]`, `[text]` …), and `light` and `dark`, the `[light.*]` and `[dark.*]` tables.
 An `[any.*]` table is an issue on its line that tells the author to remove the `any.` prefix.
 `ThemeReader.resolve(_:extending:)` resolves definitions against each other and against a base it looks up but never resolves, the built-ins for the user's files.
 
@@ -1828,12 +1832,21 @@ The Linux `shipyard` never links ShipyardConfig, so it reads neither theme files
 #### Rules
 
 **Resolving.**
-`extends` names a parent, ignoring case, that fills every token and knob the file leaves out.
-Each link of the chain lays its `light` or `dark` layer over its `both` layer, for the palette and the tokens alike.
+`extends` names a parent, ignoring case, that fills every token, phase, state and knob the file leaves out.
+Each link of the chain lays its `light` or `dark` layer over its `both` layer, for the palette, the tokens, the phases and the states alike.
+So a state colour comes from the appearance's table, then the table without a prefix, then the `extends` chain, then the default.
 Palette names are looked up per appearance once the whole chain is known, and a token no theme in the chain sets is `system`.
 Of two definitions with one name the later wins.
 A root theme that fills one appearance alone, writing `[light.*]` or `[dark.*]` for that one only, draws it in both: Paper fills light, Midnight fills dark.
 Its tables without a prefix keep it to that one when their tokens name a palette entry only that appearance's palette holds, as Paper's name `[light.palette]` colours.
+
+**State colours.**
+`Theme.color(_:_:_:)` is the one lookup for a state: a `ThemeKind`, a state's name and an appearance in, a `ThemeStateColor` out, or `nil` for a state the kind doesn't have.
+A `[phase]` value is a palette name, a hex colour or `system`; one that names a phase is a problem.
+A `[states.<kind>]` value is a phase name, a palette name, a hex colour or `system`.
+A phase's name always means the phase, even where a palette entry has that name, so the built-in themes call their grey `grey`.
+A state no theme in the chain sets takes its phase, and a phase no theme sets is its macOS colour; `system` in a state is its own phase's macOS colour.
+A `state.*` token that `[states.*]` replaced, such as `state.merged`, is a problem on its line that names the keys that replace it, in the same layer.
 
 **Files that don't read.**
 A file with a problem keeps the theme it last read, by file URL.
@@ -1848,7 +1861,7 @@ Every built-in theme passes in both appearances.
 
 **The token layer.**
 `ShipyardApp/UI/ThemeColor.swift` brings a theme into the views.
-Views read `\.theme` from the environment, Shipyard by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves its token from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` and `checks(_:)` for a row's icon and check dot, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
+Views read `\.theme` from the environment, Shipyard by default, and draw a `ThemeColor`: a `ShapeStyle` that resolves a token, or a kind's state, from the environment's theme and colour scheme when it's drawn, with a static name per token (`.panel`, `.textSecondary`, `.rowHover` …), `state(_:kind:)` and `checks(_:)` for a row's icon and check dot, `.opacity(_:)`, and `color(in:_:)` for code with no environment.
 There is no global active theme: a view that sets `\.theme` changes only what's below it.
 `View.theme(_:)` sets it at the panel's root, from `Shipyard.theme`, and gives the views below the appearance the theme draws in, so a theme that fills one appearance draws it in both, its `system` values and the text and controls with no colour of their own included.
 
@@ -2610,7 +2623,7 @@ Each row holds:
 
 - Its number, title (a run: its workflow's name), author and URL.
 - Its semantic state: open, draft, merged, closed, running, succeeded, failed.
-  The app's `ThemeColor.state(_:kind:)` colours it by where it is in its life: active takes `state.open` (a run, `state.running`), done takes `state.merged` (a merged pull request, a closed issue, a succeeded run), and failed takes `state.closed` (a closed pull request, a failed run).
+  The app's `ThemeColor.state(_:kind:)` colours its icon with the theme's state colour, `Theme.color(_:_:_:)` for the kind and the state, in the list and the tabs layouts alike; the app keeps no mapping from a state to a colour of its own, and a ping or a note is `state.neutral`.
 - `branch` (runs only) and the check dot (open and draft PRs only).
 - `since` for its age: opened or started, or closed or finished.
 - Its `needsAttention` flag and the `item` it shows; marking it seen records that version.

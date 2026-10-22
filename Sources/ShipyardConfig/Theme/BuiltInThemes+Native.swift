@@ -38,15 +38,35 @@ extension BuiltInThemes {
     pressed = "system"
     selected = "system"
 
+    # Where each state is in its life: active is green, done purple,
+    # failed red, and quiet grey.
+    [phase]
+    active = "system"
+    done = "system"
+    failed = "system"
+    quiet = "system"
+
+    # Each kind's states, by phase. A state can name its own colour instead.
+    [states.pull-request]
+    open = "active"
+    draft = "quiet"
+    merged = "done"
+    closed = "failed"
+
+    [states.issue]
+    open = "active"
+    closed = "done"
+
+    [states.run]
+    running = "active"
+    succeeded = "done"
+    failed = "failed"
+
+    # Checks, approvals, the rate limit, pings and notes.
     [state]
-    open = "system"
-    draft = "system"
-    merged = "system"
-    closed = "system"
     success = "system"
     failure = "system"
     pending = "system"
-    running = "system"
     neutral = "system"
 
     [signal]
