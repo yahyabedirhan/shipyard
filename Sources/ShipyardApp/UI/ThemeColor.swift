@@ -208,7 +208,7 @@ struct ThemeColor: ShapeStyle, Hashable {
         }
     }
 
-    /// A pull request's check dot; none when it has no checks.
+    /// A pull request's checks on its hover card; none when it has none.
     static func checks(_ checks: ChecksState) -> ThemeColor? {
         checks == .none ? nil : state(.check, checks.rawValue)
     }
@@ -257,22 +257,29 @@ enum SystemColors {
     }
 
     private static let cache = OSAllocatedUnfairLock(initialState: [Key: Color]())
+    private static let values = OSAllocatedUnfairLock(initialState: [Key: RGBA]())
     nonisolated(unsafe) private static let observer: any NSObjectProtocol = NotificationCenter.default.addObserver(
         forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: nil
     ) { _ in
-        cache.withLock { $0.removeAll() }
+        forget()
     }
 
     /// The shade as an sRGB colour, read under `appearance`, for code that
     /// works on colours' values: the theme circles, the error dot's red.
     static func rgba(_ shade: SystemShade, _ appearance: ThemeAppearance) -> RGBA {
+        _ = observer
+        let key = Key(shade: shade, appearance: appearance)
+        if let rgba = values.withLock({ $0[key] }) { return rgba }
         let color = resolved(shade, appearance)
-        return RGBA(r: color.redComponent, g: color.greenComponent, b: color.blueComponent, a: color.alphaComponent)
+        let rgba = RGBA(r: color.redComponent, g: color.greenComponent, b: color.blueComponent, a: color.alphaComponent)
+        values.withLock { $0[key] = rgba }
+        return rgba
     }
 
     /// Drops the colours read so far, so the next draw reads them again.
     static func forget() {
         cache.withLock { $0.removeAll() }
+        values.withLock { $0.removeAll() }
     }
 
     static func color(_ shade: SystemShade, _ appearance: ThemeAppearance) -> Color {

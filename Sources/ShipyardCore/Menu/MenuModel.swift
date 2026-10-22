@@ -6,7 +6,7 @@ import ShipyardConfig
 /// the attention count and menu bar label, and when the list was last
 /// brought up to date. It's built from the projects' listings (`Listing`
 /// decides which items a project has); every display rule (order, state and
-/// check dot, which rows need attention, what the menu bar says) lives here,
+/// attention dot, which rows need attention, what the menu bar says) lives here,
 /// so tests reach them without SwiftUI.
 public struct MenuModel: Equatable, Sendable {
     public var sections: [MenuSection]

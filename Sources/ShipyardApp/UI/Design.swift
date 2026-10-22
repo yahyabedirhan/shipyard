@@ -5,7 +5,7 @@ import SwiftUI
 /// The panel's sizes and type at one theme's font, density and shape knobs.
 /// It is resolved once where the theme is set (`EnvironmentValues.theme`),
 /// and views read it from the environment's `panelScale`, so a row reads
-/// its sizes and builds nothing. The Shipyard theme's knobs give the
+/// its sizes and builds nothing. System's knobs, and the Shipyard themes', give the
 /// panel's long-standing grid, with 6 and 8 pt corners.
 struct PanelScale: Equatable {
     let knobs: ThemeKnobs
@@ -24,7 +24,7 @@ struct PanelScale: Equatable {
         listType = ListType(knobs)
     }
 
-    /// The Shipyard theme's scale, for views with no theme set above them.
+    /// The default theme's scale, System's, for views with no theme set above them.
     static let shipyard = PanelScale(BuiltInThemes.system.knobs)
 
     /// A shared row piece's sizes and type, in the layout `style` draws.
@@ -138,7 +138,7 @@ enum FontKit {
 }
 
 /// The frame's and the tabs layout's type: the system text styles under the
-/// Shipyard theme, sized from the theme's body size otherwise.
+/// default theme's knobs, sized from the theme's body size otherwise.
 struct TypeScale: Equatable {
     /// The panel's heading, and a screen's title.
     let title: Font

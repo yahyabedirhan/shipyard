@@ -33,7 +33,8 @@ public enum ThemeKind: String, CaseIterable, Hashable, Sendable {
     case pullRequest = "pull-request"
     case issue
     case run
-    /// A pull request's checks: its check dot.
+    /// A pull request's checks, on its hover card; its attention dot shows
+    /// them in `signal.attention-failed` and `signal.attention`.
     case check
     /// A pull request's review decision.
     case review

@@ -48,7 +48,7 @@ public struct ThemeDefinition: Sendable {
     /// draws in both; `nil` when it fills both or extends another. It fills
     /// one when it writes `[light.*]` or `[dark.*]` tables for that one
     /// alone, and its colours without a prefix, if any, read that
-    /// appearance's own palette: Paper's `[surface]` and `[text]` tokens name
+    /// appearance's own palette: Paper Light's `[surface]` and `[text]` tokens name
     /// `[light.palette]` colours, so it fills light, where tokens without a
     /// prefix and a `[dark.*]` override still set both appearances.
     var single: ThemeAppearance? {

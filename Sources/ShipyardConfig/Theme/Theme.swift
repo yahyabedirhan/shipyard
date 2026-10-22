@@ -2,7 +2,7 @@ import Foundation
 import ShipyardCommand
 
 /// The knobs both appearances of a theme share: font, density, shape and
-/// material. The defaults are the Shipyard theme's.
+/// material. The defaults are System's.
 public struct ThemeKnobs: Hashable, Sendable {
     /// `system`, `rounded`, `mono` or a font's name.
     public var fontFamily = "system"
