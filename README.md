@@ -34,7 +34,7 @@ npx skills add yahyabedirhan/shipyard -g -y
 
 > "Watch this repo in shipyard"
 
-## What it does
+## Features
 
 Your agents open pull requests and issues and start workflow runs, often several at once across several repositories.
 shipyard lists them in the macOS menu bar.
@@ -52,7 +52,7 @@ shipyard lists them in the macOS menu bar.
 
 Needs macOS 14 or later and a GitHub account.
 
-### From source
+### Source build
 
 Building also needs the Command Line Tools with Swift 6 (`xcode-select --install`).
 
@@ -62,7 +62,7 @@ cd shipyard
 make install    # builds, signs and copies Shipyard.app to /Applications, then opens it
 ```
 
-### From the download
+### Release zip
 
 Get `Shipyard-<version>-macos.zip` from the [latest release](https://github.com/yahyabedirhan/shipyard/releases/latest).
 It is not notarized, so clear the quarantine flag before the first launch:
@@ -75,14 +75,14 @@ open /Applications/Shipyard.app
 ```
 
 <details>
-<summary><b>Updating</b></summary>
+<summary><b>Update</b></summary>
 
 Run `git pull && make install` again, or replace the app with a newer zip.
 
 </details>
 
 <details>
-<summary><b>Uninstalling</b></summary>
+<summary><b>Uninstall</b></summary>
 
 1. If you signed in with GitHub, choose **Sign out** in the gear menu.
 2. If you installed the agent skill, remove it with `npx skills remove shipyard -g`.
@@ -101,7 +101,7 @@ Run `git pull && make install` again, or replace the app with a newer zip.
 
 </details>
 
-## First run
+## Setup
 
 shipyard lives in the menu bar, with no Dock icon.
 
@@ -140,7 +140,7 @@ shipyard lives in the menu bar, with no Dock icon.
 shipyard starts at login.
 Set `launch-at-login = false` to stop that.
 
-## Configure
+## Configuration
 
 <table>
 <tr>
@@ -186,7 +186,7 @@ theme = "Midnight"
 Six come with the app: **Shipyard** (the default), **Native**, **Graphite**, **Paper**, **Midnight** and **Harbor**.
 
 <details>
-<summary><b>A theme of your own</b></summary>
+<summary><b>Custom themes</b></summary>
 
 - A theme file is one TOML file in `~/.config/shipyard/themes/`.
 - It names its colours by what they mean, such as `surface.panel` or `text.secondary`.
@@ -197,7 +197,7 @@ Six come with the app: **Shipyard** (the default), **Native**, **Graphite**, **P
 
 </details>
 
-### The gear menu
+### Gear menu
 
 It lists the parts shipyard uses, with a check mark beside each one that is set up:
 
@@ -208,9 +208,9 @@ It lists the parts shipyard uses, with a check mark beside each one that is set 
 
 Each opens a view of its status in the panel.
 
-## Use it with your agents
+## Agents
 
-### The agent skill
+### Agent skill
 
 The skill teaches coding agents that read skills, such as Claude Code and Codex, to edit shipyard's configuration.
 Install it during onboarding, from **Set up /shipyard skill** in the gear menu, or from a terminal:
@@ -269,7 +269,7 @@ shipyard ping withdraw shop-question                                     # takes
 ```
 
 <details>
-<summary><b>More about pings</b></summary>
+<summary><b>Ping details</b></summary>
 
 - A ping is filed under the projects that watch the repository of the agent's working folder.
 - `shipyard ping --help` lists every flag.
@@ -278,7 +278,7 @@ shipyard ping withdraw shop-question                                     # takes
 
 </details>
 
-### Pings from your other machines
+### Remote pings
 
 Agents on your other machines can ping you too, when your Mac's Herdr knows those machines as saved machines.
 
@@ -296,7 +296,7 @@ Agents on your other machines can ping you too, when your Mac's Herdr knows thos
    ```
 
 <details>
-<summary><b>How it works</b></summary>
+<summary><b>Remote ping details</b></summary>
 
 - shipyard asks each machine for its pings through Herdr about every 30 seconds.
 - It files them under the projects that watch their repositories, or under the machine's name.
@@ -306,7 +306,7 @@ Agents on your other machines can ping you too, when your Mac's Herdr knows thos
 
 </details>
 
-### Notes
+### Notion notes
 
 <table>
 <tr>
@@ -342,7 +342,7 @@ To connect:
 4. Open **Set up Notion** in the gear menu and choose **Connect with ntn**.
 
 <details>
-<summary><b>How it works</b></summary>
+<summary><b>Notes details</b></summary>
 
 - Each project has one database, titled with the project's title, under a "Projects" page inside a "Shipyard Notes" page.
 - The notes are read every minute and whenever you open the menu.
@@ -484,7 +484,7 @@ make release    # builds the release zip
 | [`docs/messaging.md`](docs/messaging.md) | The words every public surface uses. |
 
 <details>
-<summary><b>Build notes</b></summary>
+<summary><b>Build details</b></summary>
 
 - With the Command Line Tools alone, the first build compiles the SDK's Swift modules (about 40 s).
 - The `Makefile` keeps them in `~/Library/Caches/shipyard/ModuleCache`, so every other checkout and worktree reuses them.

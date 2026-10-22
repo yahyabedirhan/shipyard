@@ -479,7 +479,7 @@ Do every step in the same change; the tests fail on most of the ones you miss.
    Keep each example's lines together, since the test uncommenting them one example at a time treats a run of setting lines as one example.
 5. **The skill.** Add the key to `skills/shipyard/SKILL.md`: its row in the right keys table (`| key | default | allowed |`), any new choice or event, and a worked request when it answers something users will ask for.
    Tests fail until every schema key is named beside its table, every default matches the code, and every TOML example decodes cleanly and validates.
-6. **The README.** When the setting is something a user meets before reading the skill, give it a mention in `README.md`'s "Configure" section.
+6. **The README.** When the setting is something a user meets before reading the skill, give it a mention in `README.md`'s "Configuration" section.
    When the README's examples use it, keep them decoding (`ReadmeDocumentTests` checks them).
    The README stays short; the skill is the reference.
 7. **Tests at the configuration seam.** In `ConfigurationTests`, set the key in `everyKey` (away from its default) and add decode and rejection cases with their lines and messages.
