@@ -59,26 +59,34 @@ public enum GitHubError: Error, Equatable, Sendable {
 }
 
 /// Talks to GitHub's API with one token. Every request goes through `send`,
-/// which authorises it and turns a 401 into `GitHubError.unauthorized`.
+/// which authorises it, sends it again when GitHub timed out on it, and
+/// turns a 401 into `GitHubError.unauthorized`.
 public struct GitHubClient: Sendable {
     public static let apiURL = URL(string: "https://api.github.com")!
     public static let graphQLURL = apiURL.appendingPathComponent("graphql")
+    /// How many times a request GitHub answered with a timeout (502 or 504)
+    /// is sent again before its error is thrown.
+    static let timeoutRetries = 2
+    /// The longest wait before the first retry; each later retry doubles it.
+    static let timeoutBackoff: TimeInterval = 1
 
     private let token: String
     private let transport: any HTTPTransport
+    private let sleep: Sleep
     private let runCache = WorkflowRunCache()
     private let reviewSearchCache = ReviewSearchCache()
     private let repositoryCache = RepositoryCache()
 
     private let repositoriesPerRequest: Int
 
-    public init(token: String, transport: any HTTPTransport) {
-        self.init(token: token, transport: transport, repositoriesPerRequest: ProjectQuery.repositoriesPerRequest)
+    public init(token: String, transport: any HTTPTransport, sleep: @escaping Sleep = systemSleep) {
+        self.init(token: token, transport: transport, sleep: sleep, repositoriesPerRequest: ProjectQuery.repositoriesPerRequest)
     }
 
-    init(token: String, transport: any HTTPTransport, repositoriesPerRequest: Int) {
+    init(token: String, transport: any HTTPTransport, sleep: @escaping Sleep = systemSleep, repositoriesPerRequest: Int) {
         self.token = token
         self.transport = transport
+        self.sleep = sleep
         self.repositoriesPerRequest = max(1, repositoriesPerRequest)
     }
 
@@ -255,11 +263,12 @@ public struct GitHubClient: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = ProjectQuery.body(batch, reviewSearch: reviewSearch)
-        let (data, response) = try await send(request)
+        var retries = 0
+        let (data, response) = try await send(request, retries: &retries)
 
         let headers = RateLimit(headers: response)
         let resetAt = headers?.resetAt ?? fetchedAt.addingTimeInterval(60)
-        let parsed: ProjectQuery.Parsed
+        var parsed: ProjectQuery.Parsed
         do {
             parsed = try ProjectQuery.parse(data, repositories: batch, reviewSearch: reviewSearch)
         } catch GitHubError.graphQL(let message) {
@@ -267,6 +276,11 @@ public struct GitHubClient: Sendable {
             throw GitHubError.graphQL(message)
         }
         if parsed.rateLimited { throw GitHubError.rateLimited(resetAt: resetAt, api: .graphql) }
+        // A timed-out query cost points too; count each retry as the minimum, 1.
+        if retries > 0, var limit = parsed.rateLimit {
+            limit.cost = (limit.cost ?? 0) + retries
+            parsed.rateLimit = limit
+        }
         return (parsed, headers)
     }
 
@@ -291,7 +305,7 @@ public struct GitHubClient: Sendable {
             let cached = runCache.entry(repository.slug, url: url)
             if let cached { request.setValue(cached.etag, forHTTPHeaderField: "If-None-Match") }
             do {
-                let (data, response) = try await send(request, acceptingNotModified: cached != nil)
+                let (data, response) = try await send(request, acceptingNotModified: cached != nil, retries: &counted)
                 if let limit = RateLimit(headers: response) { latest = limit }
                 if response.statusCode == 304, let cached {
                     fetch.items[repository.slug] = cached.runs
@@ -325,6 +339,19 @@ public struct GitHubClient: Sendable {
     }
 
     func send(_ request: URLRequest, acceptingNotModified: Bool = false) async throws -> (Data, HTTPURLResponse) {
+        var retries = 0
+        return try await send(request, acceptingNotModified: acceptingNotModified, retries: &retries)
+    }
+
+    /// Sends `request`. GitHub answers one it took too long over with 502 or
+    /// 504; that is sent again up to `timeoutRetries` times, after an
+    /// exponential backoff with jitter, and each retry adds 1 to `retries`.
+    /// A cancelled task ends the wait with `CancellationError`.
+    func send(
+        _ request: URLRequest,
+        acceptingNotModified: Bool = false,
+        retries: inout Int
+    ) async throws -> (Data, HTTPURLResponse) {
         var request = request
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -332,15 +359,41 @@ public struct GitHubClient: Sendable {
         request.setValue("shipyard/\(ShipyardVersion.current)", forHTTPHeaderField: "User-Agent")
         if request.timeoutInterval > 30 { request.timeoutInterval = 30 }
 
-        let data: Data
-        let response: HTTPURLResponse
+        var retried = 0
+        while true {
+            let (data, response) = try await attempt(request)
+            guard [502, 504].contains(response.statusCode), retried < Self.timeoutRetries else {
+                return try Self.checked(data, response, for: request, acceptingNotModified: acceptingNotModified)
+            }
+            try await sleep(Self.backoff(after: retried))
+            retried += 1
+            retries += 1
+        }
+    }
+
+    /// The wait before the retry that follows `retried` earlier ones: up to
+    /// `timeoutBackoff` doubled per earlier retry, at least half of that.
+    static func backoff(after retried: Int) -> TimeInterval {
+        let longest = timeoutBackoff * Double(1 << retried)
+        return longest / 2 + .random(in: 0...longest / 2)
+    }
+
+    private func attempt(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         do {
-            (data, response) = try await transport.send(request)
+            return try await transport.send(request)
         } catch let error as CancellationError {
             throw error
         } catch {
             throw GitHubError.network(error.localizedDescription)
         }
+    }
+
+    private static func checked(
+        _ data: Data,
+        _ response: HTTPURLResponse,
+        for request: URLRequest,
+        acceptingNotModified: Bool
+    ) throws -> (Data, HTTPURLResponse) {
         switch response.statusCode {
         case 200..<300: return (data, response)
         case 304 where acceptingNotModified: return (data, response)

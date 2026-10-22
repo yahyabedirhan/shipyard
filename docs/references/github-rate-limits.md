@@ -1,6 +1,6 @@
 # GitHub rate limits
 
-GitHub's GraphQL and REST rate limits, what a query costs, the query and resource limits, and how to poll cheaply.
+GitHub's GraphQL and REST rate limits, what a query costs, the query and resource limits, what a timeout answers, and how to poll cheaply.
 Shipyard's refresh, its repository batches and its rate budget depend on them.
 
 ## Sources
@@ -13,6 +13,7 @@ Checked 2026-09-25 against:
 - [GraphQL reference: RateLimit](https://docs.github.com/en/graphql/reference/objects#ratelimit)
 
 [Query limits](#query-limits) was checked 2026-09-26 against the GraphQL rate-limits page.
+[Timeouts](#timeouts) was checked 2026-10-22 against the GraphQL rate-limits page ("Timeouts") and [Troubleshooting the REST API](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api) ("Timeouts").
 [Resource limits](#resource-limits) was checked 2026-10-06 against the same page ("Other resource limits" and "Query optimization strategies"), and measured the same day (issue #222).
 
 ## Primary limits
@@ -96,6 +97,30 @@ Measured:
 - A repository that still comes back cut short, or with `null` entries in its lists and no error, is that repository's error ("couldn't be read whole"), and it keeps the pull requests and issues last read whole.
 - The review search fails the same way and keeps its last pull requests.
 - A cut-short query costs points, and GitHub's secondary limits count "requests that consume excessive compute resources in a short period of time". That is why the batch is small enough to stay under the limit, and the split is the fallback, not the usual path.
+
+## Timeouts
+
+A request GitHub took too long over.
+Checked 2026-10-22.
+
+### GitHub's terms
+
+- GitHub's words: "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate the request and you will receive a timeout response".
+- For GraphQL: "you may receive either a `502` or `504` status code. Both status codes indicate that your request timed out."
+- For REST, the troubleshooting page names "a timeout response and a 'Server Error' message" and no status code.
+- GitHub's advice: "You can also try to simplify your request or try your request later", and check githubstatus.com for an outage.
+- A timeout costs points: "If a timeout occurs for any of your API requests, additional points will be deducted from your primary rate limit for the next hour".
+- Gap: GitHub doesn't say how many points a timeout deducts. Source: the GraphQL rate-limits page, "Timeouts".
+- GitHub's [best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api) say not to ignore repeated `5xx` errors, and to back off exponentially and stop after a set number of retries for secondary limits.
+
+### Shipyard's handling
+
+- A 502 or 504, on GraphQL or REST, is sent again up to 2 times (issue #316).
+- The wait before a retry is exponential with jitter: between 0.5 and 1 second before the first, between 1 and 2 seconds before the second.
+- A third timeout fails as any other 5xx does: the panel keeps the last items and shows the error until the next refresh.
+- No other status is retried: 401, 403 and 429 keep their rules above.
+- Each retry counts as 1 against the rate budget, the minimum a request costs, since GitHub doesn't number a timeout's points. The headers of the answer that follows still say where the limit stands.
+- Retrying at most twice, one request after another, keeps a slow GitHub from being asked many times over, in line with the [secondary limits](#secondary-limits).
 
 ## Rate-limit headers
 
