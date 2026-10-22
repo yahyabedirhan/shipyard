@@ -3789,8 +3789,9 @@ shipyard/
 │   ├── ProjectFiling.swift           # PingFiling over the configuration and the resolved lists: files, refuses (N1, N6, #127); filed(remote:)
 │   └── Theme/                        # pure: a theme's tokens and knobs, the theme file reader, the built-in themes, the theme files, the contrast check (ADR 0014)
 │       ├── ThemeToken.swift          # ThemeAppearance, ThemeToken (section.name, what `system` means), SystemColor, SystemShade, RGBA, ThemeValue
-│       ├── Theme.swift               # Theme (every token for light and dark), ThemeKnobs (font, density, shape, material), ThemeSource, ThemeIssue
-│       ├── ThemeReader.swift         # a file's text → ThemeDefinition (with lines), definitions → Themes (extends, palette names)
+│       ├── ThemeState.swift          # ThemePhase (the four phases and their macOS colours), ThemeKind (each kind's states and their default phases), ThemeStateKey, ThemeStateColor
+│       ├── Theme.swift               # Theme (every token, phase and state colour for light and dark; the one state lookup), ThemeKnobs (font, density, shape, material), ThemeSource, ThemeIssue
+│       ├── ThemeReader.swift         # a file's text → ThemeDefinition (with lines), definitions → Themes (extends, palette names, phases, states)
 │       ├── BuiltInThemes.swift       # the embedded themes, read once; BuiltInThemes.shipyard, the default
 │       ├── BuiltInThemes+<Name>.swift # one per built-in theme (Shipyard, Native, Graphite, Paper, Midnight, Harbor): its file, as text
 │       ├── ThemeLibrary.swift        # the themes `theme` can pick, by name; the default name
@@ -3935,7 +3936,7 @@ shipyard/
 │   └── UI/
 │       ├── Panel.swift               # the shared frame: header (the account button, #49), banners, phase switch, layout switch, footer
 │       ├── Design.swift              # PanelScale: the grid, type scale, the list's ListGrid and ListType from the theme's knobs; ItemSymbol; motion
-│       ├── ThemeColor.swift          # the token layer: the theme in the environment (\.theme), ThemeColor, SystemColors (what `system` draws), PanelBackdrop (the panel's surface)
+│       ├── ThemeColor.swift          # the token layer: the theme in the environment (\.theme), ThemeColor (a token, a phase or a kind's state), SystemColors (what `system` draws), PanelBackdrop (the panel's surface)
 │       ├── AgentLogoImage.swift      # loads a known agent's logo from the app's resource bundle (Contents/Resources in the app, beside the build otherwise), for light or dark, as a template where it's one glyph
 │       ├── Components.swift          # shared pieces: measured scroll view (#27), banner, count badge, command box, a row's icon, dots and error row, a known agent's logo (AgentMarkView), an item row's click, hover help and highlight (itemRow), the new-note icon (#196), Mark seen button, button styles, the row highlight's shape (rowHighlight), a tone's icon (ToneIcon, #238)
 │       ├── HoverHelp.swift           # hoverHelp(_:) in place of .help: the card the panel draws (hoverHelpHost), its timing and style, VoiceOver's hint

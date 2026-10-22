@@ -191,7 +191,7 @@ The theme still draws: raise the contrast until the warning is gone.
 /Users/me/.config/shipyard/cli.toml: accepted (no file: the defaults)
 ```
 
-- Every problem in a theme file stops it: an unknown key, section, token, phase, kind or state, an `[any.*]` table, a removed `state.*` token, a value that isn't a palette name, a colour or `system` (or, for a state, a phase), a phase that names another phase, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
+- Every problem in a theme file stops it: an unknown key, section, token, phase, kind or state, an `[any.*]` table, a removed `state.*` token, a value that isn't a palette name, a colour or `system`, a state value that isn't one of those or a phase, a phase that names another phase, a broken hex colour, a knob out of range, an `extends` that names no theme or goes in a circle, and two files with one `name`.
 - A theme file has problems and no warnings.
 - A file with a problem keeps the theme it last read, and the panel shows a banner with the file, the line and the problem until it is fixed.
   A file that has never read leaves `theme` drawing Shipyard.
