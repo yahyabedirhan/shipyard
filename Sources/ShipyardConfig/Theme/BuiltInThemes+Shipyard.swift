@@ -1,16 +1,17 @@
-// The Shipyard theme's file, embedded so the app and the command read it
-// with no file on disk.
+// The Shipyard Light and Shipyard Dark themes' files, embedded so the app
+// and the command read them with no file on disk. The two share every
+// table but the palette.
 
 extension BuiltInThemes {
-    static let shipyardSource = #"""
-    # Shipyard: the default theme.
-    # System glass and text for the chrome and the tabs layout,
+    static let shipyardLightSource = #"""
+    # Shipyard Light: system glass and text in the light appearance,
     # a quiet list with one blue accent and coloured state icons.
-    name = "Shipyard"
+    name = "Shipyard Light"
     version = 1
-    description = "The default: system glass and text, coloured state icons, one blue accent."
+    description = "System glass and text in light, coloured state icons, one blue accent."
 
-    # Raw colors, named once. Tokens below refer to them by name.
+    # Raw colors, named once. Tokens below refer to them by name. A theme
+    # that writes only [light.*] tables draws light in every appearance.
     [light.palette]
     accent = "#2F6BDE"
     grey = "#6B6B72"
@@ -20,6 +21,18 @@ extension BuiltInThemes {
     warn = "#9A6700"
     band = "#F8F8F9"
     on-accent = "#ffffff"
+
+    """# + shipyardTables
+
+    static let shipyardDarkSource = #"""
+    # Shipyard Dark: system glass and text in the dark appearance,
+    # a quiet list with one blue accent and coloured state icons.
+    name = "Shipyard Dark"
+    version = 1
+    description = "System glass and text in dark, coloured state icons, one blue accent."
+
+    # Raw colors, named once. Tokens below refer to them by name. A theme
+    # that writes only [dark.*] tables draws dark in every appearance.
     [dark.palette]
     accent = "#6D9CFF"
     grey = "#9A9AA2"
@@ -31,6 +44,10 @@ extension BuiltInThemes {
     # White text on the accent, in dark as in light.
     on-accent = "#ffffff"
 
+    """# + shipyardTables
+
+    /// The tables both Shipyard themes write, naming their palette's colours.
+    private static let shipyardTables = #"""
     [surface]
     window = "system"
     panel = "system"
@@ -106,6 +123,8 @@ extension BuiltInThemes {
     [states.note]
     open = "quiet"
 
+    # The attention dot: the accent for a new or changed row; while a pull
+    # request's checks fail, attention-failed, which is failed's colour unless set.
     [signal]
     attention = "accent"
     lease = "system"

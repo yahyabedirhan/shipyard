@@ -14,7 +14,7 @@ public struct Configuration: Equatable, Sendable {
 
     public var version: Int = Configuration.supportedVersion
     /// `theme`: the name of the theme the panel draws with, as the theme
-    /// spells it; Shipyard when the key is missing.
+    /// spells it; System when the key is missing.
     public var theme: String = ThemeLibrary.defaultName
     /// `refresh-interval`: a floor in seconds (at least 30); the rate
     /// budget may stretch it.
@@ -784,10 +784,12 @@ extension Configuration {
         # when a refresh would spend more than max-share-percent (below).
         # refresh-interval = "2m"
 
-        # The panel's look: "Shipyard", "Native", "Graphite", "Paper",
-        # "Midnight" or "Harbor", or the name of your own theme, a TOML file
-        # in the themes folder beside this file. A save applies at once.
-        # theme = "Shipyard"
+        # The panel's look: "System" (follows the macOS appearance and accent),
+        # "Shipyard Light", "Shipyard Dark", "Paper Light", "Paper Dark",
+        # "Harbor", "Heather", "Brass", "Ocean" or "Sunset", or the name of
+        # your own theme, a TOML file in the themes folder beside this file.
+        # The gear menu's Theme submenu sets it too. A save applies at once.
+        # theme = "System"
 
         # How the menu draws your projects: "list" (every project in one
         # scrolling list) or "tabs" (one project at a time).

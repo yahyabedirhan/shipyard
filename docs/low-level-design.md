@@ -1561,7 +1561,7 @@ Defaults shown, as the file a user would write:
 #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
 version = 1
 
-theme = "Shipyard"               # Shipyard, Native, Graphite, Paper, Midnight, Harbor or a theme file's name, ignoring case; an unknown name is an error
+theme = "System"                 # System, Shipyard Light, Shipyard Dark, Paper Light, Paper Dark, Harbor, Heather, Brass, Ocean, Sunset or a theme file's name, ignoring case; an unknown name is an error
 refresh-interval = "2m"          # at least "30s"; a floor, stretched by the rate budget if needed
 launch-at-login = true
 

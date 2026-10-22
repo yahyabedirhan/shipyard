@@ -27,21 +27,21 @@ public struct ThemeLibrary: Sendable {
         self.themes = unique
     }
 
-    /// The six themes embedded in the app.
+    /// The themes embedded in the app.
     public static let builtIn = ThemeLibrary(BuiltInThemes.themes)
 
     /// The theme a missing `theme` key picks.
-    public static let defaultName = "Shipyard"
+    public static let defaultName = "System"
 
     /// The theme called `name`, ignoring case; `nil` when there's none.
     public func theme(named name: String) -> Theme? {
         themes.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
-    /// The theme a configuration's `theme` names; Shipyard when none has
+    /// The theme a configuration's `theme` names; System when none has
     /// that name any more.
     public func theme(for configuration: Configuration) -> Theme {
-        theme(named: configuration.theme) ?? theme(named: Self.defaultName) ?? BuiltInThemes.shipyard
+        theme(named: configuration.theme) ?? theme(named: Self.defaultName) ?? BuiltInThemes.system
     }
 
     /// Every theme's name, for a problem's hint.

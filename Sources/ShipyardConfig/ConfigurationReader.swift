@@ -634,8 +634,9 @@ final class ConfigurationReader {
 
     /// `theme`: a theme of `themes`, by name, kept as the theme spells it.
     /// An unknown name is a warning while a theme file doesn't read, since
-    /// the theme may be in it. Each text tier the theme can't make readable on its panel is a
-    /// warning on the key's line.
+    /// the theme may be in it; an unknown name lists every theme's. Each
+    /// text tier the theme can't make readable on its panel, and attention
+    /// colours too close to tell apart, is a warning on the key's line.
     private func readTheme(_ name: String, into config: inout Configuration) {
         let path: ConfigurationPath = [.key("theme")]
         guard let theme = themes.theme(named: name) else {
@@ -650,14 +651,18 @@ final class ConfigurationReader {
                 ))
                 return
             }
-            let hint = Suggestion.nearest(to: name, in: themes.names).map { "did you mean `\($0)`?" }
-                ?? "expected one of " + themes.names.map { "`\($0)`" }.joined(separator: ", ")
+            // Every name, so a theme's old name leads to the new ones.
+            let names = "expected one of " + themes.names.map { "`\($0)`" }.joined(separator: ", ")
+            let hint = Suggestion.nearest(to: name, in: themes.names).map { "did you mean `\($0)`? \(names)" } ?? names
             error("unknown theme `\(name)` (\(hint))", at: path, value: name)
             return
         }
         config.theme = theme.name
         for shortfall in ThemeContrast.shortfalls(theme) {
             warnings.append(ConfigurationIssue(line: map.line(for: path), message: "theme `\(theme.name)`: \(shortfall), so it may be hard to read"))
+        }
+        for clash in ThemeSignals.clashes(theme) {
+            warnings.append(ConfigurationIssue(line: map.line(for: path), message: "theme `\(theme.name)`: \(clash), so the attention dot may look the same for failed checks"))
         }
     }
 

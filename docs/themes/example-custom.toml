@@ -1,34 +1,37 @@
 # An example of your own theme: save a file like this as
 #   ~/.config/shipyard/themes/<anything>.toml
-# then put  theme = "Sunset"  in config.toml. A save applies at once.
+# then put  theme = "Tide"  in config.toml, or pick Tide in the gear menu's
+# Theme submenu. A save applies at once.
 #
 # Start from a built-in theme with `extends`, then change only what you want.
-# Every token you leave out comes from the theme you extend.
-name = "Sunset"
+# Every token you leave out comes from the theme you extend, and so does its
+# appearance: a theme that extends Shipyard Light is light too.
+name = "Tide"
 version = 1
-extends = "Shipyard"
-description = "Shipyard with a coral accent and warmer text on dark."
+extends = "Shipyard Light"
+description = "Shipyard Light with a deep green accent on a grey-green panel."
 
 # Raw colors, named once. A token's value is one of these names,
 # a hex color (#rrggbb or #rrggbbaa), or "system" for the macOS color.
-[light.palette]
-coral = "#C2410C"
-[dark.palette]
-coral = "#FB923C"
+[palette]
+green = "#2E7357"
+mist = "#F6F9F6"
 
-# A table without a prefix, such as [accent], sets light and dark;
-# [light.*] and [dark.*] change a color for one appearance.
+# A table without a prefix, such as [accent], sets the theme's appearance.
+# A theme of both appearances, such as one that extends System, can change
+# one of them alone with [light.*] or [dark.*].
 [accent]
-accent = "coral"
+accent = "green"
 
+[surface]
+panel = "mist"
+
+# The attention dot: attention for a new or changed row, attention-failed
+# while a pull request's checks fail. Left out, attention-failed is the
+# failed phase's colour; keep the two far apart, or `shipyard config check`
+# warns that the dot may look the same.
 [signal]
-attention = "coral"
-
-# Make the unread dot and the count badge text readable on the coral fill.
-[light.text]
-on-accent = "#ffffff"
-[dark.text]
-on-accent = "#1a0b02"
+attention = "green"
 
 # The colours of states: pull requests, issues, runs, checks, reviews,
 # the rate limit, pings and notes. [phase] names one colour for each
@@ -37,20 +40,18 @@ on-accent = "#1a0b02"
 # a palette name, a hex color or "system". Every state you leave out
 # takes its phase; the rate limit's low, a warning and not a phase, is
 # the macOS orange. Here every failed state is a deeper red, a draft pull
-# request and a ping are coral, and passed checks are green, not done's purple.
-[light.phase]
-failed = "#B91C1C"
-[dark.phase]
-failed = "#F87171"
+# request and a ping are green, and passed checks are teal, not done's purple.
+[phase]
+failed = "#B3392F"
 
 [states.pull-request]
-draft = "coral"
+draft = "green"
 
 [states.check]
-passed = "#16A34A"
+passed = "#0E7C86"
 
 [states.ping]
-open = "coral"
+open = "green"
 
 # Knobs shared by both appearances.
 [density]

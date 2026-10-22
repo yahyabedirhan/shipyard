@@ -44,7 +44,7 @@ func designExample() throws -> String {
 let everyKey = """
     #:schema https://raw.githubusercontent.com/yahyabedirhan/shipyard/main/schema/config.schema.json
     version = 1
-    theme = "Paper"
+    theme = "Paper Light"
     refresh-interval = "5m"
     launch-at-login = false
 
@@ -157,7 +157,7 @@ struct ConfigurationDecodingTests {
     func defaults() {
         let config = Configuration()
         #expect(config.version == 1)
-        #expect(config.theme == "Shipyard")
+        #expect(config.theme == "System")
         #expect(config.refreshInterval == 120)
         #expect(config.launchAtLogin)
         #expect(config.menuBar.count == .total)
@@ -225,7 +225,7 @@ struct ConfigurationDecodingTests {
         let result = try #require(decoded(everyKey))
         #expect(result.warnings.isEmpty)
         let config = result.configuration
-        #expect(config.theme == "Paper")
+        #expect(config.theme == "Paper Light")
         #expect(config.refreshInterval == 300)
         #expect(!config.launchAtLogin)
         #expect(config.menuBar.count == .perKind)
@@ -405,18 +405,23 @@ struct ConfigurationValidationTests {
             == [ConfigurationIssue(line: 2, message: "unknown value `al` for `branches` (did you mean `all`?)")])
     }
 
-    @Test("theme names a theme, ignoring case, kept as the theme spells it; missing, it's Shipyard; an unknown name is rejected on its line")
+    @Test("theme names a theme, ignoring case, kept as the theme spells it; missing, it's System; an unknown name, such as a removed theme's, is rejected on its line with every theme's name")
     func theme() {
-        #expect(decoded("version = 1\n")?.configuration.theme == "Shipyard")
-        for name in ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Harbor"] {
+        #expect(decoded("version = 1\n")?.configuration.theme == "System")
+        for name in BuiltInThemes.themes.map(\.name) {
             let result = decoded("version = 1\ntheme = \"\(name.uppercased())\"\n")
             #expect(result?.configuration.theme == name)
             #expect(result?.warnings == [])
         }
-        #expect(rejection("version = 1\ntheme = \"Papr\"\n")
-            == [ConfigurationIssue(line: 2, message: "unknown theme `Papr` (did you mean `Paper`?)")])
-        #expect(rejection("version = 1\ntheme = \"Solarized\"\n")
-            == [ConfigurationIssue(line: 2, message: "unknown theme `Solarized` (expected one of `Shipyard`, `Native`, `Graphite`, `Paper`, `Midnight`, `Harbor`)")])
+        let every = "expected one of `System`, `Shipyard Light`, `Shipyard Dark`, `Paper Light`, `Paper Dark`, `Harbor`, `Heather`, `Brass`, `Ocean`, `Sunset`"
+        #expect(rejection("version = 1\ntheme = \"Ocen\"\n")
+            == [ConfigurationIssue(line: 2, message: "unknown theme `Ocen` (did you mean `Ocean`? \(every))")])
+        for removed in ["Shipyard", "Native", "Graphite", "Paper", "Midnight", "Solarized"] {
+            let issue = rejection("version = 1\ntheme = \"\(removed)\"\n").first
+            #expect(issue?.line == 2)
+            #expect(issue?.message.hasPrefix("unknown theme `\(removed)` (") == true)
+            #expect(issue?.message.hasSuffix("\(every))") == true, "\(issue?.message ?? "")")
+        }
         #expect(rejection("version = 1\ntheme = 3\n")
             == [ConfigurationIssue(line: 2, message: "`theme` must be a string")])
     }
@@ -438,6 +443,49 @@ struct ConfigurationValidationTests {
             ConfigurationIssue(line: 3, message: "theme `Faint`: light `text.tertiary` is 1.6:1 on `surface.panel`; it needs 3:1, so it may be hard to read"),
             ConfigurationIssue(line: 3, message: "theme `Faint`: dark `text.tertiary` is 1.6:1 on `surface.panel`; it needs 3:1, so it may be hard to read"),
         ])
+    }
+
+    @Test("a theme whose attention and attention-failed are closer than ΔE 25 reads, with a warning on the theme line; one that leaves attention-failed out takes its failed phase")
+    func attentionSignals() throws {
+        let close = try #require(ThemeReader.theme("""
+            name = "Close"
+            version = 1
+            extends = "Paper Light"
+            [phase]
+            failed = "#B4501E"
+            """, file: "Close.toml", source: .builtIn, library: BuiltInThemes.definitions).theme)
+        #expect(close.value(.attentionFailed, .light) == .color(RGBA(hex: "#B4501E")!))
+        let library = ThemeLibrary(BuiltInThemes.themes + [close])
+        let result = try Configuration.decode("version = 1\ntheme = \"close\"\n", themes: library)
+        #expect(result.warnings == [ConfigurationIssue(
+            line: 2,
+            message: "theme `Close`: light `signal.attention` and `signal.attention-failed` are ΔE 3 apart; they need 25, so the attention dot may look the same for failed checks"
+        )])
+        // Setting attention-failed apart clears it.
+        let apart = try #require(ThemeReader.theme("""
+            name = "Apart"
+            version = 1
+            extends = "Close"
+            [signal]
+            attention-failed = "#7A1F8F"
+            """, file: "Apart.toml", source: .builtIn, library: BuiltInThemes.definitions + [ThemeReader.definition("""
+            name = "Close"
+            version = 1
+            extends = "Paper Light"
+            [phase]
+            failed = "#B4501E"
+            """, file: "Close.toml", source: .builtIn).definition!]).theme)
+        #expect(ThemeSignals.clashes(apart).isEmpty)
+    }
+
+    @Test("the error dot keeps failed's colour, unless it is within ΔE 25 of an accent that follows the user's choice: then a deeper red")
+    func errorDotRed() {
+        let macRed = RGBA(hex: "#FF383C")!
+        let blue = RGBA(hex: "#007AFF")!
+        #expect(ThemeSignals.failed(macRed, apartFrom: blue) == macRed)
+        #expect(ThemeSignals.failed(macRed, apartFrom: RGBA(hex: "#E0383E")!) == ThemeSignals.deeperRed)
+        #expect(ThemeSignals.deeperRed.distance(to: RGBA(hex: "#E0383E")!) >= ThemeSignals.minimumDistance)
+        #expect(ThemeSignals.deeperRed.distance(to: macRed) >= ThemeSignals.minimumDistance)
     }
 
     @Test("header-counts lists the kinds with a header slot, each once, globally")

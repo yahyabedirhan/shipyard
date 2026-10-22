@@ -3,14 +3,20 @@ import Foundation
 /// The themes embedded in the app, read from their files' text once, on
 /// first use.
 public enum BuiltInThemes {
-    /// Each built-in file's name and text, in the order themes are listed.
+    /// Each built-in file's name and text, in the order themes are listed:
+    /// System, which follows the macOS appearance, then the themes of one
+    /// appearance each.
     static let sources: [(file: String, text: String)] = [
-        ("Shipyard.toml", shipyardSource),
-        ("Native.toml", nativeSource),
-        ("Graphite.toml", graphiteSource),
-        ("Paper.toml", paperSource),
-        ("Midnight.toml", midnightSource),
+        ("System.toml", systemSource),
+        ("Shipyard Light.toml", shipyardLightSource),
+        ("Shipyard Dark.toml", shipyardDarkSource),
+        ("Paper Light.toml", paperLightSource),
+        ("Paper Dark.toml", paperDarkSource),
         ("Harbor.toml", harborSource),
+        ("Heather.toml", heatherSource),
+        ("Brass.toml", brassSource),
+        ("Ocean.toml", oceanSource),
+        ("Sunset.toml", sunsetSource),
     ]
 
     /// Each built-in file parsed, for user themes to extend.
@@ -22,9 +28,9 @@ public enum BuiltInThemes {
     /// What's wrong with the built-in files; empty unless a shipped file is broken.
     public static let issues: [ThemeIssue] = read.issues
 
-    /// The default theme, Shipyard. Were its file ever broken, every token
-    /// draws its system colour, so the app still draws.
-    public static let shipyard: Theme = named("Shipyard") ?? Theme(name: "Shipyard") { _, _ in .system }
+    /// The default theme, System. Were its file ever broken, every token
+    /// still draws its system colour, so the app still draws.
+    public static let system: Theme = named("System") ?? Theme(name: "System") { _, _ in .system }
 
     /// The built-in theme called `name`, ignoring case.
     public static func named(_ name: String) -> Theme? {
