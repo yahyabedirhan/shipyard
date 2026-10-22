@@ -277,16 +277,69 @@ struct RefreshTests {
         #expect(menu.refreshDelay == .configured(120))
     }
 
-    @Test("a GitHub server error keeps the last model too")
+    @Test("a GitHub timeout three times in a row, after two retries with growing waits, keeps the last model too")
     func serverErrorKeepsModel() async throws {
-        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), .status(502))
+        let harness = try await Harness.started(config: projects, graphQL: pullRequests(), .status(504))
         let before = harness.shipyard.menu
 
         await harness.timer.fire()
 
+        #expect(harness.graphQLRequests.count == 1 + 3)
+        let waits = harness.sleeper.slept
+        try #require(waits.count == 2)
+        #expect((0.5...1).contains(waits[0]))
+        #expect((1...2).contains(waits[1]))
         #expect(harness.shipyard.menu.sections == before.sections)
-        #expect(harness.shipyard.menu.fetchError == .http(502))
-        #expect(harness.shipyard.fetchError == .http(502))
+        #expect(harness.shipyard.menu.fetchError == .http(504))
+        #expect(harness.shipyard.fetchError == .http(504))
+    }
+
+    @Test("a GitHub timeout (502 on GraphQL, 504 on REST) is sent again, and each retry counts against the budget")
+    func timeoutRetried() async throws {
+        let shop = "yahyabedirhan/shop"
+        let harness = try Harness(stored: "gho_stored", config: """
+            [[projects]]
+            slug = "shop"
+            repositories = ["\(shop)"]
+            workflow-runs = { show = true }
+
+            """)
+        harness.stub.on(Harness.userURL, Harness.viewerAnswer)
+        harness.graphQL([PullRequestsResponse(shop, [PullRequestsResponse.PullRequest(1)]).answer])
+        harness.stub.on(
+            "GET", WorkflowRunsResponse.url(shop),
+            .status(504), WorkflowRunsResponse(shop, [WorkflowRunsResponse.Run(5)]).answer()
+        )
+        await harness.shipyard.start()
+
+        #expect(harness.section("shop")?.rows.map(\.number) == [1, 5])
+        #expect(harness.shipyard.budget.costs[.rest] == [1 + 1])
+
+        harness.graphQL([.status(502), PullRequestsResponse(shop, [PullRequestsResponse.PullRequest(2)]).answer])
+        await harness.timer.fire()
+
+        #expect(harness.section("shop")?.rows.map(\.number) == [2, 5])
+        #expect(harness.shipyard.fetchError == nil)
+        #expect(harness.graphQLRequests.count == 1 + 2)
+        #expect(harness.sleeper.slept.count == 2)
+        #expect(harness.shipyard.budget.costs[.graphql] == [1, 1 + 1])
+    }
+
+    @Test("cancelling a request ends its wait before a retry with CancellationError")
+    func timeoutWaitCancelled() async throws {
+        let stub = StubHTTP()
+        stub.on(Harness.userURL, .status(502), Harness.viewerAnswer)
+        let sleeper = InstantSleeper(clock: ManualClock(Harness.now))
+        sleeper.onSleep { _, _ in withUnsafeCurrentTask { $0?.cancel() } }
+        let client = GitHubClient(token: "gho_test", transport: stub, sleep: sleeper.sleep)
+
+        // Its own task, so the hook cancels the request and not the test.
+        let request = Task { try await client.viewer() }
+
+        await #expect(throws: CancellationError.self) {
+            _ = try await request.value
+        }
+        #expect(stub.requests.count == 1)
     }
 
     @Test("a 401 during a refresh signs out and stops the timer")

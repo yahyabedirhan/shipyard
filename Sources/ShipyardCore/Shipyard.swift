@@ -205,6 +205,8 @@ public final class Shipyard {
     /// Whether the build has an OAuth App client ID, so the device flow can start.
     public let canSignInWithGitHub: Bool
     private let transport: any HTTPTransport
+    /// How the GitHub client waits before it sends a timed-out request again.
+    private let sleep: Sleep
     /// A demo run's example items, listed in place of GitHub's and
     /// Notion's; `nil` outside a demo run with a `demo-items.json`.
     private let demoItems: DemoItems?
@@ -262,6 +264,7 @@ public final class Shipyard {
         self.timer = timer
         self.tokenProvider = TokenProvider(store: tokenStore, gh: gh)
         self.deviceFlow = DeviceFlow(clientID: oauthClientID, transport: transport, clock: clock, sleep: sleep)
+        self.sleep = sleep
         self.canSignInWithGitHub = OAuthApp.isSet(oauthClientID)
         self.transport = transport
         self.demoItems = demoItems
@@ -366,7 +369,7 @@ public final class Shipyard {
     }
 
     private func connect(with found: FoundToken) async {
-        await connect(to: GitHubClient(token: found.value, transport: transport), source: found.source)
+        await connect(to: GitHubClient(token: found.value, transport: transport, sleep: sleep), source: found.source)
     }
 
     private func connect(to github: any GitHubReading, source: TokenSource) async {
