@@ -26,7 +26,7 @@ extension BuiltInThemes {
     bad = "#F2655F"
     warn = "#D9A02A"
     quiet = "#9A9AA2"
-    quiet-dim = "#9A9AA2b3"
+    violet = "#A68BE0"
     [light.palette]
     ground = "#F2F2F3"
     band = "#E8E8EA"
@@ -45,7 +45,7 @@ extension BuiltInThemes {
     bad = "#C62828"
     warn = "#8A5A00"
     quiet = "#62626A"
-    quiet-dim = "#62626Ab3"
+    violet = "#6E4FB0"
 
     [any.surface]
     window = "ground"
@@ -77,10 +77,10 @@ extension BuiltInThemes {
     selected = "press"
 
     [any.state]
-    open = "quiet"
+    open = "good"
     draft = "quiet"
-    merged = "quiet"
-    closed = "quiet-dim"
+    merged = "violet"
+    closed = "bad"
     success = "good"
     failure = "bad"
     pending = "warn"

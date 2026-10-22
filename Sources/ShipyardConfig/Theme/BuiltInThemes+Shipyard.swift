@@ -5,16 +5,17 @@ extension BuiltInThemes {
     static let shipyardSource = #"""
     # Shipyard: the default theme.
     # System glass and text for the chrome and the tabs layout,
-    # a quiet monochrome list with one blue accent.
+    # a quiet list with one blue accent and coloured state icons.
     name = "Shipyard"
     version = 1
-    description = "The default: system glass and text, quiet state icons, one blue accent."
+    description = "The default: system glass and text, coloured state icons, one blue accent."
 
     # Raw colors, named once. Tokens below refer to them by name.
     [light.palette]
     accent = "#2F6BDE"
     quiet = "#6B6B72"
-    quiet-dim = "#6B6B72b3"
+    green = "#1F883D"
+    purple = "#8250DF"
     ok = "#2E8B4Eb3"
     bad = "#D1242F"
     warn = "#9A6700"
@@ -23,7 +24,8 @@ extension BuiltInThemes {
     [dark.palette]
     accent = "#6D9CFF"
     quiet = "#9A9AA2"
-    quiet-dim = "#9A9AA2b3"
+    green = "#4CB868"
+    purple = "#A371F7"
     ok = "#4CB868b3"
     bad = "#F2655F"
     warn = "#D9A02A"
@@ -60,12 +62,12 @@ extension BuiltInThemes {
     pressed = "system"
     selected = "system"
 
-    # Open, draft, merged and closed rows are quiet ink; their icons say which.
+    # Open, merged and closed each take their own hue; a draft stays quiet.
     [any.state]
-    open = "quiet"
+    open = "green"
     draft = "quiet"
-    merged = "quiet"
-    closed = "quiet-dim"
+    merged = "purple"
+    closed = "bad"
     success = "ok"
     failure = "bad"
     pending = "warn"
