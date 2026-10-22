@@ -5,7 +5,7 @@ import Testing
 
 @Suite("Panel scale: the theme's font, density and shape knobs")
 struct PanelScaleTests {
-    @Test("the Shipyard theme gives the panel's long-standing grid and list grid, the design lab's corners, and the system text styles")
+    @Test("the Shipyard theme gives the panel's long-standing grid and list grid, its 6 and 8 pt corners, and the system text styles")
     func shipyard() {
         let scale = PanelScale(BuiltInThemes.shipyard.knobs)
         let grid = scale.grid
