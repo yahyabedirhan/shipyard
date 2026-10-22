@@ -5,10 +5,6 @@
  * Both take values only from the fixed lists below, so no agent can send text of its own.
  * A browser driven over WebDriver (`navigator.webdriver`) counts as an agent too.
  * The identity lasts for this tab only (session storage), so a person's later visits in the same browser stay human.
- *
- * Copied: `yahyabedirhan/topographic` keeps the same module in `apps/playground/src`, and
- * `yahyabedirhan/personal-website` keeps an equivalent in `src/privacy.js`, `src/analytics.js` and `src/errors.js`.
- * Change all three together. `site/docs/low-level-design.md` > 'Copied modules' lists them.
  */
 
 import { randomUuid } from './visitor';

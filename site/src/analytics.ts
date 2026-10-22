@@ -6,10 +6,6 @@
  * autocapture. Events carry only the small, fixed properties typed below, never free text. Each event says who it
  * comes from (`actor`, see `actor.ts`): a person with a `visitor_id`, or an agent with an `agent_id`.
  * This is the website's analytics only. The shipyard app sends nothing of the kind.
- *
- * Copied: `yahyabedirhan/topographic` keeps the same module in `apps/playground/src`, and
- * `yahyabedirhan/personal-website` keeps an equivalent in `src/privacy.js`, `src/analytics.js` and `src/errors.js`.
- * Change all three together. `site/docs/low-level-design.md` > 'Copied modules' lists them.
  */
 
 import { pageOf, superProperties } from './device';

@@ -423,7 +423,7 @@ A change to consent, the visitor id, the agent identity, PostHog or Sentry is ma
 | topographic.yahyapak.dev | `apps/playground/src/` in `yahyabedirhan/topographic`, with the same file names | `topographic:` | `all`, `pageviews`, `none` |
 | yahyapak.dev | `src/privacy.js`, `src/analytics.js`, `src/errors.js` in `yahyabedirhan/personal-website` | none | `full`, `pageviews`, `off` |
 
-Each copy carries a header comment that names the other two.
+This section is the one place that records the copies; the modules themselves carry no note about them.
 The three sites send to one PostHog project and tell their events apart with the `site` super property, which this site sets in `src/device.ts`.
 
 ### Observations

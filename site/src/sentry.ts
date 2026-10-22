@@ -1,10 +1,4 @@
-/**
- * The Sentry client, in its own chunk. Imported only by `errors.ts` in a build with a DSN.
- *
- * Copied: `yahyabedirhan/topographic` keeps the same module in `apps/playground/src`, and
- * `yahyabedirhan/personal-website` keeps an equivalent in `src/privacy.js`, `src/analytics.js` and `src/errors.js`.
- * Change all three together. `site/docs/low-level-design.md` > 'Copied modules' lists them.
- */
+/** The Sentry client, in its own chunk. Imported only by `errors.ts` in a build with a DSN. */
 import * as Sentry from '@sentry/browser';
 import type { Reporter } from './errors';
 
