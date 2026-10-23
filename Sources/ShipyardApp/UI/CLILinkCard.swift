@@ -14,8 +14,7 @@ struct CLILinkCard: View {
                 Spacer()
             }
             .frame(minHeight: 22)
-            Text(text.message)
-                .font(scale.type.body)
+            MarkdownText(text.message, size: 12)
                 .foregroundStyle(ThemeColor.textSecondary)
                 .lineSpacing(1.5)
                 .fixedSize(horizontal: false, vertical: true)

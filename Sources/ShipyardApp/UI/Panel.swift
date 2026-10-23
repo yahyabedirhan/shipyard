@@ -166,6 +166,7 @@ struct Panel: View {
                 text: item.text,
                 tint: item.tint,
                 action: action(of: item),
+                markdown: item.isMarkdown,
                 dismiss: dismiss
             )
         }

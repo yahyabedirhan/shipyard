@@ -21,33 +21,33 @@ extension PanelText {
         let toDo: SkillInstall.Tone = connected ? .warning : .neutral
         switch status {
         case nil:
-            page.status = .init(text: "Looking at ntn…", tone: .neutral)
+            page.status = .init(text: "Looking at `ntn`…", tone: .neutral)
         case .notRead:
             page.status = .init(text: "This run doesn't read notes.", tone: .neutral)
-            page.detail = "A demo run never asks your ntn."
+            page.detail = "A demo run never asks your `ntn`."
         case .ntnMissing:
-            page.status = .init(text: "ntn isn't installed.", tone: toDo)
-            page.detail = "Install ntn, then log in and choose your notes workspace. Run these in Terminal:"
+            page.status = .init(text: "`ntn` isn't installed.", tone: toDo)
+            page.detail = "Install `ntn`, then log in and choose your notes workspace. Run these in Terminal:"
             page.commands = [ntnInstall, ntnLogin]
             page.primary = checkAgain
         case .ntnLoggedOut:
-            page.status = .init(text: "ntn isn't logged in.", tone: toDo)
+            page.status = .init(text: "`ntn` isn't logged in.", tone: toDo)
             page.detail = "Log in in Terminal, and choose your notes workspace:"
             page.commands = [ntnLogin]
             page.primary = checkAgain
         case .noEntryPage(let workspace):
-            let name = workspace.map { "ntn's workspace \(quoted($0))" } ?? "ntn's workspace"
+            let name = workspace.map { "`ntn`'s workspace \(quoted($0))" } ?? "`ntn`'s workspace"
             page.status = .init(text: "\(name) has no Shipyard Notes page.", tone: .warning)
-            page.detail = "Shipyard reads ntn's default workspace, which `ntn doctor` shows. To change it, log in again in Terminal and choose your notes workspace:"
+            page.detail = "Shipyard reads `ntn`'s default workspace, which `ntn doctor` shows. To change it, log in again in Terminal and choose your notes workspace:"
             page.commands = [ntnLogin]
             page.primary = checkAgain
         case .ready(let workspace):
             let name = workspace.map { " to \(quoted($0))" } ?? ""
             if connected {
-                page.status = .init(text: "Connected\(name) through ntn.", tone: .success)
+                page.status = .init(text: "Connected\(name) through `ntn`.", tone: .success)
                 page.detail = "Shipyard reads your notes every minute and when you open the menu."
             } else {
-                page.status = .init(text: "ntn is logged in\(name).", tone: .success)
+                page.status = .init(text: "`ntn` is logged in\(name).", tone: .success)
                 page.detail = "Its Shipyard Notes page holds your notes. Connect to list them under your projects."
                 page.primary = .init(title: "Connect with ntn", action: .connectNotion)
             }
@@ -58,7 +58,7 @@ extension PanelText {
         }
         if connected {
             page.alternatives = [.init(
-                line: "Disconnect to stop reading your notes. Shipyard then runs no ntn.",
+                line: "Disconnect to stop reading your notes. Shipyard then runs no `ntn`.",
                 button: .init(title: "Disconnect", action: .disconnectNotion)
             )]
             switch status {

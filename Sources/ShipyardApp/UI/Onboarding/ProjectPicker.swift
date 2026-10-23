@@ -240,8 +240,7 @@ struct ProjectPicker: View {
                     .disabled(!choices.canConfirm || isAdding)
             }
             if let addError {
-                Text(addError)
-                    .font(scale.type.caption)
+                MarkdownText(addError, size: 10)
                     .foregroundStyle(ThemeColor.failed)
                     .textSelection(.enabled)
                     .fixedSize(horizontal: false, vertical: true)
