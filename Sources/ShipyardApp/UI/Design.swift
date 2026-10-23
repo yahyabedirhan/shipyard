@@ -200,7 +200,7 @@ struct ListType: Equatable {
         bodyEmphasis = FontKit.sized(knobs, base, .semibold)
         meta = FontKit.sized(knobs, base - 1.5).monospacedDigit()
         section = FontKit.sized(knobs, base - 0.5, .semibold)
-        eyebrow = FontKit.sized(knobs, base - 2.5, .semibold)
+        eyebrow = FontKit.sized(knobs, base - 1.5, .semibold)
         caption = FontKit.sized(knobs, base - 2).monospacedDigit()
         badge = FontKit.sized(knobs, base - 2, .medium).monospacedDigit()
         branch = FontKit.sized(knobs, base - 2, mono: true)
