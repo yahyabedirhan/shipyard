@@ -41,7 +41,7 @@ extension PanelText {
         case .running:
             return SkillInstall(
                 title: "Installing the agent skill…",
-                message: "Running npx in your login shell. It can take a minute.",
+                message: "Running `npx` in your login shell. It can take a minute.",
                 action: .cancel
             )
         case .finished(.installed(let output)):
@@ -63,7 +63,7 @@ extension PanelText {
         case .finished(.npxNotFound(let command)):
             return SkillInstall(
                 title: "npx wasn't found",
-                message: "Shipyard couldn't find npx (it comes with Node.js) in your login shell. Run this in a terminal instead:",
+                message: "Shipyard couldn't find `npx` (it comes with Node.js) in your login shell. Run this in a terminal instead:",
                 command: command,
                 action: .tryAgain,
                 tone: .warning

@@ -39,6 +39,16 @@ public struct PanelBanner: Equatable, Sendable, Identifiable {
         self.opens = opens
     }
 
+    /// Whether `text` is inline Markdown, its code spans drawn as code: a
+    /// configuration problem names its setting in backticks, and the notes
+    /// banner its commands. Every other banner's words are plain.
+    public var isMarkdown: Bool {
+        switch kind {
+        case .configError, .configWarnings, .notes: true
+        default: false
+        }
+    }
+
     /// App control's lease as its banners show it, which only the app knows:
     /// the lease held now and the holders the maintainer stopped.
     public struct Lease: Equatable, Sendable {

@@ -91,7 +91,7 @@ struct NotionViewTests {
     func ntnMissingPage() {
         let page = PanelText.notionStatus(.ntnMissing, connected: false)
         #expect(page.title == "Notion")
-        #expect(page.status == .init(text: "ntn isn't installed.", tone: .neutral))
+        #expect(page.status == .init(text: "`ntn` isn't installed.", tone: .neutral))
         #expect(page.commands == ["curl -fsSL https://ntn.dev | bash", "ntn login"])
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
         #expect(page.alternatives.isEmpty)
@@ -100,7 +100,7 @@ struct NotionViewTests {
     @Test("ntn logged out: ntn login in a box, and Check again")
     func loggedOutPage() {
         let page = PanelText.notionStatus(.ntnLoggedOut, connected: false)
-        #expect(page.status == .init(text: "ntn isn't logged in.", tone: .neutral))
+        #expect(page.status == .init(text: "`ntn` isn't logged in.", tone: .neutral))
         #expect(page.commands == ["ntn login"])
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
     }
@@ -108,16 +108,16 @@ struct NotionViewTests {
     @Test("logged in: the workspace's name and Connect with ntn; once connected, the workspace, Disconnect under a divider, then under another that ntn stays logged in, with ntn logout")
     func readyPage() {
         let ready = PanelText.notionStatus(.ready(workspace: "Notes"), connected: false)
-        #expect(ready.status == .init(text: "ntn is logged in to \u{201C}Notes\u{201D}.", tone: .success))
+        #expect(ready.status == .init(text: "`ntn` is logged in to \u{201C}Notes\u{201D}.", tone: .success))
         #expect(ready.primary == .init(title: "Connect with ntn", action: .connectNotion))
         #expect(ready.commands.isEmpty && ready.alternatives.isEmpty)
 
         let connected = PanelText.notionStatus(.ready(workspace: "Notes"), connected: true)
-        #expect(connected.status == .init(text: "Connected to \u{201C}Notes\u{201D} through ntn.", tone: .success))
+        #expect(connected.status == .init(text: "Connected to \u{201C}Notes\u{201D} through `ntn`.", tone: .success))
         #expect(connected.primary == nil)
         #expect(connected.alternatives == [
             .init(
-                line: "Disconnect to stop reading your notes. Shipyard then runs no ntn.",
+                line: "Disconnect to stop reading your notes. Shipyard then runs no `ntn`.",
                 button: .init(title: "Disconnect", action: .disconnectNotion)
             ),
             .init(
@@ -126,14 +126,14 @@ struct NotionViewTests {
             ),
         ])
 
-        #expect(PanelText.notionStatus(.ready(workspace: nil), connected: false).status?.text == "ntn is logged in.")
+        #expect(PanelText.notionStatus(.ready(workspace: nil), connected: false).status?.text == "`ntn` is logged in.")
     }
 
     @Test("no Shipyard Notes page: says so with the workspace's name, and how to change the workspace")
     func noEntryPagePage() {
         let page = PanelText.notionStatus(.noEntryPage(workspace: "Personal"), connected: false)
-        #expect(page.status == .init(text: "ntn's workspace \u{201C}Personal\u{201D} has no Shipyard Notes page.", tone: .warning))
-        #expect(page.detail == "Shipyard reads ntn's default workspace, which `ntn doctor` shows. To change it, log in again in Terminal and choose your notes workspace:")
+        #expect(page.status == .init(text: "`ntn`'s workspace \u{201C}Personal\u{201D} has no Shipyard Notes page.", tone: .warning))
+        #expect(page.detail == "Shipyard reads `ntn`'s default workspace, which `ntn doctor` shows. To change it, log in again in Terminal and choose your notes workspace:")
         #expect(page.commands == ["ntn login"])
         #expect(page.primary == .init(title: "Check again", action: .checkNotion))
     }
@@ -148,7 +148,7 @@ struct NotionViewTests {
 
     @Test("while looking, out of reach, and in a demo run")
     func otherPages() {
-        #expect(PanelText.notionStatus(nil, connected: false).status == .init(text: "Looking at ntn…", tone: .neutral))
+        #expect(PanelText.notionStatus(nil, connected: false).status == .init(text: "Looking at `ntn`…", tone: .neutral))
         let failed = PanelText.notionStatus(.failed(.network("offline")), connected: false)
         #expect(failed.status == .init(text: "Can't reach Notion (offline).", tone: .warning))
         #expect(failed.primary?.action == .checkNotion)

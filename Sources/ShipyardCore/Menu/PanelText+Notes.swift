@@ -42,11 +42,11 @@ extension PanelText {
     public static func notesNotice(_ notice: NotesNotice) -> String {
         switch notice {
         case .ntnMissing:
-            "Your notes live in Notion, and shipyard reads them with ntn, Notion's CLI. Install ntn and run ntn login to list them here."
+            "Your notes live in Notion, and shipyard reads them with `ntn`, Notion's CLI. Install `ntn` and run `ntn login` to list them here."
         case .ntnLoggedOut:
-            "ntn isn't logged in. Run ntn login in Terminal, choosing your notes workspace, to list your notes here."
+            "`ntn` isn't logged in. Run `ntn login` in Terminal, choosing your notes workspace, to list your notes here."
         case .noEntryPage:
-            "ntn's workspace has no Shipyard Notes page. Run ntn doctor to see its default workspace, and make it your notes workspace."
+            "`ntn`'s workspace has no Shipyard Notes page. Run `ntn doctor` to see its default workspace, and make it your notes workspace."
         }
     }
 }

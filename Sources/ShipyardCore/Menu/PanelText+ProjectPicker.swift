@@ -11,7 +11,7 @@ extension PanelText {
     /// Said while a chosen repository's project name is empty; Add waits for it.
     public static let unnamedProject = "Give every project a name."
     /// Said when Add wrote the projects but the file around them doesn't load.
-    public static let addedToBrokenFile = "Added to config.toml, but the file has an error (see above). Shipyard picks the projects up once it's fixed."
+    public static let addedToBrokenFile = "Added to `config.toml`, but the file has an error (see above). Shipyard picks the projects up once it's fixed."
 
     /// Why the suggestions didn't load; typing a repository still works.
     public static func suggestionsFailed(_ error: GitHubError) -> String {
@@ -20,7 +20,7 @@ extension PanelText {
 
     /// Why Add couldn't write the file.
     public static func couldNotWrite(_ reason: String) -> String {
-        "Couldn't write config.toml: \(reason)"
+        "Couldn't write `config.toml`: \(reason)"
     }
 
     /// The picker's confirm button: "Add 2 projects".

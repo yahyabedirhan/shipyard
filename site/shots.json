@@ -60,6 +60,7 @@
       "layout": "list",
       "size": "the panel as captured, at 2x",
       "usedIn": [
+        "README.md",
         "site: docs #first-run"
       ],
       "path": "assets/screenshots/launch/onboarding-presets-dark.png",

@@ -227,7 +227,7 @@ struct NotesTests {
         #expect(harness.noteRows().isEmpty)
         #expect(harness.noteErrors("shop").isEmpty)
         #expect(harness.section("shop")?.newNote == nil)
-        #expect(harness.notesBanner?.text == "ntn isn't logged in. Run ntn login in Terminal, choosing your notes workspace, to list your notes here.")
+        #expect(harness.notesBanner?.text == "`ntn` isn't logged in. Run `ntn login` in Terminal, choosing your notes workspace, to list your notes here.")
         #expect(harness.notesTimer.armed == 60)
 
         harness.ntn.set(.loggedIn)
@@ -252,7 +252,7 @@ struct NotesTests {
         #expect(harness.stub.notionRequests.isEmpty)
         #expect(harness.noteRows().isEmpty)
         #expect(harness.noteErrors("shop").isEmpty)
-        #expect(harness.notesBanner?.text == "Your notes live in Notion, and shipyard reads them with ntn, Notion's CLI. Install ntn and run ntn login to list them here.")
+        #expect(harness.notesBanner?.text == "Your notes live in Notion, and shipyard reads them with `ntn`, Notion's CLI. Install `ntn` and run `ntn login` to list them here.")
         #expect(harness.notesBanner?.opens == .notion)
         #expect(harness.notesTimer.armed == 60)
 
@@ -283,7 +283,7 @@ struct NotesTests {
 
         #expect(harness.noteRows().isEmpty)
         #expect(harness.noteErrors("shop").isEmpty)
-        #expect(harness.notesBanner?.text == "ntn's workspace has no Shipyard Notes page. Run ntn doctor to see its default workspace, and make it your notes workspace.")
+        #expect(harness.notesBanner?.text == "`ntn`'s workspace has no Shipyard Notes page. Run `ntn doctor` to see its default workspace, and make it your notes workspace.")
 
         harness.stub.on("POST", NotionStub.search, try .fixture("notion-search-entry.json"))
         await harness.readNotes()

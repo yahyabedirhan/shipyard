@@ -23,23 +23,23 @@ extension PanelText {
 
     /// The CLI link card for `state`, offering `command` when it helps.
     public static func cliLink(_ state: CLILink.State, command: String) -> CLILinkCard {
-        let path = CLILink.displayPath
+        let path = "`\(CLILink.displayPath)`"
         switch state {
         case .unlinked:
             return CLILinkCard(
                 title: "Link the shipyard CLI",
-                message: "Your agents send you pings with the shipyard command. Shipyard links it into ~/.local/bin, as this would:",
+                message: "Your agents send you pings with the `shipyard` command. Shipyard links it into `~/.local/bin`, as this would:",
                 command: command,
                 action: .link
             )
         case .linked:
             return CLILinkCard(
                 title: "shipyard CLI linked",
-                message: "\(path) runs this app's CLI. If your shell can't find shipyard, add ~/.local/bin to your PATH.",
+                message: "\(path) runs this app's CLI. If your shell can't find `shipyard`, add `~/.local/bin` to your `PATH`.",
                 tone: .success
             )
         case .occupied(let destination):
-            let found = destination.map { "\(path) already links to \($0)." } ?? "Something else is already at \(path)."
+            let found = destination.map { "\(path) already links to `\($0)`." } ?? "Something else is already at \(path)."
             return CLILinkCard(
                 title: "Couldn't link the shipyard CLI",
                 message: "\(found) Shipyard leaves it alone. To replace it with this app's CLI, run this in a terminal:",

@@ -125,6 +125,9 @@ struct Banner: View {
     let tint: ThemeColor
     var action: (title: String, run: () -> Void)?
     var trailing = false
+    /// Whether `text` is inline Markdown, its code spans drawn as code
+    /// (`MarkdownText`): a configuration problem's setting, a command to run.
+    var markdown = false
     var dismiss: (() -> Void)?
     @Environment(\.panelScale) private var scale
 
@@ -136,8 +139,9 @@ struct Banner: View {
                 .foregroundStyle(tint)
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 4) {
-                Text(text)
-                    .font(.system(size: 11))
+                Group {
+                    if markdown { MarkdownText(text, size: 11) } else { Text(text).font(.system(size: 11)) }
+                }
                     .foregroundStyle(ThemeColor.textPrimary.opacity(0.78))
                     .lineSpacing(1)
                     .textSelection(.enabled)
@@ -374,13 +378,8 @@ struct CommandBox: View {
             if prompt {
                 Text("$").font(scale.type.code).foregroundStyle(ThemeColor.textTertiary)
             }
-            // One line, scaled down when long: a wrapped command reads as two and crowds the box.
-            Text(command)
-                .font(scale.type.code)
+            OneLineOrWrap(command: command, font: scale.type.code, wrappedFont: scale.type.codeWrapped)
                 .foregroundStyle(ThemeColor.textPrimary)
-                .textSelection(.enabled)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
             CopyButton(text: command, copiedAt: $copiedAt)
         }
@@ -391,6 +390,37 @@ struct CommandBox: View {
         .background(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).fill(ThemeColor.field))
         .overlay(RoundedRectangle(cornerRadius: scale.grid.radius, style: .continuous).strokeBorder(ThemeColor.border, lineWidth: 0.5))
         .onChange(of: command) { copiedAt = nil }
+    }
+}
+
+/// A command on one line, scaled down as far as `minimumScale`, while that
+/// fits its width: a short command wrapped onto two lines reads as two and
+/// crowds the box. Past that, wrapped in `wrappedFont`, so a long command
+/// reads whole rather than cut off.
+private struct OneLineOrWrap: View {
+    static let minimumScale: CGFloat = 0.7
+    let command: String
+    let font: Font
+    let wrappedFont: Font
+    @State private var natural: CGFloat = 0
+    @State private var available: CGFloat = 0
+
+    var body: some View {
+        let oneLine = natural == 0 || available >= natural * Self.minimumScale
+        Group {
+            if oneLine {
+                Text(command).font(font).lineLimit(1).minimumScaleFactor(Self.minimumScale)
+            } else {
+                Text(command).font(wrappedFont).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { available = $0 }
+        .background(alignment: .leading) {
+            Text(command).font(font).fixedSize().hidden()
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { natural = $0 }
+        }
     }
 }
 
@@ -718,9 +748,18 @@ enum CodeText {
     static let chip = ThemeColor.textPrimary.opacity(0.09)
     static let padding = "\u{2009}"
 
-    /// `markdown` at `size`, each code span monospaced on `chip`: an
-    /// attributed string takes a `Color`, so the caller resolves `CodeText.chip`.
-    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular, chip: Color) -> AttributedString {
+    /// A code span's own colour in `appearance`: pink-red, as chat apps draw
+    /// inline code, so a path or a command stands apart from its sentence.
+    static func ink(_ appearance: ThemeAppearance) -> Color {
+        switch appearance {
+        case .light: Color(.sRGB, red: 0.80, green: 0.13, blue: 0.36)
+        case .dark: Color(.sRGB, red: 1.0, green: 0.48, blue: 0.62)
+        }
+    }
+
+    /// `markdown` at `size`, each code span monospaced in `ink` on `chip`: an
+    /// attributed string takes a `Color`, so the caller resolves both.
+    static func attributed(_ markdown: String, size: CGFloat, weight: Font.Weight = .regular, chip: Color, ink: Color) -> AttributedString {
         let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         let parsed = (try? AttributedString(markdown: markdown, options: options)) ?? AttributedString(markdown)
         let code = Font.system(size: size, weight: weight, design: .monospaced)
@@ -730,6 +769,7 @@ enum CodeText {
             piece.font = .system(size: size, weight: weight)
             if run.inlinePresentationIntent?.contains(.code) == true {
                 piece.font = code
+                piece.foregroundColor = ink
                 piece.backgroundColor = chip
                 var pad = AttributedString(padding)
                 pad.font = .system(size: size, weight: weight)
@@ -759,8 +799,9 @@ struct MarkdownText: View {
     }
 
     var body: some View {
-        let chip = CodeText.chip.color(in: theme, ThemeAppearance(scheme))
-        Text(CodeText.attributed(markdown, size: size, weight: weight, chip: chip))
+        let appearance = ThemeAppearance(scheme)
+        let chip = CodeText.chip.color(in: theme, appearance)
+        Text(CodeText.attributed(markdown, size: size, weight: weight, chip: chip, ink: CodeText.ink(appearance)))
     }
 }
 

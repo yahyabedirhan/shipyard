@@ -161,6 +161,8 @@ struct TypeScale: Equatable {
     let badge: Font
     /// A command to copy, and a run's branch.
     let code: Font
+    /// A command too long for one line, wrapped a step under `code`.
+    let codeWrapped: Font
     let branch: Font
 
     init(_ knobs: ThemeKnobs) {
@@ -175,6 +177,7 @@ struct TypeScale: Equatable {
         captionEmphasis = FontKit.style(knobs, .footnote, offset: -2, .medium)
         badge = FontKit.style(knobs, .caption, offset: -2, .bold).monospacedDigit()
         code = FontKit.style(knobs, .callout, offset: 0, .medium, mono: true)
+        codeWrapped = FontKit.style(knobs, .subheadline, offset: -1, .medium, mono: true)
         branch = FontKit.style(knobs, .footnote, offset: -2, .medium, mono: true)
     }
 }
@@ -197,7 +200,7 @@ struct ListType: Equatable {
         bodyEmphasis = FontKit.sized(knobs, base, .semibold)
         meta = FontKit.sized(knobs, base - 1.5).monospacedDigit()
         section = FontKit.sized(knobs, base - 0.5, .semibold)
-        eyebrow = FontKit.sized(knobs, base - 2.5, .semibold)
+        eyebrow = FontKit.sized(knobs, base - 1.5, .semibold)
         caption = FontKit.sized(knobs, base - 2).monospacedDigit()
         badge = FontKit.sized(knobs, base - 2, .medium).monospacedDigit()
         branch = FontKit.sized(knobs, base - 2, mono: true)

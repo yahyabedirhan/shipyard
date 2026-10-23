@@ -681,13 +681,13 @@ struct PanelTextTests {
         let other = PanelText.cliLink(.occupied(destination: "/Users/me/Downloads/Shipyard.app/Contents/Helpers/shipyard"), command: linkCommand)
         #expect(other.title == "Couldn't link the shipyard CLI")
         #expect(other.tone == .warning)
-        #expect(other.message.contains("already links to /Users/me/Downloads/Shipyard.app/Contents/Helpers/shipyard."))
+        #expect(other.message.contains("already links to `/Users/me/Downloads/Shipyard.app/Contents/Helpers/shipyard`."))
         #expect(other.message.contains("leaves it alone"))
         #expect(other.command == linkCommand)
         #expect(other.action == .tryAgain)
 
         let file = PanelText.cliLink(.occupied(destination: nil), command: linkCommand)
-        #expect(file.message.hasPrefix("Something else is already at ~/.local/bin/shipyard."))
+        #expect(file.message.hasPrefix("Something else is already at `~/.local/bin/shipyard`."))
         #expect(file.command == linkCommand)
     }
 
