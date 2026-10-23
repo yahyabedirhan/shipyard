@@ -575,6 +575,7 @@ GET /nope.json  (curl, an agent)
 
 ```text
 push to main
+├── GitHub tells the Cloudflare Workers and Pages app             only for repositories the app has access to
 └── Workers Builds, trigger "Deploy production", root site/      keys from the trigger's build variables
     ├── npm ci, Node from engines in site/package.json
     ├── npm run build                                           the build above
@@ -583,6 +584,10 @@ push to main
         ├── upload worker/index.js as the Worker's main
         └── route shipyard.yahyapak.dev as a custom domain      Cloudflare makes the DNS record and certificate
 ```
+
+A push that deployed has a `Workers Builds: shipyard-site` check on its commit, and a build with its hash in `cf builds list`.
+A push with neither never reached Cloudflare: the app's repository access in GitHub's settings must list `yahyabedirhan/shipyard`.
+Until it did, no push built, and the site changed only by `npm run deploy`.
 
 ### A rejected build
 
