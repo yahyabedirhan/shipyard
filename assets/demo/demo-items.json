@@ -1,15 +1,15 @@
 {
-  "account": { "login": "octocat", "name": "The Octocat", "avatar": "octocat.png" },
+  "account": { "login": "orangecat", "name": "Orange Cat", "avatar": "orangecat.png" },
   "repositories": {
     "yahyabedirhan/shipyard": {
       "pullRequests": [
-        { "number": 318, "title": "feat(focus): mute a project for an hour", "author": "octocat", "state": "open",
+        { "number": 318, "title": "feat(focus): mute a project for an hour", "author": "orangecat", "state": "open",
           "checks": "passed", "review": "review-required", "branch": "feat/focus-mode",
           "additions": 214, "deletions": 37, "files": 9, "comments": 2, "age": "5h", "updated": "8m" },
-        { "number": 321, "title": "fix(focus): keep the count steady while a project is muted", "author": "octocat", "state": "open",
+        { "number": 321, "title": "fix(focus): keep the count steady while a project is muted", "author": "orangecat", "state": "open",
           "checks": "failed", "branch": "fix/focus-count",
           "additions": 31, "deletions": 12, "files": 3, "age": "2h", "updated": "14m" },
-        { "number": 323, "title": "feat(focus): pick how long a mute lasts", "author": "octocat", "state": "draft",
+        { "number": 323, "title": "feat(focus): pick how long a mute lasts", "author": "orangecat", "state": "draft",
           "checks": "pending", "branch": "feat/focus-duration",
           "additions": 58, "deletions": 4, "files": 4, "age": "25m" },
         { "number": 322, "title": "docs(focus): show muting in the readme", "author": "teo-builds", "state": "open",
@@ -18,30 +18,30 @@
         { "number": 316, "title": "build(deps): bump actions/checkout from 4 to 5", "author": "dependabot[bot]", "state": "open",
           "checks": "passed", "branch": "dependabot/github_actions/actions/checkout-5",
           "additions": 3, "deletions": 3, "files": 2, "age": "3d", "updated": "3d" },
-        { "number": 315, "title": "refactor(focus): move mute state into the store", "author": "octocat", "state": "merged",
+        { "number": 315, "title": "refactor(focus): move mute state into the store", "author": "orangecat", "state": "merged",
           "checks": "passed", "review": "approved", "branch": "refactor/mute-state",
           "additions": 96, "deletions": 71, "files": 6, "reviews": 1, "age": "2d", "closed": "20h" }
       ],
       "issues": [
         { "number": 319, "title": "Focus mode forgets the mute after a restart", "author": "noor-codes", "state": "open",
           "comments": 3, "age": "6h", "updated": "35m" },
-        { "number": 320, "title": "Show when a muted project unmutes", "author": "octocat", "state": "open",
+        { "number": 320, "title": "Show when a muted project unmutes", "author": "orangecat", "state": "open",
           "comments": 1, "age": "1d", "updated": "4h" },
         { "number": 312, "title": "Mute a project from its header", "author": "teo-builds", "state": "closed",
           "comments": 4, "age": "4d", "closed": "20h" }
       ],
       "runs": [
-        { "workflow": "ci", "number": 1290, "branch": "feat/focus-mode", "state": "running", "actor": "octocat",
+        { "workflow": "ci", "number": 1290, "branch": "feat/focus-mode", "state": "running", "actor": "orangecat",
           "title": "feat(focus): mute a project for an hour", "event": "pull_request", "age": "3m" },
-        { "workflow": "ci", "number": 1288, "branch": "fix/focus-count", "state": "failed", "actor": "octocat",
+        { "workflow": "ci", "number": 1288, "branch": "fix/focus-count", "state": "failed", "actor": "orangecat",
           "title": "fix(focus): keep the count steady while a project is muted", "event": "pull_request", "age": "18m", "updated": "14m" },
-        { "workflow": "ci", "number": 1286, "branch": "main", "state": "succeeded", "actor": "octocat",
+        { "workflow": "ci", "number": 1286, "branch": "main", "state": "succeeded", "actor": "orangecat",
           "title": "refactor(focus): move mute state into the store", "event": "push", "age": "1h", "updated": "52m" }
       ]
     },
     "yahyabedirhan/havooch": {
       "pullRequests": [
-        { "number": 87, "title": "feat: hold feedback pings while a project is muted", "author": "octocat", "state": "open",
+        { "number": 87, "title": "feat: hold feedback pings while a project is muted", "author": "orangecat", "state": "open",
           "checks": "pending", "branch": "feat/hold-muted-pings",
           "additions": 72, "deletions": 9, "files": 5, "age": "40m", "updated": "6m" }
       ],
@@ -50,7 +50,7 @@
           "comments": 2, "age": "7h", "updated": "2h" }
       ],
       "runs": [
-        { "workflow": "ci", "number": 412, "branch": "feat/hold-muted-pings", "state": "running", "actor": "octocat",
+        { "workflow": "ci", "number": 412, "branch": "feat/hold-muted-pings", "state": "running", "actor": "orangecat",
           "title": "feat: hold feedback pings while a project is muted", "event": "pull_request", "age": "6m" },
         { "workflow": "ci", "number": 410, "branch": "main", "state": "succeeded", "actor": "teo-builds",
           "title": "fix: keep the timeline steady while a clip loads", "event": "push", "age": "2h", "updated": "2h" }
@@ -61,7 +61,7 @@
         { "number": 53, "title": "feat: dim muted projects on the map", "author": "teo-builds", "state": "open",
           "checks": "passed", "review": "review-required", "reviewRequested": true, "branch": "feat/dim-muted",
           "additions": 44, "deletions": 10, "files": 3, "comments": 2, "age": "4h", "updated": "1h" },
-        { "number": 51, "title": "fix: keep contour labels inside the frame", "author": "octocat", "state": "merged",
+        { "number": 51, "title": "fix: keep contour labels inside the frame", "author": "orangecat", "state": "merged",
           "checks": "passed", "review": "approved", "branch": "fix/contour-labels",
           "additions": 12, "deletions": 5, "files": 2, "reviews": 1, "age": "1d", "closed": "5h" }
       ],
@@ -72,7 +72,7 @@
     },
     "yahyabedirhan/skills": {
       "pullRequests": [
-        { "number": 142, "title": "docs(skill): teach agents to mute a project", "author": "octocat", "state": "open",
+        { "number": 142, "title": "docs(skill): teach agents to mute a project", "author": "orangecat", "state": "open",
           "checks": "passed", "review": "approved", "branch": "docs/mute-skill",
           "additions": 38, "deletions": 6, "files": 2, "reviews": 1, "age": "1h", "updated": "20m" }
       ],
@@ -81,7 +81,7 @@
           "comments": 2, "age": "9h", "updated": "3h" }
       ],
       "runs": [
-        { "workflow": "validate", "number": 388, "branch": "docs/mute-skill", "state": "succeeded", "actor": "octocat",
+        { "workflow": "validate", "number": 388, "branch": "docs/mute-skill", "state": "succeeded", "actor": "orangecat",
           "title": "docs(skill): teach agents to mute a project", "event": "pull_request", "age": "24m", "updated": "21m" }
       ]
     }
