@@ -388,7 +388,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/repo-subsections-showfirst.png" width="360" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
+<img src="assets/screenshots/launch/readme-subsections-dark.png" width="360" alt="The list layout: the shipyard project's items under a yahyabedirhan/shipyard header and a yahyabedirhan/skills header, four rows each, then a Show more row for each">
 </td>
 </tr>
 <tr>
@@ -414,7 +414,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/tabs.png" width="360" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
+<img src="assets/screenshots/launch/readme-tabs-dark.png" width="360" alt="The tabs layout on its All tab, beside the shipyard tab: a Pull requests group, each row with its number, repository and author">
 </td>
 </tr>
 <tr>
@@ -440,7 +440,7 @@ repositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/0.1.0/date.png" width="360" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
+<img src="assets/screenshots/launch/readme-date-dark.png" width="360" alt="The list layout grouped by date: Today, Yesterday and This week groups with three rows and a Show more row each, then an Older group of three">
 </td>
 </tr>
 <tr>
@@ -455,7 +455,7 @@ version = 1
 
 </td>
 <td valign="top">
-<img src="assets/screenshots/shipyard-0.0.2/presets.png" width="360" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
+<img src="assets/screenshots/launch/onboarding-presets-dark.png" width="360" alt="Onboarding asks How will you use Shipyard? and offers three presets, You and your agents, Incoming contributions and Review queue, then a card offering to install the agent skill">
 </td>
 </tr>
 </table>

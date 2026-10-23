@@ -70,20 +70,20 @@ struct ReadmeDocumentTests {
         }
         let twoRepositories = ["yahyabedirhan/shipyard", "yahyabedirhan/skills"]
 
-        let subsections = try #require(configurations["repo-subsections-showfirst.png"])
+        let subsections = try #require(configurations["readme-subsections-dark.png"])
         #expect(subsections.menu.layout == .list)
         #expect(subsections.defaults.arrangement == ArrangementSettings(groupBy: .repository, subsections: true, showFirst: 4))
         #expect(subsections.defaults.issues.show)
         #expect(subsections.projects.map(\.slug) == ["shipyard"])
         #expect(subsections.projects.first?.repositories.map(\.description) == twoRepositories)
 
-        let tabs = try #require(configurations["tabs.png"])
+        let tabs = try #require(configurations["readme-tabs-dark.png"])
         var listed = tabs
         listed.menu.layout = .list
         #expect(tabs.menu.layout == .tabs)
         #expect(listed == subsections)
 
-        let date = try #require(configurations["date.png"])
+        let date = try #require(configurations["readme-date-dark.png"])
         var byRepository = date
         byRepository.defaults.arrangement.groupBy = .repository
         byRepository.defaults.arrangement.showFirst = 4
@@ -91,9 +91,9 @@ struct ReadmeDocumentTests {
         #expect(date.defaults.arrangement.showFirst == 3)
         #expect(byRepository == subsections)
 
-        let presets = try #require(configurations["presets.png"])
+        let presets = try #require(configurations["onboarding-presets-dark.png"])
         #expect(presets.projects.isEmpty)
-        let presetsText = try #require(rows.first { $0.image.hasSuffix("/presets.png") }?.toml)
+        let presetsText = try #require(rows.first { $0.image.hasSuffix("/onboarding-presets-dark.png") }?.toml)
         #expect(Configuration.acceptsPreset(presetsText))
     }
 }
