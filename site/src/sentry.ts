@@ -1,11 +1,15 @@
 /** The Sentry client, in its own chunk. Imported only by `errors.ts` in a build with a DSN. */
 import * as Sentry from '@sentry/browser';
-import type { Reporter } from './errors';
+import { TRANSITION_ABORTED, type Reporter } from './errors';
 
 export function startSentry(dsn: string, maxEvents: number): Reporter {
   let sent = 0;
   Sentry.init({
     dsn,
+    ignoreErrors: [TRANSITION_ABORTED],
+    // only errors thrown in the site's own bundled scripts; scripts a browser, an in-app browser, a
+    // translation tool or an extension injects into the page run from other URLs and are not reported
+    allowUrls: [`${location.origin}/_astro/`],
     sampleRate: 1,
     // The v11 replacement for sendDefaultPii: false. The query string stays out too.
     dataCollection: { userInfo: false, cookies: false, httpHeaders: false, urlQueryParams: false, httpBodies: [] },
