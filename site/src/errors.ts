@@ -6,6 +6,15 @@ import { consent } from './consent';
 
 export const MAX_EVENTS = 10;
 
+// A view transition the browser skips or aborts, because the tab was hidden or the viewport changed
+// during a page change, rejects its promises with InvalidStateError (AbortError in some browsers).
+// The page change still completes, so these are not reported.
+export const TRANSITION_ABORTED = /(InvalidStateError|AbortError).*transition/i;
+
+export function isTransitionAborted(err: unknown): boolean {
+  return TRANSITION_ABORTED.test(err && typeof err === 'object' ? `${(err as { name?: unknown }).name}: ${(err as { message?: unknown }).message}` : String(err));
+}
+
 type Report =
   | { kind: 'error'; error: unknown; context?: Record<string, string> }
   | { kind: 'message'; message: string; context?: Record<string, string> };
@@ -49,8 +58,9 @@ export function startErrorReporting(): void {
   if (!DSN) return;
   const dsn = DSN;
   let loaded = false;
-  const onError = (e: ErrorEvent) => { if (!loaded) reportError(e.error ?? e.message, { source: 'window.error' }); };
-  const onRejection = (e: PromiseRejectionEvent) => { if (!loaded) reportError(e.reason, { source: 'unhandledrejection' }); };
+  const keep = (err: unknown, source: string) => { if (!isTransitionAborted(err)) reportError(err, { source }); };
+  const onError = (e: ErrorEvent) => { if (!loaded) keep(e.error ?? e.message, 'window.error'); };
+  const onRejection = (e: PromiseRejectionEvent) => { if (!loaded) keep(e.reason, 'unhandledrejection'); };
   window.addEventListener('error', onError);
   window.addEventListener('unhandledrejection', onRejection);
   const go = () => {

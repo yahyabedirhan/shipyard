@@ -107,6 +107,8 @@ Every page is wrapped in `src/layouts/Base.astro`, which writes the head from `s
 - An agent's name and purpose come only from fixed lists; anything else is ignored and still removed from the address bar (`src/actor.ts`, `src/actor.test.ts`).
 - A WebDriver browser counts as an agent (`src/actor.ts` > `resolveActor`).
 - One page sends at most 10 error reports (`src/errors.ts` > `MAX_EVENTS`, `src/sentry.ts`).
+- A view-transition `InvalidStateError` or `AbortError` is not reported: the early buffer drops it, and Sentry `ignoreErrors` drops it after the client loads (`src/errors.ts` > `isTransitionAborted`, `src/sentry.ts`).
+- `allowUrls` keeps only errors whose top stack frame is in the site's own bundled scripts under `/_astro/` on the current origin. Errors with no stack are still sent (`src/sentry.ts`).
 - Every key in `config.schema.json` and `cli.schema.json` appears on the page and in `docs/configuration.md`, and the skill names no key the schema lacks (`src/reference/reference.test.ts`). **inferred** as a rule from the tests.
 - Every command the Swift sources declare appears on the page and in `docs/commands.md` (`src/reference/reference.test.ts`). **inferred**
 - Every screenshot id a page uses is in `shots.json`, and each entry has its capture steps, its saved file and where it is used (`src/site.test.ts` > 'screenshots'). **inferred**
@@ -406,7 +408,13 @@ It owns the mock's rules, kept to what the documentation states.
 **`src/errors.ts`**.
 
 - State: `DSN`, resolved once on import, and the queue (early reports, sent count).
-- `reportError(error, context)`, `startErrorReporting()`, `createErrorQueue(enabled, max)`.
+- `reportError(error, context)`, `startErrorReporting()`, `createErrorQueue(enabled, max)`, `isTransitionAborted(err)`, `TRANSITION_ABORTED`.
+- The early window buffer drops a view-transition abort, so it is never queued (`isTransitionAborted`).
+
+**`src/sentry.ts`**.
+
+- `startSentry(dsn, maxEvents)`: the lazy Sentry client.
+- `ignoreErrors` drops a view-transition abort after the client loads; `allowUrls` keeps only the site's own `/_astro/` scripts.
 
 **`src/actor.ts`** and **`src/visitor.ts`**.
 
@@ -497,7 +505,7 @@ GET /docs                                                       Cloudflare asset
 │   ├── import analytics.ts -> import consent.ts                src/consent.ts: current = resolveConsent(location.search, localStorage)
 │   │   └── on import: read ?analytics_agent/_purpose, save if valid and consent is all, strip from URL   src/analytics.ts
 │   ├── startErrorReporting()                                   src/errors.ts: without DSN or consent all, nothing
-│   │   └── window error buffer, then on idle: import('./sentry') -> startSentry -> queue.attach
+│   │   └── window error buffer (skips view-transition aborts), then on idle: import('./sentry') -> startSentry -> queue.attach
 │   ├── startAnalytics()                                        src/analytics.ts: without key or with consent none, nothing
 │   │   └── on idle: tracker.start() -> load()
 │   │       ├── doNotTrack() -> stop                            src/analytics.ts
